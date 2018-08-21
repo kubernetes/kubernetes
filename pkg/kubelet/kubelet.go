@@ -540,6 +540,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		enablePluginsWatcher:                    utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher),
 	}
 
+	klet.gvisorNodeMode = crOptions.GVisorNodeMode
+
 	if klet.cloud != nil {
 		klet.cloudResourceSyncManager = cloudresource.NewSyncManager(klet.cloud, nodeName, klet.nodeStatusUpdateFrequency)
 	}
@@ -1026,6 +1028,9 @@ type Kubelet struct {
 
 	// redirectContainerStreaming enables container streaming redirect.
 	redirectContainerStreaming bool
+
+	// gvisorNodeMode enables kubelet gvisor node mode.
+	gvisorNodeMode bool
 
 	// Container runtime.
 	containerRuntime kubecontainer.Runtime
@@ -2304,4 +2309,32 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		}
 	}
 	return config
+}
+
+// gvisorStreamingCheck checks whether exec/attach into a pod is allowed.
+// 1) When gvisor node mode is not enabled, exec/attach is allowed;
+// 2) If gvisor node mode is enabled, only exec/attach into gvisor pods is allowed.
+func (kl *Kubelet) gvisorStreamingCheck(podFullName string, podUID types.UID) error {
+	const (
+		gvisorPodAnnotationKey   = "io.kubernetes.cri.untrusted-workload"
+		gvisorPodAnnotationValue = "true"
+	)
+	if !kl.gvisorNodeMode {
+		// Always pass the check if gvisor node mode is not enabled.
+		return nil
+	}
+	pod, found := kl.podManager.GetPodByFullName(podFullName)
+	if !found {
+		pod, found = kl.podManager.GetPodByUID(podUID)
+		if !found {
+			return fmt.Errorf("pod %q(%q) not found", podFullName, podUID)
+		}
+	}
+	for k, v := range pod.Annotations {
+		if k == gvisorPodAnnotationKey && v == gvisorPodAnnotationValue {
+			// Pass the check if this is a gvisor pod.
+			return nil
+		}
+	}
+	return fmt.Errorf("streaming into non-gvisor pod %q(%q) is not allowed on gvisor node", podFullName, podUID)
 }

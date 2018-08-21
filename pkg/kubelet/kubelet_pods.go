@@ -1586,6 +1586,9 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+	if err := kl.gvisorStreamingCheck(podFullName, podUID); err != nil {
+		return nil, err
+	}
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -1598,6 +1601,9 @@ func (kl *Kubelet) GetExec(podFullName string, podUID types.UID, containerName s
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
 func (kl *Kubelet) GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+	if err := kl.gvisorStreamingCheck(podFullName, podUID); err != nil {
+		return nil, err
+	}
 	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err

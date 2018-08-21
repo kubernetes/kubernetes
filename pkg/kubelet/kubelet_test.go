@@ -2171,6 +2171,80 @@ func TestSyncPodKillPod(t *testing.T) {
 	checkPodStatus(t, kl, pod, v1.PodFailed)
 }
 
+func TestGVisorStreamingCheck(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "1234",
+				Name:      "gvisor-pod",
+				Namespace: "gvisor-ns",
+				Annotations: map[string]string{
+					"io.kubernetes.cri.untrusted-workload": "true",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "5678",
+				Name:      "pod",
+				Namespace: "ns",
+			},
+		},
+	}
+	kl.podManager.SetPods(pods)
+
+	for name, test := range map[string]struct {
+		gvisorNodeMode bool
+		podUID         string
+		podFullname    string
+		expectError    bool
+	}{
+		"streaming into regular pod should be allowed when gvisor node mode is disabled": {
+			gvisorNodeMode: false,
+			podUID:         "5678",
+			expectError:    false,
+		},
+		"streaming into gvisor pod should be allowed when gvisor node mode is disabled": {
+			gvisorNodeMode: false,
+			podUID:         "1234",
+			expectError:    false,
+		},
+		"streaming into regular pod should not be allowed when gvisor node mode is enabled": {
+			gvisorNodeMode: true,
+			podUID:         "5678",
+			expectError:    true,
+		},
+		"streaming into gvisor pod should be allowed when gvisor node mode is enabled": {
+			gvisorNodeMode: true,
+			podUID:         "1234",
+			expectError:    false,
+		},
+		"streaming into regular pod with pod fullname should not be allowed when gvisor node mode is enabled": {
+			gvisorNodeMode: true,
+			podFullname:    "pod_ns",
+			expectError:    true,
+		},
+		"streaming into gvisor pod with pod fullname should be allowed when gvisor node mode is enabled": {
+			gvisorNodeMode: true,
+			podFullname:    "gvisor-pod_gvisor-ns",
+			expectError:    false,
+		},
+		"streaming into non-exist pod should not be allowed": {
+			gvisorNodeMode: true,
+			podFullname:    "random-pod_random-ns",
+			expectError:    true,
+		},
+	} {
+		t.Logf("TestCase %q", name)
+		kl.gvisorNodeMode = test.gvisorNodeMode
+		err := kl.gvisorStreamingCheck(test.podFullname, types.UID(test.podUID))
+		assert.Equal(t, test.expectError, err != nil)
+	}
+}
+
 func waitForVolumeUnmount(
 	volumeManager kubeletvolume.VolumeManager,
 	pod *v1.Pod) error {
