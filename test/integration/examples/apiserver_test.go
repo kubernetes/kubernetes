@@ -31,10 +31,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	discovery "k8s.io/client-go/discovery"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -334,9 +337,8 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// this is ugly, but sleep just a little bit so that the watch is probably observed.  Since nothing will actually be added to discovery
 	// (the service is missing), we don't have an external signal.
 	time.Sleep(100 * time.Millisecond)
-	if _, err := aggregatorDiscoveryClient.Discovery().ServerResources(); err != nil {
-		t.Fatal(err)
-	}
+	_, err = aggregatorDiscoveryClient.Discovery().ServerResources()
+	assertWardleUnavailableDiscoveryError(t, err)
 
 	_, err = aggregatorClient.ApiregistrationV1beta1().APIServices().Create(&apiregistrationv1beta1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1."},
@@ -357,11 +359,30 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// (the service is missing), we don't have an external signal.
 	time.Sleep(100 * time.Millisecond)
 	_, err = aggregatorDiscoveryClient.Discovery().ServerResources()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertWardleUnavailableDiscoveryError(t, err)
 
 	// TODO figure out how to turn on enough of services and dns to run more
+}
+
+func assertWardleUnavailableDiscoveryError(t *testing.T, err error) {
+	if err == nil {
+		t.Fatal("Discovery call expected to return failed unavailable service")
+	}
+	if !discovery.IsGroupDiscoveryFailedError(err) {
+		t.Fatalf("Unexpected error: %T, %v", err, err)
+	}
+	discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
+	if len(discoveryErr.Groups) != 1 {
+		t.Fatalf("Unexpected failed groups: %v", err)
+	}
+	groupVersion := schema.GroupVersion{Group: "wardle.k8s.io", Version: "v1alpha1"}
+	groupVersionErr, ok := discoveryErr.Groups[groupVersion]
+	if !ok {
+		t.Fatalf("Unexpected failed group version: %v", err)
+	}
+	if !apierrors.IsServiceUnavailable(groupVersionErr) {
+		t.Fatalf("Unexpected failed group version error: %v", err)
+	}
 }
 
 func createKubeConfig(clientCfg *rest.Config) *clientcmdapi.Config {
