@@ -18,9 +18,9 @@ package polymorphichelpers
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 // Returns a Rollbacker for changing the rollback version of the specified RESTMapping type or an error

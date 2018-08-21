@@ -15,7 +15,8 @@ go_library(
         "selector.go",
         "visitor.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/genericclioptions/resource",
+    importpath = "k8s.io/cli-runtime/pkg/genericclioptions/resource",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -51,8 +52,7 @@ go_test(
         "visitor_test.go",
     ],
     data = [
-        "//test/e2e/testing-manifests:all-srcs",
-        "//test/fixtures",
+        "//staging/src/k8s.io/cli-runtime/artifacts:all-srcs",
     ],
     embed = [":go_default_library"],
     deps = [
