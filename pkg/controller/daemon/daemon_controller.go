@@ -27,6 +27,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -735,14 +736,19 @@ func nodeInSameCondition(old []v1.NodeCondition, cur []v1.NodeCondition) bool {
 	return len(c1map) == 0
 }
 
+func shouldIgnoreNodeUpdate(oldNode, curNode v1.Node) bool {
+	if !nodeInSameCondition(oldNode.Status.Conditions, curNode.Status.Conditions) {
+		return false
+	}
+	oldNode.ResourceVersion = curNode.ResourceVersion
+	oldNode.Status.Conditions = curNode.Status.Conditions
+	return apiequality.Semantic.DeepEqual(oldNode, curNode)
+}
+
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) &&
-		reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) &&
-		nodeInSameCondition(oldNode.Status.Conditions, curNode.Status.Conditions) {
-		// If node labels, taints and condition didn't change, we can ignore this update.
+	if shouldIgnoreNodeUpdate(*oldNode, *curNode) {
 		return
 	}
 
