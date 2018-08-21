@@ -39,7 +39,6 @@ informergen=$(kube::util::find-binary "informer-gen")
 #
 
 GROUP_VERSIONS=(${KUBE_AVAILABLE_GROUP_VERSIONS})
-GV_DIRS=()
 INTERNAL_DIRS=()
 for gv in "${GROUP_VERSIONS[@]}"; do
   # add items, but strip off any leading apis/ you find to match command expectations
@@ -54,8 +53,6 @@ for gv in "${GROUP_VERSIONS[@]}"; do
       continue
     fi
 
-  GV_DIRS+=("${pkg_dir}")
-
   # collect internal groups
   int_group="${pkg_dir%/*}/"
   if [[ "${pkg_dir}" = core/* ]]; then
@@ -66,13 +63,21 @@ for gv in "${GROUP_VERSIONS[@]}"; do
     fi
 done
 # delimit by commas for the command
-GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 INTERNAL_DIRS_CSV=$(IFS=',';echo "${INTERNAL_DIRS[*]// /,}";IFS=$)
 
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
 ${clientgen} --input-base="k8s.io/kubernetes/pkg/apis" --input="${INTERNAL_DIRS_CSV}" "$@"
-${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt "$@"
+
+clientgen_external_apis=(
+$(
+  cd ${KUBE_ROOT}/staging/src
+  find k8s.io/api  -name types.go | xargs -n1 dirname | sort
+)
+)
+clientgen_external_apis=(${clientgen_external_apis[@]/#k8s.io\/api\//})
+clientgen_external_apis_csv=$(IFS=,; echo "${clientgen_external_apis[*]}")
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${clientgen_external_apis_csv}" --go-header-file ${KUBE_ROOT}/hack/boilerplate/boilerplate.generatego.txt "$@"
 
 listergen_internal_apis=(
 $(
