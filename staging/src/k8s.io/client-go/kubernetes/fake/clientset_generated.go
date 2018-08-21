@@ -60,6 +60,8 @@ import (
 	fakecoordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1/fake"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	fakecorev1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	csiv1alpha1 "k8s.io/client-go/kubernetes/typed/csi/v1alpha1"
+	fakecsiv1alpha1 "k8s.io/client-go/kubernetes/typed/csi/v1alpha1/fake"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	fakeeventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1/fake"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
@@ -271,6 +273,16 @@ func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 // Core retrieves the CoreV1Client
 func (c *Clientset) Core() corev1.CoreV1Interface {
 	return &fakecorev1.FakeCoreV1{Fake: &c.Fake}
+}
+
+// CsiV1alpha1 retrieves the CsiV1alpha1Client
+func (c *Clientset) CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface {
+	return &fakecsiv1alpha1.FakeCsiV1alpha1{Fake: &c.Fake}
+}
+
+// Csi retrieves the CsiV1alpha1Client
+func (c *Clientset) Csi() csiv1alpha1.CsiV1alpha1Interface {
+	return &fakecsiv1alpha1.FakeCsiV1alpha1{Fake: &c.Fake}
 }
 
 // EventsV1beta1 retrieves the EventsV1beta1Client
