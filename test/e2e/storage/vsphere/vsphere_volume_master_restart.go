@@ -102,7 +102,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			pods = append(pods, pod)
 
 			nodeName := pod.Spec.NodeName
-			By(fmt.Sprintf("Verify volume %s is attached to the pod %s", volumePath, nodeName))
+			By(fmt.Sprintf("Verify volume %s is attached to the node %s", volumePath, nodeName))
 			expectVolumeToBeAttached(nodeName, volumePath)
 		}
 
@@ -119,7 +119,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			volumePath := volumePaths[i]
 			nodeName := pod.Spec.NodeName
 
-			By(fmt.Sprintf("After master restart, verify volume %v is attached to the pod %v", volumePath, nodeName))
+			By(fmt.Sprintf("After master restart, verify volume %v is attached to the node %v", volumePath, nodeName))
 			expectVolumeToBeAttached(nodeName, volumePath)
 
 			By(fmt.Sprintf("Deleting pod on node %s", nodeName))
