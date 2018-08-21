@@ -28,6 +28,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -3949,5 +3950,70 @@ func TestGetMaxVols(t *testing.T) {
 	os.Unsetenv(KubeMaxPDVols)
 	if previousValue != "" {
 		os.Setenv(KubeMaxPDVols, previousValue)
+	}
+}
+
+func TestGetResourceRequest(t *testing.T) {
+	tests := []struct {
+		pod      *v1.Pod
+		expected *schedulercache.Resource
+	}{
+		{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
+						{
+							Name: "init-container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Name: "init-container-2",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("3"),
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container-1",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("2"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1"),
+								},
+							},
+						},
+						{
+							Name: "container-2",
+							Resources: v1.ResourceRequirements{
+								Requests: map[v1.ResourceName]resource.Quantity{
+									v1.ResourceName(v1.ResourceCPU):    resource.MustParse("1"),
+									v1.ResourceName(v1.ResourceMemory): resource.MustParse("1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &schedulercache.Resource{
+				MilliCPU: 3000,
+				Memory:   3,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		resourceResult := GetResourceRequest(test.pod)
+		if !reflect.DeepEqual(test.expected, resourceResult) {
+			t.Errorf("Got different result than expected.\nDifference detected on:\n%s", diff.ObjectGoPrintSideBySide(test.expected, resourceResult))
+		}
 	}
 }
