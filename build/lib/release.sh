@@ -388,7 +388,6 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
-  cp "${src_dir}/rescheduler.manifest" "${dst_dir}/"
   cp "${src_dir}/e2e-image-puller.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
   local internal_manifest

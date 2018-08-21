@@ -11,7 +11,6 @@ go_library(
         "predicates.go",
         "preemption.go",
         "priorities.go",
-        "rescheduler.go",
         "resource_quota.go",
         "ubernetes_lite.go",
         "ubernetes_lite_volumes.go",
@@ -19,7 +18,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/scheduling",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/scheduling:go_default_library",

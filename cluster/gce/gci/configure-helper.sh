@@ -2543,16 +2543,6 @@ function start-lb-controller {
   fi
 }
 
-# Starts rescheduler.
-function start-rescheduler {
-  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
-    echo "Start Rescheduler"
-    prepare-log-file /var/log/rescheduler.log
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
-       /etc/kubernetes/manifests/
-  fi
-}
-
 # Setup working directory for kubelet.
 function setup-kubelet-dir {
     echo "Making /var/lib/kubelet executable for kubelet"
@@ -2734,7 +2724,6 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
-    start-rescheduler
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy
