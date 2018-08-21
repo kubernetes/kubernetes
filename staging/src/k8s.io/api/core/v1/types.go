@@ -4484,14 +4484,12 @@ type LocalObjectReference struct {
 // TypedLocalObjectReference contains enough information to let you locate the
 // typed referenced object inside the same namespace.
 type TypedLocalObjectReference struct {
-	// Name of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-	// +optional
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-	// Kind of the referent.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
-	// +optional
-	Kind string `json:"kind,omitempty" protobuf:"bytes,2,opt,name=kind"`
+	// APIGroup is the group for the resource being referenced
+	APIGroup string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
+	// Kind is the type of resource being referenced
+	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
+	// Name is the name of resource being referenced
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

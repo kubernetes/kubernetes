@@ -3965,12 +3965,12 @@ type LocalObjectReference struct {
 
 // TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.
 type TypedLocalObjectReference struct {
-	// Name of the referent.
-	// +optional
-	Name string
-	// Kind of the referent.
-	// +optional
+	// APIGroup is the group for the resource being referenced
+	APIGroup string
+	// Kind is the type of resource being referenced
 	Kind string
+	// Name is the name of resource being referenced
+	Name string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
