@@ -22,6 +22,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/server/options",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -65,9 +66,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/authentication/v1beta1:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
