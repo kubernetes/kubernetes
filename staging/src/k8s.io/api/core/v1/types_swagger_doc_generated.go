@@ -1239,6 +1239,17 @@ func (PersistentVolumeClaimVolumeSource) SwaggerDoc() map[string]string {
 	return map_PersistentVolumeClaimVolumeSource
 }
 
+var map_PersistentVolumeCondition = map[string]string{
+	"lastProbeTime":      "Last time we probed the condition.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition.",
+	"message":            "Human-readable message indicating details about last transition.",
+}
+
+func (PersistentVolumeCondition) SwaggerDoc() map[string]string {
+	return map_PersistentVolumeCondition
+}
+
 var map_PersistentVolumeList = map[string]string{
 	"":         "PersistentVolumeList is a list of PersistentVolume items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -1296,10 +1307,11 @@ func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeStatus = map[string]string{
-	"":        "PersistentVolumeStatus is the current status of a persistent volume.",
-	"phase":   "Phase indicates if a volume is available, bound to a claim, or released by a claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase",
-	"message": "A human-readable message indicating details about why the volume is in this state.",
-	"reason":  "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
+	"":           "PersistentVolumeStatus is the current status of a persistent volume.",
+	"phase":      "Phase indicates if a volume is available, bound to a claim, or released by a claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#phase",
+	"message":    "A human-readable message indicating details about why the volume is in this state.",
+	"reason":     "Reason is a brief CamelCase string that describes any failure and is meant for machine parsing and tidy display in the CLI.",
+	"conditions": "Current Condition of persistent volume.",
 }
 
 func (PersistentVolumeStatus) SwaggerDoc() map[string]string {
