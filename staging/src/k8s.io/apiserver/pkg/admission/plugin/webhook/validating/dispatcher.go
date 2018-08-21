@@ -98,8 +98,12 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 
 func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
 	if attr.IsDryRun() {
-		// TODO: support this
-		return webhookerrors.NewDryRunUnsupportedErr(h.Name)
+		if h.SideEffects == nil {
+			return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
+		}
+		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
+			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
+		}
 	}
 
 	// Make the webhook request

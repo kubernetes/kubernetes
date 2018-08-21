@@ -60,6 +60,22 @@ const (
 	Fail FailurePolicyType = "Fail"
 )
 
+type SideEffectClass string
+
+const (
+	// SideEffectClassUnknown means that no information is known about the side effects of calling the webhook.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassUnknown SideEffectClass = "Unknown"
+	// SideEffectClassNone means that calling the webhook will have no side effects.
+	SideEffectClassNone SideEffectClass = "None"
+	// SideEffectClassSome means that calling the webhook will possibly have side effects.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassSome SideEffectClass = "Some"
+	// SideEffectClassNoneOnDryRun means that calling the webhook will possibly have side effects, but if the
+	// request being reviewed has the dry-run attribute, the side effects will be suppressed.
+	SideEffectClassNoneOnDryRun SideEffectClass = "NoneOnDryRun"
+)
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -191,6 +207,15 @@ type Webhook struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
+
+	// SideEffects states whether this webhookk has side effects.
+	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
+	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
+	// rejected by a future step in the admission change and the side effects therefore need to be undone.
+	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
+	// sideEffects == Unknown or Some. Defaults to Unknown.
+	// +optional
+	SideEffects *SideEffectClass `json:"sideEffects,omitempty" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
