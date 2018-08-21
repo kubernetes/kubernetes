@@ -19,8 +19,6 @@ package kubeapiserver
 import (
 	"strings"
 
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
@@ -37,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
-	kubeapiserveroptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -68,18 +65,12 @@ type StorageFactoryConfig struct {
 	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
 	DefaultStorageMediaType          string
 	Serializer                       runtime.StorageSerializer
-	StorageEncodingOverrides         map[string]schema.GroupVersion
 	ResourceEncodingOverrides        []schema.GroupVersionResource
 	EtcdServersOverrides             []string
 	EncryptionProviderConfigFilepath string
 }
 
-func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions, serializationOptions *kubeapiserveroptions.StorageSerializationOptions) (*completedStorageFactoryConfig, error) {
-	storageGroupsToEncodingVersion, err := serializationOptions.StorageGroupsToEncodingVersion()
-	if err != nil {
-		return nil, fmt.Errorf("error generating storage version map: %s", err)
-	}
-	c.StorageEncodingOverrides = storageGroupsToEncodingVersion
+func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*completedStorageFactoryConfig, error) {
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
 	c.EtcdServersOverrides = etcdOptions.EtcdServersOverrides
@@ -92,8 +83,7 @@ type completedStorageFactoryConfig struct {
 }
 
 func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
-	resourceEncodingConfig := resourceconfig.MergeGroupEncodingConfigs(c.DefaultResourceEncoding, c.StorageEncodingOverrides)
-	resourceEncodingConfig = resourceconfig.MergeResourceEncodingConfigs(resourceEncodingConfig, c.ResourceEncodingOverrides)
+	resourceEncodingConfig := resourceconfig.MergeResourceEncodingConfigs(c.DefaultResourceEncoding, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
 		c.StorageConfig,
 		c.DefaultStorageMediaType,

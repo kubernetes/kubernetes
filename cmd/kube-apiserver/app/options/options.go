@@ -47,7 +47,6 @@ type ServerRunOptions struct {
 	Authentication          *kubeoptions.BuiltInAuthenticationOptions
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
-	StorageSerialization    *kubeoptions.StorageSerializationOptions
 	APIEnablement           *genericoptions.APIEnablementOptions
 
 	AllowPrivileged           bool
@@ -87,7 +86,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		Authentication:          kubeoptions.NewBuiltInAuthenticationOptions().WithAll(),
 		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:           kubeoptions.NewCloudProviderOptions(),
-		StorageSerialization:    kubeoptions.NewStorageSerializationOptions(),
 		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
 
 		EnableLogsHandler:      true,
@@ -135,7 +133,6 @@ func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
-	s.StorageSerialization.AddFlags(fss.FlagSet("storage"))
 	s.APIEnablement.AddFlags(fss.FlagSet("api enablement"))
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 
