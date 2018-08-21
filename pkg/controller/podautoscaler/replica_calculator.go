@@ -21,6 +21,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/golang/glog"
 	autoscaling "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,29 +30,34 @@ import (
 	v1coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"runtime/debug"
 )
 
 const (
+	// TODO(jbartosik): use actual value.
+	cpuSampleWindow = time.Minute
 	// defaultTestingTolerance is default value for calculating when to
 	// scale up/scale down.
-	defaultTestingTolerance = 0.1
-
-	// Pod begins existence as unready. If pod is unready and timestamp of last pod readiness change is
-	// less than maxDelayOfInitialReadinessStatus after pod start we assume it has never been ready.
-	maxDelayOfInitialReadinessStatus = 10 * time.Second
+	defaultTestingTolerance                     = 0.1
+	defaultTestingCpuTaintAfterStart            = 2 * time.Minute
+	defaultTestingDelayOfInitialReadinessStatus = 10 * time.Second
 )
 
 type ReplicaCalculator struct {
-	metricsClient metricsclient.MetricsClient
-	podsGetter    v1coreclient.PodsGetter
-	tolerance     float64
+	metricsClient                 metricsclient.MetricsClient
+	podsGetter                    v1coreclient.PodsGetter
+	tolerance                     float64
+	cpuTaintAfterStart            time.Duration
+	delayOfInitialReadinessStatus time.Duration
 }
 
-func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podsGetter v1coreclient.PodsGetter, tolerance float64) *ReplicaCalculator {
+func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podsGetter v1coreclient.PodsGetter, tolerance float64, cpuTaintAfterStart, delayOfInitialReadinessStatus time.Duration) *ReplicaCalculator {
 	return &ReplicaCalculator{
-		metricsClient: metricsClient,
-		podsGetter:    podsGetter,
-		tolerance:     tolerance,
+		metricsClient:                 metricsClient,
+		podsGetter:                    podsGetter,
+		tolerance:                     tolerance,
+		cpuTaintAfterStart:            cpuTaintAfterStart,
+		delayOfInitialReadinessStatus: delayOfInitialReadinessStatus,
 	}
 }
 
@@ -73,7 +79,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	readyPodCount, ignoredPods, missingPods := groupPods(podList.Items, metrics, resource)
+	readyPodCount, ignoredPods, missingPods := groupPods(podList.Items, metrics, resource, c.cpuTaintAfterStart, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
 	requests, err := calculatePodRequests(podList.Items, resource)
 	if err != nil {
@@ -174,7 +180,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return 0, 0, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	readyPodCount, ignoredPods, missingPods := groupPods(podList.Items, metrics, resource)
+	readyPodCount, ignoredPods, missingPods := groupPods(podList.Items, metrics, resource, c.cpuTaintAfterStart, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
 
 	if len(metrics) == 0 {
@@ -338,9 +344,10 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 	return replicaCount, utilization, timestamp, nil
 }
 
-func groupPods(pods []v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName) (readyPodCount int, ignoredPods sets.String, missingPods sets.String) {
+func groupPods(pods []v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuTaintAfterStart, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, ignoredPods sets.String, missingPods sets.String) {
 	missingPods = sets.NewString()
 	ignoredPods = sets.NewString()
+	glog.Errorf("groupPods stack: %v", string(debug.Stack()))
 	for _, pod := range pods {
 		if pod.Status.Phase == v1.PodFailed {
 			continue
@@ -356,9 +363,9 @@ func groupPods(pods []v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.
 				ignorePod = true
 			} else {
 				if condition.Status == v1.ConditionTrue {
-					ignorePod = pod.Status.StartTime.Add(2 * time.Minute).After(time.Now())
+					ignorePod = pod.Status.StartTime.Add(cpuTaintAfterStart + cpuSampleWindow).After(time.Now())
 				} else {
-					ignorePod = pod.Status.StartTime.Add(maxDelayOfInitialReadinessStatus).After(condition.LastTransitionTime.Time)
+					ignorePod = pod.Status.StartTime.Add(delayOfInitialReadinessStatus).After(condition.LastTransitionTime.Time)
 				}
 			}
 			if ignorePod {

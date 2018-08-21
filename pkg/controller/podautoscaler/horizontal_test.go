@@ -642,11 +642,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		return true, obj, nil
 	})
 
-	replicaCalc := &ReplicaCalculator{
-		metricsClient: metricsClient,
-		podsGetter:    testClient.Core(),
-		tolerance:     defaultTestingTolerance,
-	}
+	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuTaintAfterStart, defaultTestingDelayOfInitialReadinessStatus)
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	defaultDownscaleForbiddenWindow := 5 * time.Minute

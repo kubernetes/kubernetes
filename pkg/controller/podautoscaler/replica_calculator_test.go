@@ -324,11 +324,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 
-	replicaCalc := &ReplicaCalculator{
-		metricsClient: metricsClient,
-		podsGetter:    testClient.Core(),
-		tolerance:     defaultTestingTolerance,
-	}
+	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuTaintAfterStart, defaultTestingDelayOfInitialReadinessStatus)
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
@@ -1339,7 +1335,7 @@ func TestGroupPods(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		readyPodCount, unreadyPods, missingPods := groupPods(tc.pods, tc.metrics, tc.resource)
+		readyPodCount, unreadyPods, missingPods := groupPods(tc.pods, tc.metrics, tc.resource, defaultTestingCpuTaintAfterStart, defaultTestingDelayOfInitialReadinessStatus)
 		if readyPodCount != tc.expectReadyPodCount {
 			t.Errorf("%s got readyPodCount %d, expected %d", tc.name, readyPodCount, tc.expectReadyPodCount)
 		}

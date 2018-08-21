@@ -186,11 +186,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
-	replicaCalc := &ReplicaCalculator{
-		metricsClient: metricsClient,
-		podsGetter:    testClient.Core(),
-		tolerance:     defaultTestingTolerance,
-	}
+	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuTaintAfterStart, defaultTestingDelayOfInitialReadinessStatus)
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
