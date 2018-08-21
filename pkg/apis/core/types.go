@@ -342,21 +342,21 @@ type PersistentVolumeConditionType string
 
 // These are valid conditions of PV
 const (
-        // Data has been populated to a pv
-        PersistentVolumeDataPopulated PersistentVolumeConditionType = "DataPopulated"
+	// Data has been populated to a pv
+	PersistentVolumeDataPopulated PersistentVolumeConditionType = "DataPopulated"
 )
 
 type PersistentVolumeCondition struct {
-        Type   PersistentVolumeConditionType
-        Status ConditionStatus
-        // +optional
-        LastProbeTime metav1.Time
-        // +optional
-        LastTransitionTime metav1.Time
-        // +optional
-        Reason string
-        // +optional
-        Message string
+	Type   PersistentVolumeConditionType
+	Status ConditionStatus
+	// +optional
+	LastProbeTime metav1.Time
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
 }
 
 type PersistentVolumeStatus struct {
