@@ -209,6 +209,9 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 
 		// Filter PVCs for which the corresponding volume plugins don't allow expansion.
 		if volumeSpec := volume.NewSpecFromPersistentVolume(pv, false); volumeSpec.PersistentVolume.Spec.FlexVolume == nil {
+			// A flex volume is expandable but since it resides on the kubelet not the controller
+			// and is dynamically probed plugin, FindExpandablePluginBySpec will never find it
+			// Therefore explicitly allow flex volumes to resize
 			volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 			glog.Warningf("plugin=%v err=%v fv=%v", volumePlugin != nil, err, volumeSpec.PersistentVolume.Spec.FlexVolume)
 			if err != nil || (volumePlugin == nil && volumeSpec.PersistentVolume.Spec.FlexVolume == nil) {

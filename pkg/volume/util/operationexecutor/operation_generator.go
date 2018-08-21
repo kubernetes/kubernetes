@@ -1265,10 +1265,10 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	if err != nil && volumeSpec.PersistentVolume.Spec.FlexVolume == nil {
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	} else if volumeSpec.PersistentVolume.Spec.FlexVolume != nil {
-		// we need to fake the volume expansion on the controller.
-		// this request can only happen on the controller and not kubelet so an err here
-		// finding the expandable plugin is expected
-		glog.Infof("Faking expansion for flex volume %s", pvcWithResizeRequest.QualifiedName())
+		// A flex volume is expandable but since it resides on the kubelet not the controller
+		// and is dynamically probed plugin, FindExpandablePluginBySpec will never find it
+		// Therefore fake the volume expansion on the controller.
+		glog.V(4).Infof("Faking expansion for flex volume %s", pvcWithResizeRequest.QualifiedName())
 	}
 
 	if volumePlugin == nil && volumeSpec.PersistentVolume.Spec.FlexVolume == nil {

@@ -100,6 +100,9 @@ func (populator *pvcPopulator) Sync() {
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 		pvcStatusSize := pvc.Status.Capacity[v1.ResourceStorage]
 		if volumeSpec := volume.NewSpecFromPersistentVolume(pv, false); volumeSpec.PersistentVolume.Spec.FlexVolume == nil {
+			// A flex volume is expandable but since it resides on the kubelet not the controller
+			// and is dynamically probed plugin, FindExpandablePluginBySpec will never find it
+			// Therefore explicitly allow flex volumes to resize
 			volumePlugin, err := populator.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 			if (err != nil || volumePlugin == nil) && pvcStatusSize.Cmp(pvcSize) < 0 {
 				err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
