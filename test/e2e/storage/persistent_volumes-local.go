@@ -1324,9 +1324,8 @@ func createAndMapBlockLocalVolume(config *localTestConfig, dir string, node *v1.
 	mkdirCmd := fmt.Sprintf("mkdir -p %s", dir)
 	// Create 10MB file that will serve as the backing for block device.
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file bs=512 count=20480", dir)
-	losetupLoopDevCmd := fmt.Sprintf("E2E_LOOP_DEV=$(sudo losetup -f) && echo ${E2E_LOOP_DEV}")
-	losetupCmd := fmt.Sprintf("sudo losetup ${E2E_LOOP_DEV} %s/file", dir)
-	err := issueNodeCommand(config, fmt.Sprintf("%s && %s && %s && %s", mkdirCmd, ddCmd, losetupLoopDevCmd, losetupCmd), node)
+	losetupCmd := fmt.Sprintf("sudo losetup -f  %s/file", dir)
+	err := issueNodeCommand(config, fmt.Sprintf("%s && %s && %s", mkdirCmd, ddCmd, losetupCmd), node)
 	Expect(err).NotTo(HaveOccurred())
 }
 
