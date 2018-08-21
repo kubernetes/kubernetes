@@ -16,7 +16,7 @@ spec:
       containers:
         - name: csi-driver-registrar
           imagePullPolicy: Always
-          image: quay.io/k8scsi/driver-registrar:v0.2.0
+          image: quay.io/k8scsi/driver-registrar:v0.3.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
@@ -36,7 +36,7 @@ spec:
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           image: quay.io/cephcsi/cephfsplugin:v0.3.0
           args:
             - "--v=5"

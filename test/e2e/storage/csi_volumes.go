@@ -430,6 +430,7 @@ func initCSIrbd(f *framework.Framework, config framework.VolumeTestConfig) csiTe
 	return &rbdCSIDriver{
 		nodeClusterRoles: []string{
 			csiDriverRegistrarClusterRoleName,
+			csiDriverSecretAccessClusterRoleName,
 		},
 		controllerClusterRoles: []string{
 			csiExternalAttacherClusterRoleName,
@@ -451,11 +452,12 @@ func (r *rbdCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
 			"pool":     "rbd",
 			"csiProvisionerSecretName":      r.secret.Name,
 			"csiProvisionerSecretNamespace": r.config.Namespace,
+			"csiNodePublishSecretName":      r.secret.Name,
+			"csiNodePublishSecretNamespace": r.config.Namespace,
 		},
-		claimSize:          "1Gi",
-		expectedSize:       "1Gi",
-		nodeName:           node.Name,
-		skipWriteReadCheck: true,
+		claimSize:    "1Gi",
+		expectedSize: "1Gi",
+		nodeName:     node.Name,
 	}
 }
 
@@ -500,6 +502,7 @@ func initCSIcephfs(f *framework.Framework, config framework.VolumeTestConfig) cs
 	return &cephfsCSIDriver{
 		nodeClusterRoles: []string{
 			csiDriverRegistrarClusterRoleName,
+			csiDriverSecretAccessClusterRoleName,
 		},
 		controllerClusterRoles: []string{
 			csiExternalAttacherClusterRoleName,
@@ -517,16 +520,18 @@ func (c *cephfsCSIDriver) createStorageClassTest(node v1.Node) storageClassTest 
 		name:        "csi-cephfsplugin",
 		provisioner: "csi-cephfsplugin",
 		parameters: map[string]string{
-			"monitors":        c.serverIP,
+			"monitors":        c.serverIP + ":6789",
+			"mounter":         "kernel",
 			"provisionVolume": "true",
 			"pool":            "cephfs_data",
 			"csiProvisionerSecretName":      c.secret.Name,
 			"csiProvisionerSecretNamespace": c.config.Namespace,
+			"csiNodeStageSecretName":        c.secret.Name,
+			"csiNodeStageSecretNamespace":   c.config.Namespace,
 		},
-		claimSize:          "1Gi",
-		expectedSize:       "1Gi",
-		nodeName:           node.Name,
-		skipWriteReadCheck: true,
+		claimSize:    "1Gi",
+		expectedSize: "1Gi",
+		nodeName:     node.Name,
 	}
 }
 

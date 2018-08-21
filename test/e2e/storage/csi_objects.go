@@ -128,6 +128,11 @@ func csiDriverSecretAccessClusterRole(
 				Resources: []string{"secrets"},
 				Verbs:     []string{"get", "list"},
 			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"namespaces"},
+				Verbs:     []string{"get", "list"},
+			},
 		},
 	}
 
@@ -189,7 +194,7 @@ func csiClusterRoleBindings(
 
 		binding := &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: config.Prefix + "-" + clusterRoleName + "-" + config.Namespace + "-role-binding",
+				Name: config.Prefix + "-" + sa.GetName() + "-" + clusterRoleName + "-" + config.Namespace + "-role-binding",
 			},
 			Subjects: []rbacv1.Subject{
 				{

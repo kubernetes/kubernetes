@@ -17,7 +17,7 @@ spec:
       containers:
         - name: csi-external-provisioner
           imagePullPolicy: Always
-          image: quay.io/k8scsi/csi-provisioner:v0.2.1
+          image: quay.io/k8scsi/csi-provisioner:v0.3.0
           args:
             - "--v=5"
             - "--provisioner=csi-rbdplugin"
@@ -30,7 +30,7 @@ spec:
               mountPath: /var/lib/kubelet/plugins/csi-rbdplugin
         - name: csi-attacher
           imagePullPolicy: Always
-          image: quay.io/k8scsi/csi-attacher:v0.2.0
+          image: quay.io/k8scsi/csi-attacher:v0.3.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
