@@ -56,3 +56,5 @@ approvers:
   - timothysc
   - zmerlynn
   - vishh
+labels:
+- sig/testing

@@ -6,3 +6,5 @@ approvers:
 - yujuhong
 reviewers:
 - sig-node-reviewers
+labels:
+- sig/node
