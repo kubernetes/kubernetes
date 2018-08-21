@@ -17,24 +17,22 @@ limitations under the License.
 package storage
 
 import (
-	"time"
-
+	"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/client/conditions"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"path"
 )
 
-var _ = utils.SIGDescribe("Mounted flexvolume volume expand[Slow]", func() {
+var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:ExpandInUsePersistentVolumes]", func() {
 	var (
 		c                 clientset.Interface
 		ns                string
@@ -46,16 +44,21 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand[Slow]", func() {
 		nodeKeyValueLabel map[string]string
 		nodeLabelValue    string
 		nodeKey           string
+		nodeList          *v1.NodeList
 	)
 
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "local")
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+			framework.Skipf("Only supported when %v feature is enabled", features.ExpandInUsePersistentVolumes)
+		}
+
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodeList = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if len(nodeList.Items) != 0 {
 			nodeName = nodeList.Items[0].Name
 		} else {
@@ -73,17 +76,21 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand[Slow]", func() {
 		}
 
 		test := storageClassTest{
-			name:      "flex-expand",
-			claimSize: "2Gi",
+			name:        "flex-expand",
+			claimSize:   "2Gi",
+			provisioner: "flex-expand",
 		}
 		resizableSc, err = createResizableStorageClass(test, ns, "resizing", c)
-		Expect(err).NotTo(HaveOccurred(), "Error creating resizable storage class")
+		if err != nil {
+			fmt.Printf("storage class creation error: %v\n", err)
+		}
+		Expect(err).NotTo(HaveOccurred(), "Error creating resizable storage class: %v", err)
 		Expect(*resizableSc.AllowVolumeExpansion).To(BeTrue())
 
 		pvc = newClaim(test, ns, "default")
 		pvc.Spec.StorageClassName = &resizableSc.Name
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred(), "Error creating pvc")
+		Expect(err).NotTo(HaveOccurred(), "Error creating pvc: %v", err)
 
 	})
 
@@ -107,28 +114,27 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand[Slow]", func() {
 
 	It("should be resizable when mounted", func() {
 		driver := "dummy-attachable"
-		driverInstallAs := driver + "-" + nodeName
 
-		node = nodeList.Items[0]
-		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		node := nodeList.Items[0]
+		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driver))
+		installFlex(c, &node, "k8s", driver, path.Join(driverDir, driver))
 
 		pv := framework.MakePersistentVolume(framework.PersistentVolumeConfig{
-			PVSource: v1.VolumeSource{
-				FlexVolume: &v1.FlexVolumeSource{
+			PVSource: v1.PersistentVolumeSource{
+				FlexVolume: &v1.FlexPersistentVolumeSource{
 					Driver: "k8s/" + driver,
-				},
-				NamePrefix:       "pv-",
-				StorageClassName: resizableSc.Name,
-				VolumeMode:       pvc.Spec.VolumeMode,
-			}})
+				}},
+			NamePrefix:       "pv-",
+			StorageClassName: resizableSc.Name,
+			VolumeMode:       pvc.Spec.VolumeMode,
+		})
 
 		pv, err = framework.CreatePV(c, pv)
 		Expect(err).NotTo(HaveOccurred(), "Error creating pv %v", err)
 
 		By("Waiting for PVC to be in bound phase")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-		var pvs []*v1.PersistentVolumeClaim
+		var pvs []*v1.PersistentVolume
 
 		pvs, err = framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
