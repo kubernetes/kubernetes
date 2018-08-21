@@ -191,15 +191,8 @@ func (plugin *portworxVolumePlugin) ExpandVolumeDevice(
 }
 
 func (plugin *portworxVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	portworxVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			PortworxVolume: &v1.PortworxVolumeSource{
-				VolumeID: volumeName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(portworxVolume), nil
+	//  To reconstruct volume spec we need volumeID which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct portworx volume spec from volume mountpath")
 }
 
 func (plugin *portworxVolumePlugin) SupportsMountOption() bool {

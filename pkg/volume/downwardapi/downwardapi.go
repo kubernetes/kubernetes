@@ -116,13 +116,8 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 }
 
 func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	downwardAPIVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			DownwardAPI: &v1.DownwardAPIVolumeSource{},
-		},
-	}
-	return volume.NewSpecFromVolume(downwardAPIVolume), nil
+	//  To reconstruct volume spec we need source name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct volume spec from volume mountpath")
 }
 
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.

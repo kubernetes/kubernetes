@@ -163,15 +163,8 @@ func (plugin *nfsPlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder
 }
 
 func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	nfsVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			NFS: &v1.NFSVolumeSource{
-				Path: volumeName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(nfsVolume), nil
+	//  To reconstruct volume spec we need nfs source path name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct nfs volume spec from volume mountpath")
 }
 
 // NFS volumes represent a bare host file or directory mount of an NFS export.

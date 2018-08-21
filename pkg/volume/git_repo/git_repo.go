@@ -121,13 +121,8 @@ func (plugin *gitRepoPlugin) NewUnmounter(volName string, podUID types.UID) (vol
 }
 
 func (plugin *gitRepoPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	gitVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			GitRepo: &v1.GitRepoVolumeSource{},
-		},
-	}
-	return volume.NewSpecFromVolume(gitVolume), nil
+	//  To reconstruct volume spec we need git_repo source name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct git_repo volume spec from volume mountpath")
 }
 
 // gitRepo volumes are directories which are pre-filled from a git repository.

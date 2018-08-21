@@ -142,15 +142,8 @@ func getVolumeSource(spec *volume.Spec) (*v1.QuobyteVolumeSource, bool, error) {
 }
 
 func (plugin *quobytePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	quobyteVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			Quobyte: &v1.QuobyteVolumeSource{
-				Volume: volumeName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(quobyteVolume), nil
+	//  To reconstruct volume spec we need quobyte name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct quobyte volume spec from volume mountpath")
 }
 
 func (plugin *quobytePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {

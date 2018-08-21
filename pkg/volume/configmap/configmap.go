@@ -114,13 +114,8 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 }
 
 func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	configMapVolume := &v1.Volume{
-		Name: volumeName,
-		VolumeSource: v1.VolumeSource{
-			ConfigMap: &v1.ConfigMapVolumeSource{},
-		},
-	}
-	return volume.NewSpecFromVolume(configMapVolume), nil
+	//  To reconstruct volume spec we need source name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct volume spec from volume mountpath")
 }
 
 type configMapVolume struct {

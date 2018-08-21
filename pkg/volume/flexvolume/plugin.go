@@ -235,15 +235,8 @@ func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnm
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
 func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	flexVolume := &api.Volume{
-		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			FlexVolume: &api.FlexVolumeSource{
-				Driver: plugin.driverName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(flexVolume), nil
+	//  To reconstruct volume spec we need driver name which cannot be retrieved from volumeName and mountPath.
+	return nil, fmt.Errorf("impossible to reconstruct flexvolume spec from volume mountpath")
 }
 
 func (plugin *flexVolumePlugin) SupportsMountOption() bool {
