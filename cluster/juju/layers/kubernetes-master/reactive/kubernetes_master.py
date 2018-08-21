@@ -28,6 +28,7 @@ import ipaddress
 from charms.leadership import leader_get, leader_set
 
 from shutil import move
+from tempfile import TemporaryDirectory
 
 from pathlib import Path
 from shlex import split
@@ -711,7 +712,8 @@ def kick_api_server(tls):
     tls_client.reset_certificate_write_flag('server')
 
 
-@when('kubernetes-master.components.started')
+@when_any('kubernetes-master.components.started', 'ceph-storage.configured')
+@when('leadership.is_leader')
 def configure_cdk_addons():
     ''' Configure CDK addons '''
     remove_state('cdk-addons.configured')
@@ -723,6 +725,21 @@ def configure_cdk_addons():
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     metricsEnabled = str(hookenv.config('enable-metrics')).lower()
+    if (is_state('ceph-storage.configured') and
+            get_version('kube-apiserver') >= (1, 10)):
+        cephEnabled = "true"
+    else:
+        cephEnabled = "false"
+    ceph_ep = endpoint_from_flag('ceph-storage.available')
+    ceph = {}
+    default_storage = ''
+    if ceph_ep:
+        b64_ceph_key = base64.b64encode(ceph_ep.key().encode('utf-8'))
+        ceph['admin_key'] = b64_ceph_key.decode('ascii')
+        ceph['kubernetes_key'] = b64_ceph_key.decode('ascii')
+        ceph['mon_hosts'] = ceph_ep.mon_hosts()
+        default_storage = hookenv.config('default-storage')
+
     args = [
         'arch=' + arch(),
         'dns-ip=' + get_deprecated_dns_ip(),
@@ -731,7 +748,12 @@ def configure_cdk_addons():
         'enable-dashboard=' + dbEnabled,
         'enable-kube-dns=' + dnsEnabled,
         'enable-metrics=' + metricsEnabled,
-        'enable-gpu=' + str(gpuEnable).lower()
+        'enable-gpu=' + str(gpuEnable).lower(),
+        'enable-ceph=' + cephEnabled,
+        'ceph-admin-key=' + (ceph.get('admin_key', '')),
+        'ceph-kubernetes-key=' + (ceph.get('admin_key', '')),
+        'ceph-mon-hosts="' + (ceph.get('mon_hosts', '')) + '"',
+        'default-storage=' + default_storage,
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -806,6 +828,15 @@ def ceph_storage(ceph_admin):
     configuration, and the ceph secret key file used for authentication.
     This method will install the client package, and render the requisit files
     in order to consume the ceph-storage relation.'''
+
+    # deprecated in 1.10 in favor of using CSI
+    if get_version('kube-apiserver') >= (1, 10):
+        # this is actually false, but by setting this flag we won't keep
+        # running this function for no reason. Also note that we watch this
+        # flag to run cdk-addons.apply.
+        set_state('ceph-storage.configured')
+        return
+
     ceph_context = {
         'mon_hosts': ceph_admin.mon_hosts(),
         'fsid': ceph_admin.fsid(),
@@ -1660,6 +1691,10 @@ def _gcp_creds_path(component):
 
 def _daemon_env_path(component):
     return _snap_common_path(component) / 'environment'
+
+
+def _cdk_addons_template_path():
+    return Path('/snap/cdk-addons/current/templates')
 
 
 def _write_gcp_snap_config(component):
