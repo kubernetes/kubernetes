@@ -28,10 +28,10 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	authorizationv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 // CanIOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of

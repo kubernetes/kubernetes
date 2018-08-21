@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 )
 
 type NoCompatiblePrinterError struct {
