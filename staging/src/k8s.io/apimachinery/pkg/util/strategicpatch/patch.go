@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
+	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
 )
 
 // An alternate implementation of JSON Merge Patch
@@ -1329,25 +1330,37 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 			}
 		}
 
-		_, ok := original[k]
-		if !ok {
-			// If it's not in the original document, just take the patch value.
-			original[k] = patchV
-			continue
+		var patchKind reflect.Kind
+		_, foundInOriginal := original[k]
+		if patchV != nil {
+			patchType := reflect.TypeOf(patchV)
+			patchKind = patchType.Kind()
+			if foundInOriginal {
+				// If a field is existing both in original and patch, we'll compare their kind via
+				// reflection, and simply do an overwrite if they mismatch.
+				originalType := reflect.TypeOf(original[k])
+				if originalType != patchType {
+					original[k] = patchV
+					continue
+				}
+			}
 		}
 
-		originalType := reflect.TypeOf(original[k])
-		patchType := reflect.TypeOf(patchV)
-		if originalType != patchType {
-			original[k] = patchV
-			continue
-		}
 		// If they're both maps or lists, recurse into the value.
-		switch originalType.Kind() {
+		// NOTE: We're using patch's kind to do the "switch" b/c the original could be
+		// nil when replacing/deleting unexisting fields from the original map.
+		switch patchKind {
 		case reflect.Map:
 			subschema, patchMeta, err2 := schema.LookupPatchMetadataForStruct(k)
 			if err2 != nil {
-				return nil, err2
+				switch err2.(type) {
+				case forkedjson.FieldNotFoundError, FieldNotFoundError:
+					// Handling unknown fields
+					original[k] = patchV
+					continue
+				default:
+					return nil, err2
+				}
 			}
 			_, patchStrategy, err2 := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
 			if err2 != nil {
@@ -1357,7 +1370,14 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		case reflect.Slice:
 			subschema, patchMeta, err2 := schema.LookupPatchMetadataForSlice(k)
 			if err2 != nil {
-				return nil, err2
+				switch err2.(type) {
+				case forkedjson.FieldNotFoundError, FieldNotFoundError:
+					// Handling unknown fields
+					original[k] = patchV
+					continue
+				default:
+					return nil, err2
+				}
 			}
 			_, patchStrategy, err2 := extractRetainKeysPatchStrategy(patchMeta.GetPatchStrategies())
 			if err2 != nil {
@@ -1487,6 +1507,9 @@ func mergeSliceWithSpecialElements(original, patch []interface{}, mergeKey strin
 				}
 			case replaceDirective:
 				replace = true
+				if _, ok := typedV[mergeKey]; ok {
+					patchWithoutSpecialElements = append(patchWithoutSpecialElements, v)
+				}
 				// Continue iterating through the array to prune any other $patch elements.
 			case mergeDirective:
 				return nil, nil, fmt.Errorf("merging lists cannot yet be specified in the patch")
@@ -2107,28 +2130,42 @@ func CreateDeleteDirective(mergeKey string, mergeKeyValue interface{}) map[strin
 	return map[string]interface{}{mergeKey: mergeKeyValue, directiveMarker: deleteDirective}
 }
 
-func mapTypeAssertion(original, patch interface{}) (map[string]interface{}, map[string]interface{}, error) {
-	typedOriginal, ok := original.(map[string]interface{})
-	if !ok {
-		return nil, nil, mergepatch.ErrBadArgType(typedOriginal, original)
+func mapTypeAssertion(original, patch interface{}) (typedOriginal map[string]interface{}, typedPatch map[string]interface{}, err error) {
+	var ok bool
+	if original != nil {
+		typedOriginal, ok = original.(map[string]interface{})
+		if !ok {
+			err = mergepatch.ErrBadArgType(typedOriginal, original)
+			return
+		}
 	}
-	typedPatch, ok := patch.(map[string]interface{})
-	if !ok {
-		return nil, nil, mergepatch.ErrBadArgType(typedPatch, patch)
+	if patch != nil {
+		typedPatch, ok = patch.(map[string]interface{})
+		if !ok {
+			err = mergepatch.ErrBadArgType(typedPatch, patch)
+			return
+		}
 	}
-	return typedOriginal, typedPatch, nil
+	return
 }
 
-func sliceTypeAssertion(original, patch interface{}) ([]interface{}, []interface{}, error) {
-	typedOriginal, ok := original.([]interface{})
-	if !ok {
-		return nil, nil, mergepatch.ErrBadArgType(typedOriginal, original)
+func sliceTypeAssertion(original, patch interface{}) (typedOriginal []interface{}, typedPatch []interface{}, err error) {
+	var ok bool
+	if original != nil {
+		typedOriginal, ok = original.([]interface{})
+		if !ok {
+			err = mergepatch.ErrBadArgType(typedOriginal, original)
+			return
+		}
 	}
-	typedPatch, ok := patch.([]interface{})
-	if !ok {
-		return nil, nil, mergepatch.ErrBadArgType(typedPatch, patch)
+	if patch != nil {
+		typedPatch, ok = patch.([]interface{})
+		if !ok {
+			err = mergepatch.ErrBadArgType(typedPatch, patch)
+			return
+		}
 	}
-	return typedOriginal, typedPatch, nil
+	return
 }
 
 // extractRetainKeysPatchStrategy process patch strategy, which is a string may contains multiple

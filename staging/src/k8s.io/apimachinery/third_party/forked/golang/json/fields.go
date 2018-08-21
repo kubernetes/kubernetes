@@ -22,6 +22,15 @@ const (
 	patchMergeKeyTagKey = "patchMergeKey"
 )
 
+type FieldNotFoundError struct {
+	Name      string
+	JsonField string
+}
+
+func (err FieldNotFoundError) Error() string {
+	return fmt.Sprintf("unable to find api field in struct %s for the json field %q", err.Name, err.JsonField)
+}
+
 // Finds the patchStrategy and patchMergeKey struct tag fields on a given
 // struct field given the struct type and the JSON name of the field.
 // It returns field type, a slice of patch strategies, merge key and error.
@@ -65,7 +74,10 @@ func LookupPatchMetadataForStruct(t reflect.Type, jsonField string) (
 		elemType = tjf.Type
 		return
 	}
-	e = fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
+	e = FieldNotFoundError{
+		Name:      t.Name(),
+		JsonField: jsonField,
+	}
 	return
 }
 

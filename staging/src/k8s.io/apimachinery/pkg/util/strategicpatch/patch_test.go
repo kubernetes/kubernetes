@@ -428,6 +428,52 @@ testCases:
     modified:
       retainKeysMap:
         name: foo
+  - description: retainKeys map can delete an unexisting merging list
+    original:
+      retainKeysMap: {}
+    twoWay:
+      retainKeysMap:
+        mergingList:
+          - name: noxu 
+            $patch: delete
+    modified:
+      retainKeysMap:
+        mergingList: []
+  - description: retainKeys map can replace an unexisting merging list
+    original:
+      retainKeysMap: {}
+    twoWay:
+      retainKeysMap:
+        mergingList:
+          - name: noxu
+            $patch: replace
+    modified:
+      retainKeysMap:
+        mergingList:
+          - name: noxu
+            $patch: replace
+  - description: retainKeys map can delete an unexisting nested map
+    original:
+      retainKeysMap: {}
+    twoWay:
+      retainKeysMap:
+        simpleMap:
+          $patch: delete
+    modified:
+      retainKeysMap:
+        simpleMap: {}
+  - description: retainKeys map can replace an unexisting nested map
+    original:
+      retainKeysMap: {}
+    twoWay:
+      retainKeysMap:
+        simpleMap:
+          $patch: replace
+          noxu: foo
+    modified:
+      retainKeysMap:
+        simpleMap:
+          noxu: foo
   - description: retainKeys map merge an empty map
     original:
       retainKeysMap:
