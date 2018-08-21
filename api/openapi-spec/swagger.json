@@ -2,7 +2,7 @@
   "swagger": "2.0",
   "info": {
    "title": "Kubernetes",
-   "version": "v1.13.0"
+   "version": "v1.11.0"
   },
   "paths": {
    "/api/": {
@@ -80857,6 +80857,10 @@
        "type": "string"
       }
      },
+     "dataSource": {
+      "description": "If specified, volume will be prepopulated with data from the DataSource.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.TypedLocalObjectReference"
+     },
      "resources": {
       "description": "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
@@ -80924,6 +80928,36 @@
      "readOnly": {
       "description": "Will force the ReadOnly setting in VolumeMounts. Default false.",
       "type": "boolean"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.PersistentVolumeCondition": {
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "lastProbeTime": {
+      "description": "Last time we probed the condition.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "lastTransitionTime": {
+      "description": "Last time the condition transitioned from one status to another.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     },
+     "message": {
+      "description": "Human-readable message indicating details about last transition.",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Unique, this should be a short, machine understandable string that gives the reason for condition's last transition.",
+      "type": "string"
+     },
+     "status": {
+      "type": "string"
+     },
+     "type": {
+      "type": "string"
      }
     }
    },
@@ -81098,6 +81132,15 @@
    "io.k8s.api.core.v1.PersistentVolumeStatus": {
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
     "properties": {
+     "conditions": {
+      "description": "Current Condition of persistent volume.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeCondition"
+      },
+      "x-kubernetes-patch-merge-key": "type",
+      "x-kubernetes-patch-strategy": "merge"
+     },
      "message": {
       "description": "A human-readable message indicating details about why the volume is in this state.",
       "type": "string"
@@ -83012,6 +83055,19 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
       }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.TypedLocalObjectReference": {
+    "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
+    "properties": {
+     "kind": {
+      "description": "Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names",
+      "type": "string"
      }
     }
    },

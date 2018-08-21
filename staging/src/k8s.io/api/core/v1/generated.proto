@@ -2292,6 +2292,10 @@ message PersistentVolumeClaimSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 6;
+
+  // If specified, volume will be prepopulated with data from the DataSource.
+  // +optional
+  optional TypedLocalObjectReference dataSource = 7;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -2330,6 +2334,29 @@ message PersistentVolumeClaimVolumeSource {
   // Default false.
   // +optional
   optional bool readOnly = 2;
+}
+
+message PersistentVolumeCondition {
+  optional string type = 1;
+
+  optional string status = 2;
+
+  // Last time we probed the condition.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+
+  // Last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+
+  // Unique, this should be a short, machine understandable string that gives the reason
+  // for condition's last transition.
+  // +optional
+  optional string reason = 5;
+
+  // Human-readable message indicating details about last transition.
+  // +optional
+  optional string message = 6;
 }
 
 // PersistentVolumeList is a list of PersistentVolume items.
@@ -2519,6 +2546,12 @@ message PersistentVolumeStatus {
   // for machine parsing and tidy display in the CLI.
   // +optional
   optional string reason = 3;
+
+  // Current Condition of persistent volume.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated PersistentVolumeCondition conditions = 4;
 }
 
 // Represents a Photon Controller persistent disk resource.
@@ -4467,6 +4500,20 @@ message TopologySelectorTerm {
   // A list of topology selector requirements by labels.
   // +optional
   repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the
+// typed referenced object inside the same namespace.
+message TypedLocalObjectReference {
+  // Name of the referent.
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+  // +optional
+  optional string name = 1;
+
+  // Kind of the referent.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional string kind = 2;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
