@@ -65,6 +65,7 @@ function startApiServer() {
     --runtime-config="${RUNTIME_CONFIG}" \
     --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
     --cert-dir="${TMPDIR:-/tmp/}" \
+    --authorization-mode="AlwaysAllow" \
     --service-cluster-ip-range="10.0.0.0/24" \
     --storage-versions="${storage_versions}" \
     --storage-media-type=${storage_media_type} 1>&2 &

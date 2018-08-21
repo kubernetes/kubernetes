@@ -66,6 +66,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
+  --authorization-mode="AlwaysAllow" \
   --runtime-config="api/all=true" \
   --token-auth-file=$TMP_DIR/tokenauth.csv \
   --logtostderr \

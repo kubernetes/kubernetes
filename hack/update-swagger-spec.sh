@@ -73,6 +73,7 @@ kube::log::status "Starting kube-apiserver"
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
+  --authorization-mode="AlwaysAllow" \
   --runtime-config=$(echo "${KUBE_AVAILABLE_GROUP_VERSIONS}" | sed -E 's|[[:blank:]]+|,|g') \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
 APISERVER_PID=$!

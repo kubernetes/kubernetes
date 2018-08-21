@@ -53,6 +53,7 @@ func (a *APIServer) Start() error {
 	o.ServiceClusterIPRange = *ipnet
 	o.AllowPrivileged = true
 	o.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+	o.Authorization.Modes = []string{"AlwaysAllow"}
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
