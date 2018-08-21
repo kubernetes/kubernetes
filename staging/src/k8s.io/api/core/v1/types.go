@@ -364,6 +364,33 @@ const (
 	PersistentVolumeFilesystem PersistentVolumeMode = "Filesystem"
 )
 
+// PersistentVolumeConditionType is a valid value of PersistentVolumeCondition.Type
+type PersistentVolumeConditionType string
+
+// These are valid conditions of PV
+const (
+	// Data has been populated to a pv
+	PersistentVolumeDataPopulated PersistentVolumeConditionType = "dataPopulated"
+)
+
+type PersistentVolumeCondition struct {
+	Type   PersistentVolumeConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PersistentVolumeConditionType"`
+	Status ConditionStatus               `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
+	// Last time we probed the condition.
+	// +optional
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty" protobuf:"bytes,3,opt,name=lastProbeTime"`
+	// Last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	// Unique, this should be a short, machine understandable string that gives the reason
+	// for condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	// Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
 // PersistentVolumeStatus is the current status of a persistent volume.
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim.
@@ -377,6 +404,11 @@ type PersistentVolumeStatus struct {
 	// for machine parsing and tidy display in the CLI.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
+	// Current Condition of persistent volume.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []PersistentVolumeCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,4,rep,name=conditions"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
