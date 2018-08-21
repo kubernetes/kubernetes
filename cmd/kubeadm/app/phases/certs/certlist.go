@@ -254,7 +254,10 @@ var (
 		CAName:   "front-proxy-ca",
 		config: certutil.Config{
 			CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			// This certificate needs both Server and Client Auth flags for the metrics-server
+			// to work correctly.
+			// See https://github.com/kubernetes-incubator/metrics-server/issues/35#issuecomment-360514404
+			Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		},
 	}
 
