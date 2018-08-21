@@ -22,6 +22,7 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	configv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -31,23 +32,14 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&CloudControllerManagerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_CloudControllerManagerConfiguration(obj.(*CloudControllerManagerConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&KubeControllerManagerConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*KubeControllerManagerConfiguration))
-	})
 	scheme.AddTypeDefaultingFunc(&KubeSchedulerConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeSchedulerConfiguration(obj.(*KubeSchedulerConfiguration)) })
 	return nil
 }
 
 func SetObjectDefaults_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration) {
 	SetDefaults_CloudControllerManagerConfiguration(in)
-	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
-}
-
-func SetObjectDefaults_KubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration) {
-	SetDefaults_KubeControllerManagerConfiguration(in)
-	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
-	SetDefaults_VolumeConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration)
-	SetDefaults_PersistentVolumeRecyclerConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration.PersistentVolumeRecyclerConfiguration)
+	configv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
+	configv1alpha1.SetDefaults_ServiceControllerConfiguration(&in.ServiceController)
 }
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration) {
