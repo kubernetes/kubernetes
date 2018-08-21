@@ -16,11 +16,11 @@
 
 REGISTRY?="staging-k8s.gcr.io"
 IMAGE=debian-iptables
-TAG=v10.1
+TAG?=v10.1
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 
-BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3.2
+BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):0.3.2
 
 build:
 	cp ./* $(TEMP_DIR)
