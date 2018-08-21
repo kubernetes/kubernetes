@@ -22,7 +22,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const mb int64 = 1024 * 1024
@@ -129,6 +131,180 @@ func TestCreateImageExistenceMap(t *testing.T) {
 		imageMap := createImageExistenceMap(test.nodes)
 		if !reflect.DeepEqual(test.expected, imageMap) {
 			t.Errorf("expected: %#v, got: %#v", test.expected, imageMap)
+		}
+	}
+}
+
+func TestCreateNodeNameToInfoMap(t *testing.T) {
+	resource := &Resource{MilliCPU: 0, Memory: 0, EphemeralStorage: 0, AllowedPodNumber: 0, ScalarResources: map[v1.ResourceName]int64(nil)}
+
+	tests := []struct {
+		nodes    []*v1.Node
+		pods     []*v1.Pod
+		expected map[string]*NodeInfo
+	}{
+		{
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node-0"},
+					Status: v1.NodeStatus{
+						Images: []v1.ContainerImage{
+							{
+								Names: []string{
+									"gcr.io/10:v1",
+								},
+								SizeBytes: int64(10 * mb),
+							},
+						},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
+					Status: v1.NodeStatus{
+						Images: []v1.ContainerImage{
+							{
+								Names: []string{
+									"gcr.io/200:v1",
+								},
+								SizeBytes: int64(200 * mb),
+							},
+						},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-0",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-0",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-1",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-2",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-3",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-1",
+					},
+				},
+			},
+			expected: map[string]*NodeInfo{
+				"node-0": {
+					node: &v1.Node{
+						ObjectMeta: metav1.ObjectMeta{Name: "node-0"},
+						Status: v1.NodeStatus{
+							Images: []v1.ContainerImage{
+								{
+									Names: []string{
+										"gcr.io/10:v1",
+									},
+									SizeBytes: int64(10 * mb),
+								},
+							},
+						},
+					},
+					pods: []*v1.Pod{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "pod-0",
+							},
+							Spec: v1.PodSpec{
+								NodeName: "node-0",
+							},
+						},
+					},
+					requestedResource:   resource,
+					nonzeroRequest:      resource,
+					allocatableResource: resource,
+					usedPorts:           util.HostPortInfo{},
+					imageStates: map[string]*ImageStateSummary{
+						"gcr.io/10:v1": {
+							Size:     int64(10 * mb),
+							NumNodes: 1,
+						},
+					},
+					TransientInfo: newTransientSchedulerInfo(),
+					generation:    120,
+				},
+				"node-1": {
+					node: &v1.Node{
+						ObjectMeta: metav1.ObjectMeta{Name: "node-1"},
+						Status: v1.NodeStatus{
+							Images: []v1.ContainerImage{
+								{
+									Names: []string{
+										"gcr.io/200:v1",
+									},
+									SizeBytes: int64(200 * mb),
+								},
+							},
+						},
+					},
+					pods: []*v1.Pod{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "pod-1",
+							},
+							Spec: v1.PodSpec{
+								NodeName: "node-1",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "pod-2",
+							},
+							Spec: v1.PodSpec{
+								NodeName: "node-1",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "pod-3",
+							},
+							Spec: v1.PodSpec{
+								NodeName: "node-1",
+							},
+						},
+					},
+					requestedResource:   resource,
+					nonzeroRequest:      resource,
+					allocatableResource: resource,
+					usedPorts:           util.HostPortInfo{},
+					imageStates: map[string]*ImageStateSummary{
+						"gcr.io/200:v1": {
+							Size:     int64(200 * mb),
+							NumNodes: 1,
+						},
+					},
+					TransientInfo: newTransientSchedulerInfo(),
+					generation:    121,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		nodesInfo := CreateNodeNameToInfoMap(test.pods, test.nodes)
+		if !reflect.DeepEqual(test.expected, nodesInfo) {
+			t.Errorf("Got different result than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(test.expected, nodesInfo))
 		}
 	}
 }
