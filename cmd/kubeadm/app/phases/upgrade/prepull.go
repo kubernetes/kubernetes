@@ -159,6 +159,11 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 			Namespace: metav1.NamespaceSystem,
 		},
 		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"k8s-app": addPrepullPrefix(component),
+				},
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
