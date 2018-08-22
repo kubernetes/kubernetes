@@ -34,7 +34,7 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
-	_ "github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -1319,11 +1319,10 @@ func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
 	return vs.nodeManager
 }
 
-func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *tags.RestClient) error) error {
-	vsURL := connection.Client.URL()
-	vsURL.User = url.UserPassword(connection.Username, connection.Password)
-	c := tags.NewClient(vsURL, connection.Insecure, "")
-	if err := c.Login(ctx); err != nil {
+func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *rest.Client) error) error {
+	c := rest.NewClient(connection.Client)
+	user := url.UserPassword(connection.Username, connection.Password)
+	if err := c.Login(ctx, user); err != nil {
 		return err
 	}
 	defer c.Logout(ctx)
@@ -1354,7 +1353,8 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		return cloudprovider.Zone{}, err
 	}
 	client := vsi.conn
-	err = withTagsClient(ctx, client, func(client *tags.RestClient) error {
+	err = withTagsClient(ctx, client, func(c *rest.Client) error {
+		client := tags.NewManager(c)
 		tags, err := client.ListAttachedTags(ctx, vmHost)
 		if err != nil {
 			glog.Errorf("Cannot list attached tags. Get zone for node %s error", nodeName)
