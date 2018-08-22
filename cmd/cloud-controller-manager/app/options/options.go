@@ -34,11 +34,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	cloudctrlmgrconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
+	cloudctrlmgrconfigv1alpha1 "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
 	// add the kubernetes feature gates
@@ -107,19 +107,22 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 }
 
 // NewDefaultComponentConfig returns cloud-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) (componentconfig.CloudControllerManagerConfiguration, error) {
+func NewDefaultComponentConfig(insecurePort int32) (cloudctrlmgrconfig.CloudControllerManagerConfiguration, error) {
 	scheme := runtime.NewScheme()
-	if err := componentconfigv1alpha1.AddToScheme(scheme); err != nil {
-		return componentconfig.CloudControllerManagerConfiguration{}, err
+	if err := cloudctrlmgrconfigv1alpha1.AddToScheme(scheme); err != nil {
+		return cloudctrlmgrconfig.CloudControllerManagerConfiguration{}, err
 	}
-	if err := componentconfig.AddToScheme(scheme); err != nil {
-		return componentconfig.CloudControllerManagerConfiguration{}, err
+	if err := cloudctrlmgrconfig.AddToScheme(scheme); err != nil {
+		return cloudctrlmgrconfig.CloudControllerManagerConfiguration{}, err
 	}
 
-	versioned := componentconfigv1alpha1.CloudControllerManagerConfiguration{}
+	scheme.AddKnownTypes(cloudctrlmgrconfigv1alpha1.SchemeGroupVersion, &cloudctrlmgrconfigv1alpha1.CloudControllerManagerConfiguration{})
+	scheme.AddKnownTypes(cloudctrlmgrconfig.SchemeGroupVersion, &cloudctrlmgrconfig.CloudControllerManagerConfiguration{})
+
+	versioned := cloudctrlmgrconfigv1alpha1.CloudControllerManagerConfiguration{}
 	scheme.Default(&versioned)
 
-	internal := componentconfig.CloudControllerManagerConfiguration{}
+	internal := cloudctrlmgrconfig.CloudControllerManagerConfiguration{}
 	if err := scheme.Convert(&versioned, &internal, nil); err != nil {
 		return internal, err
 	}

@@ -19,13 +19,10 @@ package v1alpha1
 import (
 	"net"
 	"strconv"
-	"time"
 
 	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
-	ctrlmgrconfigv1alpha1 "k8s.io/controller-manager/pkg/apis/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -33,27 +30,6 @@ import (
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
-}
-
-func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManagerConfiguration) {
-	zero := metav1.Duration{}
-	if obj.ServiceController.ConcurrentServiceSyncs == 0 {
-		obj.ServiceController.ConcurrentServiceSyncs = 1
-	}
-	if obj.NodeStatusUpdateFrequency == zero {
-		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 5 * time.Minute}
-	}
-
-	if obj.Generic.ClientConnection.QPS == 0.0 {
-		obj.Generic.ClientConnection.QPS = 20.0
-	}
-
-	if obj.Generic.ClientConnection.Burst == 0 {
-		obj.Generic.ClientConnection.Burst = 30
-	}
-
-	// Use the default GenericControllerManagerConfiguration
-	ctrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
 }
 
 func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {

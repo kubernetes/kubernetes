@@ -20,8 +20,6 @@ import (
 	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
-	ctrlmgrconfig "k8s.io/controller-manager/pkg/apis/config"
-	kebectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 const (
@@ -129,24 +127,4 @@ type KubeSchedulerLeaderElectionConfiguration struct {
 	LockObjectNamespace string
 	// LockObjectName defines the lock object name
 	LockObjectName string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type CloudControllerManagerConfiguration struct {
-	metav1.TypeMeta
-
-	// GenericControllerManagerConfiguration holds configuration for GenericComponent
-	// related features both in cloud controller manager and kube-controller manager.
-	Generic ctrlmgrconfig.GenericControllerManagerConfiguration
-	// KubeCloudSharedConfiguration holds configuration for shared related features
-	// both in cloud controller manager and kube-controller manager.
-	KubeCloudShared kebectrlmgrconfig.KubeCloudSharedConfiguration
-
-	// ServiceControllerConfiguration holds configuration for ServiceController
-	// related features.
-	ServiceController kebectrlmgrconfig.ServiceControllerConfiguration
-
-	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
-	NodeStatusUpdateFrequency metav1.Duration
 }
