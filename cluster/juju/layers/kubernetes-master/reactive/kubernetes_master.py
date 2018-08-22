@@ -106,6 +106,15 @@ def check_for_upgrade_needed():
     '''An upgrade charm event was triggered by Juju, react to that here.'''
     hookenv.status_set('maintenance', 'Checking resources')
 
+    # migrate to new flags
+    if is_state('kubernetes-master.restarted-for-cloud'):
+        remove_state('kubernetes-master.restarted-for-cloud')
+        set_state('kubernetes-master.cloud.ready')
+    if is_state('kubernetes-master.cloud-request-sent'):
+        # minor change, just for consistency
+        remove_state('kubernetes-master.cloud-request-sent')
+        set_state('kubernetes-master.cloud.request-sent')
+
     migrate_from_pre_snaps()
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
@@ -1691,6 +1700,8 @@ def set_cloud_pending():
     azure_joined = is_state('endpoint.azure.joined')
     if (vsphere_joined and not k8s_1_12) or (azure_joined and not k8s_1_11):
         set_state('kubernetes-master.cloud.blocked')
+    else:
+        remove_state('kubernetes-master.cloud.blocked')
     set_state('kubernetes-master.cloud.pending')
 
 
@@ -1744,10 +1755,9 @@ def request_integration():
            'endpoint.openstack.joined',
            'endpoint.vsphere.joined',
            'endpoint.azure.joined')
-@when('kubernetes-master.cloud-request-sent')
-def clear_requested_integration():
+def clear_cloud_flags():
     remove_state('kubernetes-master.cloud.pending')
-    remove_state('kubernetes-master.cloud-request-sent')
+    remove_state('kubernetes-master.cloud.request-sent')
     remove_state('kubernetes-master.cloud.blocked')
     remove_state('kubernetes-master.cloud.ready')
 
@@ -1758,8 +1768,7 @@ def clear_requested_integration():
           'endpoint.vsphere.ready',
           'endpoint.azure.ready')
 @when_not('kubernetes-master.cloud.blocked',
-          'kubernetes-master.cloud.ready',
-          'kubernetes-master.restarted-for-cloud')  # compat. TODO: remove
+          'kubernetes-master.cloud.ready')
 def cloud_ready():
     if is_state('endpoint.gcp.ready'):
         _write_gcp_snap_config('kube-apiserver')
@@ -1776,13 +1785,6 @@ def cloud_ready():
     remove_state('kubernetes-master.cloud.pending')
     set_state('kubernetes-master.cloud.ready')
     remove_state('kubernetes-master.components.started')  # force restart
-
-
-@when('kubernetes-master.restarted-for-cloud')
-@when_not('kubernetes-master.cloud.ready')
-def convert_cloud_flag():
-    remove_state('kubernetes-master.restarted-for-cloud')
-    set_state('kubernetes-master.cloud.ready')
 
 
 def _snap_common_path(component):

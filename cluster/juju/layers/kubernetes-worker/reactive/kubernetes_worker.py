@@ -64,6 +64,15 @@ db = unitdata.kv()
 
 @hook('upgrade-charm')
 def upgrade_charm():
+    # migrate to new flags
+    if is_state('kubernetes-worker.restarted-for-cloud'):
+        remove_state('kubernetes-worker.restarted-for-cloud')
+        set_state('kubernetes-worker.cloud.ready')
+    if is_state('kubernetes-worker.cloud-request-sent'):
+        # minor change, just for consistency
+        remove_state('kubernetes-worker.cloud-request-sent')
+        set_state('kubernetes-worker.cloud.request-sent')
+
     # Trigger removal of PPA docker installation if it was previously set.
     set_state('config.changed.install_from_upstream')
     hookenv.atexit(remove_state, 'config.changed.install_from_upstream')
@@ -1278,6 +1287,8 @@ def set_cloud_pending():
     azure_joined = is_state('endpoint.azure.joined')
     if (vsphere_joined and not k8s_1_12) or (azure_joined and not k8s_1_11):
         set_state('kubernetes-worker.cloud.blocked')
+    else:
+        remove_state('kubernetes-worker.cloud.blocked')
     set_state('kubernetes-worker.cloud.pending')
 
 
@@ -1327,7 +1338,7 @@ def request_integration():
            'endpoint.azure.joined')
 def clear_cloud_flags():
     remove_state('kubernetes-worker.cloud.pending')
-    remove_state('kubernetes-worker.cloud-request-sent')
+    remove_state('kubernetes-worker.cloud.request-sent')
     remove_state('kubernetes-worker.cloud.blocked')
     remove_state('kubernetes-worker.cloud.ready')
 
@@ -1338,8 +1349,7 @@ def clear_cloud_flags():
           'endpoint.vsphere.ready',
           'endpoint.azure.ready')
 @when_not('kubernetes-worker.cloud.blocked',
-          'kubernetes-worker.cloud.ready',
-          'kubernetes-worker.restarted-for-cloud')  # compat. TODO: remove
+          'kubernetes-worker.cloud.ready')
 def cloud_ready():
     remove_state('kubernetes-worker.cloud.pending')
     if is_state('endpoint.gcp.ready'):
@@ -1350,13 +1360,6 @@ def cloud_ready():
         _write_azure_snap_config('kubelet')
     set_state('kubernetes-worker.cloud.ready')
     set_state('kubernetes-worker.restart-needed')  # force restart
-
-
-@when('kubernetes-master.restarted-for-cloud')
-@when_not('kubernetes-master.cloud.ready')
-def convert_cloud_flag():
-    remove_state('kubernetes-worker.restarted-for-cloud')
-    set_state('kubernetes-worker.cloud.ready')
 
 
 def _snap_common_path(component):
