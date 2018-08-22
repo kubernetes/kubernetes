@@ -292,7 +292,7 @@ const (
 	VolumeSubpath utilfeature.Feature = "VolumeSubpath"
 
 	// owner: @gnufied
-	// alpha : v1.11
+	// beta : v1.12
 	//
 	// Add support for volume plugins to report node specific
 	// volume limits
@@ -375,7 +375,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
 	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
-	AttachVolumeLimit:                           {Default: false, PreRelease: utilfeature.Alpha},
+	AttachVolumeLimit:                           {Default: false, PreRelease: utilfeature.Beta},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
