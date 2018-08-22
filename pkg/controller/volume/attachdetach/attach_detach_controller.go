@@ -39,6 +39,7 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -96,6 +97,7 @@ type AttachDetachController interface {
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
 	kubeClient clientset.Interface,
+	csiClient csiclientset.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
@@ -122,6 +124,7 @@ func NewAttachDetachController(
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
+		csiClient:   csiClient,
 		pvcLister:   pvcInformer.Lister(),
 		pvcsSynced:  pvcInformer.Informer().HasSynced,
 		pvLister:    pvInformer.Lister(),
@@ -236,6 +239,10 @@ type attachDetachController struct {
 	// kubeClient is the kube API client used by volumehost to communicate with
 	// the API server.
 	kubeClient clientset.Interface
+
+	// csiClient is the csi.storage.k8s.io API client used by volumehost to communicate with
+	// the API server.
+	csiClient csiclientset.Interface
 
 	// pvcLister is the shared PVC lister used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
@@ -750,4 +757,8 @@ func (adc *attachDetachController) GetNodeName() types.NodeName {
 
 func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 	return adc.recorder
+}
+
+func (adc *attachDetachController) GetCSIClient() csiclientset.Interface {
+	return adc.csiClient
 }
