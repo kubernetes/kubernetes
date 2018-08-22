@@ -14,6 +14,8 @@ go_library(
         "kubelet.go",
         "kubelet_getters.go",
         "kubelet_network.go",
+        "kubelet_network_linux.go",
+        "kubelet_network_others.go",
         "kubelet_node_status.go",
         "kubelet_pods.go",
         "kubelet_resources.go",
