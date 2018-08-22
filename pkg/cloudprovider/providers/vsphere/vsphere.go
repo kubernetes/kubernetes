@@ -34,6 +34,7 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
+	_ "github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
