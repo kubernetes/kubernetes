@@ -17,6 +17,7 @@ limitations under the License.
 package uploadconfig
 
 import (
+	"reflect"
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,6 +29,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
 func TestUploadConfiguration(t *testing.T) {
@@ -62,21 +64,31 @@ func TestUploadConfiguration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
-			cfg := &kubeadmapi.InitConfiguration{
-				KubernetesVersion: "v1.10.3",
-				BootstrapTokens: []kubeadmapi.BootstrapToken{
+			initialcfg := &kubeadmapiv1alpha3.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+					API: kubeadmapiv1alpha3.API{
+						AdvertiseAddress: "1.2.3.4",
+					},
+					KubernetesVersion: "v1.10.10",
+				},
+				BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
 					{
-						Token: &kubeadmapi.BootstrapTokenString{
+						Token: &kubeadmapiv1alpha3.BootstrapTokenString{
 							ID:     "abcdef",
 							Secret: "abcdef0123456789",
 						},
 					},
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1alpha3.NodeRegistrationOptions{
 					Name:      "node-foo",
 					CRISocket: "/var/run/custom-cri.sock",
 				},
 			}
+			cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", initialcfg)
+			if err != nil {
+				t2.Fatalf("UploadConfiguration() error = %v", err)
+			}
+
 			client := clientsetfake.NewSimpleClientset()
 			if tt.errOnCreate != nil {
 				client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
@@ -107,23 +119,13 @@ func TestUploadConfiguration(t *testing.T) {
 					t2.Fatalf("Fail to find ConfigMap key")
 				}
 
-				decodedCfg := &kubeadmapi.InitConfiguration{}
+				decodedCfg := &kubeadmapi.ClusterConfiguration{}
 				if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(configData), decodedCfg); err != nil {
 					t2.Fatalf("unable to decode config from bytes: %v", err)
 				}
 
-				if decodedCfg.KubernetesVersion != cfg.KubernetesVersion {
-					t2.Errorf("Decoded value doesn't match, decoded = %#v, expected = %#v", decodedCfg.KubernetesVersion, cfg.KubernetesVersion)
-				}
-
-				// If the decoded cfg has a BootstrapTokens array, verify the sensitive information we had isn't still there.
-				if len(decodedCfg.BootstrapTokens) > 0 && decodedCfg.BootstrapTokens[0].Token != nil && decodedCfg.BootstrapTokens[0].Token.String() == cfg.BootstrapTokens[0].Token.String() {
-					t2.Errorf("Decoded value contains .BootstrapTokens (sensitive info), decoded = %#v, expected = empty", decodedCfg.BootstrapTokens)
-				}
-
-				// Make sure no information from NodeRegistrationOptions was uploaded.
-				if decodedCfg.NodeRegistration.Name == cfg.NodeRegistration.Name || decodedCfg.NodeRegistration.CRISocket != kubeadmapiv1alpha3.DefaultCRISocket {
-					t2.Errorf("Decoded value contains .NodeRegistration (node-specific info shouldn't be uploaded), decoded = %#v, expected = empty", decodedCfg.NodeRegistration)
+				if !reflect.DeepEqual(decodedCfg, &cfg.ClusterConfiguration) {
+					t2.Errorf("the initial and decoded ClusterConfiguration didn't match")
 				}
 			}
 		})

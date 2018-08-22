@@ -28,13 +28,19 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&ClusterConfiguration{}, func(obj interface{}) { SetObjectDefaults_ClusterConfiguration(obj.(*ClusterConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*InitConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*JoinConfiguration)) })
 	return nil
 }
 
+func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
+	SetDefaults_ClusterConfiguration(in)
+}
+
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 	SetDefaults_InitConfiguration(in)
+	SetObjectDefaults_ClusterConfiguration(&in.ClusterConfiguration)
 	for i := range in.BootstrapTokens {
 		a := &in.BootstrapTokens[i]
 		SetDefaults_BootstrapToken(a)

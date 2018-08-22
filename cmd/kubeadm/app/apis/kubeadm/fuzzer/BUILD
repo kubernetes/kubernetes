@@ -42,8 +42,4 @@ go_test(
     name = "go_default_test",
     srcs = ["fuzzer_test.go"],
     embed = [":go_default_library"],
-    deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
-    ],
 )

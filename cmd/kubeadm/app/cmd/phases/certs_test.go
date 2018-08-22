@@ -259,14 +259,16 @@ func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(strings.Join(test.subCmds, ","), func(t *testing.T) {
-			// Create temp folder for the test case
 
+			// Create temp folder for the test case
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
 			cfg := &kubeadmapi.InitConfiguration{
-				API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-				CertificatesDir:  tmpdir,
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+					CertificatesDir: tmpdir,
+				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 			}
 			configPath := testutil.SetupInitConfigurationFile(t, tmpdir, cfg)
