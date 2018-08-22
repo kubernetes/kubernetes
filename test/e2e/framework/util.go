@@ -4831,7 +4831,8 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeList) {
 	nodes := &v1.NodeList{}
 	masters := sets.NewString()
-	all, _ := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	all, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	ExpectNoError(err)
 	for _, n := range all.Items {
 		if system.IsMasterNode(n.Name) {
 			masters.Insert(n.Name)
