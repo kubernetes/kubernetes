@@ -77,40 +77,35 @@ var (
 		Effect: v1.TaintEffectNoExecute,
 	}
 
-	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]struct {
-		taintKey string
-		// noScheduleStatus is the condition under which the node should be tainted as not schedulable for this
-		// NodeConditionType
-		noScheduleStatus v1.ConditionStatus
-	}{
+	// map {NodeConditionType: {ConditionStatus: TaintKey}}
+	// represents which NodeConditionType under which ConditionStatus should be
+	// tainted with which TaintKey
+	// for certain NodeConditionType, there are multiple {ConditionStatus,TaintKey} pairs
+	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]map[v1.ConditionStatus]string{
 		v1.NodeReady: {
-			taintKey:         algorithm.TaintNodeNotReady,
-			noScheduleStatus: v1.ConditionFalse,
+			v1.ConditionFalse:   algorithm.TaintNodeNotReady,
+			v1.ConditionUnknown: algorithm.TaintNodeUnreachable,
 		},
 		v1.NodeMemoryPressure: {
-			taintKey:         algorithm.TaintNodeMemoryPressure,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeMemoryPressure,
 		},
 		v1.NodeOutOfDisk: {
-			taintKey:         algorithm.TaintNodeOutOfDisk,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeOutOfDisk,
 		},
 		v1.NodeDiskPressure: {
-			taintKey:         algorithm.TaintNodeDiskPressure,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeDiskPressure,
 		},
 		v1.NodeNetworkUnavailable: {
-			taintKey:         algorithm.TaintNodeNetworkUnavailable,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeNetworkUnavailable,
 		},
 		v1.NodePIDPressure: {
-			taintKey:         algorithm.TaintNodePIDPressure,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodePIDPressure,
 		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
 		algorithm.TaintNodeNotReady:           v1.NodeReady,
+		algorithm.TaintNodeUnreachable:        v1.NodeReady,
 		algorithm.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
@@ -454,10 +449,10 @@ func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 	// Map node's condition to Taints.
 	var taints []v1.Taint
 	for _, condition := range node.Status.Conditions {
-		if taint, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
-			if condition.Status == taint.noScheduleStatus {
+		if taintMap, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
+			if taintKey, found := taintMap[condition.Status]; found {
 				taints = append(taints, v1.Taint{
-					Key:    taint.taintKey,
+					Key:    taintKey,
 					Effect: v1.TaintEffectNoSchedule,
 				})
 			}
@@ -473,6 +468,10 @@ func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 
 	// Get exist taints of node.
 	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
+		// only NoSchedule taints are candidates to be compared with "taints" later
+		if t.Effect != v1.TaintEffectNoSchedule {
+			return false
+		}
 		// Find unschedulable taint of node.
 		if t.Key == algorithm.TaintNodeUnschedulable {
 			return true
