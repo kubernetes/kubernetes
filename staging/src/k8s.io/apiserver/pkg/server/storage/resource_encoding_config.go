@@ -39,10 +39,7 @@ type DefaultResourceEncodingConfig struct {
 }
 
 type GroupResourceEncodingConfig struct {
-	DefaultExternalEncoding   schema.GroupVersion
 	ExternalResourceEncodings map[string]schema.GroupVersion
-
-	DefaultInternalEncoding   schema.GroupVersion
 	InternalResourceEncodings map[string]schema.GroupVersion
 }
 
@@ -52,28 +49,18 @@ func NewDefaultResourceEncodingConfig(scheme *runtime.Scheme) *DefaultResourceEn
 	return &DefaultResourceEncodingConfig{groups: map[string]*GroupResourceEncodingConfig{}, scheme: scheme}
 }
 
-func newGroupResourceEncodingConfig(defaultEncoding, defaultInternalVersion schema.GroupVersion) *GroupResourceEncodingConfig {
+func newGroupResourceEncodingConfig() *GroupResourceEncodingConfig {
 	return &GroupResourceEncodingConfig{
-		DefaultExternalEncoding: defaultEncoding, ExternalResourceEncodings: map[string]schema.GroupVersion{},
-		DefaultInternalEncoding: defaultInternalVersion, InternalResourceEncodings: map[string]schema.GroupVersion{},
+		ExternalResourceEncodings: map[string]schema.GroupVersion{},
+		InternalResourceEncodings: map[string]schema.GroupVersion{},
 	}
-}
-
-func (o *DefaultResourceEncodingConfig) SetVersionEncoding(group string, externalEncodingVersion, internalVersion schema.GroupVersion) {
-	_, groupExists := o.groups[group]
-	if !groupExists {
-		o.groups[group] = newGroupResourceEncodingConfig(externalEncodingVersion, internalVersion)
-	}
-
-	o.groups[group].DefaultExternalEncoding = externalEncodingVersion
-	o.groups[group].DefaultInternalEncoding = internalVersion
 }
 
 func (o *DefaultResourceEncodingConfig) SetResourceEncoding(resourceBeingStored schema.GroupResource, externalEncodingVersion, internalVersion schema.GroupVersion) {
 	group := resourceBeingStored.Group
 	_, groupExists := o.groups[group]
 	if !groupExists {
-		o.groups[group] = newGroupResourceEncodingConfig(externalEncodingVersion, internalVersion)
+		o.groups[group] = newGroupResourceEncodingConfig()
 	}
 
 	o.groups[group].ExternalResourceEncodings[resourceBeingStored.Resource] = externalEncodingVersion
@@ -94,7 +81,8 @@ func (o *DefaultResourceEncodingConfig) StorageEncodingFor(resource schema.Group
 
 	resourceOverride, resourceExists := groupEncoding.ExternalResourceEncodings[resource.Resource]
 	if !resourceExists {
-		return groupEncoding.DefaultExternalEncoding, nil
+		// return the most preferred external version for the group
+		return o.scheme.PrioritizedVersionsForGroup(resource.Group)[0], nil
 	}
 
 	return resourceOverride, nil
@@ -112,7 +100,7 @@ func (o *DefaultResourceEncodingConfig) InMemoryEncodingFor(resource schema.Grou
 
 	resourceOverride, resourceExists := groupEncoding.InternalResourceEncodings[resource.Resource]
 	if !resourceExists {
-		return groupEncoding.DefaultInternalEncoding, nil
+		return schema.GroupVersion{Group: resource.Group, Version: runtime.APIVersionInternal}, nil
 	}
 
 	return resourceOverride, nil

@@ -31,8 +31,6 @@ import (
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
@@ -46,14 +44,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/certificates"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/storage"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
@@ -79,17 +70,6 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	}
 
 	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
-	resourceEncoding.SetVersionEncoding(api.GroupName, schema.GroupVersion{Group: "", Version: "v1"}, schema.GroupVersion{Group: api.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(autoscaling.GroupName, schema.GroupVersion{Group: "autoscaling", Version: "v1"}, schema.GroupVersion{Group: autoscaling.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(batch.GroupName, schema.GroupVersion{Group: "batch", Version: "v1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	// FIXME (soltysh): this GroupVersionResource override should be configurable
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: "batch", Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: "storage.k8s.io", Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
-
-	resourceEncoding.SetVersionEncoding(apps.GroupName, schema.GroupVersion{Group: "apps", Version: "v1"}, schema.GroupVersion{Group: apps.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(extensions.GroupName, schema.GroupVersion{Group: "extensions", Version: "v1beta1"}, schema.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(rbac.GroupName, schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1"}, schema.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetVersionEncoding(certificates.GroupName, schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1beta1"}, schema.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 
 	etcdOptions := options.NewEtcdOptions(storageConfig)
