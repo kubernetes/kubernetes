@@ -71,10 +71,15 @@ errors=()
 not_failing=()
 for p in "${all_packages[@]}"; do
   # Run golint on package/*.go file explicitly to validate all go files
-  # and not just the ones for the current platform.
-  # Packages with a corresponding foo_test package will make golint fail
-  # with a useless error. Just ignore that, see golang/lint#68.
-  failedLint=$(golint "$p"/*.go 2>/dev/null)
+  # and not just the ones for the current platform. This also will ensure that
+  # _test.go files are linted.
+  # Generated files are ignored, and each file is passed through golint
+  # individually, as if one file in the package contains a fatal error (such as
+  # a foo package with a corresponding foo_test package), golint seems to choke
+  # completely.
+  # Ref: https://github.com/kubernetes/kubernetes/pull/67675
+  # Ref: https://github.com/golang/lint/issues/68
+  failedLint=$(ls "$p"/*.go | egrep -v "(zz_generated.*.go|generated.pb.go|generated.proto|types_swagger_doc_generated.go)" | xargs -L1 golint 2>/dev/null)
   array_contains "$p" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
     errors+=( "${failedLint}" )
