@@ -24,6 +24,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"bufio"
+	"bytes"
+	"io"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -253,7 +256,7 @@ func handleConfigMapFromEnvFileSource(configMap *v1.ConfigMap, envFileSource str
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToConfigMap(configMap *v1.ConfigMap, keyName, filePath string) error {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := readFromFileAndTrim(filePath)
 	if err != nil {
 		return err
 	}
@@ -294,4 +297,29 @@ func validateNewConfigMap(configMap *v1.ConfigMap, keyName string) error {
 		return fmt.Errorf("cannot add key %s, another key by that name already exists in binaryData: %v", keyName, configMap.BinaryData)
 	}
 	return nil
+}
+
+func readFromFileAndTrim(filePath string) ([]byte, error) {
+	var result bytes.Buffer
+
+	file, err := os.Open(filePath)
+	defer file.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	buf := bufio.NewReader(file)
+	for {
+		line, err := buf.ReadString('\n')
+		line = strings.TrimSpace(line)
+		result.WriteString(line + "\n")
+
+		if err != nil {
+			if err == io.EOF {
+				result.Truncate(result.Len() - 1)
+				return result.Bytes(), nil
+			}
+			return nil, err
+		}
+	}
 }
