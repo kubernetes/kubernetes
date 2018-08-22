@@ -670,6 +670,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 	nodeInfo := getTestNodeInfo(v1.ResourceList{})
 	pluginOpts := make(map[string]*pluginapi.DevicePluginOptions)
+	pluginOpts[res1.resourceName] = nil
+	pluginOpts[res2.resourceName] = nil
 	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources, pluginOpts)
 	as.Nil(err)
 
@@ -766,6 +768,8 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.Nil(err)
 	defer os.RemoveAll(tmpDir)
 	pluginOpts := make(map[string]*pluginapi.DevicePluginOptions)
+	pluginOpts[res1.resourceName] = nil
+	pluginOpts[res2.resourceName] = nil
 	testManager, err := getTestManager(tmpDir, podsStub.getActivePods, testResources, pluginOpts)
 	as.Nil(err)
 

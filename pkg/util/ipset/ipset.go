@@ -52,7 +52,7 @@ type Interface interface {
 	GetVersion() (string, error)
 }
 
-// IPSetCmd represents the ipset util.  We use ipset command for ipset execute.
+// IPSetCmd represents the ipset util. We use ipset command for ipset execute.
 const IPSetCmd = "ipset"
 
 // EntryMemberPattern is the regular expression pattern of ipset member list.
@@ -72,7 +72,7 @@ var EntryMemberPattern = "(?m)^(.*\n)*Members:\n"
 // ipset version output is similar to "v6.10".
 var VersionPattern = "v[0-9]+\\.[0-9]+"
 
-// IPSet implements an Interface to an set.
+// IPSet implements an Interface to a set.
 type IPSet struct {
 	// Name is the set name.
 	Name string
@@ -123,6 +123,28 @@ func (set *IPSet) Validate() bool {
 	return true
 }
 
+//setIPSetDefaults sets some IPSet fields if not present to their default values.
+func (set *IPSet) setIPSetDefaults() {
+	// Setting default values if not present
+	if set.HashSize == 0 {
+		set.HashSize = 1024
+	}
+	if set.MaxElem == 0 {
+		set.MaxElem = 65536
+	}
+	// Default protocol is IPv4
+	if set.HashFamily == "" {
+		set.HashFamily = ProtocolFamilyIPV4
+	}
+	// Default ipset type is "hash:ip,port"
+	if len(set.SetType) == 0 {
+		set.SetType = HashIPPort
+	}
+	if len(set.PortRange) == 0 {
+		set.PortRange = DefaultPortRange
+	}
+}
+
 // Entry represents a ipset entry.
 type Entry struct {
 	// IP is the entry's IP.  The IP address protocol corresponds to the HashFamily of IPSet.
@@ -150,31 +172,13 @@ func (e *Entry) Validate(set *IPSet) bool {
 	}
 	switch e.SetType {
 	case HashIPPort:
-		// set default protocol to tcp if empty
-		if len(e.Protocol) == 0 {
-			e.Protocol = ProtocolTCP
-		}
-
-		if net.ParseIP(e.IP) == nil {
-			glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
-			return false
-		}
-
-		if valid := validateProtocol(e.Protocol); !valid {
+		//check if IP and Protocol of Entry is valid.
+		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
 	case HashIPPortIP:
-		// set default protocol to tcp if empty
-		if len(e.Protocol) == 0 {
-			e.Protocol = ProtocolTCP
-		}
-
-		if net.ParseIP(e.IP) == nil {
-			glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
-			return false
-		}
-
-		if valid := validateProtocol(e.Protocol); !valid {
+		//check if IP and Protocol of Entry is valid.
+		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
 
@@ -184,23 +188,14 @@ func (e *Entry) Validate(set *IPSet) bool {
 			return false
 		}
 	case HashIPPortNet:
-		// set default protocol to tcp if empty
-		if len(e.Protocol) == 0 {
-			e.Protocol = ProtocolTCP
-		}
-
-		if net.ParseIP(e.IP) == nil {
-			glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
-			return false
-		}
-
-		if valid := validateProtocol(e.Protocol); !valid {
+		//check if IP and Protocol of Entry is valid.
+		if valid := e.checkIPandProtocol(set); !valid {
 			return false
 		}
 
 		// Net can not be empty for `hash:ip,port,net` type ip set
-		if _, ipNet, _ := net.ParseCIDR(e.Net); ipNet == nil {
-			glog.Errorf("Error parsing entry %v ip net %v for ipset %v", e, e.Net, set)
+		if _, ipNet, err := net.ParseCIDR(e.Net); ipNet == nil {
+			glog.Errorf("Error parsing entry %v ip net %v for ipset %v, error: %v", e, e.Net, set, err)
 			return false
 		}
 	case BitmapPort:
@@ -246,6 +241,23 @@ func (e *Entry) String() string {
 	return ""
 }
 
+// checkIPandProtocol checks if IP and Protocol of Entry is valid.
+func (e *Entry) checkIPandProtocol(set *IPSet) bool {
+	// set default protocol to tcp if empty
+	if len(e.Protocol) == 0 {
+		e.Protocol = ProtocolTCP
+	} else if !validateProtocol(e.Protocol) {
+		return false
+	}
+
+	if net.ParseIP(e.IP) == nil {
+		glog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
+		return false
+	}
+
+	return true
+}
+
 type runner struct {
 	exec utilexec.Interface
 }
@@ -257,26 +269,10 @@ func New(exec utilexec.Interface) Interface {
 	}
 }
 
-// CreateSet creates a new set,  it will ignore error when the set already exists if ignoreExistErr=true.
+// CreateSet creates a new set, it will ignore error when the set already exists if ignoreExistErr=true.
 func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
-	// Setting default values if not present
-	if set.HashSize == 0 {
-		set.HashSize = 1024
-	}
-	if set.MaxElem == 0 {
-		set.MaxElem = 65536
-	}
-	// Default protocol is IPv4
-	if set.HashFamily == "" {
-		set.HashFamily = ProtocolFamilyIPV4
-	}
-	// Default ipset type is "hash:ip,port"
-	if len(set.SetType) == 0 {
-		set.SetType = HashIPPort
-	}
-	if len(set.PortRange) == 0 {
-		set.PortRange = DefaultPortRange
-	}
+	// sets some IPSet fields if not present to their default values.
+	set.setIPSetDefaults()
 
 	// Validate ipset before creating
 	valid := set.Validate()

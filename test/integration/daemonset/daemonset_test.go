@@ -94,23 +94,24 @@ func setupScheduler(
 		return
 	}
 
-	schedulerConfigFactory := factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		cs,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Apps().V1().ReplicaSets(),
-		informerFactory.Apps().V1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		true,
-		false,
-	)
+	schedulerConfigFactory := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+		SchedulerName:                  v1.DefaultSchedulerName,
+		Client:                         cs,
+		NodeInformer:                   informerFactory.Core().V1().Nodes(),
+		PodInformer:                    informerFactory.Core().V1().Pods(),
+		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
+		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
+		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
+		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
+		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
+		ServiceInformer:                informerFactory.Core().V1().Services(),
+		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+		EnableEquivalenceClassCache:    true,
+		DisablePreemption:              false,
+		PercentageOfNodesToScore:       100,
+	})
 
 	schedulerConfig, err := schedulerConfigFactory.Create()
 	if err != nil {

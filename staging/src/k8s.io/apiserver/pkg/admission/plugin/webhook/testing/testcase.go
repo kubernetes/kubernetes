@@ -18,6 +18,7 @@ package testing
 
 import (
 	"net/url"
+	"sync"
 
 	registrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -95,7 +96,37 @@ func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind sch
 		UID:  "webhook-test",
 	}
 
-	return admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, dryRun, &userInfo)
+	return &FakeAttributes{
+		Attributes: admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, dryRun, &userInfo),
+	}
+}
+
+// FakeAttributes decorate admission.Attributes. It's used to trace the added annotations.
+type FakeAttributes struct {
+	admission.Attributes
+	annotations map[string]string
+	mutex       sync.Mutex
+}
+
+// AddAnnotation adds an annotation key value pair to FakeAttributes
+func (f *FakeAttributes) AddAnnotation(k, v string) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	if err := f.Attributes.AddAnnotation(k, v); err != nil {
+		return err
+	}
+	if f.annotations == nil {
+		f.annotations = make(map[string]string)
+	}
+	f.annotations[k] = v
+	return nil
+}
+
+// GetAnnotations reads annotations from FakeAttributes
+func (f *FakeAttributes) GetAnnotations() map[string]string {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+	return f.annotations
 }
 
 // NewAttribute returns static admission Attributes for testing.
@@ -145,15 +176,16 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1beta1.WebhookC
 
 // Test is a webhook test case.
 type Test struct {
-	Name             string
-	Webhooks         []registrationv1beta1.Webhook
-	Path             string
-	IsCRD            bool
-	IsDryRun         bool
-	AdditionalLabels map[string]string
-	ExpectLabels     map[string]string
-	ExpectAllow      bool
-	ErrorContains    string
+	Name              string
+	Webhooks          []registrationv1beta1.Webhook
+	Path              string
+	IsCRD             bool
+	IsDryRun          bool
+	AdditionalLabels  map[string]string
+	ExpectLabels      map[string]string
+	ExpectAllow       bool
+	ErrorContains     string
+	ExpectAnnotations map[string]string
 }
 
 // NewNonMutatingTestCases returns test cases with a given base url.
@@ -181,12 +213,13 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 		{
 			Name: "match & allow",
 			Webhooks: []registrationv1beta1.Webhook{{
-				Name:              "allow",
+				Name:              "allow.example.com",
 				ClientConfig:      ccfgSVC("allow"),
 				Rules:             matchEverythingRules,
 				NamespaceSelector: &metav1.LabelSelector{},
 			}},
-			ExpectAllow: true,
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"allow.example.com/key1": "value1"},
 		},
 		{
 			Name: "match & disallow",
@@ -312,12 +345,13 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 		{
 			Name: "match & allow (url)",
 			Webhooks: []registrationv1beta1.Webhook{{
-				Name:              "allow",
+				Name:              "allow.example.com",
 				ClientConfig:      ccfgURL("allow"),
 				Rules:             matchEverythingRules,
 				NamespaceSelector: &metav1.LabelSelector{},
 			}},
-			ExpectAllow: true,
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"allow.example.com/key1": "value1"},
 		},
 		{
 			Name: "match & disallow (url)",
@@ -374,6 +408,16 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 			IsDryRun:      true,
 			ErrorContains: "does not support dry run",
 		},
+		{
+			Name: "illegal annotation format",
+			Webhooks: []registrationv1beta1.Webhook{{
+				Name:              "invalidAnnotation",
+				ClientConfig:      ccfgURL("invalidAnnotation"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+			}},
+			ExpectAllow: true,
+		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 	}
@@ -387,14 +431,15 @@ func NewMutatingTestCases(url *url.URL) []Test {
 		{
 			Name: "match & remove label",
 			Webhooks: []registrationv1beta1.Webhook{{
-				Name:              "removeLabel",
+				Name:              "removelabel.example.com",
 				ClientConfig:      ccfgSVC("removeLabel"),
 				Rules:             matchEverythingRules,
 				NamespaceSelector: &metav1.LabelSelector{},
 			}},
-			ExpectAllow:      true,
-			AdditionalLabels: map[string]string{"remove": "me"},
-			ExpectLabels:     map[string]string{"pod.name": "my-pod"},
+			ExpectAllow:       true,
+			AdditionalLabels:  map[string]string{"remove": "me"},
+			ExpectLabels:      map[string]string{"pod.name": "my-pod"},
+			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
 		},
 		{
 			Name: "match & add label",
@@ -422,15 +467,16 @@ func NewMutatingTestCases(url *url.URL) []Test {
 		{
 			Name: "match CRD & remove label",
 			Webhooks: []registrationv1beta1.Webhook{{
-				Name:              "removeLabel",
+				Name:              "removelabel.example.com",
 				ClientConfig:      ccfgSVC("removeLabel"),
 				Rules:             matchEverythingRules,
 				NamespaceSelector: &metav1.LabelSelector{},
 			}},
-			IsCRD:            true,
-			ExpectAllow:      true,
-			AdditionalLabels: map[string]string{"remove": "me"},
-			ExpectLabels:     map[string]string{"crd.name": "my-test-crd"},
+			IsCRD:             true,
+			ExpectAllow:       true,
+			AdditionalLabels:  map[string]string{"remove": "me"},
+			ExpectLabels:      map[string]string{"crd.name": "my-test-crd"},
+			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
 		},
 		{
 			Name: "match & invalid mutation",

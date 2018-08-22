@@ -426,7 +426,8 @@ func TestGenericScheduler(t *testing.T) {
 				nil,
 				pvcLister,
 				test.alwaysCheckAllPredicates,
-				false)
+				false,
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			machine, err := scheduler.Schedule(test.pod, schedulertesting.FakeNodeLister(makeNodeList(test.nodes)))
 
 			if !reflect.DeepEqual(err, test.wErr) {
@@ -456,7 +457,8 @@ func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Nod
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
 		algorithm.EmptyPriorityMetadataProducer,
-		nil, nil, nil, false, false)
+		nil, nil, nil, false, false,
+		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateNodeNameToInfoMap(s.(*genericScheduler).cachedNodeInfoMap)
 	return s.(*genericScheduler)
 
@@ -1362,7 +1364,8 @@ func TestPreempt(t *testing.T) {
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
 				false,
-				false)
+				false,
+				schedulerapi.DefaultPercentageOfNodesToScore)
 			// Call Preempt and check the expected results.
 			node, victims, _, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
@@ -1481,7 +1484,8 @@ func TestCacheInvalidationRace(t *testing.T) {
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
 		algorithm.EmptyPriorityMetadataProducer,
-		nil, nil, pvcLister, true, false)
+		nil, nil, pvcLister, true, false,
+		schedulerapi.DefaultPercentageOfNodesToScore)
 
 	// First scheduling attempt should fail.
 	nodeLister := schedulertesting.FakeNodeLister(makeNodeList([]string{"machine1"}))

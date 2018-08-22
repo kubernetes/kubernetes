@@ -28,42 +28,6 @@ import (
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-// sortableAntiAffinityTerms lets us to sort anti-affinity terms.
-type sortableAntiAffinityTerms []matchingPodAntiAffinityTerm
-
-// Less establishes some ordering between two matchingPodAntiAffinityTerms for
-// sorting.
-func (s sortableAntiAffinityTerms) Less(i, j int) bool {
-	t1, t2 := s[i], s[j]
-	if t1.node.Name != t2.node.Name {
-		return t1.node.Name < t2.node.Name
-	}
-	if len(t1.term.Namespaces) != len(t2.term.Namespaces) {
-		return len(t1.term.Namespaces) < len(t2.term.Namespaces)
-	}
-	if t1.term.TopologyKey != t2.term.TopologyKey {
-		return t1.term.TopologyKey < t2.term.TopologyKey
-	}
-	if len(t1.term.LabelSelector.MatchLabels) != len(t2.term.LabelSelector.MatchLabels) {
-		return len(t1.term.LabelSelector.MatchLabels) < len(t2.term.LabelSelector.MatchLabels)
-	}
-	return false
-}
-func (s sortableAntiAffinityTerms) Len() int { return len(s) }
-func (s sortableAntiAffinityTerms) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-var _ = sort.Interface(sortableAntiAffinityTerms{})
-
-func sortAntiAffinityTerms(terms map[string][]matchingPodAntiAffinityTerm) {
-	for k, v := range terms {
-		sortableTerms := sortableAntiAffinityTerms(v)
-		sort.Sort(sortableTerms)
-		terms[k] = sortableTerms
-	}
-}
-
 // sortablePods lets us to sort pods.
 type sortablePods []*v1.Pod
 
@@ -113,11 +77,6 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	for !reflect.DeepEqual(meta1.podPorts, meta2.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
-	sortAntiAffinityTerms(meta1.matchingAntiAffinityTerms)
-	sortAntiAffinityTerms(meta2.matchingAntiAffinityTerms)
-	if !reflect.DeepEqual(meta1.matchingAntiAffinityTerms, meta2.matchingAntiAffinityTerms) {
-		return fmt.Errorf("matchingAntiAffinityTerms are not euqal")
-	}
 	sortNodePodMap(meta1.nodeNameToMatchingAffinityPods)
 	sortNodePodMap(meta2.nodeNameToMatchingAffinityPods)
 	if !reflect.DeepEqual(meta1.nodeNameToMatchingAffinityPods, meta2.nodeNameToMatchingAffinityPods) {
@@ -127,6 +86,14 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	sortNodePodMap(meta2.nodeNameToMatchingAntiAffinityPods)
 	if !reflect.DeepEqual(meta1.nodeNameToMatchingAntiAffinityPods, meta2.nodeNameToMatchingAntiAffinityPods) {
 		return fmt.Errorf("nodeNameToMatchingAntiAffinityPods are not euqal")
+	}
+	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.podToTopologyPairs,
+		meta2.topologyPairsAntiAffinityPodsMap.podToTopologyPairs) {
+		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.podToTopologyPairs are not equal")
+	}
+	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.topologyPairToPods,
+		meta2.topologyPairsAntiAffinityPodsMap.topologyPairToPods) {
+		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.topologyPairToPods are not equal")
 	}
 	if meta1.serviceAffinityInUse {
 		sortablePods1 := sortablePods(meta1.serviceAffinityMatchingPodList)
@@ -465,13 +432,25 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				HostIP:        "1.2.3.4",
 			},
 		},
-		matchingAntiAffinityTerms: map[string][]matchingPodAntiAffinityTerm{
-			"term1": {
-				{
-					term: &v1.PodAffinityTerm{TopologyKey: "node"},
-					node: &v1.Node{
-						ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-					},
+		topologyPairsAntiAffinityPodsMap: &topologyPairsMaps{
+			topologyPairToPods: map[topologyPair]podSet{
+				{key: "name", value: "machine1"}: {
+					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
+						Spec: v1.PodSpec{NodeName: "nodeC"},
+					}: struct{}{},
+				},
+				{key: "name", value: "machine2"}: {
+					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+						Spec: v1.PodSpec{NodeName: "nodeA"},
+					}: struct{}{},
+				},
+			},
+			podToTopologyPairs: map[string]topologyPairSet{
+				"p2_": {
+					topologyPair{key: "name", value: "machine1"}: struct{}{},
+				},
+				"p1_": {
+					topologyPair{key: "name", value: "machine2"}: struct{}{},
 				},
 			},
 		},

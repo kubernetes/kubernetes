@@ -71,7 +71,7 @@ func logOSImages(f *framework.Framework) {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
-		framework.Logf("OS Image: %v", node.Status.NodeInfo.OSImage)
+		framework.Logf("Nodename: %v, OS Image: %v", node.Name, node.Status.NodeInfo.OSImage)
 	}
 }
 

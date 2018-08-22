@@ -166,6 +166,7 @@ spec:
         - -k
         - --cache-size=1000
         - --no-negcache
+        - --dns-loop-detect
         - --log-facility=-
         - --server=/$DNS_DOMAIN/127.0.0.1#10053
         - --server=/in-addr.arpa/127.0.0.1#10053

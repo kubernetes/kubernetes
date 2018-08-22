@@ -212,6 +212,16 @@ run_deployment_tests() {
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
+  ### Test kubectl create deployment with image and command
+  # Pre-Condition: No deployment exists.
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create deployment nginx-with-command --image=k8s.gcr.io/nginx:test-cmd -- /bin/sleep infinity
+  # Post-Condition: Deployment "nginx" is created.
+  kube::test::get_object_assert 'deploy nginx-with-command' "{{$container_name_field}}" 'nginx'
+  # Clean up
+  kubectl delete deployment nginx-with-command "${kube_flags[@]}"
+
   ### Test kubectl create deployment should not fail validation
   # Pre-Condition: No deployment exists.
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''

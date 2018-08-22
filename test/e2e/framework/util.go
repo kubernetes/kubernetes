@@ -4831,7 +4831,8 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeList) {
 	nodes := &v1.NodeList{}
 	masters := sets.NewString()
-	all, _ := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	all, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	ExpectNoError(err)
 	for _, n := range all.Items {
 		if system.IsMasterNode(n.Name) {
 			masters.Insert(n.Name)
@@ -4875,8 +4876,8 @@ func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testut
 func (p *E2ETestNodePreparer) PrepareNodes() error {
 	nodes := GetReadySchedulableNodesOrDie(p.client)
 	numTemplates := 0
-	for k := range p.countToStrategy {
-		numTemplates += k
+	for _, v := range p.countToStrategy {
+		numTemplates += v.Count
 	}
 	if numTemplates > len(nodes.Items) {
 		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes.")

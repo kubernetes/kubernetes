@@ -23,15 +23,15 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 )
 
@@ -115,6 +115,12 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook,
 
 	if response.Response == nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+	}
+	for k, v := range response.Response.AuditAnnotations {
+		key := h.Name + "/" + k
+		if err := attr.AddAnnotation(key, v); err != nil {
+			glog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, v, h.Name, err)
+		}
 	}
 	if response.Response.Allowed {
 		return nil

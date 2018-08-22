@@ -80,7 +80,6 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
-        "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/etcd:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",

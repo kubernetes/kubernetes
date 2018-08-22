@@ -323,8 +323,8 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	}
 	src += hosts[i] + ":" + cephfsVolume.path
 
-	mountOptions := util.JoinMountOptions(cephfsVolume.mountOptions, opt)
-	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
+	opt = util.JoinMountOptions(cephfsVolume.mountOptions, opt)
+	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
 
@@ -407,6 +407,17 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	mountArgs = append(mountArgs, cephfsVolume.path)
 	mountArgs = append(mountArgs, "--id")
 	mountArgs = append(mountArgs, cephfsVolume.id)
+
+	// build option array
+	opt := []string{}
+	if cephfsVolume.readonly {
+		opt = append(opt, "ro")
+	}
+	opt = util.JoinMountOptions(cephfsVolume.mountOptions, opt)
+	if len(opt) > 0 {
+		mountArgs = append(mountArgs, "-o")
+		mountArgs = append(mountArgs, strings.Join(opt, ","))
+	}
 
 	glog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
 	command := exec.Command("ceph-fuse", mountArgs...)

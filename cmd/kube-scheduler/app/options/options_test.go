@@ -175,6 +175,7 @@ users:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
+				PercentageOfNodesToScore: 50,
 			},
 		},
 		{
@@ -211,6 +212,7 @@ users:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
+				PercentageOfNodesToScore: 50,
 			},
 		},
 		{

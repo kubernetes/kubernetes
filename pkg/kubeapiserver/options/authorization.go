@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	versionedinformers "k8s.io/client-go/informers"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
@@ -110,14 +109,13 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 }
 
-func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory, versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.AuthorizationConfig {
+func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.AuthorizationConfig {
 	return authorizer.AuthorizationConfig{
 		AuthorizationModes:          s.Modes,
 		PolicyFile:                  s.PolicyFile,
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
 		WebhookCacheUnauthorizedTTL: s.WebhookCacheUnauthorizedTTL,
-		InformerFactory:             informerFactory,
 		VersionedInformerFactory:    versionedInformerFactory,
 	}
 }

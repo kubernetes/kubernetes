@@ -107,4 +107,4 @@ spec:
           path: /var/lib/docker/containers
       - name: config-volume
         configMap:
-          name: fluentd-es-config-v0.1.4
+          name: fluentd-es-config-v0.1.5

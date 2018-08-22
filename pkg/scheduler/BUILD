@@ -15,6 +15,7 @@ go_test(
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
