@@ -475,7 +475,6 @@ staging/src/k8s.io/apimachinery/pkg/api/validation/path
 staging/src/k8s.io/apimachinery/pkg/apis/config/v1alpha1
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
-staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1
 staging/src/k8s.io/apimachinery/pkg/apis/testapigroup
