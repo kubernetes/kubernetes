@@ -21,7 +21,7 @@ set -o nounset
 set -o pipefail
 
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
-KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
+KUBE_ROOT=$(readlink -e "${TMP_ROOT}" 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' "${TMP_ROOT}")
 
 source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
@@ -97,7 +97,7 @@ function generate-pki-config {
   kube::util::ensure-temp-dir
   gen-kube-bearertoken
   gen-kube-basicauth
-  create-certs ${MASTER_IP}
+  create-certs "${MASTER_IP}"
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
@@ -213,11 +213,11 @@ function create-and-upload-hollow-node-image {
     fi
     echo "Copying kubemark binary to ${MAKE_DIR}"
     cp "${KUBEMARK_BIN}" "${MAKE_DIR}"
-    CURR_DIR=`pwd`
+    CURR_DIR=$(pwd)
     cd "${MAKE_DIR}"
     REGISTRY=${KUBEMARK_IMAGE_REGISTRY} IMAGE_TAG=${KUBEMARK_IMAGE_TAG} run-cmd-with-retries "${build_cmd[@]}"
     rm kubemark
-    cd $CURR_DIR
+    cd "$CURR_DIR"
   fi
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
 }
@@ -227,27 +227,27 @@ function create-and-upload-hollow-node-image {
 # templates, and finally create these resources through kubectl.
 function create-kube-hollow-node-resources {
   # Create kubeconfig for Kubelet.
-  KUBELET_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBELET_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: kubelet
   user:
-    client-certificate-data: "${KUBELET_CERT_BASE64}"
-    client-key-data: "${KUBELET_KEY_BASE64}"
+    client-certificate-data: ${KUBELET_CERT_BASE64}
+    client-key-data: ${KUBELET_KEY_BASE64}
 clusters:
 - name: kubemark
   cluster:
-    certificate-authority-data: "${CA_CERT_BASE64}"
+    certificate-authority-data: ${CA_CERT_BASE64}
     server: https://${MASTER_IP}
 contexts:
 - context:
     cluster: kubemark
     user: kubelet
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Kubeproxy.
-  KUBEPROXY_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBEPROXY_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: kube-proxy
@@ -263,10 +263,10 @@ contexts:
     cluster: kubemark
     user: kube-proxy
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Heapster.
-  HEAPSTER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  HEAPSTER_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: heapster
@@ -282,10 +282,10 @@ contexts:
     cluster: kubemark
     user: heapster
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Cluster Autoscaler.
-  CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: cluster-autoscaler
@@ -301,10 +301,10 @@ contexts:
     cluster: kubemark
     user: cluster-autoscaler
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for NodeProblemDetector.
-  NPD_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  NPD_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: node-problem-detector
@@ -320,10 +320,10 @@ contexts:
     cluster: kubemark
     user: node-problem-detector
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubeconfig for Kube DNS.
-  KUBE_DNS_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
+  KUBE_DNS_KUBECONFIG_CONTENTS="apiVersion: v1
 kind: Config
 users:
 - name: kube-dns
@@ -339,7 +339,7 @@ contexts:
     cluster: kubemark
     user: kube-dns
   name: kubemark-context
-current-context: kubemark-context")
+current-context: kubemark-context"
 
   # Create kubemark namespace.
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
@@ -445,7 +445,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       echo "${running} hollow-nodes are reported as 'Running'"
       not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
       echo "${not_running} hollow-nodes are reported as NOT 'Running'"
-      echo $(echo "${pods}" | grep -v "Running")
+      echo "${pods}" | grep -v Running
       exit 1
     fi
     nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
