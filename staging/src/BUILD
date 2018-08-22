@@ -202,6 +202,8 @@ filegroup(
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:all-srcs",
         "//staging/src/k8s.io/sample-apiserver:all-srcs",
         "//staging/src/k8s.io/sample-controller:all-srcs",
+        "//staging/src/k8s.io/structured-merge-diff/structured-merge-diff:all-srcs",
+        "//staging/src/k8s.io/structured-merge-diff/testvectors:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
