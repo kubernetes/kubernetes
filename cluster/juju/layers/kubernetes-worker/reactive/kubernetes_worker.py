@@ -1425,8 +1425,13 @@ def _write_azure_snap_config(component):
     cloud_config_path.write_text(json.dumps({
         'useInstanceMetadata': True,
         'useManagedIdentityExtension': True,
-        'resourceGroup': azure.resource_group,
         'subscriptionId': azure.subscription_id,
+        'resourceGroup': azure.resource_group,
+        'location': azure.resource_group_location,
+        'vnetName': azure.vnet_name,
+        'vnetResourceGroup': azure.vnet_resource_group,
+        'subnetName': azure.subnet_name,
+        'securityGroupName': azure.security_group_name,
     }))
 
 
