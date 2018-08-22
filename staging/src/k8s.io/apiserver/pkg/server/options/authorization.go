@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -41,6 +42,9 @@ type DelegatingAuthorizationOptions struct {
 	// RemoteKubeConfigFile is the file to use to connect to a "normal" kube API server which hosts the
 	// SubjectAccessReview.authorization.k8s.io endpoint for checking tokens.
 	RemoteKubeConfigFile string
+	// RemoteKubeConfigFileOptional is specifying whether not specifying the kubeconfig or
+	// a missing in-cluster config will be fatal.
+	RemoteKubeConfigFileOptional bool
 
 	// AllowCacheTTL is the length of time that a successful authorization response will be cached
 	AllowCacheTTL time.Duration
@@ -72,9 +76,13 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	var optionalKubeConfigSentence string
+	if s.RemoteKubeConfigFileOptional {
+		optionalKubeConfigSentence = " This is optional. If empty, all requests not skipped by authorization are forbidden."
+	}
 	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile,
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
-			" subjectaccessreviews.authorization.k8s.io.")
+			"subjectaccessreviews.authorization.k8s.io."+optionalKubeConfigSentence)
 
 	fs.DurationVar(&s.AllowCacheTTL, "authorization-webhook-cache-authorized-ttl",
 		s.AllowCacheTTL,
@@ -115,16 +123,20 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 		authorizers = append(authorizers, a)
 	}
 
-	cfg := authorizerfactory.DelegatingAuthorizerConfig{
-		SubjectAccessReviewClient: client.AuthorizationV1beta1().SubjectAccessReviews(),
-		AllowCacheTTL:             s.AllowCacheTTL,
-		DenyCacheTTL:              s.DenyCacheTTL,
+	if client == nil {
+		glog.Warningf("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
+	} else {
+		cfg := authorizerfactory.DelegatingAuthorizerConfig{
+			SubjectAccessReviewClient: client.AuthorizationV1beta1().SubjectAccessReviews(),
+			AllowCacheTTL:             s.AllowCacheTTL,
+			DenyCacheTTL:              s.DenyCacheTTL,
+		}
+		delegatedAuthorizer, err := cfg.New()
+		if err != nil {
+			return nil, err
+		}
+		authorizers = append(authorizers, delegatedAuthorizer)
 	}
-	a, err := cfg.New()
-	if err != nil {
-		return nil, err
-	}
-	authorizers = append(authorizers, a)
 
 	return union.New(authorizers...), nil
 }
@@ -141,6 +153,9 @@ func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, erro
 		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
 		// use this path
 		clientConfig, err = rest.InClusterConfig()
+		if err == rest.ErrNotInCluster && s.RemoteKubeConfigFileOptional {
+			return nil, nil
+		}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get delegated authorization kubeconfig: %v", err)
