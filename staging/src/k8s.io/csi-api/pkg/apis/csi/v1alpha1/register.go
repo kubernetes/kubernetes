@@ -34,8 +34,10 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
+	// SchemeBuilder collects schemas to build.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme is used by generated client to add this scheme to the generated client.
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 // Adds the list of known types to the given scheme.
@@ -43,6 +45,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&CSIDriver{},
 		&CSIDriverList{},
+		&CSINodeInfo{},
+		&CSINodeInfoList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

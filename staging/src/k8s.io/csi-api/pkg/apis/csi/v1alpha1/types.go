@@ -74,3 +74,44 @@ type CSIDriverSpec struct {
 	// +optional
 	PodInfoRequiredOnMount *bool `json:"podInfoRequiredOnMount"`
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSINodeInfo holds information about all CSI drivers installed on a node.
+type CSINodeInfo struct {
+	metav1.TypeMeta `json:",inline"`
+	// ObjectMeta.Name must be node name.
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// List of CSI drivers running on the node and their properties.
+	CSIDrivers []CSIDriverInfo `json:"csiDrivers"`
+}
+
+// CSIDriverInfo contains information about one CSI driver installed on a node.
+type CSIDriverInfo struct {
+	// Driver is the name of the CSI driver that this object refers to.
+	// This MUST be the same name returned by the CSI GetPluginName() call for
+	// that driver.
+	Driver string `json:"driver"`
+
+	// ID of the node from the driver point of view.
+	NodeID string `json:"nodeID"`
+
+	// Topology keys reported by the driver on the node.
+	TopologyKeys []string `json:"topologyKeys"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSINodeInfoList is a collection of CSINodeInfo objects.
+type CSINodeInfoList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+	// Items is the list of CSINodeInfo
+	Items []CSINodeInfo `json:"items"`
+}
