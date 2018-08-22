@@ -638,6 +638,7 @@ func (os *OpenStack) DiskIsAttachedByName(nodeName types.NodeName, volumeID stri
 	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
 		instanceID = instanceID[(ind + 1):]
 	}
+
 	attached, err := os.DiskIsAttached(instanceID, volumeID)
 	return attached, instanceID, err
 }
@@ -678,6 +679,24 @@ func (os *OpenStack) DisksAreAttachedByName(nodeName types.NodeName, volumeIDs [
 	if ind := strings.LastIndex(instanceID, "/"); ind >= 0 {
 		instanceID = instanceID[(ind + 1):]
 	}
+
+	// if instance's status is not 'ACTIVE'(node is NotReady, for example 'SHUTOFF'), we should detach the volume
+	// from instance and allow the volume is attached to other instance.
+	if srv.Status != "ACTIVE" {
+		for _, volumeID := range volumeIDs {
+			attached, _ := os.DiskIsAttached(instanceID, volumeID)
+			if attached == true {
+				detachErr := os.DetachDisk(instanceID, volumeID)
+				if detachErr != nil {
+					msg := fmt.Sprintf("the status of instance %s is %s, try to detach volume %s, but get error: %v",
+						instanceID, srv.Status, volumeID, detachErr)
+					glog.Error(msg)
+					// do not return, need check volume again
+				}
+			}
+		}
+	}
+
 	return os.DisksAreAttached(instanceID, volumeIDs)
 }
 
