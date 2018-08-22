@@ -1593,8 +1593,6 @@ function start-kube-apiserver {
       fi
     fi
     if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
-      params+=" --audit-webhook-mode=batch"
-
       # Create the audit webhook config file, and mount it into the apiserver pod.
       local -r audit_webhook_config_file="/etc/audit_webhook.config"
       params+=" --audit-webhook-config-file=${audit_webhook_config_file}"
@@ -1605,6 +1603,8 @@ function start-kube-apiserver {
       # Batching parameters
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_MODE:-}" ]]; then
         params+=" --audit-webhook-mode=${ADVANCED_AUDIT_WEBHOOK_MODE}"
+      else
+        params+=" --audit-webhook-mode=batch"
       fi
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE:-}" ]]; then
         params+=" --audit-webhook-batch-buffer-size=${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE}"
