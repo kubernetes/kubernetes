@@ -195,9 +195,13 @@ func getDefaultInitConfigBytes(kind string) ([]byte, error) {
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.JoinConfiguration{
-		Token:                                  sillyToken.Token.String(),
-		DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
-		DiscoveryTokenUnsafeSkipCAVerification: true, // TODO: DiscoveryTokenUnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+		Discovery: kubeadmapiv1beta1.Discovery{
+			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
+				Token:                    sillyToken.Token.String(),
+				APIServerEndpoints:       []string{"kube-apiserver:6443"},
+				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+			},
+		},
 	})
 	if err != nil {
 		return []byte{}, err
