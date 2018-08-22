@@ -17,7 +17,8 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
+	"crypto/sha1"
+	"encoding/hex"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -32,9 +33,23 @@ func TestGetCSIAttachLimitKey(t *testing.T) {
 	}
 
 	// When driver is longer than 39 chars
-	csiLimitKeyLonger := GetCSIAttachLimitKey("com.amazon.kubernetes.eks.ec2.ebs/csi-driver")
-	fmt.Println(csiLimitKeyLonger)
+	longDriverName := "com.amazon.kubernetes.eks.ec2.ebs/csi-driver"
+	csiLimitKeyLonger := GetCSIAttachLimitKey(longDriverName)
 	if !v1helper.IsAttachableVolumeResourceName(v1.ResourceName(csiLimitKeyLonger)) {
 		t.Errorf("Expected %s to have attachable prefix", csiLimitKeyLonger)
 	}
+
+	expectedCSIKey := getDriverHash(longDriverName)
+	if csiLimitKeyLonger != expectedCSIKey {
+		t.Errorf("Expected limit to be %s got %s", expectedCSIKey, csiLimitKeyLonger)
+	}
+}
+
+func getDriverHash(driverName string) string {
+	charsFromDriverName := driverName[:23]
+	hash := sha1.New()
+	hash.Write([]byte(driverName))
+	hashed := hex.EncodeToString(hash.Sum(nil))
+	hashed = hashed[:16]
+	return CSIAttachLimitPrefix + charsFromDriverName + hashed
 }

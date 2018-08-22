@@ -114,41 +114,44 @@ func (c *CSIMaxVolumeLimitChecker) filterAttachableVolumes(
 
 	for _, vol := range volumes {
 		// CSI volumes can only be used as persistent volumes
-		if vol.PersistentVolumeClaim != nil {
-			pvcName := vol.PersistentVolumeClaim.ClaimName
-
-			if pvcName == "" {
-				return fmt.Errorf("PersistentVolumeClaim had no name")
-			}
-
-			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
-
-			if err != nil {
-				glog.Errorf("Unable to look up PVC info for %s/%s", namespace, pvcName)
-				continue
-			}
-
-			pvName := pvc.Spec.VolumeName
-			if pvName == "" {
-				glog.Errorf("Persistent volume had no name for claim %s/%s", namespace, pvcName)
-				continue
-			}
-			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
-
-			if err != nil {
-				glog.Errorf("Unable to look up PV info for PVC %s/%s and PV %s", namespace, pvcName, pvName)
-				continue
-			}
-
-			csiSource := pv.Spec.PersistentVolumeSource.CSI
-			if csiSource == nil {
-				glog.V(4).Infof("Not considering non-CSI volume %s/%s", namespace, pvcName)
-				continue
-			}
-			driverName := csiSource.Driver
-			volumeLimitKey := volumeutil.GetCSIAttachLimitKey(driverName)
-			result[csiSource.VolumeHandle] = volumeLimitKey
+		if vol.PersistentVolumeClaim == nil {
+			continue
 		}
+		pvcName := vol.PersistentVolumeClaim.ClaimName
+
+		if pvcName == "" {
+			return fmt.Errorf("PersistentVolumeClaim had no name")
+		}
+
+		pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+
+		if err != nil {
+			glog.V(4).Infof("Unable to look up PVC info for %s/%s", namespace, pvcName)
+			continue
+		}
+
+		pvName := pvc.Spec.VolumeName
+		// TODO - the actual handling of unbound PVCs will be fixed by late binding design.
+		if pvName == "" {
+			glog.V(4).Infof("Persistent volume had no name for claim %s/%s", namespace, pvcName)
+			continue
+		}
+		pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+
+		if err != nil {
+			glog.V(4).Infof("Unable to look up PV info for PVC %s/%s and PV %s", namespace, pvcName, pvName)
+			continue
+		}
+
+		csiSource := pv.Spec.PersistentVolumeSource.CSI
+		if csiSource == nil {
+			glog.V(4).Infof("Not considering non-CSI volume %s/%s", namespace, pvcName)
+			continue
+		}
+		driverName := csiSource.Driver
+		volumeLimitKey := volumeutil.GetCSIAttachLimitKey(driverName)
+		result[csiSource.VolumeHandle] = volumeLimitKey
+
 	}
 	return nil
 }
