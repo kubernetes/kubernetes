@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/controller/apis/config/v1alpha1:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/config/v1alpha1:go_default_library",
@@ -30,8 +29,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/controller-manager/pkg/apis/config/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/kube-controller-manager/config/v1alpha1:go_default_library",
     ],
 )
 

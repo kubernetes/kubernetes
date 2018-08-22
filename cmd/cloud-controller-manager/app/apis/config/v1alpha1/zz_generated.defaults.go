@@ -22,16 +22,21 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	configv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&KubeSchedulerConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeSchedulerConfiguration(obj.(*KubeSchedulerConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&CloudControllerManagerConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_CloudControllerManagerConfiguration(obj.(*CloudControllerManagerConfiguration))
+	})
 	return nil
 }
 
-func SetObjectDefaults_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration) {
-	SetDefaults_KubeSchedulerConfiguration(in)
+func SetObjectDefaults_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration) {
+	SetDefaults_CloudControllerManagerConfiguration(in)
+	configv1alpha1.SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
+	configv1alpha1.SetDefaults_ServiceControllerConfiguration(&in.ServiceController)
 }
