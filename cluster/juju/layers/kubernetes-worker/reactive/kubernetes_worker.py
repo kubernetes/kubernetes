@@ -1296,7 +1296,7 @@ def set_cloud_pending():
           'endpoint.gcp.joined',
           'endpoint.azure.joined')
 @when('kube-control.cluster_tag.available')
-@when_not('kubernetes-worker.cloud-request-sent')
+@when_not('kubernetes-worker.cloud.request-sent')
 def request_integration():
     hookenv.status_set('maintenance', 'requesting cloud integration')
     kube_control = endpoint_from_flag('kube-control.cluster_tag.available')
@@ -1327,7 +1327,7 @@ def request_integration():
         cloud.enable_object_storage_management()
     cloud.enable_instance_inspection()
     cloud.enable_dns_management()
-    set_state('kubernetes-worker.cloud-request-sent')
+    set_state('kubernetes-worker.cloud.request-sent')
     hookenv.status_set('waiting', 'Waiting for cloud integration')
 
 

@@ -1709,7 +1709,7 @@ def set_cloud_pending():
           'endpoint.gcp.joined',
           'endpoint.azure.joined')
 @when('leadership.set.cluster_tag')
-@when_not('kubernetes-master.cloud-request-sent')
+@when_not('kubernetes-master.cloud.request-sent')
 def request_integration():
     hookenv.status_set('maintenance', 'requesting cloud integration')
     cluster_tag = leader_get('cluster_tag')
@@ -1747,7 +1747,7 @@ def request_integration():
     cloud.enable_network_management()
     cloud.enable_dns_management()
     cloud.enable_block_storage_management()
-    set_state('kubernetes-master.cloud-request-sent')
+    set_state('kubernetes-master.cloud.request-sent')
 
 
 @when_none('endpoint.aws.joined',
