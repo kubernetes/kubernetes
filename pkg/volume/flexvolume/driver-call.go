@@ -44,6 +44,9 @@ const (
 	mountCmd   = "mount"
 	unmountCmd = "unmount"
 
+	expandVolumeCmd = "expandvolume"
+	expandFSCmd     = "expandfs"
+
 	// Option keys
 	optionFSType         = "kubernetes.io/fsType"
 	optionReadWrite      = "kubernetes.io/readwrite"
@@ -221,22 +224,26 @@ type DriverStatus struct {
 	// By default we assume all the capabilities are supported.
 	// If the plugin does not support a capability, it can return false for that capability.
 	Capabilities *DriverCapabilities `json:",omitempty"`
+	// Returns the actual size of the volume after resizing is done, the size is in bytes.
+	ActualVolumeSize int64 `json:"volumeNewSize,omitempty"`
 }
 
 // DriverCapabilities represents what driver can do
 type DriverCapabilities struct {
-	Attach          bool `json:"attach"`
-	SELinuxRelabel  bool `json:"selinuxRelabel"`
-	SupportsMetrics bool `json:"supportsMetrics"`
-	FSGroup         bool `json:"fsGroup"`
+	Attach           bool `json:"attach"`
+	SELinuxRelabel   bool `json:"selinuxRelabel"`
+	SupportsMetrics  bool `json:"supportsMetrics"`
+	FSGroup          bool `json:"fsGroup"`
+	RequiresFSResize bool `json:"requiresFSResize"`
 }
 
 func defaultCapabilities() *DriverCapabilities {
 	return &DriverCapabilities{
-		Attach:          true,
-		SELinuxRelabel:  true,
-		SupportsMetrics: false,
-		FSGroup:         true,
+		Attach:           true,
+		SELinuxRelabel:   true,
+		SupportsMetrics:  false,
+		FSGroup:          true,
+		RequiresFSResize: true,
 	}
 }
 

@@ -57,6 +57,8 @@ type flexVolumeAttachablePlugin struct {
 
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
+var _ volume.FSResizableVolumePlugin = &flexVolumePlugin{}
+var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
 
 var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
 
@@ -304,4 +306,8 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 
 	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
 	return path.Join(mountsDir, volumeName), nil
+}
+
+func (plugin *flexVolumePlugin) RequiresFSResize() bool {
+	return plugin.capabilities.RequiresFSResize
 }

@@ -225,6 +225,13 @@ type ExpandableVolumePlugin interface {
 	RequiresFSResize() bool
 }
 
+// FSResizableVolumePlugin is an extension of ExpandableVolumePlugin and is used for volumes (flex)
+// that require extra steps on nodes for expansion to complete
+type FSResizableVolumePlugin interface {
+	ExpandableVolumePlugin
+	ExpandFS(spec *Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) error
+}
+
 // VolumePluginWithAttachLimits is an extended interface of VolumePlugin that restricts number of
 // volumes that can be attached to a node.
 type VolumePluginWithAttachLimits interface {
@@ -383,6 +390,36 @@ func (spec *Spec) Name() string {
 		return spec.Volume.Name
 	case spec.PersistentVolume != nil:
 		return spec.PersistentVolume.Name
+	default:
+		return ""
+	}
+}
+
+// IsKubeletExpandable returns true for volume types that can be expanded only by the node
+// and not the controller. Currently Flex volume is the only one in this category since
+// it is typically not installed on the controller
+func (spec *Spec) IsKubeletExpandable() bool {
+	switch {
+	case spec.Volume != nil:
+		return spec.Volume.FlexVolume != nil
+	case spec.PersistentVolume != nil:
+		return spec.PersistentVolume.Spec.FlexVolume != nil
+	default:
+		return false
+
+	}
+}
+
+// KubeletExpandablePluginName creates and returns a name for the plugin
+// this is used in context on the controller where the plugin lookup fails
+// as volume expansion on controller isn't supported, but a plugin name is
+// required
+func (spec *Spec) KubeletExpandablePluginName() string {
+	switch {
+	case spec.Volume != nil && spec.Volume.FlexVolume != nil:
+		return spec.Volume.FlexVolume.Driver
+	case spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil:
+		return spec.PersistentVolume.Spec.FlexVolume.Driver
 	default:
 		return ""
 	}
@@ -797,6 +834,13 @@ func (pm *VolumePluginMgr) FindDeviceMountablePluginByName(name string) (DeviceM
 func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
+		if spec.IsKubeletExpandable() {
+			// for kubelet expandable volumes, return a noop plugin that
+			// returns success for expand on the controller
+			glog.Warningf("FindExpandablePluginBySpec(%s) -> returning noopExpandableVolumePluginInstance", spec.Name())
+			return &noopExpandableVolumePluginInstance{spec}, nil
+		}
+		glog.Warningf("FindExpandablePluginBySpec(%s) -> err:%v", spec.Name(), err)
 		return nil, err
 	}
 
@@ -842,6 +886,32 @@ func (pm *VolumePluginMgr) FindMapperPluginByName(name string) (BlockVolumePlugi
 	if blockVolumePlugin, ok := volumePlugin.(BlockVolumePlugin); ok {
 		return blockVolumePlugin, nil
 	}
+	return nil, nil
+}
+
+// FindFSResizablePluginBySpec fetches a persistent volume plugin by spec
+func (pm *VolumePluginMgr) FindFSResizablePluginBySpec(spec *Spec) (FSResizableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginBySpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+		return fsResizablePlugin, nil
+	}
+	return nil, nil
+}
+
+// FindFSResizablePluginByName fetches a persistent volume plugin by name
+func (pm *VolumePluginMgr) FindFSResizablePluginByName(name string) (FSResizableVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+		return fsResizablePlugin, nil
+	}
+
 	return nil, nil
 }
 
