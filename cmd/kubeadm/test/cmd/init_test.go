@@ -90,8 +90,8 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "invalid version string is detected",
-			args:     "--kubernetes-version=foobar",
+			name:     "invalid semantic version string is detected",
+			args:     "--kubernetes-version=v1.1",
 			expected: false,
 		},
 		{
