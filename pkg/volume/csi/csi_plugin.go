@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
 	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
@@ -145,6 +146,17 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		// Start informer for CSIDrivers.
 		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
 		p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
+		p.csiDriverInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				glog.Infof("CSIINFORMER: add %+v", obj)
+			},
+			DeleteFunc: func(obj interface{}) {
+				glog.Infof("CSIINFORMER: delete %+v", obj)
+			},
+			UpdateFunc: func(old, obj interface{}) {
+				glog.Infof("CSIINFORMER: update %+v", obj)
+			},
+		})
 		go factory.Start(wait.NeverStop)
 	}
 

@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	api "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -173,6 +174,23 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	if c.spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 	}
+
+	// TODO: TESTING ONLY, REMOVE!!!
+	func() {
+		if c.plugin.csiDriverInformer == nil {
+			glog.Infof("CSIDRIVER: informer not started!")
+			return
+		}
+		driver, err := c.plugin.csiDriverInformer.Lister().Get(c.driverName)
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				glog.Infof("CSIDRIVER: driver %s not found", c.driverName)
+				return
+			}
+			glog.Infof("CSIDRIVER: driver %s GET error: %s", c.driverName, err)
+		}
+		glog.Infof("CSIDRIVER: got CSIDriver %+v", driver)
+	}()
 
 	fsType := csiSource.FSType
 	err = csi.NodePublishVolume(
