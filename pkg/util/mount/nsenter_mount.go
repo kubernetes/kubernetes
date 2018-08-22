@@ -108,7 +108,8 @@ func (n *NsenterMounter) makeNsenterArgs(source, target, fstype string, options 
 		//   Kubelet container can be restarted and the fuse daemon survives.
 		// * When the daemon dies (e.g. during unmount) systemd removes the
 		//   scope automatically.
-		mountCmd, mountArgs = addSystemdScope(systemdRunPath, target, mountCmd, mountArgs)
+		description := fmt.Sprintf("Kubernetes transient mount for %s", target)
+		mountCmd, mountArgs = AddSystemdScope(systemdRunPath, description, mountCmd, mountArgs)
 	} else {
 		// Fall back to simple mount when the host has no systemd.
 		// Complete command line:

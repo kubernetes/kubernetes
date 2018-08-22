@@ -14,6 +14,8 @@ go_library(
         "mount_windows.go",
         "nsenter_mount.go",
         "nsenter_mount_unsupported.go",
+        "systemd.go",
+        "systemd_unsupported.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/util/mount",
     visibility = ["//visibility:public"],

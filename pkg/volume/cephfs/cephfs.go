@@ -19,7 +19,6 @@ package cephfs
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"runtime"
 	"strings"
@@ -419,11 +418,26 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		mountArgs = append(mountArgs, strings.Join(opt, ","))
 	}
 
-	glog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
-	command := exec.Command("ceph-fuse", mountArgs...)
-	output, err := command.CombinedOutput()
+	exec := cephfsVolume.plugin.host.GetExec(cephfsVolume.plugin.GetPluginName())
+	command := "ceph-fuse"
+	if mount.DetectSystemd(exec, "") {
+		// Try to run ceph-fuse via systemd-run --scope. This will escape the
+		// service where kubelet runs and ceph-fuse daemons will be started in
+		// a specific scope. kubelet service then can be restarted without
+		// killing ceph-fuse daemons.
+		description := fmt.Sprintf("Kubernetes CephFS Fuse for %s", mountpoint)
+		command, mountArgs = mount.AddSystemdScope("", description, command, mountArgs)
+	}
+	// We run ceph-fuse directly instead of mounting with mount.fuse.ceph
+	// helper because mount.fuse.ceph has some problems:
+	// - In kraken and earlier releases, it uses old options format which is
+	//   incompatbile with luminous+ releases.
+	// - In luminous and newer releases, it does not exit non-zero code on
+	//   failures. Kubelet mounter cannot detect failures.
+	glog.V(4).Infof("Mounting ceph-fuse using command %q with arguments: %v", command, mountArgs)
+	output, err := exec.Run(command, mountArgs...)
 	if err != nil || !(strings.Contains(string(output), "starting fuse")) {
-		return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s\n", err, mountArgs, string(output))
+		return fmt.Errorf("Mounting ceph-fuse failed: %v\ncommand: %q\narguments: %s\noutput: %s\n", err, command, mountArgs, string(output))
 	}
 
 	return nil
