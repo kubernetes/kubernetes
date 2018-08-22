@@ -33,6 +33,11 @@ func (in *AdmissionRequest) DeepCopyInto(out *AdmissionRequest) {
 	in.UserInfo.DeepCopyInto(&out.UserInfo)
 	in.Object.DeepCopyInto(&out.Object)
 	in.OldObject.DeepCopyInto(&out.OldObject)
+	if in.DryRun != nil {
+		in, out := &in.DryRun, &out.DryRun
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
