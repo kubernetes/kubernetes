@@ -207,6 +207,8 @@ filegroup(
         "//staging/src/k8s.io/metrics/pkg/client/custom_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:all-srcs",
         "//staging/src/k8s.io/sample-apiserver:all-srcs",
+        "//staging/src/k8s.io/sample-cli-plugin/cmd:all-srcs",
+        "//staging/src/k8s.io/sample-cli-plugin/pkg/cmd:all-srcs",
         "//staging/src/k8s.io/sample-controller:all-srcs",
     ],
     tags = ["automanaged"],
