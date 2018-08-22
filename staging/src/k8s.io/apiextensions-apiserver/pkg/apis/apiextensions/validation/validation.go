@@ -255,7 +255,7 @@ func ValidateCustomResourceColumnDefinition(col *apiextensions.CustomResourceCol
 	allErrs := field.ErrorList{}
 
 	if len(col.Name) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("header"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
 
 	if len(col.Type) == 0 {
@@ -269,8 +269,8 @@ func ValidateCustomResourceColumnDefinition(col *apiextensions.CustomResourceCol
 	}
 
 	if len(col.JSONPath) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
-	} else if errs := validateSimpleJSONPath(col.JSONPath, fldPath.Child("path")); len(errs) > 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("JSONPath"), ""))
+	} else if errs := validateSimpleJSONPath(col.JSONPath, fldPath.Child("JSONPath")); len(errs) > 0 {
 		allErrs = append(allErrs, errs...)
 	}
 

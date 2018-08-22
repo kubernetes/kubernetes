@@ -15,7 +15,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/features:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
@@ -45,7 +44,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
         "//pkg/features:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

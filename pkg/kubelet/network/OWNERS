@@ -5,4 +5,5 @@ approvers:
 - freehan
 reviewers:
 - sig-network-reviewers
-
+labels:
+- sig/network

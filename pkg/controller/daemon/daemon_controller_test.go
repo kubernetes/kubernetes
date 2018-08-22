@@ -2047,11 +2047,12 @@ func TestUpdateNode(t *testing.T) {
 	var enqueued bool
 
 	cases := []struct {
-		test          string
-		newNode       *v1.Node
-		oldNode       *v1.Node
-		ds            *apps.DaemonSet
-		shouldEnqueue bool
+		test               string
+		newNode            *v1.Node
+		oldNode            *v1.Node
+		ds                 *apps.DaemonSet
+		expectedEventsFunc func(strategyType apps.DaemonSetUpdateStrategyType) int
+		shouldEnqueue      bool
 	}{
 		{
 			test:    "Nothing changed, should not enqueue",
@@ -2086,6 +2087,32 @@ func TestUpdateNode(t *testing.T) {
 			ds:            newDaemonSet("ds"),
 			shouldEnqueue: true,
 		},
+		{
+			test:    "Node Allocatable changed",
+			oldNode: newNode("node1", nil),
+			newNode: func() *v1.Node {
+				node := newNode("node1", nil)
+				node.Status.Allocatable = allocatableResources("200M", "200m")
+				return node
+			}(),
+			ds: func() *apps.DaemonSet {
+				ds := newDaemonSet("ds")
+				ds.Spec.Template.Spec = resourcePodSpecWithoutNodeName("200M", "200m")
+				return ds
+			}(),
+			expectedEventsFunc: func(strategyType apps.DaemonSetUpdateStrategyType) int {
+				switch strategyType {
+				case apps.OnDeleteDaemonSetStrategyType:
+					return 2
+				case apps.RollingUpdateDaemonSetStrategyType:
+					return 3
+				default:
+					t.Fatalf("unexpected UpdateStrategy %+v", strategyType)
+				}
+				return 0
+			},
+			shouldEnqueue: true,
+		},
 	}
 	for _, c := range cases {
 		for _, strategy := range updateStrategies() {
@@ -2096,7 +2123,12 @@ func TestUpdateNode(t *testing.T) {
 			manager.nodeStore.Add(c.oldNode)
 			c.ds.Spec.UpdateStrategy = *strategy
 			manager.dsStore.Add(c.ds)
-			syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, 0)
+
+			expectedEvents := 0
+			if c.expectedEventsFunc != nil {
+				expectedEvents = c.expectedEventsFunc(strategy.Type)
+			}
+			syncAndValidateDaemonSets(t, manager, c.ds, podControl, 0, 0, expectedEvents)
 
 			manager.enqueueDaemonSet = func(ds *apps.DaemonSet) {
 				if ds.Name == "ds" {
