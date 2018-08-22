@@ -4,11 +4,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "fake_events_client.go",
+        "fake_imagepolicy_client.go",
+        "fake_imagereview.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/events/internalversion/fake",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/imagepolicy/v1alpha1/fake",
+    importpath = "k8s.io/client-go/kubernetes/typed/imagepolicy/v1alpha1/fake",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/client-go/kubernetes/typed/imagepolicy/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],

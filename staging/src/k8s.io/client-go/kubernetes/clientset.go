@@ -39,6 +39,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	imagepolicyv1alpha1 "k8s.io/client-go/kubernetes/typed/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -60,11 +61,11 @@ type Interface interface {
 	AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Admissionregistration() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface
-	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
-	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
 	AppsV1() appsv1.AppsV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Apps() appsv1.AppsV1Interface
+	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
+	AppsV1beta2() appsv1beta2.AppsV1beta2Interface
 	AuthenticationV1() authenticationv1.AuthenticationV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Authentication() authenticationv1.AuthenticationV1Interface
@@ -97,6 +98,9 @@ type Interface interface {
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Extensions() extensionsv1beta1.ExtensionsV1beta1Interface
+	ImagepolicyV1alpha1() imagepolicyv1alpha1.ImagepolicyV1alpha1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Imagepolicy() imagepolicyv1alpha1.ImagepolicyV1alpha1Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Networking() networkingv1.NetworkingV1Interface
@@ -106,8 +110,8 @@ type Interface interface {
 	RbacV1() rbacv1.RbacV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Rbac() rbacv1.RbacV1Interface
-	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
 	RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface
+	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
 	SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface
 	SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
@@ -115,11 +119,11 @@ type Interface interface {
 	SettingsV1alpha1() settingsv1alpha1.SettingsV1alpha1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Settings() settingsv1alpha1.SettingsV1alpha1Interface
-	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
 	StorageV1() storagev1.StorageV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Storage() storagev1.StorageV1Interface
 	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
+	StorageV1beta1() storagev1beta1.StorageV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -128,9 +132,9 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	admissionregistrationV1alpha1 *admissionregistrationv1alpha1.AdmissionregistrationV1alpha1Client
 	admissionregistrationV1beta1  *admissionregistrationv1beta1.AdmissionregistrationV1beta1Client
+	appsV1                        *appsv1.AppsV1Client
 	appsV1beta1                   *appsv1beta1.AppsV1beta1Client
 	appsV1beta2                   *appsv1beta2.AppsV1beta2Client
-	appsV1                        *appsv1.AppsV1Client
 	authenticationV1              *authenticationv1.AuthenticationV1Client
 	authenticationV1beta1         *authenticationv1beta1.AuthenticationV1beta1Client
 	authorizationV1               *authorizationv1.AuthorizationV1Client
@@ -145,17 +149,18 @@ type Clientset struct {
 	coreV1                        *corev1.CoreV1Client
 	eventsV1beta1                 *eventsv1beta1.EventsV1beta1Client
 	extensionsV1beta1             *extensionsv1beta1.ExtensionsV1beta1Client
+	imagepolicyV1alpha1           *imagepolicyv1alpha1.ImagepolicyV1alpha1Client
 	networkingV1                  *networkingv1.NetworkingV1Client
 	policyV1beta1                 *policyv1beta1.PolicyV1beta1Client
 	rbacV1                        *rbacv1.RbacV1Client
-	rbacV1beta1                   *rbacv1beta1.RbacV1beta1Client
 	rbacV1alpha1                  *rbacv1alpha1.RbacV1alpha1Client
+	rbacV1beta1                   *rbacv1beta1.RbacV1beta1Client
 	schedulingV1alpha1            *schedulingv1alpha1.SchedulingV1alpha1Client
 	schedulingV1beta1             *schedulingv1beta1.SchedulingV1beta1Client
 	settingsV1alpha1              *settingsv1alpha1.SettingsV1alpha1Client
-	storageV1beta1                *storagev1beta1.StorageV1beta1Client
 	storageV1                     *storagev1.StorageV1Client
 	storageV1alpha1               *storagev1alpha1.StorageV1alpha1Client
+	storageV1beta1                *storagev1beta1.StorageV1beta1Client
 }
 
 // AdmissionregistrationV1alpha1 retrieves the AdmissionregistrationV1alpha1Client
@@ -174,16 +179,6 @@ func (c *Clientset) Admissionregistration() admissionregistrationv1beta1.Admissi
 	return c.admissionregistrationV1beta1
 }
 
-// AppsV1beta1 retrieves the AppsV1beta1Client
-func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
-	return c.appsV1beta1
-}
-
-// AppsV1beta2 retrieves the AppsV1beta2Client
-func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
-	return c.appsV1beta2
-}
-
 // AppsV1 retrieves the AppsV1Client
 func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
 	return c.appsV1
@@ -193,6 +188,16 @@ func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
 // Please explicitly pick a version.
 func (c *Clientset) Apps() appsv1.AppsV1Interface {
 	return c.appsV1
+}
+
+// AppsV1beta1 retrieves the AppsV1beta1Client
+func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
+	return c.appsV1beta1
+}
+
+// AppsV1beta2 retrieves the AppsV1beta2Client
+func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
+	return c.appsV1beta2
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client
@@ -319,6 +324,17 @@ func (c *Clientset) Extensions() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return c.extensionsV1beta1
 }
 
+// ImagepolicyV1alpha1 retrieves the ImagepolicyV1alpha1Client
+func (c *Clientset) ImagepolicyV1alpha1() imagepolicyv1alpha1.ImagepolicyV1alpha1Interface {
+	return c.imagepolicyV1alpha1
+}
+
+// Deprecated: Imagepolicy retrieves the default version of ImagepolicyClient.
+// Please explicitly pick a version.
+func (c *Clientset) Imagepolicy() imagepolicyv1alpha1.ImagepolicyV1alpha1Interface {
+	return c.imagepolicyV1alpha1
+}
+
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 	return c.networkingV1
@@ -352,14 +368,14 @@ func (c *Clientset) Rbac() rbacv1.RbacV1Interface {
 	return c.rbacV1
 }
 
-// RbacV1beta1 retrieves the RbacV1beta1Client
-func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
-	return c.rbacV1beta1
-}
-
 // RbacV1alpha1 retrieves the RbacV1alpha1Client
 func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
 	return c.rbacV1alpha1
+}
+
+// RbacV1beta1 retrieves the RbacV1beta1Client
+func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
+	return c.rbacV1beta1
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
@@ -389,11 +405,6 @@ func (c *Clientset) Settings() settingsv1alpha1.SettingsV1alpha1Interface {
 	return c.settingsV1alpha1
 }
 
-// StorageV1beta1 retrieves the StorageV1beta1Client
-func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
-	return c.storageV1beta1
-}
-
 // StorageV1 retrieves the StorageV1Client
 func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
 	return c.storageV1
@@ -408,6 +419,11 @@ func (c *Clientset) Storage() storagev1.StorageV1Interface {
 // StorageV1alpha1 retrieves the StorageV1alpha1Client
 func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return c.storageV1alpha1
+}
+
+// StorageV1beta1 retrieves the StorageV1beta1Client
+func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
+	return c.storageV1beta1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -434,15 +450,15 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.appsV1, err = appsv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.appsV1beta1, err = appsv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 	cs.appsV1beta2, err = appsv1beta2.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.appsV1, err = appsv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -502,6 +518,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.imagepolicyV1alpha1, err = imagepolicyv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.networkingV1, err = networkingv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -514,11 +534,11 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.rbacV1beta1, err = rbacv1beta1.NewForConfig(&configShallowCopy)
+	cs.rbacV1alpha1, err = rbacv1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
-	cs.rbacV1alpha1, err = rbacv1alpha1.NewForConfig(&configShallowCopy)
+	cs.rbacV1beta1, err = rbacv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -534,15 +554,15 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.storageV1beta1, err = storagev1beta1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.storageV1, err = storagev1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 	cs.storageV1alpha1, err = storagev1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.storageV1beta1, err = storagev1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -560,9 +580,9 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1alpha1 = admissionregistrationv1alpha1.NewForConfigOrDie(c)
 	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.NewForConfigOrDie(c)
+	cs.appsV1 = appsv1.NewForConfigOrDie(c)
 	cs.appsV1beta1 = appsv1beta1.NewForConfigOrDie(c)
 	cs.appsV1beta2 = appsv1beta2.NewForConfigOrDie(c)
-	cs.appsV1 = appsv1.NewForConfigOrDie(c)
 	cs.authenticationV1 = authenticationv1.NewForConfigOrDie(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.NewForConfigOrDie(c)
 	cs.authorizationV1 = authorizationv1.NewForConfigOrDie(c)
@@ -577,17 +597,18 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.coreV1 = corev1.NewForConfigOrDie(c)
 	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
+	cs.imagepolicyV1alpha1 = imagepolicyv1alpha1.NewForConfigOrDie(c)
 	cs.networkingV1 = networkingv1.NewForConfigOrDie(c)
 	cs.policyV1beta1 = policyv1beta1.NewForConfigOrDie(c)
 	cs.rbacV1 = rbacv1.NewForConfigOrDie(c)
-	cs.rbacV1beta1 = rbacv1beta1.NewForConfigOrDie(c)
 	cs.rbacV1alpha1 = rbacv1alpha1.NewForConfigOrDie(c)
+	cs.rbacV1beta1 = rbacv1beta1.NewForConfigOrDie(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForConfigOrDie(c)
 	cs.schedulingV1beta1 = schedulingv1beta1.NewForConfigOrDie(c)
 	cs.settingsV1alpha1 = settingsv1alpha1.NewForConfigOrDie(c)
-	cs.storageV1beta1 = storagev1beta1.NewForConfigOrDie(c)
 	cs.storageV1 = storagev1.NewForConfigOrDie(c)
 	cs.storageV1alpha1 = storagev1alpha1.NewForConfigOrDie(c)
+	cs.storageV1beta1 = storagev1beta1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -598,9 +619,9 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.admissionregistrationV1alpha1 = admissionregistrationv1alpha1.New(c)
 	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.New(c)
+	cs.appsV1 = appsv1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
 	cs.appsV1beta2 = appsv1beta2.New(c)
-	cs.appsV1 = appsv1.New(c)
 	cs.authenticationV1 = authenticationv1.New(c)
 	cs.authenticationV1beta1 = authenticationv1beta1.New(c)
 	cs.authorizationV1 = authorizationv1.New(c)
@@ -615,17 +636,18 @@ func New(c rest.Interface) *Clientset {
 	cs.coreV1 = corev1.New(c)
 	cs.eventsV1beta1 = eventsv1beta1.New(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
+	cs.imagepolicyV1alpha1 = imagepolicyv1alpha1.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.policyV1beta1 = policyv1beta1.New(c)
 	cs.rbacV1 = rbacv1.New(c)
-	cs.rbacV1beta1 = rbacv1beta1.New(c)
 	cs.rbacV1alpha1 = rbacv1alpha1.New(c)
+	cs.rbacV1beta1 = rbacv1beta1.New(c)
 	cs.schedulingV1alpha1 = schedulingv1alpha1.New(c)
 	cs.schedulingV1beta1 = schedulingv1beta1.New(c)
 	cs.settingsV1alpha1 = settingsv1alpha1.New(c)
-	cs.storageV1beta1 = storagev1beta1.New(c)
 	cs.storageV1 = storagev1.New(c)
 	cs.storageV1alpha1 = storagev1alpha1.New(c)
+	cs.storageV1beta1 = storagev1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

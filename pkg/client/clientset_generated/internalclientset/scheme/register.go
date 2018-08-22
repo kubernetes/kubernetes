@@ -32,7 +32,6 @@ import (
 	certificates "k8s.io/kubernetes/pkg/apis/certificates/install"
 	coordination "k8s.io/kubernetes/pkg/apis/coordination/install"
 	core "k8s.io/kubernetes/pkg/apis/core/install"
-	events "k8s.io/kubernetes/pkg/apis/events/install"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions/install"
 	networking "k8s.io/kubernetes/pkg/apis/networking/install"
 	policy "k8s.io/kubernetes/pkg/apis/policy/install"
@@ -62,7 +61,6 @@ func Install(scheme *runtime.Scheme) {
 	batch.Install(scheme)
 	certificates.Install(scheme)
 	coordination.Install(scheme)
-	events.Install(scheme)
 	extensions.Install(scheme)
 	networking.Install(scheme)
 	policy.Install(scheme)
