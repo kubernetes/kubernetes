@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
@@ -170,13 +171,15 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 	}()
 
 	var err error
-	if service.Spec.Type != api.ServiceTypeExternalName {
-		if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
-			return nil, err
+	if !dryrun.IsDryRun(options.DryRun) {
+		if service.Spec.Type != api.ServiceTypeExternalName {
+			if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
+	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
 	defer nodePortOp.Finish()
 
 	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
@@ -222,13 +225,32 @@ func (rs *REST) Delete(ctx context.Context, id string, options *metav1.DeleteOpt
 
 	svc := obj.(*api.Service)
 
-	// TODO: can leave dangling endpoints, and potentially return incorrect
-	// endpoints if a new service is created with the same name
-	_, _, err = rs.endpoints.Delete(ctx, id, &metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, false, err
+	// Only perform the cleanup if this is a non-dryrun deletion
+	if !dryrun.IsDryRun(options.DryRun) {
+		// TODO: can leave dangling endpoints, and potentially return incorrect
+		// endpoints if a new service is created with the same name
+		_, _, err = rs.endpoints.Delete(ctx, id, &metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return nil, false, err
+		}
+
+		rs.releaseAllocatedResources(svc)
 	}
 
+	// TODO: this is duplicated from the generic storage, when this wrapper is fully removed we can drop this
+	details := &metav1.StatusDetails{
+		Name: svc.Name,
+		UID:  svc.UID,
+	}
+	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
+		details.Group = info.APIGroup
+		details.Kind = info.Resource // legacy behavior
+	}
+	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
+	return status, true, nil
+}
+
+func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 	if helper.IsServiceIPSet(svc) {
 		rs.serviceIPs.Release(net.ParseIP(svc.Spec.ClusterIP))
 	}
@@ -251,18 +273,6 @@ func (rs *REST) Delete(ctx context.Context, id string, options *metav1.DeleteOpt
 			}
 		}
 	}
-
-	// TODO: this is duplicated from the generic storage, when this wrapper is fully removed we can drop this
-	details := &metav1.StatusDetails{
-		Name: svc.Name,
-		UID:  svc.UID,
-	}
-	if info, ok := genericapirequest.RequestInfoFrom(ctx); ok {
-		details.Group = info.APIGroup
-		details.Kind = info.Resource // legacy behavior
-	}
-	status := &metav1.Status{Status: metav1.StatusSuccess, Details: details}
-	return status, true, nil
 }
 
 // externalTrafficPolicyUpdate adjusts ExternalTrafficPolicy during service update if needed.
@@ -358,19 +368,21 @@ func (rs *REST) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 	}()
 
-	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts)
+	nodePortOp := portallocator.StartOperation(rs.serviceNodePorts, dryrun.IsDryRun(options.DryRun))
 	defer nodePortOp.Finish()
 
-	// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
-	if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
-		if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
-			return nil, false, err
+	if !dryrun.IsDryRun(options.DryRun) {
+		// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
+		if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
+			if releaseServiceIP, err = initClusterIP(service, rs.serviceIPs); err != nil {
+				return nil, false, err
+			}
 		}
-	}
-	// Update service from non-ExternalName to ExternalName, should release ClusterIP if exists.
-	if oldService.Spec.Type != api.ServiceTypeExternalName && service.Spec.Type == api.ServiceTypeExternalName {
-		if helper.IsServiceIPSet(oldService) {
-			rs.serviceIPs.Release(net.ParseIP(oldService.Spec.ClusterIP))
+		// Update service from non-ExternalName to ExternalName, should release ClusterIP if exists.
+		if oldService.Spec.Type != api.ServiceTypeExternalName && service.Spec.Type == api.ServiceTypeExternalName {
+			if helper.IsServiceIPSet(oldService) {
+				rs.serviceIPs.Release(net.ParseIP(oldService.Spec.ClusterIP))
+			}
 		}
 	}
 	// Update service from NodePort or LoadBalancer to ExternalName or ClusterIP, should release NodePort if exists.
