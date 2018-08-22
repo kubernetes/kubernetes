@@ -94,6 +94,13 @@ type AdmissionResponse struct {
 	// The type of Patch. Currently we only allow "JSONPatch".
 	// +optional
 	PatchType *PatchType `json:"patchType,omitempty" protobuf:"bytes,5,opt,name=patchType"`
+
+	// AuditAnnotations is an unstructured key value map set by remote admission controller (e.g. error=image-blacklisted).
+	// MutatingAdmissionWebhook and ValidatingAdmissionWebhook admission controller will prefix the keys with
+	// admission webhook name (e.g. imagepolicy.example.com/error=image-blacklisted). AuditAnnotations will be provided by
+	// the admission webhook to add additional context to the audit log for this request.
+	// +optional
+	AuditAnnotations map[string]string `json:"auditAnnotations,omitempty" protobuf:"bytes,6,opt,name=auditAnnotations"`
 }
 
 // PatchType is the type of patch being used to represent the mutated object
