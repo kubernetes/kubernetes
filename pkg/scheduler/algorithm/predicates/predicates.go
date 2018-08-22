@@ -73,6 +73,8 @@ const (
 	PodToleratesNodeTaintsPred = "PodToleratesNodeTaints"
 	// CheckNodeUnschedulablePred defines the name of predicate CheckNodeUnschedulablePredicate.
 	CheckNodeUnschedulablePred = "CheckNodeUnschedulable"
+	// CheckNodeLostPred defines the name of predicate CheckNodeLostPredicate.
+	CheckNodeLostPred = "CheckNodeLost"
 	// PodToleratesNodeNoExecuteTaintsPred defines the name of predicate PodToleratesNodeNoExecuteTaints.
 	PodToleratesNodeNoExecuteTaintsPred = "PodToleratesNodeNoExecuteTaints"
 	// CheckNodeLabelPresencePred defines the name of predicate CheckNodeLabelPresence.
@@ -134,7 +136,7 @@ const (
 // Design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
 var (
 	predicatesOrdering = []string{CheckNodeConditionPred, CheckNodeUnschedulablePred,
-		GeneralPred, HostNamePred, PodFitsHostPortsPred,
+		CheckNodeLostPred, GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred,
@@ -1524,6 +1526,23 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			podName(pod), node.Name)
 	}
 	return nil, nil
+}
+
+// CheckNodeLostPredicate makes sure a pod won't be scheduled to a NodeLost node
+func CheckNodeLostPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	if nodeInfo == nil || nodeInfo.Node() == nil {
+		return false, []algorithm.PredicateFailureReason{ErrNodeUnknownCondition}, nil
+	}
+	// sometimes worker nodes can't communicate back to apisever due to network partition
+	// then no networkUnschedulable taint is not received, so PodToleratesNodeTaints won't help
+	for _, cond := range nodeInfo.Node().Status.Conditions {
+		// using following logic to determine semantics of "NodeLost"
+		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionUnknown &&
+			cond.Message == "Kubelet stopped posting node status." {
+			return false, []algorithm.PredicateFailureReason{ErrNodeUnknownCondition}, nil
+		}
+	}
+	return true, nil, nil
 }
 
 // CheckNodeUnschedulablePredicate checks if a pod can be scheduled on a node with Unschedulable spec.
