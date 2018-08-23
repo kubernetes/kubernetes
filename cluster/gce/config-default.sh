@@ -287,9 +287,6 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   AUTOSCALER_EXPANDER_CONFIG="${KUBE_AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
 fi
 
-# Optional: Enable Rescheduler
-ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
-
 # Optional: Enable allocation of pod IPs using IP aliases.
 #
 # BETA FEATURE.

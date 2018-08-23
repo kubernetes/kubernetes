@@ -25,7 +25,6 @@ filegroup(
         "kube-controller-manager.manifest",
         "kube-proxy.manifest",
         "kube-scheduler.manifest",
-        "rescheduler.manifest",
     ] + glob(["internal-*"]),
 )
 
