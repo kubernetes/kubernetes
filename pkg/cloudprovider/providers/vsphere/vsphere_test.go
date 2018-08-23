@@ -31,6 +31,7 @@ import (
 	"github.com/vmware/govmomi/simulator"
 	"github.com/vmware/govmomi/simulator/vpx"
 	sts "github.com/vmware/govmomi/sts/simulator"
+	_ "github.com/vmware/govmomi/vapi/simulator"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"

@@ -2977,153 +2977,168 @@
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/find",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/list",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/lookup",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/lookup/methods",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/lookup/simulator",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/lookup/types",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/nfc",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/object",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/pbm",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/pbm/methods",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/pbm/types",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/property",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/session",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/simulator",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/simulator/esx",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/simulator/vpx",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/sts",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/sts/internal",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/sts/simulator",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/task",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
+		},
+		{
+			"ImportPath": "github.com/vmware/govmomi/vapi/internal",
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
+		},
+		{
+			"ImportPath": "github.com/vmware/govmomi/vapi/rest",
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
+		},
+		{
+			"ImportPath": "github.com/vmware/govmomi/vapi/simulator",
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vapi/tags",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25/debug",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25/methods",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25/mo",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25/progress",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25/soap",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25/types",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/govmomi/vim25/xml",
-			"Comment": "v0.18.0-40-gbbd9953",
-			"Rev": "bbd99532a768d2fe369079ceda730e30726ae1a6"
+			"Comment": "v0.18.0-48-g22f7465",
+			"Rev": "22f74650cf39ba4649fba45e770df0f44df6f758"
 		},
 		{
 			"ImportPath": "github.com/vmware/photon-controller-go-sdk/SSPI",
