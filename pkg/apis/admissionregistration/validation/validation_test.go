@@ -751,6 +751,21 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				}),
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
 		},
+		{
+			name: "caBundle is invalid",
+			config: newValidatingWebhookConfiguration(
+				[]admissionregistration.Webhook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.WebhookClientConfig{
+							URL:      strPtr("https://example.com"),
+							CABundle: []byte("invalid"),
+						},
+					},
+				},
+			),
+			expectedError: "caBundle is invalid",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/pem"
 	"fmt"
 	"net/url"
 	"strings"
@@ -237,6 +238,23 @@ func validateWebhookClientConfig(fldPath *field.Path, cc *admissionregistration.
 	if cc.Service != nil {
 		allErrors = append(allErrors, validateWebhookService(fldPath.Child("service"), cc.Service)...)
 	}
+
+	var (
+		caBytes  = cc.CABundle
+		pemBlock *pem.Block
+	)
+	for len(caBytes) > 0 {
+		pemBlock, caBytes = pem.Decode(caBytes)
+		if pemBlock == nil {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("caBundle"), string(cc.CABundle), "caBundle is invalid"))
+			break
+		}
+		if pemBlock.Type != "CERTIFICATE" {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("caBundle"), string(cc.CABundle), "caBundle should be a TLS certificate, got a "+pemBlock.Type))
+			break
+		}
+	}
+
 	return allErrors
 }
 
