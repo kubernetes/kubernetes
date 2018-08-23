@@ -256,6 +256,17 @@ var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, msg := range apimachineryvalidation.NameIsDNSSubdomain(name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
+	}
+	return allErrs
+}
+
 // Validates that given value is not negative.
 func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
 	return apimachineryvalidation.ValidateNonnegativeField(value, fldPath)
@@ -2997,6 +3008,10 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
 			}
 		}
+	}
+
+	if spec.RuntimeClassName != nil && utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		allErrs = append(allErrs, ValidateRuntimeClassName(*spec.RuntimeClassName, fldPath.Child("runtimeClassName"))...)
 	}
 
 	return allErrs

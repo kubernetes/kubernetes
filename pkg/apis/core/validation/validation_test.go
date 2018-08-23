@@ -6032,6 +6032,7 @@ func TestValidatePodSpec(t *testing.T) {
 
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, true)()
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 
 	successCases := []core.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
@@ -6165,6 +6166,12 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &core.PodSecurityContext{
 				ShareProcessNamespace: &[]bool{true}[0],
 			},
+		},
+		{ // Populate RuntimeClassName
+			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:    core.RestartPolicyAlways,
+			DNSPolicy:        core.DNSClusterFirst,
+			RuntimeClassName: utilpointer.StringPtr("valid-sandbox"),
 		},
 	}
 	for i := range successCases {
@@ -6346,6 +6353,12 @@ func TestValidatePodSpec(t *testing.T) {
 				HostPID:               true,
 				ShareProcessNamespace: &[]bool{true}[0],
 			},
+		},
+		"bad RuntimeClassName": {
+			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:    core.RestartPolicyAlways,
+			DNSPolicy:        core.DNSClusterFirst,
+			RuntimeClassName: utilpointer.StringPtr("invalid/sandbox"),
 		},
 	}
 	for k, v := range failureCases {

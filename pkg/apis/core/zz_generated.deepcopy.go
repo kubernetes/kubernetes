@@ -3541,6 +3541,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = make([]PodReadinessGate, len(*in))
 		copy(*out, *in)
 	}
+	if in.RuntimeClassName != nil {
+		in, out := &in.RuntimeClassName, &out.RuntimeClassName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
