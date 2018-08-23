@@ -655,6 +655,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/apimachinery/pkg/api/meta/table",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/apimachinery/pkg/api/resource",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -752,6 +756,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apimachinery/pkg/util/diff",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apimachinery/pkg/util/duration",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
