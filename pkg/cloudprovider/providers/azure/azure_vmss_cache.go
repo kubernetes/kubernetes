@@ -27,15 +27,16 @@ import (
 )
 
 var (
-	vmssNameSeparator = "_"
+	vmssNameSeparator  = "_"
+	vmssCacheSeparator = "#"
 
 	nodeNameToScaleSetMappingKey = "k8sNodeNameToScaleSetMappingKey"
 	availabilitySetNodesKey      = "k8sAvailabilitySetNodesKey"
 
 	vmssCacheTTL                      = time.Minute
 	vmssVMCacheTTL                    = time.Minute
-	availabilitySetNodesCacheTTL      = 15 * time.Minute
-	nodeNameToScaleSetMappingCacheTTL = 15 * time.Minute
+	availabilitySetNodesCacheTTL      = 5 * time.Minute
+	nodeNameToScaleSetMappingCacheTTL = 5 * time.Minute
 )
 
 // nodeNameToScaleSetMapping maps nodeName to scaleSet name.
@@ -49,19 +50,19 @@ func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
 func extractVmssVMName(name string) (string, string, error) {
 	split := strings.SplitAfter(name, vmssNameSeparator)
 	if len(split) < 2 {
-		glog.Errorf("Failed to extract vmssVMName %q", name)
+		glog.V(3).Infof("Failed to extract vmssVMName %q", name)
 		return "", "", ErrorNotVmssInstance
 	}
 
 	ssName := strings.Join(split[0:len(split)-1], "")
 	// removing the trailing `vmssNameSeparator` since we used SplitAfter
 	ssName = ssName[:len(ssName)-1]
-
 	instanceID := split[len(split)-1]
-
 	return ssName, instanceID, nil
 }
 
+// vmssCache only holds vmss from ss.ResourceGroup because nodes from other resourceGroups
+// will be excluded from LB backends.
 func (ss *scaleSet) newVmssCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
 		ctx, cancel := getContextWithCancel()
@@ -85,26 +86,34 @@ func (ss *scaleSet) newVmssCache() (*timedCache, error) {
 
 func (ss *scaleSet) newNodeNameToScaleSetMappingCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		scaleSetNames, err := ss.listScaleSets()
+		localCache := make(nodeNameToScaleSetMapping)
+
+		allResourceGroups, err := ss.GetResourceGroups()
 		if err != nil {
 			return nil, err
 		}
 
-		localCache := make(nodeNameToScaleSetMapping)
-		for _, ssName := range scaleSetNames {
-			vms, err := ss.listScaleSetVMs(ssName)
+		for _, resourceGroup := range allResourceGroups.List() {
+			scaleSetNames, err := ss.listScaleSets(resourceGroup)
 			if err != nil {
 				return nil, err
 			}
 
-			for _, vm := range vms {
-				if vm.OsProfile == nil || vm.OsProfile.ComputerName == nil {
-					glog.Warningf("failed to get computerName for vmssVM (%q)", ssName)
-					continue
+			for _, ssName := range scaleSetNames {
+				vms, err := ss.listScaleSetVMs(ssName, resourceGroup)
+				if err != nil {
+					return nil, err
 				}
 
-				computerName := strings.ToLower(*vm.OsProfile.ComputerName)
-				localCache[computerName] = ssName
+				for _, vm := range vms {
+					if vm.OsProfile == nil || vm.OsProfile.ComputerName == nil {
+						glog.Warningf("failed to get computerName for vmssVM (%q)", ssName)
+						continue
+					}
+
+					computerName := strings.ToLower(*vm.OsProfile.ComputerName)
+					localCache[computerName] = ssName
+				}
 			}
 		}
 
@@ -116,14 +125,23 @@ func (ss *scaleSet) newNodeNameToScaleSetMappingCache() (*timedCache, error) {
 
 func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		vmList, err := ss.Cloud.VirtualMachineClientListWithRetry()
+		localCache := sets.NewString()
+		resourceGroups, err := ss.GetResourceGroups()
 		if err != nil {
 			return nil, err
 		}
 
-		localCache := sets.NewString()
-		for _, vm := range vmList {
-			localCache.Insert(*vm.Name)
+		for _, resourceGroup := range resourceGroups.List() {
+			vmList, err := ss.Cloud.VirtualMachineClientListWithRetry(resourceGroup)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, vm := range vmList {
+				if vm.Name != nil {
+					localCache.Insert(*vm.Name)
+				}
+			}
 		}
 
 		return localCache, nil
@@ -132,10 +150,33 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 	return newTimedcache(availabilitySetNodesCacheTTL, getter)
 }
 
+func buildVmssCacheKey(resourceGroup, name string) string {
+	// key is composed of <resourceGroup>#<vmName>
+	return fmt.Sprintf("%s%s%s", resourceGroup, vmssCacheSeparator, name)
+}
+
+func extractVmssCacheKey(key string) (string, string, error) {
+	// key is composed of <resourceGroup>#<vmName>
+	keyItems := strings.Split(key, vmssCacheSeparator)
+	if len(keyItems) != 2 {
+		return "", "", fmt.Errorf("key %q is not in format '<resouceGroup>#<vmName>'", key)
+	}
+
+	resourceGroup := keyItems[0]
+	vmName := keyItems[1]
+	return resourceGroup, vmName, nil
+}
+
 func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 	getter := func(key string) (interface{}, error) {
-		// vmssVM name's format is 'scaleSetName_instanceID'
-		ssName, instanceID, err := extractVmssVMName(key)
+		// key is composed of <resourceGroup>#<vmName>
+		resourceGroup, vmName, err := extractVmssCacheKey(key)
+		if err != nil {
+			return nil, err
+		}
+
+		// vmName's format is 'scaleSetName_instanceID'
+		ssName, instanceID, err := extractVmssVMName(vmName)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +188,7 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
-		result, err := ss.VirtualMachineScaleSetVMsClient.Get(ctx, ss.ResourceGroup, ssName, instanceID)
+		result, err := ss.VirtualMachineScaleSetVMsClient.Get(ctx, resourceGroup, ssName, instanceID)
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
