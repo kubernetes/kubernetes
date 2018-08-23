@@ -2514,7 +2514,9 @@ EOF
   fi
 
   # Place addon manager pod manifest.
-  cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
+  src_file="${src_dir}/kube-addon-manager.yaml"
+  sed -i -e "s@{{kubectl_extra_prune_whitelist}}@${ADDON_MANAGER_PRUNE_WHITELIST:-}@g" "${src_file}"
+  cp "${src_file}" /etc/kubernetes/manifests
 }
 
 function setup-node-termination-handler-manifest {
