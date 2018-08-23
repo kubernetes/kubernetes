@@ -69,20 +69,20 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 }
 
 // VirtualMachineClientListWithRetry invokes az.VirtualMachinesClient.List with exponential backoff retry
-func (az *Cloud) VirtualMachineClientListWithRetry() ([]compute.VirtualMachine, error) {
+func (az *Cloud) VirtualMachineClientListWithRetry(resourceGroup string) ([]compute.VirtualMachine, error) {
 	allNodes := []compute.VirtualMachine{}
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		var retryErr error
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
-		allNodes, retryErr = az.VirtualMachinesClient.List(ctx, az.ResourceGroup)
+		allNodes, retryErr = az.VirtualMachinesClient.List(ctx, resourceGroup)
 		if retryErr != nil {
 			glog.Errorf("VirtualMachinesClient.List(%v) - backoff: failure, will retry,err=%v",
-				az.ResourceGroup,
+				resourceGroup,
 				retryErr)
 			return false, retryErr
 		}
-		glog.V(2).Infof("VirtualMachinesClient.List(%v) - backoff: success", az.ResourceGroup)
+		glog.V(2).Infof("VirtualMachinesClient.List(%v) - backoff: success", resourceGroup)
 		return true, nil
 	})
 	if err != nil {
@@ -281,12 +281,12 @@ func (az *Cloud) DeleteRouteWithRetry(routeName string) error {
 }
 
 // CreateOrUpdateVMWithRetry invokes az.VirtualMachinesClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) CreateOrUpdateVMWithRetry(vmName string, newVM compute.VirtualMachine) error {
+func (az *Cloud) CreateOrUpdateVMWithRetry(resourceGroup, vmName string, newVM compute.VirtualMachine) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.VirtualMachinesClient.CreateOrUpdate(ctx, az.ResourceGroup, vmName, newVM)
+		resp, err := az.VirtualMachinesClient.CreateOrUpdate(ctx, resourceGroup, vmName, newVM)
 		glog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): end", vmName)
 		return processHTTPRetryResponse(resp, err)
 	})

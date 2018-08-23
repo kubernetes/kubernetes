@@ -19,14 +19,19 @@ package watch
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 )
 
 type fakePod struct {
@@ -170,5 +175,129 @@ func TestUntilErrorCondition(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), expected) {
 		t.Fatalf("expected %q in error string, got %q", expected, err.Error())
+	}
+}
+
+func TestUntilWithSync(t *testing.T) {
+	// FIXME: test preconditions
+	tt := []struct {
+		name             string
+		lw               *cache.ListWatch
+		preconditionFunc PreconditionFunc
+		conditionFunc    ConditionFunc
+		expectedErr      error
+		expectedEvent    *watch.Event
+	}{
+		{
+			name: "doesn't wait for sync with no precondition",
+			lw: &cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					select {}
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					select {}
+				},
+			},
+			preconditionFunc: nil,
+			conditionFunc: func(e watch.Event) (bool, error) {
+				return true, nil
+			},
+			expectedErr:   errors.New("timed out waiting for the condition"),
+			expectedEvent: nil,
+		},
+		{
+			name: "waits indefinitely with precondition if it can't sync",
+			lw: &cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					select {}
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					select {}
+				},
+			},
+			preconditionFunc: func(store cache.Store) (bool, error) {
+				return true, nil
+			},
+			conditionFunc: func(e watch.Event) (bool, error) {
+				return true, nil
+			},
+			expectedErr:   errors.New("UntilWithSync: unable to sync caches: context deadline exceeded"),
+			expectedEvent: nil,
+		},
+		{
+			name: "precondition can stop the loop",
+			lw: func() *cache.ListWatch {
+				fakeclient := fakeclient.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "first"}})
+
+				return &cache.ListWatch{
+					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+						return fakeclient.CoreV1().Secrets("").List(options)
+					},
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return fakeclient.CoreV1().Secrets("").Watch(options)
+					},
+				}
+			}(),
+			preconditionFunc: func(store cache.Store) (bool, error) {
+				_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: "", Name: "first"})
+				if err != nil {
+					return true, err
+				}
+				if exists {
+					return true, nil
+				}
+				return false, nil
+			},
+			conditionFunc: func(e watch.Event) (bool, error) {
+				return true, errors.New("should never reach this")
+			},
+			expectedErr:   nil,
+			expectedEvent: nil,
+		},
+		{
+			name: "precondition lets it proceed to regular condition",
+			lw: func() *cache.ListWatch {
+				fakeclient := fakeclient.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "first"}})
+
+				return &cache.ListWatch{
+					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+						return fakeclient.CoreV1().Secrets("").List(options)
+					},
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return fakeclient.CoreV1().Secrets("").Watch(options)
+					},
+				}
+			}(),
+			preconditionFunc: func(store cache.Store) (bool, error) {
+				return false, nil
+			},
+			conditionFunc: func(e watch.Event) (bool, error) {
+				if e.Type == watch.Added {
+					return true, nil
+				}
+				panic("no other events are expected")
+			},
+			expectedErr:   nil,
+			expectedEvent: &watch.Event{Type: watch.Added, Object: &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			// Informer waits for caches to sync by polling in 100ms intervals,
+			// timeout needs to be reasonably higher
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			defer cancel()
+
+			event, err := UntilWithSync(ctx, tc.lw, &corev1.Secret{}, tc.preconditionFunc, tc.conditionFunc)
+
+			if !reflect.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("expected error %#v, got %#v", tc.expectedErr, err)
+			}
+
+			if !reflect.DeepEqual(event, tc.expectedEvent) {
+				t.Errorf("expected event %#v, got %#v", tc.expectedEvent, event)
+			}
+		})
 	}
 }

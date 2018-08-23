@@ -83,6 +83,7 @@ docs/admin/kubeadm_upgrade_apply.md
 docs/admin/kubeadm_upgrade_diff.md
 docs/admin/kubeadm_upgrade_node.md
 docs/admin/kubeadm_upgrade_node_config.md
+docs/admin/kubeadm_upgrade_node_experimental-control-plane.md
 docs/admin/kubeadm_upgrade_plan.md
 docs/admin/kubeadm_version.md
 docs/admin/kubelet.md
@@ -167,6 +168,7 @@ docs/man/man1/kubeadm-token.1
 docs/man/man1/kubeadm-upgrade-apply.1
 docs/man/man1/kubeadm-upgrade-diff.1
 docs/man/man1/kubeadm-upgrade-node-config.1
+docs/man/man1/kubeadm-upgrade-node-experimental-control-plane.1
 docs/man/man1/kubeadm-upgrade-node.1
 docs/man/man1/kubeadm-upgrade-plan.1
 docs/man/man1/kubeadm-upgrade.1

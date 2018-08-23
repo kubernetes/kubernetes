@@ -751,6 +751,13 @@ run_secrets_test() {
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
+  # Command with process substitution
+  kubectl create secret tls test-secret --namespace=test-secrets --key <(cat hack/testdata/tls.key) --cert <(cat hack/testdata/tls.crt)
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
+    # Clean-up
+  kubectl delete secret test-secret --namespace=test-secrets
+
   # Create a secret using stringData
   kubectl create --namespace=test-secrets -f - "${kube_flags[@]}" << __EOF__
 {

@@ -302,6 +302,13 @@ func (fVMC *fakeAzureVirtualMachinesClient) List(ctx context.Context, resourceGr
 	return result, nil
 }
 
+func (fVMC *fakeAzureVirtualMachinesClient) setFakeStore(store map[string]map[string]compute.VirtualMachine) {
+	fVMC.mutex.Lock()
+	defer fVMC.mutex.Unlock()
+
+	fVMC.FakeStore = store
+}
+
 type fakeAzureSubnetsClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.Subnet

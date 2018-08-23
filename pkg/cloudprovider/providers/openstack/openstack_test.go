@@ -444,6 +444,10 @@ func TestNodeAddresses(t *testing.T) {
 				},
 			},
 		},
+		Metadata: map[string]string{
+			"name":       "a1-yinvcez57-0-bvynoyawrhcg-kube-minion-fg5i4jwcc2yy",
+			TypeHostName: "a1-yinvcez57-0-bvynoyawrhcg-kube-minion-fg5i4jwcc2yy.novalocal",
+		},
 	}
 
 	addrs, err := nodeAddresses(&srv)
@@ -462,6 +466,7 @@ func TestNodeAddresses(t *testing.T) {
 		{Type: v1.NodeExternalIP, Address: "50.56.176.35"},
 		{Type: v1.NodeExternalIP, Address: "50.56.176.36"},
 		{Type: v1.NodeExternalIP, Address: "50.56.176.99"},
+		{Type: v1.NodeHostName, Address: "a1-yinvcez57-0-bvynoyawrhcg-kube-minion-fg5i4jwcc2yy.novalocal"},
 	}
 
 	if !reflect.DeepEqual(want, addrs) {

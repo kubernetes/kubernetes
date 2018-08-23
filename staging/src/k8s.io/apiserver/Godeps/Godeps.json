@@ -1783,10 +1783,6 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
-			"ImportPath": "k8s.io/client-go/tools/watch",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
 			"ImportPath": "k8s.io/client-go/transport",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},

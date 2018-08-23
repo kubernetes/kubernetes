@@ -1593,8 +1593,6 @@ function start-kube-apiserver {
       fi
     fi
     if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
-      params+=" --audit-webhook-mode=batch"
-
       # Create the audit webhook config file, and mount it into the apiserver pod.
       local -r audit_webhook_config_file="/etc/audit_webhook.config"
       params+=" --audit-webhook-config-file=${audit_webhook_config_file}"
@@ -1605,6 +1603,8 @@ function start-kube-apiserver {
       # Batching parameters
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_MODE:-}" ]]; then
         params+=" --audit-webhook-mode=${ADVANCED_AUDIT_WEBHOOK_MODE}"
+      else
+        params+=" --audit-webhook-mode=batch"
       fi
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE:-}" ]]; then
         params+=" --audit-webhook-batch-buffer-size=${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE}"
@@ -2543,16 +2543,6 @@ function start-lb-controller {
   fi
 }
 
-# Starts rescheduler.
-function start-rescheduler {
-  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
-    echo "Start Rescheduler"
-    prepare-log-file /var/log/rescheduler.log
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
-       /etc/kubernetes/manifests/
-  fi
-}
-
 # Setup working directory for kubelet.
 function setup-kubelet-dir {
     echo "Making /var/lib/kubelet executable for kubelet"
@@ -2734,7 +2724,6 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
-    start-rescheduler
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy

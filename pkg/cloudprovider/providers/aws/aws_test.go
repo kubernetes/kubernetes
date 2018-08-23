@@ -348,13 +348,14 @@ func TestNodeAddresses(t *testing.T) {
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
-	if len(addrs3) != 4 {
-		t.Errorf("Should return exactly 4 NodeAddresses")
+	if len(addrs3) != 5 {
+		t.Errorf("Should return exactly 5 NodeAddresses")
 	}
 	testHasNodeAddress(t, addrs3, v1.NodeInternalIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalIP, "1.2.3.4")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalDNS, "instance-same.ec2.external")
 	testHasNodeAddress(t, addrs3, v1.NodeInternalDNS, "instance-same.ec2.internal")
+	testHasNodeAddress(t, addrs3, v1.NodeHostName, "instance-same.ec2.internal")
 }
 
 func TestNodeAddressesWithMetadata(t *testing.T) {

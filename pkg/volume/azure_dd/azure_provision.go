@@ -304,14 +304,16 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 
 		if zoned {
 			// Set node affinity labels based on availability zone labels.
-			requirements := make([]v1.NodeSelectorRequirement, 0)
-			for k, v := range labels {
-				requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-			}
+			if len(labels) > 0 {
+				requirements := make([]v1.NodeSelectorRequirement, 0)
+				for k, v := range labels {
+					requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+				}
 
-			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-				MatchExpressions: requirements,
-			})
+				nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+					MatchExpressions: requirements,
+				})
+			}
 		} else {
 			// Set node affinity labels based on fault domains.
 			// This is required because unzoned AzureDisk can't be attached to zoned nodes.
@@ -336,10 +338,12 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			}
 		}
 
-		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
-			Required: &v1.NodeSelector{
-				NodeSelectorTerms: nodeSelectorTerms,
-			},
+		if len(nodeSelectorTerms) > 0 {
+			pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+				Required: &v1.NodeSelector{
+					NodeSelectorTerms: nodeSelectorTerms,
+				},
+			}
 		}
 	}
 

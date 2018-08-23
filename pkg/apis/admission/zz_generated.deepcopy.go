@@ -37,6 +37,11 @@ func (in *AdmissionRequest) DeepCopyInto(out *AdmissionRequest) {
 	if in.OldObject != nil {
 		out.OldObject = in.OldObject.DeepCopyObject()
 	}
+	if in.DryRun != nil {
+		in, out := &in.DryRun, &out.DryRun
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

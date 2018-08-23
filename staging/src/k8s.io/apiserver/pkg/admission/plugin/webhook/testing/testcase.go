@@ -43,6 +43,11 @@ var matchEverythingRules = []registrationv1beta1.RuleWithOperations{{
 	},
 }}
 
+var sideEffectsUnknown registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassUnknown
+var sideEffectsNone registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassNone
+var sideEffectsSome registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassSome
+var sideEffectsNoneOnDryRun registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassNoneOnDryRun
+
 // NewFakeDataSource returns a mock client and informer returning the given webhooks.
 func NewFakeDataSource(name string, webhooks []registrationv1beta1.Webhook, mutating bool, stopCh <-chan struct{}) (clientset kubernetes.Interface, factory informers.SharedInformerFactory) {
 	var objs = []runtime.Object{
@@ -388,25 +393,65 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 			Name: "no match dry run",
 			Webhooks: []registrationv1beta1.Webhook{{
 				Name:         "nomatch",
-				ClientConfig: ccfgSVC("disallow"),
+				ClientConfig: ccfgSVC("allow"),
 				Rules: []registrationv1beta1.RuleWithOperations{{
 					Operations: []registrationv1beta1.OperationType{registrationv1beta1.Create},
 				}},
 				NamespaceSelector: &metav1.LabelSelector{},
+				SideEffects:       &sideEffectsSome,
 			}},
 			IsDryRun:    true,
 			ExpectAllow: true,
 		},
 		{
-			Name: "match dry run",
+			Name: "match dry run side effects Unknown",
 			Webhooks: []registrationv1beta1.Webhook{{
 				Name:              "allow",
 				ClientConfig:      ccfgSVC("allow"),
 				Rules:             matchEverythingRules,
 				NamespaceSelector: &metav1.LabelSelector{},
+				SideEffects:       &sideEffectsUnknown,
 			}},
 			IsDryRun:      true,
 			ErrorContains: "does not support dry run",
+		},
+		{
+			Name: "match dry run side effects None",
+			Webhooks: []registrationv1beta1.Webhook{{
+				Name:              "allow",
+				ClientConfig:      ccfgSVC("allow"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+				SideEffects:       &sideEffectsNone,
+			}},
+			IsDryRun:          true,
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"allow/key1": "value1"},
+		},
+		{
+			Name: "match dry run side effects Some",
+			Webhooks: []registrationv1beta1.Webhook{{
+				Name:              "allow",
+				ClientConfig:      ccfgSVC("allow"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+				SideEffects:       &sideEffectsSome,
+			}},
+			IsDryRun:      true,
+			ErrorContains: "does not support dry run",
+		},
+		{
+			Name: "match dry run side effects NoneOnDryRun",
+			Webhooks: []registrationv1beta1.Webhook{{
+				Name:              "allow",
+				ClientConfig:      ccfgSVC("allow"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+				SideEffects:       &sideEffectsNoneOnDryRun,
+			}},
+			IsDryRun:          true,
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"allow/key1": "value1"},
 		},
 		{
 			Name: "illegal annotation format",
@@ -489,12 +534,13 @@ func NewMutatingTestCases(url *url.URL) []Test {
 			ErrorContains: "invalid character",
 		},
 		{
-			Name: "match & remove label dry run",
+			Name: "match & remove label dry run unsupported",
 			Webhooks: []registrationv1beta1.Webhook{{
 				Name:              "removeLabel",
 				ClientConfig:      ccfgSVC("removeLabel"),
 				Rules:             matchEverythingRules,
 				NamespaceSelector: &metav1.LabelSelector{},
+				SideEffects:       &sideEffectsUnknown,
 			}},
 			IsDryRun:      true,
 			ErrorContains: "does not support dry run",
