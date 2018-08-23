@@ -92,11 +92,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 	if obj.HPAController.HorizontalPodAutoscalerSyncPeriod == zero {
 		obj.HPAController.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
-	if obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow == zero {
-		obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow = metav1.Duration{Duration: 3 * time.Minute}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow == zero {
-		obj.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow = metav1.Duration{Duration: 5 * time.Minute}
+	if obj.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow == zero {
+		obj.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow = metav1.Duration{Duration: 5 * time.Minute}
 	}
 	if obj.HPAController.HorizontalPodAutoscalerTolerance == 0 {
 		obj.HPAController.HorizontalPodAutoscalerTolerance = 0.1

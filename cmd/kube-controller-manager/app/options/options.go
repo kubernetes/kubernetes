@@ -131,11 +131,12 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 			EnableGarbageCollector: componentConfig.GarbageCollectorController.EnableGarbageCollector,
 		},
 		HPAController: &HPAControllerOptions{
-			HorizontalPodAutoscalerSyncPeriod:               componentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod,
-			HorizontalPodAutoscalerUpscaleForbiddenWindow:   componentConfig.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow,
-			HorizontalPodAutoscalerDownscaleForbiddenWindow: componentConfig.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow,
-			HorizontalPodAutoscalerTolerance:                componentConfig.HPAController.HorizontalPodAutoscalerTolerance,
-			HorizontalPodAutoscalerUseRESTClients:           componentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients,
+			HorizontalPodAutoscalerSyncPeriod:                   componentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod,
+			HorizontalPodAutoscalerUpscaleForbiddenWindow:       componentConfig.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow,
+			HorizontalPodAutoscalerDownscaleForbiddenWindow:     componentConfig.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow,
+			HorizontalPodAutoscalerDownscaleStabilizationWindow: componentConfig.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow,
+			HorizontalPodAutoscalerTolerance:                    componentConfig.HPAController.HorizontalPodAutoscalerTolerance,
+			HorizontalPodAutoscalerUseRESTClients:               componentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients,
 		},
 		JobController: &JobControllerOptions{
 			ConcurrentJobSyncs: componentConfig.JobController.ConcurrentJobSyncs,

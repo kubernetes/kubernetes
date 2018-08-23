@@ -646,7 +646,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	}
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
-	defaultDownscaleForbiddenWindow := 5 * time.Minute
+	defaultDownscalestabilizationWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
 		eventClient.Core(),
@@ -656,7 +656,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		replicaCalc,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		controller.NoResyncPeriodFunc(),
-		defaultDownscaleForbiddenWindow,
+		defaultDownscalestabilizationWindow,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -2162,6 +2162,7 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 	}
 	for _, tc := range tests {
 		hc := HorizontalController{
+			downscaleStabilisationWindow: 5 * time.Minute,
 			recommendations: map[string][]timestampedRecommendation{
 				tc.key: tc.recommendations,
 			},
