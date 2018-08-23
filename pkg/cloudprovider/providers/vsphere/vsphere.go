@@ -1371,33 +1371,26 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 				glog.Errorf("Get category %s error", value)
 				return err
 			}
-			switch {
 
+			switch {
 			case category.Name == vs.cfg.Labels.Zone:
 				zone.FailureDomain = tag.Name
-
 			case category.Name == vs.cfg.Labels.Region:
 				zone.Region = tag.Name
+			}
+		}
 
-			default:
-				zone.FailureDomain = ""
-				zone.Region = ""
-			}
-		}
-		switch {
-		case zone.Region == "":
-			if vs.cfg.Labels.Zone != "" {
-				return fmt.Errorf("The zone in vSphere configuration file not match for node %s ", nodeName)
-			}
-			glog.Infof("No zones support for node %s error", nodeName)
-			return nil
-		case zone.FailureDomain == "":
+		if zone.Region == "" {
 			if vs.cfg.Labels.Region != "" {
-				return fmt.Errorf("The zone in vSphere configuration file not match for node %s ", nodeName)
+				return fmt.Errorf("vSphere region category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Region, nodeName, vs.vmUUID)
 			}
-			glog.Infof("No zones support for node %s error", nodeName)
-			return nil
 		}
+		if zone.FailureDomain == "" {
+			if vs.cfg.Labels.Zone != "" {
+				return fmt.Errorf("vSphere zone category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Zone, nodeName, vs.vmUUID)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {

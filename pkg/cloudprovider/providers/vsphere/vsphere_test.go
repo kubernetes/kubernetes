@@ -28,10 +28,14 @@ import (
 	"testing"
 
 	lookup "github.com/vmware/govmomi/lookup/simulator"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/simulator"
 	"github.com/vmware/govmomi/simulator/vpx"
 	sts "github.com/vmware/govmomi/sts/simulator"
-	_ "github.com/vmware/govmomi/vapi/simulator"
+	"github.com/vmware/govmomi/vapi/rest"
+	vapi "github.com/vmware/govmomi/vapi/simulator"
+	"github.com/vmware/govmomi/vapi/tags"
+	"github.com/vmware/govmomi/vim25/mo"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -116,6 +120,10 @@ func configFromSimWithTLS(tlsConfig *tls.Config, insecureAllowed bool) (VSphereC
 
 	// STS simulator
 	path, handler := sts.New(s.URL, vpx.Setting)
+	model.Service.ServeMux.Handle(path, handler)
+
+	// vAPI simulator
+	path, handler = vapi.New(s.URL, vpx.Setting)
 	model.Service.ServeMux.Handle(path, handler)
 
 	// Lookup Service simulator
@@ -315,22 +323,168 @@ func TestVSphereLoginWithCaCert(t *testing.T) {
 	vcInstance.conn.Logout(ctx)
 }
 
+func TestZonesNoConfig(t *testing.T) {
+	_, ok := new(VSphere).Zones()
+	if ok {
+		t.Fatalf("Zones() should return false without VCP configured")
+	}
+}
+
 func TestZones(t *testing.T) {
+	// Any context will do
+	ctx := context.Background()
+
+	// Create a vcsim instance
+	cfg, cleanup := configFromSim()
+	defer cleanup()
+
 	// Create vSphere configuration object
-	cfg, ok := configFromEnv()
-	vs := VSphere{
-		cfg: &cfg,
-	}
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
-	_, err := vs.GetZone(context.TODO())
+	vs, err := newControllerNode(cfg)
 	if err != nil {
-		t.Fatalf("GetZone() failed: %s", err)
+		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
-	_, ok = vs.Zones()
+
+	// Configure region and zone categories
+	vs.cfg.Labels.Region = "k8s-region"
+	vs.cfg.Labels.Zone = "k8s-zone"
+
+	// Create vSphere client
+	vsi, ok := vs.vsphereInstanceMap[cfg.Global.VCenterIP]
 	if !ok {
-		t.Fatalf("Zones() returned false")
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
+
+	err = vsi.conn.Connect(ctx)
+	if err != nil {
+		t.Errorf("Failed to connect to vSphere: %s", err)
+	}
+
+	// Lookup Datacenter for this test's Workspace
+	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Lookup VM's host where we'll attach tags
+	host, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Property Collector instance
+	pc := property.DefaultCollector(vsi.conn.Client)
+
+	// Tag manager instance
+	m := tags.NewManager(rest.NewClient(vsi.conn.Client))
+
+	// Create a region category
+	regionID, err := m.CreateCategory(ctx, &tags.Category{Name: vs.cfg.Labels.Region})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a region tag
+	regionID, err = m.CreateTag(ctx, &tags.Tag{CategoryID: regionID, Name: "k8s-region-US"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a zone category
+	zoneID, err := m.CreateCategory(ctx, &tags.Category{Name: vs.cfg.Labels.Zone})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a zone tag
+	zoneID, err = m.CreateTag(ctx, &tags.Tag{CategoryID: zoneID, Name: "k8s-zone-US-CA1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a random category
+	randomID, err := m.CreateCategory(ctx, &tags.Category{Name: "random-cat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a random tag
+	randomID, err = m.CreateTag(ctx, &tags.Tag{CategoryID: randomID, Name: "random-tag"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Attach a random tag to VM's host
+	if err = m.AttachTag(ctx, randomID, host); err != nil {
+		t.Fatal(err)
+	}
+
+	// Expecting Zones() to return true, indicating VCP supports the Zones interface
+	zones, ok := vs.Zones()
+	if !ok {
+		t.Fatalf("zones=%t", ok)
+	}
+
+	// GetZone() tests, covering error and success paths
+	tests := []struct {
+		name string // name of the test for logging
+		fail bool   // expect GetZone() to return error if true
+		prep func() // prepare vCenter state for the test
+	}{
+		{"no tags", true, func() {
+			// no prep
+		}},
+		{"no zone tag", true, func() {
+			if err = m.AttachTag(ctx, regionID, host); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"host tags set", false, func() {
+			if err = m.AttachTag(ctx, zoneID, host); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"host tags removed", true, func() {
+			if err = m.DetachTag(ctx, zoneID, host); err != nil {
+				t.Fatal(err)
+			}
+			if err = m.DetachTag(ctx, regionID, host); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"dc region, cluster zone", true, func() {
+			var h mo.HostSystem
+			if err = pc.RetrieveOne(ctx, host.Reference(), []string{"parent"}, &h); err != nil {
+				t.Fatal(err)
+			}
+			// Attach region tag to Datacenter
+			if err = m.AttachTag(ctx, regionID, dc); err != nil {
+				t.Fatal(err)
+			}
+			// Attach zone tag to Cluster
+			if err = m.AttachTag(ctx, zoneID, h.Parent); err != nil {
+				t.Fatal(err)
+			}
+
+			// TODO: this should pass with Datacenter tagged as the region and Cluster tagged as the zone
+		}},
+	}
+
+	for _, test := range tests {
+		test.prep()
+
+		zone, err := zones.GetZone(ctx)
+		if test.fail {
+			if err == nil {
+				t.Errorf("%s: expected error", test.name)
+			} else {
+				t.Logf("%s: expected error=%s", test.name, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s: %s", test.name, err)
+			}
+			t.Logf("zone=%#v", zone)
+		}
 	}
 }
 
