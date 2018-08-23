@@ -476,6 +476,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet := &Kubelet{
 		hostname:                       hostname,
+		hostnameOverridden:             len(hostnameOverride) > 0,
 		nodeName:                       nodeName,
 		kubeClient:                     kubeDeps.KubeClient,
 		heartbeatClient:                kubeDeps.HeartbeatClient,
@@ -855,7 +856,11 @@ type serviceLister interface {
 type Kubelet struct {
 	kubeletConfiguration kubeletconfiginternal.KubeletConfiguration
 
-	hostname        string
+	// hostname is the hostname the kubelet detected or was given via flag/config
+	hostname string
+	// hostnameOverridden indicates the hostname was overridden via flag/config
+	hostnameOverridden bool
+
 	nodeName        types.NodeName
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface

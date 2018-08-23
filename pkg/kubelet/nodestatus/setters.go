@@ -59,6 +59,7 @@ type Setter func(node *v1.Node) error
 func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 	validateNodeIPFunc func(net.IP) error, // typically Kubelet.nodeIPValidator
 	hostname string, // typically Kubelet.hostname
+	hostnameOverridden bool, // was the hostname force set?
 	externalCloudProvider bool, // typically Kubelet.externalCloudProvider
 	cloud cloudprovider.Interface, // typically Kubelet.cloud
 	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
@@ -111,10 +112,38 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
 			}
 
-			// Only add a NodeHostName address if the cloudprovider did not specify any addresses.
-			// (we assume the cloudprovider is authoritative if it specifies any addresses)
-			if len(nodeAddresses) == 0 {
-				nodeAddresses = []v1.NodeAddress{{Type: v1.NodeHostName, Address: hostname}}
+			switch {
+			case len(nodeAddresses) == 0:
+				// the cloud provider didn't specify any addresses
+				nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
+
+			case !hasAddressType(nodeAddresses, v1.NodeHostName) && hasAddressValue(nodeAddresses, hostname):
+				// the cloud provider didn't specify an address of type Hostname,
+				// but the auto-detected hostname matched an address reported by the cloud provider,
+				// so we can add it and count on the value being verifiable via cloud provider metadata
+				nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
+
+			case hostnameOverridden:
+				// the hostname was force-set via flag/config.
+				// this means the hostname might not be able to be validated via cloud provider metadata,
+				// but was a choice by the kubelet deployer we should honor
+				var existingHostnameAddress *v1.NodeAddress
+				for i := range nodeAddresses {
+					if nodeAddresses[i].Type == v1.NodeHostName {
+						existingHostnameAddress = &nodeAddresses[i]
+						break
+					}
+				}
+
+				if existingHostnameAddress == nil {
+					// no existing Hostname address found, add it
+					glog.Warningf("adding overridden hostname of %v to cloudprovider-reported addresses", hostname)
+					nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
+				} else {
+					// override the Hostname address reported by the cloud provider
+					glog.Warningf("replacing cloudprovider-reported hostname of %v with overridden hostname of %v", existingHostnameAddress.Address, hostname)
+					existingHostnameAddress.Address = hostname
+				}
 			}
 			node.Status.Addresses = nodeAddresses
 		} else {
@@ -161,6 +190,23 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 		}
 		return nil
 	}
+}
+
+func hasAddressType(addresses []v1.NodeAddress, addressType v1.NodeAddressType) bool {
+	for _, address := range addresses {
+		if address.Type == addressType {
+			return true
+		}
+	}
+	return false
+}
+func hasAddressValue(addresses []v1.NodeAddress, addressValue string) bool {
+	for _, address := range addresses {
+		if address.Address == addressValue {
+			return true
+		}
+	}
+	return false
 }
 
 // MachineInfo returns a Setter that updates machine-related information on the node.
