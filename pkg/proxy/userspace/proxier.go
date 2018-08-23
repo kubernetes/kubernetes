@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	libcontainersystem "github.com/opencontainers/runc/libcontainer/system"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -207,7 +208,10 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 
 	err = setRLimit(64 * 1000)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set open file handler limit: %v", err)
+		if !libcontainersystem.RunningInUserNS() {
+			return nil, fmt.Errorf("failed to set open file handler limit to 64000: %v", err)
+		}
+		klog.Errorf("failed to set open file handler limit to 64000: %v (running in UserNS)", err)
 	}
 
 	proxyPorts := newPortAllocator(pr)
