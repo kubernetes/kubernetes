@@ -2,3 +2,6 @@ approvers:
 - sig-cli-maintainers
 reviewers:
 - sig-cli
+labels:
+- area/kubectl
+- sig/cli
