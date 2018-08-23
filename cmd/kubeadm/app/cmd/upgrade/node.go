@@ -22,14 +22,20 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -57,6 +63,13 @@ type nodeUpgradeFlags struct {
 	dryRun            bool
 }
 
+type controlplaneUpgradeFlags struct {
+	kubeConfigPath   string
+	advertiseAddress string
+	nodeName         string
+	dryRun           bool
+}
+
 // NewCmdNode returns the cobra command for `kubeadm upgrade node`
 func NewCmdNode() *cobra.Command {
 	cmd := &cobra.Command{
@@ -65,6 +78,7 @@ func NewCmdNode() *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("node"),
 	}
 	cmd.AddCommand(NewCmdUpgradeNodeConfig())
+	cmd.AddCommand(NewCmdUpgradeControlPlane())
 	return cmd
 }
 
@@ -91,6 +105,55 @@ func NewCmdUpgradeNodeConfig() *cobra.Command {
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output the actions that would be performed.")
 	cmd.Flags().StringVar(&flags.kubeletVersionStr, "kubelet-version", flags.kubeletVersionStr, "The *desired* version for the kubelet after the upgrade.")
+	return cmd
+}
+
+// NewCmdUpgradeControlPlane returns the cobra.Command for upgrading the controlplane instance on this node
+func NewCmdUpgradeControlPlane() *cobra.Command {
+
+	flags := &controlplaneUpgradeFlags{
+		kubeConfigPath:   constants.GetKubeletKubeConfigPath(),
+		advertiseAddress: "",
+		dryRun:           false,
+	}
+
+	cmd := &cobra.Command{
+		Use:     "experimental-control-plane",
+		Short:   "Upgrades the control plane instance deployed on this node. IMPORTANT. This command should be executed after executing `kubeadm upgrade apply` on another control plane instance",
+		Long:    upgradeNodeConfigLongDesc,
+		Example: upgradeNodeConfigExample,
+		Run: func(cmd *cobra.Command, args []string) {
+
+			if flags.nodeName == "" {
+				glog.V(1).Infoln("[upgrade] found NodeName empty; considered OS hostname as NodeName")
+			}
+			nodeName, err := node.GetHostname(flags.nodeName)
+			if err != nil {
+				kubeadmutil.CheckErr(err)
+			}
+			flags.nodeName = nodeName
+
+			if flags.advertiseAddress == "" {
+				ip, err := netutil.ChooseBindAddress(nil)
+				if err != nil {
+					kubeadmutil.CheckErr(err)
+					return
+				}
+
+				flags.advertiseAddress = ip.String()
+			}
+
+			err = RunUpgradeControlPlane(flags)
+			kubeadmutil.CheckErr(err)
+		},
+	}
+
+	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
+	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output the actions that would be performed.")
+
+	//TODO: following values should retrieved form the kubeadm-config config map; remove as soon as the new config wil be in place
+	cmd.Flags().StringVar(&flags.advertiseAddress, "apiserver-advertise-address", flags.advertiseAddress, "If the node is joining as a master, the IP address the API Server will advertise it's listening on.")
+	cmd.Flags().StringVar(&flags.nodeName, "node-name", flags.nodeName, "Specify the node name.")
 	return cmd
 }
 
@@ -155,4 +218,44 @@ func printFilesIfDryRunning(dryRun bool, kubeletDir string) error {
 		PrintPath: filepath.Join(constants.KubeletRunDirectory, constants.KubeletConfigurationFileName),
 	}
 	return dryrunutil.PrintDryRunFiles([]dryrunutil.FileToPrint{fileToPrint}, os.Stdout)
+}
+
+// RunUpgradeControlPlane is executed when `kubeadm upgrade node controlplane` runs.
+func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
+
+	client, err := getClient(flags.kubeConfigPath, flags.dryRun)
+	if err != nil {
+		return fmt.Errorf("Couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
+	}
+
+	waiter := apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
+
+	// Fetches the cluster configuration
+	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade", "")
+	if err != nil {
+		return fmt.Errorf("Unable to fetch the kubeadm-config ConfigMap: %v", err)
+	}
+
+	//TODO: as soon as the new config wil be in place check if the node is a known control plane instance
+	//      and retrive corresponding infos (now are temporary managed as flag)
+	cfg.NodeRegistration.Name = flags.nodeName
+	cfg.API.AdvertiseAddress = flags.advertiseAddress
+
+	// Rotate API server certificate if needed
+	if err := upgrade.BackupAPIServerCertIfNeeded(cfg, flags.dryRun); err != nil {
+		return fmt.Errorf("Unable to rotate API server certificate: %v", err)
+	}
+
+	// Upgrade the control plane
+	fmt.Printf("[upgrade] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
+	if flags.dryRun {
+		return DryRunStaticPodUpgrade(cfg)
+	}
+
+	if err := PerformStaticPodUpgrade(client, waiter, cfg, false); err != nil {
+		return fmt.Errorf("Couldn't complete the static pod upgrade: %v", err)
+	}
+
+	fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")
+	return nil
 }

@@ -108,7 +108,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Rotate the kube-apiserver cert and key if needed
-	if err := backupAPIServerCertIfNeeded(cfg, dryRun); err != nil {
+	if err := BackupAPIServerCertIfNeeded(cfg, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -172,7 +172,8 @@ func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.InitConfig
 	return nil
 }
 
-func backupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+// BackupAPIServerCertIfNeeded rotates the kube-apiserver certificate if older than 180 days
+func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
 	certAndKeyDir := kubeadmapiv1alpha3.DefaultCertificatesDir
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	if err != nil {
