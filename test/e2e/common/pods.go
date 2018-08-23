@@ -39,6 +39,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -46,6 +47,10 @@ var (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
 	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
+	// maxReadyStatusUpdateTolerance specifies the latency that allows kubelet to update pod status.
+	// When kubelet is under heavy load (tests may be parallelized), the delay may be longer, hence
+	// causing tests to be flaky.
+	maxReadyStatusUpdateTolerance = 10 * time.Second
 )
 
 // testHostIP tests that a pod gets a host IP
@@ -693,5 +698,65 @@ var _ = framework.KubeDescribe("Pods", func() {
 		if delay2 < kubelet.MaxContainerBackOff || delay2 > maxBackOffTolerance { // syncloop cumulative drift
 			framework.Failf("expected %s back-off got=%s on delay2", kubelet.MaxContainerBackOff, delay2)
 		}
+	})
+
+	// TODO(freehan): label the test to be [NodeConformance] after tests are proven to be stable.
+	It("should support pod readiness gates [NodeFeature:PodReadinessGate]", func() {
+		podName := "pod-ready"
+		readinessGate1 := "k8s.io/test-condition1"
+		readinessGate2 := "k8s.io/test-condition2"
+		patchStatusFmt := `{"status":{"conditions":[{"type":%q, "status":%q}]}}`
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"test": "pod-readiness-gate"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "pod-readiness-gate",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
+					},
+				},
+				ReadinessGates: []v1.PodReadinessGate{
+					{ConditionType: v1.PodConditionType(readinessGate1)},
+					{ConditionType: v1.PodConditionType(readinessGate2)},
+				},
+			},
+		}
+
+		validatePodReadiness := func(expectReady bool) {
+			Expect(wait.Poll(time.Second, maxReadyStatusUpdateTolerance, func() (bool, error) {
+				podReady := podClient.PodIsReady(podName)
+				res := expectReady == podReady
+				if !res {
+					framework.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
+				}
+				return res, nil
+			})).NotTo(HaveOccurred())
+		}
+
+		By("submitting the pod to kubernetes")
+		podClient.CreateSync(pod)
+		Expect(podClient.PodIsReady(podName)).To(BeFalse(), "Expect pod's Ready condition to be false initially.")
+
+		By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate1))
+		_, err := podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "True")), "status")
+		Expect(err).NotTo(HaveOccurred())
+		// Sleep for 10 seconds.
+		time.Sleep(maxReadyStatusUpdateTolerance)
+		Expect(podClient.PodIsReady(podName)).To(BeFalse(), "Expect pod's Ready condition to be false with only one condition in readinessGates equal to True")
+
+		By(fmt.Sprintf("patching pod status with condition %q to true", readinessGate2))
+		_, err = podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate2, "True")), "status")
+		Expect(err).NotTo(HaveOccurred())
+		validatePodReadiness(true)
+
+		By(fmt.Sprintf("patching pod status with condition %q to false", readinessGate1))
+		_, err = podClient.Patch(podName, types.StrategicMergePatchType, []byte(fmt.Sprintf(patchStatusFmt, readinessGate1, "False")), "status")
+		Expect(err).NotTo(HaveOccurred())
+		validatePodReadiness(false)
+
 	})
 })
