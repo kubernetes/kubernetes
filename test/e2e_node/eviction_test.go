@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -234,7 +233,6 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	evictionTestTimeout := 10 * time.Minute
 	Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
 		})
@@ -303,7 +301,6 @@ var _ = framework.KubeDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [
 
 	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.PodPriority)] = true
 			memoryConsumed := resource.MustParse("600Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Memory.AvailableBytes)
@@ -363,8 +360,6 @@ var _ = framework.KubeDescribe("PriorityLocalStorageEvictionOrdering [Slow] [Ser
 
 	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			initialConfig.FeatureGates[string(features.PodPriority)] = true
-			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
 			diskConsumed := resource.MustParse("350Mi")
 			summary := eventuallyGetSummary()
 			availableBytes := *(summary.Node.Fs.AvailableBytes)
