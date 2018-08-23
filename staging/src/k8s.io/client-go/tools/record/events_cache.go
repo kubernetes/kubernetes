@@ -125,6 +125,10 @@ type spamRecord struct {
 
 // Filter controls that a given source+object are not exceeding the allowed rate.
 func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
+	// do not skip if it's an new event
+	if event.Count == 1 {
+		return false
+	}
 	var record spamRecord
 
 	// controls our cached information about this event (source+object)
