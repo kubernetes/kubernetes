@@ -265,7 +265,7 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
-	Remote  runtime.Unstructured
+	Remote  *unstructured.Unstructured
 	Info    *resource.Info
 	Encoder runtime.Encoder
 	Parser  *parse.Factory
