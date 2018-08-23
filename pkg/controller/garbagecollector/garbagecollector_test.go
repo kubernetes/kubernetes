@@ -812,7 +812,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 	fakeDiscoveryClient := &fakeServerResources{
 		PreferredResources: serverResources,
 		Error:              nil,
-		Lock:               sync.Mutex{},
+		Lock:               sync.RWMutex{},
 		InterfaceUsedCount: 0,
 	}
 
@@ -926,7 +926,7 @@ func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *
 type fakeServerResources struct {
 	PreferredResources []*metav1.APIResourceList
 	Error              error
-	Lock               sync.Mutex
+	Lock               sync.RWMutex
 	InterfaceUsedCount int
 }
 
@@ -958,8 +958,8 @@ func (f *fakeServerResources) setError(err error) {
 }
 
 func (f *fakeServerResources) getInterfaceUsedCount() int {
-	f.Lock.Lock()
-	defer f.Lock.Unlock()
+	f.Lock.RLock()
+	defer f.Lock.RUnlock()
 	return f.InterfaceUsedCount
 }
 

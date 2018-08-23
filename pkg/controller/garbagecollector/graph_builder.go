@@ -285,8 +285,8 @@ func (gb *GraphBuilder) startMonitors() {
 // true at one time, and then later return false if all monitors were
 // reconstructed.
 func (gb *GraphBuilder) IsSynced() bool {
-	gb.monitorLock.Lock()
-	defer gb.monitorLock.Unlock()
+	gb.monitorLock.RLock()
+	defer gb.monitorLock.RUnlock()
 
 	if len(gb.monitors) == 0 {
 		glog.V(4).Info("garbage controller monitor not synced: no monitors")

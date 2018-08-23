@@ -25,7 +25,7 @@ import (
 
 // UIDCache is an LRU cache for uid.
 type UIDCache struct {
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	cache *lru.Cache
 }
 
@@ -45,8 +45,8 @@ func (c *UIDCache) Add(uid types.UID) {
 
 // Has returns if a uid is in the cache.
 func (c *UIDCache) Has(uid types.UID) bool {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 	_, found := c.cache.Get(uid)
 	return found
 }
