@@ -19,6 +19,22 @@ metadata:
 spec:
   privileged: false
   allowPrivilegeEscalation: false
+  # The docker default set of capabilities
+  allowedCapabilities:
+  - SETPCAP
+  - MKNOD
+  - AUDIT_WRITE
+  - CHOWN
+  - NET_RAW
+  - DAC_OVERRIDE
+  - FOWNER
+  - FSETID
+  - KILL
+  - SETGID
+  - SETUID
+  - NET_BIND_SERVICE
+  - SYS_CHROOT
+  - SETFCAP
   volumes:
   - 'emptyDir'
   - 'configMap'

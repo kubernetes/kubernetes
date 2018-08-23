@@ -85,8 +85,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 		Long:    jobLong,
 		Example: jobExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			argsLenAtDash := cmd.ArgsLenAtDash()
-			cmdutil.CheckErr(o.Complete(f, cmd, args, argsLenAtDash))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
@@ -103,11 +102,12 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	return cmd
 }
 
-func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, argsLenAtDash int) error {
-	if len(args) == 0 || argsLenAtDash == 0 {
-		return cmdutil.UsageErrorf(cmd, "NAME is required")
+func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	name, err := NameFromCommandArgs(cmd, args)
+	if err != nil {
+		return err
 	}
-	o.Name = args[0]
+	o.Name = name
 	if len(args) > 1 {
 		o.Command = args[1:]
 	}

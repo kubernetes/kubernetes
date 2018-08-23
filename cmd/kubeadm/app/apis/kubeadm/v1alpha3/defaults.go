@@ -67,8 +67,15 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_InitConfiguration assigns default values to Master node
+// SetDefaults_InitConfiguration assigns default values for the InitConfiguration
 func SetDefaults_InitConfiguration(obj *InitConfiguration) {
+	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
+	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
+	SetDefaults_BootstrapTokens(obj)
+}
+
+// SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
+func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
@@ -97,14 +104,12 @@ func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
-	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
-	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_AuditPolicyConfiguration(obj)
 }
 
 // SetDefaults_Etcd assigns default values for the Proxy
-func SetDefaults_Etcd(obj *InitConfiguration) {
+func SetDefaults_Etcd(obj *ClusterConfiguration) {
 	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
 		obj.Etcd.Local = &LocalEtcd{}
 	}
@@ -152,7 +157,7 @@ func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
 }
 
 // SetDefaults_AuditPolicyConfiguration sets default values for the AuditPolicyConfiguration
-func SetDefaults_AuditPolicyConfiguration(obj *InitConfiguration) {
+func SetDefaults_AuditPolicyConfiguration(obj *ClusterConfiguration) {
 	if obj.AuditPolicyConfiguration.LogDir == "" {
 		obj.AuditPolicyConfiguration.LogDir = constants.StaticPodAuditPolicyLogDir
 	}

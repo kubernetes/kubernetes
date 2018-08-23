@@ -64,6 +64,13 @@ func (in *AdmissionResponse) DeepCopyInto(out *AdmissionResponse) {
 		*out = new(PatchType)
 		**out = **in
 	}
+	if in.AuditAnnotations != nil {
+		in, out := &in.AuditAnnotations, &out.AuditAnnotations
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 

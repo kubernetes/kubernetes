@@ -89,7 +89,8 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 		StreamOptions: StreamOptions{
 			IOStreams: streams,
 		},
-		Attach: &DefaultRemoteAttach{},
+		Attach:     &DefaultRemoteAttach{},
+		AttachFunc: defaultAttachFunc,
 	}
 }
 
@@ -192,8 +193,6 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 	o.Config = config
-
-	o.AttachFunc = defaultAttachFunc
 
 	if o.CommandName == "" {
 		o.CommandName = cmd.CommandPath()

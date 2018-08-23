@@ -33,18 +33,18 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
+// NOTE: Right now this code is unused, as the test utilizing this is disabled.
+
 // Funcs returns the fuzzer functions for the kubeadm apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+			fuzzClusterConfig(obj)
+		},
 		func(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
-			obj.KubernetesVersion = "v10"
-			obj.API.BindPort = 20
-			obj.API.AdvertiseAddress = "foo"
-			obj.Networking.ServiceSubnet = "10.96.0.0/12"
-			obj.Networking.DNSDomain = "cluster.local"
-			obj.CertificatesDir = "foo"
-			obj.APIServerCertSANs = []string{"foo"}
+			fuzzClusterConfig(&obj.ClusterConfiguration)
 			obj.BootstrapTokens = []kubeadm.BootstrapToken{
 				{
 					Token: &kubeadm.BootstrapTokenString{
@@ -56,47 +56,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					Groups: []string{"foo"},
 				},
 			}
-			obj.ImageRepository = "foo"
-			obj.CIImageRepository = ""
-			obj.UnifiedControlPlaneImage = "foo"
-			obj.FeatureGates = map[string]bool{"foo": true}
-			obj.ClusterName = "foo"
-			obj.APIServerExtraArgs = map[string]string{"foo": "foo"}
-			obj.APIServerExtraVolumes = []kubeadm.HostPathMount{{
-				Name:      "foo",
-				HostPath:  "foo",
-				MountPath: "foo",
-				Writable:  false,
-			}}
-			obj.Etcd.Local = &kubeadm.LocalEtcd{
-				Image:          "foo",
-				DataDir:        "foo",
-				ServerCertSANs: []string{"foo"},
-				PeerCertSANs:   []string{"foo"},
-				ExtraArgs:      map[string]string{"foo": "foo"},
-			}
 			obj.NodeRegistration = kubeadm.NodeRegistrationOptions{
 				CRISocket: "foo",
 				Name:      "foo",
 				Taints:    []v1.Taint{},
 			}
-			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
-				Path:      "foo",
-				LogDir:    "/foo",
-				LogMaxAge: utilpointer.Int32Ptr(0),
-			}
-			// Set the Kubelet ComponentConfig to an empty, defaulted struct
-			extkubeletconfig := &kubeletconfigv1beta1.KubeletConfiguration{}
-			obj.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
-			componentconfigs.Scheme.Default(extkubeletconfig)
-			componentconfigs.Scheme.Convert(extkubeletconfig, obj.ComponentConfigs.Kubelet, nil)
-			componentconfigs.DefaultKubeletConfiguration(obj)
-			// Set the KubeProxy ComponentConfig to an empty, defaulted struct
-			extkubeproxyconfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
-			obj.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
-			componentconfigs.Scheme.Default(extkubeproxyconfig)
-			componentconfigs.Scheme.Convert(extkubeproxyconfig, obj.ComponentConfigs.KubeProxy, nil)
-			componentconfigs.DefaultKubeProxyConfiguration(obj)
 		},
 		func(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
@@ -114,4 +78,50 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 		},
 	}
+}
+
+func fuzzClusterConfig(obj *kubeadm.ClusterConfiguration) {
+	obj.KubernetesVersion = "v10"
+	obj.API.BindPort = 20
+	obj.API.AdvertiseAddress = "foo"
+	obj.Networking.ServiceSubnet = "10.96.0.0/12"
+	obj.Networking.DNSDomain = "cluster.local"
+	obj.CertificatesDir = "foo"
+	obj.APIServerCertSANs = []string{"foo"}
+	obj.ImageRepository = "foo"
+	obj.CIImageRepository = ""
+	obj.UnifiedControlPlaneImage = "foo"
+	obj.FeatureGates = map[string]bool{"foo": true}
+	obj.ClusterName = "foo"
+	obj.APIServerExtraArgs = map[string]string{"foo": "foo"}
+	obj.APIServerExtraVolumes = []kubeadm.HostPathMount{{
+		Name:      "foo",
+		HostPath:  "foo",
+		MountPath: "foo",
+		Writable:  false,
+	}}
+	obj.Etcd.Local = &kubeadm.LocalEtcd{
+		Image:          "foo",
+		DataDir:        "foo",
+		ServerCertSANs: []string{"foo"},
+		PeerCertSANs:   []string{"foo"},
+		ExtraArgs:      map[string]string{"foo": "foo"},
+	}
+	obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
+		Path:      "foo",
+		LogDir:    "/foo",
+		LogMaxAge: utilpointer.Int32Ptr(0),
+	}
+	// Set the Kubelet ComponentConfig to an empty, defaulted struct
+	extkubeletconfig := &kubeletconfigv1beta1.KubeletConfiguration{}
+	obj.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
+	componentconfigs.Scheme.Default(extkubeletconfig)
+	componentconfigs.Scheme.Convert(extkubeletconfig, obj.ComponentConfigs.Kubelet, nil)
+	componentconfigs.DefaultKubeletConfiguration(obj)
+	// Set the KubeProxy ComponentConfig to an empty, defaulted struct
+	extkubeproxyconfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	obj.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
+	componentconfigs.Scheme.Default(extkubeproxyconfig)
+	componentconfigs.Scheme.Convert(extkubeproxyconfig, obj.ComponentConfigs.KubeProxy, nil)
+	componentconfigs.DefaultKubeProxyConfiguration(obj)
 }

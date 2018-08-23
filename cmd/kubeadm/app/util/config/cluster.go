@@ -29,6 +29,7 @@ import (
 )
 
 // FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
+// TODO: This func should be renamed FetchClusterConfigFromFileOrCluster, and return a ClusterConfiguration instead of an InitConfiguration
 func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string) (*kubeadmapi.InitConfiguration, error) {
 	// Load the configuration from a file or the cluster
 	configBytes, err := loadConfigurationBytes(client, w, logPrefix, cfgPath)
@@ -36,8 +37,17 @@ func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPr
 		return nil, err
 	}
 
-	// Take the versioned configuration populated from the file or ConfigMap, convert it to internal, default and validate
-	return BytesToInternalConfig(configBytes)
+	// Unmarshal the versioned configuration populated from the file or ConfigMap, convert it to the internal API types, then default and validate
+	initcfg, err := BytesToInternalConfig(configBytes)
+	if err != nil {
+		return nil, err
+	}
+	// In this function we're only interested in the ClusterConfiguration part.
+	// TODO: As described above, the return value of this func actually should be a ClusterConfiguration
+	if err := SetClusterDynamicDefaults(&initcfg.ClusterConfiguration); err != nil {
+		return nil, err
+	}
+	return initcfg, err
 }
 
 // loadConfigurationBytes loads the configuration byte slice from either a file or the cluster ConfigMap
@@ -50,6 +60,8 @@ func loadConfigurationBytes(client clientset.Interface, w io.Writer, logPrefix, 
 
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
 
+	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
+	// Also, the key really should be ClusterConfiguration...
 	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// Return the apierror directly so the caller of this function can know what type of error occurred and act based on that

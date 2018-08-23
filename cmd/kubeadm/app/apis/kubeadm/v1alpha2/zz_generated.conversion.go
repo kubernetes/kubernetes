@@ -351,68 +351,34 @@ func autoConvert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration(in *Ini
 	if err := Convert_v1alpha2_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
-	if err := Convert_v1alpha2_API_To_kubeadm_API(&in.API, &out.API, s); err != nil {
-		return err
-	}
+	// WARNING: in.API requires manual conversion: does not exist in peer-type
 	// WARNING: in.KubeProxy requires manual conversion: does not exist in peer-type
-	if err := Convert_v1alpha2_Etcd_To_kubeadm_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
-		return err
-	}
+	// WARNING: in.Etcd requires manual conversion: does not exist in peer-type
 	// WARNING: in.KubeletConfiguration requires manual conversion: does not exist in peer-type
-	if err := Convert_v1alpha2_Networking_To_kubeadm_Networking(&in.Networking, &out.Networking, s); err != nil {
-		return err
-	}
-	out.KubernetesVersion = in.KubernetesVersion
-	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
-	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
-	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
-	out.APIServerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.APIServerExtraVolumes))
-	out.ControllerManagerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ControllerManagerExtraVolumes))
-	out.SchedulerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
-	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
-	out.CertificatesDir = in.CertificatesDir
-	out.ImageRepository = in.ImageRepository
-	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	if err := Convert_v1alpha2_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
-		return err
-	}
-	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	out.ClusterName = in.ClusterName
+	// WARNING: in.Networking requires manual conversion: does not exist in peer-type
+	// WARNING: in.KubernetesVersion requires manual conversion: does not exist in peer-type
+	// WARNING: in.APIServerExtraArgs requires manual conversion: does not exist in peer-type
+	// WARNING: in.ControllerManagerExtraArgs requires manual conversion: does not exist in peer-type
+	// WARNING: in.SchedulerExtraArgs requires manual conversion: does not exist in peer-type
+	// WARNING: in.APIServerExtraVolumes requires manual conversion: does not exist in peer-type
+	// WARNING: in.ControllerManagerExtraVolumes requires manual conversion: does not exist in peer-type
+	// WARNING: in.SchedulerExtraVolumes requires manual conversion: does not exist in peer-type
+	// WARNING: in.APIServerCertSANs requires manual conversion: does not exist in peer-type
+	// WARNING: in.CertificatesDir requires manual conversion: does not exist in peer-type
+	// WARNING: in.ImageRepository requires manual conversion: does not exist in peer-type
+	// WARNING: in.UnifiedControlPlaneImage requires manual conversion: does not exist in peer-type
+	// WARNING: in.AuditPolicyConfiguration requires manual conversion: does not exist in peer-type
+	// WARNING: in.FeatureGates requires manual conversion: does not exist in peer-type
+	// WARNING: in.ClusterName requires manual conversion: does not exist in peer-type
 	return nil
 }
 
 func autoConvert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
+	// WARNING: in.ClusterConfiguration requires manual conversion: does not exist in peer-type
 	out.BootstrapTokens = *(*[]BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1alpha2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
-	// INFO: in.ComponentConfigs opted out of conversion generation
-	if err := Convert_kubeadm_API_To_v1alpha2_API(&in.API, &out.API, s); err != nil {
-		return err
-	}
-	if err := Convert_kubeadm_Etcd_To_v1alpha2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
-		return err
-	}
-	if err := Convert_kubeadm_Networking_To_v1alpha2_Networking(&in.Networking, &out.Networking, s); err != nil {
-		return err
-	}
-	out.KubernetesVersion = in.KubernetesVersion
-	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
-	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
-	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
-	out.APIServerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.APIServerExtraVolumes))
-	out.ControllerManagerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ControllerManagerExtraVolumes))
-	out.SchedulerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
-	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
-	out.CertificatesDir = in.CertificatesDir
-	out.ImageRepository = in.ImageRepository
-	// INFO: in.CIImageRepository opted out of conversion generation
-	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	if err := Convert_kubeadm_AuditPolicyConfiguration_To_v1alpha2_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
-		return err
-	}
-	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	out.ClusterName = in.ClusterName
 	return nil
 }
 

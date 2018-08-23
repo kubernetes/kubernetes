@@ -152,9 +152,11 @@ func makeCmd(certSpec *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
 	defaultConfig := &kubeadmapiv1alpha3.InitConfiguration{
-		API: kubeadmapiv1alpha3.API{
-			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
-			AdvertiseAddress: "127.0.0.1",
+		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+			API: kubeadmapiv1alpha3.API{
+				// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
+				AdvertiseAddress: "127.0.0.1",
+			},
 		},
 	}
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}

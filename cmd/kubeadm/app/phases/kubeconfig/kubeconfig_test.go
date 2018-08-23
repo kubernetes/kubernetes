@@ -26,14 +26,11 @@ import (
 	"reflect"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
-
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
@@ -47,7 +44,9 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 
 	// Creates a Master Configuration pointing to the pkidir folder
 	cfg := &kubeadmapi.InitConfiguration{
-		CertificatesDir: tmpdir,
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: tmpdir,
+		},
 	}
 
 	// Executes getKubeConfigSpecs
@@ -67,28 +66,38 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 	// Creates Master Configurations pointing to the pkidir folder
 	cfgs := []*kubeadmapi.InitConfiguration{
 		{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-			CertificatesDir:  pkidir,
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				CertificatesDir: pkidir,
+			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
-			CertificatesDir:  pkidir,
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
+				CertificatesDir: pkidir,
+			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
-			CertificatesDir:  pkidir,
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
+				CertificatesDir: pkidir,
+			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
-			CertificatesDir:  pkidir,
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
+				CertificatesDir: pkidir,
+			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
-			CertificatesDir:  pkidir,
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
+				CertificatesDir: pkidir,
+			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 	}
@@ -307,8 +316,10 @@ func TestCreateKubeconfigFilesAndWrappers(t *testing.T) {
 
 		// Creates a Master Configuration pointing to the pkidir folder
 		cfg := &kubeadmapi.InitConfiguration{
-			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-			CertificatesDir: pkidir,
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				CertificatesDir: pkidir,
+			},
 		}
 
 		// Execs the createKubeConfigFunction
@@ -335,7 +346,9 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 
 	// Creates a Master Configuration pointing to the tmpdir folder
 	cfg := &kubeadmapi.InitConfiguration{
-		CertificatesDir: tmpdir,
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: tmpdir,
+		},
 	}
 
 	var tests = []struct {
@@ -380,8 +393,10 @@ func TestWriteKubeConfig(t *testing.T) {
 
 	// Creates a Master Configuration pointing to the pkidir folder
 	cfg := &kubeadmapi.InitConfiguration{
-		API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-		CertificatesDir: pkidir,
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			CertificatesDir: pkidir,
+		},
 	}
 
 	var tests = []struct {

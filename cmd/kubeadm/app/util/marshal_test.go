@@ -111,26 +111,21 @@ func TestMarshalUnmarshalYaml(t *testing.T) {
 func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 	cfg := &kubeadmapiv1alpha3.InitConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       "InitConfiguration",
+			Kind:       constants.InitConfigurationKind,
 			APIVersion: kubeadmapiv1alpha3.SchemeGroupVersion.String(),
-		},
-		API: kubeadmapiv1alpha3.API{
-			AdvertiseAddress: "10.100.0.1",
-			BindPort:         4332,
 		},
 		NodeRegistration: kubeadmapiv1alpha3.NodeRegistrationOptions{
 			Name:      "testNode",
 			CRISocket: "/var/run/cri.sock",
-		},
-		Networking: kubeadmapiv1alpha3.Networking{
-			ServiceSubnet: "10.100.0.0/24",
-			PodSubnet:     "10.100.1.0/24",
 		},
 		BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
 			{
 				Token: &kubeadmapiv1alpha3.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 			},
 		},
+		// NOTE: Using MarshalToYamlForCodecs and UnmarshalFromYamlForCodecs for ClusterConfiguration fields here won't work
+		// by design. This is because we have a `json:"-"` annotation in order to avoid struct duplication. See the comment
+		// at the kubeadmapiv1alpha3.InitConfiguration definition.
 	}
 
 	kubeadmapiv1alpha3.SetDefaults_InitConfiguration(cfg)
