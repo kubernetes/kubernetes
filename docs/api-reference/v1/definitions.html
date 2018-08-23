@@ -9700,6 +9700,13 @@ More info: <a href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifec
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_podreadinessgate">v1.PodReadinessGate</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">runtimeClassName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RuntimeClassName refers to a RuntimeClass object with the same name, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. More info: <a href="https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md">https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md</a> This is an alpha feature and may change in the future.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
