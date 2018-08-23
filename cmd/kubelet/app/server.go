@@ -985,7 +985,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// NewMainKubelet should have set up a pod source config if one didn't exist
 	// when the builder was run. This is just a precaution.
 	if kubeDeps.PodConfig == nil {
-		return fmt.Errorf("failed to create kubelet, pod source config was nil")
+		return errors.New("failed to create kubelet, pod source config was nil")
 	}
 	podCfg := kubeDeps.PodConfig
 

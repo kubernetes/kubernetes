@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -96,7 +97,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 // or is not still running, this returns an error.
 func (r *EtcdMigrateServer) Stop() error {
 	if r.cmd == nil {
-		return fmt.Errorf("cannot stop EtcdMigrateServer that has not been started")
+		return errors.New("cannot stop EtcdMigrateServer that has not been started")
 	}
 	err := r.cmd.Process.Signal(os.Interrupt)
 	if err != nil {

@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -70,7 +71,7 @@ type fakeKernelCompatTester struct {
 
 func (fake *fakeKernelCompatTester) IsCompatible() error {
 	if !fake.ok {
-		return fmt.Errorf("error")
+		return errors.New("error")
 	}
 	return nil
 }

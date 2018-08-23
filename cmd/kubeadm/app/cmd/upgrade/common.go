@@ -19,6 +19,7 @@ package upgrade
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -198,5 +199,5 @@ func InteractivelyConfirmUpgrade(question string) error {
 		return nil
 	}
 
-	return fmt.Errorf("won't proceed; the user didn't answer (Y|y) in order to continue")
+	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
 }

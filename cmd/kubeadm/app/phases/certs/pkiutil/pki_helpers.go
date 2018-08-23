@@ -19,6 +19,7 @@ package pkiutil
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -85,7 +86,7 @@ func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *r
 // WriteCert stores the given certificate at the given location
 func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	if cert == nil {
-		return fmt.Errorf("certificate cannot be nil when writing to file")
+		return errors.New("certificate cannot be nil when writing to file")
 	}
 
 	certificatePath := pathForCert(pkiPath, name)
@@ -99,7 +100,7 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 // WriteKey stores the given key at the given location
 func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	if key == nil {
-		return fmt.Errorf("private key cannot be nil when writing to file")
+		return errors.New("private key cannot be nil when writing to file")
 	}
 
 	privateKeyPath := pathForKey(pkiPath, name)
@@ -113,7 +114,7 @@ func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 // WritePublicKey stores the given public key at the given location
 func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	if key == nil {
-		return fmt.Errorf("public key cannot be nil when writing to file")
+		return errors.New("public key cannot be nil when writing to file")
 	}
 
 	publicKeyBytes, err := certutil.EncodePublicKeyPEM(key)

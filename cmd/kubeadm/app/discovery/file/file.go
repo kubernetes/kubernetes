@@ -17,6 +17,7 @@ limitations under the License.
 package file
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"k8s.io/api/core/v1"
@@ -153,11 +154,11 @@ func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, e
 // validateKubeConfig makes sure the user-provided KubeConfig file is valid
 func validateKubeConfig(config *clientcmdapi.Config) error {
 	if len(config.Clusters) < 1 {
-		return fmt.Errorf("the provided cluster-info KubeConfig file must have at least one Cluster defined")
+		return errors.New("the provided cluster-info KubeConfig file must have at least one Cluster defined")
 	}
 	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
 	if defaultCluster == nil {
-		return fmt.Errorf("the provided cluster-info KubeConfig file must have an unnamed Cluster or a CurrentContext that specifies a non-nil Cluster")
+		return errors.New("the provided cluster-info KubeConfig file must have an unnamed Cluster or a CurrentContext that specifies a non-nil Cluster")
 	}
 	return clientcmd.Validate(*config)
 }

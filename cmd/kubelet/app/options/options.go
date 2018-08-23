@@ -18,7 +18,7 @@ limitations under the License.
 package options
 
 import (
-	"fmt"
+	"errors"
 	_ "net/http/pprof"
 	"path/filepath"
 	"runtime"
@@ -245,10 +245,10 @@ func NewKubeletFlags() *KubeletFlags {
 func ValidateKubeletFlags(f *KubeletFlags) error {
 	// ensure that nobody sets DynamicConfigDir if the dynamic config feature gate is turned off
 	if f.DynamicConfigDir.Provided() && !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		return fmt.Errorf("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
+		return errors.New("the DynamicKubeletConfig feature gate must be enabled in order to use the --dynamic-config-dir flag")
 	}
 	if f.NodeStatusMaxImages < -1 {
-		return fmt.Errorf("invalid configuration: NodeStatusMaxImages (--node-status-max-images) must be -1 or greater")
+		return errors.New("invalid configuration: NodeStatusMaxImages (--node-status-max-images) must be -1 or greater")
 	}
 	return nil
 }
