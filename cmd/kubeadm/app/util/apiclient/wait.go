@@ -17,6 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -143,7 +144,7 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("[kubelet-check] It seems like the kubelet isn't running or healthy.")
 			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' returned HTTP code %d\n", healthzEndpoint, resp.StatusCode)
-			return fmt.Errorf("the kubelet healthz endpoint is unhealthy")
+			return errors.New("the kubelet healthz endpoint is unhealthy")
 		}
 		return nil
 	}, 5) // a failureThreshold of five means waiting for a total of 155 seconds

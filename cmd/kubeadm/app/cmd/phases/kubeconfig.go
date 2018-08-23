@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -144,7 +145,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 			examples: userKubeconfigExample,
 			cmdFunc: func(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 				if clientName == "" {
-					return fmt.Errorf("missing required argument --client-name")
+					return errors.New("missing required argument --client-name")
 				}
 
 				// if the kubeconfig file for an additional user has to use a token, use it

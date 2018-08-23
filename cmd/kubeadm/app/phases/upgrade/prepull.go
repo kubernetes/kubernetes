@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -131,7 +132,7 @@ func waitForItemsFromChan(timeoutChan <-chan time.Time, stringChan chan string, 
 	for {
 		select {
 		case <-timeoutChan:
-			return fmt.Errorf("The prepull operation timed out")
+			return errors.New("The prepull operation timed out")
 		case result := <-stringChan:
 			i++
 			// If the cleanup function errors; error here as well
@@ -159,11 +160,6 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 			Namespace: metav1.NamespaceSystem,
 		},
 		Spec: apps.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"k8s-app": addPrepullPrefix(component),
-				},
-			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{

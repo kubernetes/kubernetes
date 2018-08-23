@@ -17,7 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"io/ioutil"
 
@@ -125,7 +125,7 @@ func runDiff(flags *diffFlags, args []string) error {
 			return err
 		}
 		if path == "" {
-			return fmt.Errorf("empty manifest path")
+			return errors.New("empty manifest path")
 		}
 		existingManifest, err := ioutil.ReadFile(path)
 		if err != nil {
