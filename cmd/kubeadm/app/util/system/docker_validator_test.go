@@ -72,6 +72,26 @@ func TestValidateDockerInfo(t *testing.T) {
 			warn: false,
 		},
 		{
+			info: types.Info{Driver: "driver_2", ServerVersion: "17.09.0-ce"},
+			err:  false,
+			warn: false,
+		},
+		{
+			info: types.Info{Driver: "driver_2", ServerVersion: "17.09.0-ce"},
+			err:  false,
+			warn: false,
+		},
+		{
+			info: types.Info{Driver: "driver_2", ServerVersion: "17.12.0-ce"},
+			err:  false,
+			warn: false,
+		},
+		{
+			info: types.Info{Driver: "driver_2", ServerVersion: "17.12.0-ce"},
+			err:  false,
+			warn: false,
+		},
+		{
 			info: types.Info{Driver: "driver_2", ServerVersion: "18.03.0-ce"},
 			err:  false,
 			warn: false,
