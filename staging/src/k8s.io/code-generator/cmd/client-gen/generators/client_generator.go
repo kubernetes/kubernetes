@@ -44,10 +44,10 @@ func NameSystems() namer.NameSystems {
 
 	publicNamer := &ExceptionNamer{
 		Exceptions: map[string]string{
-			// these exceptions are used to deconflict the generated code
-			// you can put your fully qualified package like
-			// to generate a name that doesn't conflict with your group.
-			// "k8s.io/apis/events/v1beta1.Event": "EventResource"
+		// these exceptions are used to deconflict the generated code
+		// you can put your fully qualified package like
+		// to generate a name that doesn't conflict with your group.
+		// "k8s.io/apis/events/v1beta1.Event": "EventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
@@ -56,10 +56,10 @@ func NameSystems() namer.NameSystems {
 	}
 	privateNamer := &ExceptionNamer{
 		Exceptions: map[string]string{
-			// these exceptions are used to deconflict the generated code
-			// you can put your fully qualified package like
-			// to generate a name that doesn't conflict with your group.
-			// "k8s.io/apis/events/v1beta1.Event": "eventResource"
+		// these exceptions are used to deconflict the generated code
+		// you can put your fully qualified package like
+		// to generate a name that doesn't conflict with your group.
+		// "k8s.io/apis/events/v1beta1.Event": "eventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
@@ -68,10 +68,10 @@ func NameSystems() namer.NameSystems {
 	}
 	publicPluralNamer := &ExceptionNamer{
 		Exceptions: map[string]string{
-			// these exceptions are used to deconflict the generated code
-			// you can put your fully qualified package like
-			// to generate a name that doesn't conflict with your group.
-			// "k8s.io/apis/events/v1beta1.Event": "EventResource"
+		// these exceptions are used to deconflict the generated code
+		// you can put your fully qualified package like
+		// to generate a name that doesn't conflict with your group.
+		// "k8s.io/apis/events/v1beta1.Event": "EventResource"
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name
@@ -368,6 +368,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			}
 			gvToTypes[gv] = append(gvToTypes[gv], t)
 		}
+		if len(gvToTypes[gv]) == 0 {
+			glog.V(5).Infof("Skipping empty group %s", gv)
+			delete(gvToTypes, gv)
+			delete(groupGoNames, gv)
+			removeGroupVersion(customArgs, gv)
+		}
 	}
 
 	var packageList []generator.Package
@@ -422,5 +428,28 @@ func NewTagOverrideNamer(tagName string, fallback namer.Namer) namer.Namer {
 	return &tagOverrideNamer{
 		tagName:  tagName,
 		fallback: fallback,
+	}
+}
+
+// Remove given group version from customArgs.
+// Remove the group too if it gets empty.
+func removeGroupVersion(ca *clientgenargs.CustomArgs, gv clientgentypes.GroupVersion) {
+	for i, grp := range ca.Groups {
+		if grp.Group != gv.Group {
+			continue
+		}
+		for j, v := range grp.Versions {
+			if v.Version != gv.Version {
+				continue
+			}
+			// Remove version.
+			grp.Versions = append(grp.Versions[:j], grp.Versions[j+1:]...)
+			break
+		}
+		// Remove group if the last version was just removed.
+		if len(grp.Versions) == 0 {
+			ca.Groups = append(ca.Groups[:i], ca.Groups[i+1:]...)
+		}
+		return
 	}
 }
