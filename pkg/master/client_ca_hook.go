@@ -41,11 +41,6 @@ type ClientCARegistrationHook struct {
 }
 
 func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
-	// no work to do
-	if len(h.ClientCA) == 0 && len(h.RequestHeaderCA) == 0 {
-		return nil
-	}
-
 	// initializing CAs is important so that aggregated API servers can come up with "normal" config.
 	// We've seen lagging etcd before, so we want to retry this a few times before we decide to crashloop
 	// the API server on it.
@@ -68,7 +63,6 @@ func (h ClientCARegistrationHook) PostStartHook(hookContext genericapiserver.Pos
 	}
 
 	return nil
-
 }
 
 // tryToWriteClientCAs is here for unit testing with a fake client.  This is a wait.ConditionFunc so the bool
