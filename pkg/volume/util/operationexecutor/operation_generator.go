@@ -632,7 +632,6 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, devi
 				if _, resizeErr = fsResizablePlugin.ExpandVolumeDevice(volumeToMount.VolumeSpec, pvSpecCap, pvcStatusCap); resizeErr == nil {
 					resizeErr = fsResizablePlugin.ExpandFS(volumeToMount.VolumeSpec, devicePath, deviceMountPath)
 				}
-
 				if resizeErr == nil {
 					resizeStatus = true
 				}
@@ -1279,11 +1278,9 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		if volumePlugin != nil {
 			return volumePlugin.GetPluginName()
 		}
-
 		if volumeSpec.PersistentVolume.Spec.FlexVolume != nil {
 			return "flexvolume-" + volumeSpec.PersistentVolume.Spec.FlexVolume.Driver
 		}
-
 		return ""
 	}
 
@@ -1303,7 +1300,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 					pvcWithResizeRequest.CurrentSize)
 
 				if expandErr != nil {
-					detailedErr := fmt.Errorf("Error expanding volume %q of plugin %s : %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
+					detailedErr := fmt.Errorf("error expanding volume %q of plugin %s: %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
 					return detailedErr, detailedErr
 				}
 			} else {

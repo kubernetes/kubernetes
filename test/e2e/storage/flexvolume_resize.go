@@ -24,9 +24,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"path"
@@ -50,20 +48,16 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "local")
-		if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
-			framework.Skipf("Only supported when %v feature is enabled", features.ExpandInUsePersistentVolumes)
-		}
 
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 
 		nodeList = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) != 0 {
-			nodeName = nodeList.Items[0].Name
-		} else {
-			framework.Failf("Unable to find ready and schedulable Node")
+		if len(nodeList.Items) == 0 {
+			framework.Failf("unable to find ready and schedulable Node")
 		}
+		nodeName = nodeList.Items[0].Name
 
 		nodeKey = "mounted_flexvolume_expand"
 
@@ -81,9 +75,6 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 			provisioner: "flex-expand",
 		}
 		resizableSc, err = createResizableStorageClass(test, ns, "resizing", c)
-		if err != nil {
-			fmt.Printf("storage class creation error: %v\n", err)
-		}
 		Expect(err).NotTo(HaveOccurred(), "Error creating resizable storage class: %v", err)
 		Expect(*resizableSc.AllowVolumeExpansion).To(BeTrue())
 
