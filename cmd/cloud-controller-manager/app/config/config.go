@@ -45,6 +45,10 @@ type Config struct {
 	// the rest config for the master
 	Kubeconfig *restclient.Config
 
+	// NodeIpamControllerConfiguration holds configuration for NodeIpamController
+	// related features.
+	NodeIpamController componentconfig.NodeIpamControllerConfiguration
+
 	// the event sink
 	EventRecorder record.EventRecorder
 

@@ -885,3 +885,9 @@ func (manager *gceServiceManager) getProjectsAPIEndpointBeta() string {
 
 	return projectsApiEndpoint
 }
+
+func warnStack(warn string) {
+	buf := make([]byte, 1<<16)
+	runtime.Stack(buf, false)
+	glog.Warningf("%s:\n %s", warn, buf)
+}

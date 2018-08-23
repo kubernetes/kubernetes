@@ -430,6 +430,9 @@ func autoConvert_v1alpha1_CloudControllerManagerConfiguration_To_componentconfig
 	if err := Convert_v1alpha1_KubeCloudSharedConfiguration_To_componentconfig_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
 		return err
 	}
+	if err := Convert_v1alpha1_NodeIpamControllerConfiguration_To_componentconfig_NodeIpamControllerConfiguration(&in.NodeIpamController, &out.NodeIpamController, s); err != nil {
+		return err
+	}
 	if err := Convert_v1alpha1_ServiceControllerConfiguration_To_componentconfig_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {
 		return err
 	}
@@ -453,6 +456,9 @@ func autoConvert_componentconfig_CloudControllerManagerConfiguration_To_v1alpha1
 		return err
 	}
 	if err := Convert_componentconfig_KubeCloudSharedConfiguration_To_v1alpha1_KubeCloudSharedConfiguration(&in.KubeCloudShared, &out.KubeCloudShared, s); err != nil {
+		return err
+	}
+	if err := Convert_componentconfig_NodeIpamControllerConfiguration_To_v1alpha1_NodeIpamControllerConfiguration(&in.NodeIpamController, &out.NodeIpamController, s); err != nil {
 		return err
 	}
 	if err := Convert_componentconfig_ServiceControllerConfiguration_To_v1alpha1_ServiceControllerConfiguration(&in.ServiceController, &out.ServiceController, s); err != nil {

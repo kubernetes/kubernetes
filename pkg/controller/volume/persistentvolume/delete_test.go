@@ -58,7 +58,7 @@ func TestDeleteSync(t *testing.T) {
 			// delete failure - plugin not found
 			"8-3 - plugin not found",
 			newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
-			withMessage("Error getting deleter volume plugin for volume \"volume8-3\": no volume plugin matched", newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
+			withMessage("Error getting deleter volume plugin for volume \"volume8-3\": no volume plugin matched by spec", newVolumeArray("volume8-3", "1Gi", "uid8-3", "claim8-3", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedDelete"}, noerrors, testSyncVolume,

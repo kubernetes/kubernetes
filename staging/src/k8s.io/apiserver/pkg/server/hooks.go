@@ -148,6 +148,7 @@ func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 	}
 
 	for hookName, hookEntry := range s.postStartHooks {
+		glog.V(1).Infof("WRF calling hook %s", hookName)
 		go runPostStartHook(hookName, hookEntry, context)
 	}
 }

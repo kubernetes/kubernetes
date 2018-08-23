@@ -66,6 +66,7 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,Debugging
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,GenericComponent
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,KubeCloudShared
+API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,NodeIpamController
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,ServiceController
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudControllerManagerConfiguration,NodeStatusUpdateFrequency
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CloudProviderConfiguration,Name

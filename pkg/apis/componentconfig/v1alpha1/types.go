@@ -269,6 +269,9 @@ type CloudControllerManagerConfiguration struct {
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
+	// NodeIpamControllerConfiguration holds configuration for NodeIpamController
+	// related features.
+	NodeIpamController NodeIpamControllerConfiguration
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration

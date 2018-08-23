@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	"runtime"
 )
 
 const (
@@ -90,6 +91,7 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (string, int, map[string]string, string, error) {
 	cloud, err := getCloudProvider(c.gcePersistentDisk.plugin.host.GetCloudProvider())
 	if err != nil {
+		glog.Warningf("WRF:CreateVolume() c.gcePersistentDisk.plugin.host(%T), c.gcePersistentDisk.plugin(%T)", c.gcePersistentDisk.plugin.host, c.gcePersistentDisk.plugin)
 		return "", 0, nil, "", err
 	}
 
@@ -358,19 +360,24 @@ func getDiskByIdPaths(pdName string, partition string) []string {
 // Return cloud provider
 func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.GCECloud, error) {
 	var err error
-	for numRetries := 0; numRetries < maxRetries; numRetries++ {
-		gceCloudProvider, ok := cloudProvider.(*gcecloud.GCECloud)
-		if !ok || gceCloudProvider == nil {
-			// Retry on error. See issue #11321
-			glog.Errorf("Failed to get GCE Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
-			time.Sleep(errorSleepDuration)
-			continue
+	if cloudProvider == nil {
+		buf := make([]byte, 1<<16)
+		runtime.Stack(buf, false)
+		glog.Warningf("WRF:getCloudProvider called with no cloudProvider %s", buf)
+	} else {
+		for numRetries := 0; numRetries < maxRetries; numRetries++ {
+			gceCloudProvider, ok := cloudProvider.(*gcecloud.GCECloud)
+			if !ok || gceCloudProvider == nil {
+				// Retry on error. See issue #11321
+				glog.Errorf("Failed to get GCE Cloud Provider. plugin.host.GetCloudProvider returned %v instead", cloudProvider)
+				time.Sleep(errorSleepDuration)
+				continue
+			}
+
+			return gceCloudProvider, nil
 		}
-
-		return gceCloudProvider, nil
 	}
-
-	return nil, fmt.Errorf("Failed to get GCE GCECloudProvider with error %v", err)
+	return nil, fmt.Errorf("Failed to get GCE GCECloudProvider(%T) with error %v", cloudProvider, err)
 }
 
 // Triggers the application of udev rules by calling "udevadm trigger

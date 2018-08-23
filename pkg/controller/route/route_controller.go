@@ -99,10 +99,11 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting route controller")
+	glog.Infof("Starting route controller with a sync period of %v", syncPeriod)
 	defer glog.Info("Shutting down route controller")
 
 	if !controller.WaitForCacheSync("route", stopCh, rc.nodeListerSynced) {
+		glog.Warning("Could not wait for route cache to sync.")
 		return
 	}
 
@@ -125,9 +126,12 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 }
 
 func (rc *RouteController) reconcileNodeRoutes() error {
+	glog.Info("Running reconcileNodeRoutes()")
 	routeList, err := rc.routes.ListRoutes(context.TODO(), rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
+	} else {
+		glog.Infof("List routes for %s returned %v.", rc.clusterName, routeList)
 	}
 	nodes, err := rc.nodeLister.List(labels.Everything())
 	if err != nil {
@@ -137,6 +141,7 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 }
 
 func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
+	glog.Infof("Running reconcile with nodes %v and routes %v", nodes, routes)
 	// nodeCIDRs maps nodeName->nodeCIDR
 	nodeCIDRs := make(map[types.NodeName]string)
 	// routeMap maps routeTargetNode->route
@@ -153,6 +158,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	for _, node := range nodes {
 		// Skip if the node hasn't been assigned a CIDR yet.
 		if node.Spec.PodCIDR == "" {
+			glog.Infof("Skipping %s, because node.Spec.PodCIDR == \"\"", node.Name)
 			continue
 		}
 		nodeName := types.NodeName(node.Name)

@@ -49,6 +49,7 @@ var _ volume.DeviceMountableVolumePlugin = &gcePersistentDiskPlugin{}
 func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
+		glog.Warningf("WRF:NewAttacher() plugin.host(%T), plugin(%T)", plugin.host, plugin)
 		return nil, err
 	}
 

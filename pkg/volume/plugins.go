@@ -536,21 +536,27 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	matches := []VolumePlugin{}
 	for k, v := range pm.plugins {
 		if v.CanSupport(spec) {
+			glog.V(1).Infof("WRF:FindPluginBySpec() plugin %s can support %s.", v.GetPluginName(), spec.Name())
 			matchedPluginNames = append(matchedPluginNames, k)
 			matches = append(matches, v)
+		} else {
+			glog.V(1).Infof("WRF:FindPluginBySpec() plugin %s does NOT support %s.", v.GetPluginName(), spec.Name())
 		}
 	}
 
 	pm.refreshProbedPlugins()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
+			glog.V(1).Infof("WRF:FindPluginBySpec() probed plugin %s can support %s.", plugin.GetPluginName(), spec.Name())
 			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
 			matches = append(matches, plugin)
+		} else {
+			glog.V(1).Infof("WRF:FindPluginBySpec() probed plugin %s does NOT support %s.", plugin.GetPluginName(), spec.Name())
 		}
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
+		return nil, fmt.Errorf("no volume plugin matched by spec")
 	}
 	if len(matches) > 1 {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
@@ -569,21 +575,27 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	matches := []VolumePlugin{}
 	for k, v := range pm.plugins {
 		if v.GetPluginName() == name {
+			glog.V(1).Infof("WRF:FindPluginByName() plugin %s can support %s.", v.GetPluginName(), name)
 			matchedPluginNames = append(matchedPluginNames, k)
 			matches = append(matches, v)
+		} else {
+			glog.V(1).Infof("WRF:FindPluginByName() plugin %s does NOT support %s.", v.GetPluginName(), name)
 		}
 	}
 
 	pm.refreshProbedPlugins()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.GetPluginName() == name {
+			glog.V(1).Infof("WRF:FindPluginByName() probed plugin %s can support %s.", plugin.GetPluginName(), name)
 			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
 			matches = append(matches, plugin)
+		} else {
+			glog.V(1).Infof("WRF:FindPluginByName() probed plugin %s does not support %s.", plugin.GetPluginName(), name)
 		}
 	}
 
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
+		return nil, fmt.Errorf("no volume plugin matched by name")
 	}
 	if len(matches) > 1 {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))

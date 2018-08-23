@@ -4201,6 +4201,8 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	oldNode.Status.Capacity = node.Status.Capacity
 	// Allow users to unschedule node
 	oldNode.Spec.Unschedulable = node.Spec.Unschedulable
+	// Allow the ProviderID to be set
+	oldNode.Spec.ProviderID = node.Spec.ProviderID
 	// Clear status
 	oldNode.Status = node.Status
 
@@ -4213,7 +4215,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	// We made allowed changes to oldNode, and now we compare oldNode to node. Any remaining differences indicate changes to protected fields.
 	// TODO: Add a 'real' error type for this error and provide print actual diffs.
 	if !apiequality.Semantic.DeepEqual(oldNode, node) {
-		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
+		glog.V(2).Infof("Update failed validation %#v vs %#v", oldNode, node)
 		allErrs = append(allErrs, field.Forbidden(field.NewPath(""), "node updates may only change labels, taints, or capacity (or configSource, if the DynamicKubeletConfig feature gate is enabled)"))
 	}
 

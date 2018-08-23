@@ -61,6 +61,8 @@ type CloudControllerManagerOptions struct {
 	KubeCloudShared   *cmoptions.KubeCloudSharedOptions
 	ServiceController *cmoptions.ServiceControllerOptions
 
+	NodeIpamController *cmoptions.NodeIpamControllerOptions
+
 	SecureServing *apiserveroptions.SecureServingOptions
 	// TODO: remove insecure serving mode
 	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptions
@@ -86,6 +88,9 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		Debugging:        &cmoptions.DebuggingOptions{},
 		GenericComponent: cmoptions.NewGenericComponentConfigOptions(componentConfig.GenericComponent),
 		KubeCloudShared:  cmoptions.NewKubeCloudSharedOptions(componentConfig.KubeCloudShared),
+		NodeIpamController: &cmoptions.NodeIpamControllerOptions{
+			NodeCIDRMaskSize: componentConfig.NodeIpamController.NodeCIDRMaskSize,
+		},
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
 		},
@@ -137,6 +142,7 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Debugging.AddFlags(fs)
 	o.GenericComponent.AddFlags(fs)
 	o.KubeCloudShared.AddFlags(fs)
+	o.NodeIpamController.AddFlags(fs)
 	o.ServiceController.AddFlags(fs)
 
 	o.SecureServing.AddFlags(fs)
@@ -196,6 +202,11 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	}
 
 	c.LeaderElectionClient = clientset.NewForConfigOrDie(restclient.AddUserAgent(c.Kubeconfig, "leader-election"))
+
+	c.NodeIpamController = componentconfig.NodeIpamControllerConfiguration{
+		ServiceCIDR: o.NodeIpamController.ServiceCIDR,
+		NodeCIDRMaskSize: o.NodeIpamController.NodeCIDRMaskSize,
+	}
 
 	c.EventRecorder = createRecorder(c.Client, userAgent)
 

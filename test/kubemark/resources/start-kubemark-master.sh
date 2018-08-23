@@ -138,7 +138,32 @@ function mount-pd() {
 	# locations.
 }
 
-# Create kubeconfig for controller-manager's service account authentication.
+# Create kubeconfig for cloud-controller-manager's service account authentication.
+function create-cloudcontrollermanager-kubeconfig {
+	echo "Creating cloud-controller-manager kubeconfig file"
+	mkdir -p "${KUBE_ROOT}/k8s_auth_data/cloud-controller-manager"
+	cat <<EOF >"${KUBE_ROOT}/k8s_auth_data/cloud-controller-manager/kubeconfig"
+apiVersion: v1
+kind: Config
+users:
+- name: cloud-controller-manager
+  user:
+    token: ${CLOUD_CONTROLLER_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: cloud-controller-manager
+  name: service-account-context
+current-context: service-account-context
+EOF
+}
+
+# Create kubeconfig for kube-controller-manager's service account authentication.
 function create-kubecontrollermanager-kubeconfig {
 	echo "Creating kube-controller-manager kubeconfig file"
 	mkdir -p "${KUBE_ROOT}/k8s_auth_data/kube-controller-manager"
@@ -226,6 +251,7 @@ function load-docker-images {
 	echo "Start loading kube-system docker images"
 	local -r img_dir="${KUBE_BINDIR}"
 	try-load-docker-image "${img_dir}/kube-apiserver.tar"
+	try-load-docker-image "${img_dir}/cloud-controller-manager.tar"
 	try-load-docker-image "${img_dir}/kube-controller-manager.tar"
 	try-load-docker-image "${img_dir}/kube-scheduler.tar"
 }
@@ -553,6 +579,17 @@ function compute-kube-apiserver-params {
 }
 
 # Computes command line arguments to be passed to controller-manager.
+function compute-cloud-controller-manager-params {
+	local params="${CLOUD_CONTROLLER_MANAGER_TEST_ARGS:-}"
+	params+=" --use-service-account-credentials"
+	params+=" --kubeconfig=/etc/srv/kubernetes/cloud-controller-manager/kubeconfig"
+	params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+	params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
+	params+=" --cluster-cidr=${CLUSTER_IP_RANGE}"
+	echo "${params}"
+}
+
+# Computes command line arguments to be passed to controller-manager.
 function compute-kube-controller-manager-params {
 	local params="${CONTROLLER_MANAGER_TEST_ARGS:-}"
 	params+=" --use-service-account-credentials"
@@ -582,9 +619,10 @@ function compute-kube-addon-manager-params {
 # 1. etcd
 # 2. etcd-events
 # 3. kube-apiserver
-# 4. kube-controller-manager
-# 5. kube-scheduler
-# 6. kube-addon-manager
+# 4. cloud-controller-manager
+# 5. kube-controller-manager
+# 6. kube-scheduler
+# 7. kube-addon-manager
 #
 # It prepares the log file, loads the docker tag, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.
@@ -649,8 +687,13 @@ setup-kubelet-dir
 delete-default-etcd-configs
 compute-etcd-variables
 
-# Setup authentication tokens and kubeconfigs for kube-controller-manager and kube-scheduler,
-# only if their kubeconfigs don't already exist as this script could be running on reboot.
+# Setup authentication tokens and kubeconfigs for cloud-controller-manager, kube-controller-manager and
+# kube-scheduler, only if their kubeconfigs don't already exist as this script could be running on reboot.
+if [[ ! -f "${KUBE_ROOT}/k8s_auth_data/cloud-controller-manager/kubeconfig" ]]; then
+	CLOUD_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+	echo "${CLOUD_CONTROLLER_MANAGER_TOKEN},system:cloud-controller-manager,uid:system:cloud-controller-manager" >> "${KUBE_ROOT}/k8s_auth_data/known_tokens.csv"
+	create-cloudcontrollermanager-kubeconfig
+fi
 if [[ ! -f "${KUBE_ROOT}/k8s_auth_data/kube-controller-manager/kubeconfig" ]]; then
 	KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 	echo "${KUBE_CONTROLLER_MANAGER_TOKEN},system:kube-controller-manager,uid:system:kube-controller-manager" >> "${KUBE_ROOT}/k8s_auth_data/known_tokens.csv"
@@ -709,6 +752,7 @@ if [ "${EVENT_STORE_IP:-}" == "127.0.0.1" ]; then
 	start-kubemaster-component "etcd-events"
 fi
 start-kubemaster-component "kube-apiserver"
+start-kubemaster-component "cloud-controller-manager"
 start-kubemaster-component "kube-controller-manager"
 start-kubemaster-component "kube-scheduler"
 start-kubemaster-component "kube-addon-manager"

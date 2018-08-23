@@ -524,7 +524,15 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 			}
 			kubeDeps.Cloud = cloud
+		} else if cloudprovider.IsExternal(s.CloudProvider) {
+			glog.V(2).Infof("WRF - Initting the cloud provider as GCE anyway!!!")
+			kubeDeps.Cloud, err = cloudprovider.InitCloudProvider("gce", s.CloudConfigFile)
+			if err != nil {
+				glog.V(2).Infof("WRF - Initting cloud provider got ERROR %v", err)
+			}
 		}
+	} else {
+		glog.V(2).Infof("WRF - kubeDeps.Cloud is null!")
 	}
 
 	hostName, err := nodeutil.GetHostname(s.HostnameOverride)
