@@ -73,6 +73,11 @@ type AdmissionRequest struct {
 	// OldObject is the existing object. Only populated for UPDATE requests.
 	// +optional
 	OldObject runtime.Object
+	// DryRun indicates that modifications will definitely not be persisted for this request.
+	// Calls to webhooks must have no side effects if DryRun is true.
+	// Defaults to false.
+	// +optional
+	DryRun *bool
 }
 
 // AdmissionResponse describes an admission response.
