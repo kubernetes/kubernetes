@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	faultDomainURI  = "v1/InstanceInfo/FD"
-	zoneMetadataURI = "instance/compute/zone"
+	faultDomainURI     = "v1/InstanceInfo/FD"
+	computeMetadataURI = "instance/compute"
 )
 
 var faultMutex = &sync.Mutex{}
@@ -58,19 +58,20 @@ func (az *Cloud) GetZoneID(zoneLabel string) string {
 // GetZone returns the Zone containing the current availability zone and locality region that the program is running in.
 // If the node is not running with availability zones, then it will fall back to fault domain.
 func (az *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
-	zone, err := az.metadata.Text(zoneMetadataURI)
+	computeInfo := ComputeMetadata{}
+	err := az.metadata.Object(computeMetadataURI, &computeInfo)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
 
-	if zone == "" {
+	if computeInfo.Zone == "" {
 		glog.V(3).Infof("Availability zone is not enabled for the node, falling back to fault domain")
 		return az.getZoneFromFaultDomain()
 	}
 
-	zoneID, err := strconv.Atoi(zone)
+	zoneID, err := strconv.Atoi(computeInfo.Zone)
 	if err != nil {
-		return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone ID %q: %v", zone, err)
+		return cloudprovider.Zone{}, fmt.Errorf("failed to parse zone ID %q: %v", computeInfo.Zone, err)
 	}
 
 	return cloudprovider.Zone{

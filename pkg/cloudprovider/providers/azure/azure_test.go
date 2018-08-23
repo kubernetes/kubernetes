@@ -1715,8 +1715,8 @@ func TestGetZone(t *testing.T) {
 		mux.Handle("/v1/InstanceInfo/FD", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, test.faultDomain)
 		}))
-		mux.Handle("/instance/compute/zone", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, test.zone)
+		mux.Handle("/instance/compute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, fmt.Sprintf("{\"zone\":\"%s\"}", test.zone))
 		}))
 		go func() {
 			http.Serve(listener, mux)

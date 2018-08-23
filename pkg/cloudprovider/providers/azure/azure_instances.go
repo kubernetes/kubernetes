@@ -51,7 +51,12 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 	}
 
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		computeMetadata, err := az.getComputeMetadata()
+		if err != nil {
+			return nil, err
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, computeMetadata.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -119,23 +124,30 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 	return false, cloudprovider.NotImplemented
 }
 
-func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
-	nodeName := mapNodeNameToVMName(name)
-	metadataName, err := az.metadata.Text("instance/compute/name")
+// getComputeMetadata gets compute information from instance metadata.
+func (az *Cloud) getComputeMetadata() (*ComputeMetadata, error) {
+	computeInfo := ComputeMetadata{}
+	err := az.metadata.Object(computeMetadataURI, &computeInfo)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
+	return &computeInfo, nil
+}
+
+func (az *Cloud) isCurrentInstance(name types.NodeName, metadataVMName string) (bool, error) {
+	var err error
+	nodeName := mapNodeNameToVMName(name)
 	if az.VMType == vmTypeVMSS {
 		// VMSS vmName is not same with hostname, use hostname instead.
-		metadataName, err = os.Hostname()
+		metadataVMName, err = os.Hostname()
 		if err != nil {
 			return false, err
 		}
 	}
 
-	metadataName = strings.ToLower(metadataName)
-	return (metadataName == nodeName), err
+	metadataVMName = strings.ToLower(metadataVMName)
+	return (metadataVMName == nodeName), err
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
@@ -144,7 +156,12 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 	nodeName := mapNodeNameToVMName(name)
 
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		computeMetadata, err := az.getComputeMetadata()
+		if err != nil {
+			return "", err
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, computeMetadata.Name)
 		if err != nil {
 			return "", err
 		}
@@ -160,11 +177,7 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 		}
 
 		// Get scale set name and instanceID from vmName for vmss.
-		metadataName, err := az.metadata.Text("instance/compute/name")
-		if err != nil {
-			return "", err
-		}
-		ssName, instanceID, err := extractVmssVMName(metadataName)
+		ssName, instanceID, err := extractVmssVMName(computeMetadata.Name)
 		if err != nil {
 			if err == ErrorNotVmssInstance {
 				// Compose machineID for standard Node.
@@ -197,14 +210,18 @@ func (az *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string
 //       Adding node label from cloud provider: beta.kubernetes.io/instance-type=[value]
 func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		computeMetadata, err := az.getComputeMetadata()
+		if err != nil {
+			return "", err
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, computeMetadata.Name)
 		if err != nil {
 			return "", err
 		}
 		if isLocalInstance {
-			machineType, err := az.metadata.Text("instance/compute/vmSize")
-			if err == nil {
-				return machineType, nil
+			if computeMetadata.VMSize != "" {
+				return computeMetadata.VMSize, nil
 			}
 		}
 	}
