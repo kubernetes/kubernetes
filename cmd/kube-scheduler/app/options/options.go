@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -40,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	controlleroptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -85,10 +85,10 @@ func NewOptions() (*Options, error) {
 		ComponentConfig: *cfg,
 		SecureServing:   nil, // TODO: enable with apiserveroptions.NewSecureServingOptions()
 		CombinedInsecureServing: &CombinedInsecureServingOptions{
-			Healthz: &controlleroptions.InsecureServingOptions{
+			Healthz: &apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
 			},
-			Metrics: &controlleroptions.InsecureServingOptions{
+			Metrics: &apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
 			},
 			BindPort:    hport,
@@ -262,7 +262,7 @@ func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElection
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config apimachineryconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
 		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}

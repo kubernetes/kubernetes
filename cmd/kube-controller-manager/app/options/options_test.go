@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -130,7 +131,7 @@ func TestAddFlags(t *testing.T) {
 			KubeAPIQPS:              50.0,
 			KubeAPIBurst:            100,
 			ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
-			LeaderElection: componentconfig.LeaderElectionConfiguration{
+			LeaderElection: apiserverconfig.LeaderElectionConfiguration{
 				ResourceLock:  "configmap",
 				LeaderElect:   false,
 				LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
@@ -139,8 +140,8 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			Port:    10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-			Address: "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Port:    10252,     // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Address: "0.0.0.0", // Note: DeprecatedInsecureServingOptions.ApplyTo will write the flag value back into the component config
 			UseServiceAccountCredentials: true,
 			RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
 			NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
@@ -252,7 +253,7 @@ func TestAddFlags(t *testing.T) {
 			},
 			HTTP2MaxStreamsPerConnection: 47,
 		},
-		InsecureServing: &cmoptions.InsecureServingOptions{
+		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",

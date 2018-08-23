@@ -24,7 +24,6 @@ go_test(
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//pkg/util/labels:go_default_library",
-        "//pkg/util/metrics:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -41,6 +40,8 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//test/integration/framework:go_default_library",
     ],
 )

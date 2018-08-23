@@ -106,5 +106,8 @@ func (f *FakeCache) Snapshot() *schedulercache.Snapshot {
 	return &schedulercache.Snapshot{}
 }
 
-// IsUpToDate is a fake mthod for testing
+// IsUpToDate is a fake method for testing
 func (f *FakeCache) IsUpToDate(*schedulercache.NodeInfo) bool { return true }
+
+// NodeTree is a fake method for testing.
+func (f *FakeCache) NodeTree() *schedulercache.NodeTree { return nil }

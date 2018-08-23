@@ -132,7 +132,6 @@ release_filegroup(
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",
-        "//vendor/k8s.io/kube-aggregator",
     ],
 )
 

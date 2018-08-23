@@ -5,3 +5,5 @@ reviewers:
 approvers:
   - janetkuo
   - kargakis
+labels:
+- sig/apps

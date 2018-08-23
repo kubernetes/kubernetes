@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -199,7 +200,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "dapi-container",
-						Image:   busyboxImage,
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"sh", "-c", "env"},
 						Env:     env,
 					},
@@ -299,7 +300,7 @@ var _ = framework.KubeDescribe("Downward API [Serial] [Disruptive] [NodeFeature:
 					Containers: []v1.Container{
 						{
 							Name:    "dapi-container",
-							Image:   busyboxImage,
+							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"sh", "-c", "env"},
 							Env:     env,
 						},
@@ -324,7 +325,7 @@ func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, ex
 			Containers: []v1.Container{
 				{
 					Name:    "dapi-container",
-					Image:   busyboxImage,
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c", "env"},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
@@ -356,7 +357,7 @@ func testDownwardAPIForEphemeralStorage(f *framework.Framework, podName string, 
 			Containers: []v1.Container{
 				{
 					Name:    "dapi-container",
-					Image:   busyboxImage,
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c", "env"},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{

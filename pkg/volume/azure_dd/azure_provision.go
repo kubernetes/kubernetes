@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -195,8 +196,8 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		}
 	}
 
-	if !zoned && (zonePresent || zonesPresent) {
-		return nil, fmt.Errorf("zone or zones StorageClass parameters must be used together with zoned parameter")
+	if !zoned && (zonePresent || zonesPresent || len(allowedTopologies) > 0) {
+		return nil, fmt.Errorf("zone, zones and allowedTopologies StorageClass parameters must be used together with zoned parameter")
 	}
 
 	if cachingMode, err = normalizeCachingMode(cachingMode); err != nil {
@@ -298,18 +299,46 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		},
 	}
 
-	if zoned && utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		requirements := make([]v1.NodeSelectorRequirement, 0)
-		for k, v := range labels {
-			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
+
+		if zoned {
+			// Set node affinity labels based on availability zone labels.
+			requirements := make([]v1.NodeSelectorRequirement, 0)
+			for k, v := range labels {
+				requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+			}
+
+			nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+				MatchExpressions: requirements,
+			})
+		} else {
+			// Set node affinity labels based on fault domains.
+			// This is required because unzoned AzureDisk can't be attached to zoned nodes.
+			// There are at most 3 fault domains available in each region.
+			// Refer https://docs.microsoft.com/en-us/azure/virtual-machines/windows/manage-availability.
+			for i := 0; i < 3; i++ {
+				requirements := []v1.NodeSelectorRequirement{
+					{
+						Key:      kubeletapis.LabelZoneRegion,
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{diskController.GetLocation()},
+					},
+					{
+						Key:      kubeletapis.LabelZoneFailureDomain,
+						Operator: v1.NodeSelectorOpIn,
+						Values:   []string{strconv.Itoa(i)},
+					},
+				}
+				nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
+					MatchExpressions: requirements,
+				})
+			}
 		}
 
-		nodeSelectorTerm := v1.NodeSelectorTerm{
-			MatchExpressions: requirements,
-		}
 		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
 			Required: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{nodeSelectorTerm},
+				NodeSelectorTerms: nodeSelectorTerms,
 			},
 		}
 	}

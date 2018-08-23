@@ -22,7 +22,7 @@ spec:
     # TODO: Make resource requirements depend on the size of the cluster
     resources:
       requests:
-        cpu: 10m
+        cpu: 5m
         memory: 100Mi
     command:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428

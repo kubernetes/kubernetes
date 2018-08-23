@@ -40,7 +40,11 @@ type cinderDiskAttacher struct {
 
 var _ volume.Attacher = &cinderDiskAttacher{}
 
+var _ volume.DeviceMounter = &cinderDiskAttacher{}
+
 var _ volume.AttachableVolumePlugin = &cinderPlugin{}
+
+var _ volume.DeviceMountableVolumePlugin = &cinderPlugin{}
 
 const (
 	probeVolumeInitDelay     = 1 * time.Second
@@ -65,6 +69,10 @@ func (plugin *cinderPlugin) NewAttacher() (volume.Attacher, error) {
 		host:           plugin.host,
 		cinderProvider: cinder,
 	}, nil
+}
+
+func (plugin *cinderPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
 }
 
 func (plugin *cinderPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
@@ -299,6 +307,8 @@ type cinderDiskDetacher struct {
 
 var _ volume.Detacher = &cinderDiskDetacher{}
 
+var _ volume.DeviceUnmounter = &cinderDiskDetacher{}
+
 func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 	cinder, err := plugin.getCloudProvider()
 	if err != nil {
@@ -308,6 +318,10 @@ func (plugin *cinderPlugin) NewDetacher() (volume.Detacher, error) {
 		mounter:        plugin.host.GetMounter(plugin.GetPluginName()),
 		cinderProvider: cinder,
 	}, nil
+}
+
+func (plugin *cinderPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error {

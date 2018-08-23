@@ -67,18 +67,18 @@ http_file(
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:fb18678f8203ca1bd2fad2671e3ebd80cb408a1baae423d4ad39c05f4caac4e1",
+    digest = "sha256:58e53e477d204fe32f761ec2718b792f653063d4192ae89efc79e4b6a8dbba91",
     registry = "k8s.gcr.io",
     repository = "debian-iptables-amd64",
-    tag = "v10",  # ignored, but kept here for documentation
+    tag = "v10.1",  # ignored, but kept here for documentation
 )
 
 docker_pull(
     name = "debian-hyperkube-base-amd64",
-    digest = "sha256:cc782ed16599000ca4c85d47ec6264753747ae1e77520894dca84b104a7621e2",
+    digest = "sha256:1c83ca9c8ac4a06e4585802edf8a1cd954011152409116e9c801f4736b97b956",
     registry = "k8s.gcr.io",
     repository = "debian-hyperkube-base-amd64",
-    tag = "0.10",  # ignored, but kept here for documentation
+    tag = "0.10.1",  # ignored, but kept here for documentation
 )
 
 docker_pull(

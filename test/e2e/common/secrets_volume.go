@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -83,7 +84,12 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		doSecretE2EWithMapping(f, &mode)
 	})
 
-	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
+	/*
+		Release : v1.12
+		Testname: Secrets Volume, volume mode default, secret with same name in different namespace
+		Description: Create a secret with same name in two namespaces. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secrets from the mounted volume from the container runtime and only secrets which are associated with namespace where pod is created. The file mode of the secret MUST be -rw-r--r-- by default.
+	*/
+	framework.ConformanceIt("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
 		var (
 			namespace2  *v1.Namespace
 			err         error
@@ -154,7 +160,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: mountImage,
+						Image: imageutils.GetE2EImage(imageutils.Mounttest),
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
@@ -280,7 +286,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -292,7 +298,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -304,7 +310,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -407,7 +413,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
@@ -484,7 +490,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/secret-volume/new-path-data-1",
 						"--file_mode=/etc/secret-volume/new-path-data-1"},

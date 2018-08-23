@@ -174,3 +174,10 @@ func TestGetValueFromIntOrPercent(t *testing.T) {
 		}
 	}
 }
+
+func TestGetValueFromIntOrPercentNil(t *testing.T) {
+	_, err := GetValueFromIntOrPercent(nil, 0, false)
+	if err == nil {
+		t.Errorf("expected error got none")
+	}
+}

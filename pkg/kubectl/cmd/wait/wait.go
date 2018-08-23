@@ -17,6 +17,7 @@ limitations under the License.
 package wait
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -32,12 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
+	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 )
 
 var (
@@ -272,11 +274,14 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 			// we're out of time
 			return gottenObj, false, wait.ErrWaitTimeout
 		}
-		watchEvent, err := watch.Until(o.Timeout, objWatch, isDeleted)
+
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, isDeleted)
+		cancel()
 		switch {
 		case err == nil:
 			return watchEvent.Object, true, nil
-		case err == watch.ErrWatchClosed:
+		case err == watchtools.ErrWatchClosed:
 			continue
 		case err == wait.ErrWaitTimeout:
 			if watchEvent != nil {
@@ -334,11 +339,14 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 			// we're out of time
 			return gottenObj, false, wait.ErrWaitTimeout
 		}
-		watchEvent, err := watch.Until(o.Timeout, objWatch, w.isConditionMet)
+
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, w.isConditionMet)
+		cancel()
 		switch {
 		case err == nil:
 			return watchEvent.Object, true, nil
-		case err == watch.ErrWatchClosed:
+		case err == watchtools.ErrWatchClosed:
 			continue
 		case err == wait.ErrWaitTimeout:
 			if watchEvent != nil {

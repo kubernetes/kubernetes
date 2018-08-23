@@ -29,7 +29,6 @@ import (
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -64,7 +63,7 @@ type CloudControllerManagerOptions struct {
 
 	SecureServing *apiserveroptions.SecureServingOptions
 	// TODO: remove insecure serving mode
-	InsecureServing *cmoptions.InsecureServingOptions
+	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptions
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
@@ -91,7 +90,7 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions(),
-		InsecureServing: &cmoptions.InsecureServingOptions{
+		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.KubeCloudShared.Address),
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
@@ -141,7 +140,7 @@ func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.ServiceController.AddFlags(fs)
 
 	o.SecureServing.AddFlags(fs)
-	o.InsecureServing.AddFlags(fs)
+	o.InsecureServing.AddUnqualifiedFlags(fs)
 	o.Authentication.AddFlags(fs)
 	o.Authorization.AddFlags(fs)
 
@@ -269,7 +268,7 @@ func (o *CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config,
 	return c, nil
 }
 
-func createRecorder(kubeClient kubernetes.Interface, userAgent string) record.EventRecorder {
+func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})

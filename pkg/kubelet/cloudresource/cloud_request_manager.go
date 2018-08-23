@@ -94,7 +94,7 @@ func (manager *cloudResourceSyncManager) NodeAddresses() ([]v1.NodeAddress, erro
 }
 
 func (manager *cloudResourceSyncManager) collectNodeAddresses(ctx context.Context, nodeName types.NodeName) {
-	glog.V(2).Infof("Requesting node addresses from cloud provider for node %q", nodeName)
+	glog.V(5).Infof("Requesting node addresses from cloud provider for node %q", nodeName)
 
 	instances, ok := manager.cloud.Instances()
 	if !ok {
@@ -113,7 +113,7 @@ func (manager *cloudResourceSyncManager) collectNodeAddresses(ctx context.Contex
 		glog.V(2).Infof("Node addresses from cloud provider for node %q not collected", nodeName)
 	} else {
 		manager.setNodeAddressSafe(nodeAddresses, nil)
-		glog.V(2).Infof("Node addresses from cloud provider for node %q collected", nodeName)
+		glog.V(5).Infof("Node addresses from cloud provider for node %q collected", nodeName)
 	}
 }
 

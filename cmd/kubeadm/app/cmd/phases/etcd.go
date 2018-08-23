@@ -45,7 +45,7 @@ var (
 		`)
 )
 
-// NewCmdEtcd return main command for Etcd phase
+// NewCmdEtcd returns main command for Etcd phase
 func NewCmdEtcd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "etcd",

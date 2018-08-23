@@ -301,7 +301,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
 		"Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
 	)
-	secretPaths := collectSecretPaths(t, nil, "", reflect.TypeOf(&v1.Pod{}))
+	secretPaths := collectResourcePaths(t, "secret", nil, "", reflect.TypeOf(&v1.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
 	if missingPaths := expectedSecretPaths.Difference(secretPaths); len(missingPaths) > 0 {
 		t.Logf("Missing expected secret paths:\n%s", strings.Join(missingPaths.List(), "\n"))
@@ -322,38 +322,113 @@ func TestPodSecrets(t *testing.T) {
 	}
 }
 
-// collectSecretPaths traverses the object, computing all the struct paths that lead to fields with "secret" in the name.
-func collectSecretPaths(t *testing.T, path *field.Path, name string, tp reflect.Type) sets.String {
-	secretPaths := sets.NewString()
+// collectResourcePaths traverses the object, computing all the struct paths that lead to fields with resourcename in the name.
+func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, name string, tp reflect.Type) sets.String {
+	resourcename = strings.ToLower(resourcename)
+	resourcePaths := sets.NewString()
 
 	if tp.Kind() == reflect.Ptr {
-		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
-		return secretPaths
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
+		return resourcePaths
 	}
 
-	if strings.Contains(strings.ToLower(name), "secret") {
-		secretPaths.Insert(path.String())
+	if strings.Contains(strings.ToLower(name), resourcename) {
+		resourcePaths.Insert(path.String())
 	}
 
 	switch tp.Kind() {
 	case reflect.Ptr:
-		secretPaths.Insert(collectSecretPaths(t, path, name, tp.Elem()).List()...)
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
-			secretPaths.Insert(collectSecretPaths(t, path.Child(field.Name), field.Name, field.Type).List()...)
+			resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type).List()...)
 		}
 	case reflect.Interface:
-		t.Errorf("cannot find secret fields in interface{} field %s", path.String())
+		t.Errorf("cannot find %s fields in interface{} field %s", resourcename, path.String())
 	case reflect.Map:
-		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).List()...)
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).List()...)
 	case reflect.Slice:
-		secretPaths.Insert(collectSecretPaths(t, path.Key("*"), "", tp.Elem()).List()...)
+		resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Key("*"), "", tp.Elem()).List()...)
 	default:
 		// all primitive types
 	}
 
-	return secretPaths
+	return resourcePaths
+}
+
+func TestPodConfigmaps(t *testing.T) {
+	// Stub containing all possible ConfigMap references in a pod.
+	// The names of the referenced ConfigMaps match struct paths detected by reflection.
+	pod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "Spec.Containers[*].EnvFrom[*].ConfigMapRef"}}}},
+				Env: []v1.EnvVar{{
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+			InitContainers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "Spec.InitContainers[*].EnvFrom[*].ConfigMapRef"}}}},
+				Env: []v1.EnvVar{{
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+			Volumes: []v1.Volume{{
+				VolumeSource: v1.VolumeSource{
+					Projected: &v1.ProjectedVolumeSource{
+						Sources: []v1.VolumeProjection{{
+							ConfigMap: &v1.ConfigMapProjection{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: "Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap"}}}}}}}, {
+				VolumeSource: v1.VolumeSource{
+					ConfigMap: &v1.ConfigMapVolumeSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.ConfigMap"}}}}},
+		},
+	}
+	extractedNames := sets.NewString()
+	VisitPodConfigmapNames(pod, func(name string) bool {
+		extractedNames.Insert(name)
+		return true
+	})
+
+	// expectedPaths holds struct paths to fields with "ConfigMap" in the name that are references to ConfigMap API objects.
+	// every path here should be represented as an example in the Pod stub above, with the ConfigMap name set to the path.
+	expectedPaths := sets.NewString(
+		"Spec.Containers[*].EnvFrom[*].ConfigMapRef",
+		"Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+		"Spec.InitContainers[*].EnvFrom[*].ConfigMapRef",
+		"Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+		"Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap",
+		"Spec.Volumes[*].VolumeSource.ConfigMap",
+	)
+	collectPaths := collectResourcePaths(t, "ConfigMap", nil, "", reflect.TypeOf(&v1.Pod{}))
+	if missingPaths := expectedPaths.Difference(collectPaths); len(missingPaths) > 0 {
+		t.Logf("Missing expected paths:\n%s", strings.Join(missingPaths.List(), "\n"))
+		t.Error("Missing expected paths. Verify VisitPodConfigmapNames() is correctly finding the missing paths, then correct expectedPaths")
+	}
+	if extraPaths := collectPaths.Difference(expectedPaths); len(extraPaths) > 0 {
+		t.Logf("Extra paths:\n%s", strings.Join(extraPaths.List(), "\n"))
+		t.Error("Extra fields with resource in the name found. Verify VisitPodConfigmapNames() is including these fields if appropriate, then correct expectedPaths")
+	}
+
+	if missingNames := expectedPaths.Difference(extractedNames); len(missingNames) > 0 {
+		t.Logf("Missing expected names:\n%s", strings.Join(missingNames.List(), "\n"))
+		t.Error("Missing expected names. Verify the pod stub above includes these references, then verify VisitPodConfigmapNames() is correctly finding the missing names")
+	}
+	if extraNames := extractedNames.Difference(expectedPaths); len(extraNames) > 0 {
+		t.Logf("Extra names:\n%s", strings.Join(extraNames.List(), "\n"))
+		t.Error("Extra names extracted. Verify VisitPodConfigmapNames() is correctly extracting resource names")
+	}
 }
 
 func newPod(now metav1.Time, ready bool, beforeSec int) *v1.Pod {

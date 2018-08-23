@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -86,7 +85,7 @@ type KubeControllerManagerOptions struct {
 
 	SecureServing *apiserveroptions.SecureServingOptions
 	// TODO: remove insecure serving mode
-	InsecureServing *cmoptions.InsecureServingOptions
+	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptions
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
@@ -179,7 +178,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		},
 		Controllers:   componentConfig.Controllers,
 		SecureServing: apiserveroptions.NewSecureServingOptions(),
-		InsecureServing: &cmoptions.InsecureServingOptions{
+		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.KubeCloudShared.Address),
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
@@ -235,7 +234,7 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 	s.ServiceController.AddFlags(fs)
 
 	s.SecureServing.AddFlags(fs)
-	s.InsecureServing.AddFlags(fs)
+	s.InsecureServing.AddUnqualifiedFlags(fs)
 	s.Authentication.AddFlags(fs)
 	s.Authorization.AddFlags(fs)
 
@@ -342,10 +341,10 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
 		return err
 	}
-	if err := s.SecureServing.ApplyTo(&c.SecureServing); err != nil {
+	if err := s.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
 		return err
 	}
-	if err := s.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
+	if err := s.SecureServing.ApplyTo(&c.SecureServing); err != nil {
 		return err
 	}
 	if err := s.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
@@ -460,7 +459,7 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	return c, nil
 }
 
-func createRecorder(kubeClient kubernetes.Interface, userAgent string) record.EventRecorder {
+func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})

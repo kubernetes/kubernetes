@@ -20,9 +20,8 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
-	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
+	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
 )
@@ -318,7 +317,7 @@ func (g *Graph) AddPod(pod *corev1.Pod) {
 	// Short-circuit adding edges to other resources for mirror pods.
 	// A node must never be able to create a pod that grants them permissions on other API objects.
 	// The NodeRestriction admission plugin prevents creation of such pods, but short-circuiting here gives us defense in depth.
-	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+	if _, isMirrorPod := pod.Annotations[corev1.MirrorPodAnnotationKey]; isMirrorPod {
 		return
 	}
 
@@ -365,7 +364,7 @@ func (g *Graph) DeletePod(name, namespace string) {
 //   secret -> pv
 //
 //   pv -> pvc
-func (g *Graph) AddPV(pv *api.PersistentVolume) {
+func (g *Graph) AddPV(pv *corev1.PersistentVolume) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 

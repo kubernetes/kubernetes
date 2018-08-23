@@ -62,8 +62,11 @@ type Clusters interface {
 	Master(ctx context.Context, clusterName string) (string, error)
 }
 
-// TODO(#6812): Use a shorter name that's less likely to be longer than cloud
-// providers' name length limits.
+// (DEPRECATED) DefaultLoadBalancerName is the default load balancer name that is called from
+// LoadBalancer.GetLoadBalancerName. Use this method to maintain backward compatible names for
+// LoadBalancers that were created prior to Kubernetes v1.12. In the future, each provider should
+// replace this method call in GetLoadBalancerName with a provider-specific implementation that
+// is less cryptic than the Service's UUID.
 func DefaultLoadBalancerName(service *v1.Service) string {
 	//GCE requires that the name of a load balancer starts with a lower case letter.
 	ret := "a" + string(service.UID)
@@ -134,7 +137,8 @@ type Instances interface {
 	// services cannot be used in this method to obtain nodeaddresses
 	NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error)
 	// InstanceID returns the cloud provider ID of the node with the specified NodeName.
-	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+	// Note that if the instance does not exist, we must return ("", cloudprovider.InstanceNotFound)
+	// cloudprovider.InstanceNotFound should NOT be returned for instances that exist but are stopped/sleeping
 	InstanceID(ctx context.Context, nodeName types.NodeName) (string, error)
 	// InstanceType returns the type of the specified instance.
 	InstanceType(ctx context.Context, name types.NodeName) (string, error)
@@ -146,8 +150,9 @@ type Instances interface {
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 	CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error)
-	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
+	// InstanceExistsByProviderID returns true if the instance for the given provider exists.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+	// This method should still return true for instances that exist but are stopped/sleeping.
 	InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error)
 	// InstanceShutdownByProviderID returns true if the instance is shutdown in cloudprovider
 	InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error)

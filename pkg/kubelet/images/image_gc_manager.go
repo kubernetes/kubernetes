@@ -401,9 +401,8 @@ func (ev byLastUsedAndDetected) Less(i, j int) bool {
 	// Sort by last used, break ties by detected.
 	if ev[i].lastUsed.Equal(ev[j].lastUsed) {
 		return ev[i].firstDetected.Before(ev[j].firstDetected)
-	} else {
-		return ev[i].lastUsed.Before(ev[j].lastUsed)
 	}
+	return ev[i].lastUsed.Before(ev[j].lastUsed)
 }
 
 func isImageUsed(imageID string, imagesInUse sets.String) bool {

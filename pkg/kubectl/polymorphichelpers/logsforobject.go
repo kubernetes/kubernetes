@@ -26,11 +26,11 @@ import (
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	coreinternal "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
@@ -87,7 +87,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -96,7 +96,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -115,7 +115,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}
@@ -124,7 +124,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, options, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
 			if err != nil {
 				return nil, err
 			}

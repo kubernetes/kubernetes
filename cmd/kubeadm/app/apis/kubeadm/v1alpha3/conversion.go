@@ -108,5 +108,5 @@ func defaultKubeletConfiguration(internalcfg *InitConfiguration, obj *kubeletcon
 
 	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
 	obj.HealthzBindAddress = "127.0.0.1"
-	obj.HealthzPort = 10248
+	obj.HealthzPort = constants.KubeletHealthzPort
 }

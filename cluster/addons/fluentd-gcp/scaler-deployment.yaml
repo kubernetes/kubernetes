@@ -22,7 +22,7 @@ spec:
         image: k8s.gcr.io/fluentd-gcp-scaler:0.3
         command:
           - /scaler.sh
-          - --ds-name=fluentd-gcp-v3.0.0
+          - --ds-name=fluentd-gcp-{{ fluentd_gcp_yaml_version }}
           - --scaling-policy=fluentd-gcp-scaling-policy
         env:
         # Defaults, used if no overrides are found in fluentd-gcp-scaling-policy

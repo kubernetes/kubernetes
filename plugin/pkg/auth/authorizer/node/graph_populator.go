@@ -26,8 +26,6 @@ import (
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -37,9 +35,9 @@ type graphPopulator struct {
 
 func AddGraphEventHandlers(
 	graph *Graph,
-	nodes coreinformers.NodeInformer,
+	nodes corev1informers.NodeInformer,
 	pods corev1informers.PodInformer,
-	pvs coreinformers.PersistentVolumeInformer,
+	pvs corev1informers.PersistentVolumeInformer,
 	attachments storageinformers.VolumeAttachmentInformer,
 ) {
 	g := &graphPopulator{
@@ -80,10 +78,10 @@ func (g *graphPopulator) addNode(obj interface{}) {
 }
 
 func (g *graphPopulator) updateNode(oldObj, obj interface{}) {
-	node := obj.(*api.Node)
-	var oldNode *api.Node
+	node := obj.(*corev1.Node)
+	var oldNode *corev1.Node
 	if oldObj != nil {
-		oldNode = oldObj.(*api.Node)
+		oldNode = oldObj.(*corev1.Node)
 	}
 
 	// we only set up rules for ConfigMap today, because that is the only reference type
@@ -119,7 +117,7 @@ func (g *graphPopulator) deleteNode(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	node, ok := obj.(*api.Node)
+	node, ok := obj.(*corev1.Node)
 	if !ok {
 		glog.Infof("unexpected type %T", obj)
 		return
@@ -175,7 +173,7 @@ func (g *graphPopulator) addPV(obj interface{}) {
 }
 
 func (g *graphPopulator) updatePV(oldObj, obj interface{}) {
-	pv := obj.(*api.PersistentVolume)
+	pv := obj.(*corev1.PersistentVolume)
 	// TODO: skip add if uid, pvc, and secrets are all identical between old and new
 	g.graph.AddPV(pv)
 }
@@ -184,7 +182,7 @@ func (g *graphPopulator) deletePV(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	pv, ok := obj.(*api.PersistentVolume)
+	pv, ok := obj.(*corev1.PersistentVolume)
 	if !ok {
 		glog.Infof("unexpected type %T", obj)
 		return
@@ -212,7 +210,7 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	attachment, ok := obj.(*api.PersistentVolume)
+	attachment, ok := obj.(*storagev1beta1.VolumeAttachment)
 	if !ok {
 		glog.Infof("unexpected type %T", obj)
 		return

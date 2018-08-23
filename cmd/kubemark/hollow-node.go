@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -152,10 +151,6 @@ func run(config *HollowNodeConfig) {
 	if err != nil {
 		glog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
 	}
-	internalClientset, err := internalclientset.NewForConfig(clientConfig)
-	if err != nil {
-		glog.Fatalf("Failed to create an internal ClientSet: %v. Exiting.", err)
-	}
 
 	if config.Morph == "kubelet" {
 		cadvisorInterface := &cadvisortest.Fake{
@@ -196,7 +191,7 @@ func run(config *HollowNodeConfig) {
 
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,
-			internalClientset,
+			client,
 			client.CoreV1(),
 			iptInterface,
 			sysctl,

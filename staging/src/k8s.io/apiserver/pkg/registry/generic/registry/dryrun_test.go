@@ -215,7 +215,7 @@ func TestDryRunUpdateReturnsObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to dry-run update: %v", err)
 	}
-	out = UnstructuredOrDie(`{"field": "value", "kind": "Pod", "metadata": {"resourceVersion": "2", "selfLink": ""}}`)
+	out = UnstructuredOrDie(`{"field": "value", "kind": "Pod", "metadata": {"resourceVersion": "2"}}`)
 	if !reflect.DeepEqual(obj, out) {
 		t.Fatalf("Returned object %#v different from expected %#v", obj, out)
 	}
@@ -268,7 +268,7 @@ func TestDryRunDeleteReturnsObject(t *testing.T) {
 	}
 
 	out = UnstructuredOrDie(`{}`)
-	expected := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"resourceVersion": "2", "selfLink": ""}}`)
+	expected := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"resourceVersion": "2"}}`)
 	err = s.Delete(context.Background(), "key", out, nil, true)
 	if err != nil {
 		t.Fatalf("Failed to delete with valid precondition: %v", err)

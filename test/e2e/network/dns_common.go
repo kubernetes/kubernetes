@@ -213,7 +213,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 					Image:   imageutils.GetE2EImage(imageutils.Dnsutils),
 					Command: []string{"sleep", "10000"},
 					Ports: []v1.ContainerPort{
-						{ContainerPort: servicePort, Protocol: "TCP"},
+						{ContainerPort: servicePort, Protocol: v1.ProtocolTCP},
 					},
 				},
 			},
@@ -238,7 +238,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 			Selector: map[string]string{"app": baseName},
 			Ports: []v1.ServicePort{
 				{
-					Protocol:   "TCP",
+					Protocol:   v1.ProtocolTCP,
 					Port:       servicePort,
 					TargetPort: intstr.FromInt(servicePort),
 				},

@@ -731,7 +731,7 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 	// there should be no cached predicate any more
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if nodeCache, exist := ecache.nodeToCache[test.nodeName]; exist {
+			if nodeCache, exist := ecache.GetNodeCache(test.nodeName); exist {
 				if _, exist := nodeCache.cache[testPredicate]; exist {
 					t.Errorf("Failed: cached item for predicate key: %v on node: %v should be invalidated",
 						testPredicate, test.nodeName)
