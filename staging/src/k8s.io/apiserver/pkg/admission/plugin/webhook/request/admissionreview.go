@@ -36,6 +36,7 @@ func CreateAdmissionReview(attr *generic.VersionedAttributes) admissionv1beta1.A
 		UID:      aUserInfo.GetUID(),
 		Username: aUserInfo.GetName(),
 	}
+	dryRun := attr.IsDryRun()
 
 	// Convert the extra information in the user object
 	for key, val := range aUserInfo.GetExtra() {
@@ -66,6 +67,7 @@ func CreateAdmissionReview(attr *generic.VersionedAttributes) admissionv1beta1.A
 			OldObject: runtime.RawExtension{
 				Object: attr.VersionedOldObject,
 			},
+			DryRun: &dryRun,
 		},
 	}
 }

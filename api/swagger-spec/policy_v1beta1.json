@@ -2266,7 +2266,6 @@
     "id": "v1beta1.PodDisruptionBudgetStatus",
     "description": "PodDisruptionBudgetStatus represents information about the status of a PodDisruptionBudget. Status may trail the actual state of a system.",
     "required": [
-     "disruptedPods",
      "disruptionsAllowed",
      "currentHealthy",
      "desiredHealthy",

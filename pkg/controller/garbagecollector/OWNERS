@@ -6,3 +6,5 @@ reviewers:
 - caesarxuchao
 - lavalamp
 - deads2k
+labels:
+- sig/api-machinery

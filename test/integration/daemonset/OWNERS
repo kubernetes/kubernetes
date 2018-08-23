@@ -7,3 +7,5 @@ reviewers:
 - lukaszo
 - janetkuo
 - kow3ns
+labels:
+- sig/apps

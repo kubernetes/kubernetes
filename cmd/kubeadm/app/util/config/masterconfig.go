@@ -43,7 +43,44 @@ import (
 
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
 func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
+	// Populate the .Token field with a random value if unset
+	// We do this at this layer, and not the API defaulting layer
+	// because of possible security concerns, and more practically
+	// because we can't return errors in the API object defaulting
+	// process but here we can.
+	for i, bt := range cfg.BootstrapTokens {
+		if bt.Token != nil && len(bt.Token.String()) > 0 {
+			continue
+		}
 
+		tokenStr, err := bootstraputil.GenerateBootstrapToken()
+		if err != nil {
+			return fmt.Errorf("couldn't generate random token: %v", err)
+		}
+		token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+		if err != nil {
+			return err
+		}
+		cfg.BootstrapTokens[i].Token = token
+	}
+
+	var err error
+	cfg.NodeRegistration.Name, err = nodeutil.GetHostname(cfg.NodeRegistration.Name)
+	if err != nil {
+		return err
+	}
+
+	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
+	if cfg.NodeRegistration.Taints == nil {
+		cfg.NodeRegistration.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	}
+
+	// Do all the defaulting for the nested ClusterConfiguration as well
+	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration)
+}
+
+// SetClusterDynamicDefaults checks and sets configuration values for the InitConfiguration object
+func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration) error {
 	// Default all the embedded ComponentConfig structs
 	componentconfigs.Known.Default(cfg)
 
@@ -72,38 +109,6 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 
 	// Downcase SANs. Some domain names (like ELBs) have capitals in them.
 	LowercaseSANs(cfg.APIServerCertSANs)
-
-	// Populate the .Token field with a random value if unset
-	// We do this at this layer, and not the API defaulting layer
-	// because of possible security concerns, and more practically
-	// because we can't return errors in the API object defaulting
-	// process but here we can.
-	for i, bt := range cfg.BootstrapTokens {
-		if bt.Token != nil && len(bt.Token.String()) > 0 {
-			continue
-		}
-
-		tokenStr, err := bootstraputil.GenerateBootstrapToken()
-		if err != nil {
-			return fmt.Errorf("couldn't generate random token: %v", err)
-		}
-		token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
-		if err != nil {
-			return err
-		}
-		cfg.BootstrapTokens[i].Token = token
-	}
-
-	cfg.NodeRegistration.Name, err = nodeutil.GetHostname(cfg.NodeRegistration.Name)
-	if err != nil {
-		return err
-	}
-
-	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
-	if cfg.NodeRegistration.Taints == nil {
-		cfg.NodeRegistration.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
-	}
-
 	return nil
 }
 
@@ -124,24 +129,35 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 		if err != nil {
 			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		return BytesToInternalConfig(b)
+		internalcfg, err = BytesToInternalConfig(b)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
+		// static default values to cfg only for values not provided with flags
+		kubeadmscheme.Scheme.Default(defaultversionedcfg)
+		kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
 	}
 
-	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
-	// static default values to cfg only for values not provided with flags
-	kubeadmscheme.Scheme.Default(defaultversionedcfg)
-	kubeadmscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
-
-	return defaultAndValidate(internalcfg)
+	// Applies dynamic defaults to settings not provided with flags
+	if err := SetInitDynamicDefaults(internalcfg); err != nil {
+		return nil, err
+	}
+	// Validates cfg (flags/configs + defaults + dynamic defaults)
+	if err := validation.ValidateInitConfiguration(internalcfg).ToAggregate(); err != nil {
+		return nil, err
+	}
+	return internalcfg, nil
 }
 
 // BytesToInternalConfig converts a byte slice to an internal, defaulted and validated configuration object.
 // The byte slice may contain one or many different YAML documents. These YAML documents are parsed one-by-one
 // and well-known ComponentConfig GroupVersionKinds are stored inside of the internal InitConfiguration struct
 func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
-	internalcfg := &kubeadmapi.InitConfiguration{}
-	decodedObjs := map[componentconfigs.RegistrationKind]runtime.Object{}
-	masterConfigFound := false
+	var initcfg *kubeadmapi.InitConfiguration
+	var clustercfg *kubeadmapi.ClusterConfiguration
+	decodedComponentConfigObjects := map[componentconfigs.RegistrationKind]runtime.Object{}
 
 	if err := DetectUnsupportedVersion(b); err != nil {
 		return nil, err
@@ -162,30 +178,57 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 			if err != nil {
 				return nil, err
 			}
-			decodedObjs[regKind] = obj
+			decodedComponentConfigObjects[regKind] = obj
 			continue
 		}
 
 		if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvk) {
-			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), fileContent, internalcfg); err != nil {
+			// Set initcfg to an empty struct value the deserializer will populate
+			initcfg = &kubeadmapi.InitConfiguration{}
+			// Decode the bytes into the internal struct. Under the hood, the bytes will be unmarshalled into the
+			// right external version, defaulted, and converted into the internal version.
+			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), fileContent, initcfg); err != nil {
 				return nil, err
 			}
-			masterConfigFound = true
+			continue
+		}
+		if kubeadmutil.GroupVersionKindsHasClusterConfiguration(gvk) {
+			// Set clustercfg to an empty struct value the deserializer will populate
+			clustercfg = &kubeadmapi.ClusterConfiguration{}
+			// Decode the bytes into the internal struct. Under the hood, the bytes will be unmarshalled into the
+			// right external version, defaulted, and converted into the internal version.
+			if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), fileContent, clustercfg); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
 		fmt.Printf("[config] WARNING: Ignored YAML document with GroupVersionKind %v\n", gvk)
 	}
-	// Just as an extra safety check, don't proceed if a InitConfiguration object wasn't found
-	if !masterConfigFound {
-		return nil, fmt.Errorf("no InitConfiguration kind was found in the YAML file")
+
+	// Enforce that InitConfiguration and/or ClusterConfiguration has to exist among the YAML documents
+	if initcfg == nil && clustercfg == nil {
+		return nil, fmt.Errorf("no InitConfiguration or ClusterConfiguration kind was found in the YAML file")
 	}
 
-	// Save the loaded ComponentConfig objects in the internalcfg object
-	for kind, obj := range decodedObjs {
+	// If InitConfiguration wasn't given, default it by creating an external struct instance, default it and convert into the internal type
+	if initcfg == nil {
+		extinitcfg := &kubeadmapiv1alpha3.InitConfiguration{}
+		kubeadmscheme.Scheme.Default(extinitcfg)
+		// Set initcfg to an empty struct value the deserializer will populate
+		initcfg = &kubeadmapi.InitConfiguration{}
+		kubeadmscheme.Scheme.Convert(extinitcfg, initcfg, nil)
+	}
+	// If ClusterConfiguration was given, populate it in the InitConfiguration struct
+	if clustercfg != nil {
+		initcfg.ClusterConfiguration = *clustercfg
+	}
+
+	// Save the loaded ComponentConfig objects in the initcfg object
+	for kind, obj := range decodedComponentConfigObjects {
 		registration, found := componentconfigs.Known[kind]
 		if found {
-			if ok := registration.SetToInternalConfig(obj, internalcfg); !ok {
+			if ok := registration.SetToInternalConfig(obj, &initcfg.ClusterConfiguration); !ok {
 				return nil, fmt.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 			}
 		} else {
@@ -193,26 +236,12 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 			fmt.Printf("[config] WARNING: Decoded a kind that couldn't be saved to the internal configuration: %q\n", string(kind))
 		}
 	}
-
-	return defaultAndValidate(internalcfg)
+	return initcfg, nil
 }
 
-func defaultAndValidate(cfg *kubeadmapi.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
-	// Applies dynamic defaults to settings not provided with flags
-	if err := SetInitDynamicDefaults(cfg); err != nil {
-		return nil, err
-	}
-	// Validates cfg (flags/configs + defaults + dynamic defaults)
-	if err := validation.ValidateInitConfiguration(cfg).ToAggregate(); err != nil {
-		return nil, err
-	}
-
-	return cfg, nil
-}
-
-func defaultedInternalConfig() *kubeadmapi.InitConfiguration {
-	externalcfg := &kubeadmapiv1alpha3.InitConfiguration{}
-	internalcfg := &kubeadmapi.InitConfiguration{}
+func defaultedInternalConfig() *kubeadmapi.ClusterConfiguration {
+	externalcfg := &kubeadmapiv1alpha3.ClusterConfiguration{}
+	internalcfg := &kubeadmapi.ClusterConfiguration{}
 
 	kubeadmscheme.Scheme.Default(externalcfg)
 	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
@@ -223,41 +252,57 @@ func defaultedInternalConfig() *kubeadmapi.InitConfiguration {
 }
 
 // MarshalInitConfigurationToBytes marshals the internal InitConfiguration object to bytes. It writes the embedded
-// ComponentConfiguration objects out as separate YAML documents
+// ClusterConfiguration object with ComponentConfigs out as separate YAML documents
 func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schema.GroupVersion) ([]byte, error) {
-	masterbytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg, gv, kubeadmscheme.Codecs)
+	initbytes, err := kubeadmutil.MarshalToYamlForCodecs(cfg, gv, kubeadmscheme.Codecs)
 	if err != nil {
 		return []byte{}, err
 	}
-	allFiles := [][]byte{masterbytes}
-	componentConfigContent := map[string][]byte{}
+	allFiles := [][]byte{initbytes}
 
-	// If the specified groupversion is targeting the internal type, don't print the extra componentconfig YAML documents
+	// Exception: If the specified groupversion is targeting the internal type, don't print embedded ClusterConfiguration contents
+	// This is mostly used for unit testing. In a real scenario the internal version of the API is never marshalled as-is.
 	if gv.Version != runtime.APIVersionInternal {
+		clusterbytes, err := MarshalClusterConfigurationToBytes(&cfg.ClusterConfiguration, gv)
+		if err != nil {
+			return []byte{}, err
+		}
+		allFiles = append(allFiles, clusterbytes)
+	}
+	return bytes.Join(allFiles, []byte(kubeadmconstants.YAMLDocumentSeparator)), nil
+}
 
-		defaultedcfg := defaultedInternalConfig()
+// MarshalClusterConfigurationToBytes marshals the internal ClusterConfiguration object to bytes. It writes the embedded
+// ComponentConfiguration objects out as separate YAML documents
+func MarshalClusterConfigurationToBytes(clustercfg *kubeadmapi.ClusterConfiguration, gv schema.GroupVersion) ([]byte, error) {
+	clusterbytes, err := kubeadmutil.MarshalToYamlForCodecs(clustercfg, gv, kubeadmscheme.Codecs)
+	if err != nil {
+		return []byte{}, err
+	}
+	allFiles := [][]byte{clusterbytes}
+	componentConfigContent := map[string][]byte{}
+	defaultedcfg := defaultedInternalConfig()
 
-		for kind, registration := range componentconfigs.Known {
-			// If the ComponentConfig struct for the current registration is nil, skip it when marshalling
-			realobj, ok := registration.GetFromInternalConfig(cfg)
-			if !ok {
-				continue
+	for kind, registration := range componentconfigs.Known {
+		// If the ComponentConfig struct for the current registration is nil, skip it when marshalling
+		realobj, ok := registration.GetFromInternalConfig(clustercfg)
+		if !ok {
+			continue
+		}
+
+		defaultedobj, ok := registration.GetFromInternalConfig(defaultedcfg)
+		// Invalid: The caller asked to not print the componentconfigs if defaulted, but defaultComponentConfigs() wasn't able to create default objects to use for reference
+		if !ok {
+			return []byte{}, fmt.Errorf("couldn't create a default componentconfig object")
+		}
+
+		// If the real ComponentConfig object differs from the default, print it out. If not, there's no need to print it out, so skip it
+		if !reflect.DeepEqual(realobj, defaultedobj) {
+			contentBytes, err := registration.Marshal(realobj)
+			if err != nil {
+				return []byte{}, err
 			}
-
-			defaultedobj, ok := registration.GetFromInternalConfig(defaultedcfg)
-			// Invalid: The caller asked to not print the componentconfigs if defaulted, but defaultComponentConfigs() wasn't able to create default objects to use for reference
-			if !ok {
-				return []byte{}, fmt.Errorf("couldn't create a default componentconfig object")
-			}
-
-			// If the real ComponentConfig object differs from the default, print it out. If not, there's no need to print it out, so skip it
-			if !reflect.DeepEqual(realobj, defaultedobj) {
-				contentBytes, err := registration.Marshal(realobj)
-				if err != nil {
-					return []byte{}, err
-				}
-				componentConfigContent[string(kind)] = contentBytes
-			}
+			componentConfigContent[string(kind)] = contentBytes
 		}
 	}
 

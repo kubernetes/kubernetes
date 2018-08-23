@@ -95,7 +95,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
-		printConfiguration(cfg, os.Stdout)
+		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
 	}
 
 	return &upgradeVariables{
@@ -109,13 +109,13 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 }
 
 // printConfiguration prints the external version of the API to yaml
-func printConfiguration(cfg *kubeadmapi.InitConfiguration, w io.Writer) {
+func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer) {
 	// Short-circuit if cfg is nil, so we can safely get the value of the pointer below
-	if cfg == nil {
+	if clustercfg == nil {
 		return
 	}
 
-	cfgYaml, err := configutil.MarshalKubeadmConfigObject(cfg)
+	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg)
 	if err == nil {
 		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
 

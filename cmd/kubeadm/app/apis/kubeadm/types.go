@@ -19,7 +19,7 @@ package kubeadm
 import (
 	fuzz "github.com/google/gofuzz"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
@@ -27,29 +27,37 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// InitConfiguration contains a list of elements which make up master's
-// configuration object.
+// InitConfiguration contains a list of fields that are specifically "kubeadm init"-only runtime
+// information. The cluster-wide config is stored in ClusterConfiguration. The InitConfiguration
+// object IS NOT uploaded to the kubeadm-config ConfigMap in the cluster, only the
+// ClusterConfiguration is.
 type InitConfiguration struct {
 	metav1.TypeMeta
 
-	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
-	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
-	// that is used by `kubeadm upgrade` for instance.
+	// ClusterConfiguration holds the cluster-wide information, and embeds that struct (which can be (un)marshalled separately as well)
+	// When InitConfiguration is marshalled to bytes in the external version, this information IS NOT preserved (which can be seen from
+	// the `json:"-"` tag in the external variant of these API types. Here, in the internal version `json:",inline"` is used, which means
+	// that all of ClusterConfiguration's fields will appear as they would be InitConfiguration's fields. This is used in practice solely
+	// in kubeadm API roundtrip unit testing. Check out `cmd/kubeadm/app/util/config/*_test.go` for more information. Normally, the internal
+	// type is NEVER marshalled, but always converted to some external version first.
+	ClusterConfiguration `json:",inline"`
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
-	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
 	BootstrapTokens []BootstrapToken
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
+type ClusterConfiguration struct {
+	metav1.TypeMeta
 
 	// ComponentConfigs holds internal ComponentConfig struct types known to kubeadm, should long-term only exist in the internal kubeadm API
 	// +k8s:conversion-gen=false
 	ComponentConfigs ComponentConfigs
-
-	// Cluster-wide configuration
-	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
-	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
 
 	// API holds configuration for the k8s apiserver.
 	API API
@@ -254,7 +262,6 @@ type ExternalEtcd struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // JoinConfiguration contains elements describing a particular node.
-// TODO: This struct should be replaced by dynamic kubelet configuration.
 type JoinConfiguration struct {
 	metav1.TypeMeta
 

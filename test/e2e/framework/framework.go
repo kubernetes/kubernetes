@@ -155,6 +155,15 @@ func (f *Framework) BeforeEach() {
 	if f.ClientSet == nil {
 		By("Creating a kubernetes client")
 		config, err := LoadConfig()
+		testDesc := CurrentGinkgoTestDescription()
+		if len(testDesc.ComponentTexts) > 0 {
+			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+			config.UserAgent = fmt.Sprintf(
+				"%v -- %v",
+				rest.DefaultKubernetesUserAgent(),
+				componentTexts)
+		}
+
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst

@@ -69,7 +69,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			},
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1alpha3
-				kind: InitConfiguration
+				kind: ClusterConfiguration
 				kubernetesVersion: v1.10.1
 			`)),
 		},
@@ -81,10 +81,10 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			},
 			configContents: []byte(dedent.Dedent(`
 				apiVersion: kubeadm.k8s.io/v1alpha3
-				kind: InitConfiguration
+				kind: ClusterConfiguration
 				kubernetesVersion: v1.11.0
 				featureGates:
-				  CoreDNS: True
+				  CoreDNS: true
 			`)),
 		},
 	}
@@ -98,13 +98,14 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 
 			configFilePath := filepath.Join(tmpDir, "test-config-file")
-			err = ioutil.WriteFile(configFilePath, tc.configContents, 0644)
-			if err != nil {
+			if err := ioutil.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
 			i, err := cmd.NewImagesList(configFilePath, &kubeadmapiv1alpha3.InitConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+					KubernetesVersion: dummyKubernetesVersion,
+				},
 			})
 			if err != nil {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
@@ -137,28 +138,34 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
 			cfg: kubeadmapiv1alpha3.InitConfiguration{
-				KubernetesVersion: dummyKubernetesVersion,
+				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+					KubernetesVersion: dummyKubernetesVersion,
+				},
 			},
 		},
 		{
 			name: "external etcd configuration",
 			cfg: kubeadmapiv1alpha3.InitConfiguration{
-				Etcd: kubeadmapiv1alpha3.Etcd{
-					External: &kubeadmapiv1alpha3.ExternalEtcd{
-						Endpoints: []string{"https://some.etcd.com:2379"},
+				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+					Etcd: kubeadmapiv1alpha3.Etcd{
+						External: &kubeadmapiv1alpha3.ExternalEtcd{
+							Endpoints: []string{"https://some.etcd.com:2379"},
+						},
 					},
+					KubernetesVersion: dummyKubernetesVersion,
 				},
-				KubernetesVersion: dummyKubernetesVersion,
 			},
 			expectedImages: defaultNumberOfImages - 1,
 		},
 		{
 			name: "coredns enabled",
 			cfg: kubeadmapiv1alpha3.InitConfiguration{
-				FeatureGates: map[string]bool{
-					features.CoreDNS: true,
+				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+					FeatureGates: map[string]bool{
+						features.CoreDNS: true,
+					},
+					KubernetesVersion: dummyKubernetesVersion,
 				},
-				KubernetesVersion: dummyKubernetesVersion,
 			},
 			expectedImages: defaultNumberOfImages,
 		},
@@ -226,8 +233,9 @@ func TestImagesPull(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	cfg := []byte(dedent.Dedent(`
-		apiVersion: kubeadm.k8s.io/v1alpha3
-		kind: InitConfiguration
+		# This is intentionally testing an old API version and the old kind naming and making sure the output is correct
+		apiVersion: kubeadm.k8s.io/v1alpha2
+		kind: MasterConfiguration
 		kubernetesVersion: v1.10.0
 	`))
 	configFile, cleanup := tempConfig(t, cfg)
@@ -235,13 +243,15 @@ func TestMigrate(t *testing.T) {
 
 	var output bytes.Buffer
 	command := cmd.NewCmdConfigMigrate(&output)
-	err := command.Flags().Set("old-config", configFile)
-	if err != nil {
+	if err := command.Flags().Set("old-config", configFile); err != nil {
 		t.Fatalf("failed to set old-config flag")
 	}
+	newConfigPath := filepath.Join(filepath.Dir(configFile), "new-migrated-config")
+	if err := command.Flags().Set("new-config", newConfigPath); err != nil {
+		t.Fatalf("failed to set new-config flag")
+	}
 	command.Run(nil, nil)
-	_, err = config.BytesToInternalConfig(output.Bytes())
-	if err != nil {
+	if _, err := config.ConfigFileAndDefaultsToInternalConfig(newConfigPath, &kubeadmapiv1alpha3.InitConfiguration{}); err != nil {
 		t.Fatalf("Could not read output back into internal type: %v", err)
 	}
 }
@@ -254,8 +264,7 @@ func tempConfig(t *testing.T, config []byte) (string, func()) {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}
 	configFilePath := filepath.Join(tmpDir, "test-config-file")
-	err = ioutil.WriteFile(configFilePath, config, 0644)
-	if err != nil {
+	if err := ioutil.WriteFile(configFilePath, config, 0644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed writing a config file: %v", err)
 	}

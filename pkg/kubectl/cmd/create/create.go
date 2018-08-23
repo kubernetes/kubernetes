@@ -32,13 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
@@ -328,8 +328,13 @@ func createAndRefresh(info *resource.Info) error {
 
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
 func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
-	if len(args) != 1 {
-		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", len(args))
+	argsLen := cmd.ArgsLenAtDash()
+	// ArgsLenAtDash returns -1 when -- was not specified
+	if argsLen == -1 {
+		argsLen = len(args)
+	}
+	if argsLen != 1 {
+		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", argsLen)
 	}
 	return args[0], nil
 }

@@ -187,9 +187,12 @@ const (
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
 
 	// InitConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
+	// TODO: Rename this to ClusterConfigurationConfigMap
 	InitConfigurationConfigMap = "kubeadm-config"
 
 	// InitConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
+	// TODO: Rename this to ClusterConfigurationConfigMapKey, and migrate the value to ClusterConfiguration,
+	// but still support the old MasterConfiguration naming in earlier versions
 	InitConfigurationConfigMapKey = "InitConfiguration"
 
 	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
@@ -287,6 +290,9 @@ const (
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
 	CoreDNSVersion = "1.1.3"
+
+	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
+	ClusterConfigurationKind = "ClusterConfiguration"
 
 	// InitConfigurationKind is the string kind value for the InitConfiguration struct
 	InitConfigurationKind = "InitConfiguration"

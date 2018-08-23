@@ -25,50 +25,45 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-// PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
-// containers of the pod.
-func PodRequestsAndLimits(pod *v1.Pod) (reqs map[v1.ResourceName]resource.Quantity, limits map[v1.ResourceName]resource.Quantity) {
-	reqs, limits = map[v1.ResourceName]resource.Quantity{}, map[v1.ResourceName]resource.Quantity{}
-	for _, container := range pod.Spec.Containers {
-		for name, quantity := range container.Resources.Requests {
-			if value, ok := reqs[name]; !ok {
-				reqs[name] = *quantity.Copy()
-			} else {
-				value.Add(quantity)
-				reqs[name] = value
-			}
+// addResourceList adds the resources in newList to list
+func addResourceList(list, new v1.ResourceList) {
+	for name, quantity := range new {
+		if value, ok := list[name]; !ok {
+			list[name] = *quantity.Copy()
+		} else {
+			value.Add(quantity)
+			list[name] = value
 		}
-		for name, quantity := range container.Resources.Limits {
-			if value, ok := limits[name]; !ok {
-				limits[name] = *quantity.Copy()
-			} else {
-				value.Add(quantity)
-				limits[name] = value
+	}
+}
+
+// maxResourceList sets list to the greater of list/newList for every resource
+// either list
+func maxResourceList(list, new v1.ResourceList) {
+	for name, quantity := range new {
+		if value, ok := list[name]; !ok {
+			list[name] = *quantity.Copy()
+			continue
+		} else {
+			if quantity.Cmp(value) > 0 {
+				list[name] = *quantity.Copy()
 			}
 		}
 	}
+}
+
+// PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
+// containers of the pod.
+func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
+	reqs, limits = v1.ResourceList{}, v1.ResourceList{}
+	for _, container := range pod.Spec.Containers {
+		addResourceList(reqs, container.Resources.Requests)
+		addResourceList(limits, container.Resources.Limits)
+	}
 	// init containers define the minimum of any resource
 	for _, container := range pod.Spec.InitContainers {
-		for name, quantity := range container.Resources.Requests {
-			value, ok := reqs[name]
-			if !ok {
-				reqs[name] = *quantity.Copy()
-				continue
-			}
-			if quantity.Cmp(value) > 0 {
-				reqs[name] = *quantity.Copy()
-			}
-		}
-		for name, quantity := range container.Resources.Limits {
-			value, ok := limits[name]
-			if !ok {
-				limits[name] = *quantity.Copy()
-				continue
-			}
-			if quantity.Cmp(value) > 0 {
-				limits[name] = *quantity.Copy()
-			}
-		}
+		maxResourceList(reqs, container.Resources.Requests)
+		maxResourceList(limits, container.Resources.Limits)
 	}
 	return
 }

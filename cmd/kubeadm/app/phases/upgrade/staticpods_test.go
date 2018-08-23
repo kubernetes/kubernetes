@@ -28,15 +28,14 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
-	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
@@ -48,6 +47,12 @@ const (
 	testConfiguration = `
 apiVersion: kubeadm.k8s.io/v1alpha3
 kind: InitConfiguration
+nodeRegistration:
+  name: foo
+  criSocket: ""
+---
+apiVersion: kubeadm.k8s.io/v1alpha3
+kind: ClusterConfiguration
 api:
   advertiseAddress: 1.2.3.4
   bindPort: 6443
@@ -415,32 +420,21 @@ func TestStaticPodControlPlane(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpEtcdDataDir)
 
-		oldcfg, err := getConfig("v1.9.0", tempCertsDir, tmpEtcdDataDir)
+		oldcfg, err := getConfig("v1.12.0", tempCertsDir, tmpEtcdDataDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
 		}
 
-		// Initialize PKI minus any etcd certificates to simulate etcd PKI upgrade
-		certActions := []func(cfg *kubeadmapi.InitConfiguration) error{
-			certsphase.CreateCACertAndKeyFiles,
-			certsphase.CreateAPIServerCertAndKeyFiles,
-			certsphase.CreateAPIServerKubeletClientCertAndKeyFiles,
-			// certsphase.CreateEtcdCACertAndKeyFiles,
-			// certsphase.CreateEtcdServerCertAndKeyFiles,
-			// certsphase.CreateEtcdPeerCertAndKeyFiles,
-			// certsphase.CreateEtcdHealthcheckClientCertAndKeyFiles,
-			// certsphase.CreateAPIServerEtcdClientCertAndKeyFiles,
-			certsphase.CreateServiceAccountKeyAndPublicKeyFiles,
-			certsphase.CreateFrontProxyCACertAndKeyFiles,
-			certsphase.CreateFrontProxyClientCertAndKeyFiles,
+		tree, err := certsphase.GetCertsWithoutEtcd().AsMap().CertTree()
+		if err != nil {
+			t.Fatalf("couldn't get cert tree: %v", err)
 		}
-		for _, action := range certActions {
-			err := action(oldcfg)
-			if err != nil {
-				t.Fatalf("couldn't initialize pre-upgrade certificate: %v", err)
-			}
+
+		if err := tree.CreateTree(oldcfg); err != nil {
+			t.Fatalf("couldn't get create cert tree: %v", err)
 		}
-		fmt.Printf("Wrote certs to %s\n", oldcfg.CertificatesDir)
+
+		t.Logf("Wrote certs to %s\n", oldcfg.CertificatesDir)
 
 		// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
 		err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
@@ -513,15 +507,26 @@ func getAPIServerHash(dir string) (string, error) {
 	return fmt.Sprintf("%x", sha256.Sum256(fileBytes)), nil
 }
 
-// TODO: Make this test function use the rest of the "official" API machinery helper funcs we have inside of kubeadm
 func getConfig(version, certsDir, etcdDataDir string) (*kubeadmapi.InitConfiguration, error) {
-	externalcfg := &kubeadmapiv1alpha3.InitConfiguration{}
-	internalcfg := &kubeadmapi.InitConfiguration{}
-	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version)), externalcfg); err != nil {
-		return nil, fmt.Errorf("unable to decode config: %v", err)
+	configBytes := []byte(fmt.Sprintf(testConfiguration, certsDir, etcdDataDir, version))
+
+	// Unmarshal the config
+	cfg, err := configutil.BytesToInternalConfig(configBytes)
+	if err != nil {
+		return nil, err
 	}
-	kubeadmscheme.Scheme.Convert(externalcfg, internalcfg, nil)
-	return internalcfg, nil
+
+	// Applies dynamic defaults to settings not provided with flags
+	if err = configutil.SetInitDynamicDefaults(cfg); err != nil {
+		return nil, err
+	}
+
+	// Validates cfg (flags/configs + defaults + dynamic defaults)
+	if err = validation.ValidateInitConfiguration(cfg).ToAggregate(); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
 }
 
 func getTempDir(t *testing.T, name string) (string, func()) {

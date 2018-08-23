@@ -60,7 +60,8 @@ type PodDisruptionBudgetStatus struct {
 	// the list automatically by PodDisruptionBudget controller after some time.
 	// If everything goes smooth this map should be empty for the most of the time.
 	// Large number of entries in the map may indicate problems with pod deletions.
-	DisruptedPods map[string]metav1.Time `json:"disruptedPods" protobuf:"bytes,2,rep,name=disruptedPods"`
+	// +optional
+	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty" protobuf:"bytes,2,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
 	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`

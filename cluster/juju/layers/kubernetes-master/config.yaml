@@ -147,3 +147,9 @@ options:
     default: true
     description: |
       If true the metrics server for Kubernetes will be deployed onto the cluster.
+  default-storage:
+    type: string
+    default: "auto"
+    description: |
+      The storage class to make the default storage class. Allowed values are "auto",
+      "none", "ceph-xfs", "ceph-ext4". Note: Only works in Kubernetes >= 1.10

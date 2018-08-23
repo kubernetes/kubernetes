@@ -232,10 +232,12 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid DNS ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "cp.k8s.io:8081",
-					AdvertiseAddress:     "4.5.6.7",
-					BindPort:             6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "cp.k8s.io:8081",
+						AdvertiseAddress:     "4.5.6.7",
+						BindPort:             6443,
+					},
 				},
 			},
 			expected: true,
@@ -243,10 +245,12 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid IPv4 ControlPlaneEndpoint (with port), AdvertiseAddress and default port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "1.2.3.4:8081",
-					AdvertiseAddress:     "4.5.6.7",
-					BindPort:             6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "1.2.3.4:8081",
+						AdvertiseAddress:     "4.5.6.7",
+						BindPort:             6443,
+					},
 				},
 			},
 			expected: true,
@@ -254,10 +258,12 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid IPv6 ControlPlaneEndpoint (with port), ControlPlaneEndpoint and port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "[2001:db7::1]:8081",
-					AdvertiseAddress:     "2001:db7::2",
-					BindPort:             6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "[2001:db7::1]:8081",
+						AdvertiseAddress:     "2001:db7::2",
+						BindPort:             6443,
+					},
 				},
 			},
 			expected: true,
@@ -265,10 +271,12 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid DNS ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "cp.k8s.io",
-					AdvertiseAddress:     "4.5.6.7",
-					BindPort:             6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "cp.k8s.io",
+						AdvertiseAddress:     "4.5.6.7",
+						BindPort:             6443,
+					},
 				},
 			},
 			expected: true,
@@ -276,10 +284,12 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid IPv4 ControlPlaneEndpoint (without port), AdvertiseAddress and default port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "1.2.3.4",
-					AdvertiseAddress:     "4.5.6.7",
-					BindPort:             6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "1.2.3.4",
+						AdvertiseAddress:     "4.5.6.7",
+						BindPort:             6443,
+					},
 				},
 			},
 			expected: true,
@@ -287,10 +297,12 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid IPv6 ControlPlaneEndpoint (without port), ControlPlaneEndpoint and port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "2001:db7::1",
-					AdvertiseAddress:     "2001:db7::2",
-					BindPort:             6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "2001:db7::1",
+						AdvertiseAddress:     "2001:db7::2",
+						BindPort:             6443,
+					},
 				},
 			},
 			expected: true,
@@ -298,9 +310,11 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid IPv4 AdvertiseAddress and default port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.3.4",
+						BindPort:         6443,
+					},
 				},
 			},
 			expected: true,
@@ -308,9 +322,11 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Valid IPv6 AdvertiseAddress and port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "2001:db7::1",
-					BindPort:         3446,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "2001:db7::1",
+						BindPort:         3446,
+					},
 				},
 			},
 			expected: true,
@@ -318,9 +334,11 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Invalid IPv4 AdvertiseAddress",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.34",
-					BindPort:         6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.34",
+						BindPort:         6443,
+					},
 				},
 			},
 			expected: false,
@@ -328,9 +346,11 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Invalid IPv6 AdvertiseAddress",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "2001:db7:1",
-					BindPort:         3446,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "2001:db7:1",
+						BindPort:         3446,
+					},
 				},
 			},
 			expected: false,
@@ -338,9 +358,11 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Invalid BindPort",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         0,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.3.4",
+						BindPort:         0,
+					},
 				},
 			},
 			expected: false,
@@ -348,8 +370,10 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Invalid DNS ControlPlaneEndpoint",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "bad!!.k8s.io",
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "bad!!.k8s.io",
+					},
 				},
 			},
 			expected: false,
@@ -357,8 +381,10 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Invalid ipv4 ControlPlaneEndpoint",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "1..3.4",
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "1..3.4",
+					},
 				},
 			},
 			expected: false,
@@ -366,8 +392,10 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Invalid ipv6 ControlPlaneEndpoint",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
+					},
 				},
 			},
 			expected: false,
@@ -375,8 +403,10 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		{
 			name: "Invalid ControlPlaneEndpoint port",
 			s: &kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					ControlPlaneEndpoint: "1.2.3.4:0",
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						ControlPlaneEndpoint: "1.2.3.4:0",
+					},
 				},
 			},
 			expected: false,
@@ -406,143 +436,155 @@ func TestValidateInitConfiguration(t *testing.T) {
 			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.3.4",
+						BindPort:         6443,
+					},
+					Networking: kubeadm.Networking{
+						ServiceSubnet: "10.96.0.1/12",
+						DNSDomain:     "cluster.local",
+					},
+					CertificatesDir: "/some/cert/dir",
 				},
-				Networking: kubeadm.Networking{
-					ServiceSubnet: "10.96.0.1/12",
-					DNSDomain:     "cluster.local",
-				},
-				CertificatesDir:  "/some/cert/dir",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.3.4",
+						BindPort:         6443,
+					},
+					Networking: kubeadm.Networking{
+						ServiceSubnet: "2001:db8::1/98",
+						DNSDomain:     "cluster.local",
+					},
+					CertificatesDir: "/some/cert/dir",
 				},
-				Networking: kubeadm.Networking{
-					ServiceSubnet: "2001:db8::1/98",
-					DNSDomain:     "cluster.local",
-				},
-				CertificatesDir:  "/some/cert/dir",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.3.4",
+						BindPort:         6443,
+					},
+					Networking: kubeadm.Networking{
+						ServiceSubnet: "10.96.0.1/12",
+						DNSDomain:     "cluster.local",
+					},
+					CertificatesDir: "/some/other/cert/dir",
 				},
-				Networking: kubeadm.Networking{
-					ServiceSubnet: "10.96.0.1/12",
-					DNSDomain:     "cluster.local",
-				},
-				CertificatesDir: "/some/other/cert/dir",
 			}, false},
 		{"valid master configuration with incorrect IPv4 pod subnet",
 			&kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         6443,
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.3.4",
+						BindPort:         6443,
+					},
+					Networking: kubeadm.Networking{
+						ServiceSubnet: "10.96.0.1/12",
+						DNSDomain:     "cluster.local",
+						PodSubnet:     "10.0.1.15",
+					},
+					CertificatesDir: "/some/other/cert/dir",
 				},
-				Networking: kubeadm.Networking{
-					ServiceSubnet: "10.96.0.1/12",
-					DNSDomain:     "cluster.local",
-					PodSubnet:     "10.0.1.15",
-				},
-				CertificatesDir:  "/some/other/cert/dir",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         6443,
-				},
-				Etcd: kubeadm.Etcd{
-					Local: &kubeadm.LocalEtcd{
-						DataDir: "/some/path",
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1.2.3.4",
+						BindPort:         6443,
 					},
-				},
-				ComponentConfigs: kubeadm.ComponentConfigs{
-					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
-						BindAddress:        "192.168.59.103",
-						HealthzBindAddress: "0.0.0.0:10256",
-						MetricsBindAddress: "127.0.0.1:10249",
-						ClusterCIDR:        "192.168.59.0/24",
-						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-							MasqueradeAll: true,
-							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-						},
-						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
-							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
-						},
-						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
-							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					Etcd: kubeadm.Etcd{
+						Local: &kubeadm.LocalEtcd{
+							DataDir: "/some/path",
 						},
 					},
+					ComponentConfigs: kubeadm.ComponentConfigs{
+						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
+							BindAddress:        "192.168.59.103",
+							HealthzBindAddress: "0.0.0.0:10256",
+							MetricsBindAddress: "127.0.0.1:10249",
+							ClusterCIDR:        "192.168.59.0/24",
+							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+								MasqueradeAll: true,
+								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+							},
+							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+							},
+							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+								Max:        utilpointer.Int32Ptr(2),
+								MaxPerCore: utilpointer.Int32Ptr(1),
+								Min:        utilpointer.Int32Ptr(1),
+								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+							},
+						},
+					},
+					Networking: kubeadm.Networking{
+						ServiceSubnet: "10.96.0.1/12",
+						DNSDomain:     "cluster.local",
+						PodSubnet:     "10.0.1.15/16",
+					},
+					CertificatesDir: "/some/other/cert/dir",
 				},
-				Networking: kubeadm.Networking{
-					ServiceSubnet: "10.96.0.1/12",
-					DNSDomain:     "cluster.local",
-					PodSubnet:     "10.0.1.15/16",
-				},
-				CertificatesDir:  "/some/other/cert/dir",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
 			&kubeadm.InitConfiguration{
-				API: kubeadm.API{
-					AdvertiseAddress: "1:2:3::4",
-					BindPort:         3446,
-				},
-				Etcd: kubeadm.Etcd{
-					Local: &kubeadm.LocalEtcd{
-						DataDir: "/some/path",
+				ClusterConfiguration: kubeadm.ClusterConfiguration{
+					API: kubeadm.API{
+						AdvertiseAddress: "1:2:3::4",
+						BindPort:         3446,
 					},
-				},
-				ComponentConfigs: kubeadm.ComponentConfigs{
-					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
-						BindAddress:        "192.168.59.103",
-						HealthzBindAddress: "0.0.0.0:10256",
-						MetricsBindAddress: "127.0.0.1:10249",
-						ClusterCIDR:        "192.168.59.0/24",
-						UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
-						ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
-						IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
-							MasqueradeAll: true,
-							SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
-							MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
-						},
-						IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
-							SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
-							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
-						},
-						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
-							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
-							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+					Etcd: kubeadm.Etcd{
+						Local: &kubeadm.LocalEtcd{
+							DataDir: "/some/path",
 						},
 					},
+					ComponentConfigs: kubeadm.ComponentConfigs{
+						KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
+							BindAddress:        "192.168.59.103",
+							HealthzBindAddress: "0.0.0.0:10256",
+							MetricsBindAddress: "127.0.0.1:10249",
+							ClusterCIDR:        "192.168.59.0/24",
+							UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
+							ConfigSyncPeriod:   metav1.Duration{Duration: 1 * time.Second},
+							IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
+								MasqueradeAll: true,
+								SyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+								MinSyncPeriod: metav1.Duration{Duration: 2 * time.Second},
+							},
+							IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
+								SyncPeriod:    metav1.Duration{Duration: 10 * time.Second},
+								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
+							},
+							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
+								Max:        utilpointer.Int32Ptr(2),
+								MaxPerCore: utilpointer.Int32Ptr(1),
+								Min:        utilpointer.Int32Ptr(1),
+								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
+								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
+							},
+						},
+					},
+					Networking: kubeadm.Networking{
+						ServiceSubnet: "2001:db8::1/98",
+						DNSDomain:     "cluster.local",
+					},
+					CertificatesDir: "/some/other/cert/dir",
 				},
-				Networking: kubeadm.Networking{
-					ServiceSubnet: "2001:db8::1/98",
-					DNSDomain:     "cluster.local",
-				},
-				CertificatesDir:  "/some/other/cert/dir",
 				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 	}

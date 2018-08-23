@@ -1,7 +1,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: fluentd-es-config-v0.1.4
+  name: fluentd-es-config-v0.1.5
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
@@ -327,6 +327,7 @@ data:
       <storage>
         @type local
         persistent true
+        path /var/log/journald-docker.pos
       </storage>
       read_from_head true
       tag docker
@@ -339,6 +340,7 @@ data:
       <storage>
         @type local
         persistent true
+        path /var/log/journald-container-runtime.pos
       </storage>
       read_from_head true
       tag container-runtime
@@ -351,6 +353,7 @@ data:
       <storage>
         @type local
         persistent true
+        path /var/log/journald-kubelet.pos
       </storage>
       read_from_head true
       tag kubelet
@@ -363,11 +366,12 @@ data:
       <storage>
         @type local
         persistent true
+        path /var/log/journald-node-problem-detector.pos
       </storage>
       read_from_head true
       tag node-problem-detector
     </source>
-    
+
     <source>
       @id kernel
       @type systemd
@@ -375,6 +379,7 @@ data:
       <storage>
         @type local
         persistent true
+        path /var/log/kernel.pos
       </storage>
       <entry>
         fields_strip_underscores true
@@ -435,6 +440,7 @@ data:
       @id elasticsearch
       @type elasticsearch
       @log_level info
+      type_name fluentd
       include_tag_key true
       host elasticsearch-logging
       port 9200

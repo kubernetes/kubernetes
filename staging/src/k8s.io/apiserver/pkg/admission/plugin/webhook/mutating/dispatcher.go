@@ -83,8 +83,12 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 // note that callAttrMutatingHook updates attr
 func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
 	if attr.IsDryRun() {
-		// TODO: support this
-		return webhookerrors.NewDryRunUnsupportedErr(h.Name)
+		if h.SideEffects == nil {
+			return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
+		}
+		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
+			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
+		}
 	}
 
 	// Make the webhook request
@@ -100,6 +104,13 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 
 	if response.Response == nil {
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+	}
+
+	for k, v := range response.Response.AuditAnnotations {
+		key := h.Name + "/" + k
+		if err := attr.AddAnnotation(key, v); err != nil {
+			glog.Warningf("Failed to set admission audit annotation %s to %s for mutating webhook %s: %v", key, v, h.Name, err)
+		}
 	}
 
 	if !response.Response.Allowed {

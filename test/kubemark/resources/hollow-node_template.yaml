@@ -18,7 +18,7 @@ spec:
       initContainers:
       - name: init-inotify-limit
         image: busybox
-        command: ['sysctl', '-w', 'fs.inotify.max_user_instances=200']
+        command: ['sysctl', '-w', 'fs.inotify.max_user_instances=1000']
         securityContext:
           privileged: true
       volumes:
