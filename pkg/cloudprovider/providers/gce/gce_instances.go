@@ -91,10 +91,20 @@ func (gce *GCECloud) NodeAddresses(_ context.Context, _ types.NodeName) ([]v1.No
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get external IP: %v", err)
 	}
-	return []v1.NodeAddress{
+	addresses := []v1.NodeAddress{
 		{Type: v1.NodeInternalIP, Address: internalIP},
 		{Type: v1.NodeExternalIP, Address: externalIP},
-	}, nil
+	}
+
+	if internalDNSFull, err := metadata.Get("instance/hostname"); err != nil {
+		glog.Warningf("couldn't get full internal DNS name: %v", err)
+	} else {
+		addresses = append(addresses,
+			v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNSFull},
+			v1.NodeAddress{Type: v1.NodeHostName, Address: internalDNSFull},
+		)
+	}
+	return addresses, nil
 }
 
 // NodeAddressesByProviderID will not be called from the node that is requesting this ID.
