@@ -121,10 +121,10 @@ var _ = SIGDescribe("Load capacity", func() {
 		}
 	})
 
-	// We assume a default throughput of 10 pods/second throughput.
+	// We assume a default throughput of 20 pods/second throughput.
 	// We may want to revisit it in the future.
 	// However, this can be overridden by LOAD_TEST_THROUGHPUT env var.
-	throughput := 10
+	throughput := 20
 	if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
 		if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
 			throughput = newThroughput
@@ -338,9 +338,10 @@ var _ = SIGDescribe("Load capacity", func() {
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
-			// Currently we assume <throughput> pods/second average deletion throughput.
+			// Currently we assume <throughput/2> pods/second average deletion throughput,
+			// as GC is rate-limited and needs to make 2 calls per pod deletion.
 			// We may want to revisit it in the future.
-			deletingTime := time.Duration(totalPods/throughput) * time.Second
+			deletingTime := time.Duration(totalPods/(throughput/2)) * time.Second
 			framework.Logf("Starting to delete %v objects...", itArg.kind)
 			deleteAllResources(configs, deletingTime, testPhaseDurations.StartPhase(500, "load pods deletion"))
 		})
