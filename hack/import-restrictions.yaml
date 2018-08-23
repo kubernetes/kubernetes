@@ -119,3 +119,10 @@
   - k8s.io/apimachinery
   - k8s.io/kube-openapi
   - k8s.io/gengo
+
+- baseImportPath: "./vendor/k8s.io/sample-cli-plugin/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/cli-runtime
+  - k8s.io/client-go
+  - k8s.io/sample-cli-plugin
