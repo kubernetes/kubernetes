@@ -351,6 +351,9 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 // It synchronizes node status to master, registering the kubelet first if
 // necessary.
 func (kl *Kubelet) syncNodeStatus() {
+	kl.syncNodeStatusMux.Lock()
+	defer kl.syncNodeStatusMux.Unlock()
+
 	if kl.kubeClient == nil || kl.heartbeatClient == nil {
 		return
 	}
@@ -402,7 +405,9 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	}
 
 	if node.Spec.PodCIDR != "" {
-		kl.updatePodCIDR(node.Spec.PodCIDR)
+		if err := kl.updatePodCIDR(node.Spec.PodCIDR); err != nil {
+			glog.Errorf(err.Error())
+		}
 	}
 
 	kl.setNodeStatus(node)

@@ -56,22 +56,25 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
 // from the current CIDR.
-func (kl *Kubelet) updatePodCIDR(cidr string) {
+func (kl *Kubelet) updatePodCIDR(cidr string) error {
+	kl.updatePodCIDRMux.Lock()
+	defer kl.updatePodCIDRMux.Unlock()
+
 	podCIDR := kl.runtimeState.podCIDR()
 
 	if podCIDR == cidr {
-		return
+		return nil
 	}
 
 	// kubelet -> generic runtime -> runtime shim -> network plugin
 	// docker/non-cri implementations have a passthrough UpdatePodCIDR
 	if err := kl.getRuntime().UpdatePodCIDR(cidr); err != nil {
-		glog.Errorf("Failed to update pod CIDR: %v", err)
-		return
+		return fmt.Errorf("failed to update pod CIDR: %v", err)
 	}
 
 	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
 	kl.runtimeState.setPodCIDR(cidr)
+	return nil
 }
 
 // syncNetworkUtil ensures the network utility are present on host.
