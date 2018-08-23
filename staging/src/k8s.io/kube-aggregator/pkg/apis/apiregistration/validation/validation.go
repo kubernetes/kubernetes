@@ -89,9 +89,8 @@ func ValidateAPIService(apiService *apiregistration.APIService) field.ErrorList 
 }
 
 func ValidateAPIServiceUpdate(newAPIService *apiregistration.APIService, oldAPIService *apiregistration.APIService) field.ErrorList {
-	allErrs := validation.ValidateObjectMetaUpdate(&newAPIService.ObjectMeta, &oldAPIService.ObjectMeta, field.NewPath("metadata"))
+	var allErrs field.ErrorList
 	allErrs = append(allErrs, ValidateAPIService(newAPIService)...)
-
 	return allErrs
 }
 
@@ -111,7 +110,7 @@ func ValidateAPIServiceStatus(status *apiregistration.APIServiceStatus, fldPath 
 }
 
 func ValidateAPIServiceStatusUpdate(newAPIService *apiregistration.APIService, oldAPIService *apiregistration.APIService) field.ErrorList {
-	allErrs := validation.ValidateObjectMetaUpdate(&newAPIService.ObjectMeta, &oldAPIService.ObjectMeta, field.NewPath("metadata"))
+	var allErrs field.ErrorList
 	allErrs = append(allErrs, ValidateAPIServiceStatus(&newAPIService.Status, field.NewPath("status"))...)
 	return allErrs
 }
