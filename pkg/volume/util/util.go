@@ -520,6 +520,11 @@ func GetPath(mounter volume.Mounter) (string, error) {
 // This means that a StatefulSet's volumes (`claimname-statefulsetname-id`) will spread across available zones,
 // assuming the id values are consecutive.
 func ChooseZoneForVolume(zones sets.String, pvcName string) string {
+	// No zones available, return empty string.
+	if zones.Len() == 0 {
+		return ""
+	}
+
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
 	hash, index := getPVCNameHashAndIndexOffset(pvcName)
@@ -541,6 +546,12 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 
 // ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
 func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
+	// No zones available, return empty set.
+	replicaZones := sets.NewString()
+	if zones.Len() == 0 {
+		return replicaZones
+	}
+
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
 	hash, index := getPVCNameHashAndIndexOffset(pvcName)
@@ -554,7 +565,6 @@ func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) se
 	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
 	// unhealthy zones)
 	zoneSlice := zones.List()
-	replicaZones := sets.NewString()
 
 	startingIndex := index * numZones
 	for index = startingIndex; index < startingIndex+numZones; index++ {
