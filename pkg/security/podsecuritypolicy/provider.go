@@ -20,16 +20,16 @@ import (
 	"fmt"
 	"strings"
 
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
 // simpleProvider is the default implementation of Provider.
 type simpleProvider struct {
-	psp        *policy.PodSecurityPolicy
+	psp        *policyv1beta1.PodSecurityPolicy
 	strategies *ProviderStrategies
 }
 
@@ -37,7 +37,7 @@ type simpleProvider struct {
 var _ Provider = &simpleProvider{}
 
 // NewSimpleProvider creates a new Provider instance.
-func NewSimpleProvider(psp *policy.PodSecurityPolicy, namespace string, strategyFactory StrategyFactory) (Provider, error) {
+func NewSimpleProvider(psp *policyv1beta1.PodSecurityPolicy, namespace string, strategyFactory StrategyFactory) (Provider, error) {
 	if psp == nil {
 		return nil, fmt.Errorf("NewSimpleProvider requires a PodSecurityPolicy")
 	}
@@ -137,7 +137,7 @@ func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container
 	// if we're using the non-root strategy set the marker that this container should not be
 	// run as root which will signal to the kubelet to do a final check either on the runAsUser
 	// or, if runAsUser is not set, the image UID will be checked.
-	if sc.RunAsNonRoot() == nil && sc.RunAsUser() == nil && s.psp.Spec.RunAsUser.Rule == policy.RunAsUserStrategyMustRunAsNonRoot {
+	if sc.RunAsNonRoot() == nil && sc.RunAsUser() == nil && s.psp.Spec.RunAsUser.Rule == policyv1beta1.RunAsUserStrategyMustRunAsNonRoot {
 		nonRoot := true
 		sc.SetRunAsNonRoot(&nonRoot)
 	}
@@ -162,8 +162,8 @@ func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container
 	}
 
 	// if the PSP sets psp.AllowPrivilegeEscalation to false set that as the default
-	if !s.psp.Spec.AllowPrivilegeEscalation && sc.AllowPrivilegeEscalation() == nil {
-		sc.SetAllowPrivilegeEscalation(&s.psp.Spec.AllowPrivilegeEscalation)
+	if !*s.psp.Spec.AllowPrivilegeEscalation && sc.AllowPrivilegeEscalation() == nil {
+		sc.SetAllowPrivilegeEscalation(s.psp.Spec.AllowPrivilegeEscalation)
 	}
 
 	pod.Annotations = annotations
@@ -220,7 +220,7 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 				continue
 			}
 
-			if fsType == policy.HostPath {
+			if fsType == policyv1beta1.HostPath {
 				allows, mustBeReadOnly := psputil.AllowsHostVolumePath(s.psp, v.HostPath.Path)
 				if !allows {
 					allErrs = append(allErrs, field.Invalid(
@@ -251,7 +251,7 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 				}
 			}
 
-			if fsType == policy.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
+			if fsType == policyv1beta1.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
 				found := false
 				driver := v.FlexVolume.Driver
 				for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
@@ -303,11 +303,11 @@ func (s *simpleProvider) ValidateContainer(pod *api.Pod, container *api.Containe
 	}
 
 	allowEscalation := sc.AllowPrivilegeEscalation()
-	if !s.psp.Spec.AllowPrivilegeEscalation && allowEscalation == nil {
+	if !*s.psp.Spec.AllowPrivilegeEscalation && allowEscalation == nil {
 		allErrs = append(allErrs, field.Invalid(scPath.Child("allowPrivilegeEscalation"), allowEscalation, "Allowing privilege escalation for containers is not allowed"))
 	}
 
-	if !s.psp.Spec.AllowPrivilegeEscalation && allowEscalation != nil && *allowEscalation {
+	if !*s.psp.Spec.AllowPrivilegeEscalation && allowEscalation != nil && *allowEscalation {
 		allErrs = append(allErrs, field.Invalid(scPath.Child("allowPrivilegeEscalation"), *allowEscalation, "Allowing privilege escalation for containers is not allowed"))
 	}
 
@@ -341,7 +341,7 @@ func (s *simpleProvider) GetPSPName() string {
 	return s.psp.Name
 }
 
-func hostPortRangesToString(ranges []policy.HostPortRange) string {
+func hostPortRangesToString(ranges []policyv1beta1.HostPortRange) string {
 	formattedString := ""
 	if ranges != nil {
 		strRanges := []string{}

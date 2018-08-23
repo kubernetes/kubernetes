@@ -22,7 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	//"k8s.io/kubernetes/pkg/apis/policy"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 )
 
 const (
@@ -40,102 +41,102 @@ func GetAllFSTypesExcept(exceptions ...string) sets.String {
 func GetAllFSTypesAsSet() sets.String {
 	fstypes := sets.NewString()
 	fstypes.Insert(
-		string(policy.HostPath),
-		string(policy.AzureFile),
-		string(policy.Flocker),
-		string(policy.FlexVolume),
-		string(policy.EmptyDir),
-		string(policy.GCEPersistentDisk),
-		string(policy.AWSElasticBlockStore),
-		string(policy.GitRepo),
-		string(policy.Secret),
-		string(policy.NFS),
-		string(policy.ISCSI),
-		string(policy.Glusterfs),
-		string(policy.PersistentVolumeClaim),
-		string(policy.RBD),
-		string(policy.Cinder),
-		string(policy.CephFS),
-		string(policy.DownwardAPI),
-		string(policy.FC),
-		string(policy.ConfigMap),
-		string(policy.VsphereVolume),
-		string(policy.Quobyte),
-		string(policy.AzureDisk),
-		string(policy.PhotonPersistentDisk),
-		string(policy.StorageOS),
-		string(policy.Projected),
-		string(policy.PortworxVolume),
-		string(policy.ScaleIO),
-		string(policy.CSI),
+		string(policyv1beta1.HostPath),
+		string(policyv1beta1.AzureFile),
+		string(policyv1beta1.Flocker),
+		string(policyv1beta1.FlexVolume),
+		string(policyv1beta1.EmptyDir),
+		string(policyv1beta1.GCEPersistentDisk),
+		string(policyv1beta1.AWSElasticBlockStore),
+		string(policyv1beta1.GitRepo),
+		string(policyv1beta1.Secret),
+		string(policyv1beta1.NFS),
+		string(policyv1beta1.ISCSI),
+		string(policyv1beta1.Glusterfs),
+		string(policyv1beta1.PersistentVolumeClaim),
+		string(policyv1beta1.RBD),
+		string(policyv1beta1.Cinder),
+		string(policyv1beta1.CephFS),
+		string(policyv1beta1.DownwardAPI),
+		string(policyv1beta1.FC),
+		string(policyv1beta1.ConfigMap),
+		//string(policyv1beta1.VsphereVolume),
+		string(policyv1beta1.Quobyte),
+		string(policyv1beta1.AzureDisk),
+		//string(policyv1beta1.PhotonPersistentDisk),
+		//string(policyv1beta1.StorageOS),
+		//string(policyv1beta1.Projected),
+		//string(policyv1beta1.PortworxVolume),
+		//string(policyv1beta1.ScaleIO),
+		//string(policyv1beta1.CSI),
 	)
 	return fstypes
 }
 
 // getVolumeFSType gets the FSType for a volume.
-func GetVolumeFSType(v api.Volume) (policy.FSType, error) {
+func GetVolumeFSType(v api.Volume) (policyv1beta1.FSType, error) {
 	switch {
 	case v.HostPath != nil:
-		return policy.HostPath, nil
+		return policyv1beta1.HostPath, nil
 	case v.EmptyDir != nil:
-		return policy.EmptyDir, nil
+		return policyv1beta1.EmptyDir, nil
 	case v.GCEPersistentDisk != nil:
-		return policy.GCEPersistentDisk, nil
+		return policyv1beta1.GCEPersistentDisk, nil
 	case v.AWSElasticBlockStore != nil:
-		return policy.AWSElasticBlockStore, nil
+		return policyv1beta1.AWSElasticBlockStore, nil
 	case v.GitRepo != nil:
-		return policy.GitRepo, nil
+		return policyv1beta1.GitRepo, nil
 	case v.Secret != nil:
-		return policy.Secret, nil
+		return policyv1beta1.Secret, nil
 	case v.NFS != nil:
-		return policy.NFS, nil
+		return policyv1beta1.NFS, nil
 	case v.ISCSI != nil:
-		return policy.ISCSI, nil
+		return policyv1beta1.ISCSI, nil
 	case v.Glusterfs != nil:
-		return policy.Glusterfs, nil
+		return policyv1beta1.Glusterfs, nil
 	case v.PersistentVolumeClaim != nil:
-		return policy.PersistentVolumeClaim, nil
+		return policyv1beta1.PersistentVolumeClaim, nil
 	case v.RBD != nil:
-		return policy.RBD, nil
+		return policyv1beta1.RBD, nil
 	case v.FlexVolume != nil:
-		return policy.FlexVolume, nil
+		return policyv1beta1.FlexVolume, nil
 	case v.Cinder != nil:
-		return policy.Cinder, nil
+		return policyv1beta1.Cinder, nil
 	case v.CephFS != nil:
-		return policy.CephFS, nil
+		return policyv1beta1.CephFS, nil
 	case v.Flocker != nil:
-		return policy.Flocker, nil
+		return policyv1beta1.Flocker, nil
 	case v.DownwardAPI != nil:
-		return policy.DownwardAPI, nil
+		return policyv1beta1.DownwardAPI, nil
 	case v.FC != nil:
-		return policy.FC, nil
+		return policyv1beta1.FC, nil
 	case v.AzureFile != nil:
-		return policy.AzureFile, nil
+		return policyv1beta1.AzureFile, nil
 	case v.ConfigMap != nil:
-		return policy.ConfigMap, nil
-	case v.VsphereVolume != nil:
-		return policy.VsphereVolume, nil
+		return policyv1beta1.ConfigMap, nil
+	//case v.VsphereVolume != nil:
+	//	return policyv1beta1.VsphereVolume, nil
 	case v.Quobyte != nil:
-		return policy.Quobyte, nil
+		return policyv1beta1.Quobyte, nil
 	case v.AzureDisk != nil:
-		return policy.AzureDisk, nil
-	case v.PhotonPersistentDisk != nil:
-		return policy.PhotonPersistentDisk, nil
-	case v.StorageOS != nil:
-		return policy.StorageOS, nil
-	case v.Projected != nil:
-		return policy.Projected, nil
-	case v.PortworxVolume != nil:
-		return policy.PortworxVolume, nil
-	case v.ScaleIO != nil:
-		return policy.ScaleIO, nil
+		return policyv1beta1.AzureDisk, nil
+		//case v.PhotonPersistentDisk != nil:
+		//	return policyv1beta1.PhotonPersistentDisk, nil
+		//case v.StorageOS != nil:
+		//	return policyv1beta1.StorageOS, nil
+		//case v.Projected != nil:
+		//	return policyv1beta1.Projected, nil
+		//case v.PortworxVolume != nil:
+		//	return policyv1beta1.PortworxVolume, nil
+		//case v.ScaleIO != nil:
+		//	return policyv1beta1.ScaleIO, nil
 	}
 
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)
 }
 
 // FSTypeToStringSet converts an FSType slice to a string set.
-func FSTypeToStringSet(fsTypes []policy.FSType) sets.String {
+func FSTypeToStringSet(fsTypes []policyv1beta1.FSType) sets.String {
 	set := sets.NewString()
 	for _, v := range fsTypes {
 		set.Insert(string(v))
@@ -144,19 +145,19 @@ func FSTypeToStringSet(fsTypes []policy.FSType) sets.String {
 }
 
 // PSPAllowsAllVolumes checks for FSTypeAll in the psp's allowed volumes.
-func PSPAllowsAllVolumes(psp *policy.PodSecurityPolicy) bool {
-	return PSPAllowsFSType(psp, policy.All)
+func PSPAllowsAllVolumes(psp *policyv1beta1.PodSecurityPolicy) bool {
+	return PSPAllowsFSType(psp, policyv1beta1.All)
 }
 
 // PSPAllowsFSType is a utility for checking if a PSP allows a particular FSType.
 // If all volumes are allowed then this will return true for any FSType passed.
-func PSPAllowsFSType(psp *policy.PodSecurityPolicy, fsType policy.FSType) bool {
+func PSPAllowsFSType(psp *policyv1beta1.PodSecurityPolicy, fsType policyv1beta1.FSType) bool {
 	if psp == nil {
 		return false
 	}
 
 	for _, v := range psp.Spec.Volumes {
-		if v == fsType || v == policy.All {
+		if v == fsType || v == policyv1beta1.All {
 			return true
 		}
 	}
@@ -164,18 +165,18 @@ func PSPAllowsFSType(psp *policy.PodSecurityPolicy, fsType policy.FSType) bool {
 }
 
 // UserFallsInRange is a utility to determine it the id falls in the valid range.
-func UserFallsInRange(id int64, rng policy.IDRange) bool {
+func UserFallsInRange(id int64, rng policyv1beta1.IDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }
 
 // GroupFallsInRange is a utility to determine it the id falls in the valid range.
-func GroupFallsInRange(id int64, rng policy.IDRange) bool {
+func GroupFallsInRange(id int64, rng policyv1beta1.IDRange) bool {
 	return id >= rng.Min && id <= rng.Max
 }
 
 // AllowsHostVolumePath is a utility for checking if a PSP allows the host volume path.
 // This only checks the path. You should still check to make sure the host volume fs type is allowed.
-func AllowsHostVolumePath(psp *policy.PodSecurityPolicy, hostPath string) (pathIsAllowed, mustBeReadOnly bool) {
+func AllowsHostVolumePath(psp *policyv1beta1.PodSecurityPolicy, hostPath string) (pathIsAllowed, mustBeReadOnly bool) {
 	if psp == nil {
 		return false, false
 	}
