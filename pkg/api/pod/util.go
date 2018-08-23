@@ -259,8 +259,8 @@ func DropDisabledAlphaFields(podSpec *api.PodSpec) {
 
 	DropDisabledRunAsGroupField(podSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && podSpec.RuntimeClassName != "" {
-		podSpec.RuntimeClassName = ""
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && podSpec.RuntimeClassName != nil {
+		podSpec.RuntimeClassName = nil
 	}
 }
 

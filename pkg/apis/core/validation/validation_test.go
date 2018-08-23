@@ -6171,7 +6171,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy:    core.RestartPolicyAlways,
 			DNSPolicy:        core.DNSClusterFirst,
-			RuntimeClassName: "valid-sandbox",
+			RuntimeClassName: utilpointer.StringPtr("valid-sandbox"),
 		},
 	}
 	for i := range successCases {
@@ -6358,7 +6358,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers:       []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			RestartPolicy:    core.RestartPolicyAlways,
 			DNSPolicy:        core.DNSClusterFirst,
-			RuntimeClassName: "invalid/sandbox",
+			RuntimeClassName: utilpointer.StringPtr("invalid/sandbox"),
 		},
 	}
 	for k, v := range failureCases {
