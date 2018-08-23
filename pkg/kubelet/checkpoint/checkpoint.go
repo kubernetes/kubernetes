@@ -31,7 +31,6 @@ import (
 const (
 	// Delimiter used on checkpoints written to disk
 	delimiter = "_"
-	podPrefix = "Pod"
 )
 
 type PodCheckpoint interface {
@@ -94,6 +93,7 @@ func LoadPods(cpm checkpointmanager.CheckpointManager) ([]*v1.Pod, error) {
 	checkpointKeys, err = cpm.ListCheckpoints()
 	if err != nil {
 		glog.Errorf("Failed to list checkpoints: %v", err)
+		return nil, err
 	}
 
 	for _, key := range checkpointKeys {
