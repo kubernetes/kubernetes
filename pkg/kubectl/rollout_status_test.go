@@ -405,7 +405,7 @@ func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
 	client := fake.NewSimpleClientset(d).Apps()
 	dsv := &DaemonSetStatusViewer{c: client}
 	msg, done, err := dsv.Status("bar", "foo", 0)
-	errMsg := "Status is available only for RollingUpdate strategy type"
+	errMsg := "rollout status is only available for RollingUpdate strategy type"
 	if err == nil || err.Error() != errMsg {
 		t.Errorf("Status for daemon sets with UpdateStrategy type different than RollingUpdate should return error. Instead got: msg: %s\ndone: %t\n err: %v", msg, done, err)
 	}
