@@ -645,22 +645,18 @@ func TestMachineInfo(t *testing.T) {
 				NumCores:       2,
 				MemoryCapacity: 1024,
 			},
-			capacity: v1.ResourceList{
-				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
-			},
+			capacity: v1.ResourceList{},
 			expectNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
 					},
 					Allocatable: v1.ResourceList{
-						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-						v1.ResourceMemory:           *resource.NewQuantity(1024, resource.BinarySI),
-						v1.ResourcePods:             *resource.NewQuantity(110, resource.DecimalSI),
-						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+						v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
 					},
 				},
 			},
