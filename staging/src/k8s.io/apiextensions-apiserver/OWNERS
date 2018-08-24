@@ -9,4 +9,3 @@ approvers:
 - sttts
 labels:
 - sig/api-machinery
-- area/custom-resources
