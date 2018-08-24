@@ -117,16 +117,6 @@ func (c *Cache) InvalidateAllPredicatesOnNode(nodeName string) {
 // InvalidateCachedPredicateItem for pod add case
 // TODO: This does not belong with the equivalence cache implementation.
 func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
-	// MatchInterPodAffinity: we assume scheduler can make sure newly bound pod
-	// will not break the existing inter pod affinity. So we does not need to
-	// invalidate MatchInterPodAffinity when pod added.
-	//
-	// But when a pod is deleted, existing inter pod affinity may become invalid.
-	// (e.g. this pod was preferred by some else, or vice versa)
-	//
-	// NOTE: assumptions above will not stand when we implemented features like
-	// RequiredDuringSchedulingRequiredDuringExecutioc.
-
 	// NoDiskConflict: the newly scheduled pod fits to existing pods on this node,
 	// it will also fits to equivalence class of existing pods
 
@@ -150,6 +140,21 @@ func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName str
 		}
 	}
 	c.InvalidatePredicatesOnNode(nodeName, invalidPredicates)
+
+	// MatchInterPodAffinity: we assume scheduler can make sure newly bound pod
+	// will not break the existing inter pod affinity. So normally we does not need to
+	// invalidate MatchInterPodAffinity when pod added.
+	//
+	// NOTE: assumptions above will not stand when we implemented features like
+	// RequiredDuringSchedulingRequiredDuringExecutioc.
+	//
+	// But the exception is: pod has anti-affinity to itself. This is common in a ReplicaSet,
+	// so we have to skip MatachInterPodAffinity temporarily in this case.
+
+	// We should consider a more fine-grained way later, especially after eCache is merged
+	// to predicates pkg (#67241). Then we can do invalidation:
+	// 1. only for nodes with same topology key;
+	// 2. only for pods with self anti-affinity.
 }
 
 // Class represents a set of pods which are equivalent from the perspective of
@@ -212,10 +217,12 @@ func (n *NodeCache) RunPredicate(
 	if ok {
 		return result.Fit, result.FailReasons, nil
 	}
+
 	fit, reasons, err := pred(pod, meta, nodeInfo)
 	if err != nil {
 		return fit, reasons, err
 	}
+
 	if cache != nil {
 		n.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClass.hash, cache, nodeInfo)
 	}

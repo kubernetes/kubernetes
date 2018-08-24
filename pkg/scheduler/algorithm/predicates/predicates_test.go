@@ -3951,3 +3951,57 @@ func TestGetMaxVols(t *testing.T) {
 		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }
+
+func TestECacheMightHelpful(t *testing.T) {
+	tests := []struct {
+		name                string
+		notHelpfulPredicate []string
+		helpfulPredicate    []string
+	}{
+		{
+			name: "cheap predicates/is not helpful",
+			notHelpfulPredicate: []string{
+				CheckNodeConditionPred,
+				CheckNodeUnschedulablePred,
+				GeneralPred,
+				CheckNodeMemoryPressurePred,
+				CheckNodePIDPressurePred,
+				CheckNodeDiskPressurePred,
+			},
+		},
+		{
+			name: "inter pod affinity predicate/is skipped",
+			notHelpfulPredicate: []string{
+				MatchInterPodAffinityPred,
+			},
+		},
+		{
+			name: "expensive predicates/are helpful",
+			helpfulPredicate: []string{
+				PodToleratesNodeTaintsPred,
+				PodToleratesNodeNoExecuteTaintsPred,
+				MaxGCEPDVolumeCountPred,
+				MaxAzureDiskVolumeCountPred,
+				MaxEBSVolumeCountPred,
+				CheckVolumeBindingPred,
+				NoVolumeZoneConflictPred,
+				CheckNodeLabelPresencePred,
+				NoDiskConflictPred,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for _, pred := range test.notHelpfulPredicate {
+				if ok := ECacheMightHelpful(pred); ok {
+					t.Errorf("Failed: predicate: %v should not be helpful", pred)
+				}
+			}
+			for _, pred := range test.helpfulPredicate {
+				if ok := ECacheMightHelpful(pred); !ok {
+					t.Errorf("Failed: predicate: %v should be helpful", pred)
+				}
+			}
+		})
+	}
+}

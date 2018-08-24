@@ -563,7 +563,7 @@ func podFitsOnNode(
 			)
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
-				if eCacheAvailable {
+				if eCacheAvailable && predicates.ECacheMightHelpful(predicateKey) {
 					fit, reasons, err = nodeCache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivClass, cache)
 				} else {
 					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
