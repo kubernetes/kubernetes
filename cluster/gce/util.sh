@@ -2358,7 +2358,8 @@ function create-nodes() {
     gcloud compute instance-groups managed wait-until-stable \
         "${group_name}" \
         --zone "${ZONE}" \
-        --project "${PROJECT}" || true;
+        --project "${PROJECT}" \
+        --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true;
   done
 }
 

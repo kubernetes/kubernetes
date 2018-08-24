@@ -10,6 +10,7 @@ go_library(
         "jwe.go",
         "jwk.go",
         "jws.go",
+        "opaque.go",
         "shared.go",
         "signing.go",
         "symmetric.go",

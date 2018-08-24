@@ -127,7 +127,10 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate the RSA token
-	rsaGenerator := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(rsaPrivateKey))
+	rsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(rsaPrivateKey))
+	if err != nil {
+		t.Fatalf("error making generator: %v", err)
+	}
 	rsaToken, err := rsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret))
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
@@ -140,7 +143,10 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate the ECDSA token
-	ecdsaGenerator := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
+	ecdsaGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, getPrivateKey(ecdsaPrivateKey))
+	if err != nil {
+		t.Fatalf("error making generator: %v", err)
+	}
 	ecdsaToken, err := ecdsaGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *ecdsaSecret))
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
@@ -153,7 +159,10 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 	}
 
 	// Generate signer with same keys as RSA signer but different issuer
-	badIssuerGenerator := serviceaccount.JWTTokenGenerator("foo", getPrivateKey(rsaPrivateKey))
+	badIssuerGenerator, err := serviceaccount.JWTTokenGenerator("foo", getPrivateKey(rsaPrivateKey))
+	if err != nil {
+		t.Fatalf("error making generator: %v", err)
+	}
 	badIssuerToken, err := badIssuerGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret))
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)

@@ -435,11 +435,15 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		apiServer.Close()
 	}
 
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)
+	if err != nil {
+		return rootClientset, clientConfig, stop, err
+	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
 		rootClientset,
-		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)},
+		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: tokenGenerator},
 	)
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
