@@ -37,7 +37,7 @@ func GetGenericArchImage(prefix, image, tag string) string {
 }
 
 // GetKubeControlPlaneImage generates and returns the image for the core Kubernetes components or returns the unified control plane image if specified
-func GetKubeControlPlaneImage(image string, cfg *kubeadmapi.InitConfiguration) string {
+func GetKubeControlPlaneImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.UnifiedControlPlaneImage != "" {
 		return cfg.UnifiedControlPlaneImage
 	}
@@ -47,7 +47,7 @@ func GetKubeControlPlaneImage(image string, cfg *kubeadmapi.InitConfiguration) s
 }
 
 // GetEtcdImage generates and returns the image for etcd or returns cfg.Etcd.Local.Image if specified
-func GetEtcdImage(cfg *kubeadmapi.InitConfiguration) string {
+func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.Image != "" {
 		return cfg.Etcd.Local.Image
 	}
@@ -60,7 +60,7 @@ func GetEtcdImage(cfg *kubeadmapi.InitConfiguration) string {
 }
 
 // GetAllImages returns a list of container images kubeadm expects to use on a control plane node
-func GetAllImages(cfg *kubeadmapi.InitConfiguration) []string {
+func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs := []string{}
 	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeAPIServer, cfg))
 	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeControllerManager, cfg))
