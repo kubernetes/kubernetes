@@ -966,7 +966,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Allow env from resource with keys & updated tests ([#60636](https://github.com/kubernetes/kubernetes/pull/60636), [@PhilipGough](https://github.com/PhilipGough))
 * set EnableHTTPSTrafficOnly in azure storage account creation ([#64957](https://github.com/kubernetes/kubernetes/pull/64957), [@andyzhangx](https://github.com/andyzhangx))
 * New conformance test added for Watch. ([#61424](https://github.com/kubernetes/kubernetes/pull/61424), [@jennybuckley](https://github.com/jennybuckley))
-* Use DeleteOptions.PropagationPolicy instead of OrphanDependents in kubectl  ([#59851](https://thub.com/kubernetes/kubernetes/pull/59851), [@nilebox](https://github.com/nilebox))
+* Use DeleteOptions.PropagationPolicy instead of OrphanDependents in kubectl  ([#59851](https://github.com/kubernetes/kubernetes/pull/59851), [@nilebox](https://github.com/nilebox))
 * Add probe based mechanism for kubelet plugin discovery ([#63328](https://github.com/kubernetes/kubernetes/pull/63328), [@vikaschoudhary16](https://github.com/vikaschoudhary16))
 * keep pod state consistent when scheduler cache UpdatePod ([#64692](https://github.com/kubernetes/kubernetes/pull/64692),  [@adohe](https://github.com/adohe))
 * kubectl delete does not use reapers for removing objects anymore, but relies on server-side GC entirely ([#63979](https://github.com/kubernetes/kubernetes/pull/63979), [@soltysh](https://github.com/soltysh))
