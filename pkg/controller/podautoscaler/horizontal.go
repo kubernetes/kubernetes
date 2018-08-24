@@ -243,7 +243,7 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 			setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "InvalidMetricSourceType", "the HPA was unable to compute the replica count: %s", errMsg)
 			return 0, "", nil, time.Time{}, fmt.Errorf(errMsg)
 		}
-		if replicas == 0 || replicaCountProposal > replicas {
+		if replicaCountProposal >= replicas {
 			timestamp = timestampProposal
 			replicas = replicaCountProposal
 			metric = metricNameProposal
