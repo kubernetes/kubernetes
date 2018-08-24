@@ -23,7 +23,9 @@ import (
 	apps "k8s.io/api/apps/v1"
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestDeploymentStatusViewerStatus(t *testing.T) {
@@ -126,9 +128,15 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				},
 				Status: test.status,
 			}
+			unstructuredD := &unstructured.Unstructured{}
+			err := scheme.Scheme.Convert(d, unstructuredD, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			client := fake.NewSimpleClientset(d).Apps()
 			dsv := &DeploymentStatusViewer{c: client}
-			msg, done, err := dsv.Status("bar", "foo", 0)
+			msg, done, err := dsv.Status(unstructuredD, 0)
 			if err != nil {
 				t.Fatalf("DeploymentStatusViewer.Status(): %v", err)
 			}
@@ -225,9 +233,16 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				},
 				Status: test.status,
 			}
+
+			unstructuredD := &unstructured.Unstructured{}
+			err := scheme.Scheme.Convert(d, unstructuredD, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			client := fake.NewSimpleClientset(d).Apps()
 			dsv := &DaemonSetStatusViewer{c: client}
-			msg, done, err := dsv.Status("bar", "foo", 0)
+			msg, done, err := dsv.Status(unstructuredD, 0)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -370,9 +385,16 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 			s.Status = test.status
 			s.Spec.UpdateStrategy = test.strategy
 			s.Generation = test.generation
+
+			unstructuredS := &unstructured.Unstructured{}
+			err := scheme.Scheme.Convert(s, unstructuredS, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			client := fake.NewSimpleClientset(s).AppsV1()
 			dsv := &StatefulSetStatusViewer{c: client}
-			msg, done, err := dsv.Status(s.Namespace, s.Name, 0)
+			msg, done, err := dsv.Status(unstructuredS, 0)
 			if test.err && err == nil {
 				t.Fatalf("%s: expected error", test.name)
 			}
@@ -402,9 +424,16 @@ func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
 			},
 		},
 	}
+
+	unstructuredD := &unstructured.Unstructured{}
+	err := scheme.Scheme.Convert(d, unstructuredD, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	client := fake.NewSimpleClientset(d).Apps()
 	dsv := &DaemonSetStatusViewer{c: client}
-	msg, done, err := dsv.Status("bar", "foo", 0)
+	msg, done, err := dsv.Status(unstructuredD, 0)
 	errMsg := "rollout status is only available for RollingUpdate strategy type"
 	if err == nil || err.Error() != errMsg {
 		t.Errorf("Status for daemon sets with UpdateStrategy type different than RollingUpdate should return error. Instead got: msg: %s\ndone: %t\n err: %v", msg, done, err)
