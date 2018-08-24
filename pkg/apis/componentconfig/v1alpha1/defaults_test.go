@@ -24,24 +24,6 @@ import (
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
-func TestSchedulerDefaults(t *testing.T) {
-	ks1 := &KubeSchedulerConfiguration{}
-	SetDefaults_KubeSchedulerConfiguration(ks1)
-	cm, err := componentconfig.ConvertObjToConfigMap("KubeSchedulerConfiguration", ks1)
-	if err != nil {
-		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
-	}
-
-	ks2 := &KubeSchedulerConfiguration{}
-	if err = json.Unmarshal([]byte(cm.Data["KubeSchedulerConfiguration"]), ks2); err != nil {
-		t.Errorf("unexpected error unserializing scheduler config %v", err)
-	}
-
-	if !reflect.DeepEqual(ks2, ks1) {
-		t.Errorf("Expected:\n%#v\n\nGot:\n%#v", ks1, ks2)
-	}
-}
-
 func TestControllerDefaultsRoundTrip(t *testing.T) {
 	ks1 := &KubeControllerManagerConfiguration{}
 	SetDefaults_KubeControllerManagerConfiguration(ks1)

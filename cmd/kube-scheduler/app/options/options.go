@@ -41,18 +41,19 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
 // Options has all the params needed to run a Scheduler
 type Options struct {
 	// The default values. These are overridden if ConfigFile is set or by values in InsecureServing.
-	ComponentConfig componentconfig.KubeSchedulerConfiguration
+	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
 	SecureServing           *apiserveroptions.SecureServingOptions
 	CombinedInsecureServing *CombinedInsecureServingOptions
@@ -117,11 +118,11 @@ func splitHostIntPort(s string) (string, int, error) {
 	return host, portInt, err
 }
 
-func newDefaultComponentConfig() (*componentconfig.KubeSchedulerConfiguration, error) {
-	cfgv1alpha1 := componentconfigv1alpha1.KubeSchedulerConfiguration{}
-	configScheme.Default(&cfgv1alpha1)
-	cfg := componentconfig.KubeSchedulerConfiguration{}
-	if err := configScheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {
+func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+	cfgv1alpha1 := kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}
+	kubeschedulerscheme.Scheme.Default(&cfgv1alpha1)
+	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
+	if err := kubeschedulerscheme.Scheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
@@ -232,7 +233,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
 // create a new resource lock associated with the configuration.
-func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get hostname: %v", err)

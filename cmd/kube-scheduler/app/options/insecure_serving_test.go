@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 func TestOptions_ApplyTo(t *testing.T) {
@@ -41,7 +41,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "no config, zero port",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
@@ -56,7 +56,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "config loaded, non-nil healthz",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
@@ -74,7 +74,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "config loaded, non-nil metrics",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
@@ -92,7 +92,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "config loaded, all set, zero BindPort",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
@@ -113,7 +113,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "config loaded, all set, different addresses",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1235",
 				},
@@ -136,7 +136,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "no config, all set, port passed",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
@@ -158,7 +158,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "no config, all set, address passed",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
@@ -180,7 +180,7 @@ func TestOptions_ApplyTo(t *testing.T) {
 		{
 			name: "no config, all set, zero port passed",
 			options: Options{
-				ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+				ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 					HealthzBindAddress: "1.2.3.4:1234",
 					MetricsBindAddress: "1.2.3.4:1234",
 				},
