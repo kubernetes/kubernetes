@@ -226,7 +226,15 @@ func TestPodDeletionOnUnavailableNodeByDswp(t *testing.T) {
 	ns := framework.CreateTestingNamespace(namespaceName, server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
-	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
+	fastimer := attachdetach.TimerConfig{
+		ReconcilerLoopPeriod:                        100 * time.Millisecond,
+		ReconcilerMaxWaitForUnmountDuration:         6 * time.Second,
+		DesiredStateOfWorldPopulatorLoopSleepPeriod: 1 * time.Second,
+		// Use same period as loop period to trigger pod addition
+		DesiredStateOfWorldPopulatorListPodsRetryDuration: 1 * time.Second,
+	}
+
+	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, fastimer)
 	pod := fakePodWithVol(namespaceName)
 	tgp := int64(1)
 	pod.Spec.TerminationGracePeriodSeconds = &tgp
@@ -279,10 +287,9 @@ func TestPodDeletionOnUnavailableNodeByDswp(t *testing.T) {
 	}
 
 	waitToObservePods(t, podInformer, 1)
-	time.Sleep(2 * time.Second)
-	// the populator loop turns every 1 minute
+	time.Sleep(5 * time.Second)
+	// the populator loop turns every 1 second
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
-
 	close(podStopCh)
 	close(stopCh)
 }

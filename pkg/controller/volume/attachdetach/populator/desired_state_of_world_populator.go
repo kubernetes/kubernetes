@@ -158,6 +158,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 	pods, err := dswp.podLister.List(labels.Everything())
+
 	if err != nil {
 		glog.Errorf("podLister List failed: %v", err)
 		return
@@ -165,13 +166,13 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 	dswp.timeOfLastListPods = time.Now()
 
 	for _, pod := range pods {
-		if volutil.IsPodTerminated(pod, pod.Status) {
-			// Do not add volumes for terminated pods
-			continue
+		// Use same function we use on podAdd event. This will ensure we are processing deleted
+		// pods correctly.
+		volumeActionFlag := util.DetermineVolumeAction(pod, dswp.desiredStateOfWorld, true /* add volume */)
+		if volumeActionFlag {
+			util.ProcessPodVolumes(pod, true,
+				dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister)
 		}
-		util.ProcessPodVolumes(pod, true,
-			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister)
-
 	}
 
 }
