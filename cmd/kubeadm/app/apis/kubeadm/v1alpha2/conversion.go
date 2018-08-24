@@ -32,51 +32,72 @@ func Convert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitCon
 	if err := autoConvert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s); err != nil {
 		return err
 	}
+	if err := split_v1alpha2_InitConfiguration_into_kubeadm_ClusterConfiguration(in, &out.ClusterConfiguration, s); err != nil {
+		return err
+	}
+	return nil
+}
 
+func split_v1alpha2_InitConfiguration_into_kubeadm_ClusterConfiguration(in *InitConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	if err := split_v1alpha2_InitConfiguration_into_kubeadm_ComponentConfigs(in, &out.ComponentConfigs, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha2_API_To_kubeadm_API(&in.API, &out.API, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha2_Networking_To_kubeadm_Networking(&in.Networking, &out.Networking, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha2_Etcd_To_kubeadm_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha2_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
+		return err
+	}
+	out.KubernetesVersion = in.KubernetesVersion
+	out.ControlPlaneEndpoint = in.API.ControlPlaneEndpoint
+	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
+	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
+	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
+	out.APIServerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.APIServerExtraVolumes))
+	out.ControllerManagerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ControllerManagerExtraVolumes))
+	out.SchedulerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
+	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
+	out.CertificatesDir = in.CertificatesDir
+	out.ImageRepository = in.ImageRepository
+	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+	out.ClusterName = in.ClusterName
+	return nil
+}
+
+func Convert_v1alpha2_API_To_kubeadm_API(in *API, out *kubeadm.API, s conversion.Scope) error {
+	if err := autoConvert_v1alpha2_API_To_kubeadm_API(in, out, s); err != nil {
+		return err
+	}
+	// in.ControlPlaneEndpoint is assigned outside this function
+	return nil
+}
+
+func split_v1alpha2_InitConfiguration_into_kubeadm_ComponentConfigs(in *InitConfiguration, out *kubeadm.ComponentConfigs, s conversion.Scope) error {
 	if in.KubeProxy.Config != nil {
-		if out.ComponentConfigs.KubeProxy == nil {
-			out.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
+		if out.KubeProxy == nil {
+			out.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
 		}
 
-		if err := componentconfigs.Scheme.Convert(in.KubeProxy.Config, out.ComponentConfigs.KubeProxy, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.KubeProxy.Config, out.KubeProxy, nil); err != nil {
 			return err
 		}
 	}
 	if in.KubeletConfiguration.BaseConfig != nil {
-		if out.ComponentConfigs.Kubelet == nil {
-			out.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
+		if out.Kubelet == nil {
+			out.Kubelet = &kubeletconfig.KubeletConfiguration{}
 		}
 
-		if err := componentconfigs.Scheme.Convert(in.KubeletConfiguration.BaseConfig, out.ComponentConfigs.Kubelet, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.KubeletConfiguration.BaseConfig, out.Kubelet, nil); err != nil {
 			return err
 		}
 	}
-
-	if err := Convert_v1alpha2_API_To_kubeadm_API(&in.API, &out.ClusterConfiguration.API, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha2_Etcd_To_kubeadm_Etcd(&in.Etcd, &out.ClusterConfiguration.Etcd, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha2_Networking_To_kubeadm_Networking(&in.Networking, &out.ClusterConfiguration.Networking, s); err != nil {
-		return err
-	}
-	out.ClusterConfiguration.KubernetesVersion = in.KubernetesVersion
-	out.ClusterConfiguration.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
-	out.ClusterConfiguration.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
-	out.ClusterConfiguration.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
-	out.ClusterConfiguration.APIServerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.APIServerExtraVolumes))
-	out.ClusterConfiguration.ControllerManagerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ControllerManagerExtraVolumes))
-	out.ClusterConfiguration.SchedulerExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
-	out.ClusterConfiguration.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
-	out.ClusterConfiguration.CertificatesDir = in.CertificatesDir
-	out.ClusterConfiguration.ImageRepository = in.ImageRepository
-	out.ClusterConfiguration.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
-	if err := Convert_v1alpha2_AuditPolicyConfiguration_To_kubeadm_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.ClusterConfiguration.AuditPolicyConfiguration, s); err != nil {
-		return err
-	}
-	out.ClusterConfiguration.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	out.ClusterConfiguration.ClusterName = in.ClusterName
 	return nil
 }
 
@@ -84,51 +105,71 @@ func Convert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in *kubeadm
 	if err := autoConvert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in, out, s); err != nil {
 		return err
 	}
+	if err := join_kubeadm_ClusterConfiguration_into_v1alpha2_InitConfiguration(&in.ClusterConfiguration, out, s); err != nil {
+		return err
+	}
+	return nil
+}
 
-	if in.ComponentConfigs.KubeProxy != nil {
+func join_kubeadm_ClusterConfiguration_into_v1alpha2_InitConfiguration(in *kubeadm.ClusterConfiguration, out *InitConfiguration, s conversion.Scope) error {
+	if err := join_kubeadm_ComponentConfigs_into_v1alpha2_InitConfiguration(&in.ComponentConfigs, out, s); err != nil {
+		return err
+	}
+	if err := Convert_kubeadm_API_To_v1alpha2_API(&in.API, &out.API, s); err != nil {
+		return err
+	}
+	if err := Convert_kubeadm_Etcd_To_v1alpha2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
+		return err
+	}
+	if err := Convert_kubeadm_Networking_To_v1alpha2_Networking(&in.Networking, &out.Networking, s); err != nil {
+		return err
+	}
+	if err := Convert_kubeadm_AuditPolicyConfiguration_To_v1alpha2_AuditPolicyConfiguration(&in.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
+		return err
+	}
+	out.KubernetesVersion = in.KubernetesVersion
+	out.API.ControlPlaneEndpoint = in.ControlPlaneEndpoint
+	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
+	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
+	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
+	out.APIServerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.APIServerExtraVolumes))
+	out.ControllerManagerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ControllerManagerExtraVolumes))
+	out.SchedulerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
+	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.APIServerCertSANs))
+	out.CertificatesDir = in.CertificatesDir
+	out.ImageRepository = in.ImageRepository
+	out.UnifiedControlPlaneImage = in.UnifiedControlPlaneImage
+	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+	out.ClusterName = in.ClusterName
+	return nil
+}
+
+func Convert_kubeadm_API_To_v1alpha2_API(in *kubeadm.API, out *API, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_API_To_v1alpha2_API(in, out, s); err != nil {
+		return err
+	}
+	// out.ControlPlaneEndpoint is assigned outside this function
+	return nil
+}
+
+func join_kubeadm_ComponentConfigs_into_v1alpha2_InitConfiguration(in *kubeadm.ComponentConfigs, out *InitConfiguration, s conversion.Scope) error {
+	if in.KubeProxy != nil {
 		if out.KubeProxy.Config == nil {
 			out.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 		}
 
-		if err := componentconfigs.Scheme.Convert(in.ComponentConfigs.KubeProxy, out.KubeProxy.Config, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.KubeProxy, out.KubeProxy.Config, nil); err != nil {
 			return err
 		}
 	}
-	if in.ComponentConfigs.Kubelet != nil {
+	if in.Kubelet != nil {
 		if out.KubeletConfiguration.BaseConfig == nil {
 			out.KubeletConfiguration.BaseConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 		}
 
-		if err := componentconfigs.Scheme.Convert(in.ComponentConfigs.Kubelet, out.KubeletConfiguration.BaseConfig, nil); err != nil {
+		if err := componentconfigs.Scheme.Convert(in.Kubelet, out.KubeletConfiguration.BaseConfig, nil); err != nil {
 			return err
 		}
 	}
-
-	if err := Convert_kubeadm_API_To_v1alpha2_API(&in.ClusterConfiguration.API, &out.API, s); err != nil {
-		return err
-	}
-	if err := Convert_kubeadm_Etcd_To_v1alpha2_Etcd(&in.ClusterConfiguration.Etcd, &out.Etcd, s); err != nil {
-		return err
-	}
-	if err := Convert_kubeadm_Networking_To_v1alpha2_Networking(&in.ClusterConfiguration.Networking, &out.Networking, s); err != nil {
-		return err
-	}
-	out.KubernetesVersion = in.ClusterConfiguration.KubernetesVersion
-	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ClusterConfiguration.APIServerExtraArgs))
-	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ClusterConfiguration.ControllerManagerExtraArgs))
-	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ClusterConfiguration.SchedulerExtraArgs))
-	out.APIServerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ClusterConfiguration.APIServerExtraVolumes))
-	out.ControllerManagerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ClusterConfiguration.ControllerManagerExtraVolumes))
-	out.SchedulerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ClusterConfiguration.SchedulerExtraVolumes))
-	out.APIServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ClusterConfiguration.APIServerCertSANs))
-	out.CertificatesDir = in.ClusterConfiguration.CertificatesDir
-	out.ImageRepository = in.ClusterConfiguration.ImageRepository
-	out.UnifiedControlPlaneImage = in.ClusterConfiguration.UnifiedControlPlaneImage
-	if err := Convert_kubeadm_AuditPolicyConfiguration_To_v1alpha2_AuditPolicyConfiguration(&in.ClusterConfiguration.AuditPolicyConfiguration, &out.AuditPolicyConfiguration, s); err != nil {
-		return err
-	}
-	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.ClusterConfiguration.FeatureGates))
-	out.ClusterName = in.ClusterConfiguration.ClusterName
-
 	return nil
 }

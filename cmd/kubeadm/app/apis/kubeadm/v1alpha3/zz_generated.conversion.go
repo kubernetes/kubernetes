@@ -177,7 +177,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha3_API_To_kubeadm_API(in *API, out *kubeadm.API, s conversion.Scope) error {
 	out.AdvertiseAddress = in.AdvertiseAddress
-	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.BindPort = in.BindPort
 	return nil
 }
@@ -189,7 +188,6 @@ func Convert_v1alpha3_API_To_kubeadm_API(in *API, out *kubeadm.API, s conversion
 
 func autoConvert_kubeadm_API_To_v1alpha3_API(in *kubeadm.API, out *API, s conversion.Scope) error {
 	out.AdvertiseAddress = in.AdvertiseAddress
-	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.BindPort = in.BindPort
 	return nil
 }
@@ -286,6 +284,7 @@ func autoConvert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(i
 		return err
 	}
 	out.KubernetesVersion = in.KubernetesVersion
+	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
@@ -316,6 +315,7 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(i
 		return err
 	}
 	out.KubernetesVersion = in.KubernetesVersion
+	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	out.APIServerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.APIServerExtraArgs))
 	out.ControllerManagerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ControllerManagerExtraArgs))
 	out.SchedulerExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.SchedulerExtraArgs))
