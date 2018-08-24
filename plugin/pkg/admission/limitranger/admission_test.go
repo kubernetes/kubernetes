@@ -22,18 +22,20 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func getComputeResourceList(cpu, memory string) api.ResourceList {
@@ -63,8 +65,8 @@ func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequ
 }
 
 // createLimitRange creates a limit range with the specified data
-func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRequest, maxLimitRequestRatio api.ResourceList) api.LimitRange {
-	return api.LimitRange{
+func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRequest, maxLimitRequestRatio api.ResourceList) corev1.LimitRange {
+	internalLimitRage := api.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
@@ -82,10 +84,13 @@ func createLimitRange(limitType api.LimitType, min, max, defaultLimit, defaultRe
 			},
 		},
 	}
+	externalLimitRange := corev1.LimitRange{}
+	v1.Convert_core_LimitRange_To_v1_LimitRange(&internalLimitRage, &externalLimitRange, nil)
+	return externalLimitRange
 }
 
-func validLimitRange() api.LimitRange {
-	return api.LimitRange{
+func validLimitRange() corev1.LimitRange {
+	internalLimitRange := api.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
@@ -107,10 +112,13 @@ func validLimitRange() api.LimitRange {
 			},
 		},
 	}
+	externalLimitRange := corev1.LimitRange{}
+	v1.Convert_core_LimitRange_To_v1_LimitRange(&internalLimitRange, &externalLimitRange, nil)
+	return externalLimitRange
 }
 
-func validLimitRangeNoDefaults() api.LimitRange {
-	return api.LimitRange{
+func validLimitRangeNoDefaults() corev1.LimitRange {
+	internalLimitRange := api.LimitRange{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "abc",
 			Namespace: "test",
@@ -130,6 +138,9 @@ func validLimitRangeNoDefaults() api.LimitRange {
 			},
 		},
 	}
+	externalLimitRange := corev1.LimitRange{}
+	v1.Convert_core_LimitRange_To_v1_LimitRange(&internalLimitRange, &externalLimitRange, nil)
+	return externalLimitRange
 }
 
 func validPod(name string, numContainers int, resources api.ResourceRequirements) api.Pod {
@@ -255,7 +266,7 @@ func TestMergePodResourceRequirements(t *testing.T) {
 func TestPodLimitFunc(t *testing.T) {
 	type testCase struct {
 		pod        api.Pod
-		limitRange api.LimitRange
+		limitRange corev1.LimitRange
 	}
 
 	successCases := []testCase{
@@ -686,7 +697,7 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 
 func TestLimitRangerIgnoresSubresource(t *testing.T) {
 	limitRange := validLimitRangeNoDefaults()
-	mockClient := newMockClientForTest([]api.LimitRange{limitRange})
+	mockClient := newMockClientForTest([]corev1.LimitRange{limitRange})
 	handler, informerFactory, err := newHandlerForTest(mockClient)
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
@@ -712,7 +723,7 @@ func TestLimitRangerIgnoresSubresource(t *testing.T) {
 
 func TestLimitRangerAdmitPod(t *testing.T) {
 	limitRange := validLimitRangeNoDefaults()
-	mockClient := newMockClientForTest([]api.LimitRange{limitRange})
+	mockClient := newMockClientForTest([]corev1.LimitRange{limitRange})
 	handler, informerFactory, err := newHandlerForTest(mockClient)
 	if err != nil {
 		t.Errorf("unexpected error initializing handler: %v", err)
@@ -745,10 +756,10 @@ func TestLimitRangerAdmitPod(t *testing.T) {
 }
 
 // newMockClientForTest creates a mock client that returns a client configured for the specified list of limit ranges
-func newMockClientForTest(limitRanges []api.LimitRange) *fake.Clientset {
+func newMockClientForTest(limitRanges []corev1.LimitRange) *fake.Clientset {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("list", "limitranges", func(action core.Action) (bool, runtime.Object, error) {
-		limitRangeList := &api.LimitRangeList{
+		limitRangeList := &corev1.LimitRangeList{
 			ListMeta: metav1.ListMeta{
 				ResourceVersion: fmt.Sprintf("%d", len(limitRanges)),
 			},
@@ -769,7 +780,7 @@ func newHandlerForTest(c clientset.Interface) (*LimitRanger, informers.SharedInf
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
+	pluginInitializer := genericadmissioninitializer.New(c, f, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err
@@ -788,7 +799,7 @@ func validPersistentVolumeClaim(name string, resources api.ResourceRequirements)
 func TestPersistentVolumeClaimLimitFunc(t *testing.T) {
 	type testCase struct {
 		pvc        api.PersistentVolumeClaim
-		limitRange api.LimitRange
+		limitRange corev1.LimitRange
 	}
 
 	successCases := []testCase{
