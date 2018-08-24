@@ -490,8 +490,7 @@ func setWriteCommand(file string, container *v1.Container) {
 }
 
 func addSubpathVolumeContainer(container *v1.Container, volumeMount v1.VolumeMount) {
-	existingMounts := container.VolumeMounts
-	container.VolumeMounts = append(existingMounts, volumeMount)
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 }
 
 func addMultipleWrites(container *v1.Container, file1 string, file2 string) {

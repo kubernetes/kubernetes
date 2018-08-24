@@ -185,7 +185,7 @@ func NewDryRunClientWithOpts(opts DryRunClientOptions) clientset.Interface {
 
 	// The chain of reactors will look like this:
 	// opts.PrependReactors | defaultReactorChain | opts.AppendReactors | client.Fake.ReactionChain (default reactors for the fake clientset)
-	fullReactorChain := append(opts.PrependReactors, defaultReactorChain...)
+	fullReactorChain := append(append([]core.Reactor(nil), opts.PrependReactors...), defaultReactorChain...)
 	fullReactorChain = append(fullReactorChain, opts.AppendReactors...)
 
 	// Prepend the reaction chain with our reactors. Important, these MUST be prepended; not appended due to how the fake clientset works by default

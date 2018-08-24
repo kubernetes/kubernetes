@@ -825,7 +825,7 @@ func (ss *scaleSet) ensureScaleSetBackendPoolDeleted(poolID, ssName string) erro
 		if strings.EqualFold(poolID, *curPool.ID) {
 			glog.V(10).Infof("ensureScaleSetBackendPoolDeleted gets unwanted backend pool %q for scale set %q", poolID, ssName)
 			foundPool = true
-			newBackendPools = append(existingBackendPools[:i], existingBackendPools[i+1:]...)
+			newBackendPools = append(append([]compute.SubResource(nil), existingBackendPools[:i]...), existingBackendPools[i+1:]...)
 		}
 	}
 	if !foundPool {

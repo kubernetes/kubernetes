@@ -154,8 +154,8 @@ func SetCondition(status *apps.ReplicaSetStatus, condition apps.ReplicaSetCondit
 	if currentCond != nil && currentCond.Status == condition.Status && currentCond.Reason == condition.Reason {
 		return
 	}
-	newConditions := filterOutCondition(status.Conditions, condition.Type)
-	status.Conditions = append(newConditions, condition)
+	status.Conditions = filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(status.Conditions, condition)
 }
 
 // RemoveCondition removes the condition with the provided type from the replicaset status.

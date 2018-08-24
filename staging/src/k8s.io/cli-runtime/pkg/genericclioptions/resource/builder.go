@@ -39,7 +39,7 @@ import (
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}
-var InputExtensions = append(FileExtensions, "stdin")
+var InputExtensions = append(append([]string{}, FileExtensions...), "stdin")
 
 const defaultHttpGetAttempts int = 3
 

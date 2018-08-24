@@ -566,7 +566,7 @@ func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, obj runti
 		// LABELS is always the last column.
 		headers = append(headers, formatShowLabelsHeader(options.ShowLabels)...)
 		if options.WithNamespace {
-			headers = append(withNamespacePrefixColumns, headers...)
+			headers = append(append([]string(nil), withNamespacePrefixColumns...), headers...)
 		}
 		printHeader(headers, output)
 	}

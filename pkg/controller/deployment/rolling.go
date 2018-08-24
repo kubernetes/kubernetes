@@ -140,7 +140,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*apps.ReplicaSe
 	glog.V(4).Infof("Cleaned up unhealthy replicas from old RSes by %d", cleanupCount)
 
 	// Scale down old replica sets, need check maxUnavailable to ensure we can scale down
-	allRSs = append(oldRSs, newRS)
+	allRSs = append(append([]*apps.ReplicaSet(nil), oldRSs...), newRS)
 	scaledDownCount, err := dc.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
 	if err != nil {
 		return false, nil

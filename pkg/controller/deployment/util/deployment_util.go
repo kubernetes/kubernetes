@@ -131,8 +131,8 @@ func SetDeploymentCondition(status *apps.DeploymentStatus, condition apps.Deploy
 	if currentCond != nil && currentCond.Status == condition.Status {
 		condition.LastTransitionTime = currentCond.LastTransitionTime
 	}
-	newConditions := filterOutCondition(status.Conditions, condition.Type)
-	status.Conditions = append(newConditions, condition)
+	status.Conditions = filterOutCondition(status.Conditions, condition.Type)
+	status.Conditions = append(status.Conditions, condition)
 }
 
 // RemoveDeploymentCondition removes the deployment condition with the provided type.

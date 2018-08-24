@@ -297,7 +297,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 		Expect(err).NotTo(HaveOccurred())
 		volumePaths = append(volumePaths, volumePath)
-		testvolumePathsPodB = append(testvolumePathsPodA, volumePath)
+		testvolumePathsPodB = append(append([]string(nil), testvolumePathsPodA...), volumePath)
 
 		for index := 0; index < 5; index++ {
 			By(fmt.Sprintf("Creating pod-A on the node: %v with volume: %v", node1Name, testvolumePathsPodA[0]))

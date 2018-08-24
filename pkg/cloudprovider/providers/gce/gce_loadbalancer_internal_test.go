@@ -345,7 +345,7 @@ func TestUpdateInternalLoadBalancerNodes(t *testing.T) {
 	newNodesZoneB, err := createAndInsertNodes(gce, []string{node3Name}, vals.SecondaryZoneName)
 	require.NoError(t, err)
 
-	nodes = append(newNodesZoneA, newNodesZoneB...)
+	nodes = append(append([]*v1.Node(nil), newNodesZoneA...), newNodesZoneB...)
 	err = gce.updateInternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nodes)
 	assert.NoError(t, err)
 

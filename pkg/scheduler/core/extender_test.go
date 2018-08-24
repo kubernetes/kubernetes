@@ -154,7 +154,7 @@ func (f *FakeExtender) ProcessPreemption(
 			delete(nodeToVictimsCopy, node)
 		} else {
 			// Append new victims to original victims
-			nodeToVictimsCopy[node].Pods = append(victims.Pods, extenderVictimPods...)
+			nodeToVictimsCopy[node].Pods = append(append([]*v1.Pod(nil), victims.Pods...), extenderVictimPods...)
 			nodeToVictimsCopy[node].NumPDBViolations = victims.NumPDBViolations + extendernPDBViolations
 		}
 	}

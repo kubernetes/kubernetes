@@ -189,7 +189,7 @@ func (g *Graph) deleteVertex_locked(vertexType vertexType, namespace, name strin
 			neighborsToRemove = append(neighborsToRemove, neighbor)
 		} else {
 			// recompute the destination edge index on this neighbor
-			neighborsToRecompute = append(neighborsToRemove, neighbor)
+			neighborsToRecompute = append(append([]graph.Node(nil), neighborsToRemove...), neighbor)
 		}
 		return true
 	})

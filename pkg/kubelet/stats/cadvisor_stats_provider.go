@@ -129,7 +129,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		if vstats, found := p.resourceAnalyzer.GetPodVolumeStats(podUID); found {
 			ephemeralStats = make([]statsapi.VolumeStats, len(vstats.EphemeralVolumes))
 			copy(ephemeralStats, vstats.EphemeralVolumes)
-			podStats.VolumeStats = append(vstats.EphemeralVolumes, vstats.PersistentVolumes...)
+			podStats.VolumeStats = append(append([]statsapi.VolumeStats(nil), vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
 		}
 		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo)
 		// Lookup the pod-level cgroup's CPU and memory stats

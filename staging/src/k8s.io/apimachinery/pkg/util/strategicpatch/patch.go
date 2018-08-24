@@ -1018,7 +1018,6 @@ func validatePatchWithSetOrderList(patchList, setOrderList interface{}, mergeKey
 	if patchIndex < len(nonDeleteList) && setOrderIndex >= len(typedSetOrderList) {
 		return fmt.Errorf("The order in patch list:\n%v\n doesn't match %s list:\n%v\n", typedPatchList, setElementOrderDirectivePrefix, setOrderList)
 	}
-	typedPatchList = append(nonDeleteList, toDeleteList...)
 	return nil
 }
 

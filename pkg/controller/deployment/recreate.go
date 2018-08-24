@@ -55,7 +55,7 @@ func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*ap
 		if err != nil {
 			return err
 		}
-		allRSs = append(oldRSs, newRS)
+		allRSs = append(append([]*apps.ReplicaSet(nil), oldRSs...), newRS)
 	}
 
 	// scale up new replica set.
