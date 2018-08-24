@@ -1460,6 +1460,866 @@ func TestSelectZoneForVolume(t *testing.T) {
 	}
 }
 
+func TestSelectZonesForVolume(t *testing.T) {
+
+	nodeWithZoneLabels := &v1.Node{}
+	nodeWithZoneLabels.Labels = map[string]string{kubeletapis.LabelZoneFailureDomain: "zoneX"}
+
+	nodeWithNoLabels := &v1.Node{}
+
+	tests := []struct {
+		// Parameters passed by test to SelectZonesForVolume
+		Name              string
+		ReplicaCount      uint32
+		ZonePresent       bool
+		Zone              string
+		ZonesPresent      bool
+		Zones             string
+		ZonesWithNodes    string
+		Node              *v1.Node
+		AllowedTopologies []v1.TopologySelectorTerm
+		// Expectations around returned zones from SelectZonesForVolume
+		Reject              bool   // expect error due to validation failing
+		ExpectSpecificZones bool   // expect set of returned zones to be equal to ExpectedZones (rather than subset of ExpectedZones)
+		ExpectedZones       string // set of zones that is a superset of returned zones or equal to returned zones (if ExpectSpecificZones is set)
+		ExpectSpecificZone  bool   // expect set of returned zones to include ExpectedZone as a member
+		ExpectedZone        string // zone that should be a member of returned zones
+	}{
+		// NEGATIVE TESTS
+
+		// Zone and Zones are both specified [Fail]
+		// [1] Node irrelevant
+		// [2] Zone and Zones parameters presents
+		// [3] AllowedTopologies irrelevant
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Nil_Node_with_Zone_Zones_parameters_present",
+			ZonePresent:  true,
+			Zone:         "zoneX",
+			ZonesPresent: true,
+			Zones:        "zoneX,zoneY",
+			Reject:       true,
+		},
+
+		// Node has no zone labels [Fail]
+		// [1] Node with no zone labels
+		// [2] Zone/Zones parameter irrelevant
+		// [3] AllowedTopologies irrelevant
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:   "Node_with_no_Zone_labels",
+			Node:   nodeWithNoLabels,
+			Reject: true,
+		},
+
+		// Node with Zone labels as well as Zone parameter specified [Fail]
+		// [1] Node with zone labels
+		// [2] Zone parameter specified
+		// [3] AllowedTopologies irrelevant
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:        "Node_with_Zone_labels_and_Zone_parameter_present",
+			Node:        nodeWithZoneLabels,
+			ZonePresent: true,
+			Zone:        "zoneX",
+			Reject:      true,
+		},
+
+		// Node with Zone labels as well as Zones parameter specified [Fail]
+		// [1] Node with zone labels
+		// [2] Zones parameter specified
+		// [3] AllowedTopologies irrelevant
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Node_with_Zone_labels_and_Zones_parameter_present",
+			Node:         nodeWithZoneLabels,
+			ZonesPresent: true,
+			Zones:        "zoneX,zoneY",
+			Reject:       true,
+		},
+
+		// Zone parameter as well as AllowedTopologies specified [Fail]
+		// [1] nil Node
+		// [2] Zone parameter specified
+		// [3] AllowedTopologies specified
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:        "Nil_Node_and_Zone_parameter_and_Allowed_Topology_term",
+			Node:        nil,
+			ZonePresent: true,
+			Zone:        "zoneX",
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX"},
+						},
+					},
+				},
+			},
+			Reject: true,
+		},
+
+		// Zones parameter as well as AllowedTopologies specified [Fail]
+		// [1] nil Node
+		// [2] Zones parameter specified
+		// [3] AllowedTopologies specified
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Nil_Node_and_Zones_parameter_and_Allowed_Topology_term",
+			Node:         nil,
+			ZonesPresent: true,
+			Zones:        "zoneX,zoneY",
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX"},
+						},
+					},
+				},
+			},
+			Reject: true,
+		},
+
+		// Key specified in AllowedTopologies is not LabelZoneFailureDomain [Fail]
+		// [1] nil Node
+		// [2] no Zone/Zones parameter
+		// [3] AllowedTopologies with invalid key specified
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name: "Nil_Node_and_Invalid_Allowed_Topology_Key",
+			Node: nil,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    "invalid_key",
+							Values: []string{"zoneX"},
+						},
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneY"},
+						},
+					},
+				},
+			},
+			Reject: true,
+		},
+
+		// AllowedTopologies without keys specifying LabelZoneFailureDomain [Fail]
+		// [1] nil Node
+		// [2] no Zone/Zones parameter
+		// [3] Invalid AllowedTopologies
+		// [4] ReplicaCount irrelevant
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name: "Nil_Node_and_Invalid_AllowedTopologies",
+			Node: nil,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{},
+				},
+			},
+			Reject: true,
+		},
+
+		// Zone specified with ReplicaCount > 1 [Fail]
+		// [1] nil Node
+		// [2] Zone/Zones parameter specified
+		// [3] AllowedTopologies irrelevant
+		// [4] ReplicaCount > 1
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Zone_and_Replicas_mismatched",
+			Node:         nil,
+			ZonePresent:  true,
+			Zone:         "zoneX",
+			ReplicaCount: 2,
+			Reject:       true,
+		},
+
+		// Not enough zones in Zones parameter to satisfy ReplicaCount [Fail]
+		// [1] nil Node
+		// [2] Zone/Zones parameter specified
+		// [3] AllowedTopologies irrelevant
+		// [4] ReplicaCount > zones
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Zones_and_Replicas_mismatched",
+			Node:         nil,
+			ZonesPresent: true,
+			Zones:        "zoneX",
+			ReplicaCount: 2,
+			Reject:       true,
+		},
+
+		// Not enough zones in ZonesWithNodes to satisfy ReplicaCount [Fail]
+		// [1] nil Node
+		// [2] no Zone/Zones parameter specified
+		// [3] AllowedTopologies irrelevant
+		// [4] ReplicaCount > ZonesWithNodes
+		// [5] ZonesWithNodes specified but not enough
+		{
+			Name:           "Zones_and_Replicas_mismatched",
+			Node:           nil,
+			ZonesWithNodes: "zoneX",
+			ReplicaCount:   2,
+			Reject:         true,
+		},
+
+		// Not enough zones in AllowedTopologies to satisfy ReplicaCount [Fail]
+		// [1] nil Node
+		// [2] Zone/Zones parameter specified
+		// [3] Invalid AllowedTopologies
+		// [4] ReplicaCount > zones
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "AllowedTopologies_and_Replicas_mismatched",
+			Node:         nil,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX"},
+						},
+					},
+				},
+			},
+			Reject: true,
+		},
+
+		// POSITIVE TESTS
+
+		// Select zones from zones parameter [Pass]
+		// [1] nil Node (Node irrelevant)
+		// [2] Zones parameter specified
+		// [3] no AllowedTopologies
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:          "Zones_parameter_Dual_replica_Superset",
+			ZonesPresent:  true,
+			Zones:         "zoneW,zoneX,zoneY,zoneZ",
+			ReplicaCount:  2,
+			Reject:        false,
+			ExpectedZones: "zoneW,zoneX,zoneY,zoneZ",
+		},
+
+		// Select zones from zones parameter [Pass]
+		// [1] nil Node (Node irrelevant)
+		// [2] Zones parameter specified
+		// [3] no AllowedTopologies
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:                "Zones_parameter_Dual_replica_Match",
+			ZonesPresent:        true,
+			Zones:               "zoneX,zoneY",
+			ReplicaCount:        2,
+			Reject:              false,
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX,zoneY",
+		},
+
+		// Select zones from active zones with nodes [Pass]
+		// [1] nil Node (Node irrelevant)
+		// [2] no Zone parameter
+		// [3] no AllowedTopologies
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes specified
+		{
+			Name:           "Active_zones_Nil_node_Dual_replica_Superset",
+			ZonesWithNodes: "zoneW,zoneX,zoneY,zoneZ",
+			ReplicaCount:   2,
+			Reject:         false,
+			ExpectedZones:  "zoneW,zoneX,zoneY,zoneZ",
+		},
+
+		// Select zones from active zones [Pass]
+		// [1] nil Node (Node irrelevant)
+		// [2] no Zone[s] parameter
+		// [3] no AllowedTopologies
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes specified
+		{
+			Name:                "Active_zones_Nil_node_Dual_replica_Match",
+			ZonesWithNodes:      "zoneW,zoneX",
+			ReplicaCount:        2,
+			Reject:              false,
+			ExpectSpecificZone:  true,
+			ExpectedZone:        "zoneX",
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneW,zoneX",
+		},
+
+		// Select zones from node label and active zones [Pass]
+		// [1] Node with zone labels
+		// [2] no Zone parameter
+		// [3] no AllowedTopologies
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:               "Active_zones_Node_with_Zone_labels_Dual_replica_Superset",
+			Node:               nodeWithZoneLabels,
+			ZonesWithNodes:     "zoneW,zoneX,zoneY,zoneZ",
+			ReplicaCount:       2,
+			Reject:             false,
+			ExpectSpecificZone: true,
+			ExpectedZone:       "zoneX",
+			ExpectedZones:      "zoneW,zoneX,zoneY,zoneZ",
+		},
+
+		// Select zones from node label and active zones [Pass]
+		// [1] Node with zone labels
+		// [2] no Zone[s] parameter
+		// [3] no AllowedTopologies
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:                "Active_zones_Node_with_Zone_labels_Dual_replica_Match",
+			Node:                nodeWithZoneLabels,
+			ZonesWithNodes:      "zoneW,zoneX",
+			ReplicaCount:        2,
+			Reject:              false,
+			ExpectSpecificZone:  true,
+			ExpectedZone:        "zoneX",
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneW,zoneX",
+		},
+
+		// Select zones from node label and AllowedTopologies [Pass]
+		// [1] Node with zone labels
+		// [2] no Zone/Zones parameters
+		// [3] AllowedTopologies with single term with multiple values specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		// Note: the test Name suffix is used as the pvcname and it's suffix is important to influence ChooseZonesForVolume
+		// to NOT pick zoneX from AllowedTopologies if zoneFromNode is incorrectly set or not set at all.
+		{
+			Name:         "Node_with_Zone_labels_and_Multiple_Allowed_Topology_values_Superset-1",
+			Node:         nodeWithZoneLabels,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneV", "zoneW", "zoneX", "zoneY", "zoneZ"},
+						},
+					},
+				},
+			},
+			Reject:             false,
+			ExpectSpecificZone: true,
+			ExpectedZone:       "zoneX",
+			ExpectedZones:      "zoneV,zoneW,zoneX,zoneY,zoneZ",
+		},
+
+		// Select zones from node label and AllowedTopologies [Pass]
+		// [1] Node with zone labels
+		// [2] no Zone/Zones parameters
+		// [3] AllowedTopologies with single term with multiple values specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Node_with_Zone_labels_and_Multiple_Allowed_Topology_values_Match",
+			Node:         nodeWithZoneLabels,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX", "zoneY"},
+						},
+					},
+				},
+			},
+			Reject:              false,
+			ExpectSpecificZone:  true,
+			ExpectedZone:        "zoneX",
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX,zoneY",
+		},
+
+		// Select Zones from AllowedTopologies [Pass]
+		// [1] nil Node
+		// [2] no Zone/Zones parametes specified
+		// [3] AllowedTopologies with single term with multiple values specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Nil_Node_with_Multiple_Allowed_Topology_values_Superset",
+			Node:         nil,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX", "zoneY", "zoneZ"},
+						},
+					},
+				},
+			},
+			Reject:        false,
+			ExpectedZones: "zoneX,zoneY,zoneZ",
+		},
+
+		// Select Zones from AllowedTopologies [Pass]
+		// [1] nil Node
+		// [2] no Zone/Zones parametes specified
+		// [3] AllowedTopologies with single term with multiple values specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Nil_Node_with_Multiple_Allowed_Topology_values_Match",
+			Node:         nil,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX", "zoneY"},
+						},
+					},
+				},
+			},
+			Reject:              false,
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX,zoneY",
+		},
+
+		// Select zones from node label and AllowedTopologies [Pass]
+		// [1] Node with zone labels
+		// [2] no Zone/Zones parametes specified
+		// [3] AllowedTopologies with multiple terms specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		// Note: the test Name is used as the pvcname and it's hash is important to influence ChooseZonesForVolume
+		// to NOT pick zoneX from AllowedTopologies of 5 zones. If zoneFromNode (zoneX) is incorrectly set or
+		// not set at all in SelectZonesForVolume it will be detected.
+		{
+			Name:         "Node_with_Zone_labels_and_Multiple_Allowed_Topology_terms_Superset-2",
+			Node:         nodeWithZoneLabels,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneV"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneW"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneY"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneZ"},
+						},
+					},
+				},
+			},
+			Reject:             false,
+			ExpectSpecificZone: true,
+			ExpectedZone:       "zoneX",
+			ExpectedZones:      "zoneV,zoneW,zoneX,zoneY,zoneZ",
+		},
+
+		// Select zones from node label and AllowedTopologies [Pass]
+		// [1] Node with zone labels
+		// [2] no Zone/Zones parametes specified
+		// [3] AllowedTopologies with multiple terms specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Node_with_Zone_labels_and_Multiple_Allowed_Topology_terms_Match",
+			Node:         nodeWithZoneLabels,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneY"},
+						},
+					},
+				},
+			},
+			Reject:              false,
+			ExpectSpecificZone:  true,
+			ExpectedZone:        "zoneX",
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX,zoneY",
+		},
+
+		// Select zones from AllowedTopologies [Pass]
+		// [1] nil Node
+		// [2] no Zone/Zones parametes specified
+		// [3] AllowedTopologies with multiple terms specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Nil_Node_and_Multiple_Allowed_Topology_terms_Superset",
+			Node:         nil,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneY"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneZ"},
+						},
+					},
+				},
+			},
+			Reject:        false,
+			ExpectedZones: "zoneX,zoneY,zoneZ",
+		},
+
+		// Select zones from AllowedTopologies [Pass]
+		// [1] nil Node
+		// [2] no Zone/Zones parametes specified
+		// [3] AllowedTopologies with multiple terms specified
+		// [4] ReplicaCount specified
+		// [5] ZonesWithNodes irrelevant
+		{
+			Name:         "Nil_Node_and_Multiple_Allowed_Topology_terms_Match",
+			Node:         nil,
+			ReplicaCount: 2,
+			AllowedTopologies: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneX"},
+						},
+					},
+				},
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    kubeletapis.LabelZoneFailureDomain,
+							Values: []string{"zoneY"},
+						},
+					},
+				},
+			},
+			Reject:              false,
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX,zoneY",
+		},
+	}
+
+	for _, test := range tests {
+		var zonesParameter, zonesWithNodes sets.String
+		var err error
+
+		if test.Zones != "" {
+			zonesParameter, err = ZonesToSet(test.Zones)
+			if err != nil {
+				t.Errorf("Could not convert Zones to a set: %s. This is a test error %s", test.Zones, test.Name)
+				continue
+			}
+		}
+
+		if test.ZonesWithNodes != "" {
+			zonesWithNodes, err = ZonesToSet(test.ZonesWithNodes)
+			if err != nil {
+				t.Errorf("Could not convert specified ZonesWithNodes to a set: %s. This is a test error %s", test.ZonesWithNodes, test.Name)
+				continue
+			}
+		}
+
+		zones, err := SelectZonesForVolume(test.ZonePresent, test.ZonesPresent, test.Zone, zonesParameter, zonesWithNodes, test.Node, test.AllowedTopologies, test.Name, test.ReplicaCount)
+
+		if test.Reject && err == nil {
+			t.Errorf("Unexpected zones from SelectZonesForVolume in %s. Zones: %v", test.Name, zones)
+			continue
+		}
+
+		if !test.Reject {
+			if err != nil {
+				t.Errorf("Unexpected error from SelectZonesForVolume in %s; Error: %v", test.Name, err)
+				continue
+			}
+
+			if uint32(zones.Len()) != test.ReplicaCount {
+				t.Errorf("Number of elements in returned zones %v does not equal replica count %d in %s", zones, test.ReplicaCount, test.Name)
+				continue
+			}
+
+			expectedZones, err := ZonesToSet(test.ExpectedZones)
+			if err != nil {
+				t.Errorf("Could not convert ExpectedZones to a set: %v. This is a test error in %s", test.ExpectedZones, test.Name)
+				continue
+			}
+
+			if test.ExpectSpecificZones && !zones.Equal(expectedZones) {
+				t.Errorf("Expected zones %v does not match obtained zones %v in %s", expectedZones, zones, test.Name)
+				continue
+			}
+
+			if test.ExpectSpecificZone && !zones.Has(test.ExpectedZone) {
+				t.Errorf("Expected zone %s not found in obtained zones %v in %s", test.ExpectedZone, zones, test.Name)
+				continue
+			}
+
+			if !expectedZones.IsSuperset(zones) {
+				t.Errorf("Obtained zones %v not subset of of expectedZones %v in %s", zones, expectedZones, test.Name)
+			}
+		}
+	}
+}
+
+func TestChooseZonesForVolumeIncludingZone(t *testing.T) {
+	tests := []struct {
+		// Parameters passed by test to chooseZonesForVolumeIncludingZone
+		Name          string
+		ReplicaCount  uint32
+		Zones         string
+		ZoneToInclude string
+		// Expectations around returned zones from chooseZonesForVolumeIncludingZone
+		Reject              bool   // expect error due to validation failing
+		ExpectSpecificZones bool   // expect set of returned zones to be equal to ExpectedZones (rather than subset of ExpectedZones)
+		ExpectedZones       string // set of zones that is a superset of returned zones or equal to returned zones (if ExpectSpecificZones is set)
+		ExpectSpecificZone  bool   // expect set of returned zones to include ExpectedZone as a member
+		ExpectedZone        string // zone that should be a member of returned zones
+	}{
+		// NEGATIVE TESTS
+
+		// Not enough zones specified to fit ReplicaCount [Fail]
+		{
+			Name:         "Too_Few_Zones",
+			ReplicaCount: 2,
+			Zones:        "zoneX",
+			Reject:       true,
+		},
+
+		// Invalid ReplicaCount [Fail]
+		{
+			Name:         "Zero_Replica_Count",
+			ReplicaCount: 0,
+			Zones:        "zoneY,zoneZ",
+			Reject:       true,
+		},
+
+		// Invalid ZoneToInclude [Fail]
+		{
+			Name:          "ZoneToInclude_Not_In_Zones_Single_replica_Dual_zones",
+			ReplicaCount:  1,
+			ZoneToInclude: "zoneX",
+			Zones:         "zoneY,zoneZ",
+			Reject:        true,
+		},
+
+		// Invalid ZoneToInclude [Fail]
+		{
+			Name:          "ZoneToInclude_Not_In_Zones_Single_replica_Single_zone",
+			ReplicaCount:  1,
+			ZoneToInclude: "zoneX",
+			Zones:         "zoneY",
+			Reject:        true,
+		},
+
+		// Invalid ZoneToInclude [Fail]
+		{
+			Name:          "ZoneToInclude_Not_In_Zones_Dual_replica_Multiple_zones",
+			ReplicaCount:  2,
+			ZoneToInclude: "zoneX",
+			Zones:         "zoneY,zoneZ,zoneW",
+			Reject:        true,
+		},
+
+		// POSITIVE TESTS
+
+		// Pick any one zone from Zones
+		{
+			Name:          "No_zones_to_include_and_Single_replica_and_Superset",
+			ReplicaCount:  1,
+			Zones:         "zoneX,zoneY,zoneZ",
+			Reject:        false,
+			ExpectedZones: "zoneX,zoneY,zoneZ",
+		},
+
+		// Pick any two zones from Zones
+		{
+			Name:          "No_zones_to_include_and_Dual_replicas_and_Superset",
+			ReplicaCount:  2,
+			Zones:         "zoneW,zoneX,zoneY,zoneZ",
+			Reject:        false,
+			ExpectedZones: "zoneW,zoneX,zoneY,zoneZ",
+		},
+
+		// Pick the two zones from Zones
+		{
+			Name:                "No_zones_to_include_and_Dual_replicas_and_Match",
+			ReplicaCount:        2,
+			Zones:               "zoneX,zoneY",
+			Reject:              false,
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX,zoneY",
+		},
+
+		// Pick one zone from ZoneToInclude (other zones ignored)
+		{
+			Name:                "Include_zone_and_Single_replica_and_Match",
+			ReplicaCount:        1,
+			Zones:               "zoneW,zoneX,zoneY,zoneZ",
+			ZoneToInclude:       "zoneX",
+			Reject:              false,
+			ExpectSpecificZone:  true,
+			ExpectedZone:        "zoneX",
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX",
+		},
+
+		// Pick one zone from ZoneToInclude (other zones ignored)
+		{
+			Name:                "Include_zone_and_single_replica_and_Match",
+			ReplicaCount:        1,
+			Zones:               "zoneX",
+			ZoneToInclude:       "zoneX",
+			Reject:              false,
+			ExpectSpecificZone:  true,
+			ExpectedZone:        "zoneX",
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX",
+		},
+
+		// Pick one zone from Zones and the other from ZoneToInclude
+		{
+			Name:               "Include_zone_and_dual_replicas_and_Superset",
+			ReplicaCount:       2,
+			Zones:              "zoneW,zoneX,zoneY,zoneZ",
+			ZoneToInclude:      "zoneX",
+			Reject:             false,
+			ExpectSpecificZone: true,
+			ExpectedZone:       "zoneX",
+			ExpectedZones:      "zoneW,zoneX,zoneY,zoneZ",
+		},
+
+		// Pick one zone from Zones and the other from ZoneToInclude
+		{
+			Name:                "Include_zone_and_dual_replicas_and_Match",
+			ReplicaCount:        2,
+			Zones:               "zoneX,zoneY",
+			ZoneToInclude:       "zoneX",
+			Reject:              false,
+			ExpectSpecificZone:  true,
+			ExpectedZone:        "zoneX",
+			ExpectSpecificZones: true,
+			ExpectedZones:       "zoneX,zoneY",
+		},
+	}
+	for _, test := range tests {
+		zonesParameter, err := ZonesToSet(test.Zones)
+		if err != nil {
+			t.Errorf("Could not convert Zones to a set: %s. This is a test error %s", test.Zones, test.Name)
+			continue
+		}
+
+		zones, err := chooseZonesForVolumeIncludingZone(zonesParameter, test.Name, test.ZoneToInclude, test.ReplicaCount)
+		if test.Reject && err == nil {
+			t.Errorf("Unexpected zones from chooseZonesForVolumeIncludingZone in %s. Zones: %v", test.Name, zones)
+			continue
+		}
+		if !test.Reject {
+			if err != nil {
+				t.Errorf("Unexpected error from chooseZonesForVolumeIncludingZone in %s; Error: %v", test.Name, err)
+				continue
+			}
+
+			if uint32(zones.Len()) != test.ReplicaCount {
+				t.Errorf("Number of elements in returned zones %v does not equal replica count %d in %s", zones, test.ReplicaCount, test.Name)
+				continue
+			}
+
+			expectedZones, err := ZonesToSet(test.ExpectedZones)
+			if err != nil {
+				t.Errorf("Could not convert ExpectedZones to a set: %v. This is a test error in %s", test.ExpectedZones, test.Name)
+				continue
+			}
+
+			if test.ExpectSpecificZones && !zones.Equal(expectedZones) {
+				t.Errorf("Expected zones %v does not match obtained zones %v in %s", expectedZones, zones, test.Name)
+				continue
+			}
+
+			if test.ExpectSpecificZone && !zones.Has(test.ExpectedZone) {
+				t.Errorf("Expected zone %s not found in obtained zones %v in %s", test.ExpectedZone, zones, test.Name)
+				continue
+			}
+
+			if !expectedZones.IsSuperset(zones) {
+				t.Errorf("Obtained zones %v not subset of of expectedZones %v in %s", zones, expectedZones, test.Name)
+			}
+		}
+	}
+}
+
 func TestGetWindowsPath(t *testing.T) {
 	tests := []struct {
 		path         string

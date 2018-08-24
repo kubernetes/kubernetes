@@ -87,7 +87,7 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 
 // CreateVolume creates a GCE PD.
 // Returns: gcePDName, volumeSizeGB, labels, fsType, error
-func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (string, int, map[string]string, string, error) {
+func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (string, int, map[string]string, string, error) {
 	cloud, err := getCloudProvider(c.gcePersistentDisk.plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", 0, nil, "", err
@@ -104,7 +104,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 	// to the cloud provider.
 	diskType := ""
 	configuredZone := ""
-	configuredZones := ""
+	var configuredZones sets.String
 	zonePresent := false
 	zonesPresent := false
 	replicationType := replicationTypeNone
@@ -118,7 +118,10 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 			configuredZone = v
 		case "zones":
 			zonesPresent = true
-			configuredZones = v
+			configuredZones, err = volumeutil.ZonesToSet(v)
+			if err != nil {
+				return "", 0, nil, "", err
+			}
 		case "replication-type":
 			if !utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
 				return "", 0, nil, "",
@@ -133,76 +136,49 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 		}
 	}
 
-	if zonePresent && zonesPresent {
-		return "", 0, nil, "", fmt.Errorf("the 'zone' and 'zones' StorageClass parameters must not be used at the same time")
-	}
-
-	if replicationType == replicationTypeRegionalPD && zonePresent {
-		// If a user accidentally types 'zone' instead of 'zones', we want to throw an error
-		// instead of assuming that 'zones' is empty and proceed by randomly selecting zones.
-		return "", 0, nil, "", fmt.Errorf("the '%s' replication type does not support the 'zone' parameter; use 'zones' instead", replicationTypeRegionalPD)
-	}
-
 	// TODO: implement PVC.Selector parsing
 	if c.options.PVC.Spec.Selector != nil {
 		return "", 0, nil, "", fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on GCE")
 	}
 
+	var activezones sets.String
+	activezones, err = cloud.GetAllCurrentZones()
+	if err != nil {
+		return "", 0, nil, "", err
+	}
+
 	switch replicationType {
 	case replicationTypeRegionalPD:
-		err = createRegionalPD(
-			name,
-			c.options.PVC.Name,
-			diskType,
-			configuredZones,
-			requestGB,
-			c.options.CloudTags,
-			cloud)
+		selectedZones, err := volumeutil.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
 		if err != nil {
+			glog.V(2).Infof("Error selecting zones for regional GCE PD volume: %v", err)
+			return "", 0, nil, "", err
+		}
+		if err = cloud.CreateRegionalDisk(
+			name,
+			diskType,
+			selectedZones,
+			int64(requestGB),
+			*c.options.CloudTags); err != nil {
 			glog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
-
 		glog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
 
 	case replicationTypeNone:
-		var zones sets.String
-		if !zonePresent && !zonesPresent {
-			// 00 - neither "zone" or "zones" specified
-			// Pick a zone randomly selected from all active zones where
-			// Kubernetes cluster has a node.
-			zones, err = cloud.GetAllCurrentZones()
-			if err != nil {
-				glog.V(2).Infof("error getting zone information from GCE: %v", err)
-				return "", 0, nil, "", err
-			}
-		} else if !zonePresent && zonesPresent {
-			// 01 - "zones" specified
-			// Pick a zone randomly selected from specified set.
-			if zones, err = volumeutil.ZonesToSet(configuredZones); err != nil {
-				return "", 0, nil, "", err
-			}
-		} else if zonePresent && !zonesPresent {
-			// 10 - "zone" specified
-			// Use specified zone
-			if err := volumeutil.ValidateZone(configuredZone); err != nil {
-				return "", 0, nil, "", err
-			}
-			zones = make(sets.String)
-			zones.Insert(configuredZone)
+		selectedZone, err := volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name)
+		if err != nil {
+			return "", 0, nil, "", err
 		}
-		zone := volumeutil.ChooseZoneForVolume(zones, c.options.PVC.Name)
-
 		if err := cloud.CreateDisk(
 			name,
 			diskType,
-			zone,
+			selectedZone,
 			int64(requestGB),
 			*c.options.CloudTags); err != nil {
 			glog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
-
 		glog.V(2).Infof("Successfully created single-zone GCE PD volume %s", name)
 
 	default:
@@ -216,57 +192,6 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner) (strin
 	}
 
 	return name, int(requestGB), labels, fstype, nil
-}
-
-// Creates a Regional PD
-func createRegionalPD(
-	diskName string,
-	pvcName string,
-	diskType string,
-	zonesString string,
-	requestGB int64,
-	cloudTags *map[string]string,
-	cloud *gcecloud.GCECloud) error {
-
-	var replicaZones sets.String
-	var err error
-
-	if zonesString == "" {
-		// Consider all zones
-		replicaZones, err = cloud.GetAllCurrentZones()
-		if err != nil {
-			glog.V(2).Infof("error getting zone information from GCE: %v", err)
-			return err
-		}
-	} else {
-		replicaZones, err = volumeutil.ZonesToSet(zonesString)
-		if err != nil {
-			return err
-		}
-	}
-
-	zoneCount := replicaZones.Len()
-	var selectedReplicaZones sets.String
-	if zoneCount < maxRegionalPDZones {
-		return fmt.Errorf("cannot specify only %d zone(s) for Regional PDs.", zoneCount)
-	} else if zoneCount == maxRegionalPDZones {
-		selectedReplicaZones = replicaZones
-	} else {
-		// Must randomly select zones
-		selectedReplicaZones = volumeutil.ChooseZonesForVolume(
-			replicaZones, pvcName, maxRegionalPDZones)
-	}
-
-	if err = cloud.CreateRegionalDisk(
-		diskName,
-		diskType,
-		selectedReplicaZones,
-		int64(requestGB),
-		*cloudTags); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Returns the first path that exists, or empty string if none exist.
