@@ -1213,9 +1213,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 
 // getPhase returns the phase of a pod given its container info.
 func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
-	initialized := 0
-	pendingInitialization := 0
-	failedInitialization := 0
+	initialized, pendingInitialization, failedInitialization := 0, 0, 0
 	for _, container := range spec.InitContainers {
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
@@ -1247,12 +1245,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 		}
 	}
 
-	unknown := 0
-	running := 0
-	waiting := 0
-	stopped := 0
-	failed := 0
-	succeeded := 0
+	unknown, running, waiting, stopped, failed, succeeded := 0, 0, 0, 0, 0, 0
 	for _, container := range spec.Containers {
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
@@ -1289,7 +1282,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	case pendingInitialization > 0:
 		fallthrough
 	case waiting > 0:
-		glog.V(5).Infof("pod waiting > 0, pending")
+		glog.V(5).Info("pod waiting > 0, pending")
 		// One or more containers has not been started
 		return v1.PodPending
 	case running > 0 && unknown == 0:
@@ -1316,7 +1309,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 		// and in the process of restarting
 		return v1.PodRunning
 	default:
-		glog.V(5).Infof("pod default case, pending")
+		glog.V(5).Info("pod default case, pending")
 		return v1.PodPending
 	}
 }
