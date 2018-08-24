@@ -68,6 +68,11 @@ func (m *MockedFakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGrou
 	return args.Get(0).([]*ec2.SecurityGroup), nil
 }
 
+func (m *MockedFakeEC2) CreateVolume(request *ec2.CreateVolumeInput) (*ec2.Volume, error) {
+	args := m.Called(request)
+	return args.Get(0).(*ec2.Volume), nil
+}
+
 type MockedFakeELB struct {
 	*FakeELB
 	mock.Mock
@@ -1391,6 +1396,38 @@ func TestFindSecurityGroupForInstanceMultipleTagged(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "sg123(my_group)")
 	assert.Contains(t, err.Error(), "sg123(another_group)")
+}
+
+func TestCreateDisk(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, _ := newAWSCloud(CloudConfig{}, awsServices)
+
+	volumeOptions := &VolumeOptions{
+		AvailabilityZone: "us-east-1a",
+		CapacityGB:       10,
+	}
+	request := &ec2.CreateVolumeInput{
+		AvailabilityZone: aws.String("us-east-1a"),
+		Encrypted:        aws.Bool(false),
+		VolumeType:       aws.String(DefaultVolumeType),
+		Size:             aws.Int64(10),
+		TagSpecifications: []*ec2.TagSpecification{
+			{ResourceType: aws.String(ec2.ResourceTypeVolume), Tags: []*ec2.Tag{
+				{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(TestClusterID)},
+				{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterID)), Value: aws.String(ResourceLifecycleOwned)},
+			}},
+		},
+	}
+	volume := &ec2.Volume{
+		AvailabilityZone: aws.String("us-east-1a"),
+		VolumeId:         aws.String("vol-volumeId0"),
+	}
+	awsServices.ec2.(*MockedFakeEC2).On("CreateVolume", request).Return(volume, nil)
+
+	volumeID, err := c.CreateDisk(volumeOptions)
+	assert.Nil(t, err, "Error creating disk: %v", err)
+	assert.Equal(t, volumeID, KubernetesVolumeID("aws://us-east-1a/vol-volumeId0"))
+	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
 func newMockedFakeAWSServices(id string) *FakeAWSServices {
