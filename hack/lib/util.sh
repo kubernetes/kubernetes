@@ -18,6 +18,20 @@ kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
 
+# arguments: target, item1, item2, item3, ...
+# returns 0 if target is in the given items, 1 otherwise.
+kube::util::array_contains() {
+  local search="$1"
+  local element
+  shift
+  for element; do
+    if [[ "$element" == "$search" ]]; then
+      return 0
+     fi
+  done
+  return 1
+}
+
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
