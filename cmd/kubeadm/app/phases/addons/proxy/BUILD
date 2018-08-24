@@ -15,7 +15,7 @@ go_test(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//pkg/apis/core:go_default_library",
-        "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
+        "//pkg/proxy/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

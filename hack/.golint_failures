@@ -254,8 +254,8 @@ pkg/probe/exec
 pkg/probe/http
 pkg/probe/tcp
 pkg/proxy
-pkg/proxy/apis/kubeproxyconfig
-pkg/proxy/apis/kubeproxyconfig/v1alpha1
+pkg/proxy/apis/config
+pkg/proxy/apis/config/v1alpha1
 pkg/proxy/iptables
 pkg/proxy/userspace
 pkg/proxy/util

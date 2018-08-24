@@ -22,8 +22,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	utilpointer "k8s.io/utils/pointer"
 )
 

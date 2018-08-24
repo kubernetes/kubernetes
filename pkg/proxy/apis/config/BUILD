@@ -13,7 +13,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig",
+    importpath = "k8s.io/kubernetes/pkg/proxy/apis/config",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -32,10 +32,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/proxy/apis/kubeproxyconfig/fuzzer:all-srcs",
-        "//pkg/proxy/apis/kubeproxyconfig/scheme:all-srcs",
-        "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:all-srcs",
-        "//pkg/proxy/apis/kubeproxyconfig/validation:all-srcs",
+        "//pkg/proxy/apis/config/fuzzer:all-srcs",
+        "//pkg/proxy/apis/config/scheme:all-srcs",
+        "//pkg/proxy/apis/config/v1alpha1:all-srcs",
+        "//pkg/proxy/apis/config/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -53,10 +53,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -105,7 +105,7 @@ type Options struct {
 	config *kubeproxyconfig.KubeProxyConfiguration
 
 	// The fields below here are placeholders for flags that can't be directly mapped into
-	// kubeproxyconfig.KubeProxyConfiguration.
+	// config.KubeProxyConfiguration.
 	//
 	// TODO remove these fields once the deprecated flags are removed.
 
