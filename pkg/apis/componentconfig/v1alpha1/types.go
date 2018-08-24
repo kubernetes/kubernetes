@@ -312,6 +312,8 @@ type HPAControllerConfiguration struct {
 	// horizontalPodAutoscalerUpscaleForbiddenWindow is a period after which next upscale allowed.
 	HorizontalPodAutoscalerUpscaleForbiddenWindow metav1.Duration
 	// horizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.
+	HorizontalPodAutoscalerDownscaleStabilizationWindow metav1.Duration
+	// HorizontalPodAutoscalerDownscaleForbiddenWindow is a period after which next downscale allowed.
 	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
 	// horizontalPodAutoscalerTolerance is the tolerance for when
 	// resource usage suggests upscaling/downscaling
