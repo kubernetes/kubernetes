@@ -151,10 +151,6 @@ func (rc *reconciler) isMultiAttachForbidden(volumeSpec *volume.Spec) bool {
 	// multi-attach. We trust in the individual volume implementations to not allow unsupported access modes
 	if volumeSpec.PersistentVolume != nil {
 		// Check for persistent volume types which do not fail when trying to multi-attach
-		if volumeSpec.PersistentVolume.Spec.VsphereVolume != nil {
-			return false
-		}
-
 		if len(volumeSpec.PersistentVolume.Spec.AccessModes) == 0 {
 			// No access mode specified so we don't know for sure. Let the attacher fail if needed
 			return false
