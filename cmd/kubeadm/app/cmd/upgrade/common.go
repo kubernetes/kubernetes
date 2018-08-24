@@ -93,6 +93,14 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		}
 	}
 
+	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
+	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, cfg.FeatureGates); len(msg) > 0 {
+		for _, m := range msg {
+			fmt.Printf("[upgrade/config] %s\n", m)
+		}
+		return nil, fmt.Errorf("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
+	}
+
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
 		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)

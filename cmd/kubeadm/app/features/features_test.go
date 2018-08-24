@@ -31,6 +31,7 @@ func TestKnownFeatures(t *testing.T) {
 		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
 		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
 		"feature3": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.GA}},
+		"hidden":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.GA}, HiddenInHelpText: true},
 	}
 
 	r := KnownFeatures(&someFeatures)
@@ -58,8 +59,9 @@ func TestKnownFeatures(t *testing.T) {
 
 func TestNewFeatureGate(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
+		"feature1":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+		"feature2":   {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
+		"deprecated": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}},
 	}
 
 	var tests = []struct {
@@ -89,6 +91,10 @@ func TestNewFeatureGate(t *testing.T) {
 		},
 		{ //unrecognized feature-gate key
 			value:         "feature1=true,unknownFeature=false",
+			expectedError: true,
+		},
+		{ //deprecated feature-gate key
+			value:         "deprecated=true",
 			expectedError: true,
 		},
 		{ //one feature
@@ -202,6 +208,35 @@ func TestEnabledDefaults(t *testing.T) {
 		enabled := Enabled(featureList, featureName)
 		if enabled != feature.Default {
 			t.Errorf("Enabled returned %v instead of default value %v for feature %s", enabled, feature.Default, featureName)
+		}
+	}
+}
+
+func TestCheckDeprecatedFlags(t *testing.T) {
+	dummyMessage := "dummy message"
+	var someFeatures = FeatureList{
+		"feature1":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+		"deprecated": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, DeprecationMessage: dummyMessage},
+	}
+
+	var tests = []struct {
+		features    map[string]bool
+		expectedMsg map[string]string
+	}{
+		{ // feature deprecated
+			features:    map[string]bool{"deprecated": true},
+			expectedMsg: map[string]string{"deprecated": dummyMessage},
+		},
+		{ // valid feature
+			features:    map[string]bool{"feature1": true},
+			expectedMsg: map[string]string{},
+		},
+	}
+
+	for _, test := range tests {
+		msg := CheckDeprecatedFlags(&someFeatures, test.features)
+		if !reflect.DeepEqual(test.expectedMsg, msg) {
+			t.Error("CheckDeprecatedFlags didn't returned expected message")
 		}
 	}
 }
