@@ -1501,6 +1501,9 @@ var supportedReclaimPolicy = sets.NewString(string(core.PersistentVolumeReclaimD
 
 var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), string(core.PersistentVolumeFilesystem))
 
+var supportedDataSourceKinds = sets.NewString(string("VolumeSnapshot"))
+var supportedDataSourceAPIGroups = sets.NewString(string("snapshot.storage.k8s.io"))
+
 func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
@@ -1827,16 +1830,13 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 
 	if spec.DataSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("dataSource"), "VolumeSnapshotDataSource is disabled by feature-gate"))
-		spec.DataSource = nil
 	} else if spec.DataSource != nil {
 		if len(spec.DataSource.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource").Key(string("Name")), "VolumeSnapshotDataSource Name cannot be empty"))
-		}
-		if spec.DataSource.Kind != "VolumeSnapshot" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("dataSource"), spec.DataSource.Kind, "expected DataSource Kind is VolumeSnapshot"))
-		}
-		if spec.DataSource.APIGroup != "snapshot.storage.k8s.io" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("dataSource"), spec.DataSource.APIGroup, "expected DataSource APIGroup is snapshot.storage.k8s.io"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "name"), ""))
+		} else if !supportedDataSourceKinds.Has(string(spec.DataSource.Kind)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), spec.DataSource.Kind, supportedDataSourceKinds.List()))
+		} else if !supportedDataSourceAPIGroups.Has(string(spec.DataSource.APIGroup)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), spec.DataSource.APIGroup, supportedDataSourceAPIGroups.List()))
 		}
 	}
 

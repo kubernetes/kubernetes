@@ -1210,7 +1210,7 @@ var map_PersistentVolumeClaimSpec = map[string]string{
 	"volumeName":       "VolumeName is the binding reference to the PersistentVolume backing this claim.",
 	"storageClassName": "Name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
 	"volumeMode":       "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future.",
-	"dataSource":       "If specified, volume will be prepopulated with data from the DataSource.",
+	"dataSource":       "If specified, volume will be prepopulated with data from the specified data source. This depends on the provisioner for this volume being able to use the specified source. If the provisioner does not support it, it will fail to provision the volume.",
 }
 
 func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
