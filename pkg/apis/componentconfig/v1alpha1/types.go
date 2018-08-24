@@ -320,6 +320,14 @@ type HPAControllerConfiguration struct {
 	// through the kube-aggregator when enabled, instead of using the legacy metrics client
 	// through the API server proxy.
 	HorizontalPodAutoscalerUseRESTClients *bool
+	// HorizontalPodAutoscalerCPUTaintPeriod is period after pod start for which HPA will consider CPU
+	// samples from the pod contaminated by initialization and disregard them.
+	HorizontalPodAutoscalerCPUTaintPeriod metav1.Duration
+	// HorizontalPodAutoscalerInitialReadinessDelay is period after pod start during which readiness
+	// changes are treated as readiness being set for the first time. The only effect of this is that
+	// HPA will disregard CPU samples from unready pods that had last readiness change during that
+	// period.
+	HorizontalPodAutoscalerInitialReadinessDelay metav1.Duration
 }
 
 type JobControllerConfiguration struct {
