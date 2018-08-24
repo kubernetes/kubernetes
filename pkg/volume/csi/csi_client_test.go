@@ -59,6 +59,7 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 	volumeAttribs map[string]string,
 	nodePublishSecrets map[string]string,
 	fsType string,
+	mountOptions []string,
 ) error {
 	c.t.Log("calling fake.NodePublishVolume...")
 	req := &csipb.NodePublishVolumeRequest{
@@ -74,7 +75,8 @@ func (c *fakeCsiDriverClient) NodePublishVolume(
 			},
 			AccessType: &csipb.VolumeCapability_Mount{
 				Mount: &csipb.VolumeCapability_MountVolume{
-					FsType: fsType,
+					FsType:     fsType,
+					MountFlags: mountOptions,
 				},
 			},
 		},
@@ -237,6 +239,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 			map[string]string{"attr0": "val0"},
 			map[string]string{},
 			tc.fsType,
+			[]string{},
 		)
 
 		if tc.mustFail && err == nil {
