@@ -37,6 +37,7 @@ import (
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
 	settings "k8s.io/kubernetes/pkg/apis/settings"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
+	storagedrivers "k8s.io/kubernetes/pkg/apis/storagedrivers"
 )
 
 // GenericInformer is type of SharedIndexInformer which will locate and delegate to other
@@ -130,6 +131,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().InternalVersion().Services().Informer()}, nil
 	case core.SchemeGroupVersion.WithResource("serviceaccounts"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().InternalVersion().ServiceAccounts().Informer()}, nil
+
+		// Group=drivers.storage.k8s.io, Version=internalVersion
+	case storagedrivers.SchemeGroupVersion.WithResource("csidrivers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Drivers().InternalVersion().CSIDrivers().Informer()}, nil
 
 		// Group=extensions, Version=internalVersion
 	case extensions.SchemeGroupVersion.WithResource("daemonsets"):

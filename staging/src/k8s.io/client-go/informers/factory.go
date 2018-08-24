@@ -42,6 +42,7 @@ import (
 	scheduling "k8s.io/client-go/informers/scheduling"
 	settings "k8s.io/client-go/informers/settings"
 	storage "k8s.io/client-go/informers/storage"
+	storagedrivers "k8s.io/client-go/informers/storagedrivers"
 	kubernetes "k8s.io/client-go/kubernetes"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -201,6 +202,7 @@ type SharedInformerFactory interface {
 	Scheduling() scheduling.Interface
 	Settings() settings.Interface
 	Storage() storage.Interface
+	Drivers() storagedrivers.Interface
 }
 
 func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
@@ -261,4 +263,8 @@ func (f *sharedInformerFactory) Settings() settings.Interface {
 
 func (f *sharedInformerFactory) Storage() storage.Interface {
 	return storage.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Drivers() storagedrivers.Interface {
+	return storagedrivers.New(f, f.namespace, f.tweakListOptions)
 }

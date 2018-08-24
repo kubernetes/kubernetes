@@ -27,6 +27,7 @@ go_library(
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/settings:go_default_library",
         "//pkg/apis/storage:go_default_library",
+        "//pkg/apis/storagedrivers:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/admissionregistration:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/apps:go_default_library",
@@ -43,6 +44,7 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion/scheduling:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/settings:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/storage:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion/storagedrivers:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -76,6 +78,7 @@ filegroup(
         "//pkg/client/informers/informers_generated/internalversion/scheduling:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion/settings:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion/storage:all-srcs",
+        "//pkg/client/informers/informers_generated/internalversion/storagedrivers:all-srcs",
     ],
     tags = ["automanaged"],
 )

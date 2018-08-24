@@ -40,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/storagedrivers/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -59,6 +60,7 @@ go_library(
         "//staging/src/k8s.io/client-go/informers/scheduling:go_default_library",
         "//staging/src/k8s.io/client-go/informers/settings:go_default_library",
         "//staging/src/k8s.io/client-go/informers/storage:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/storagedrivers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
@@ -91,6 +93,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/informers/scheduling:all-srcs",
         "//staging/src/k8s.io/client-go/informers/settings:all-srcs",
         "//staging/src/k8s.io/client-go/informers/storage:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/storagedrivers:all-srcs",
     ],
     tags = ["automanaged"],
 )
