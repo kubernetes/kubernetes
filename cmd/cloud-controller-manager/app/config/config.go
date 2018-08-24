@@ -22,13 +22,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	cloudctrlmgrconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Config is the main context object for the cloud controller manager.
 type Config struct {
-	ComponentConfig componentconfig.CloudControllerManagerConfiguration
+	ComponentConfig cloudctrlmgrconfig.CloudControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo
 	// TODO: remove deprecated insecure serving

@@ -20,33 +20,31 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
 // and cloud-controller-manager.
 type KubeCloudSharedOptions struct {
-	Port                         int32
-	Address                      string
-	UseServiceAccountCredentials bool
-	AllowUntaggedCloud           bool
-	RouteReconciliationPeriod    metav1.Duration
-	NodeMonitorPeriod            metav1.Duration
-	ClusterName                  string
-	ClusterCIDR                  string
-	AllocateNodeCIDRs            bool
-	CIDRAllocatorType            string
-	ConfigureCloudRoutes         bool
-	NodeSyncPeriod               metav1.Duration
+	CloudProvider             *CloudProviderOptions
+	ExternalCloudVolumePlugin string
+	AllowUntaggedCloud        bool
+	RouteReconciliationPeriod metav1.Duration
+	NodeMonitorPeriod         metav1.Duration
+	ClusterName               string
+	ClusterCIDR               string
+	AllocateNodeCIDRs         bool
+	CIDRAllocatorType         string
+	ConfigureCloudRoutes      bool
+	NodeSyncPeriod            metav1.Duration
 }
 
 // NewKubeCloudSharedOptions returns common/default configuration values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewKubeCloudSharedOptions(cfg componentconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
+func NewKubeCloudSharedOptions(cfg kubectrlmgrconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
 	o := &KubeCloudSharedOptions{
-		Port:                      cfg.Port,
-		Address:                   cfg.Address,
+		CloudProvider:             &CloudProviderOptions{},
 		RouteReconciliationPeriod: cfg.RouteReconciliationPeriod,
 		NodeMonitorPeriod:         cfg.NodeMonitorPeriod,
 		ClusterName:               cfg.ClusterName,
@@ -62,7 +60,8 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.BoolVar(&o.UseServiceAccountCredentials, "use-service-account-credentials", o.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
+	o.CloudProvider.AddFlags(fs)
+	fs.StringVar(&o.ExternalCloudVolumePlugin, "external-cloud-volume-plugin", o.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node and volume controllers to work for in tree cloud providers.")
 	fs.BoolVar(&o.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
 	fs.DurationVar(&o.RouteReconciliationPeriod.Duration, "route-reconciliation-period", o.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
@@ -81,14 +80,15 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up KubeCloudShared config with options.
-func (o *KubeCloudSharedOptions) ApplyTo(cfg *componentconfig.KubeCloudSharedConfiguration) error {
+func (o *KubeCloudSharedOptions) ApplyTo(cfg *kubectrlmgrconfig.KubeCloudSharedConfiguration) error {
 	if o == nil {
 		return nil
 	}
 
-	cfg.Port = o.Port
-	cfg.Address = o.Address
-	cfg.UseServiceAccountCredentials = o.UseServiceAccountCredentials
+	if err := o.CloudProvider.ApplyTo(&cfg.CloudProvider); err != nil {
+		return err
+	}
+	cfg.ExternalCloudVolumePlugin = o.ExternalCloudVolumePlugin
 	cfg.AllowUntaggedCloud = o.AllowUntaggedCloud
 	cfg.RouteReconciliationPeriod = o.RouteReconciliationPeriod
 	cfg.NodeMonitorPeriod = o.NodeMonitorPeriod
@@ -109,5 +109,7 @@ func (o *KubeCloudSharedOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	errs = append(errs, o.CloudProvider.Validate()...)
+
 	return errs
 }

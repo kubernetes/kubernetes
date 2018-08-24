@@ -11,11 +11,11 @@ go_library(
     srcs = ["options.go"],
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/options",
     deps = [
+        "//cmd/cloud-controller-manager/app/apis/config:go_default_library",
+        "//cmd/cloud-controller-manager/app/apis/config/v1alpha1:go_default_library",
         "//cmd/cloud-controller-manager/app/config:go_default_library",
         "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
-        "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -55,6 +55,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",

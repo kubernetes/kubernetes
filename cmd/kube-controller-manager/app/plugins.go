@@ -17,20 +17,13 @@ limitations under the License.
 package app
 
 import (
-	// This file exists to force the desired plugin implementations to be linked.
-	// This should probably be part of some configuration fed into the build for a
-	// given binary target.
-
 	"fmt"
 
 	// Cloud providers
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
-	"k8s.io/utils/exec"
 
 	// Volume plugins
-	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
@@ -56,7 +49,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/exec"
+
+	"github.com/golang/glog"
 )
 
 // ProbeAttachableVolumePlugins collects all volume plugins for the attach/
@@ -87,12 +84,12 @@ func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for the attach/detach controller.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(config componentconfig.VolumeConfiguration) volume.DynamicPluginProber {
+func GetDynamicPluginProber(config kubectrlmgrconfig.VolumeConfiguration) volume.DynamicPluginProber {
 	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
-func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeExpandableVolumePlugins(config kubectrlmgrconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
@@ -114,7 +111,7 @@ func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config kubectrlmgrconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
