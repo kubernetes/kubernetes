@@ -1824,6 +1824,22 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	} else if spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*spec.VolumeMode)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumeMode"), *spec.VolumeMode, supportedVolumeModes.List()))
 	}
+
+	if spec.DataSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("dataSource"), "VolumeSnapshotDataSource is disabled by feature-gate"))
+		spec.DataSource = nil
+	} else if spec.DataSource != nil {
+		if len(spec.DataSource.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource").Key(string("Name")), "VolumeSnapshotDataSource Name cannot be empty"))
+		}
+		if spec.DataSource.Kind != "VolumeSnapshot" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("dataSource"), spec.DataSource.Kind, "expected DataSource Kind is VolumeSnapshot"))
+		}
+		if spec.DataSource.APIGroup != "snapshot.storage.k8s.io" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("dataSource"), spec.DataSource.APIGroup, "expected DataSource APIGroup is snapshot.storage.k8s.io"))
+		}
+	}
+
 	return allErrs
 }
 
