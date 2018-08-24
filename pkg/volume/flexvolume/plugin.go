@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/golang/glog"
 
 	api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -57,6 +59,8 @@ type flexVolumeAttachablePlugin struct {
 
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
+var _ volume.FSResizableVolumePlugin = &flexVolumePlugin{}
+var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
 
 var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
 
@@ -286,4 +290,35 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 
 	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
 	return path.Join(mountsDir, volumeName), nil
+}
+
+func (plugin *flexVolumePlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error) {
+	call := plugin.NewDriverCall(expandVolumeCmd)
+	call.AppendSpec(spec, plugin.host, nil)
+	call.Append(strconv.FormatInt(newSize.Value(), 10))
+	call.Append(strconv.FormatInt(oldSize.Value(), 10))
+
+	_, err := call.Run()
+
+	return newSize, err
+}
+
+func (plugin *flexVolumePlugin) RequiresFSResize() bool {
+	return plugin.capabilities.RequiresFSResize
+}
+
+func (plugin *flexVolumePlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string) error {
+	// This method is called after we spec.PersistentVolume.Spec.Capacity
+	// has been updated to the new size. The underlying driver thus sees
+	// the _new_ (requested) size and can find out the _current_ size from
+	// its underlying storage implementation
+
+	call := plugin.NewDriverCall(expandFSCmd)
+	call.AppendSpec(spec, plugin.host, nil)
+	call.Append(devicePath)
+	call.Append(deviceMountPath)
+
+	_, err := call.Run()
+
+	return err
 }
