@@ -616,11 +616,14 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 
 // DetachBlockISCSIDisk removes loopback device for a volume and detaches a volume from node
 func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
-	if pathExists, pathErr := volumeutil.PathExists(mapPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
+	pathExists, pathErr := volumeutil.PathExists(mapPath)
+	if !pathExists {
 		glog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
 		return nil
+	}
+	corruptedMnt := volumeutil.IsCorruptedMnt(pathErr)
+	if pathErr != nil && !corruptedMnt {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	}
 	// If we arrive here, device is no longer used, see if need to logout the target
 	// device: 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
