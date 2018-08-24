@@ -110,7 +110,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var typesToGenerate []*types.Type
 		for _, t := range p.Types {
-			tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+			tags := util.MustParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...))
 			if !tags.GenerateClient || !tags.HasVerb("list") || !tags.HasVerb("get") {
 				continue
 			}
@@ -152,7 +152,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				return generators
 			},
 			FilterFunc: func(c *generator.Context, t *types.Type) bool {
-				tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+				tags := util.MustParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...))
 				return tags.GenerateClient && tags.HasVerb("list") && tags.HasVerb("get")
 			},
 		})
@@ -166,7 +166,7 @@ func objectMetaForPackage(p *types.Package) (*types.Type, bool, error) {
 	generatingForPackage := false
 	for _, t := range p.Types {
 		// filter out types which dont have genclient.
-		if !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient {
+		if !util.MustParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...)).GenerateClient {
 			continue
 		}
 		generatingForPackage = true
@@ -230,7 +230,7 @@ func (g *listerGenerator) GenerateType(c *generator.Context, t *types.Type, w io
 		"objectMeta": g.objectMeta,
 	}
 
-	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+	tags, err := util.ParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...))
 	if err != nil {
 		return err
 	}

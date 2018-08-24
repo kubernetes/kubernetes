@@ -344,7 +344,7 @@ func FindActiveOrLatest(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) *apps
 	}
 
 	sort.Sort(sort.Reverse(controller.ReplicaSetsByCreationTimestamp(oldRSs)))
-	allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
+	allRSs := controller.FilterActiveReplicaSets(append(append([]*apps.ReplicaSet(nil), oldRSs...), newRS))
 
 	switch len(allRSs) {
 	case 0:

@@ -39,7 +39,7 @@ func GetNameFromCallsite(ignoredPackages ...string) string {
 			}
 			i += maxStack
 		}
-		if hasPackage(file, append(ignoredPackages, "/runtime/asm_")) {
+		if hasPackage(file, ignoredPackages) || hasPackage(file, []string{"/runtime/asm_"}) {
 			continue
 		}
 

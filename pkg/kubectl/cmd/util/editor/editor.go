@@ -94,7 +94,7 @@ func defaultEnvEditor(envs []string) ([]string, bool) {
 	}
 	// rather than parse the shell arguments ourselves, punt to the shell
 	shell := defaultEnvShell()
-	return append(shell, editor), true
+	return append(append([]string(nil), shell...), editor), true
 }
 
 func (e Editor) args(path string) []string {

@@ -56,7 +56,7 @@ func (m *modelPrinter) PrintDescription(schema proto.Schema) error {
 	if err := m.Writer.Write("DESCRIPTION:"); err != nil {
 		return err
 	}
-	for i, desc := range append(m.Descriptions, schema.GetDescription()) {
+	for i, desc := range append(append([]string(nil), m.Descriptions...), schema.GetDescription()) {
 		if desc == "" {
 			continue
 		}

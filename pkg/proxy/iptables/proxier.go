@@ -381,7 +381,7 @@ var iptablesCleanupOnlyChains = []iptablesJumpChain{
 // It returns true if an error was encountered. Errors are logged.
 func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 	// Unlink our chains
-	for _, chain := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
+	for _, chain := range append(append([]iptablesJumpChain(nil), iptablesJumpChains...), iptablesCleanupOnlyChains...) {
 		args := append(chain.extraArgs,
 			"-m", "comment", "--comment", chain.comment,
 			"-j", string(chain.chain),

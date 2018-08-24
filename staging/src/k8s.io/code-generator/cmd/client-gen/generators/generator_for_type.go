@@ -67,14 +67,14 @@ func genStatus(t *types.Type) bool {
 			break
 		}
 	}
-	return hasStatus && !util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).NoStatus
+	return hasStatus && !util.MustParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...)).NoStatus
 }
 
 // GenerateType makes the body of a file implementing the individual typed client for type t.
 func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	pkg := filepath.Base(t.Name.Package)
-	tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+	tags, err := util.ParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...))
 	if err != nil {
 		return err
 	}

@@ -167,7 +167,7 @@ func (m *Method) args(skip int, nameArgs bool, prefix []string) []string {
 			a = append(a, args[i].String())
 		}
 	}
-	return append(prefix, a...)
+	return append(append([]string(nil), prefix...), a...)
 }
 
 // init the method. This performs some rudimentary static checking as well as

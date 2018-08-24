@@ -114,8 +114,8 @@ func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceCon
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	policy := &PolicyData{
-		ClusterRoles:            append(bootstrappolicy.ClusterRoles(), bootstrappolicy.ControllerRoles()...),
-		ClusterRoleBindings:     append(bootstrappolicy.ClusterRoleBindings(), bootstrappolicy.ControllerRoleBindings()...),
+		ClusterRoles:            append(append([]rbacapiv1.ClusterRole(nil), bootstrappolicy.ClusterRoles()...), bootstrappolicy.ControllerRoles()...),
+		ClusterRoleBindings:     append(append([]rbacapiv1.ClusterRoleBinding(nil), bootstrappolicy.ClusterRoleBindings()...), bootstrappolicy.ControllerRoleBindings()...),
 		Roles:                   bootstrappolicy.NamespaceRoles(),
 		RoleBindings:            bootstrappolicy.NamespaceRoleBindings(),
 		ClusterRolesToAggregate: bootstrappolicy.ClusterRolesToAggregate(),

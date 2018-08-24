@@ -204,7 +204,7 @@ func computeReconciledRoleBinding(existing, expected RoleBinding, removeExtraSub
 	switch {
 	case !removeExtraSubjects && len(result.MissingSubjects) > 0:
 		// add missing subjects in the union case
-		result.RoleBinding.SetSubjects(append(result.RoleBinding.GetSubjects(), result.MissingSubjects...))
+		result.RoleBinding.SetSubjects(append(append([]rbacv1.Subject(nil), result.RoleBinding.GetSubjects()...), result.MissingSubjects...))
 		result.Operation = ReconcileUpdate
 
 	case removeExtraSubjects && (len(result.MissingSubjects) > 0 || len(result.ExtraSubjects) > 0):

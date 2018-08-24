@@ -94,7 +94,7 @@ func (l *line) Len() int {
 func (l *line) Add(word string) bool {
 	newLine := line{
 		wrap:  l.wrap,
-		words: append(l.words, word),
+		words: append(l.words, word), // this mutates the array behind l.words, but not the length of l.words
 	}
 	if newLine.Len() <= l.wrap || len(l.words) == 0 {
 		l.words = newLine.words

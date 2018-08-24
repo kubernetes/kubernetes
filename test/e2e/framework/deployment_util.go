@@ -165,7 +165,7 @@ func WatchRecreateDeployment(c clientset.Interface, d *apps.Deployment) error {
 			if err == nil && nerr == nil {
 				Logf("%+v", d)
 				logReplicaSetsOfDeployment(d, allOldRSs, newRS)
-				logPodsOfDeployment(c, d, append(allOldRSs, newRS))
+				logPodsOfDeployment(c, d, append(append([]*apps.ReplicaSet(nil), allOldRSs...), newRS))
 			}
 			return false, fmt.Errorf("deployment %q is running new pods alongside old pods: %#v", d.Name, status)
 		}

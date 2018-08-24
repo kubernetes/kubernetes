@@ -189,7 +189,7 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient
+			return util.MustParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...)).GenerateClient
 		},
 	}
 }
@@ -359,7 +359,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			} else {
 				// User has not specified any override for this group version.
 				// filter out types which dont have genclient.
-				if tags := util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)); !tags.GenerateClient {
+				if tags := util.MustParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...)); !tags.GenerateClient {
 					continue
 				}
 			}
@@ -409,7 +409,7 @@ type tagOverrideNamer struct {
 }
 
 func (n *tagOverrideNamer) Name(t *types.Type) string {
-	if nameOverride := extractTag(n.tagName, append(t.SecondClosestCommentLines, t.CommentLines...)); nameOverride != "" {
+	if nameOverride := extractTag(n.tagName, append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...)); nameOverride != "" {
 		return nameOverride
 	}
 

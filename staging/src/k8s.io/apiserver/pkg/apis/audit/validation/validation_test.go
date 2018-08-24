@@ -128,7 +128,7 @@ func TestValidatePolicy(t *testing.T) {
 	}
 
 	// Multiple rules.
-	errorCases = append(errorCases, audit.Policy{Rules: append(validRules, audit.PolicyRule{})})
+	errorCases = append(errorCases, audit.Policy{Rules: append(append([]audit.PolicyRule(nil), validRules...), audit.PolicyRule{})})
 
 	// invalid omitStages in policy
 	policy := audit.Policy{OmitStages: []audit.Stage{

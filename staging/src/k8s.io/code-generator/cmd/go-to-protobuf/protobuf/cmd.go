@@ -260,7 +260,7 @@ func Run(g *Generator) {
 		}
 
 		// generate the gogoprotobuf protoc
-		cmd := exec.Command("protoc", append(args, path)...)
+		cmd := exec.Command("protoc", append(append([]string(nil), args...), path)...)
 		out, err := cmd.CombinedOutput()
 		if len(out) > 0 {
 			log.Printf(string(out))

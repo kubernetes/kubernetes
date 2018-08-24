@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
@@ -200,7 +201,7 @@ func computeReconciledRole(existing, expected RuleOwner, removeExtraPermissions 
 	switch {
 	case !removeExtraPermissions && len(result.MissingRules) > 0:
 		// add missing rules in the union case
-		result.Role.SetRules(append(result.Role.GetRules(), result.MissingRules...))
+		result.Role.SetRules(append(append([]rbacv1.PolicyRule(nil), result.Role.GetRules()...), result.MissingRules...))
 		result.Operation = ReconcileUpdate
 
 	case removeExtraPermissions && (len(result.MissingRules) > 0 || len(result.ExtraRules) > 0):

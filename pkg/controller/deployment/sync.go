@@ -312,7 +312,7 @@ func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.R
 	// We need to proportionally scale all replica sets (new and old) in case of a
 	// rolling deployment.
 	if deploymentutil.IsRollingUpdate(deployment) {
-		allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
+		allRSs := controller.FilterActiveReplicaSets(append(append([]*apps.ReplicaSet(nil), oldRSs...), newRS))
 		allRSsReplicas := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
 
 		allowedSize := int32(0)

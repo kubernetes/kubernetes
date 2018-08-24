@@ -79,7 +79,7 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 			return generators
 		},
 		FilterFunc: func(c *generator.Context, t *types.Type) bool {
-			return util.MustParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...)).GenerateClient
+			return util.MustParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...)).GenerateClient
 		},
 	}
 }

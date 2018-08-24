@@ -304,6 +304,7 @@ func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []by
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 
+// makeURLSegments returns a new slice with the URL segments of the given name.
 func (c *dynamicResourceClient) makeURLSegments(name string) []string {
 	url := []string{}
 	if len(c.resource.Group) == 0 {

@@ -54,7 +54,7 @@ func (g *AuthenticatedGroupAdder) AuthenticateRequest(req *http.Request) (user.I
 	return &user.DefaultInfo{
 		Name:   u.GetName(),
 		UID:    u.GetUID(),
-		Groups: append(u.GetGroups(), user.AllAuthenticated),
+		Groups: append(append([]string(nil), u.GetGroups()...), user.AllAuthenticated),
 		Extra:  u.GetExtra(),
 	}, true, nil
 }

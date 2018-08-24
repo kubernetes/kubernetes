@@ -55,5 +55,5 @@ func AddAdditionalCommands(g CommandGroups, message string, cmds []*cobra.Comman
 	if len(group.Commands) == 0 {
 		return g
 	}
-	return append(g, group)
+	return append(append(CommandGroups(nil), g...), group)
 }

@@ -62,7 +62,7 @@ func (d *DefaultPackage) Generators(c *Context) []Generator {
 
 func (d *DefaultPackage) Header(filename string) []byte {
 	if filename == "doc.go" {
-		return append(d.HeaderText, d.PackageDocumentation...)
+		return append(append([]byte(nil), d.HeaderText...), d.PackageDocumentation...)
 	}
 	return d.HeaderText
 }

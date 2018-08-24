@@ -108,7 +108,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
 	for _, t := range g.types {
-		tags, err := util.ParseClientGenTags(append(t.SecondClosestCommentLines, t.CommentLines...))
+		tags, err := util.ParseClientGenTags(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...))
 		if err != nil {
 			return err
 		}

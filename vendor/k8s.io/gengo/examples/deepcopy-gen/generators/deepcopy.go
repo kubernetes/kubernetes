@@ -518,7 +518,7 @@ func (g *genDeepCopy) deepCopyableInterfacesInner(c *generator.Context, t *types
 		return nil, nil
 	}
 
-	intfs := extractInterfacesTag(append(t.SecondClosestCommentLines, t.CommentLines...))
+	intfs := extractInterfacesTag(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...))
 
 	var ts []*types.Type
 	for _, intf := range intfs {
@@ -557,7 +557,7 @@ func (g *genDeepCopy) deepCopyableInterfaces(c *generator.Context, t *types.Type
 
 	TypeSlice(result).Sort() // we need a stable sorting because it determines the order in generation
 
-	nonPointerReceiver, err := extractNonPointerInterfaces(append(t.SecondClosestCommentLines, t.CommentLines...))
+	nonPointerReceiver, err := extractNonPointerInterfaces(append(append([]string(nil), t.SecondClosestCommentLines...), t.CommentLines...))
 	if err != nil {
 		return nil, false, err
 	}

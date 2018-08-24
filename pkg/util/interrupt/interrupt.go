@@ -44,7 +44,7 @@ func Chain(handler *Handler, notify ...func()) *Handler {
 	if handler == nil {
 		return New(nil, notify...)
 	}
-	return New(handler.Signal, append(notify, handler.Close)...)
+	return New(handler.Signal, append(append([](func())(nil), notify...), handler.Close)...)
 }
 
 // New creates a new handler that guarantees all notify functions are run after the critical

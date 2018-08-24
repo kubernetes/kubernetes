@@ -67,7 +67,7 @@ func NewCgroupName(base CgroupName, components ...string) CgroupName {
 			panic(fmt.Errorf("invalid character in component [%q] of CgroupName", component))
 		}
 	}
-	return CgroupName(append(base, components...))
+	return CgroupName(append(append([]string(nil), base...), components...))
 }
 
 func escapeSystemdCgroupName(part string) string {

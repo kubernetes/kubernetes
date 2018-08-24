@@ -762,14 +762,14 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 
 		n.writeCalls(local, true, sw)
 		for i := range n.children {
-			n.children[i].WriteMethod(local, depth+1, append(ancestors, n), sw)
+			n.children[i].WriteMethod(local, depth+1, append(append([]*callNode(nil), ancestors...), n), sw)
 		}
 		sw.Do("}\n", nil)
 	case n.key:
 	default:
 		n.writeCalls(varName, isPointer, sw)
 		for i := range n.children {
-			n.children[i].WriteMethod(varName, depth, append(ancestors, n), sw)
+			n.children[i].WriteMethod(varName, depth, append(append([]*callNode(nil), ancestors...), n), sw)
 		}
 	}
 

@@ -140,19 +140,19 @@ func (m *AdmissionMetrics) reset() {
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
 func (m *AdmissionMetrics) ObserveAdmissionStep(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
 	gvr := attr.GetResource()
-	m.step.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.step.observe(elapsed, append(append([]string(nil), extraLabels...), stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
 }
 
 // ObserveAdmissionController records admission related metrics for a built-in admission controller, identified by it's plugin handler name.
 func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
 	gvr := attr.GetResource()
-	m.controller.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.controller.observe(elapsed, append(append([]string(nil), extraLabels...), stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
 }
 
 // ObserveWebhook records admission related metrics for a admission webhook.
 func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
 	gvr := attr.GetResource()
-	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.webhook.observe(elapsed, append(append([]string(nil), extraLabels...), stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
 }
 
 type metricSet struct {

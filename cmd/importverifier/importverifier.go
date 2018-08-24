@@ -124,7 +124,7 @@ func (i *ImportRestriction) forbiddenImportsFor(pkg Package) []string {
 	forbiddenImportSet := map[string]struct{}{}
 	imports := pkg.Imports
 	if !i.ExcludeTests {
-		imports = append(imports, append(pkg.TestImports, pkg.XTestImports...)...)
+		imports = append(append(append([]string(nil), imports...), pkg.TestImports...), pkg.XTestImports...)
 	}
 	for _, imp := range imports {
 		path := extractVendorPath(imp)

@@ -129,7 +129,7 @@ func (g *genSet) Namers(c *generator.Context) namer.NameSystems {
 }
 
 func (g *genSet) Imports(c *generator.Context) (imports []string) {
-	return append(g.imports.ImportLines(), "reflect", "sort")
+	return append(append([]string(nil), g.imports.ImportLines()...), "reflect", "sort")
 }
 
 // args constructs arguments for templates. Usage:

@@ -129,7 +129,7 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	// endpoint by endpoint basis
 	ws.Consumes("*/*")
 	mediaTypes, streamMediaTypes := negotiation.MediaTypesForSerializer(a.group.Serializer)
-	ws.Produces(append(mediaTypes, streamMediaTypes...)...)
+	ws.Produces(append(append([]string(nil), mediaTypes...), streamMediaTypes...)...)
 	ws.ApiVersion(a.group.GroupVersion.String())
 
 	return ws
@@ -584,7 +584,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(append(append([]string(nil), storageMeta.ProducesMIMETypes(action.Verb)...), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				Writes(producedObject)
 			if isGetterWithOptions {
@@ -612,7 +612,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), allMediaTypes...)...).
+				Produces(append(append([]string(nil), storageMeta.ProducesMIMETypes(action.Verb)...), allMediaTypes...)...).
 				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
@@ -644,7 +644,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(append(append([]string(nil), storageMeta.ProducesMIMETypes(action.Verb)...), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
 				// but currently go-restful can't handle multiple different objects being returned.
@@ -669,7 +669,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(string(types.JSONPatchType), string(types.MergePatchType), string(types.StrategicMergePatchType)).
 				Operation("patch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(append(append([]string(nil), storageMeta.ProducesMIMETypes(action.Verb)...), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				Reads(metav1.Patch{}).
 				Writes(producedObject)
@@ -692,7 +692,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(append(append([]string(nil), storageMeta.ProducesMIMETypes(action.Verb)...), mediaTypes...)...).
 				Returns(http.StatusOK, "OK", producedObject).
 				// TODO: in some cases, the API may return a v1.Status instead of the versioned object
 				// but currently go-restful can't handle multiple different objects being returned.
@@ -713,7 +713,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(append(append([]string(nil), storageMeta.ProducesMIMETypes(action.Verb)...), mediaTypes...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus).
 				Returns(http.StatusAccepted, "Accepted", versionedStatus)
@@ -735,7 +735,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
+				Produces(append(append([]string(nil), storageMeta.ProducesMIMETypes(action.Verb)...), mediaTypes...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
