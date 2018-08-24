@@ -72,7 +72,7 @@ var (
 		{{.Error}}
 
 		Please ensure that:
-		* The cluster has a stable api.controlPlaneEndpoint address.
+		* The cluster has a stable controlPlaneEndpoint address.
 		* The cluster uses an external etcd.
 		* The certificates that must be shared among control plane instances are provided.
 
@@ -388,8 +388,8 @@ func (j *Join) FetchInitClusterConfiguration(tlsBootstrapCfg *clientcmdapi.Confi
 // joining an additional control plane instance and if the node is ready to join
 func (j *Join) CheckIfReadyForAdditionalControlPlane(clusterConfiguration *kubeadmapi.InitConfiguration) error {
 	// blocks if the cluster was created without a stable control plane endpoint
-	if clusterConfiguration.API.ControlPlaneEndpoint == "" {
-		return fmt.Errorf("unable to add a new control plane instance a cluster that doesn't have a stable api.controlPlaneEndpoint address")
+	if clusterConfiguration.ControlPlaneEndpoint == "" {
+		return fmt.Errorf("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
 	// blocks if the cluster was created without an external etcd cluster

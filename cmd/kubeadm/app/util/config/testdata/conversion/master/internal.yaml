@@ -1,7 +1,6 @@
 API:
   AdvertiseAddress: 192.168.2.2
   BindPort: 6443
-  ControlPlaneEndpoint: ""
 APIServerCertSANs: null
 APIServerExtraArgs:
   authorization-mode: Node,RBAC,Webhook
@@ -157,6 +156,7 @@ ComponentConfigs:
     TLSMinVersion: ""
     TLSPrivateKeyFile: ""
     VolumeStatsAggPeriod: 1m0s
+ControlPlaneEndpoint: ""
 ControllerManagerExtraArgs: null
 ControllerManagerExtraVolumes: null
 Etcd:

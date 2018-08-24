@@ -284,16 +284,16 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 		},
 	}
 
-	// add api server controlPlaneEndpoint if present (dns or ip)
-	if len(cfg.API.ControlPlaneEndpoint) > 0 {
-		if host, _, err := kubeadmutil.ParseHostPort(cfg.API.ControlPlaneEndpoint); err == nil {
+	// add cluster controlPlaneEndpoint if present (dns or ip)
+	if len(cfg.ControlPlaneEndpoint) > 0 {
+		if host, _, err := kubeadmutil.ParseHostPort(cfg.ControlPlaneEndpoint); err == nil {
 			if ip := net.ParseIP(host); ip != nil {
 				altNames.IPs = append(altNames.IPs, ip)
 			} else {
 				altNames.DNSNames = append(altNames.DNSNames, host)
 			}
 		} else {
-			return nil, fmt.Errorf("error parsing API api.controlPlaneEndpoint %q: %s", cfg.API.ControlPlaneEndpoint, err)
+			return nil, fmt.Errorf("error parsing cluster controlPlaneEndpoint %q: %s", cfg.ControlPlaneEndpoint, err)
 		}
 	}
 

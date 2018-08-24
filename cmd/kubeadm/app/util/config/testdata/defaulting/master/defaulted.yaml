@@ -18,7 +18,6 @@ nodeRegistration:
 api:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
-  controlPlaneEndpoint: ""
 apiVersion: kubeadm.k8s.io/v1alpha3
 auditPolicy:
   logDir: /var/log/kubernetes/audit
@@ -26,6 +25,7 @@ auditPolicy:
   path: ""
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
+controlPlaneEndpoint: ""
 etcd:
   local:
     dataDir: /var/lib/etcd

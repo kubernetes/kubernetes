@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -57,7 +58,8 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
-	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
+	allErrs = append(allErrs, ValidateAPI(&c.API, field.NewPath("api"))...)
+	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
 	return allErrs
@@ -312,6 +314,24 @@ func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePort validates port numbers
+func ValidatePort(port int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if _, err := kubeadmutil.ParsePort(strconv.Itoa(int(port))); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, port, "port number is not valid"))
+	}
+	return allErrs
+}
+
+// ValidateHostPort validates host[:port] endpoints
+func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if _, _, err := kubeadmutil.ParseHostPort(endpoint); endpoint != "" && err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, "endpoint is not valid"))
+	}
+	return allErrs
+}
+
 // ValidateIPNetFromString validates network portion of ip address
 func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -385,14 +405,11 @@ func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) fie
 	return allErrs
 }
 
-// ValidateAPIEndpoint validates API server's endpoint
-func ValidateAPIEndpoint(c *kubeadm.API, fldPath *field.Path) field.ErrorList {
+// ValidateAPI validates API configuration
+func ValidateAPI(c *kubeadm.API, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	endpoint, err := kubeadmutil.GetMasterEndpoint(c)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, err.Error()))
-	}
+	allErrs = append(allErrs, ValidateIPFromString(c.AdvertiseAddress, fldPath.Child("advertiseAddress"))...)
+	allErrs = append(allErrs, ValidatePort(c.BindPort, fldPath.Child("bindPort"))...)
 	return allErrs
 }
 

@@ -447,9 +447,10 @@ func TestGetAPIServerAltNames(t *testing.T) {
 			name: "ControlPlaneEndpoint DNS",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:6443"},
-					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-					APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
+					API:                  kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+					ControlPlaneEndpoint: "api.k8s.io:6443",
+					Networking:           kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+					APIServerCertSANs:    []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			},
@@ -460,9 +461,10 @@ func TestGetAPIServerAltNames(t *testing.T) {
 			name: "ControlPlaneEndpoint IP",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "4.5.6.7:6443"},
-					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-					APIServerCertSANs: []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
+					API:                  kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
+					ControlPlaneEndpoint: "4.5.6.7:6443",
+					Networking:           kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+					APIServerCertSANs:    []string{"10.1.245.94", "10.1.245.95", "1.2.3.L", "invalid,commas,in,DNS"},
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			},
