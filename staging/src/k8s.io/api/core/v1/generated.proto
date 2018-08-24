@@ -2292,6 +2292,10 @@ message PersistentVolumeClaimSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 6;
+
+  // If specified, volume will be prepopulated with data from the DataSource.
+  // +optional
+  optional TypedLocalObjectReference dataSource = 7;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -4476,6 +4480,19 @@ message TopologySelectorTerm {
   // A list of topology selector requirements by labels.
   // +optional
   repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the
+// typed referenced object inside the same namespace.
+message TypedLocalObjectReference {
+  // APIGroup is the group for the resource being referenced
+  optional string apiGroup = 1;
+
+  // Kind is the type of resource being referenced
+  optional string kind = 2;
+
+  // Name is the name of resource being referenced
+  optional string name = 3;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

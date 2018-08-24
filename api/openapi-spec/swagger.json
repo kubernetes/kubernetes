@@ -82489,6 +82489,10 @@
        "type": "string"
       }
      },
+     "dataSource": {
+      "description": "If specified, volume will be prepopulated with data from the DataSource.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.TypedLocalObjectReference"
+     },
      "resources": {
       "description": "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
@@ -84648,6 +84652,28 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
       }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.TypedLocalObjectReference": {
+    "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
+    "required": [
+     "apiGroup",
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "apiGroup": {
+      "description": "APIGroup is the group for the resource being referenced",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is the type of resource being referenced",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name is the name of resource being referenced",
+      "type": "string"
      }
     }
    },
