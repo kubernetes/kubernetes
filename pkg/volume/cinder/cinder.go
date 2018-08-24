@@ -87,7 +87,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 
 func (plugin *cinderPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.volumeLocks = keymutex.NewKeyMutex()
+	plugin.volumeLocks = keymutex.NewHashed(0)
 	return nil
 }
 
