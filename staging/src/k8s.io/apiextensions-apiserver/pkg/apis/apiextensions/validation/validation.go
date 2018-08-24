@@ -504,12 +504,10 @@ func ValidateCustomResourceDefinitionSubresources(subresources *apiextensions.Cu
 			}
 		}
 
-		// if labelSelectorPath is present, it should be a constrained json path under .status
+		// if labelSelectorPath is present, it should be a constrained json path
 		if subresources.Scale.LabelSelectorPath != nil && len(*subresources.Scale.LabelSelectorPath) > 0 {
 			if errs := validateSimpleJSONPath(*subresources.Scale.LabelSelectorPath, fldPath.Child("scale.labelSelectorPath")); len(errs) > 0 {
 				allErrs = append(allErrs, errs...)
-			} else if !strings.HasPrefix(*subresources.Scale.LabelSelectorPath, ".status.") {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("scale.labelSelectorPath"), subresources.Scale.LabelSelectorPath, "should be a json path under .status"))
 			}
 		}
 	}
