@@ -36,13 +36,21 @@ type KeyMutex interface {
 // Returns a new instance of a key mutex.
 func NewKeyMutex() KeyMutex {
 	return &keyMutex{
-		mutexMap: make(map[string]*sync.Mutex),
+		mutexMap: make(map[string]*mutexWithRefCnt),
 	}
+}
+
+// It wraps sync.Mutex with an reference count.
+type mutexWithRefCnt struct {
+	sync.Mutex
+	// Number of goroutines hold and trying to hode the lock.
+	// This reference count is protected by global big lock.
+	refcnt int64
 }
 
 type keyMutex struct {
 	sync.RWMutex
-	mutexMap map[string]*sync.Mutex
+	mutexMap map[string]*mutexWithRefCnt
 }
 
 // Acquires a lock associated with the specified ID (creates the lock if one doesn't already exist).
@@ -58,26 +66,36 @@ func (km *keyMutex) LockKey(id string) {
 func (km *keyMutex) UnlockKey(id string) error {
 	glog.V(5).Infof("UnlockKey(...) called for id %q\r\n", id)
 	km.RLock()
-	defer km.RUnlock()
 	mutex, exists := km.mutexMap[id]
 	if !exists {
+		km.RUnlock()
 		return fmt.Errorf("id %q not found", id)
 	}
 	glog.V(5).Infof("UnlockKey(...) for id. Mutex found, trying to unlock it. %q\r\n", id)
 
 	mutex.Unlock()
 	glog.V(5).Infof("UnlockKey(...) for id %q completed.\r\n", id)
+	km.RUnlock()
+
+	km.Lock()
+	km.mutexMap[id].refcnt--
+	if km.mutexMap[id].refcnt == 0 {
+		// Free the lock if no one is holding or trying to hold.
+		delete(km.mutexMap, id)
+	}
+	km.Unlock()
 	return nil
 }
 
 // Returns lock associated with the specified ID, or creates the lock if one doesn't already exist.
-func (km *keyMutex) getOrCreateLock(id string) *sync.Mutex {
+func (km *keyMutex) getOrCreateLock(id string) *mutexWithRefCnt {
 	km.Lock()
 	defer km.Unlock()
 
 	if _, exists := km.mutexMap[id]; !exists {
-		km.mutexMap[id] = &sync.Mutex{}
+		km.mutexMap[id] = &mutexWithRefCnt{}
 	}
 
+	km.mutexMap[id].refcnt++
 	return km.mutexMap[id]
 }
