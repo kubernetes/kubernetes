@@ -643,6 +643,9 @@ func pastBackoffLimitOnFailure(job *batch.Job, pods []*v1.Pod) bool {
 			result += stat.RestartCount
 		}
 	}
+	if *job.Spec.BackoffLimit == 0 {
+		return result > 0
+	}
 	return result >= *job.Spec.BackoffLimit
 }
 
