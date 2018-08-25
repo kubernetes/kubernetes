@@ -320,62 +320,102 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	return pod, nil
 }
 
-// SelectZone selects a zone for a volume based on several factors:
-// node.zone, allowedTopologies, zone/zones parameters from storageclass
-// and zones with active nodes from the cluster
+// SelectZoneForVolume is a wrapper around SelectZonesForVolume
+// to select a single zone for a volume based on parameters
 func SelectZoneForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string) (string, error) {
+	zones, err := SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent, zoneParameter, zonesParameter, zonesWithNodes, node, allowedTopologies, pvcName, 1)
+	if err != nil {
+		return "", err
+	}
+	zone, ok := zones.PopAny()
+	if !ok {
+		return "", fmt.Errorf("could not determine a zone to provision volume in")
+	}
+	return zone, nil
+}
+
+// SelectZonesForVolume selects zones for a volume based on several factors:
+// node.zone, allowedTopologies, zone/zones parameters from storageclass,
+// zones with active nodes from the cluster. The number of zones = replicas.
+func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zoneParameter string, zonesParameter, zonesWithNodes sets.String, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm, pvcName string, numReplicas uint32) (sets.String, error) {
 	if zoneParameterPresent && zonesParameterPresent {
-		return "", fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
+		return nil, fmt.Errorf("both zone and zones StorageClass parameters must not be used at the same time")
 	}
 
-	// pick zone from node if present
+	var zoneFromNode string
+	// pick one zone from node if present
 	if node != nil {
 		// DynamicProvisioningScheduling implicit since node is not nil
 		if zoneParameterPresent || zonesParameterPresent {
-			return "", fmt.Errorf("zone[s] cannot be specified in StorageClass if VolumeBindingMode is set to WaitForFirstConsumer. Please specify allowedTopologies in StorageClass for constraining zones.")
+			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if VolumeBindingMode is set to WaitForFirstConsumer. Please specify allowedTopologies in StorageClass for constraining zones")
 		}
 
-		// pick node's zone and ignore any allowedTopologies (since scheduler is assumed to have accounted for it already)
-		z, ok := node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		// pick node's zone for one of the replicas
+		var ok bool
+		zoneFromNode, ok = node.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
 		if !ok {
-			return "", fmt.Errorf("%s Label for node missing", kubeletapis.LabelZoneFailureDomain)
+			return nil, fmt.Errorf("%s Label for node missing", kubeletapis.LabelZoneFailureDomain)
 		}
-		return z, nil
+		// if single replica volume and node with zone found, return immediately
+		if numReplicas == 1 {
+			return sets.NewString(zoneFromNode), nil
+		}
 	}
 
 	// pick zone from allowedZones if specified
 	allowedZones, err := ZonesFromAllowedTopologies(allowedTopologies)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if (len(allowedTopologies) > 0) && (allowedZones.Len() == 0) {
-		return "", fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", kubeletapis.LabelZoneFailureDomain, kubeletapis.LabelZoneFailureDomain)
+		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", kubeletapis.LabelZoneFailureDomain, kubeletapis.LabelZoneFailureDomain)
 	}
 
 	if allowedZones.Len() > 0 {
 		// DynamicProvisioningScheduling implicit since allowedZones present
 		if zoneParameterPresent || zonesParameterPresent {
-			return "", fmt.Errorf("zone[s] cannot be specified in StorageClass if allowedTopologies specified")
+			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if allowedTopologies specified")
 		}
-		return ChooseZoneForVolume(*allowedZones, pvcName), nil
+		// scheduler will guarantee if node != null above, zoneFromNode is member of allowedZones.
+		// so if zoneFromNode != "", we can safely assume it is part of allowedZones.
+		if zones, err := chooseZonesForVolumeIncludingZone(allowedZones, pvcName, zoneFromNode, numReplicas); err != nil {
+			return nil, fmt.Errorf("cannot process zones in allowedTopologies: %v", err)
+		} else {
+			return zones, nil
+		}
 	}
 
 	// pick zone from parameters if present
 	if zoneParameterPresent {
-		return zoneParameter, nil
+		if numReplicas > 1 {
+			return nil, fmt.Errorf("zone cannot be specified if desired number of replicas for pv is greather than 1. Please specify zones or allowedTopologies to specify desired zones")
+		}
+		return sets.NewString(zoneParameter), nil
 	}
 
 	if zonesParameterPresent {
-		return ChooseZoneForVolume(zonesParameter, pvcName), nil
+		if uint32(zonesParameter.Len()) < numReplicas {
+			return nil, fmt.Errorf("not enough zones found in zones parameter to provision a volume with %d replicas. Found %d zones, need %d zones", numReplicas, zonesParameter.Len(), numReplicas)
+		}
+		// directly choose from zones parameter; no zone from node need to be considered
+		return ChooseZonesForVolume(zonesParameter, pvcName, numReplicas), nil
 	}
 
 	// pick zone from zones with nodes
-	return ChooseZoneForVolume(zonesWithNodes, pvcName), nil
+	if zonesWithNodes.Len() > 0 {
+		// If node != null (and thus zoneFromNode != ""), zoneFromNode will be member of zonesWithNodes
+		if zones, err := chooseZonesForVolumeIncludingZone(zonesWithNodes, pvcName, zoneFromNode, numReplicas); err != nil {
+			return nil, fmt.Errorf("cannot process zones where nodes exist in the cluster: %v", err)
+		} else {
+			return zones, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot determine zones to provision volume in")
 }
 
 // ZonesFromAllowedTopologies returns a list of zones specified in allowedTopologies
-func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (*sets.String, error) {
+func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (sets.String, error) {
 	zones := make(sets.String)
 	for _, term := range allowedTopologies {
 		for _, exp := range term.MatchLabelExpressions {
@@ -388,7 +428,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (*s
 			}
 		}
 	}
-	return &zones, nil
+	return zones, nil
 }
 
 func ZonesSetToLabelValue(strSet sets.String) string {
@@ -397,7 +437,11 @@ func ZonesSetToLabelValue(strSet sets.String) string {
 
 // ZonesToSet converts a string containing a comma separated list of zones to set
 func ZonesToSet(zonesString string) (sets.String, error) {
-	return stringToSet(zonesString, ",")
+	zones, err := stringToSet(zonesString, ",")
+	if err != nil {
+		return nil, fmt.Errorf("error parsing zones %s, must be strings separated by commas: %v", zonesString, err)
+	}
+	return zones, nil
 }
 
 // LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
@@ -420,6 +464,27 @@ func stringToSet(str, delimiter string) (sets.String, error) {
 		zonesSet.Insert(trimmedZone)
 	}
 	return zonesSet, nil
+}
+
+// LabelZonesToList converts a PV label value from string containing a delimited list of zones to list
+func LabelZonesToList(labelZonesValue string) ([]string, error) {
+	return stringToList(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
+}
+
+// StringToList converts a string containing list separated by specified delimiter to a list
+func stringToList(str, delimiter string) ([]string, error) {
+	zonesSlice := make([]string, 0)
+	for _, zone := range strings.Split(str, delimiter) {
+		trimmedZone := strings.TrimSpace(zone)
+		if trimmedZone == "" {
+			return nil, fmt.Errorf(
+				"%q separated list (%q) must not contain an empty string",
+				delimiter,
+				str)
+		}
+		zonesSlice = append(zonesSlice, trimmedZone)
+	}
+	return zonesSlice, nil
 }
 
 // CalculateTimeoutForVolume calculates time for a Recycler pod to complete a
@@ -537,6 +602,33 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 
 	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
 	return zone
+}
+
+// chooseZonesForVolumeIncludingZone is a wrapper around ChooseZonesForVolume that ensures zoneToInclude is chosen
+// zoneToInclude can either be empty in which case it is ignored. If non-empty, zoneToInclude is expected to be member of zones.
+// numReplicas is expected to be > 0 and <= zones.Len()
+func chooseZonesForVolumeIncludingZone(zones sets.String, pvcName, zoneToInclude string, numReplicas uint32) (sets.String, error) {
+	if numReplicas == 0 {
+		return nil, fmt.Errorf("invalid number of replicas passed")
+	}
+	if uint32(zones.Len()) < numReplicas {
+		return nil, fmt.Errorf("not enough zones found to provision a volume with %d replicas. Need at least %d distinct zones for a volume with %d replicas", numReplicas, numReplicas, numReplicas)
+	}
+	if zoneToInclude != "" && !zones.Has(zoneToInclude) {
+		return nil, fmt.Errorf("zone to be included: %s needs to be member of set: %v", zoneToInclude, zones)
+	}
+	if uint32(zones.Len()) == numReplicas {
+		return zones, nil
+	}
+	if zoneToInclude != "" {
+		zones.Delete(zoneToInclude)
+		numReplicas = numReplicas - 1
+	}
+	zonesChosen := ChooseZonesForVolume(zones, pvcName, numReplicas)
+	if zoneToInclude != "" {
+		zonesChosen.Insert(zoneToInclude)
+	}
+	return zonesChosen, nil
 }
 
 // ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
