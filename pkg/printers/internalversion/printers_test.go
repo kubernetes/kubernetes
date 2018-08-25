@@ -1130,6 +1130,9 @@ func TestPrintHumanReadableService(t *testing.T) {
 							IP: "2.3.4.5",
 						},
 						{
+							IP: "2.3.4.5",
+						},
+						{
 							IP: "3.4.5.6",
 						},
 					},
@@ -1245,6 +1248,11 @@ func TestPrintHumanReadableService(t *testing.T) {
 				if (n == 0 || wide) && !strings.Contains(output, ip) {
 					t.Errorf("expected to contain ingress ip %s with wide=%v, but doesn't: %s", ip, wide, output)
 				}
+				// Check for duplicate ip's
+				if strings.Count(output, ip) > 1 {
+					t.Errorf("expected to contain non duplicate ip's %s but got: %s", ip, output)
+				}
+
 			}
 
 			for _, port := range svc.Spec.Ports {
