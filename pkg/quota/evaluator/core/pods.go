@@ -56,6 +56,7 @@ var podResources = []api.ResourceName{
 	api.ResourceLimitsMemory,
 	api.ResourceLimitsEphemeralStorage,
 	api.ResourcePods,
+	api.ResourcePodsHostPorts,
 }
 
 // podResourcePrefixes are the set of prefixes for resources (Hugepages, and other
@@ -352,6 +353,7 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (api.ResourceList, erro
 		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
 		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
 	}
+
 	// InitContainers are run sequentially before other containers start, so the highest
 	// init container resource is compared against the sum of app containers to determine
 	// the effective usage for both requests and limits.
@@ -361,6 +363,19 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (api.ResourceList, erro
 	}
 
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
+
+	var hostPorts int64
+	for i := range pod.Spec.Containers {
+		for k := range pod.Spec.Containers[i].Ports {
+			if pod.Spec.Containers[i].Ports[k].HostPort != 0 {
+				hostPorts++
+			}
+		}
+	}
+	if hostPorts != 0 {
+		result[api.ResourcePodsHostPorts] = *(resource.NewQuantity(hostPorts, resource.DecimalSI))
+	}
+
 	return result, nil
 }
 

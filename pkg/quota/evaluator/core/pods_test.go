@@ -274,6 +274,36 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"container hostports": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					// hostports in initContainers are not calculated.
+					InitContainers: []api.Container{{
+						Ports: []api.ContainerPort{
+							{HostPort: 80},
+							{HostPort: 8080},
+						},
+					}},
+					Containers: []api.Container{{
+						Ports: []api.ContainerPort{
+							{HostPort: 80},
+							{HostPort: 8080},
+						},
+					},
+						{
+							Ports: []api.ContainerPort{
+								{ContainerPort: 1000},
+							},
+						},
+					},
+				},
+			},
+			usage: api.ResourceList{
+				api.ResourcePodsHostPorts: resource.MustParse("2"),
+				api.ResourcePods:          resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+		},
 		"init container maximums override sum of containers": {
 			pod: &api.Pod{
 				Spec: api.PodSpec{
