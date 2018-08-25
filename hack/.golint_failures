@@ -703,6 +703,7 @@ staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-aggregator/pkg/controllers/status
 staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice
 staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
+staging/src/k8s.io/kube-proxy/config/v1alpha1
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/external_metrics
