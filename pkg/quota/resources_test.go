@@ -197,6 +197,18 @@ func TestResourceNames(t *testing.T) {
 			},
 			expected: []api.ResourceName{api.ResourceMemory, api.ResourceCPU},
 		},
+		"values-one-cpu": {
+			a: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("100m"),
+			},
+			expected: []api.ResourceName{api.ResourceCPU},
+		},
+		"values-one-memory": {
+			a: api.ResourceList{
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expected: []api.ResourceName{api.ResourceMemory},
+		},
 	}
 	for testName, testCase := range testCases {
 		actualSet := ToSet(ResourceNames(testCase.a))
@@ -218,9 +230,14 @@ func TestContains(t *testing.T) {
 			b:        api.ResourceCPU,
 			expected: false,
 		},
-		"does-contain": {
+		"does-contain-cpu": {
 			a:        []api.ResourceName{api.ResourceMemory, api.ResourceCPU},
 			b:        api.ResourceCPU,
+			expected: true,
+		},
+		"does-contain-memory": {
+			a:        []api.ResourceName{api.ResourceMemory, api.ResourceCPU},
+			b:        api.ResourceMemory,
 			expected: true,
 		},
 	}
@@ -271,9 +288,23 @@ func TestIsZero(t *testing.T) {
 			},
 			expected: true,
 		},
-		"non-zero": {
+		"non-zero-both": {
 			a: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("200m"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expected: false,
+		},
+		"non-zero-cpu": {
+			a: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("200m"),
+				api.ResourceMemory: resource.MustParse("0"),
+			},
+			expected: false,
+		},
+		"non-zero-memory": {
+			a: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("0"),
 				api.ResourceMemory: resource.MustParse("1Gi"),
 			},
 			expected: false,
@@ -295,12 +326,19 @@ func TestIsNegative(t *testing.T) {
 			a:        api.ResourceList{},
 			expected: []api.ResourceName{},
 		},
-		"some-negative": {
+		"some-negative-cpu": {
 			a: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("-10"),
 				api.ResourceMemory: resource.MustParse("0"),
 			},
 			expected: []api.ResourceName{api.ResourceCPU},
+		},
+		"some-negative-memory": {
+			a: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("0"),
+				api.ResourceMemory: resource.MustParse("-10"),
+			},
+			expected: []api.ResourceName{api.ResourceMemory},
 		},
 		"all-negative": {
 			a: api.ResourceList{
