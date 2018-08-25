@@ -170,7 +170,6 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1,KubeletConfiguration,ResolverConfig
 API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1,KubeletConfiguration,IPTablesDropBit
-API rule violation: names_match,k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1,ClientConnectionConfiguration,KubeConfigFile
 API rule violation: names_match,k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1,KubeProxyConfiguration,IPTables
 API rule violation: names_match,k8s.io/metrics/pkg/apis/custom_metrics/v1beta1,MetricValue,WindowSeconds
 API rule violation: names_match,k8s.io/metrics/pkg/apis/external_metrics/v1beta1,ExternalMetricValue,WindowSeconds

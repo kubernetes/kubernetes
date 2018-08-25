@@ -136,8 +136,8 @@ func SetDefaults_ProxyConfiguration(obj *InitConfiguration) {
 		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
 	}
 
-	if obj.KubeProxy.Config.ClientConnection.KubeConfigFile == "" {
-		obj.KubeProxy.Config.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
+	if obj.KubeProxy.Config.ClientConnection.Kubeconfig == "" {
+		obj.KubeProxy.Config.ClientConnection.Kubeconfig = KubeproxyKubeConfigFileName
 	}
 
 	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)

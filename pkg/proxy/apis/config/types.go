@@ -21,24 +21,9 @@ import (
 	"sort"
 	"strings"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// ClientConnectionConfiguration contains details for constructing a client.
-type ClientConnectionConfiguration struct {
-	// kubeconfig is the path to a kubeconfig file.
-	KubeConfigFile string
-	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
-	// default value of 'application/json'. This field will control all connections to the server used by a particular
-	// client.
-	AcceptContentTypes string
-	// contentType is the content type used when sending data to the server from this client.
-	ContentType string
-	// qps controls the number of queries per second allowed for this connection.
-	QPS float32
-	// burst allows extra queries to accumulate when a client is exceeding its rate.
-	Burst int32
-}
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
 // details for the Kubernetes proxy server.
@@ -123,7 +108,7 @@ type KubeProxyConfiguration struct {
 	HostnameOverride string
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
-	ClientConnection ClientConnectionConfiguration
+	ClientConnection apimachineryconfig.ClientConnectionConfiguration
 	// iptables contains iptables-related configuration options.
 	IPTables KubeProxyIPTablesConfiguration
 	// ipvs contains ipvs-related configuration options.

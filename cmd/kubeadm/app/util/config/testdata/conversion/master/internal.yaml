@@ -29,7 +29,7 @@ ComponentConfigs:
       AcceptContentTypes: ""
       Burst: 10
       ContentType: application/vnd.kubernetes.protobuf
-      KubeConfigFile: /var/lib/kube-proxy/kubeconfig.conf
+      Kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
       QPS: 5
     ClusterCIDR: ""
     ConfigSyncPeriod: 15m0s

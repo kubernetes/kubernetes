@@ -45,8 +45,8 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 		externalproxycfg.ClusterCIDR = internalcfg.Networking.PodSubnet
 	}
 
-	if externalproxycfg.ClientConnection.KubeConfigFile == "" {
-		externalproxycfg.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
+	if externalproxycfg.ClientConnection.Kubeconfig == "" {
+		externalproxycfg.ClientConnection.Kubeconfig = KubeproxyKubeConfigFileName
 	}
 
 	// Run the rest of the kube-proxy defaulting code

@@ -66,8 +66,8 @@ func defaultKubeProxyConfiguration(internalcfg *ClusterConfiguration, obj *kubep
 		obj.ClusterCIDR = internalcfg.Networking.PodSubnet
 	}
 
-	if obj.ClientConnection.KubeConfigFile == "" {
-		obj.ClientConnection.KubeConfigFile = "/var/lib/kube-proxy/kubeconfig.conf"
+	if obj.ClientConnection.Kubeconfig == "" {
+		obj.ClientConnection.Kubeconfig = "/var/lib/kube-proxy/kubeconfig.conf"
 	}
 }
 
