@@ -474,32 +474,22 @@ kube::golang::create_coverage_dummy_test() {
   local name="$(basename "$package")"
   cat <<EOF > $(kube::golang::path_for_coverage_dummy_test "$package")
 package main
- import (
-  "flag"
-	"os"
-	"strconv"
-	"testing"
-	"time"
+import (
+  "testing"
+  "k8s.io/kubernetes/pkg/util/coverage"
 )
- func TestMain(m *testing.M) {
-  // We need to pass coverage instructions to the unittest framework, so we hijack os.Args
-  original_args := os.Args
-  now := time.Now().UnixNano()
-  test_args := []string{os.Args[0], "-test.coverprofile=/tmp/k8s-${name}-" + strconv.FormatInt(now, 10) + ".cov"}
-  os.Args = test_args
 
-  // This is sufficient for the unit tests to be set up.
-  flag.Parse()
+func TestMain(m *testing.M) {
+  // Get coverage running
+  coverage.InitCoverage("${name}")
 
-   // Restore the original args for use by the program.
-	os.Args = original_args
  	// Go!
   main()
 
-   // Make sure we actually write the profiling information to disk, if we make it here.
+  // Make sure we actually write the profiling information to disk, if we make it here.
   // On long-running services, or anything that calls os.Exit(), this is insufficient,
   // so be sure to call this from inside the binary too.
-  // TODO: actually have some code here.
+  coverage.FlushCoverage()
 }
 EOF
 }
@@ -530,6 +520,7 @@ kube::golang::build_some_binaries() {
           -covermode count \
           -coverpkg k8s.io/... \
           "${build_args[@]}" \
+          -tags coverage \
           "$package"
         kube::golang::delete_coverage_dummy_test "$package"
       else
