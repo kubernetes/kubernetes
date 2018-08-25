@@ -144,7 +144,6 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_kubeproxyconfig_KubeProxyCon
 	}
 	out.ConfigSyncPeriod = in.ConfigSyncPeriod
 	out.NodePortAddresses = *(*[]string)(unsafe.Pointer(&in.NodePortAddresses))
-	out.SCTPUserSpaceNode = in.SCTPUserSpaceNode
 	return nil
 }
 
@@ -180,7 +179,6 @@ func autoConvert_kubeproxyconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyCon
 	}
 	out.ConfigSyncPeriod = in.ConfigSyncPeriod
 	out.NodePortAddresses = *(*[]string)(unsafe.Pointer(&in.NodePortAddresses))
-	out.SCTPUserSpaceNode = in.SCTPUserSpaceNode
 	return nil
 }
 

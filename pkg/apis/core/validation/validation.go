@@ -1918,10 +1918,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	return allErrs
 }
 
-var supportedServicePortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP), string(core.ProtocolSCTP))
-var supportedLoadBalancerProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP))
-var supportedContainerPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP), string(core.ProtocolSCTP))
-var supportedHostPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP))
+var supportedPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP), string(core.ProtocolSCTP))
 
 func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1954,12 +1951,10 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
-		} else if port.HostPort != 0 {
-			if !supportedHostPortProtocols.Has(string(port.Protocol)) {
-				allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedHostPortProtocols.List()))
-			}
-		} else if !supportedContainerPortProtocols.Has(string(port.Protocol)) {
-			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedContainerPortProtocols.List()))
+		} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
+			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
+		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
+			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 		}
 	}
 	return allErrs
@@ -3733,8 +3728,10 @@ func ValidateService(service *core.Service) field.ErrorList {
 		includeProtocols := sets.NewString()
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if !supportedLoadBalancerProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP ports"))
+			if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && service.Spec.Ports[i].Protocol == core.ProtocolSCTP {
+				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
+			} else if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP/SCTP ports"))
 			} else {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
 			}
@@ -3829,11 +3826,13 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 	for _, msg := range validation.IsValidPortNum(int(sp.Port)) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("port"), sp.Port, msg))
 	}
-
+	
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !supportedServicePortProtocols.Has(string(sp.Protocol)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedServicePortProtocols.List()))
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && sp.Protocol == core.ProtocolSCTP {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
+	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
 
 	allErrs = append(allErrs, ValidatePortNumOrName(sp.TargetPort, fldPath.Child("targetPort"))...)
@@ -5201,8 +5200,10 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
-	} else if !supportedServicePortProtocols.Has(string(port.Protocol)) {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedServicePortProtocols.List()))
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
+	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}
 	return allErrs
 }

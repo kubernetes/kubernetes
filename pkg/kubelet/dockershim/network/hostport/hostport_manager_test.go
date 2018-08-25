@@ -152,6 +152,11 @@ func TestOpenCloseHostports(t *testing.T) {
 				{HostPort: 7070, Protocol: v1.Protocol("TCP")},
 			},
 		},
+		{
+			portMappings: []*PortMapping{
+				{HostPort: 7777, Protocol: v1.Protocol("SCTP")},
+			},
+		},
 	}
 
 	for _, tc := range closePortCases {
@@ -197,6 +202,11 @@ func TestHostportManager(t *testing.T) {
 						ContainerPort: 81,
 						Protocol:      v1.ProtocolUDP,
 					},
+					{
+                        HostPort:      8083,
+                        ContainerPort: 83,
+                        Protocol:      v1.ProtocolSCTP,
+                    },
 				},
 			},
 			expectError: false,
@@ -217,6 +227,11 @@ func TestHostportManager(t *testing.T) {
 						HostPort:      8081,
 						ContainerPort: 81,
 						Protocol:      v1.ProtocolUDP,
+					},
+					{
+						HostPort:      8083,
+						ContainerPort: 83,
+						Protocol:      v1.ProtocolSCTP,
 					},
 				},
 			},

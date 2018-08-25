@@ -166,7 +166,6 @@ func newProxyServer(
 			recorder,
 			healthzUpdater,
 			config.NodePortAddresses,
-			config.SCTPUserSpaceNode,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -206,7 +205,6 @@ func newProxyServer(
 			healthzServer,
 			config.IPVS.Scheduler,
 			config.NodePortAddresses,
-			config.SCTPUserSpaceNode,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)

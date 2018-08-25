@@ -4060,6 +4060,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 }
 
 func TestValidatePorts(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 	successCase := []core.ContainerPort{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
@@ -8590,6 +8591,8 @@ func makeValidService() core.Service {
 }
 
 func TestValidateService(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
+	
 	testCases := []struct {
 		name     string
 		tweakSvc func(svc *core.Service) // given a basic valid service, each test case can customize it

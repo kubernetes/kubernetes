@@ -171,7 +171,6 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		ipsetList:         ipsetList,
 		nodePortAddresses: make([]string, 0),
 		networkInterfacer: proxyutiltest.NewFakeNetwork(),
-		sctpUserSpaceNode: false,
 	}
 }
 
@@ -1362,8 +1361,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "foobar", "UDP", 8675, 30061, 7000)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "baz", "UDP", 8676, 30062, 7001)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "sctpfoo", "SCTP", 8677, 30063, 7002)
-			svc.Status.LoadBalancer = api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			svc.Status.LoadBalancer = v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
 					{IP: "10.1.2.4"},
 				},
 			}
@@ -1375,8 +1374,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "foobar2", "UDP", 8677, 30063, 7002)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "baz", "UDP", 8678, 30064, 7003)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "sctpbaz", "SCTP", 8679, 30065, 7004)
-			svc.Status.LoadBalancer = api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			svc.Status.LoadBalancer = v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
 					{IP: "10.1.2.3"},
 				},
 			}
@@ -1460,9 +1459,9 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = v1.ClusterIPNone
 		}),
-		makeTestService("somewhere-else", "headless-sctp", func(svc *api.Service) {
-			svc.Spec.Type = api.ServiceTypeClusterIP
-			svc.Spec.ClusterIP = api.ClusterIPNone
+		makeTestService("somewhere-else", "headless-sctp", func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = v1.ClusterIPNone
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "sip", "SCTP", 1235, 0, 0)
 		}),
 	)
@@ -2634,7 +2633,7 @@ func Test_syncService(t *testing.T) {
 			// case 4, SCTP, old virtual server is same as new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
-				Protocol:  string(api.ProtocolSCTP),
+				Protocol:  string(v1.ProtocolSCTP),
 				Port:      80,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -2642,7 +2641,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "foo",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
-				Protocol:  string(api.ProtocolSCTP),
+				Protocol:  string(v1.ProtocolSCTP),
 				Port:      80,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -2653,7 +2652,7 @@ func Test_syncService(t *testing.T) {
 			// case 5, old virtual server is different from new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
-				Protocol:  string(api.ProtocolSCTP),
+				Protocol:  string(v1.ProtocolSCTP),
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -2661,7 +2660,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "bar",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
-				Protocol:  string(api.ProtocolSCTP),
+				Protocol:  string(v1.ProtocolSCTP),
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagPersistent,
@@ -2672,7 +2671,7 @@ func Test_syncService(t *testing.T) {
 			// case 6, old virtual server is different from new virtual server
 			oldVirtualServer: &utilipvs.VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
-				Protocol:  string(api.ProtocolSCTP),
+				Protocol:  string(v1.ProtocolSCTP),
 				Port:      8080,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -2680,7 +2679,7 @@ func Test_syncService(t *testing.T) {
 			svcName: "bar",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
-				Protocol:  string(api.ProtocolSCTP),
+				Protocol:  string(v1.ProtocolSCTP),
 				Port:      8080,
 				Scheduler: "wlc",
 				Flags:     utilipvs.FlagHashed,
@@ -2693,7 +2692,7 @@ func Test_syncService(t *testing.T) {
 			svcName:          "baz",
 			newVirtualServer: &utilipvs.VirtualServer{
 				Address:   net.ParseIP("1.2.3.4"),
-				Protocol:  string(api.ProtocolSCTP),
+				Protocol:  string(v1.ProtocolSCTP),
 				Port:      53,
 				Scheduler: "rr",
 				Flags:     utilipvs.FlagHashed,
@@ -2828,7 +2827,6 @@ func TestCleanLegacyService(t *testing.T) {
 		nil,
 		DefaultScheduler,
 		make([]string, 0),
-		false,
 	)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

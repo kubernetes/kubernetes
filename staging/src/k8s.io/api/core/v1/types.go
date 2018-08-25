@@ -1664,7 +1664,7 @@ type ContainerPort struct {
 	// Number of port to expose on the pod's IP address.
 	// This must be a valid port number, 0 < x < 65536.
 	ContainerPort int32 `json:"containerPort" protobuf:"varint,3,opt,name=containerPort"`
-	// Protocol for port. Must be UDP, TCP, or SCTP. "SCTP" is supported only if "HostPort" is not specified.
+	// Protocol for port. Must be UDP, TCP, or SCTP.
 	// Defaults to "TCP".
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=Protocol"`

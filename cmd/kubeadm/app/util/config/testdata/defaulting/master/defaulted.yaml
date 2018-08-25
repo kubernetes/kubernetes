@@ -75,7 +75,6 @@ nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
 resourceContainer: /kube-proxy
-sctpUserSpaceNode: false
 udpIdleTimeout: 250ms
 ---
 address: 0.0.0.0

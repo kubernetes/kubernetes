@@ -161,9 +161,9 @@ func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, port int, prot
 
 func TestDeleteEndpointConnections(t *testing.T) {
 	const (
-		UDP = api.ProtocolUDP
-		TCP = api.ProtocolTCP
-		SCTP = api.ProtocolSCTP
+		UDP = v1.ProtocolUDP
+		TCP = v1.ProtocolTCP
+		SCTP = v1.ProtocolSCTP
 	)
 	testCases := []struct {
 		description  string
@@ -394,7 +394,6 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		natRules:                 bytes.NewBuffer(nil),
 		nodePortAddresses:        make([]string, 0),
 		networkInterfacer:        utilproxytest.NewFakeNetwork(),
-		sctpUserSpaceNode:        false,
 	}
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
 	return p

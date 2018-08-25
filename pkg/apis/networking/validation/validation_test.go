@@ -23,6 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateNetworkPolicy(t *testing.T) {
@@ -30,6 +33,8 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	protocolUDP := api.ProtocolUDP
 	protocolICMP := api.Protocol("ICMP")
 	protocolSCTP := api.ProtocolSCTP
+	
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 
 	successCases := []networking.NetworkPolicy{
 		{
@@ -279,6 +284,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	// Success cases are expected to pass validation.
+	
 	for k, v := range successCases {
 		if errs := ValidateNetworkPolicy(&v); len(errs) != 0 {
 			t.Errorf("Expected success for %d, got %v", k, errs)

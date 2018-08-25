@@ -33,7 +33,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	"github.com/ishidawataru/sctp"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -260,10 +259,6 @@ type Proxier struct {
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer utilproxy.NetworkInterfacer
-
-	// Indicates whether a node is dedicated for applications that use userspace
-	// SCTP stack.
-	sctpUserSpaceNode bool
 }
 
 // listenPortOpener opens ports by calling bind() and listen().
@@ -295,7 +290,6 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
 	nodePortAddresses []string,
-	sctpUserSpaceNode bool,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
@@ -352,7 +346,6 @@ func NewProxier(ipt utiliptables.Interface,
 		natRules:                 bytes.NewBuffer(nil),
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        utilproxy.RealNetwork{},
-		sctpUserSpaceNode:        sctpUserSpaceNode,
 	}
 	burstSyncs := 2
 	glog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
@@ -852,15 +845,9 @@ func (proxier *Proxier) syncProxyRules() {
 			// If the "external" IP happens to be an IP that is local to this
 			// machine, hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			// Exception: if the node is dedicated for applications that use
-			// userspace SCTP stack we must not start listening on the local port
-			// in the kernel because that would load the SCTP kernel module, and
-			// there are interworking issues between the SCTP kernel module and
-			// userspace SCTP stacks.
 			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
-			} else if local && (svcInfo.GetProtocol() != api.ProtocolSCTP || !proxier.sctpUserSpaceNode) {
-
+			} else if local && (svcInfo.GetProtocol() != v1.ProtocolSCTP) {
 				lp := utilproxy.LocalPort{
 					Description: "externalIP for " + svcNameString,
 					IP:          externalIP,
@@ -1029,7 +1016,7 @@ func (proxier *Proxier) syncProxyRules() {
 				if proxier.portsMap[lp] != nil {
 					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 					replacementPortsMap[lp] = proxier.portsMap[lp]
-				} else if svcInfo.GetProtocol() != api.ProtocolSCTP || !proxier.sctpUserSpaceNode {
+				} else if svcInfo.GetProtocol() != v1.ProtocolSCTP {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
 						glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
@@ -1428,18 +1415,6 @@ func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 			return nil, err
 		}
 		conn, err := net.ListenUDP("udp", addr)
-		if err != nil {
-			return nil, err
-		}
-		socket = conn
-	case "sctp":
-		// There is not any golang/net way to bind or listen on an SCTP socket.
-		// We have to use a 3rd part lib - the same which is used in Docker
-		addr, err := sctp.ResolveSCTPAddr("sctp", net.JoinHostPort(lp.IP, strconv.Itoa(lp.Port)))
-		if err != nil {
-			return nil, err
-		}
-		conn, err := sctp.ListenSCTP("sctp", addr)
 		if err != nil {
 			return nil, err
 		}
