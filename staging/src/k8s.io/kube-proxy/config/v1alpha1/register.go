@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 )
 
 // GroupName is the group name use in this package
@@ -29,7 +29,8 @@ var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha
 
 var (
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
-	localSchemeBuilder = &kubeproxyconfigv1alpha1.SchemeBuilder
+	SchemeBuilder      runtime.SchemeBuilder
+	localSchemeBuilder = &SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
@@ -37,5 +38,12 @@ func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addDefaultingFuncs)
+	localSchemeBuilder.Register(addKnownTypes)
+}
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&KubeProxyConfiguration{},
+	)
+	return nil
 }

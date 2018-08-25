@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/utils/pointer"
@@ -32,7 +33,7 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
+func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyConfiguration) {
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}
