@@ -87,6 +87,10 @@ func (s *EtcdOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("--etcd-servers must be specified"))
 	}
 
+	if len(s.StorageConfig.ServerList) > 1 && !s.StorageConfig.Quorum {
+		allErrors = append(allErrors, fmt.Errorf("--etcd-quorum-read must be enabled with multi-member etcd clusters"))
+	}
+
 	if !storageTypes.Has(s.StorageConfig.Type) {
 		allErrors = append(allErrors, fmt.Errorf("--storage-backend invalid, must be 'etcd3' or 'etcd2'. If not specified, it will default to 'etcd3'"))
 	}
@@ -104,6 +108,9 @@ func (s *EtcdOptions) Validate() []error {
 			continue
 		}
 
+		if len(strings.Split(tokens[1], ";")) > 1 && !s.StorageConfig.Quorum {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-quorum-read must be enabled with multi-member etcd clusters"))
+		}
 	}
 
 	return allErrors
