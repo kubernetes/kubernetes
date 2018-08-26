@@ -422,11 +422,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
-<<<<<<< HEAD
 	NodeLease:                                   {Default: false, PreRelease: utilfeature.Alpha},
-=======
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
->>>>>>> Changes according to the approved KEP. SCTP is supported for HostPort and LoadBalancer. Alpha feature flag SCTPSupport controls the support of SCTP. Kube-proxy config parameter is removed.
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

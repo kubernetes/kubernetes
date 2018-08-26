@@ -161,8 +161,8 @@ func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, port int, prot
 
 func TestDeleteEndpointConnections(t *testing.T) {
 	const (
-		UDP = v1.ProtocolUDP
-		TCP = v1.ProtocolTCP
+		UDP  = v1.ProtocolUDP
+		TCP  = v1.ProtocolTCP
 		SCTP = v1.ProtocolSCTP
 	)
 	testCases := []struct {
@@ -189,14 +189,14 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			svcPort:     80,
 			protocol:    TCP,
 			endpoint:    "10.240.0.4:80",
-		},{
+		}, {
 			description: "V4 SCTP",
 			svcName:     "v4-sctp",
 			svcIP:       "10.96.3.3",
 			svcPort:     80,
 			protocol:    SCTP,
 			endpoint:    "10.240.0.5:80",
-		},{
+		}, {
 			description:  "V4 UDP, nothing to delete, benign error",
 			svcName:      "v4-udp-nothing-to-delete",
 			svcIP:        "10.96.1.1",

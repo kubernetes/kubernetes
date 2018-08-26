@@ -47,8 +47,6 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
-	
-
 )
 
 const (
@@ -811,8 +809,8 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, externalIP := range svcInfo.ExternalIPs {
 			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
-			// We do not start listening on SCTP ports, according to our agreement in the
-			// SCTP support KEP
+				// We do not start listening on SCTP ports, according to our agreement in the
+				// SCTP support KEP
 			} else if local && (svcInfo.GetProtocol() != v1.ProtocolSCTP) {
 				lp := utilproxy.LocalPort{
 					Description: "externalIP for " + svcNameString,
@@ -1012,8 +1010,8 @@ func (proxier *Proxier) syncProxyRules() {
 				if proxier.portsMap[lp] != nil {
 					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 					replacementPortsMap[lp] = proxier.portsMap[lp]
-				// We do not start listening on SCTP ports, according to our agreement in the
-				// SCTP support KEP	
+					// We do not start listening on SCTP ports, according to our agreement in the
+					// SCTP support KEP
 				} else if svcInfo.GetProtocol() != v1.ProtocolSCTP {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {

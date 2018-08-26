@@ -1425,11 +1425,11 @@ func TestValidateEntry(t *testing.T) {
 		},
 		{ // case[19]
 			entry: &Entry{
-				SetType: HashIPPortIP,
-				IP:      "10.20.30.40",
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
 				Protocol: ProtocolSCTP,
-				Port: 8090,
-				IP2:  "10.20.30.41",
+				Port:     8090,
+				IP2:      "10.20.30.41",
 			},
 			set: &IPSet{
 				Name: "sctp",

@@ -736,7 +736,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				// compatible with UDP (it uses an HTTP check)
 				return nil, fmt.Errorf("services requiring health checks are incompatible with UDP ports")
 			}
-			
+
 			if port.Protocol == v1.ProtocolSCTP {
 				// ERROR: this isn't supported
 				// health check (aka source ip preservation) is not
