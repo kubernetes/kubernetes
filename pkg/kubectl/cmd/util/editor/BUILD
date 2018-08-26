@@ -7,6 +7,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "editoptions.go",
         "editor.go",
     ],
