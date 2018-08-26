@@ -1085,7 +1085,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 		}
 	}
 
-	extenders := make([]algorithm.SchedulerExtender, 0)
+	var extenders []algorithm.SchedulerExtender
 	if len(policy.ExtenderConfigs) != 0 {
 		ignoredExtendedResources := sets.NewString()
 		for ii := range policy.ExtenderConfigs {
