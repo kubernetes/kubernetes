@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package webhook
 
 import (
 	"context"
@@ -24,13 +24,11 @@ import (
 	"net"
 	"net/url"
 
-	lru "github.com/hashicorp/golang-lru"
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
-	"k8s.io/api/admissionregistration/v1beta1"
+	"github.com/hashicorp/golang-lru"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/client-go/rest"
 )
 
@@ -38,9 +36,20 @@ const (
 	defaultCacheSize = 200
 )
 
-var (
-	ErrNeedServiceOrURL = errors.New("webhook configuration must have either service or URL")
-)
+// ClientConfig defines parameters required for creating a hook client.
+type ClientConfig struct {
+	Name     string
+	URL      string
+	CABundle []byte
+	Service  *ClientConfigService
+}
+
+// ClientConfigService defines service discovery parameters of the webhook.
+type ClientConfigService struct {
+	Name      string
+	Namespace string
+	Path      string
+}
 
 // ClientManager builds REST clients to talk to webhooks. It caches the clients
 // to avoid duplicate creation.
@@ -52,19 +61,19 @@ type ClientManager struct {
 }
 
 // NewClientManager creates a clientManager.
-func NewClientManager() (ClientManager, error) {
+func NewClientManager(gv schema.GroupVersion, addToSchemaFunc func(s *runtime.Scheme) error) (ClientManager, error) {
 	cache, err := lru.New(defaultCacheSize)
 	if err != nil {
 		return ClientManager{}, err
 	}
 	admissionScheme := runtime.NewScheme()
-	if err := admissionv1beta1.AddToScheme(admissionScheme); err != nil {
+	if err := addToSchemaFunc(admissionScheme); err != nil {
 		return ClientManager{}, err
 	}
 	return ClientManager{
 		cache: cache,
 		negotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: serializer.NewCodecFactory(admissionScheme).LegacyCodec(admissionv1beta1.SchemeGroupVersion),
+			Serializer: serializer.NewCodecFactory(admissionScheme).LegacyCodec(gv),
 		}),
 	}, nil
 }
@@ -106,8 +115,10 @@ func (cm *ClientManager) Validate() error {
 
 // HookClient get a RESTClient from the cache, or constructs one based on the
 // webhook configuration.
-func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error) {
-	cacheKey, err := json.Marshal(h.ClientConfig)
+func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
+	ccWithNoName := cc
+	ccWithNoName.Name = ""
+	cacheKey, err := json.Marshal(ccWithNoName)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +131,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		if len(cfg.TLSClientConfig.CAData) > 0 {
 			cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, '\n')
 		}
-		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, h.ClientConfig.CABundle...)
+		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, cc.CABundle...)
 
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
@@ -131,18 +142,16 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		return client, err
 	}
 
-	if svc := h.ClientConfig.Service; svc != nil {
-		restConfig, err := cm.authInfoResolver.ClientConfigForService(svc.Name, svc.Namespace)
+	if cc.Service != nil {
+		restConfig, err := cm.authInfoResolver.ClientConfigForService(cc.Service.Name, cc.Service.Namespace)
 		if err != nil {
 			return nil, err
 		}
 		cfg := rest.CopyConfig(restConfig)
-		serverName := svc.Name + "." + svc.Namespace + ".svc"
+		serverName := cc.Service.Name + "." + cc.Service.Namespace + ".svc"
 		host := serverName + ":443"
 		cfg.Host = "https://" + host
-		if svc.Path != nil {
-			cfg.APIPath = *svc.Path
-		}
+		cfg.APIPath = cc.Service.Path
 		// Set the server name if not already set
 		if len(cfg.TLSClientConfig.ServerName) == 0 {
 			cfg.TLSClientConfig.ServerName = serverName
@@ -155,7 +164,7 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		}
 		cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == host {
-				u, err := cm.serviceResolver.ResolveEndpoint(svc.Namespace, svc.Name)
+				u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name)
 				if err != nil {
 					return nil, err
 				}
@@ -167,13 +176,13 @@ func (cm *ClientManager) HookClient(h *v1beta1.Webhook) (*rest.RESTClient, error
 		return complete(cfg)
 	}
 
-	if h.ClientConfig.URL == nil {
-		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: ErrNeedServiceOrURL}
+	if cc.URL == "" {
+		return nil, &ErrCallingWebhook{WebhookName: cc.Name, Reason: errors.New("webhook configuration must have either service or URL")}
 	}
 
-	u, err := url.Parse(*h.ClientConfig.URL)
+	u, err := url.Parse(cc.URL)
 	if err != nil {
-		return nil, &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
+		return nil, &ErrCallingWebhook{WebhookName: cc.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
 	}
 
 	restConfig, err := cm.authInfoResolver.ClientConfigFor(u.Host)
