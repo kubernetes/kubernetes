@@ -21,16 +21,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -53,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -270,14 +269,14 @@ func constructBody(val string, size int, field string, t *testing.T) *appsv1.Dep
 	case "labels":
 		labelsMap := map[string]string{}
 		for i := 0; i < size; i++ {
-			key := val + strconv.Itoa(i)
+			key := fmt.Sprintf("%010d", i)
 			labelsMap[key] = val
 		}
 		deploymentObject.ObjectMeta.Labels = labelsMap
 	case "annotations":
 		annotationsMap := map[string]string{}
 		for i := 0; i < size; i++ {
-			key := val + strconv.Itoa(i)
+			key := fmt.Sprintf("%010d", i)
 			annotationsMap[key] = val
 		}
 		deploymentObject.ObjectMeta.Annotations = annotationsMap
@@ -300,30 +299,34 @@ func TestObjectSizeResponses(t *testing.T) {
 
 	client := clientsetv1.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
-	const DeploymentMegabyteSize = 130000
-	const DeploymentTwoMegabyteSize = 1000000
+	const labelString = ""
+	const finalizerString = "sample/sample"
+	// for given labelString and finalizerString, size of the object returned by constructBody is increased by factor*(size passed)
+	const factor = 16
+	Deployment1_5MegabyteSize := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
+	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
 
-	expectedMsgFor1MB := `etcdserver: request is too large`
-	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
+	expectedMsgFor1_5MB := `etcdserver: request is too large`
+	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = grpc: trying to send message larger than max`
 	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
 
-	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)    // >1 MB file
-	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t) // >2 MB file
+	deployment1 := constructBody(labelString, Deployment1_5MegabyteSize, "labels", t) // >1.5 MB file
+	deployment2 := constructBody(labelString, DeploymentTwoMegabyteSize, "labels", t) // >2 MB file
 
-	deployment3 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
+	deployment3 := constructBody(labelString, Deployment1_5MegabyteSize, "annotations", t)
 
-	deployment4 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)    // >1 MB file
-	deployment5 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t) // >2 MB file
+	deployment4 := constructBody(finalizerString, Deployment1_5MegabyteSize, "finalizers", t) // >1.5 MB file
+	deployment5 := constructBody(finalizerString, DeploymentTwoMegabyteSize, "finalizers", t) // >2 MB file
 
 	requests := []struct {
 		size             string
 		deploymentObject *appsv1.Deployment
 		expectedMessage  string
 	}{
-		{"1 MB", deployment1, expectedMsgFor1MB},
+		{"1.5 MB", deployment1, expectedMsgFor1_5MB},
 		{"2 MB", deployment2, expectedMsgFor2MB},
-		{"1 MB", deployment3, expectedMsgForLargeAnnotation},
-		{"1 MB", deployment4, expectedMsgFor1MB},
+		{"1.5 MB", deployment3, expectedMsgForLargeAnnotation},
+		{"1.5 MB", deployment4, expectedMsgFor1_5MB},
 		{"2 MB", deployment5, expectedMsgFor2MB},
 	}
 
