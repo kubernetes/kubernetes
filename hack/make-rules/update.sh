@@ -50,7 +50,6 @@ fi
 "${KUBE_ROOT}/hack/godep-restore.sh" ${V}
 
 BASH_TARGETS="
-	update-generated-protobuf
 	update-codegen
 	update-generated-runtime
 	update-generated-device-plugin

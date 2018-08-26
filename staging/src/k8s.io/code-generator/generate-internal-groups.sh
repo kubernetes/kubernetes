@@ -47,7 +47,7 @@ EXT_APIS_PKG="$4"
 GROUPS_WITH_VERSIONS="$5"
 shift 5
 
-go install ./$(dirname "${0}")/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen}
+go install ./$(dirname "${0}")/cmd/{defaulter-gen,conversion-gen,client-gen,lister-gen,informer-gen,deepcopy-gen,go-to-protobuf,go-to-protobuf/protoc-gen-gogo}
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
 # enumerate group versions
@@ -107,3 +107,41 @@ if [ "${GENS}" = "all" ] || grep -qw "informer" <<<"${GENS}"; then
            --output-package ${OUTPUT_PKG}/informers \
            "$@"
 fi
+
+if [ "${GENS}" = "all" ] || grep -qw "protobuf" <<<"${GENS}"; then
+  PROTO_PACKAGES=(
+    k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
+    k8s.io/metrics/pkg/apis/metrics/v1alpha1
+    k8s.io/metrics/pkg/apis/metrics/v1beta1
+    k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
+    k8s.io/metrics/pkg/apis/external_metrics/v1beta1
+    k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
+    k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1
+  )
+
+  if [[ " ${PROTO_PACKAGES[@]} " =~ " ${EXT_FQ_APIS[@]} " ]]; then
+    echo "Generating protobuf for ${GROUPS_WITH_VERSIONS}"
+
+    if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
+      echo "Generating protobuf requires protoc 3.0.0-beta1 or newer. Please download and"
+      echo "install the platform appropriate Protobuf package for your OS: "
+      echo
+      echo "  https://github.com/google/protobuf/releases"
+      echo
+      echo "WARNING: Protobuf changes are not being validated"
+      exit 1
+    fi
+
+    # requires the 'proto' tag to build (will remove when ready)
+    # searches for the protoc-gen-gogo extension in the output directory
+    # satisfies import of github.com/gogo/protobuf/gogoproto/gogo.proto and the
+    # core Google protobuf types
+    PATH="./$(dirname "${0}")/_output/bin:${PATH}" \
+      ${GOPATH}/bin/go-to-protobuf \
+      --proto-import "./vendor" \
+      --packages $(codegen::join , "${EXT_FQ_APIS[@]}") \
+      "$@" \
+      --output-base "$GOPATH/src"
+  fi
+fi
+
