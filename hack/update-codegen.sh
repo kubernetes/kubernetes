@@ -138,3 +138,20 @@ CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/sample-controller/hack/
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/metrics/hack/update-codegen.sh
 CODEGEN_PKG=./vendor/k8s.io/code-generator vendor/k8s.io/apiextensions-apiserver/examples/client-go/hack/update-codegen.sh
+
+# call generation on admission controllers for now
+
+# resourcequota admission controller
+vendor/k8s.io/code-generator/generate-internal-groups.sh deepcopy,conversion,defaults \
+  k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis \
+  k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis \
+  k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis \
+  "resourcequota:v1alpha1,v1beta1"
+
+# eventratelimit admission controller
+vendor/k8s.io/code-generator/generate-internal-groups.sh deepcopy,conversion,defaults \
+  k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis \
+  k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis \
+  k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis \
+  "eventratelimit:v1alpha1"
+
