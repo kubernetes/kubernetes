@@ -3470,6 +3470,66 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 	}
 }
 
+func TestPodSchedulesOnNodeWithPIDPressureCondition(t *testing.T) {
+
+	// specify a node with no pid pressure condition on
+	noPressureNode := &v1.Node{
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	// specify a node with pressure condition on
+	pressureNode := &v1.Node{
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodePIDPressure,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		name     string
+	}{
+		{
+			nodeInfo: makeEmptyNodeInfo(noPressureNode),
+			fits:     true,
+			name:     "pod schedulable on node without pressure condition on",
+		},
+		{
+			nodeInfo: makeEmptyNodeInfo(pressureNode),
+			fits:     false,
+			name:     "pod not schedulable on node with pressure condition on",
+		},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeUnderPIDPressure}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fits, reasons, err := CheckNodePIDPressurePredicate(&v1.Pod{}, PredicateMetadata(&v1.Pod{}, nil), test.nodeInfo)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, expectedFailureReasons)
+			}
+			if fits != test.fits {
+				t.Errorf("expected %v got %v", test.fits, fits)
+			}
+		})
+	}
+}
+
 func TestNodeConditionPredicate(t *testing.T) {
 	tests := []struct {
 		name        string
