@@ -36,6 +36,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
+	"github.com/vmware/govmomi/vim25/mo"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -1352,31 +1353,51 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		glog.Errorf("Cannot find VM runtime host. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
 	}
-	client := vsi.conn
-	err = withTagsClient(ctx, client, func(c *rest.Client) error {
+
+	pc := vsi.conn.Client.ServiceContent.PropertyCollector
+	err = withTagsClient(ctx, vsi.conn, func(c *rest.Client) error {
 		client := tags.NewManager(c)
-		tags, err := client.ListAttachedTags(ctx, vmHost)
+		// example result: ["Folder", "Datacenter", "Cluster", "Host"]
+		objects, err := mo.Ancestors(ctx, vsi.conn.Client, pc, *vmHost)
 		if err != nil {
-			glog.Errorf("Cannot list attached tags. Get zone for node %s error", nodeName)
 			return err
 		}
-		for _, value := range tags {
-			tag, err := client.GetTag(ctx, value)
-			if err != nil {
-				glog.Errorf("Get tag %s error", value)
-				return err
-			}
-			category, err := client.GetCategory(ctx, tag.CategoryID)
-			if err != nil {
-				glog.Errorf("Get category %s error", value)
-				return err
-			}
 
-			switch {
-			case category.Name == vs.cfg.Labels.Zone:
-				zone.FailureDomain = tag.Name
-			case category.Name == vs.cfg.Labels.Region:
-				zone.Region = tag.Name
+		// search the hierarchy, example order: ["Host", "Cluster", "Datacenter", "Folder"]
+		for i := range objects {
+			obj := objects[len(objects)-1-i]
+			tags, err := client.ListAttachedTags(ctx, obj)
+			if err != nil {
+				glog.Errorf("Cannot list attached tags. Get zone for node %s: %s", nodeName, err)
+				return err
+			}
+			for _, value := range tags {
+				tag, err := client.GetTag(ctx, value)
+				if err != nil {
+					glog.Errorf("Get tag %s: %s", value, err)
+					return err
+				}
+				category, err := client.GetCategory(ctx, tag.CategoryID)
+				if err != nil {
+					glog.Errorf("Get category %s error", value)
+					return err
+				}
+
+				found := func() {
+					glog.Errorf("Found %q tag (%s) for %s attached to %s", category.Name, tag.Name, vs.vmUUID, obj.Reference())
+				}
+				switch {
+				case category.Name == vs.cfg.Labels.Zone:
+					zone.FailureDomain = tag.Name
+					found()
+				case category.Name == vs.cfg.Labels.Region:
+					zone.Region = tag.Name
+					found()
+				}
+
+				if zone.FailureDomain != "" && zone.Region != "" {
+					return nil
+				}
 			}
 		}
 
@@ -1394,7 +1415,7 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		return nil
 	})
 	if err != nil {
-		glog.Errorf("Get zone for node %s error", nodeName)
+		glog.Errorf("Get zone for node %s: %s", nodeName, err)
 		return cloudprovider.Zone{}, err
 	}
 	return zone, nil
