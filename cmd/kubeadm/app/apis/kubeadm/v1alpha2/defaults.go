@@ -47,8 +47,6 @@ const (
 	DefaultImageRepository = "k8s.gcr.io"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
-	// DefaultCRISocket defines the default cri socket
-	DefaultCRISocket = "/var/run/dockershim.sock"
 	// DefaultClusterName defines the default cluster name
 	DefaultClusterName = "kubernetes"
 
