@@ -43,9 +43,6 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
-	api:
-	  advertiseAddress: ""
-	  bindPort: 0
 	apiVersion: kubeadm.k8s.io/v1alpha3
 	auditPolicy:
 	  logDir: ""
@@ -79,9 +76,6 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
-	api:
-	  advertiseAddress: ""
-	  bindPort: 0
 	apiVersion: kubeadm.k8s.io/v1alpha3
 	auditPolicy:
 	  logDir: ""

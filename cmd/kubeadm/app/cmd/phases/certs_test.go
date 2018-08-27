@@ -265,8 +265,8 @@ func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 			defer os.RemoveAll(tmpdir)
 
 			cfg := &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 					CertificatesDir: tmpdir,
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},

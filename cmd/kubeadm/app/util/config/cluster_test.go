@@ -41,12 +41,12 @@ func TestFetchConfigFromFileOrCluster(t *testing.T) {
 		{
 			name: "fetch valid config from configMap",
 			testCfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					KubernetesVersion: "v1.10.3",
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
@@ -76,12 +76,12 @@ func TestFetchConfigFromFileOrCluster(t *testing.T) {
 		{
 			name: "fetch invalid config from configMap",
 			testCfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					KubernetesVersion: "v1.10.3",
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
@@ -113,12 +113,12 @@ func TestFetchConfigFromFileOrCluster(t *testing.T) {
 			name:    "fetch valid config from cfgPath",
 			cfgPath: "testdata/conversion/master/v1alpha3.yaml",
 			testCfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 					KubernetesVersion: "v1.10.3",
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",

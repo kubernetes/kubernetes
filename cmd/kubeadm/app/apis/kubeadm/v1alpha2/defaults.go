@@ -170,6 +170,10 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
+	if obj.BindPort == 0 {
+		obj.BindPort = DefaultAPIBindPort
+	}
+
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 }
 

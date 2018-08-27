@@ -285,6 +285,10 @@ type JoinConfiguration struct {
 	// API server will be installed only on nodes hosting an additional control plane instance.
 	AdvertiseAddress string `json:"advertiseAddress,omitempty"`
 
+	// BindPort sets the secure port for the API Server to bind to.
+	// Defaults to 6443.
+	BindPort int32 `json:"bindPort,omitempty"`
+
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 }

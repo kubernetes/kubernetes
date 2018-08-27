@@ -42,9 +42,9 @@ func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPr
 	if err != nil {
 		return nil, err
 	}
-	// In this function we're only interested in the ClusterConfiguration part.
-	// TODO: As described above, the return value of this func actually should be a ClusterConfiguration
-	if err := SetClusterDynamicDefaults(&initcfg.ClusterConfiguration); err != nil {
+
+	//TODO: this will be reviewed in the following PR for reading/storing the kubeadm-config ConfigMap
+	if err := SetInitDynamicDefaults(initcfg); err != nil {
 		return nil, err
 	}
 	return initcfg, err

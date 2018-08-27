@@ -855,15 +855,15 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
-		PortOpenCheck{port: int(cfg.API.BindPort)},
+		FirewalldCheck{ports: []int{int(cfg.APIEndpoint.BindPort), 10250}},
+		PortOpenCheck{port: int(cfg.APIEndpoint.BindPort)},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress},
+		HTTPProxyCheck{Proto: "https", Host: cfg.APIEndpoint.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
@@ -898,7 +898,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
-	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
+	if ip := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress); ip != nil {
 		if ip.To4() == nil && ip.To16() != nil {
 			checks = append(checks,
 				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
