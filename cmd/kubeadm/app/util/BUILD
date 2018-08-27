@@ -11,6 +11,8 @@ go_library(
     srcs = [
         "arguments.go",
         "cgroupdriver.go",
+        "chroot_unix.go",
+        "chroot_windows.go",
         "copy.go",
         "endpoint.go",
         "error.go",
@@ -40,6 +42,7 @@ go_test(
     srcs = [
         "arguments_test.go",
         "cgroupdriver_test.go",
+        "chroot_test.go",
         "endpoint_test.go",
         "error_test.go",
         "marshal_test.go",
