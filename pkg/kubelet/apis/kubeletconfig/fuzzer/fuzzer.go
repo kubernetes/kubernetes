@@ -61,6 +61,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.MaxPods = 110
 			obj.PodPidsLimit = -1
 			obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
+			obj.NodeLeaseDurationSeconds = 40
 			obj.CPUManagerPolicy = "none"
 			obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
 			obj.QOSReserved = map[string]string{
@@ -95,6 +96,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.StaticPodURLHeader = make(map[string][]string)
 			obj.ContainerLogMaxFiles = 5
 			obj.ContainerLogMaxSize = "10Mi"
+			obj.ConfigMapAndSecretChangeDetectionStrategy = "Watch"
 		},
 	}
 }

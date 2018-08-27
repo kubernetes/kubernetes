@@ -394,7 +394,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	if tryNumber == 0 {
 		util.FromApiserverCache(&opts)
 	}
-	node, err := kl.heartbeatClient.Nodes().Get(string(kl.nodeName), opts)
+	node, err := kl.heartbeatClient.CoreV1().Nodes().Get(string(kl.nodeName), opts)
 	if err != nil {
 		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
 	}
@@ -412,7 +412,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 
 	kl.setNodeStatus(node)
 	// Patch the current status on the API server
-	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient, types.NodeName(kl.nodeName), originalNode, node)
+	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node)
 	if err != nil {
 		return err
 	}

@@ -106,6 +106,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.NodeStatusUpdateFrequency == zeroDuration {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 	}
+	if obj.NodeLeaseDurationSeconds == 0 {
+		obj.NodeLeaseDurationSeconds = 40
+	}
 	if obj.ImageMinimumGCAge == zeroDuration {
 		obj.ImageMinimumGCAge = metav1.Duration{Duration: 2 * time.Minute}
 	}

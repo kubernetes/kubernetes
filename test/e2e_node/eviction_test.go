@@ -43,7 +43,7 @@ import (
 )
 
 // Eviction Policy is described here:
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/kubelet-eviction.md
+// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-eviction.md
 
 const (
 	postTestConditionMonitoringPeriod = 1 * time.Minute

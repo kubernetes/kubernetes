@@ -35,6 +35,8 @@ const (
 	NamespaceSystem string = "kube-system"
 	// NamespacePublic is the namespace where we place public info (ConfigMaps)
 	NamespacePublic string = "kube-public"
+	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
+	NamespaceNodeLease string = "kube-node-lease"
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )

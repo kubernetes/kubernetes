@@ -134,6 +134,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 			HorizontalPodAutoscalerSyncPeriod:               componentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod,
 			HorizontalPodAutoscalerUpscaleForbiddenWindow:   componentConfig.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow,
 			HorizontalPodAutoscalerDownscaleForbiddenWindow: componentConfig.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow,
+			HorizontalPodAutoscalerCPUTaintPeriod:           componentConfig.HPAController.HorizontalPodAutoscalerCPUTaintPeriod,
+			HorizontalPodAutoscalerInitialReadinessDelay:    componentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay,
 			HorizontalPodAutoscalerTolerance:                componentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 			HorizontalPodAutoscalerUseRESTClients:           componentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients,
 		},

@@ -74,29 +74,33 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 		},
 		{
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
-				CertificatesDir: pkidir,
+				API:                  kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				ControlPlaneEndpoint: "api.k8s.io",
+				CertificatesDir:      pkidir,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
-				CertificatesDir: pkidir,
+				API:                  kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				ControlPlaneEndpoint: "api.k8s.io:4321",
+				CertificatesDir:      pkidir,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io", BindPort: 1234},
-				CertificatesDir: pkidir,
+				API:                  kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				ControlPlaneEndpoint: "api.k8s.io",
+				CertificatesDir:      pkidir,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
 		{
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", ControlPlaneEndpoint: "api.k8s.io:4321", BindPort: 1234},
-				CertificatesDir: pkidir,
+				API:                  kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				ControlPlaneEndpoint: "api.k8s.io:4321",
+				CertificatesDir:      pkidir,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 		},
@@ -155,7 +159,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			}
 
 			// Asserts InitConfiguration values injected into spec
-			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
+			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
 			if err != nil {
 				t.Error(err)
 			}

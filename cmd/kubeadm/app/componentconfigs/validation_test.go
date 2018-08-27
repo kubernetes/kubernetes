@@ -307,6 +307,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 						RegistryBurst:               10,
 						RegistryPullQPS:             5,
 						HairpinMode:                 "promiscuous-bridge",
+						NodeLeaseDurationSeconds:    40,
 					},
 				},
 			},

@@ -41,8 +41,7 @@ func init() {
 }
 
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeSchedulerConfiguration{},
-	)
+	// TODO: All structs in this package are about to be moved out,
+	// so nothing should be registered here as this API group is going to be removed soon.
 	return nil
 }

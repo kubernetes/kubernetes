@@ -28,6 +28,8 @@ const (
 	NamespaceDefault string = "default"
 	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
 	NamespaceAll string = ""
+	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
+	NamespaceNodeLease string = "kube-node-lease"
 )
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

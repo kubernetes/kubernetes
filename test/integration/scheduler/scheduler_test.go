@@ -45,11 +45,11 @@ import (
 	schedulerapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -173,7 +173,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		configPolicyName := fmt.Sprintf("scheduler-custom-policy-config-%d", i)
 		policyConfigMap := v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-			Data:       map[string]string{componentconfig.SchedulerPolicyConfigMapKey: test.policy},
+			Data:       map[string]string{kubeschedulerconfig.SchedulerPolicyConfigMapKey: test.policy},
 		}
 
 		policyConfigMap.APIVersion = "v1"
@@ -183,12 +183,12 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
 		ss := &schedulerappconfig.Config{
-			ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+			ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 				HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 				SchedulerName:                  v1.DefaultSchedulerName,
-				AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
-					Policy: &componentconfig.SchedulerPolicySource{
-						ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{
+					Policy: &kubeschedulerconfig.SchedulerPolicySource{
+						ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
 							Namespace: policyConfigMap.Namespace,
 							Name:      policyConfigMap.Name,
 						},
@@ -244,11 +244,11 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
 	ss := &schedulerappconfig.Config{
-		ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+		ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 			SchedulerName: v1.DefaultSchedulerName,
-			AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
-				Policy: &componentconfig.SchedulerPolicySource{
-					ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+			AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{
+				Policy: &kubeschedulerconfig.SchedulerPolicySource{
+					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
 						Namespace: "non-existent-config",
 						Name:      "non-existent-config",
 					},

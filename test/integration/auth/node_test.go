@@ -38,6 +38,7 @@ import (
 	externalclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -46,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/pointer"
 )
 
 func TestNodeAuthorizer(t *testing.T) {
@@ -81,6 +83,9 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
+
+	// Enable NodeLease feature so that nodes can create leases
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
 	// Set up Node+RBAC authorizer
 	authorizerConfig := &authorizer.AuthorizationConfig{
@@ -365,6 +370,54 @@ func TestNodeAuthorizer(t *testing.T) {
 		}
 	}
 
+	getNode1Lease := func(client clientset.Interface) func() error {
+		return func() error {
+			_, err := client.Coordination().Leases(api.NamespaceNodeLease).Get("node1", metav1.GetOptions{})
+			return err
+		}
+	}
+	node1LeaseDurationSeconds := int32(40)
+	createNode1Lease := func(client clientset.Interface) func() error {
+		return func() error {
+			lease := &coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: coordination.LeaseSpec{
+					HolderIdentity:       pointer.StringPtr("node1"),
+					LeaseDurationSeconds: pointer.Int32Ptr(node1LeaseDurationSeconds),
+					RenewTime:            &metav1.MicroTime{Time: time.Now()},
+				},
+			}
+			_, err := client.Coordination().Leases(api.NamespaceNodeLease).Create(lease)
+			return err
+		}
+	}
+	updateNode1Lease := func(client clientset.Interface) func() error {
+		return func() error {
+			lease, err := client.Coordination().Leases(api.NamespaceNodeLease).Get("node1", metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			lease.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
+			_, err = client.Coordination().Leases(api.NamespaceNodeLease).Update(lease)
+			return err
+		}
+	}
+	patchNode1Lease := func(client clientset.Interface) func() error {
+		return func() error {
+			node1LeaseDurationSeconds++
+			bs := []byte(fmt.Sprintf(`{"spec": {"leaseDurationSeconds": %d}}`, node1LeaseDurationSeconds))
+			_, err := client.Coordination().Leases(api.NamespaceNodeLease).Patch("node1", types.StrategicMergePatchType, bs)
+			return err
+		}
+	}
+	deleteNode1Lease := func(client clientset.Interface) func() error {
+		return func() error {
+			return client.Coordination().Leases(api.NamespaceNodeLease).Delete("node1", &metav1.DeleteOptions{})
+		}
+	}
+
 	nodeanonClient, _ := clientsetForToken(tokenNodeUnknown, clientConfig)
 	node1Client, node1ClientExternal := clientsetForToken(tokenNode1, clientConfig)
 	node2Client, node2ClientExternal := clientsetForToken(tokenNode2, clientConfig)
@@ -506,6 +559,19 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, deleteNode2(node2Client))
 
 	//TODO(mikedanese): integration test node restriction of TokenRequest
+
+	// node1 allowed to operate on its own lease
+	expectAllowed(t, createNode1Lease(node1Client))
+	expectAllowed(t, getNode1Lease(node1Client))
+	expectAllowed(t, updateNode1Lease(node1Client))
+	expectAllowed(t, patchNode1Lease(node1Client))
+	expectAllowed(t, deleteNode1Lease(node1Client))
+	// node2 not allowed to operate on another node's lease
+	expectForbidden(t, createNode1Lease(node2Client))
+	expectForbidden(t, getNode1Lease(node2Client))
+	expectForbidden(t, updateNode1Lease(node2Client))
+	expectForbidden(t, patchNode1Lease(node2Client))
+	expectForbidden(t, deleteNode1Lease(node2Client))
 }
 
 // expect executes a function a set number of times until it either returns the

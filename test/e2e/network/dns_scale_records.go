@@ -38,7 +38,7 @@ const (
 	checkServicePercent          = 0.05
 )
 
-var _ = SIGDescribe("[Feature:PerformanceDNS]", func() {
+var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	f := framework.NewDefaultFramework("performancedns")
 
 	BeforeEach(func() {

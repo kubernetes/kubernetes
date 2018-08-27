@@ -27,16 +27,16 @@ import (
 )
 
 const (
-	// HighAvailability is alpha in v1.9
+	// HighAvailability is alpha in v1.9 - deprecated in v1.12 (TODO remove in v1.13)
 	HighAvailability = "HighAvailability"
 
 	// CoreDNS is GA in v1.11
 	CoreDNS = "CoreDNS"
 
-	// SelfHosting is alpha in v1.8 and v1.9
+	// SelfHosting is alpha in v1.8 and v1.9 - deprecated in v1.12 (TODO remove in v1.13)
 	SelfHosting = "SelfHosting"
 
-	// StoreCertsInSecrets is alpha in v1.8 and v1.9
+	// StoreCertsInSecrets is alpha in v1.8 and v1.9 - deprecated in v1.12 (TODO remove in v1.13)
 	StoreCertsInSecrets = "StoreCertsInSecrets"
 
 	// DynamicKubeletConfig is beta in v1.11
@@ -46,12 +46,18 @@ const (
 	Auditing = "Auditing"
 )
 
+var selfHostingDeprecationMessage = "featureGates:SelfHosting has been removed in v1.12"
+
+var storeCertsInSecretsDeprecationMessage = "featureGates:StoreCertsInSecrets has been removed in v1.12"
+
+var highAvailabilityMessage = "featureGates:HighAvailability has been removed in v1.12\n" +
+	"\tThis feature has been replaced by the kubeadm join --control-plane workflow."
+
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:         {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
-	StoreCertsInSecrets: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
-	// We don't want to advertise this feature gate exists in v1.9 to avoid confusion as it is not yet working
-	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, HiddenInHelpText: true},
+	SelfHosting:          {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: selfHostingDeprecationMessage},
+	StoreCertsInSecrets:  {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: storeCertsInSecretsDeprecationMessage},
+	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: highAvailabilityMessage},
 	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.GA}},
 	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
 	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
@@ -60,8 +66,9 @@ var InitFeatureGates = FeatureList{
 // Feature represents a feature being gated
 type Feature struct {
 	utilfeature.FeatureSpec
-	MinimumVersion   *version.Version
-	HiddenInHelpText bool
+	MinimumVersion     *version.Version
+	HiddenInHelpText   bool
+	DeprecationMessage string
 }
 
 // FeatureList represents a list of feature gates
@@ -151,8 +158,13 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		k := strings.TrimSpace(arr[0])
 		v := strings.TrimSpace(arr[1])
 
-		if !Supports(*f, k) {
+		featureSpec, ok := (*f)[k]
+		if !ok {
 			return nil, fmt.Errorf("unrecognized feature-gate key: %s", k)
+		}
+
+		if featureSpec.PreRelease == utilfeature.Deprecated {
+			return nil, fmt.Errorf("feature-gate key is deprecated: %s", k)
 		}
 
 		boolValue, err := strconv.ParseBool(v)
@@ -165,6 +177,29 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 	ResolveFeatureGateDependencies(featureGate)
 
 	return featureGate, nil
+}
+
+// CheckDeprecatedFlags takes a list of existing feature gate flags and validates against the current feature flag set.
+// It used during upgrades for ensuring consistency of feature gates used in an existing cluster, that might
+// be created with a previous version of kubeadm, with the set of features currently supported by kubeadm
+func CheckDeprecatedFlags(f *FeatureList, features map[string]bool) map[string]string {
+	deprecatedMsg := map[string]string{}
+	for k := range features {
+		featureSpec, ok := (*f)[k]
+		if !ok {
+			// This case should never happen, it is implemented only as a sentinel
+			// for removal of flags executed when flags are still in use (always before deprecate, then after one cycle remove)
+			deprecatedMsg[k] = fmt.Sprintf("Unknown feature gate flag: %s", k)
+		}
+
+		if featureSpec.PreRelease == utilfeature.Deprecated {
+			if _, ok := deprecatedMsg[k]; !ok {
+				deprecatedMsg[k] = featureSpec.DeprecationMessage
+			}
+		}
+	}
+
+	return deprecatedMsg
 }
 
 // ResolveFeatureGateDependencies resolve dependencies between feature gates

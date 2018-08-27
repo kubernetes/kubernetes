@@ -36,6 +36,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	localFeatureGate := utilfeature.DefaultFeatureGate.DeepCopy()
 	localFeatureGate.SetFromMap(kc.FeatureGates)
 
+	if kc.NodeLeaseDurationSeconds <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: NodeLeaseDurationSeconds must be greater than 0"))
+	}
 	if !kc.CgroupsPerQOS && len(kc.EnforceNodeAllocatable) > 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) is not supported unless CgroupsPerQOS (--cgroups-per-qos) feature is turned on"))
 	}

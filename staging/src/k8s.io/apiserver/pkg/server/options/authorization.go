@@ -22,7 +22,10 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/apiserver/pkg/authorization/path"
+	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	"k8s.io/client-go/rest"
@@ -45,6 +48,10 @@ type DelegatingAuthorizationOptions struct {
 	// DenyCacheTTL is the length of time that an unsuccessful authorization response will be cached.
 	// You generally want more responsive, "deny, try again" flows.
 	DenyCacheTTL time.Duration
+
+	// AlwaysAllowPaths are HTTP paths which are excluded from authorization. They can be plain
+	// paths or end in * in which case prefix-match is applied. A leading / is optional.
+	AlwaysAllowPaths []string
 }
 
 func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
@@ -65,9 +72,9 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
-	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile, ""+
+	fs.StringVar(&s.RemoteKubeConfigFile, "authorization-kubeconfig", s.RemoteKubeConfigFile,
 		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to create "+
-		" subjectaccessreviews.authorization.k8s.io.")
+			" subjectaccessreviews.authorization.k8s.io.")
 
 	fs.DurationVar(&s.AllowCacheTTL, "authorization-webhook-cache-authorized-ttl",
 		s.AllowCacheTTL,
@@ -76,6 +83,10 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.DenyCacheTTL,
 		"authorization-webhook-cache-unauthorized-ttl", s.DenyCacheTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
+
+	fs.StringSliceVar(&s.AlwaysAllowPaths, "authorization-always-allow-paths", s.AlwaysAllowPaths,
+		"A list of HTTP paths to skip during authorization, i.e. these are authorized without "+
+			"contacting the 'core' kubernetes server.")
 }
 
 func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) error {
@@ -84,31 +95,41 @@ func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) er
 		return nil
 	}
 
-	cfg, err := s.ToAuthorizationConfig()
+	a, err := s.ToAuthorization()
 	if err != nil {
 		return err
 	}
-	authorizer, err := cfg.New()
-	if err != nil {
-		return err
-	}
-
-	c.Authorizer = authorizer
+	c.Authorizer = a
 	return nil
 }
 
-func (s *DelegatingAuthorizationOptions) ToAuthorizationConfig() (authorizerfactory.DelegatingAuthorizerConfig, error) {
-	sarClient, err := s.newSubjectAccessReview()
-	if err != nil {
-		return authorizerfactory.DelegatingAuthorizerConfig{}, err
+func (s *DelegatingAuthorizationOptions) ToAuthorization() (authorizer.Authorizer, error) {
+	var authorizers []authorizer.Authorizer
+
+	if len(s.AlwaysAllowPaths) > 0 {
+		a, err := path.NewAuthorizer(s.AlwaysAllowPaths)
+		if err != nil {
+			return nil, err
+		}
+		authorizers = append(authorizers, a)
 	}
 
-	ret := authorizerfactory.DelegatingAuthorizerConfig{
+	sarClient, err := s.newSubjectAccessReview()
+	if err != nil {
+		return nil, err
+	}
+	cfg := authorizerfactory.DelegatingAuthorizerConfig{
 		SubjectAccessReviewClient: sarClient,
 		AllowCacheTTL:             s.AllowCacheTTL,
 		DenyCacheTTL:              s.DenyCacheTTL,
 	}
-	return ret, nil
+	a, err := cfg.New()
+	if err != nil {
+		return nil, err
+	}
+	authorizers = append(authorizers, a)
+
+	return union.New(authorizers...), nil
 }
 
 func (s *DelegatingAuthorizationOptions) newSubjectAccessReview() (authorizationclient.SubjectAccessReviewInterface, error) {

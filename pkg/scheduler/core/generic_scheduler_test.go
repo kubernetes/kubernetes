@@ -1170,6 +1170,24 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 			},
 			expected: map[string]bool{},
 		},
+		{
+			name: "Node condition errors and ErrNodeUnknownCondition should be considered unresolvable",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeNotReady},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeNetworkUnavailable},
+				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnknownCondition},
+			},
+			expected: map[string]bool{"machine4": true},
+		},
+		{
+			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
+			failedPredMap: FailedPredicateMap{
+				"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrVolumeZoneConflict},
+				"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrVolumeNodeConflict},
+				"machine3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrVolumeBindConflict},
+			},
+			expected: map[string]bool{"machine4": true},
+		},
 	}
 
 	for _, test := range tests {

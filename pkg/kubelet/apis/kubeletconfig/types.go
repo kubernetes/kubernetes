@@ -155,6 +155,8 @@ type KubeletConfiguration struct {
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency metav1.Duration
+	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
+	NodeLeaseDurationSeconds int32
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	ImageMinimumGCAge metav1.Duration

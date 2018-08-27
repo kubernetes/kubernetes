@@ -60,7 +60,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.InitConfiguration) v1.Pod {
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:            kubeadmconstants.Etcd,
 		Command:         getEtcdCommand(cfg),
-		Image:           images.GetEtcdImage(cfg),
+		Image:           images.GetEtcdImage(&cfg.ClusterConfiguration),
 		ImagePullPolicy: v1.PullIfNotPresent,
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts: []v1.VolumeMount{

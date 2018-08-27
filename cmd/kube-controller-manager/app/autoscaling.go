@@ -84,6 +84,8 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		metricsClient,
 		hpaClient.CoreV1(),
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUTaintPeriod.Duration,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
 	)
 	go podautoscaler.NewHorizontalController(
 		hpaClient.CoreV1(),
