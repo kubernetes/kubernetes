@@ -76,7 +76,6 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/scale/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
