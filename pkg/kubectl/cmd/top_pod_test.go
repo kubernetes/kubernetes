@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -132,6 +133,14 @@ func TestTopPod(t *testing.T) {
 			namespaces:   []string{testNS},
 			containers:   true,
 		},
+		{
+			name:         "no-headers set",
+			flags:        map[string]string{"containers": "true", "no-headers": "true"},
+			args:         []string{"pod1"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
+			namespaces:   []string{testNS},
+			containers:   true,
+		},
 	}
 	initTestErrorHandler(t)
 	for _, testCase := range testCases {
@@ -220,6 +229,9 @@ func TestTopPod(t *testing.T) {
 				if strings.Contains(result, name) {
 					t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
 				}
+			}
+			if cmdutil.GetFlagBool(cmd, "no-headers") && strings.Contains(result, "MEMORY") {
+				t.Errorf("%s: unexpected headers with no-headers option set: \n%s", testCase.name, result)
 			}
 		})
 	}
