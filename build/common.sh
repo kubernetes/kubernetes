@@ -596,6 +596,7 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
+    --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
