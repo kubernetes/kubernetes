@@ -67,13 +67,13 @@ func TestWriteLoadDeletePods(t *testing.T) {
 
 	dir, err := ioutil.TempDir("", "checkpoint")
 	if err != nil {
-		t.Errorf("Failed to allocate temp directory for TestWriteLoadDeletePods error=%v", err)
+		t.Fatalf("Failed to allocate temp directory for TestWriteLoadDeletePods: %v", err)
 	}
 	defer os.RemoveAll(dir)
 
 	cpm, err := checkpointmanager.NewCheckpointManager(dir)
 	if err != nil {
-		t.Errorf("Failed to initialize checkpoint manager error=%v", err)
+		t.Fatalf("Failed to initialize checkpoint manager: %v", err)
 	}
 	for _, p := range testPods {
 		// Write pods should always pass unless there is an fs error
@@ -103,22 +103,22 @@ func TestWriteLoadDeletePods(t *testing.T) {
 					t.Errorf("expected %#v, \ngot %#v", p.pod, lpod)
 				}
 			} else {
-				t.Errorf("Got unexpected result for %v, should have been loaded", pname)
+				t.Errorf("Got unexpected result for %s, should have been loaded", pname)
 			}
 		} else if lpod != nil {
-			t.Errorf("Got unexpected result for %v, should not have been loaded", pname)
+			t.Errorf("Got unexpected result for %s, should not have been loaded", pname)
 		}
 		err = DeletePod(cpm, p.pod)
 		if err != nil {
-			t.Errorf("Failed to delete pod %v", pname)
+			t.Errorf("Failed to delete pod %s", pname)
 		}
 	}
 	// finally validate the contents of the directory is empty.
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
-		t.Errorf("Failed to read directory %v", dir)
+		t.Errorf("Failed to read directory %s", dir)
 	}
 	if len(files) > 0 {
-		t.Errorf("Directory %v should be empty but found %#v", dir, files)
+		t.Errorf("Directory %s should be empty but found %#v", dir, files)
 	}
 }
