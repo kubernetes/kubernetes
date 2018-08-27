@@ -732,14 +732,14 @@ func getEtcdBucket(path string) string {
 // stable fields to compare as a sanity check
 type metaObject struct {
 	// all of type meta
-	Kind       string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
-	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
+	Kind       string `json:"kind,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty"`
 
 	// parts of object meta
 	Metadata struct {
-		Name      string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-		Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
-	} `json:"metadata,omitempty" protobuf:"bytes,3,opt,name=metadata"`
+		Name      string `json:"name,omitempty"`
+		Namespace string `json:"namespace,omitempty"`
+	} `json:"metadata,omitempty"`
 }
 
 func (obj *metaObject) getGVK() schema.GroupVersionKind {
