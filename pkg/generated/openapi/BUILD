@@ -69,6 +69,7 @@ openapi_library(
         "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1",
         "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1",
         "k8s.io/client-go/pkg/version",
+        "k8s.io/csi-api/pkg/apis/csi/v1alpha1",
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
         "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1",
