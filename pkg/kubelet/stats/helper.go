@@ -25,6 +25,7 @@ import (
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
@@ -140,6 +141,9 @@ func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) 
 	}
 	cstat, found := latestContainerStats(info)
 	if !found {
+		return nil
+	}
+	if cstat.Network == nil {
 		return nil
 	}
 
@@ -310,4 +314,72 @@ func getUint64Value(value *uint64) uint64 {
 	}
 
 	return *value
+}
+
+// criStatsToNetworkInterfaceStats converts runtimeapi.InterfaceStats to statsapi.InterfaceStats.
+func criStatsToNetworkInterfaceStats(stats *runtimeapi.InterfaceStats) *statsapi.InterfaceStats {
+	if stats == nil {
+		return nil
+	}
+
+	iStats := &statsapi.InterfaceStats{
+		Name: stats.Name,
+	}
+
+	if stats.RxBytes != nil {
+		iStats.RxBytes = &stats.RxBytes.Value
+	}
+	if stats.RxErrors != nil {
+		iStats.RxErrors = &stats.RxErrors.Value
+	}
+	if stats.TxBytes != nil {
+		iStats.TxBytes = &stats.TxBytes.Value
+	}
+	if stats.TxErrors != nil {
+		iStats.TxErrors = &stats.TxErrors.Value
+	}
+
+	return iStats
+}
+
+// criNetworkUsageToNetworkStats returns the statsapi.NetworkStats converted from
+// the network usage from CRI.
+func criNetworkUsageToNetworkStats(stats *runtimeapi.NetworkUsage) *statsapi.NetworkStats {
+	if stats == nil {
+		return nil
+	}
+
+	iStats := statsapi.NetworkStats{
+		Time: metav1.NewTime(time.Unix(0, stats.Timestamp)),
+	}
+
+	defaultStats := criStatsToNetworkInterfaceStats(stats.Default)
+	if defaultStats != nil {
+		iStats.InterfaceStats = *defaultStats
+	}
+
+	for i := range stats.Interfaces {
+		iStat := criStatsToNetworkInterfaceStats(stats.Interfaces[i])
+		if iStat != nil {
+			iStats.Interfaces = append(iStats.Interfaces, *iStat)
+		}
+	}
+
+	return &iStats
+}
+
+// addNetworkInterfaceStats adds two statsapi.InterfaceStats.
+func addNetworkInterfaceStats(to, from statsapi.InterfaceStats) statsapi.InterfaceStats {
+	rxBytes := getUint64Value(to.RxBytes) + getUint64Value(from.RxBytes)
+	rxErrors := getUint64Value(to.RxErrors) + getUint64Value(from.RxErrors)
+	txBytes := getUint64Value(to.TxBytes) + getUint64Value(from.TxBytes)
+	txErrors := getUint64Value(to.TxErrors) + getUint64Value(from.TxErrors)
+
+	return statsapi.InterfaceStats{
+		Name:     from.Name,
+		RxBytes:  &rxBytes,
+		RxErrors: &rxErrors,
+		TxBytes:  &txBytes,
+		TxErrors: &txErrors,
+	}
 }

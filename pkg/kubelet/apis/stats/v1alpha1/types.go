@@ -147,6 +147,10 @@ type ContainerStats struct {
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	UserDefinedMetrics []UserDefinedMetric `json:"userDefinedMetrics,omitmepty" patchStrategy:"merge" patchMergeKey:"name"`
+	// Stats pertaining to network resources.
+	// Required for Windows containers.
+	// +optional
+	Network *NetworkStats `json:"network,omitempty"`
 }
 
 // PodReference contains enough information to locate the referenced pod.

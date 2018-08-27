@@ -276,11 +276,45 @@ func (p *criStatsProvider) addPodNetworkStats(
 	caPodSandbox, found := caInfos[podSandboxID]
 	// try get network stats from cadvisor first.
 	if found {
-		ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
-		return
+		networkStats := cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
+		if networkStats != nil {
+			ps.Network = networkStats
+			return
+		}
 	}
 
-	// TODO: sum Pod network stats from container stats.
+	// Not found from cadvisor, sum network stats from container interface stats.
+	if cs.Network != nil {
+		if ps.Network == nil {
+			ps.Network = &statsapi.NetworkStats{
+				Time:           cs.Network.Time,
+				InterfaceStats: statsapi.InterfaceStats{},
+				Interfaces:     make([]statsapi.InterfaceStats, 0),
+			}
+		}
+
+		if cs.Network.Name != "" {
+			ps.Network.InterfaceStats = addNetworkInterfaceStats(ps.Network.InterfaceStats, cs.Network.InterfaceStats)
+		}
+
+		getAdapterIndex := func(stats []statsapi.InterfaceStats, name string) int {
+			for k := range stats {
+				if stats[k].Name == name {
+					return k
+				}
+			}
+			return -1
+		}
+		for _, iStat := range cs.Network.Interfaces {
+			psIndex := getAdapterIndex(ps.Network.Interfaces, iStat.Name)
+			if psIndex == -1 {
+				ps.Network.Interfaces = append(ps.Network.Interfaces, iStat)
+			} else {
+				ps.Network.Interfaces[psIndex] = addNetworkInterfaceStats(ps.Network.Interfaces[psIndex], iStat)
+			}
+		}
+	}
+
 	glog.V(4).Infof("Unable to find cadvisor stats for sandbox %q", podSandboxID)
 }
 
@@ -390,6 +424,12 @@ func (p *criStatsProvider) makeContainerStats(
 	}
 	containerLogPath := kuberuntime.BuildContainerLogsDirectory(types.UID(uid), container.GetMetadata().GetName())
 	result.Logs = p.getContainerLogStats(containerLogPath, rootFsInfo)
+
+	// make network stats.
+	if stats.Network != nil {
+		result.Network = criNetworkUsageToNetworkStats(stats.Network)
+	}
+
 	return result
 }
 
