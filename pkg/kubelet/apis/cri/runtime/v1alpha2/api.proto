@@ -1223,6 +1223,8 @@ message ContainerStats {
     MemoryUsage memory = 3;
     // Usage of the writeable layer.
     FilesystemUsage writable_layer = 4;
+    // Usage of the network interfaces.
+    NetworkUsage network = 5;
 }
 
 // CpuUsage provides the CPU usage information.
@@ -1239,6 +1241,30 @@ message MemoryUsage {
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
+}
+
+// NetworkUsage provides the network usage information.
+message NetworkUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Stats for the default interface, if found.
+    InterfaceStats default = 2;
+    // Stats of all interfaces.
+    repeated InterfaceStats interfaces = 3;
+}
+
+// InterfaceStats contains resource value data about interface.
+message InterfaceStats {
+    // The name of the interface
+    string name = 1;
+    // Cumulative count of bytes received.
+    UInt64Value rx_bytes = 2;
+    // Cumulative count of receive errors encountered.
+    UInt64Value rx_errors = 3;
+    // Cumulative count of bytes transmitted.
+    UInt64Value tx_bytes = 4;
+    // Cumulative count of transmit errors encountered.
+    UInt64Value tx_errors = 5;
 }
 
 message ReopenContainerLogRequest {
