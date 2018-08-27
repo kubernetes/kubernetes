@@ -110,5 +110,30 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 			UsedBytes: &runtimeapi.UInt64Value{Value: uint64(*containerJSON.SizeRw)},
 		},
 	}
+
+	if len(statsJSON.Networks) > 0 {
+		containerStats.Network = &runtimeapi.NetworkUsage{
+			Timestamp:  timestamp,
+			Interfaces: make([]*runtimeapi.InterfaceStats, 0),
+		}
+
+		for name, stat := range statsJSON.Networks {
+			criInterfaceStat := &runtimeapi.InterfaceStats{
+				Name:     name,
+				RxBytes:  &runtimeapi.UInt64Value{Value: stat.RxBytes},
+				RxErrors: &runtimeapi.UInt64Value{Value: stat.RxErrors},
+				TxBytes:  &runtimeapi.UInt64Value{Value: stat.TxBytes},
+				TxErrors: &runtimeapi.UInt64Value{Value: stat.TxErrors},
+			}
+
+			// TODO: add support of multiple interfaces for getting default interface.
+			if len(statsJSON.Networks) == 1 {
+				containerStats.Network.Default = criInterfaceStat
+			}
+
+			containerStats.Network.Interfaces = append(containerStats.Network.Interfaces, criInterfaceStat)
+		}
+	}
+
 	return containerStats, nil
 }
