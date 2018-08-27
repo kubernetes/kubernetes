@@ -80,7 +80,7 @@ func TestGetCgroupStats(t *testing.T) {
 		assert  = assert.New(t)
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
 
-		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
+		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container", true)
 		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{cgroupName: containerInfo}
 	)
 
@@ -114,7 +114,7 @@ func TestRootFsStats(t *testing.T) {
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
 
 		rootFsInfo       = getTestFsInfo(rootFsInfoSeed)
-		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
+		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container", true)
 		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{"/": containerInfo}
 	)
 
@@ -398,13 +398,13 @@ func TestHasDedicatedImageFs(t *testing.T) {
 }
 
 func getTerminatedContainerInfo(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
-	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
+	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName, true)
 	cinfo.Stats[0].Memory.RSS = 0
 	cinfo.Stats[0].CpuInst.Usage.Total = 0
 	return cinfo
 }
 
-func getTestContainerInfo(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
+func getTestContainerInfo(seed int, podName string, podNamespace string, containerName string, hasNetwork bool) cadvisorapiv2.ContainerInfo {
 	labels := map[string]string{}
 	if podName != "" {
 		labels = map[string]string{
@@ -445,7 +445,15 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
 			},
 		},
-		Network: &cadvisorapiv2.NetworkStats{
+		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
+		Filesystem: &cadvisorapiv2.FilesystemStats{
+			TotalUsageBytes: &totalUsageBytes,
+			BaseUsageBytes:  &baseUsageBytes,
+			InodeUsage:      &inodeUsage,
+		},
+	}
+	if hasNetwork {
+		stats.Network = &cadvisorapiv2.NetworkStats{
 			Interfaces: []cadvisorapiv1.InterfaceStats{{
 				Name:     "eth0",
 				RxBytes:  uint64(seed + offsetNetRxBytes),
@@ -459,13 +467,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				TxBytes:  100,
 				TxErrors: 100,
 			}},
-		},
-		CustomMetrics: generateCustomMetrics(spec.CustomMetrics),
-		Filesystem: &cadvisorapiv2.FilesystemStats{
-			TotalUsageBytes: &totalUsageBytes,
-			BaseUsageBytes:  &baseUsageBytes,
-			InodeUsage:      &inodeUsage,
-		},
+		}
 	}
 	stats.Cpu.Usage.Total = uint64(seed + offsetCPUUsageCoreSeconds)
 	stats.CpuInst.Usage.Total = uint64(seed + offsetCPUUsageCores)

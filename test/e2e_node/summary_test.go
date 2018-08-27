@@ -106,6 +106,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Rootfs":             BeNil(),
 					"Logs":               BeNil(),
 					"UserDefinedMetrics": BeEmpty(),
+					"Network":            BeNil(),
 				})
 			}
 			podsContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
@@ -207,6 +208,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"InodesUsed":     bounded(0, 1E8),
 						}),
 						"UserDefinedMetrics": BeEmpty(),
+						"Network":            BeNil(),
 					}),
 				}),
 				"Network": ptrMatchAllFields(gstruct.Fields{

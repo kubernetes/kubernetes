@@ -102,6 +102,7 @@ func TestSummaryProvider(t *testing.T) {
 		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
+		Network:            cgroupStatsMap["/kubelet"].cs.Network,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "misc",
@@ -110,6 +111,7 @@ func TestSummaryProvider(t *testing.T) {
 		Memory:             cgroupStatsMap["/misc"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
+		Network:            cgroupStatsMap["/misc"].cs.Network,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "runtime",
@@ -118,6 +120,7 @@ func TestSummaryProvider(t *testing.T) {
 		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
+		Network:            cgroupStatsMap["/runtime"].cs.Network,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
 		Name:               "pods",
@@ -126,6 +129,7 @@ func TestSummaryProvider(t *testing.T) {
 		Memory:             cgroupStatsMap["/pods"].cs.Memory,
 		Accelerators:       cgroupStatsMap["/pods"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/pods"].cs.UserDefinedMetrics,
+		Network:            cgroupStatsMap["/pods"].cs.Network,
 	})
 	assert.Equal(summary.Pods, podStats)
 }

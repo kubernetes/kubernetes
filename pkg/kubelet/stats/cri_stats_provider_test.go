@@ -23,6 +23,7 @@ import (
 	"time"
 
 	cadvisorfs "github.com/google/cadvisor/fs"
+	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -58,12 +59,14 @@ func TestCRIListPodStats(t *testing.T) {
 		seedContainer2 = 5000
 		seedSandbox2   = 6000
 		seedContainer3 = 7000
+		seedSandbox3   = 8000
 	)
 
 	const (
 		pName0 = "pod0"
 		pName1 = "pod1"
 		pName2 = "pod2"
+		pName3 = "pod3"
 	)
 
 	const (
@@ -71,6 +74,8 @@ func TestCRIListPodStats(t *testing.T) {
 		cName1 = "container1-name"
 		cName2 = "container2-name"
 		cName3 = "container3-name"
+		cName4 = "container4-name"
+		cName5 = "container5-name"
 	)
 
 	var (
@@ -101,6 +106,15 @@ func TestCRIListPodStats(t *testing.T) {
 		container4         = makeFakeContainer(sandbox2, cName3, 1, false)
 		containerStats4    = makeFakeContainerStats(container4, imageFsMountpoint)
 		containerLogStats4 = makeFakeLogStats(4000)
+
+		sandbox3           = makeFakePodSandbox("sandbox3-name", "sandbox3-uid", "sandbox3-ns")
+		sandbox3Cgroup     = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox3.PodSandboxStatus.Metadata.Uid))
+		container5         = makeFakeContainer(sandbox3, cName4, 0, false)
+		containerStats5    = makeFakeContainerStats(container5, imageFsMountpoint)
+		containerLogStats5 = makeFakeLogStats(5000)
+		container6         = makeFakeContainer(sandbox3, cName5, 1, false)
+		containerStats6    = makeFakeContainerStats(container6, imageFsMountpoint)
+		containerLogStats6 = makeFakeLogStats(5000)
 	)
 
 	var (
@@ -113,19 +127,24 @@ func TestCRIListPodStats(t *testing.T) {
 	)
 
 	infos := map[string]cadvisorapiv2.ContainerInfo{
-		"/":                           getTestContainerInfo(seedRoot, "", "", ""),
-		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", ""),
-		"/system":                     getTestContainerInfo(seedMisc, "", "", ""),
-		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
-		sandbox0Cgroup:                getTestContainerInfo(seedSandbox0, "", "", ""),
-		container0.ContainerStatus.Id: getTestContainerInfo(seedContainer0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName0),
-		container1.ContainerStatus.Id: getTestContainerInfo(seedContainer1, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName1),
-		sandbox1.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox1, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
-		sandbox1Cgroup:                getTestContainerInfo(seedSandbox1, "", "", ""),
-		container2.ContainerStatus.Id: getTestContainerInfo(seedContainer2, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, cName2),
-		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName),
-		sandbox2Cgroup:                getTestContainerInfo(seedSandbox2, "", "", ""),
-		container4.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, cName3),
+		"/":                           getTestContainerInfo(seedRoot, "", "", "", true),
+		"/kubelet":                    getTestContainerInfo(seedKubelet, "", "", "", true),
+		"/system":                     getTestContainerInfo(seedMisc, "", "", "", true),
+		sandbox0.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName, true),
+		sandbox0Cgroup:                getTestContainerInfo(seedSandbox0, "", "", "", true),
+		container0.ContainerStatus.Id: getTestContainerInfo(seedContainer0, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName0, true),
+		container1.ContainerStatus.Id: getTestContainerInfo(seedContainer1, pName0, sandbox0.PodSandboxStatus.Metadata.Namespace, cName1, true),
+		sandbox1.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox1, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName, true),
+		sandbox1Cgroup:                getTestContainerInfo(seedSandbox1, "", "", "", true),
+		container2.ContainerStatus.Id: getTestContainerInfo(seedContainer2, pName1, sandbox1.PodSandboxStatus.Metadata.Namespace, cName2, true),
+		sandbox2.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox2, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName, true),
+		sandbox2Cgroup:                getTestContainerInfo(seedSandbox2, "", "", "", true),
+		container4.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox2.PodSandboxStatus.Metadata.Namespace, cName3, true),
+
+		// containers belonging to sandbox3 get network stats from CRI.
+		sandbox3.PodSandboxStatus.Id:  getTestContainerInfo(seedSandbox3, pName3, sandbox3.PodSandboxStatus.Metadata.Namespace, leaky.PodInfraContainerName, false),
+		sandbox3Cgroup:                getTestContainerInfo(seedSandbox3, "", "", "", false),
+		container5.ContainerStatus.Id: getTestContainerInfo(seedContainer3, pName2, sandbox3.PodSandboxStatus.Metadata.Namespace, cName3, false),
 	}
 
 	options := cadvisorapiv2.RequestOptions{
@@ -140,13 +159,13 @@ func TestCRIListPodStats(t *testing.T) {
 		On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil).
 		On("GetDirFsInfo", unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
-		sandbox0, sandbox1, sandbox2,
+		sandbox0, sandbox1, sandbox2, sandbox3,
 	})
 	fakeRuntimeService.SetFakeContainers([]*critest.FakeContainer{
-		container0, container1, container2, container3, container4,
+		container0, container1, container2, container3, container4, container5, container6,
 	})
 	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
-		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4,
+		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6,
 	})
 
 	ephemeralVolumes := makeFakeVolumeStats([]string{"ephVolume1, ephVolumes2"})
@@ -161,6 +180,8 @@ func TestCRIListPodStats(t *testing.T) {
 		kuberuntime.BuildContainerLogsDirectory(types.UID("sandbox0-uid"), cName1): containerLogStats1,
 		kuberuntime.BuildContainerLogsDirectory(types.UID("sandbox1-uid"), cName2): containerLogStats2,
 		kuberuntime.BuildContainerLogsDirectory(types.UID("sandbox2-uid"), cName3): containerLogStats4,
+		kuberuntime.BuildContainerLogsDirectory(types.UID("sandbox3-uid"), cName4): containerLogStats5,
+		kuberuntime.BuildContainerLogsDirectory(types.UID("sandbox3-uid"), cName5): containerLogStats6,
 	}
 	fakeLogStatsProvider := NewFakeLogMetricsService(fakeLogStats)
 
@@ -177,7 +198,7 @@ func TestCRIListPodStats(t *testing.T) {
 	stats, err := provider.ListPodStats()
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Equal(3, len(stats))
+	assert.Equal(4, len(stats))
 
 	podStatsMap := make(map[statsapi.PodReference]statsapi.PodStats)
 	for _, s := range stats {
@@ -238,6 +259,25 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRILogsStats(assert, c3, &rootFsInfo, containerLogStats4)
 	checkCRINetworkStats(assert, p2.Network, infos[sandbox2.PodSandboxStatus.Id].Stats[0].Network)
 	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
+
+	p3 := podStatsMap[statsapi.PodReference{Name: "sandbox3-name", UID: "sandbox3-uid", Namespace: "sandbox3-ns"}]
+	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
+	assert.Equal(2, len(p3.Containers))
+	checkEphemeralStorageStats(assert, p3, ephemeralVolumes, []*runtimeapi.ContainerStats{containerStats5, containerStats6}, []*volume.Metrics{containerLogStats5, containerLogStats6})
+	assert.Nil(infos[sandbox3.PodSandboxStatus.Id].Stats[0].Network)
+	// expectedNetworkStats are sum of containerStats5 and containerStats6.
+	expectedNetworkStats := &cadvisorapiv2.NetworkStats{
+		Interfaces: []cadvisorapiv1.InterfaceStats{
+			{
+				Name:     "eth0",
+				RxBytes:  containerStats5.Network.Interfaces[0].RxBytes.GetValue() + containerStats6.Network.Interfaces[0].RxBytes.GetValue(),
+				RxErrors: containerStats5.Network.Interfaces[0].RxErrors.GetValue() + containerStats6.Network.Interfaces[0].RxErrors.GetValue(),
+				TxBytes:  containerStats5.Network.Interfaces[0].TxBytes.GetValue() + containerStats6.Network.Interfaces[0].TxBytes.GetValue(),
+				TxErrors: containerStats5.Network.Interfaces[0].TxErrors.GetValue() + containerStats6.Network.Interfaces[0].TxErrors.GetValue(),
+			},
+		},
+	}
+	checkCRINetworkStats(assert, p3.Network, expectedNetworkStats)
 
 	mockCadvisor.AssertExpectations(t)
 }
@@ -346,6 +386,7 @@ func makeFakeContainerStats(container *critest.FakeContainer, imageFsMountpoint 
 	if container.State == runtimeapi.ContainerState_CONTAINER_EXITED {
 		containerStats.Cpu = nil
 		containerStats.Memory = nil
+		containerStats.Network = nil
 	} else {
 		containerStats.Cpu = &runtimeapi.CpuUsage{
 			Timestamp:            time.Now().UnixNano(),
@@ -355,8 +396,26 @@ func makeFakeContainerStats(container *critest.FakeContainer, imageFsMountpoint 
 			Timestamp:       time.Now().UnixNano(),
 			WorkingSetBytes: &runtimeapi.UInt64Value{Value: rand.Uint64()},
 		}
+
+		fakeEth0Stats := makeFakeInterfaceStats("eth0")
+		fakeEth1Stats := makeFakeInterfaceStats("eth1")
+		containerStats.Network = &runtimeapi.NetworkUsage{
+			Timestamp:  time.Now().UnixNano(),
+			Default:    fakeEth0Stats,
+			Interfaces: []*runtimeapi.InterfaceStats{fakeEth0Stats, fakeEth1Stats},
+		}
 	}
 	return containerStats
+}
+
+func makeFakeInterfaceStats(name string) *runtimeapi.InterfaceStats {
+	return &runtimeapi.InterfaceStats{
+		Name:     name,
+		RxBytes:  &runtimeapi.UInt64Value{Value: rand.Uint64()},
+		RxErrors: &runtimeapi.UInt64Value{Value: rand.Uint64()},
+		TxBytes:  &runtimeapi.UInt64Value{Value: rand.Uint64()},
+		TxErrors: &runtimeapi.UInt64Value{Value: rand.Uint64()},
+	}
 }
 
 func makeFakeImageFsUsage(fsMountpoint string) *runtimeapi.FilesystemUsage {
