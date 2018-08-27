@@ -65,8 +65,8 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 			defer GinkgoRecover()
 			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]))
 		}
-		framework.Logf("Creating %v test services", maxServicesPerCluster)
-		workqueue.Parallelize(parallelCreateServiceWorkers, len(services), createService)
+
+		framework.Logf("Creating client pod")
 		dnsTest := dnsTestCommon{
 			f:  f,
 			c:  f.ClientSet,
@@ -74,6 +74,18 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 		}
 		dnsTest.createUtilPodLabel("e2e-dns-scale-records")
 		defer dnsTest.deleteUtilPod()
+		dnsTest.checkDNSRecordFrom(
+			"kubernetes.default.svc.cluster.local",
+			func(actual []string) bool {
+				return len(actual) == 1
+			},
+			"cluster-dns",
+			wait.ForeverTestTimeout,
+		)
+
+		framework.Logf("Creating %v test services", maxServicesPerCluster)
+		workqueue.Parallelize(parallelCreateServiceWorkers, len(services), createService)
+
 		framework.Logf("Querying %v%% of service records", checkServicePercent*100)
 		for i := 0; i < len(services); i++ {
 			if i%(1/checkServicePercent) != 0 {
