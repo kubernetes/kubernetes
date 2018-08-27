@@ -194,10 +194,16 @@ const (
 	VolumeScheduling utilfeature.Feature = "VolumeScheduling"
 
 	// owner: @vladimirvivien
-	// alpha: v1.9
+	// beta: v1.10
 	//
 	// Enable mount/attachment of Container Storage Interface (CSI) backed PVs
 	CSIPersistentVolume utilfeature.Feature = "CSIPersistentVolume"
+
+	// owner: @saad-ali
+	// alpha: v1.12
+	//
+	// Enable automatic installation of CRD for csi.storage.k8s.io API objects.
+	CSICrdAutoInstall utilfeature.Feature = "CSICrdAutoInstall"
 
 	// owner @MrHohn
 	// beta: v1.10
@@ -400,6 +406,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
+	CSICrdAutoInstall:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
