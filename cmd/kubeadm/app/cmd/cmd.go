@@ -108,6 +108,6 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
 	flagSet.StringVar(
 		rootfsPath, "rootfs", *rootfsPath,
-		"The path to the 'real' host root filesystem.",
+		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
 	)
 }
