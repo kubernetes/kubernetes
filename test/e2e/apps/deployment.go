@@ -163,6 +163,10 @@ func failureTrap(c clientset.Interface, ns string) {
 		}
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		podList, err := c.CoreV1().Pods(rs.Namespace).List(options)
+		if err != nil {
+			framework.Logf("Failed to list Pods in namespace %s: %v", rs.Namespace, err)
+			continue
+		}
 		for _, pod := range podList.Items {
 			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
 		}
