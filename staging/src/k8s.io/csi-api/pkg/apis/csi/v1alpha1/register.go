@@ -22,8 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// GroupName is the group name use in this package
-const GroupName = "csi.storage.k8s.io"
+const (
+	// GroupName is the group name use in this package
+	GroupName string = "csi.storage.k8s.io"
+
+	// CsiDriverResourcePlural is the plural name of the CSIDriver resource
+	CsiDriverResourcePlural string = "csidrivers"
+
+	// CsiNodeInfoResourcePlural is the plural name of the CSINode resource
+	CsiNodeInfoResourcePlural string = "csinodeinfos"
+)
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
