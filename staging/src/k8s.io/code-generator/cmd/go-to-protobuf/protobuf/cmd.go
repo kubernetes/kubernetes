@@ -220,6 +220,18 @@ func Run(g *Generator) {
 		log.Fatalf("Failed to identify Common types: %v", err)
 	}
 
+	if g.Common.VerifyOnly && !g.KeepGogoproto {
+		for _, outputPackage := range vendoredOutputPackages {
+			p := outputPackage.(*protobufPackage)
+			p.OmitGogo = true
+		}
+
+		for _, outputPackage := range localOutputPackages {
+			p := outputPackage.(*protobufPackage)
+			p.OmitGogo = true
+		}
+	}
+
 	if err := c.ExecutePackages(g.VendorOutputBase, vendoredOutputPackages); err != nil {
 		log.Fatalf("Failed executing vendor generator: %v", err)
 	}
@@ -313,6 +325,7 @@ func Run(g *Generator) {
 			p := outputPackage.(*protobufPackage)
 			p.OmitGogo = true
 		}
+
 		if err := c.ExecutePackages(g.VendorOutputBase, vendoredOutputPackages); err != nil {
 			log.Fatalf("Failed executing vendor generator: %v", err)
 		}
