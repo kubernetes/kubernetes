@@ -44,6 +44,7 @@ filegroup(
         "//test/integration/daemonset:all-srcs",
         "//test/integration/defaulttolerationseconds:all-srcs",
         "//test/integration/deployment:all-srcs",
+        "//test/integration/dryrun:all-srcs",
         "//test/integration/etcd:all-srcs",
         "//test/integration/evictions:all-srcs",
         "//test/integration/examples:all-srcs",
