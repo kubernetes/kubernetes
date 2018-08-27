@@ -19,6 +19,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -213,12 +214,12 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 
 		leaderElector.Run(ctx)
 
-		return fmt.Errorf("lost lease")
+		return errors.New("lost lease")
 	}
 
 	// Leader election is disabled, so run inline until done.
 	run(ctx)
-	return fmt.Errorf("finished without leader elect")
+	return errors.New("finished without leader elect")
 }
 
 // buildHandlerChain wraps the given handler with the standard filters.

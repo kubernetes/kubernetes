@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -388,7 +389,7 @@ func (i *Init) Run(out io.Writer) error {
 
 		kubeletFailTempl.Execute(out, ctx)
 
-		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
+		return errors.New("couldn't initialize a Kubernetes cluster")
 	}
 
 	// Upload currently used configuration to the cluster

@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -357,7 +358,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			moveFileFunc: func(oldPath, newPath string) error {
 				// fail for kube-apiserver move
 				if strings.Contains(newPath, "kube-apiserver") {
-					return fmt.Errorf("moving the kube-apiserver file failed")
+					return errors.New("moving the kube-apiserver file failed")
 				}
 				return os.Rename(oldPath, newPath)
 			},
@@ -374,7 +375,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			moveFileFunc: func(oldPath, newPath string) error {
 				// fail for kube-controller-manager move
 				if strings.Contains(newPath, "kube-controller-manager") {
-					return fmt.Errorf("moving the kube-apiserver file failed")
+					return errors.New("moving the kube-apiserver file failed")
 				}
 				return os.Rename(oldPath, newPath)
 			},
@@ -391,7 +392,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			moveFileFunc: func(oldPath, newPath string) error {
 				// fail for kube-scheduler move
 				if strings.Contains(newPath, "kube-scheduler") {
-					return fmt.Errorf("moving the kube-apiserver file failed")
+					return errors.New("moving the kube-apiserver file failed")
 				}
 				return os.Rename(oldPath, newPath)
 			},

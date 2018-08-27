@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -46,7 +47,7 @@ func (s *Set) Allow(pubKeyHashes ...string) error {
 	for _, pubKeyHash := range pubKeyHashes {
 		parts := strings.Split(pubKeyHash, ":")
 		if len(parts) != 2 {
-			return fmt.Errorf("invalid public key hash, expected \"format:value\"")
+			return errors.New("invalid public key hash, expected \"format:value\"")
 		}
 		format, value := parts[0], parts[1]
 

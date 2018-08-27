@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -195,7 +196,7 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 	defer v3client.Close()
 	objectsResp, err := v3client.KV.Get(ctx, ttlKeysPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return fmt.Errorf("Error while getting objects to attach to the lease")
+		return errors.New("Error while getting objects to attach to the lease")
 	}
 
 	lease, err := v3client.Lease.Grant(ctx, int64(leaseDuration/time.Second))

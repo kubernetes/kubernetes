@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -231,7 +232,7 @@ func SetImplicitFlags(flags *applyFlags) error {
 	}
 
 	if len(flags.newK8sVersionStr) == 0 {
-		return fmt.Errorf("version string can't be empty")
+		return errors.New("version string can't be empty")
 	}
 
 	return nil

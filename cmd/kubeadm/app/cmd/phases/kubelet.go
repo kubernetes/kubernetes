@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -159,7 +160,7 @@ func RunKubeletWriteEnvFile(cfgPath string) error {
 		featureGates = cfg.FeatureGates
 		registerWithTaints = true
 	default:
-		return fmt.Errorf("couldn't read config file, no matching kind found")
+		return errors.New("couldn't read config file, no matching kind found")
 	}
 
 	if err := kubeletphase.WriteKubeletDynamicEnvFile(nodeRegistrationObj, featureGates, registerWithTaints, constants.KubeletRunDirectory); err != nil {

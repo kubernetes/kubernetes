@@ -31,10 +31,10 @@ import (
 )
 
 const (
-	// NodesKubeadmConfigClusterRoleName sets the name for the ClusterRole that allows
+	// BootstrapDiscoveryClusterRoleName sets the name for the ClusterRole that allows
 	// the bootstrap tokens to access the kubeadm-config ConfigMap during the node bootstrap/discovery
-	// or during upgrade nodes
-	NodesKubeadmConfigClusterRoleName = "kubeadm:nodes-kubeadm-config"
+	// phase for additional master nodes
+	BootstrapDiscoveryClusterRoleName = "kubeadm:bootstrap-discovery-kubeadm-config"
 )
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
@@ -70,10 +70,10 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 		return err
 	}
 
-	// Ensure that the NodesKubeadmConfigClusterRoleName exists
+	// Ensure that the BootstrapDiscoveryClusterRole exists
 	err = apiclient.CreateOrUpdateRole(client, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      NodesKubeadmConfigClusterRoleName,
+			Name:      BootstrapDiscoveryClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
@@ -84,27 +84,22 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 		return err
 	}
 
-	// Binds the NodesKubeadmConfigClusterRoleName to all the bootstrap tokens
+	// Binds the BootstrapDiscoveryClusterRole to all the bootstrap tokens
 	// that are members of the system:bootstrappers:kubeadm:default-node-token group
-	// and to all nodes
 	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      NodesKubeadmConfigClusterRoleName,
+			Name:      BootstrapDiscoveryClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "Role",
-			Name:     NodesKubeadmConfigClusterRoleName,
+			Name:     BootstrapDiscoveryClusterRoleName,
 		},
 		Subjects: []rbac.Subject{
 			{
 				Kind: rbac.GroupKind,
 				Name: kubeadmconstants.NodeBootstrapTokenAuthGroup,
-			},
-			{
-				Kind: rbac.GroupKind,
-				Name: kubeadmconstants.NodesGroup,
 			},
 		},
 	})
