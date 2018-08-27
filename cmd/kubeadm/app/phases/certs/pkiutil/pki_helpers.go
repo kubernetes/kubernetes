@@ -253,9 +253,9 @@ func pathForPublicKey(pkiPath, name string) string {
 // GetAPIServerAltNames builds an AltNames object for to be used when generating apiserver certificate
 func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
 	// advertise address
-	advertiseAddress := net.ParseIP(cfg.API.AdvertiseAddress)
+	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, fmt.Errorf("error parsing API AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.API.AdvertiseAddress)
+		return nil, fmt.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.APIEndpoint.AdvertiseAddress)
 	}
 
 	// internal IP address for the API server
@@ -326,9 +326,9 @@ func GetEtcdAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, err
 // The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.PeerCertSANs`.
 func GetEtcdPeerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
 	// advertise address
-	advertiseAddress := net.ParseIP(cfg.API.AdvertiseAddress)
+	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
-		return nil, fmt.Errorf("error parsing API AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.API.AdvertiseAddress)
+		return nil, fmt.Errorf("error parsing APIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address", cfg.APIEndpoint.AdvertiseAddress)
 	}
 
 	// create AltNames with defaults DNSNames/IPs

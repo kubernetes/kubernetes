@@ -239,7 +239,7 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 	//TODO: as soon as the new config wil be in place check if the node is a known control plane instance
 	//      and retrive corresponding infos (now are temporary managed as flag)
 	cfg.NodeRegistration.Name = flags.nodeName
-	cfg.API.AdvertiseAddress = flags.advertiseAddress
+	cfg.APIEndpoint.AdvertiseAddress = flags.advertiseAddress
 
 	// Rotate API server certificate if needed
 	if err := upgrade.BackupAPIServerCertIfNeeded(cfg, flags.dryRun); err != nil {

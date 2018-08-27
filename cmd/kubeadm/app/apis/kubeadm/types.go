@@ -47,6 +47,9 @@ type InitConfiguration struct {
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions
+
+	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
+	APIEndpoint APIEndpoint
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -59,8 +62,6 @@ type ClusterConfiguration struct {
 	// +k8s:conversion-gen=false
 	ComponentConfigs ComponentConfigs
 
-	// API holds configuration for the k8s apiserver.
-	API API
 	// Etcd holds configuration for etcd.
 	Etcd Etcd
 
@@ -148,8 +149,20 @@ type ComponentConfigs struct {
 // the roundtrip is considered valid, as semi-static values are set and preserved during a roundtrip.
 func (cc ComponentConfigs) Fuzz(c fuzz.Continue) {}
 
-// API struct contains elements of API server address.
-type API struct {
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
+// ConfigMap in the cluster, and then updated by kubeadm when additional control plane instance joins or leaves the cluster.
+type ClusterStatus struct {
+	metav1.TypeMeta
+
+	// APIEndpoints currently available in the cluster, one for each control plane/api server instance.
+	// The key of the map is the IP of the host's default interface
+	APIEndpoints map[string]APIEndpoint
+}
+
+// APIEndpoint struct contains elements of API server instance deployed on a node.
+type APIEndpoint struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string
 
@@ -314,9 +327,8 @@ type JoinConfiguration struct {
 	// control plane instance.
 	ControlPlane bool
 
-	// AdvertiseAddress sets the IP address for the API server to advertise; the
-	// API server will be installed only on nodes hosting an additional control plane instance.
-	AdvertiseAddress string
+	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
+	APIEndpoint APIEndpoint
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool

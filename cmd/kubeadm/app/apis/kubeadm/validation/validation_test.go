@@ -288,15 +288,15 @@ func TestValidateHostPort(t *testing.T) {
 	}
 }
 
-func TestValidateAPI(t *testing.T) {
+func TestValidateAPIEndpoint(t *testing.T) {
 	var tests = []struct {
 		name     string
-		s        *kubeadm.API
+		s        *kubeadm.APIEndpoint
 		expected bool
 	}{
 		{
 			name: "Valid IPv4 address / port",
-			s: &kubeadm.API{
+			s: &kubeadm.APIEndpoint{
 				AdvertiseAddress: "4.5.6.7",
 				BindPort:         6443,
 			},
@@ -304,7 +304,7 @@ func TestValidateAPI(t *testing.T) {
 		},
 		{
 			name: "Valid IPv6 address / port",
-			s: &kubeadm.API{
+			s: &kubeadm.APIEndpoint{
 				AdvertiseAddress: "2001:db7::2",
 				BindPort:         6443,
 			},
@@ -312,7 +312,7 @@ func TestValidateAPI(t *testing.T) {
 		},
 		{
 			name: "Invalid IPv4 address",
-			s: &kubeadm.API{
+			s: &kubeadm.APIEndpoint{
 				AdvertiseAddress: "1.2.34",
 				BindPort:         6443,
 			},
@@ -320,7 +320,7 @@ func TestValidateAPI(t *testing.T) {
 		},
 		{
 			name: "Invalid IPv6 address",
-			s: &kubeadm.API{
+			s: &kubeadm.APIEndpoint{
 				AdvertiseAddress: "2001:db7:1",
 				BindPort:         6443,
 			},
@@ -328,7 +328,7 @@ func TestValidateAPI(t *testing.T) {
 		},
 		{
 			name: "Invalid BindPort",
-			s: &kubeadm.API{
+			s: &kubeadm.APIEndpoint{
 				AdvertiseAddress: "4.5.6.7",
 				BindPort:         0,
 			},
@@ -336,7 +336,7 @@ func TestValidateAPI(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := ValidateAPI(rt.s, nil)
+		actual := ValidateAPIEndpoint(rt.s, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
 				"%s test case failed:\n\texpected: %t\n\t  actual: %t",
@@ -360,11 +360,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 			&kubeadm.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
+				APIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Networking: kubeadm.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
@@ -375,11 +375,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.InitConfiguration{
+				APIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Networking: kubeadm.Networking{
 						ServiceSubnet: "2001:db8::1/98",
 						DNSDomain:     "cluster.local",
@@ -390,11 +390,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.InitConfiguration{
+				APIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Networking: kubeadm.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
@@ -404,11 +404,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"valid master configuration with incorrect IPv4 pod subnet",
 			&kubeadm.InitConfiguration{
+				APIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Networking: kubeadm.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
@@ -420,11 +420,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.InitConfiguration{
+				APIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					API: kubeadm.API{
-						AdvertiseAddress: "1.2.3.4",
-						BindPort:         6443,
-					},
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
@@ -467,11 +467,11 @@ func TestValidateInitConfiguration(t *testing.T) {
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
 			&kubeadm.InitConfiguration{
+				APIEndpoint: kubeadm.APIEndpoint{
+					AdvertiseAddress: "1:2:3::4",
+					BindPort:         3446,
+				},
 				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					API: kubeadm.API{
-						AdvertiseAddress: "1:2:3::4",
-						BindPort:         3446,
-					},
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",

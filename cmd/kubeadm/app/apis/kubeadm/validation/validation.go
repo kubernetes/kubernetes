@@ -48,6 +48,7 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
 	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
 	return allErrs
 }
 
@@ -58,7 +59,6 @@ func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorLi
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
-	allErrs = append(allErrs, ValidateAPI(&c.API, field.NewPath("api"))...)
 	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
@@ -70,7 +70,7 @@ func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(c)...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
-	allErrs = append(allErrs, ValidateIPFromString(c.AdvertiseAddress, field.NewPath("advertiseAddress"))...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
@@ -405,8 +405,8 @@ func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) fie
 	return allErrs
 }
 
-// ValidateAPI validates API configuration
-func ValidateAPI(c *kubeadm.API, fldPath *field.Path) field.ErrorList {
+// ValidateAPIEndpoint validates API server's endpoint
+func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateIPFromString(c.AdvertiseAddress, fldPath.Child("advertiseAddress"))...)
 	allErrs = append(allErrs, ValidatePort(c.BindPort, fldPath.Child("bindPort"))...)

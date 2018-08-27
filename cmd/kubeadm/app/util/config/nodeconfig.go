@@ -23,28 +23,21 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	netutil "k8s.io/apimachinery/pkg/util/net"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
 func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
-	nodeName, err := node.GetHostname(cfg.NodeRegistration.Name)
-	if err != nil {
+
+	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, cfg.ControlPlane); err != nil {
 		return err
 	}
-	cfg.NodeRegistration.Name = nodeName
 
-	if cfg.AdvertiseAddress == "" {
-		ip, err := netutil.ChooseBindAddress(nil)
-		if err != nil {
-			return err
-		}
-		cfg.AdvertiseAddress = ip.String()
+	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+		return err
 	}
 
 	return nil

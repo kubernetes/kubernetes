@@ -400,8 +400,8 @@ func TestUsingExternalCA(t *testing.T) {
 		defer os.RemoveAll(dir)
 
 		cfg := &kubeadmapi.InitConfiguration{
+			APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 				CertificatesDir: dir,
 			},
@@ -569,8 +569,8 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 
 		cfg := &kubeadmapi.InitConfiguration{
+			APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
 				Etcd:            kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
 				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 				CertificatesDir: tmpdir,

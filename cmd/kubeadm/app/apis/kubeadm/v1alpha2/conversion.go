@@ -35,14 +35,21 @@ func Convert_v1alpha2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitCon
 	if err := split_v1alpha2_InitConfiguration_into_kubeadm_ClusterConfiguration(in, &out.ClusterConfiguration, s); err != nil {
 		return err
 	}
+	if err := split_v1alpha2_InitConfiguration_into_kubeadm_APIEndpoint(in, &out.APIEndpoint, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func split_v1alpha2_InitConfiguration_into_kubeadm_APIEndpoint(in *InitConfiguration, out *kubeadm.APIEndpoint, s conversion.Scope) error {
+	out.AdvertiseAddress = in.API.AdvertiseAddress
+	out.BindPort = in.API.BindPort
+	// in.API.ControlPlaneEndpoint will be splitted into ClusterConfiguration
 	return nil
 }
 
 func split_v1alpha2_InitConfiguration_into_kubeadm_ClusterConfiguration(in *InitConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
 	if err := split_v1alpha2_InitConfiguration_into_kubeadm_ComponentConfigs(in, &out.ComponentConfigs, s); err != nil {
-		return err
-	}
-	if err := Convert_v1alpha2_API_To_kubeadm_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
 	if err := Convert_v1alpha2_Networking_To_kubeadm_Networking(&in.Networking, &out.Networking, s); err != nil {
@@ -71,14 +78,6 @@ func split_v1alpha2_InitConfiguration_into_kubeadm_ClusterConfiguration(in *Init
 	return nil
 }
 
-func Convert_v1alpha2_API_To_kubeadm_API(in *API, out *kubeadm.API, s conversion.Scope) error {
-	if err := autoConvert_v1alpha2_API_To_kubeadm_API(in, out, s); err != nil {
-		return err
-	}
-	// in.ControlPlaneEndpoint is assigned outside this function
-	return nil
-}
-
 func split_v1alpha2_InitConfiguration_into_kubeadm_ComponentConfigs(in *InitConfiguration, out *kubeadm.ComponentConfigs, s conversion.Scope) error {
 	if in.KubeProxy.Config != nil {
 		if out.KubeProxy == nil {
@@ -101,6 +100,15 @@ func split_v1alpha2_InitConfiguration_into_kubeadm_ComponentConfigs(in *InitConf
 	return nil
 }
 
+func Convert_v1alpha2_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha2_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s); err != nil {
+		return err
+	}
+	out.APIEndpoint.AdvertiseAddress = in.AdvertiseAddress
+	out.APIEndpoint.BindPort = in.BindPort
+	return nil
+}
+
 func Convert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in, out, s); err != nil {
 		return err
@@ -108,14 +116,14 @@ func Convert_kubeadm_InitConfiguration_To_v1alpha2_InitConfiguration(in *kubeadm
 	if err := join_kubeadm_ClusterConfiguration_into_v1alpha2_InitConfiguration(&in.ClusterConfiguration, out, s); err != nil {
 		return err
 	}
+	if err := join_kubeadm_APIEndpoint_into_v1alpha2_InitConfiguration(&in.APIEndpoint, out, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func join_kubeadm_ClusterConfiguration_into_v1alpha2_InitConfiguration(in *kubeadm.ClusterConfiguration, out *InitConfiguration, s conversion.Scope) error {
 	if err := join_kubeadm_ComponentConfigs_into_v1alpha2_InitConfiguration(&in.ComponentConfigs, out, s); err != nil {
-		return err
-	}
-	if err := Convert_kubeadm_API_To_v1alpha2_API(&in.API, &out.API, s); err != nil {
 		return err
 	}
 	if err := Convert_kubeadm_Etcd_To_v1alpha2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
@@ -144,11 +152,10 @@ func join_kubeadm_ClusterConfiguration_into_v1alpha2_InitConfiguration(in *kubea
 	return nil
 }
 
-func Convert_kubeadm_API_To_v1alpha2_API(in *kubeadm.API, out *API, s conversion.Scope) error {
-	if err := autoConvert_kubeadm_API_To_v1alpha2_API(in, out, s); err != nil {
-		return err
-	}
-	// out.ControlPlaneEndpoint is assigned outside this function
+func join_kubeadm_APIEndpoint_into_v1alpha2_InitConfiguration(in *kubeadm.APIEndpoint, out *InitConfiguration, s conversion.Scope) error {
+	out.API.AdvertiseAddress = in.AdvertiseAddress
+	out.API.BindPort = in.BindPort
+	// out.API.ControlPlaneEndpoint will join from ClusterConfiguration
 	return nil
 }
 
@@ -171,5 +178,14 @@ func join_kubeadm_ComponentConfigs_into_v1alpha2_InitConfiguration(in *kubeadm.C
 			return err
 		}
 	}
+	return nil
+}
+
+func Convert_kubeadm_JoinConfiguration_To_v1alpha2_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_JoinConfiguration_To_v1alpha2_JoinConfiguration(in, out, s); err != nil {
+		return err
+	}
+	out.AdvertiseAddress = in.APIEndpoint.AdvertiseAddress
+	out.BindPort = in.APIEndpoint.BindPort
 	return nil
 }

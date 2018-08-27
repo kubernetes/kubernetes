@@ -277,8 +277,8 @@ func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
 
 		// Adds a master configuration file
 		cfg := &kubeadmapi.InitConfiguration{
+			APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 				CertificatesDir: pkidir,
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
