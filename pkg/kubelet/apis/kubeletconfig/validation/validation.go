@@ -109,7 +109,13 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
 		case kubetypes.SystemReservedEnforcementKey:
+			if kc.SystemReserved == nil {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) must not contain '%s' when '%s' is not specified", kubetypes.SystemReservedEnforcementKey, "--system-reserved"))
+			}
 		case kubetypes.KubeReservedEnforcementKey:
+			if kc.KubeReserved == nil {
+				allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) must not contain '%s' when '%s' is not specified", kubetypes.KubeReservedEnforcementKey, "--kube-reserved"))
+			}
 		case kubetypes.NodeAllocatableNoneKey:
 			if len(kc.EnforceNodeAllocatable) > 1 {
 				allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when '%s' is specified", kubetypes.NodeAllocatableNoneKey))
