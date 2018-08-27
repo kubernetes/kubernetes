@@ -26,7 +26,7 @@ import (
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeletconfig.KubeletConfiguration{
 		CgroupsPerQOS:               true,
-		EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
+		EnforceNodeAllocatable:      []string{"pods"},
 		SystemCgroups:               "",
 		CgroupRoot:                  "",
 		EventBurst:                  10,
@@ -78,7 +78,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		HairpinMode:                 "foo",
 		NodeLeaseDurationSeconds:    -1,
 	}
-	const numErrs = 23
+	const numErrs = 25
 	if allErrors := ValidateKubeletConfiguration(errorCase); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrs {
 		t.Errorf("expect %d errors, got %v", numErrs, len(allErrors.(utilerrors.Aggregate).Errors()))
 	}
