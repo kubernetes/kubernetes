@@ -458,9 +458,12 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
-	// If specified, volume will be prepopulated with data from the specified data source.
-	// This depends on the provisioner for this volume being able to use the specified source.
-	// If the provisioner does not support it, it will fail to provision the volume.
+        // If specified, volume will be prepopulated with data from the specified data source.
+        // This depends on the provisioner for this volume being able to use the specified source.
+        // If the provisioner does not support it, it will create an empty volume.
+        // It requires the VolumeSnapshotDataSource alpha feature gate to be enabled and
+        // currently VolumeSnapshot is the only supported data source.
+        // In the future, we will allow more data source types when new feature is ready.
 	// +optional
 	DataSource *TypedLocalObjectReference `json:"dataSource" protobuf:"bytes,7,opt,name=dataSource"`
 }
