@@ -22,6 +22,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+type MetricIdentifier struct {
+	// name is the name of the given metric
+	Name string
+	// selector represents the label selector that could be used to select
+	// this metric, and will generally just be the selector passed in to
+	// the query used to fetch this metric.
+	// +optional
+	Selector *metav1.LabelSelector
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // a list of values for a given metric for some set of objects
@@ -42,8 +52,7 @@ type MetricValue struct {
 	// a reference to the described object
 	DescribedObject ObjectReference `json:"describedObject"`
 
-	// the name of the metric
-	MetricName string `json:"metricName"`
+	Metric MetricIdentifier
 
 	// indicates the time at which the metrics were produced
 	Timestamp metav1.Time `json:"timestamp"`

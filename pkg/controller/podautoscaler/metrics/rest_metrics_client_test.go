@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
+	autoscalingapi "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,7 +32,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
@@ -143,9 +143,11 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 							APIVersion: "v1",
 							Name:       fmt.Sprintf("%s-%d", podNamePrefix, i),
 						},
-						Value:      *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
-						Timestamp:  metav1.Time{Time: timestamp},
-						MetricName: tc.metricName,
+						Value:     *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
+						Timestamp: metav1.Time{Time: timestamp},
+						Metric: cmapi.MetricIdentifier{
+							Name: tc.metricName,
+						},
 					}
 
 					metrics.Items = append(metrics.Items, metric)
@@ -176,9 +178,11 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 								APIVersion: tc.singleObject.APIVersion,
 								Name:       tc.singleObject.Name,
 							},
-							Timestamp:  metav1.Time{Time: timestamp},
-							MetricName: tc.metricName,
-							Value:      *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
+							Timestamp: metav1.Time{Time: timestamp},
+							Metric: cmapi.MetricIdentifier{
+								Name: tc.metricName,
+							},
+							Value: *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
 						},
 					},
 				}
@@ -227,10 +231,10 @@ func (tc *restClientTestCase) runTest(t *testing.T) {
 		}
 		tc.verifyResults(t, info, timestamp, err)
 	} else if tc.singleObject == nil {
-		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector, tc.metricLabelSelector)
 		tc.verifyResults(t, info, timestamp, err)
 	} else {
-		val, timestamp, err := metricsClient.GetObjectMetric(tc.metricName, tc.namespace, tc.singleObject)
+		val, timestamp, err := metricsClient.GetObjectMetric(tc.metricName, tc.namespace, tc.singleObject, tc.metricLabelSelector)
 		info := PodMetricsInfo{tc.singleObject.Name: val}
 		tc.verifyResults(t, info, timestamp, err)
 	}

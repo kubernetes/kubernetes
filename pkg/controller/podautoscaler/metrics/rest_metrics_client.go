@@ -22,12 +22,12 @@ import (
 
 	"github.com/golang/glog"
 
-	autoscaling "k8s.io/api/autoscaling/v2beta1"
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	customapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
@@ -101,8 +101,8 @@ type customMetricsClient struct {
 
 // GetRawMetric gets the given metric (and an associated oldest timestamp)
 // for all pods matching the specified selector in the given namespace
-func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
-	metrics, err := c.client.NamespacedMetrics(namespace).GetForObjects(schema.GroupKind{Kind: "Pod"}, selector, metricName)
+func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector, metricSelector labels.Selector) (PodMetricsInfo, time.Time, error) {
+	metrics, err := c.client.NamespacedMetrics(namespace).GetForObjects(schema.GroupKind{Kind: "Pod"}, selector, metricName, metricSelector)
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("unable to fetch metrics from custom metrics API: %v", err)
 	}
@@ -123,7 +123,7 @@ func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, 
 
 // GetObjectMetric gets the given metric (and an associated timestamp) for the given
 // object in the given namespace
-func (c *customMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (int64, time.Time, error) {
+func (c *customMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (int64, time.Time, error) {
 	gvk := schema.FromAPIVersionAndKind(objectRef.APIVersion, objectRef.Kind)
 	var metricValue *customapi.MetricValue
 	var err error
@@ -131,9 +131,9 @@ func (c *customMetricsClient) GetObjectMetric(metricName string, namespace strin
 		// handle namespace separately
 		// NB: we ignore namespace name here, since CrossVersionObjectReference isn't
 		// supposed to allow you to escape your namespace
-		metricValue, err = c.client.RootScopedMetrics().GetForObject(gvk.GroupKind(), namespace, metricName)
+		metricValue, err = c.client.RootScopedMetrics().GetForObject(gvk.GroupKind(), namespace, metricName, metricSelector)
 	} else {
-		metricValue, err = c.client.NamespacedMetrics(namespace).GetForObject(gvk.GroupKind(), objectRef.Name, metricName)
+		metricValue, err = c.client.NamespacedMetrics(namespace).GetForObject(gvk.GroupKind(), objectRef.Name, metricName, metricSelector)
 	}
 
 	if err != nil {

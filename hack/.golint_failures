@@ -46,6 +46,7 @@ pkg/apis/authorization/validation
 pkg/apis/autoscaling
 pkg/apis/autoscaling/v1
 pkg/apis/autoscaling/v2beta1
+pkg/apis/autoscaling/v2beta2
 pkg/apis/autoscaling/validation
 pkg/apis/batch
 pkg/apis/batch/v1
@@ -461,6 +462,7 @@ staging/src/k8s.io/api/authorization/v1
 staging/src/k8s.io/api/authorization/v1beta1
 staging/src/k8s.io/api/autoscaling/v1
 staging/src/k8s.io/api/autoscaling/v2beta1
+staging/src/k8s.io/api/autoscaling/v2beta2
 staging/src/k8s.io/api/batch/v1
 staging/src/k8s.io/api/batch/v1beta1
 staging/src/k8s.io/api/batch/v2alpha1
@@ -705,6 +707,7 @@ staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice
 staging/src/k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
+staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2
 staging/src/k8s.io/metrics/pkg/apis/external_metrics
 staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/apis/metrics
@@ -712,6 +715,7 @@ staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1
 staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1
 staging/src/k8s.io/metrics/pkg/client/custom_metrics
 staging/src/k8s.io/metrics/pkg/client/custom_metrics/fake
+staging/src/k8s.io/metrics/pkg/client/custom_metrics/scheme
 staging/src/k8s.io/metrics/pkg/client/external_metrics
 staging/src/k8s.io/metrics/pkg/client/external_metrics/fake
 staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder

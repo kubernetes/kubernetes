@@ -210,7 +210,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 
 	} else {
-		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector)
+		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector, nil)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")

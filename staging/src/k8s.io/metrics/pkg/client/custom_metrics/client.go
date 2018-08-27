@@ -20,14 +20,13 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
+	"k8s.io/metrics/pkg/client/custom_metrics/scheme"
 )
 
 type customMetricsClient struct {
@@ -50,7 +49,7 @@ func NewForConfig(c *rest.Config) (CustomMetricsClient, error) {
 	if configShallowCopy.UserAgent == "" {
 		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	configShallowCopy.GroupVersion = &v1beta1.SchemeGroupVersion
+	configShallowCopy.GroupVersion = &v1beta2.SchemeGroupVersion
 	configShallowCopy.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
 
 	client, err := rest.RESTClientFor(&configShallowCopy)
@@ -112,12 +111,15 @@ type rootScopedMetrics struct {
 	client *customMetricsClient
 }
 
-func (m *rootScopedMetrics) getForNamespace(namespace string, metricName string) (*v1beta1.MetricValue, error) {
-	res := &v1beta1.MetricValueList{}
+func (m *rootScopedMetrics) getForNamespace(namespace string, metricName string, metricSelector labels.Selector) (*v1beta2.MetricValue, error) {
+	res := &v1beta2.MetricValueList{}
 	err := m.client.client.Get().
 		Resource("metrics").
 		Namespace(namespace).
 		Name(metricName).
+		VersionedParams(&v1beta2.MetricListOptions{
+			MetricLabelSelector: metricSelector.String(),
+		}, scheme.ParameterCodec).
 		Do().
 		Into(res)
 
@@ -132,10 +134,10 @@ func (m *rootScopedMetrics) getForNamespace(namespace string, metricName string)
 	return &res.Items[0], nil
 }
 
-func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string, metricName string) (*v1beta1.MetricValue, error) {
+func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string, metricName string, metricSelector labels.Selector) (*v1beta2.MetricValue, error) {
 	// handle namespace separately
 	if groupKind.Kind == "Namespace" && groupKind.Group == "" {
-		return m.getForNamespace(name, metricName)
+		return m.getForNamespace(name, metricName, metricSelector)
 	}
 
 	resourceName, err := m.client.qualResourceForKind(groupKind)
@@ -143,11 +145,14 @@ func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string
 		return nil, err
 	}
 
-	res := &v1beta1.MetricValueList{}
+	res := &v1beta2.MetricValueList{}
 	err = m.client.client.Get().
 		Resource(resourceName).
 		Name(name).
 		SubResource(metricName).
+		VersionedParams(&v1beta2.MetricListOptions{
+			MetricLabelSelector: metricSelector.String(),
+		}, scheme.ParameterCodec).
 		Do().
 		Into(res)
 
@@ -162,7 +167,7 @@ func (m *rootScopedMetrics) GetForObject(groupKind schema.GroupKind, name string
 	return &res.Items[0], nil
 }
 
-func (m *rootScopedMetrics) GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string) (*v1beta1.MetricValueList, error) {
+func (m *rootScopedMetrics) GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string, metricSelector labels.Selector) (*v1beta2.MetricValueList, error) {
 	// we can't wildcard-fetch for namespaces
 	if groupKind.Kind == "Namespace" && groupKind.Group == "" {
 		return nil, fmt.Errorf("cannot fetch metrics for multiple namespaces at once")
@@ -173,14 +178,15 @@ func (m *rootScopedMetrics) GetForObjects(groupKind schema.GroupKind, selector l
 		return nil, err
 	}
 
-	res := &v1beta1.MetricValueList{}
+	res := &v1beta2.MetricValueList{}
 	err = m.client.client.Get().
 		Resource(resourceName).
-		Name(v1beta1.AllObjects).
+		Name(v1beta2.AllObjects).
 		SubResource(metricName).
-		VersionedParams(&metav1.ListOptions{
-			LabelSelector: selector.String(),
-		}, metav1.ParameterCodec).
+		VersionedParams(&v1beta2.MetricListOptions{
+			LabelSelector:       selector.String(),
+			MetricLabelSelector: metricSelector.String(),
+		}, scheme.ParameterCodec).
 		Do().
 		Into(res)
 
@@ -196,18 +202,21 @@ type namespacedMetrics struct {
 	namespace string
 }
 
-func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string, metricName string) (*v1beta1.MetricValue, error) {
+func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string, metricName string, metricSelector labels.Selector) (*v1beta2.MetricValue, error) {
 	resourceName, err := m.client.qualResourceForKind(groupKind)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &v1beta1.MetricValueList{}
+	res := &v1beta2.MetricValueList{}
 	err = m.client.client.Get().
 		Resource(resourceName).
 		Namespace(m.namespace).
 		Name(name).
 		SubResource(metricName).
+		VersionedParams(&v1beta2.MetricListOptions{
+			MetricLabelSelector: metricSelector.String(),
+		}, scheme.ParameterCodec).
 		Do().
 		Into(res)
 
@@ -222,21 +231,22 @@ func (m *namespacedMetrics) GetForObject(groupKind schema.GroupKind, name string
 	return &res.Items[0], nil
 }
 
-func (m *namespacedMetrics) GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string) (*v1beta1.MetricValueList, error) {
+func (m *namespacedMetrics) GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string, metricSelector labels.Selector) (*v1beta2.MetricValueList, error) {
 	resourceName, err := m.client.qualResourceForKind(groupKind)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &v1beta1.MetricValueList{}
+	res := &v1beta2.MetricValueList{}
 	err = m.client.client.Get().
 		Resource(resourceName).
 		Namespace(m.namespace).
-		Name(v1beta1.AllObjects).
+		Name(v1beta2.AllObjects).
 		SubResource(metricName).
-		VersionedParams(&metav1.ListOptions{
-			LabelSelector: selector.String(),
-		}, metav1.ParameterCodec).
+		VersionedParams(&v1beta2.MetricListOptions{
+			LabelSelector:       selector.String(),
+			MetricLabelSelector: metricSelector.String(),
+		}, scheme.ParameterCodec).
 		Do().
 		Into(res)
 

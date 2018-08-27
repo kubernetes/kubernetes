@@ -210,6 +210,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
+	// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2
+	gvr("autoscaling", "v2beta2", "horizontalpodautoscalers"): {
+		stub:             `{"metadata": {"name": "hpa3"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
+		expectedEtcdPath: "/registry/horizontalpodautoscalers/etcdstoragepathtestnamespace/hpa3",
+		expectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+	},
+	// --
+
 	// k8s.io/kubernetes/pkg/apis/batch/v1
 	gvr("batch", "v1", "jobs"): {
 		stub:             `{"metadata": {"name": "job1"}, "spec": {"manualSelector": true, "selector": {"matchLabels": {"controller-uid": "uid1"}}, "template": {"metadata": {"labels": {"controller-uid": "uid1"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container1"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}`,
