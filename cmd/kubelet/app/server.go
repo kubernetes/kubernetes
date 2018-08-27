@@ -956,7 +956,6 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.NodeIP,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
-		kubeServer.CertDirectory,
 		kubeServer.RootDirectory,
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
