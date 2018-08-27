@@ -94,9 +94,11 @@ func TestDefaultFlags(t *testing.T) {
 }
 
 func TestAddFlags(t *testing.T) {
-	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewCloudControllerManagerOptions()
-	s.AddFlags(f)
+	for _, f := range s.Flags().FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	args := []string{
 		"--address=192.168.4.10",
@@ -129,7 +131,7 @@ func TestAddFlags(t *testing.T) {
 		"--secure-port=10001",
 		"--use-service-account-credentials=false",
 	}
-	f.Parse(args)
+	fs.Parse(args)
 
 	expected := &CloudControllerManagerOptions{
 		CloudProvider: &cmoptions.CloudProviderOptions{
