@@ -350,6 +350,13 @@ const (
 	//
 	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
 	RuntimeClass utilfeature.Feature = "RuntimeClass"
+
+	// owner: @mtaufen
+	// alpha: v1.12
+	//
+	// Kubelet uses the new Lease API to report node heartbeats,
+	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
+	NodeLease utilfeature.Feature = "NodeLease"
 )
 
 func init() {
@@ -409,6 +416,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
+	NodeLease:                                   {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

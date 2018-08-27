@@ -160,6 +160,11 @@ func NodeRules() []rbacv1.PolicyRule {
 		volAttachRule := rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, volAttachRule)
 	}
+
+	// Node leases
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("coordination.k8s.io").Resources("leases").RuleOrDie())
+	}
 	return nodePolicyRules
 }
 

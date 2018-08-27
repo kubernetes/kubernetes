@@ -138,6 +138,7 @@ kubeAPIQPS: 5
 makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110
+nodeLeaseDurationSeconds: 40
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
 podPidsLimit: -1
