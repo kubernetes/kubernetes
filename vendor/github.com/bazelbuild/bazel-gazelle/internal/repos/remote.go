@@ -272,7 +272,12 @@ func defaultHeadCmd(remote, vcs string) (string, error) {
 		return "", nil
 
 	case "git":
-		cmd := exec.Command("git", "ls-remote", "--", remote, "HEAD")
+		// Old versions of git ls-remote exit with code 129 when "--" is passed.
+		// We'll try to validate the argument here instead.
+		if strings.HasPrefix(remote, "-") {
+			return "", fmt.Errorf("remote must not start with '-': %q", remote)
+		}
+		cmd := exec.Command("git", "ls-remote", remote, "HEAD")
 		out, err := cmd.Output()
 		if err != nil {
 			return "", err
