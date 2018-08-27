@@ -357,7 +357,7 @@ const (
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
 	NodeLease utilfeature.Feature = "NodeLease"
-	
+
 	// owner: @janosi
 	// alpha: v1.12
 	//
