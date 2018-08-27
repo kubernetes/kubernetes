@@ -17,20 +17,19 @@ limitations under the License.
 package core
 
 import (
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 // legacyObjectCountAliases are what we used to do simple object counting quota with mapped to alias
-var legacyObjectCountAliases = map[schema.GroupVersionResource]api.ResourceName{
-	v1.SchemeGroupVersion.WithResource("configmaps"):             api.ResourceConfigMaps,
-	v1.SchemeGroupVersion.WithResource("resourcequotas"):         api.ResourceQuotas,
-	v1.SchemeGroupVersion.WithResource("replicationcontrollers"): api.ResourceReplicationControllers,
-	v1.SchemeGroupVersion.WithResource("secrets"):                api.ResourceSecrets,
+var legacyObjectCountAliases = map[schema.GroupVersionResource]corev1.ResourceName{
+	corev1.SchemeGroupVersion.WithResource("configmaps"):             corev1.ResourceConfigMaps,
+	corev1.SchemeGroupVersion.WithResource("resourcequotas"):         corev1.ResourceQuotas,
+	corev1.SchemeGroupVersion.WithResource("replicationcontrollers"): corev1.ResourceReplicationControllers,
+	corev1.SchemeGroupVersion.WithResource("secrets"):                corev1.ResourceSecrets,
 }
 
 // NewEvaluators returns the list of static evaluators that manage more than counts

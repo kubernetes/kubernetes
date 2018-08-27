@@ -19,28 +19,29 @@ package core
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
 	evaluator := NewServiceEvaluator(nil)
 	// we give a lot of resources
-	input := []api.ResourceName{
-		api.ResourceConfigMaps,
-		api.ResourceCPU,
-		api.ResourceServices,
-		api.ResourceServicesNodePorts,
-		api.ResourceServicesLoadBalancers,
+	input := []corev1.ResourceName{
+		corev1.ResourceConfigMaps,
+		corev1.ResourceCPU,
+		corev1.ResourceServices,
+		corev1.ResourceServicesNodePorts,
+		corev1.ResourceServicesLoadBalancers,
 	}
 	// but we only match these...
-	expected := quota.ToSet([]api.ResourceName{
-		api.ResourceServices,
-		api.ResourceServicesNodePorts,
-		api.ResourceServicesLoadBalancers,
+	expected := quota.ToSet([]corev1.ResourceName{
+		corev1.ResourceServices,
+		corev1.ResourceServicesNodePorts,
+		corev1.ResourceServicesLoadBalancers,
 	})
 	actual := quota.ToSet(evaluator.MatchingResources(input))
 	if !expected.Equal(actual) {
@@ -52,7 +53,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 	evaluator := NewServiceEvaluator(nil)
 	testCases := map[string]struct {
 		service *api.Service
-		usage   api.ResourceList
+		usage   corev1.ResourceList
 	}{
 		"loadbalancer": {
 			service: &api.Service{
@@ -60,10 +61,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 					Type: api.ServiceTypeLoadBalancer,
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServicesNodePorts:     resource.MustParse("0"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
-				api.ResourceServices:              resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceServicesNodePorts:                                                    resource.MustParse("0"),
+				corev1.ResourceServicesLoadBalancers:                                                resource.MustParse("1"),
+				corev1.ResourceServices:                                                             resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
@@ -78,10 +79,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServicesNodePorts:     resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
-				api.ResourceServices:              resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceServicesNodePorts:                                                    resource.MustParse("1"),
+				corev1.ResourceServicesLoadBalancers:                                                resource.MustParse("1"),
+				corev1.ResourceServices:                                                             resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
@@ -91,10 +92,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 					Type: api.ServiceTypeClusterIP,
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServices:                                                                resource.MustParse("1"),
-				api.ResourceServicesNodePorts:                                                       resource.MustParse("0"),
-				api.ResourceServicesLoadBalancers:                                                   resource.MustParse("0"),
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:                                                             resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:                                                    resource.MustParse("0"),
+				corev1.ResourceServicesLoadBalancers:                                                resource.MustParse("0"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
@@ -109,10 +110,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServices:                                                                resource.MustParse("1"),
-				api.ResourceServicesNodePorts:                                                       resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers:                                                   resource.MustParse("0"),
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:                                                             resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:                                                    resource.MustParse("1"),
+				corev1.ResourceServicesLoadBalancers:                                                resource.MustParse("0"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
@@ -130,10 +131,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceServices:                                                                resource.MustParse("1"),
-				api.ResourceServicesNodePorts:                                                       resource.MustParse("2"),
-				api.ResourceServicesLoadBalancers:                                                   resource.MustParse("0"),
+			usage: corev1.ResourceList{
+				corev1.ResourceServices:                                                             resource.MustParse("1"),
+				corev1.ResourceServicesNodePorts:                                                    resource.MustParse("2"),
+				corev1.ResourceServicesLoadBalancers:                                                resource.MustParse("0"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
 		},
@@ -152,7 +153,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 func TestServiceConstraintsFunc(t *testing.T) {
 	testCases := map[string]struct {
 		service  *api.Service
-		required []api.ResourceName
+		required []corev1.ResourceName
 		err      string
 	}{
 		"loadbalancer": {
@@ -161,7 +162,7 @@ func TestServiceConstraintsFunc(t *testing.T) {
 					Type: api.ServiceTypeLoadBalancer,
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesLoadBalancers},
+			required: []corev1.ResourceName{corev1.ResourceServicesLoadBalancers},
 		},
 		"clusterip": {
 			service: &api.Service{
@@ -169,7 +170,7 @@ func TestServiceConstraintsFunc(t *testing.T) {
 					Type: api.ServiceTypeClusterIP,
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesLoadBalancers, api.ResourceServices},
+			required: []corev1.ResourceName{corev1.ResourceServicesLoadBalancers, corev1.ResourceServices},
 		},
 		"nodeports": {
 			service: &api.Service{
@@ -182,7 +183,7 @@ func TestServiceConstraintsFunc(t *testing.T) {
 					},
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesNodePorts},
+			required: []corev1.ResourceName{corev1.ResourceServicesNodePorts},
 		},
 		"multi-nodeports": {
 			service: &api.Service{
@@ -198,7 +199,7 @@ func TestServiceConstraintsFunc(t *testing.T) {
 					},
 				},
 			},
-			required: []api.ResourceName{api.ResourceServicesNodePorts},
+			required: []corev1.ResourceName{corev1.ResourceServicesNodePorts},
 		},
 	}
 
