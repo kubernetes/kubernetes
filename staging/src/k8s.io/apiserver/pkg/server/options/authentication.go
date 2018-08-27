@@ -25,21 +25,24 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/server"
-	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
 
 type RequestHeaderAuthenticationOptions struct {
+	// ClientCAFile is the root certificate bundle to verify client certificates on incoming requests
+	// before trusting usernames in headers.
+	ClientCAFile string
+
 	UsernameHeaders     []string
 	GroupHeaders        []string
 	ExtraHeaderPrefixes []string
-	ClientCAFile        string
 	AllowedNames        []string
 }
 
@@ -158,35 +161,39 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 		return nil
 	}
 
-	clientCA, err := s.getClientCA()
+	client, err := s.getClient()
 	if err != nil {
-		if _, ignorable := err.(ignorableError); !ignorable {
+		return fmt.Errorf("failed to get delegated authentication kubeconfig: %v", err)
+	}
+
+	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
+		Anonymous:               true,
+		CacheTTL:                s.CacheTTL,
+		TokenAccessReviewClient: client.AuthenticationV1beta1().TokenReviews(),
+	}
+
+	// look into configmaps/external-apiserver-authentication for missing authn info
+	if !s.SkipInClusterLookup {
+		err := s.lookupMissingConfigInCluster(client)
+		if err != nil {
 			return err
-		} else {
-			glog.Warning(err)
 		}
 	}
-	if err = c.ApplyClientCert(clientCA.ClientCA, servingInfo); err != nil {
+
+	// configure AuthenticationInfo config
+	if err = c.ApplyClientCert(s.ClientCert.ClientCA, servingInfo); err != nil {
+		return fmt.Errorf("unable to load client CA file: %v", err)
+	}
+	cfg.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
+	if err = c.ApplyClientCert(s.RequestHeader.ClientCAFile, servingInfo); err != nil {
 		return fmt.Errorf("unable to load client CA file: %v", err)
 	}
 
-	requestHeader, err := s.getRequestHeader()
-	if err != nil {
-		return err
-	}
-	if err = c.ApplyClientCert(requestHeader.ClientCAFile, servingInfo); err != nil {
-		return fmt.Errorf("unable to load client CA file: %v", err)
-	}
-
-	cfg, err := s.ToAuthenticationConfig()
-	if err != nil {
-		return err
-	}
+	// create authenticator
 	authenticator, securityDefinitions, err := cfg.New()
 	if err != nil {
 		return err
 	}
-
 	c.Authenticator = authenticator
 	if openAPIConfig != nil {
 		openAPIConfig.SecurityDefinitions = securityDefinitions
@@ -194,35 +201,6 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(c *server.AuthenticationInfo, 
 	c.SupportsBasicAuth = false
 
 	return nil
-}
-
-func (s *DelegatingAuthenticationOptions) ToAuthenticationConfig() (authenticatorfactory.DelegatingAuthenticatorConfig, error) {
-	tokenClient, err := s.newTokenAccessReview()
-	if err != nil {
-		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
-	}
-
-	clientCA, err := s.getClientCA()
-	if err != nil {
-		if _, ignorable := err.(ignorableError); !ignorable {
-			return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
-		} else {
-			glog.Warning(err)
-		}
-	}
-	requestHeader, err := s.getRequestHeader()
-	if err != nil {
-		return authenticatorfactory.DelegatingAuthenticatorConfig{}, err
-	}
-
-	ret := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:               true,
-		TokenAccessReviewClient: tokenClient,
-		CacheTTL:                s.CacheTTL,
-		ClientCAFile:            clientCA.ClientCA,
-		RequestHeaderConfig:     requestHeader.ToAuthenticationRequestHeaderConfig(),
-	}
-	return ret, nil
 }
 
 const (
@@ -235,59 +213,50 @@ const (
 	authenticationRoleName      = "extension-apiserver-authentication-reader"
 )
 
-func (s *DelegatingAuthenticationOptions) getClientCA() (*ClientCertAuthenticationOptions, error) {
-	if len(s.ClientCert.ClientCA) > 0 || s.SkipInClusterLookup {
-		return &s.ClientCert, nil
+func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client kubernetes.Interface) error {
+	if len(s.ClientCert.ClientCA) > 0 && len(s.RequestHeader.ClientCAFile) > 0 {
+		return nil
 	}
 
-	incluster, err := s.lookupInClusterClientCA()
+	authConfigMap, err := client.CoreV1().ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
 	if err != nil {
 		glog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
 			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
-		return nil, err
+		return err
 	}
-	if incluster == nil {
-		return &s.ClientCert, ignorableError{fmt.Errorf("cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)}
+
+	if len(s.ClientCert.ClientCA) == 0 {
+		opt, err := inClusterClientCA(authConfigMap)
+		if err != nil {
+			return err
+		}
+		if opt == nil {
+			glog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		} else {
+			s.ClientCert = *opt
+		}
 	}
-	return incluster, nil
+
+	if len(s.RequestHeader.ClientCAFile) == 0 {
+		opt, err := inClusterRequestHeader(authConfigMap)
+		if err != nil {
+			return err
+		}
+		if opt == nil {
+			glog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+		} else {
+			s.RequestHeader = *opt
+		}
+	}
+
+	return nil
 }
 
-func (s *DelegatingAuthenticationOptions) getRequestHeader() (*RequestHeaderAuthenticationOptions, error) {
-	if len(s.RequestHeader.ClientCAFile) > 0 || s.SkipInClusterLookup {
-		return &s.RequestHeader, nil
-	}
-
-	incluster, err := s.lookupInClusterRequestHeader()
-	if err != nil {
-		glog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
-			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
-			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
-		return nil, err
-	}
-	if incluster == nil {
-		return nil, fmt.Errorf("cluster doesn't provide requestheader-client-ca-file")
-	}
-	return incluster, nil
-}
-
-func (s *DelegatingAuthenticationOptions) lookupInClusterClientCA() (*ClientCertAuthenticationOptions, error) {
-	clientConfig, err := s.getClientConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get delegated authentication kubeconfig: %v", err)
-	}
-	client, err := coreclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
+func inClusterClientCA(authConfigMap *v1.ConfigMap) (*ClientCertAuthenticationOptions, error) {
 	clientCA, ok := authConfigMap.Data["client-ca-file"]
 	if !ok {
+		// not having a client-ca is fine, return nil
 		return nil, nil
 	}
 
@@ -301,23 +270,10 @@ func (s *DelegatingAuthenticationOptions) lookupInClusterClientCA() (*ClientCert
 	return &ClientCertAuthenticationOptions{ClientCA: f.Name()}, nil
 }
 
-func (s *DelegatingAuthenticationOptions) lookupInClusterRequestHeader() (*RequestHeaderAuthenticationOptions, error) {
-	clientConfig, err := s.getClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	client, err := coreclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	authConfigMap, err := client.ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
+func inClusterRequestHeader(authConfigMap *v1.ConfigMap) (*RequestHeaderAuthenticationOptions, error) {
 	requestHeaderCA, ok := authConfigMap.Data["requestheader-client-ca-file"]
 	if !ok {
+		// not having a requestheader-client-ca is fine, return nil
 		return nil, nil
 	}
 
@@ -365,7 +321,7 @@ func deserializeStrings(in string) ([]string, error) {
 	return ret, nil
 }
 
-func (s *DelegatingAuthenticationOptions) getClientConfig() (*rest.Config, error) {
+func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, error) {
 	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
@@ -380,27 +336,12 @@ func (s *DelegatingAuthenticationOptions) getClientConfig() (*rest.Config, error
 		clientConfig, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get delegated authentication kubeconfig: %v", err)
 	}
 
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
 
-	return clientConfig, nil
+	return kubernetes.NewForConfig(clientConfig)
 }
-
-func (s *DelegatingAuthenticationOptions) newTokenAccessReview() (authenticationclient.TokenReviewInterface, error) {
-	clientConfig, err := s.getClientConfig()
-	if err != nil {
-		return nil, err
-	}
-	client, err := authenticationclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.TokenReviews(), nil
-}
-
-type ignorableError struct{ error }
