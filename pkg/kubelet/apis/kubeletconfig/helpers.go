@@ -21,6 +21,7 @@ package kubeletconfig
 // passing the configuration to the application. This method must be kept up to date as new fields are added.
 func KubeletConfigurationPathRefs(kc *KubeletConfiguration) []*string {
 	paths := []*string{}
+	paths = append(paths, &kc.Kubeconfig)
 	paths = append(paths, &kc.BootstrapKubeconfig)
 	paths = append(paths, &kc.StaticPodPath)
 	paths = append(paths, &kc.Authentication.X509.ClientCAFile)

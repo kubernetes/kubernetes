@@ -501,7 +501,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 
 	// About to get clients and such, detect standaloneMode
 	standaloneMode := true
-	if len(s.KubeConfig) > 0 {
+	if len(s.Kubeconfig) > 0 {
 		standaloneMode = false
 	}
 
@@ -537,7 +537,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	}
 
 	if s.BootstrapKubeconfig != "" {
-		if err := bootstrap.LoadClientCert(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+		if err := bootstrap.LoadClientCert(s.Kubeconfig, s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 			return err
 		}
 	}
@@ -851,7 +851,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 }
@@ -859,7 +859,7 @@ func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error
 // createClientConfig creates a client configuration from the command line arguments.
 // If --kubeconfig is explicitly set, it will be used.
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	if s.BootstrapKubeconfig != "" || len(s.KubeConfig) > 0 {
+	if s.BootstrapKubeconfig != "" || len(s.Kubeconfig) > 0 {
 		return kubeconfigClientConfig(s)
 	} else {
 		return nil, fmt.Errorf("createClientConfig called in standalone mode")

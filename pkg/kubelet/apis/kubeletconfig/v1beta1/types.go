@@ -62,6 +62,8 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Path to a kubeconfig file, specifying how to connect to the API server.
+	Kubeconfig string `json:"kubeconfig,omitempty"`
 	// Path to a kubeconfig file that will be used to get client certificate for kubelet.
 	// Default: ""
 	// +optional
