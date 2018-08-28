@@ -183,7 +183,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, framework.ImagePullerLabels); err != nil {
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
@@ -192,36 +192,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
 		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
-	}
-
-	if err := framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout); err != nil {
-		// There is no guarantee that the image pulling will succeed in 3 minutes
-		// and we don't even run the image puller on all platforms (including GKE).
-		// We wait for it so we get an indication of failures in the logs, and to
-		// maximize benefit of image pre-pulling.
-		framework.Logf("WARNING: Image pulling pods failed to enter success in %v: %v", framework.ImagePrePullingTimeout, err)
-	}
-
-	// Dump the output of the nethealth containers only once per run
-	if framework.TestContext.DumpLogsOnFailure {
-		logFunc := framework.Logf
-		if framework.TestContext.ReportDir != "" {
-			filePath := path.Join(framework.TestContext.ReportDir, "nethealth.txt")
-			file, err := os.Create(filePath)
-			if err != nil {
-				framework.Logf("Failed to create a file with network health data %v: %v\nPrinting to stdout", filePath, err)
-			} else {
-				defer file.Close()
-				if err = file.Chmod(0644); err != nil {
-					framework.Logf("Failed to chmod to 644 of %v: %v", filePath, err)
-				}
-				logFunc = framework.GetLogToFileFunc(file)
-				framework.Logf("Dumping network health container logs from all nodes to file %v", filePath)
-			}
-		} else {
-			framework.Logf("Dumping network health container logs from all nodes...")
-		}
-		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", logFunc)
 	}
 
 	// Log the version of the server and this client.

@@ -2526,14 +2526,6 @@ function setup-node-termination-handler-manifest {
     fi 
 }
 
-# Starts an image-puller - used in test clusters.
-function start-image-puller {
-  echo "Start image-puller"
-  local -r e2e_image_puller_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest"
-  update-container-runtime "${e2e_image_puller_manifest}"
-  cp "${e2e_image_puller_manifest}" /etc/kubernetes/manifests/
-}
-
 # Setups manifests for ingress controller and gce-specific policies for service controller.
 function start-lb-controller {
   setup-addon-manifests "addons" "loadbalancing"
@@ -2744,9 +2736,6 @@ function main() {
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy
-    fi
-    if [[ "${PREPULL_E2E_IMAGES:-}" == "true" ]]; then
-      start-image-puller
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       start-node-problem-detector

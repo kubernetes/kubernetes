@@ -63,7 +63,6 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var systemPodsNo int
 	var ns string
 	f := framework.NewDefaultFramework("sched-priority")
-	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
 	})
@@ -78,7 +77,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
-		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
