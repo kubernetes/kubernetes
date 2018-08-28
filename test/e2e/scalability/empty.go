@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Empty [Feature:Empty]", func() {
+var _ = SIGDescribe("Empty [Feature:Empty] [Serial]", func() {
 	f := framework.NewDefaultFramework("empty")
 
 	BeforeEach(func() {
