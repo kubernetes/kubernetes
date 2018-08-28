@@ -40,6 +40,7 @@ filegroup(
         ":package-srcs",
         "//cmd/cloud-controller-manager/app/config:all-srcs",
         "//cmd/cloud-controller-manager/app/options:all-srcs",
+        "//cmd/cloud-controller-manager/app/testing:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
