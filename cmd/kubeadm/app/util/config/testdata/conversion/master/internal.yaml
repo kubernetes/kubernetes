@@ -77,6 +77,7 @@ ComponentConfigs:
       Webhook:
         CacheAuthorizedTTL: 5m0s
         CacheUnauthorizedTTL: 30s
+    BootstrapKubeconfig: ""
     CPUCFSQuota: true
     CPUManagerPolicy: none
     CPUManagerReconcilePeriod: 10s
@@ -123,6 +124,7 @@ ComponentConfigs:
     KubeAPIQPS: 5
     KubeReserved: null
     KubeReservedCgroup: ""
+    Kubeconfig: ""
     KubeletCgroups: ""
     MakeIPTablesUtilChains: true
     MaxOpenFiles: 1000000
