@@ -248,8 +248,8 @@ const (
 	// gate is present only for backward compatibility, it will be removed in the 1.11 release.
 	ReadOnlyAPIDataVolumes utilfeature.Feature = "ReadOnlyAPIDataVolumes"
 
-	// owner: @k82cn
-	// alpha: v1.10
+	// owner: @k82cn, @Huang-Wei
+	// beta: v1.12
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
 	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
@@ -407,7 +407,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
-	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
+	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
 	TokenRequestProjection:                      {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
