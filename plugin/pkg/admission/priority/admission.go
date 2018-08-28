@@ -183,7 +183,7 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 		if len(pod.Spec.PriorityClassName) == 0 &&
 			utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
 			kubelettypes.IsCritical(a.GetNamespace(), pod.Annotations) {
-			pod.Spec.PriorityClassName = scheduling.SystemClusterCritical
+			pod.Spec.PriorityClassName = scheduling.SystemNodeCritical
 		}
 		if len(pod.Spec.PriorityClassName) == 0 {
 			var err error
