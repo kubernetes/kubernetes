@@ -4855,7 +4855,7 @@ func validateScopedResourceSelectorRequirement(resourceQuotaSpec *core.ResourceQ
 		case core.ScopeSelectorOpIn, core.ScopeSelectorOpNotIn:
 			if len(req.Values) == 0 {
 				allErrs = append(allErrs, field.Required(fldPath.Child("values"),
-					"must be atleast one value when `operator` is 'In' or 'NotIn' for scope selector"))
+					"must be at least one value when `operator` is 'In' or 'NotIn' for scope selector"))
 			}
 		case core.ScopeSelectorOpExists, core.ScopeSelectorOpDoesNotExist:
 			if len(req.Values) != 0 {
