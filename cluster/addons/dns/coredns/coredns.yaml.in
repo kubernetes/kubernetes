@@ -66,7 +66,9 @@ data:
         prometheus :9153
         proxy . /etc/resolv.conf
         cache 30
+        loop
         reload
+        loadbalance
     }
 ---
 apiVersion: extensions/v1beta1
@@ -106,7 +108,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.1.3
+        image: k8s.gcr.io/coredns:1.2.2
         imagePullPolicy: IfNotPresent
         resources:
           limits:
