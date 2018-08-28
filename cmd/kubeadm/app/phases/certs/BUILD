@@ -52,6 +52,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app/phases/certs/pkiutil:all-srcs",
+        "//cmd/kubeadm/app/phases/certs/renewal:all-srcs",
     ],
     tags = ["automanaged"],
 )
