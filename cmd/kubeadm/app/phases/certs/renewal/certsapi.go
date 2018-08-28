@@ -17,8 +17,8 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
@@ -55,7 +55,7 @@ func NewCertsAPIRenawal(client kubernetes.Interface) Interface {
 }
 
 // Renew takes a certificate using the cert and key.
-func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.PrivateKey, error) {
+func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	reqTmp := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,

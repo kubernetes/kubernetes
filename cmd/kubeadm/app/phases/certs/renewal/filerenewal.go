@@ -17,10 +17,8 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto"
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
@@ -29,11 +27,11 @@ import (
 // FileRenewal renews a certificate using local certs
 type FileRenewal struct {
 	caCert *x509.Certificate
-	caKey  crypto.PrivateKey
+	caKey  *rsa.PrivateKey
 }
 
 // NewFileRenewal takes a certificate pair to construct the Interface.
-func NewFileRenewal(caCert *x509.Certificate, caKey crypto.PrivateKey) Interface {
+func NewFileRenewal(caCert *x509.Certificate, caKey *rsa.PrivateKey) Interface {
 	return &FileRenewal{
 		caCert: caCert,
 		caKey:  caKey,
@@ -41,11 +39,6 @@ func NewFileRenewal(caCert *x509.Certificate, caKey crypto.PrivateKey) Interface
 }
 
 // Renew takes a certificate using the cert and key
-func (r *FileRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.PrivateKey, error) {
-	caKey, ok := r.caKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, nil, fmt.Errorf("unsupported private key type %t", r.caKey)
-	}
-
-	return pkiutil.NewCertAndKey(r.caCert, caKey, cfg)
+func (r *FileRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
+	return pkiutil.NewCertAndKey(r.caCert, r.caKey, cfg)
 }
