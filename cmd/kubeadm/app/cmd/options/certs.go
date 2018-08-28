@@ -14,16 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package renewal
+package options
 
-import (
-	"crypto/rsa"
-	"crypto/x509"
+import "github.com/spf13/pflag"
 
-	certutil "k8s.io/client-go/util/cert"
-)
-
-// Interface represents a standard way to renew a certificate.
-type Interface interface {
-	Renew(*certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error)
+// AddCertificateDirFlag adds the --certs-dir flag to the given flagset
+func AddCertificateDirFlag(fs *pflag.FlagSet, certsDir *string) {
+	fs.StringVar(certsDir, "cert-dir", *certsDir, "The path where to save the certificates")
 }
