@@ -71,10 +71,11 @@ type testCase struct {
 	reportedMetricsPoints [][]metricPoint
 	reportedPodMetrics    [][]int64
 
-	namespace    string
-	selector     labels.Selector
-	resourceName v1.ResourceName
-	metricName   string
+	namespace      string
+	selector       labels.Selector
+	metricSelector labels.Selector
+	resourceName   v1.ResourceName
+	metricName     string
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
@@ -211,7 +212,7 @@ func (tc *testCase) runTest(t *testing.T) {
 		info, timestamp, err := metricsClient.GetResourceMetric(tc.resourceName, tc.namespace, tc.selector)
 		tc.verifyResults(t, info, timestamp, err)
 	} else {
-		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector, tc.metricSelector)
 		tc.verifyResults(t, info, timestamp, err)
 	}
 }

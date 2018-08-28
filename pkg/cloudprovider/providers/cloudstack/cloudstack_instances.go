@@ -69,6 +69,10 @@ func (cs *CSCloud) nodeAddresses(instance *cloudstack.VirtualMachine) ([]v1.Node
 		{Type: v1.NodeInternalIP, Address: instance.Nic[0].Ipaddress},
 	}
 
+	if instance.Hostname != "" {
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: instance.Hostname})
+	}
+
 	if instance.Publicip != "" {
 		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: instance.Publicip})
 	} else {

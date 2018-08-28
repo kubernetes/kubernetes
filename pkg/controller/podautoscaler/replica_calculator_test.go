@@ -22,20 +22,20 @@ import (
 	"testing"
 	"time"
 
-	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
@@ -86,8 +86,9 @@ type replicaCalcTestCase struct {
 
 	timestamp time.Time
 
-	resource *resourceInfo
-	metric   *metricInfo
+	resource            *resourceInfo
+	metric              *metricInfo
+	metricLabelSelector labels.Selector
 
 	podReadiness []v1.ConditionStatus
 	podStartTime []metav1.Time
@@ -235,9 +236,11 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: testNamespace,
 					},
-					Timestamp:  metav1.Time{Time: tc.timestamp},
-					MetricName: tc.metric.name,
-					Value:      *resource.NewMilliQuantity(level, resource.DecimalSI),
+					Timestamp: metav1.Time{Time: tc.timestamp},
+					Metric: cmapi.MetricIdentifier{
+						Name: tc.metric.name,
+					},
+					Value: *resource.NewMilliQuantity(level, resource.DecimalSI),
 				}
 				metrics.Items = append(metrics.Items, podMetric)
 			}
@@ -265,9 +268,11 @@ func (tc *replicaCalcTestCase) prepareTestCMClient(t *testing.T) *cmfake.FakeCus
 					APIVersion: tc.metric.singleObject.APIVersion,
 					Name:       name,
 				},
-				Timestamp:  metav1.Time{Time: tc.timestamp},
-				MetricName: tc.metric.name,
-				Value:      *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
+				Timestamp: metav1.Time{Time: tc.timestamp},
+				Metric: cmapi.MetricIdentifier{
+					Name: tc.metric.name,
+				},
+				Value: *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
 			},
 		}
 
@@ -322,7 +327,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
+	metricsClient := metricsclient.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 
 	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuTaintAfterStart, defaultTestingDelayOfInitialReadinessStatus)
 
@@ -357,7 +362,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
-		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, selector)
+		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, tc.metric.singleObject, selector, nil)
 	case externalMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalMetric but metric.selector is nil.")
@@ -376,7 +381,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUtilization, tc.metric.name, testNamespace, tc.metric.selector)
 	case podMetric:
-		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector)
+		outReplicas, outUtilization, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector, nil)
 	default:
 		t.Fatalf("Unknown metric type: %d", tc.metric.metricType)
 	}

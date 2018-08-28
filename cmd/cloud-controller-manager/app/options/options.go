@@ -28,6 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -45,7 +46,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -131,24 +131,27 @@ func NewDefaultComponentConfig(insecurePort int32) (componentconfig.CloudControl
 	return internal, nil
 }
 
-// AddFlags adds flags for a specific ExternalCMServer to the specified FlagSet
-func (o *CloudControllerManagerOptions) AddFlags(fs *pflag.FlagSet) {
-	o.CloudProvider.AddFlags(fs)
-	o.Debugging.AddFlags(fs)
-	o.GenericComponent.AddFlags(fs)
-	o.KubeCloudShared.AddFlags(fs)
-	o.ServiceController.AddFlags(fs)
+// Flags returns flags for a specific APIServer by section name
+func (o *CloudControllerManagerOptions) Flags() (fss apiserverflag.NamedFlagSets) {
+	o.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
+	o.Debugging.AddFlags(fss.FlagSet("debugging"))
+	o.GenericComponent.AddFlags(fss.FlagSet("generic"))
+	o.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
+	o.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
-	o.SecureServing.AddFlags(fs)
-	o.InsecureServing.AddUnqualifiedFlags(fs)
-	o.Authentication.AddFlags(fs)
-	o.Authorization.AddFlags(fs)
+	o.SecureServing.AddFlags(fss.FlagSet("secure serving"))
+	o.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving"))
+	o.Authentication.AddFlags(fss.FlagSet("authentication"))
+	o.Authorization.AddFlags(fss.FlagSet("authorization"))
 
+	fs := fss.FlagSet("misc")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fss.FlagSet("generic"))
+
+	return fss
 }
 
 // ApplyTo fills up cloud controller manager config with options.

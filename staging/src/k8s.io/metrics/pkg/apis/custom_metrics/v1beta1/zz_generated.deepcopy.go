@@ -21,6 +21,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -36,6 +37,11 @@ func (in *MetricValue) DeepCopyInto(out *MetricValue) {
 		**out = **in
 	}
 	out.Value = in.Value.DeepCopy()
+	if in.Selector != nil {
+		in, out := &in.Selector, &out.Selector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

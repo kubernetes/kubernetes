@@ -127,14 +127,6 @@ func validateEvent(messagePrefix string, actualEvent *v1.Event, expectedEvent *v
 	return actualEvent, nil
 }
 
-// TestDefaultEventFilterFunc ensures that no events are filtered
-func TestDefaultEventFilterFunc(t *testing.T) {
-	event := makeEvent("end-of-world", "it was fun", makeObjectReference("Pod", "pod1", "other"))
-	if DefaultEventFilterFunc(&event) {
-		t.Fatalf("DefaultEventFilterFunc should always return false")
-	}
-}
-
 // TestEventAggregatorByReasonFunc ensures that two events are aggregated if they vary only by event.message
 func TestEventAggregatorByReasonFunc(t *testing.T) {
 	event1 := makeEvent("end-of-world", "it was fun", makeObjectReference("Pod", "pod1", "other"))

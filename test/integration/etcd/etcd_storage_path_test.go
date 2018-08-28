@@ -210,6 +210,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
+	// k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2
+	gvr("autoscaling", "v2beta2", "horizontalpodautoscalers"): {
+		stub:             `{"metadata": {"name": "hpa3"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
+		expectedEtcdPath: "/registry/horizontalpodautoscalers/etcdstoragepathtestnamespace/hpa3",
+		expectedGVK:      gvkP("autoscaling", "v1", "HorizontalPodAutoscaler"),
+	},
+	// --
+
 	// k8s.io/kubernetes/pkg/apis/batch/v1
 	gvr("batch", "v1", "jobs"): {
 		stub:             `{"metadata": {"name": "job1"}, "spec": {"manualSelector": true, "selector": {"matchLabels": {"controller-uid": "uid1"}}, "template": {"metadata": {"labels": {"controller-uid": "uid1"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container1"}], "dnsPolicy": "ClusterFirst", "restartPolicy": "Never"}}}}`,
@@ -732,14 +740,14 @@ func getEtcdBucket(path string) string {
 // stable fields to compare as a sanity check
 type metaObject struct {
 	// all of type meta
-	Kind       string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
-	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
+	Kind       string `json:"kind,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty"`
 
 	// parts of object meta
 	Metadata struct {
-		Name      string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-		Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
-	} `json:"metadata,omitempty" protobuf:"bytes,3,opt,name=metadata"`
+		Name      string `json:"name,omitempty"`
+		Namespace string `json:"namespace,omitempty"`
+	} `json:"metadata,omitempty"`
 }
 
 func (obj *metaObject) getGVK() schema.GroupVersionKind {

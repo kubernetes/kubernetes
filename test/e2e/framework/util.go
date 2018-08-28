@@ -87,6 +87,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -2654,6 +2655,8 @@ func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeLi
 	return nodes
 }
 
+// WaitForAllNodesSchedulable waits up to timeout for all
+// (but TestContext.AllowedNotReadyNodes) to become scheduable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
@@ -2676,7 +2679,13 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if !isNodeSchedulable(node) {
+			if _, hasMasterRoleLabel := node.ObjectMeta.Labels[service.LabelNodeRoleMaster]; hasMasterRoleLabel {
+				// Kops clusters have masters with spec.unscheduable = false and
+				// node-role.kubernetes.io/master NoSchedule taint.
+				// Don't wait for them.
+				continue
+			}
+			if !isNodeSchedulable(node) || !isNodeUntainted(node) {
 				notSchedulable = append(notSchedulable, node)
 			}
 		}
@@ -2692,10 +2701,11 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 			if len(nodes.Items) >= largeClusterThreshold && attempt%10 == 0 {
 				Logf("Unschedulable nodes:")
 				for i := range notSchedulable {
-					Logf("-> %s Ready=%t Network=%t",
+					Logf("-> %s Ready=%t Network=%t Taints=%v",
 						notSchedulable[i].Name,
 						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
-						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false))
+						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
+						notSchedulable[i].Spec.Taints)
 				}
 				Logf("================================")
 			}

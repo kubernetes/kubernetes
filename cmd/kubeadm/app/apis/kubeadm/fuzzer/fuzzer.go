@@ -24,12 +24,12 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -45,25 +45,14 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			fuzzClusterConfig(&obj.ClusterConfiguration)
-			obj.BootstrapTokens = []kubeadm.BootstrapToken{
-				{
-					Token: &kubeadm.BootstrapTokenString{
-						ID:     "abcdef",
-						Secret: "abcdef0123456789",
-					},
-					TTL:    &metav1.Duration{Duration: 1 * time.Hour},
-					Usages: []string{"foo"},
-					Groups: []string{"foo"},
-				},
-			}
-			obj.NodeRegistration = kubeadm.NodeRegistrationOptions{
-				CRISocket: "foo",
-				Name:      "foo",
-				Taints:    []v1.Taint{},
-			}
+			fuzzBootstrapTokens(&obj.BootstrapTokens)
+			fuzzNodeRegistration(&obj.NodeRegistration)
+			fuzzAPIEndpoint(&obj.APIEndpoint)
 		},
 		func(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
+			fuzzNodeRegistration(&obj.NodeRegistration)
+			fuzzAPIEndpoint(&obj.APIEndpoint)
 			obj.CACertPath = "foo"
 			obj.DiscoveryFile = "foo"
 			obj.DiscoveryToken = "foo"
@@ -72,18 +61,37 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
 			obj.ClusterName = "foo"
-			obj.NodeRegistration = kubeadm.NodeRegistrationOptions{
-				CRISocket: "foo",
-				Name:      "foo",
-			}
 		},
 	}
 }
 
+func fuzzBootstrapTokens(obj *[]kubeadm.BootstrapToken) {
+	obj = &[]kubeadm.BootstrapToken{
+		{
+			Token: &kubeadm.BootstrapTokenString{
+				ID:     "abcdef",
+				Secret: "abcdef0123456789",
+			},
+			TTL:    &metav1.Duration{Duration: 1 * time.Hour},
+			Usages: []string{"foo"},
+			Groups: []string{"foo"},
+		},
+	}
+}
+
+func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions) {
+	obj.CRISocket = "foo"
+	obj.Name = "foo"
+	obj.Taints = []v1.Taint{}
+}
+
+func fuzzAPIEndpoint(obj *kubeadm.APIEndpoint) {
+	obj.BindPort = 20
+	obj.AdvertiseAddress = "foo"
+}
+
 func fuzzClusterConfig(obj *kubeadm.ClusterConfiguration) {
 	obj.KubernetesVersion = "v10"
-	obj.API.BindPort = 20
-	obj.API.AdvertiseAddress = "foo"
 	obj.Networking.ServiceSubnet = "10.96.0.0/12"
 	obj.Networking.DNSDomain = "cluster.local"
 	obj.CertificatesDir = "foo"

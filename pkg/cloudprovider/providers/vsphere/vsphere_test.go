@@ -451,7 +451,7 @@ func TestZones(t *testing.T) {
 				t.Fatal(err)
 			}
 		}},
-		{"dc region, cluster zone", true, func() {
+		{"dc region, cluster zone", false, func() {
 			var h mo.HostSystem
 			if err = pc.RetrieveOne(ctx, host.Reference(), []string{"parent"}, &h); err != nil {
 				t.Fatal(err)
@@ -464,8 +464,6 @@ func TestZones(t *testing.T) {
 			if err = m.AttachTag(ctx, zoneID, h.Parent); err != nil {
 				t.Fatal(err)
 			}
-
-			// TODO: this should pass with Datacenter tagged as the region and Cluster tagged as the zone
 		}},
 	}
 

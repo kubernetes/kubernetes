@@ -145,15 +145,17 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 func TestGetAPIServerCommand(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.ClusterConfiguration
+		cfg      *kubeadmapi.InitConfiguration
 		expected []string
 	}{
 		{
 			name: "testing defaults",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+				},
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -187,14 +189,16 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "ignores the audit policy if the feature gate is not enabled",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
-				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
-					Path:      "/foo/bar",
-					LogDir:    "/foo/baz",
-					LogMaxAge: utilpointer.Int32Ptr(10),
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+					AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
+						Path:      "/foo/bar",
+						LogDir:    "/foo/baz",
+						LogMaxAge: utilpointer.Int32Ptr(10),
+					},
 				},
 			},
 			expected: []string{
@@ -229,10 +233,12 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "ipv6 advertise address",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+				},
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -266,19 +272,21 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "an external etcd with custom ca, certs and keys",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:          kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:   kubeadmapi.Networking{ServiceSubnet: "bar"},
-				FeatureGates: map[string]bool{features.HighAvailability: true},
-				Etcd: kubeadmapi.Etcd{
-					External: &kubeadmapi.ExternalEtcd{
-						Endpoints: []string{"https://8.6.4.1:2379", "https://8.6.4.2:2379"},
-						CAFile:    "fuz",
-						CertFile:  "fiz",
-						KeyFile:   "faz",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:   kubeadmapi.Networking{ServiceSubnet: "bar"},
+					FeatureGates: map[string]bool{features.HighAvailability: true},
+					Etcd: kubeadmapi.Etcd{
+						External: &kubeadmapi.ExternalEtcd{
+							Endpoints: []string{"https://8.6.4.1:2379", "https://8.6.4.2:2379"},
+							CAFile:    "fuz",
+							CertFile:  "fiz",
+							KeyFile:   "faz",
+						},
 					},
+					CertificatesDir: testCertsDir,
 				},
-				CertificatesDir: testCertsDir,
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -313,15 +321,17 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "an insecure etcd",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:        kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
-				Etcd: kubeadmapi.Etcd{
-					External: &kubeadmapi.ExternalEtcd{
-						Endpoints: []string{"http://127.0.0.1:2379", "http://127.0.0.1:2380"},
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
+					Etcd: kubeadmapi.Etcd{
+						External: &kubeadmapi.ExternalEtcd{
+							Endpoints: []string{"http://127.0.0.1:2379", "http://127.0.0.1:2380"},
+						},
 					},
+					CertificatesDir: testCertsDir,
 				},
-				CertificatesDir: testCertsDir,
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -352,13 +362,15 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "auditing and HA are enabled with a custom log max age of 0",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				FeatureGates:    map[string]bool{features.HighAvailability: true, features.Auditing: true},
-				CertificatesDir: testCertsDir,
-				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
-					LogMaxAge: utilpointer.Int32Ptr(0),
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					FeatureGates:    map[string]bool{features.HighAvailability: true, features.Auditing: true},
+					CertificatesDir: testCertsDir,
+					AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
+						LogMaxAge: utilpointer.Int32Ptr(0),
+					},
 				},
 			},
 			expected: []string{
@@ -397,11 +409,13 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "ensure the DynamicKubelet flag gets passed through",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
-				FeatureGates:    map[string]bool{features.DynamicKubeletConfig: true},
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+					FeatureGates:    map[string]bool{features.DynamicKubeletConfig: true},
+				},
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -436,16 +450,18 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "test APIServerExtraArgs works as expected",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
-				FeatureGates:    map[string]bool{features.DynamicKubeletConfig: true, features.Auditing: true},
-				APIServerExtraArgs: map[string]string{
-					"service-cluster-ip-range": "baz",
-					"advertise-address":        "9.9.9.9",
-					"audit-policy-file":        "/etc/config/audit.yaml",
-					"audit-log-path":           "/var/log/kubernetes",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+					FeatureGates:    map[string]bool{features.DynamicKubeletConfig: true, features.Auditing: true},
+					APIServerExtraArgs: map[string]string{
+						"service-cluster-ip-range": "baz",
+						"advertise-address":        "9.9.9.9",
+						"audit-policy-file":        "/etc/config/audit.yaml",
+						"audit-log-path":           "/var/log/kubernetes",
+					},
 				},
 			},
 			expected: []string{
@@ -484,12 +500,14 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "authorization-mode extra-args ABAC",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
-				APIServerExtraArgs: map[string]string{
-					"authorization-mode": authzmodes.ModeABAC,
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+					APIServerExtraArgs: map[string]string{
+						"authorization-mode": authzmodes.ModeABAC,
+					},
 				},
 			},
 			expected: []string{
@@ -524,12 +542,14 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "insecure-port extra-args",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
-				APIServerExtraArgs: map[string]string{
-					"insecure-port": "1234",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+					APIServerExtraArgs: map[string]string{
+						"insecure-port": "1234",
+					},
 				},
 			},
 			expected: []string{
@@ -564,12 +584,14 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "authorization-mode extra-args Webhook",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				CertificatesDir: testCertsDir,
-				APIServerExtraArgs: map[string]string{
-					"authorization-mode": authzmodes.ModeWebhook,
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					CertificatesDir: testCertsDir,
+					APIServerExtraArgs: map[string]string{
+						"authorization-mode": authzmodes.ModeWebhook,
+					},
 				},
 			},
 			expected: []string{
@@ -606,11 +628,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			// TODO: Make getAPIServerCommand accept a ClusterConfiguration object instead of InitConfiguration
-			initcfg := &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: *rt.cfg,
-			}
-			actual := getAPIServerCommand(initcfg)
+			actual := getAPIServerCommand(rt.cfg)
 			sort.Strings(actual)
 			sort.Strings(rt.expected)
 			if !reflect.DeepEqual(actual, rt.expected) {
@@ -829,16 +847,18 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		cfg             *kubeadmapi.ClusterConfiguration
+		cfg             *kubeadmapi.InitConfiguration
 		caKeyPresent    bool
 		expectedArgFunc func(dir string) []string
 	}{
 		{
 			name: "caKeyPresent-false",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				KubernetesVersion: "v1.7.0",
-				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "v1.7.0",
+					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				},
 			},
 			caKeyPresent: false,
 			expectedArgFunc: func(tmpdir string) []string {
@@ -858,10 +878,12 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 		},
 		{
 			name: "caKeyPresent true",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				KubernetesVersion: "v1.7.0",
-				API:               kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-				Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "v1.7.0",
+					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				},
 			},
 			caKeyPresent: true,
 			expectedArgFunc: func(tmpdir string) []string {
@@ -887,12 +909,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 		test.cfg.CertificatesDir = tmpdir
 
-		// TODO: Make getControllerManagerCommand and CreatePKIAssets accept a ClusterConfiguration object instead of InitConfiguration
-		initcfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: *test.cfg,
-		}
-
-		if err := certs.CreatePKIAssets(initcfg); err != nil {
+		if err := certs.CreatePKIAssets(test.cfg); err != nil {
 			t.Errorf("failed creating pki assets: %v", err)
 		}
 
@@ -906,7 +923,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			}
 		}
 
-		actual := getControllerManagerCommand(initcfg, version.MustParseSemantic(test.cfg.KubernetesVersion))
+		actual := getControllerManagerCommand(test.cfg, version.MustParseSemantic(test.cfg.KubernetesVersion))
 		expected := test.expectedArgFunc(tmpdir)
 		sort.Strings(actual)
 		sort.Strings(expected)

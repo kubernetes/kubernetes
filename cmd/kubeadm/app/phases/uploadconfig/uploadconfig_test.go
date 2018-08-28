@@ -65,10 +65,10 @@ func TestUploadConfiguration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
 			initialcfg := &kubeadmapiv1alpha3.InitConfiguration{
+				APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+				},
 				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
-					API: kubeadmapiv1alpha3.API{
-						AdvertiseAddress: "1.2.3.4",
-					},
 					KubernetesVersion: "v1.10.10",
 				},
 				BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{

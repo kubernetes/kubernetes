@@ -320,7 +320,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 }
 
 func (jm *JobController) updateJob(old, cur interface{}) {
-	oldJob := cur.(*batch.Job)
+	oldJob := old.(*batch.Job)
 	curJob := cur.(*batch.Job)
 
 	// never return error

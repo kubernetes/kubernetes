@@ -84,11 +84,6 @@ func getSpamKey(event *v1.Event) string {
 // EventFilterFunc is a function that returns true if the event should be skipped
 type EventFilterFunc func(event *v1.Event) bool
 
-// DefaultEventFilterFunc returns false for all incoming events
-func DefaultEventFilterFunc(event *v1.Event) bool {
-	return false
-}
-
 // EventSourceObjectSpamFilter is responsible for throttling
 // the amount of events a source and object can produce.
 type EventSourceObjectSpamFilter struct {

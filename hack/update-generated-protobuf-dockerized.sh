@@ -52,6 +52,7 @@ PACKAGES=(
   k8s.io/api/autoscaling/v1
   k8s.io/api/authorization/v1
   k8s.io/api/autoscaling/v2beta1
+  k8s.io/api/autoscaling/v2beta2
   k8s.io/api/authorization/v1beta1
   k8s.io/api/batch/v1
   k8s.io/api/batch/v1beta1
@@ -81,6 +82,7 @@ PACKAGES=(
   k8s.io/metrics/pkg/apis/metrics/v1alpha1
   k8s.io/metrics/pkg/apis/metrics/v1beta1
   k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
+  k8s.io/metrics/pkg/apis/custom_metrics/v1beta2
   k8s.io/metrics/pkg/apis/external_metrics/v1beta1
   k8s.io/apiserver/pkg/apis/audit/v1alpha1
   k8s.io/apiserver/pkg/apis/audit/v1beta1

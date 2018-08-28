@@ -1580,47 +1580,47 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	for i, spec := range specs {
 		switch spec.Type {
 		case autoscaling.ExternalMetricSourceType:
-			if spec.External.TargetAverageValue != nil {
+			if spec.External.Target.AverageValue != nil {
 				current := "<unknown>"
-				if len(statuses) > i && statuses[i].External != nil && statuses[i].External.CurrentAverageValue != nil {
-					current = statuses[i].External.CurrentAverageValue.String()
+				if len(statuses) > i && statuses[i].External != nil && &statuses[i].External.Current.AverageValue != nil {
+					current = statuses[i].External.Current.AverageValue.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s (avg)", current, spec.External.TargetAverageValue.String()))
+				list = append(list, fmt.Sprintf("%s/%s (avg)", current, spec.External.Target.AverageValue.String()))
 			} else {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].External != nil {
-					current = statuses[i].External.CurrentValue.String()
+					current = statuses[i].External.Current.Value.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.TargetValue.String()))
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.Target.Value.String()))
 			}
 		case autoscaling.PodsMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Pods != nil {
-				current = statuses[i].Pods.CurrentAverageValue.String()
+				current = statuses[i].Pods.Current.AverageValue.String()
 			}
-			list = append(list, fmt.Sprintf("%s/%s", current, spec.Pods.TargetAverageValue.String()))
+			list = append(list, fmt.Sprintf("%s/%s", current, spec.Pods.Target.AverageValue.String()))
 		case autoscaling.ObjectMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Object != nil {
-				current = statuses[i].Object.CurrentValue.String()
+				current = statuses[i].Object.Current.Value.String()
 			}
-			list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.TargetValue.String()))
+			list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.Target.Value.String()))
 		case autoscaling.ResourceMetricSourceType:
-			if spec.Resource.TargetAverageValue != nil {
+			if spec.Resource.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].Resource != nil {
-					current = statuses[i].Resource.CurrentAverageValue.String()
+					current = statuses[i].Resource.Current.AverageValue.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, spec.Resource.TargetAverageValue.String()))
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.Resource.Target.AverageValue.String()))
 			} else {
 				current := "<unknown>"
-				if len(statuses) > i && statuses[i].Resource != nil && statuses[i].Resource.CurrentAverageUtilization != nil {
-					current = fmt.Sprintf("%d%%", *statuses[i].Resource.CurrentAverageUtilization)
+				if len(statuses) > i && statuses[i].Resource != nil && statuses[i].Resource.Current.AverageUtilization != nil {
+					current = fmt.Sprintf("%d%%", *statuses[i].Resource.Current.AverageUtilization)
 				}
 
 				target := "<auto>"
-				if spec.Resource.TargetAverageUtilization != nil {
-					target = fmt.Sprintf("%d%%", *spec.Resource.TargetAverageUtilization)
+				if spec.Resource.Target.AverageUtilization != nil {
+					target = fmt.Sprintf("%d%%", *spec.Resource.Target.AverageUtilization)
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, target))
 			}

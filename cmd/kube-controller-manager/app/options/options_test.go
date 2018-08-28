@@ -34,9 +34,11 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
-	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
-	s.AddFlags(f, []string{""}, []string{""})
+	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	args := []string{
 		"--address=192.168.4.10",
@@ -113,7 +115,7 @@ func TestAddFlags(t *testing.T) {
 		"--bind-address=192.168.4.21",
 		"--secure-port=10001",
 	}
-	f.Parse(args)
+	fs.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
 	sort.Sort(sortedGCIgnoredResources(s.GarbageCollectorController.GCIgnoredResources))

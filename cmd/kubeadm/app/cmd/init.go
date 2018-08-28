@@ -158,11 +158,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
-		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
+		&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
 	)
 	flagSet.Int32Var(
-		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
+		&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort,
 		"Port for the API Server to bind to.",
 	)
 	flagSet.StringVar(

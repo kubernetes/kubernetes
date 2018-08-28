@@ -30,7 +30,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/pointer"
 )
 
@@ -171,11 +171,11 @@ func TestEnsureProxyAddon(t *testing.T) {
 		client := clientsetfake.NewSimpleClientset()
 		// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
 		masterConfig := &kubeadmapiv1alpha3.InitConfiguration{
+			APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{
+				AdvertiseAddress: "1.2.3.4",
+				BindPort:         1234,
+			},
 			ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
-				API: kubeadmapiv1alpha3.API{
-					AdvertiseAddress: "1.2.3.4",
-					BindPort:         1234,
-				},
 				Networking: kubeadmapiv1alpha3.Networking{
 					PodSubnet: "5.6.7.8/24",
 				},
@@ -191,9 +191,9 @@ func TestEnsureProxyAddon(t *testing.T) {
 				return true, nil, apierrors.NewUnauthorized("")
 			})
 		case InvalidMasterEndpoint:
-			masterConfig.API.AdvertiseAddress = "1.2.3"
+			masterConfig.APIEndpoint.AdvertiseAddress = "1.2.3"
 		case IPv6SetBindAddress:
-			masterConfig.API.AdvertiseAddress = "1:2::3:4"
+			masterConfig.APIEndpoint.AdvertiseAddress = "1:2::3:4"
 			masterConfig.Networking.PodSubnet = "2001:101::/96"
 		}
 

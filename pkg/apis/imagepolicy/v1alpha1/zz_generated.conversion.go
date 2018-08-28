@@ -158,6 +158,7 @@ func Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(in *imagepo
 func autoConvert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *v1alpha1.ImageReviewStatus, out *imagepolicy.ImageReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 
@@ -169,6 +170,7 @@ func Convert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *v1a
 func autoConvert_imagepolicy_ImageReviewStatus_To_v1alpha1_ImageReviewStatus(in *imagepolicy.ImageReviewStatus, out *v1alpha1.ImageReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 

@@ -1600,6 +1600,56 @@
      "targetValue": {
       "type": "string",
       "description": "targetValue is the target value of the metric (as a quantity)."
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics."
+     },
+     "averageValue": {
+      "type": "string",
+      "description": "averageValue is the target value of the average of the metric across all relevant pods (as a quantity)"
+     }
+    }
+   },
+   "v1.LabelSelector": {
+    "id": "v1.LabelSelector",
+    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
+    "properties": {
+     "matchLabels": {
+      "type": "object",
+      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
+     },
+     "matchExpressions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.LabelSelectorRequirement"
+      },
+      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
+     }
+    }
+   },
+   "v1.LabelSelectorRequirement": {
+    "id": "v1.LabelSelectorRequirement",
+    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
+    "required": [
+     "key",
+     "operator"
+    ],
+    "properties": {
+     "key": {
+      "type": "string",
+      "description": "key is the label key that the selector applies to."
+     },
+     "operator": {
+      "type": "string",
+      "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist."
+     },
+     "values": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
      }
     }
    },
@@ -1618,6 +1668,10 @@
      "targetAverageValue": {
       "type": "string",
       "description": "targetAverageValue is the target value of the average of the metric across all relevant pods (as a quantity)"
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping When unset, just the metricName will be used to gather metrics."
      }
     }
    },
@@ -1665,48 +1719,6 @@
      "targetAverageValue": {
       "type": "string",
       "description": "targetAverageValue is the target per-pod value of global metric (as a quantity). Mutually exclusive with TargetValue."
-     }
-    }
-   },
-   "v1.LabelSelector": {
-    "id": "v1.LabelSelector",
-    "description": "A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.",
-    "properties": {
-     "matchLabels": {
-      "type": "object",
-      "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed."
-     },
-     "matchExpressions": {
-      "type": "array",
-      "items": {
-       "$ref": "v1.LabelSelectorRequirement"
-      },
-      "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed."
-     }
-    }
-   },
-   "v1.LabelSelectorRequirement": {
-    "id": "v1.LabelSelectorRequirement",
-    "description": "A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.",
-    "required": [
-     "key",
-     "operator"
-    ],
-    "properties": {
-     "key": {
-      "type": "string",
-      "description": "key is the label key that the selector applies to."
-     },
-     "operator": {
-      "type": "string",
-      "description": "operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist."
-     },
-     "values": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch."
      }
     }
    },
@@ -1804,6 +1816,14 @@
      "currentValue": {
       "type": "string",
       "description": "currentValue is the current value of the metric (as a quantity)."
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the ObjectMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics."
+     },
+     "averageValue": {
+      "type": "string",
+      "description": "averageValue is the current value of the average of the metric across all relevant pods (as a quantity)"
      }
     }
    },
@@ -1822,6 +1842,10 @@
      "currentAverageValue": {
       "type": "string",
       "description": "currentAverageValue is the current value of the average of the metric across all relevant pods (as a quantity)"
+     },
+     "selector": {
+      "$ref": "v1.LabelSelector",
+      "description": "selector is the string-encoded form of a standard kubernetes label selector for the given metric When set in the PodsMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping. When unset, just the metricName will be used to gather metrics."
      }
     }
    },

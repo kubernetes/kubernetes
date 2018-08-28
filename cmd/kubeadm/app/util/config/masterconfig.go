@@ -43,12 +43,29 @@ import (
 
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
 func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
+	if err := SetBootstrapTokensDynamicDefaults(&cfg.BootstrapTokens); err != nil {
+		return err
+	}
+	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, true); err != nil {
+		return err
+	}
+	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+		return err
+	}
+	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.APIEndpoint.AdvertiseAddress); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SetBootstrapTokensDynamicDefaults checks and sets configuration values for the BootstrapTokens object
+func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 	// Populate the .Token field with a random value if unset
 	// We do this at this layer, and not the API defaulting layer
 	// because of possible security concerns, and more practically
 	// because we can't return errors in the API object defaulting
 	// process but here we can.
-	for i, bt := range cfg.BootstrapTokens {
+	for i, bt := range *cfg {
 		if bt.Token != nil && len(bt.Token.String()) > 0 {
 			continue
 		}
@@ -61,33 +78,34 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 		if err != nil {
 			return err
 		}
-		cfg.BootstrapTokens[i].Token = token
+		(*cfg)[i].Token = token
 	}
 
+	return nil
+}
+
+// SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
+func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, masterTaint bool) error {
 	var err error
-	cfg.NodeRegistration.Name, err = nodeutil.GetHostname(cfg.NodeRegistration.Name)
+	cfg.Name, err = nodeutil.GetHostname(cfg.Name)
 	if err != nil {
 		return err
 	}
 
 	// Only if the slice is nil, we should append the master taint. This allows the user to specify an empty slice for no default master taint
-	if cfg.NodeRegistration.Taints == nil {
-		cfg.NodeRegistration.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
+	if masterTaint && cfg.Taints == nil {
+		cfg.Taints = []v1.Taint{kubeadmconstants.MasterTaint}
 	}
 
-	// Do all the defaulting for the nested ClusterConfiguration as well
-	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration)
+	return nil
 }
 
-// SetClusterDynamicDefaults checks and sets configuration values for the InitConfiguration object
-func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration) error {
-	// Default all the embedded ComponentConfig structs
-	componentconfigs.Known.Default(cfg)
-
+// SetAPIEndpointDynamicDefaults checks and sets configuration values for the APIEndpoint object
+func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	// validate cfg.API.AdvertiseAddress.
-	addressIP := net.ParseIP(cfg.API.AdvertiseAddress)
-	if addressIP == nil && cfg.API.AdvertiseAddress != "" {
-		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.API.AdvertiseAddress)
+	addressIP := net.ParseIP(cfg.AdvertiseAddress)
+	if addressIP == nil && cfg.AdvertiseAddress != "" {
+		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
 	// This is the same logic as the API Server uses
@@ -95,13 +113,23 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration) error {
 	if err != nil {
 		return err
 	}
-	cfg.API.AdvertiseAddress = ip.String()
-	ip = net.ParseIP(cfg.API.AdvertiseAddress)
+	cfg.AdvertiseAddress = ip.String()
+
+	return nil
+}
+
+// SetClusterDynamicDefaults checks and sets configuration values for the InitConfiguration object
+func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAddress string) error {
+	// Default all the embedded ComponentConfig structs
+	componentconfigs.Known.Default(cfg)
+
+	ip := net.ParseIP(advertiseAddress)
 	if ip.To4() != nil {
 		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv4
 	} else {
 		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv6
 	}
+
 	// Resolve possible version labels and validate version string
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
 		return err

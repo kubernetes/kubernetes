@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -45,7 +46,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/features"
 
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -227,38 +227,39 @@ func NewDefaultComponentConfig(insecurePort int32) (componentconfig.KubeControll
 	return internal, nil
 }
 
-// AddFlags adds flags for a specific KubeControllerManagerOptions to the specified FlagSet
-func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allControllers []string, disabledByDefaultControllers []string) {
-	s.CloudProvider.AddFlags(fs)
-	s.Debugging.AddFlags(fs)
-	s.GenericComponent.AddFlags(fs)
-	s.KubeCloudShared.AddFlags(fs)
-	s.ServiceController.AddFlags(fs)
+// Flags returns flags for a specific APIServer by section name
+func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string) (fss apiserverflag.NamedFlagSets) {
+	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
+	s.Debugging.AddFlags(fss.FlagSet("debugging"))
+	s.GenericComponent.AddFlags(fss.FlagSet("generic"))
+	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
+	s.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
-	s.SecureServing.AddFlags(fs)
-	s.InsecureServing.AddUnqualifiedFlags(fs)
-	s.Authentication.AddFlags(fs)
-	s.Authorization.AddFlags(fs)
+	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
+	s.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving"))
+	s.Authentication.AddFlags(fss.FlagSet("authentication"))
+	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 
-	s.AttachDetachController.AddFlags(fs)
-	s.CSRSigningController.AddFlags(fs)
-	s.DeploymentController.AddFlags(fs)
-	s.DaemonSetController.AddFlags(fs)
-	s.DeprecatedFlags.AddFlags(fs)
-	s.EndPointController.AddFlags(fs)
-	s.GarbageCollectorController.AddFlags(fs)
-	s.HPAController.AddFlags(fs)
-	s.JobController.AddFlags(fs)
-	s.NamespaceController.AddFlags(fs)
-	s.NodeIpamController.AddFlags(fs)
-	s.NodeLifecycleController.AddFlags(fs)
-	s.PersistentVolumeBinderController.AddFlags(fs)
-	s.PodGCController.AddFlags(fs)
-	s.ReplicaSetController.AddFlags(fs)
-	s.ReplicationController.AddFlags(fs)
-	s.ResourceQuotaController.AddFlags(fs)
-	s.SAController.AddFlags(fs)
+	s.AttachDetachController.AddFlags(fss.FlagSet("attachdetach controller"))
+	s.CSRSigningController.AddFlags(fss.FlagSet("csrsigning controller"))
+	s.DeploymentController.AddFlags(fss.FlagSet("deployment controller"))
+	s.DaemonSetController.AddFlags(fss.FlagSet("daemonset controller"))
+	s.DeprecatedFlags.AddFlags(fss.FlagSet("deprecated"))
+	s.EndPointController.AddFlags(fss.FlagSet("endpoint controller"))
+	s.GarbageCollectorController.AddFlags(fss.FlagSet("garbagecollector controller"))
+	s.HPAController.AddFlags(fss.FlagSet("horizontalpodautoscaling controller"))
+	s.JobController.AddFlags(fss.FlagSet("job controller"))
+	s.NamespaceController.AddFlags(fss.FlagSet("namespace controller"))
+	s.NodeIpamController.AddFlags(fss.FlagSet("nodeipam controller"))
+	s.NodeLifecycleController.AddFlags(fss.FlagSet("nodelifecycle controller"))
+	s.PersistentVolumeBinderController.AddFlags(fss.FlagSet("persistentvolume-binder controller"))
+	s.PodGCController.AddFlags(fss.FlagSet("podgc controller"))
+	s.ReplicaSetController.AddFlags(fss.FlagSet("replicaset controller"))
+	s.ReplicationController.AddFlags(fss.FlagSet("replicationcontroller"))
+	s.ResourceQuotaController.AddFlags(fss.FlagSet("resourcequota controller"))
+	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
 
+	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.StringSliceVar(&s.Controllers, "controllers", s.Controllers, fmt.Sprintf(""+
@@ -269,7 +270,9 @@ func (s *KubeControllerManagerOptions) AddFlags(fs *pflag.FlagSet, allController
 	var dummy string
 	fs.MarkDeprecated("insecure-experimental-approve-all-kubelet-csrs-for-group", "This flag does nothing.")
 	fs.StringVar(&dummy, "insecure-experimental-approve-all-kubelet-csrs-for-group", "", "This flag does nothing.")
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fss.FlagSet("generic"))
+
+	return fss
 }
 
 // ApplyTo fills up controller manager config with options.

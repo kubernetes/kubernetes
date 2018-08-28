@@ -29,6 +29,7 @@ import (
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&ClusterConfiguration{}, func(obj interface{}) { SetObjectDefaults_ClusterConfiguration(obj.(*ClusterConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&ClusterStatus{}, func(obj interface{}) { SetObjectDefaults_ClusterStatus(obj.(*ClusterStatus)) })
 	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*InitConfiguration)) })
 	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*JoinConfiguration)) })
 	return nil
@@ -36,6 +37,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 	SetDefaults_ClusterConfiguration(in)
+}
+
+func SetObjectDefaults_ClusterStatus(in *ClusterStatus) {
 }
 
 func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
@@ -46,9 +50,11 @@ func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 		SetDefaults_BootstrapToken(a)
 	}
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
+	SetDefaults_APIEndpoint(&in.APIEndpoint)
 }
 
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 	SetDefaults_JoinConfiguration(in)
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
+	SetDefaults_APIEndpoint(&in.APIEndpoint)
 }
