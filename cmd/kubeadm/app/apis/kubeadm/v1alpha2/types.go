@@ -327,5 +327,8 @@ type AuditPolicyConfiguration struct {
 	LogDir string `json:"logDir"`
 	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
 	LogMaxAge *int32 `json:"logMaxAge,omitempty"`
-	//TODO(chuckha) add other options for audit policy.
+	// LogMaxBackup is the number of audit logs to retain.
+	LogMaxBackup *int32 `json:"logMaxBackup,omitempty"`
+	// LogMaxSize is the max size in MB to retain.
+	LogMaxSize *int32 `json:"logMaxSize,omitempty"`
 }

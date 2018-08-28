@@ -59,6 +59,10 @@ var (
 	// DefaultAuditPolicyLogMaxAge is defined as a var so its address can be taken
 	// It is the number of days to store audit logs
 	DefaultAuditPolicyLogMaxAge = int32(2)
+	// DefaultAuditPolicyLogMaxBackup is defined the maximum number of audit log files to retain
+	DefaultAuditPolicyLogMaxBackup = int32(2)
+	// DefaultAuditPolicyLogMaxSize is defined the maximum size in megabytes of the audit log file before it gets rotated
+	DefaultAuditPolicyLogMaxSize = int32(100)
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -159,6 +163,12 @@ func SetDefaults_AuditPolicyConfiguration(obj *ClusterConfiguration) {
 	}
 	if obj.AuditPolicyConfiguration.LogMaxAge == nil {
 		obj.AuditPolicyConfiguration.LogMaxAge = &DefaultAuditPolicyLogMaxAge
+	}
+	if obj.AuditPolicyConfiguration.LogMaxBackup == nil {
+		obj.AuditPolicyConfiguration.LogMaxBackup = &DefaultAuditPolicyLogMaxBackup
+	}
+	if obj.AuditPolicyConfiguration.LogMaxSize == nil {
+		obj.AuditPolicyConfiguration.LogMaxSize = &DefaultAuditPolicyLogMaxSize
 	}
 }
 
