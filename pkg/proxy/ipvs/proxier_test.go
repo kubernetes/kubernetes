@@ -163,6 +163,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		ipvsScheduler:     DefaultScheduler,
 		ipGetter:          &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:      bytes.NewBuffer(nil),
+		filterChainsData:  bytes.NewBuffer(nil),
 		natChains:         bytes.NewBuffer(nil),
 		natRules:          bytes.NewBuffer(nil),
 		filterChains:      bytes.NewBuffer(nil),

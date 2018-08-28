@@ -242,11 +242,12 @@ type Proxier struct {
 
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
-	iptablesData *bytes.Buffer
-	filterChains *bytes.Buffer
-	filterRules  *bytes.Buffer
-	natChains    *bytes.Buffer
-	natRules     *bytes.Buffer
+	iptablesData             *bytes.Buffer
+	existingFilterChainsData *bytes.Buffer
+	filterChains             *bytes.Buffer
+	filterRules              *bytes.Buffer
+	natChains                *bytes.Buffer
+	natRules                 *bytes.Buffer
 
 	// endpointChainsNumber is the total amount of endpointChains across all
 	// services that we will generate (it is computed at the beginning of
@@ -340,6 +341,7 @@ func NewProxier(ipt utiliptables.Interface,
 		healthzServer:            healthzServer,
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
+		existingFilterChainsData: bytes.NewBuffer(nil),
 		filterChains:             bytes.NewBuffer(nil),
 		filterRules:              bytes.NewBuffer(nil),
 		natChains:                bytes.NewBuffer(nil),
@@ -682,14 +684,12 @@ func (proxier *Proxier) syncProxyRules() {
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
 	existingFilterChains := make(map[utiliptables.Chain][]byte)
-	// TODO: Filter table is small so we're not reusing this buffer over rounds.
-	// However, to optimize it further, we should do that.
-	existingFilterChainsData := bytes.NewBuffer(nil)
-	err := proxier.iptables.SaveInto(utiliptables.TableFilter, existingFilterChainsData)
+	proxier.existingFilterChainsData.Reset()
+	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.existingFilterChainsData)
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, existingFilterChainsData.Bytes())
+		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, proxier.existingFilterChainsData.Bytes())
 	}
 
 	// IMPORTANT: existingNATChains may share memory with proxier.iptablesData.
