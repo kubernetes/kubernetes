@@ -42,8 +42,8 @@ import (
 )
 
 var (
-	bFalse bool = false
-	bTrue  bool = true
+	bFalse = false
+	bTrue  = true
 )
 
 func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttachment {

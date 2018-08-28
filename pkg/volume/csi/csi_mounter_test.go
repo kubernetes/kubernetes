@@ -268,14 +268,14 @@ func TestSaveVolumeData(t *testing.T) {
 }
 
 func getCSIDriver(name string, requiresPodInfo *bool, attachable *bool) *csiapi.CSIDriver {
+	podInfoMountVersion := "v1"
 	return &csiapi.CSIDriver{
 		ObjectMeta: meta.ObjectMeta{
 			Name: name,
 		},
 		Spec: csiapi.CSIDriverSpec{
-			Driver:                 name,
-			PodInfoRequiredOnMount: requiresPodInfo,
-			AttachRequired:         attachable,
+			PodInfoOnMountVersion: &podInfoMountVersion,
+			AttachRequired:        attachable,
 		},
 	}
 }
