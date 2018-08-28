@@ -504,8 +504,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 			Param("stderr", "1").
 			Param("stdout", "1").
 			Param("container", pod.Spec.Containers[0].Name).
-			Param("command", "cat").
-			Param("command", "/etc/resolv.conf")
+			Param("command", "echo").
+			Param("command", "remote execution test")
 
 		url := req.URL()
 		ws, err := framework.OpenWebSocketForURL(url, config, []string{"channel.k8s.io"})
@@ -541,8 +541,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 			if buf.Len() == 0 {
 				return fmt.Errorf("Unexpected output from server")
 			}
-			if !strings.Contains(buf.String(), "nameserver") {
-				return fmt.Errorf("Expected to find 'nameserver' in %q", buf.String())
+			if !strings.Contains(buf.String(), "remote execution test") {
+				return fmt.Errorf("Expected to find 'remote execution test' in %q", buf.String())
 			}
 			return nil
 		}, time.Minute, 10*time.Second).Should(BeNil())
