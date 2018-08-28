@@ -1731,16 +1731,16 @@ function start-kube-apiserver {
 
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
-    container_env="\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\""
+    container_env="{\"name\": \"KUBE_CACHE_MUTATION_DETECTOR\", \"value\": \"${ENABLE_CACHE_MUTATION_DETECTOR}\"}"
   fi
   if [[ -n "${ENABLE_PATCH_CONVERSION_DETECTOR:-}" ]]; then
     if [[ -n "${container_env}" ]]; then
       container_env="${container_env}, "
     fi
-    container_env="\"name\": \"KUBE_PATCH_CONVERSION_DETECTOR\", \"value\": \"${ENABLE_PATCH_CONVERSION_DETECTOR}\""
+    container_env="${container_env}{\"name\": \"KUBE_PATCH_CONVERSION_DETECTOR\", \"value\": \"${ENABLE_PATCH_CONVERSION_DETECTOR}\"}"
   fi
   if [[ -n "${container_env}" ]]; then
-    container_env="\"env\":[{${container_env}}],"
+    container_env="\"env\":[${container_env}],"
   fi
 
   if [[ -n "${ETCD_KMS_KEY_ID:-}" ]]; then

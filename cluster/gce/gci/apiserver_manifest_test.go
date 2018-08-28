@@ -56,6 +56,8 @@ readonly LOG_OWNER_GROUP=$(id -gn)
 ENCRYPTION_PROVIDER_CONFIG={{.EncryptionProviderConfig}}
 ENCRYPTION_PROVIDER_CONFIG_PATH={{.EncryptionProviderConfigPath}}
 readonly ETCD_KMS_KEY_ID={{.ETCDKMSKeyID}}
+readonly ENABLE_CACHE_MUTATION_DETECTOR=yes
+readonly ENABLE_PATCH_CONVERSION_DETECTOR=yes
 `
 	kubeAPIServerManifestFileName = "kube-apiserver.manifest"
 	kmsPluginManifestFileName     = "kms-plugin-container.manifest"
@@ -208,5 +210,21 @@ func TestKMSPluginAndAPIServerSharedVolume(t *testing.T) {
 	if k != a {
 		t.Fatalf("Got %s!=%s, wanted KMSPlugin VolumeMount #1:%s to be equal to kube-apiserver VolumeMount #0:%s",
 			k, a, k, a)
+	}
+}
+
+func TestEnvConcatenation(t *testing.T) {
+	c := newKubeAPIServerManifestTestCase(t)
+	defer c.tearDown()
+
+	e := kubeAPIServerEnv{
+		KubeHome: c.kubeHome,
+	}
+
+	c.invokeTest(e)
+
+	if len(c.apiServerContainer.Env) != 2 {
+		t.Fatalf("Expected apiServerContainer's env to have two entries, actually has %d",
+			len(c.apiServerContainer.Env))
 	}
 }
