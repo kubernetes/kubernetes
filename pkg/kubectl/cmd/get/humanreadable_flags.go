@@ -113,6 +113,7 @@ func (f *HumanPrintFlags) AddFlags(c *cobra.Command) {
 	}
 	if f.SortBy != nil {
 		c.Flags().StringVar(f.SortBy, "sort-by", *f.SortBy, "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
+		c.Flags().MarkDeprecated("sort-by", "and will be removed in a future version.")
 	}
 	if f.ColumnLabels != nil {
 		c.Flags().StringSliceVarP(f.ColumnLabels, "label-columns", "L", *f.ColumnLabels, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
