@@ -1,0 +1,10 @@
+approvers:
+- juanvallejo
+- soltysh
+reviewers:
+- seans3
+- deads2k
+- soltysh
+- juanvallejo
+labels:
+- sig/cli
