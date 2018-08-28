@@ -4,7 +4,6 @@ cmd/hyperkube
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
-cmd/kube-scheduler/app
 cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm/v1alpha2
 cmd/kubeadm/app/apis/kubeadm/v1alpha3

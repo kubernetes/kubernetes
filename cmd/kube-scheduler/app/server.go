@@ -122,6 +122,7 @@ through the API as necessary.`,
 	return cmd
 }
 
+// Run runs the Scheduler.
 func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
