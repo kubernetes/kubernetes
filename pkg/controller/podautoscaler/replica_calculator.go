@@ -21,7 +21,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/golang/glog"
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,6 @@ import (
 	v1coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-	"runtime/debug"
 )
 
 const (
@@ -347,7 +345,6 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 func groupPods(pods []v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuTaintAfterStart, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, ignoredPods sets.String, missingPods sets.String) {
 	missingPods = sets.NewString()
 	ignoredPods = sets.NewString()
-	glog.Errorf("groupPods stack: %v", string(debug.Stack()))
 	for _, pod := range pods {
 		if pod.Status.Phase == v1.PodFailed {
 			continue
