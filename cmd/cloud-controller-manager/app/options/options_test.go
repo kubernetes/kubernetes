@@ -70,7 +70,7 @@ func TestDefaultFlags(t *testing.T) {
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 1,
 		},
-		SecureServing: &apiserveroptions.SecureServingOptions{
+		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10258,
 			BindAddress: net.ParseIP("0.0.0.0"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -78,12 +78,12 @@ func TestDefaultFlags(t *testing.T) {
 				PairName:      "cloud-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 0,
-		},
-		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
+		}).WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("0.0.0.0"),
 			BindPort:    int(10253),
 			BindNetwork: "tcp",
-		},
+		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
 			CacheTTL:   10 * time.Second,
 			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
@@ -185,7 +185,7 @@ func TestAddFlags(t *testing.T) {
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 1,
 		},
-		SecureServing: &apiserveroptions.SecureServingOptions{
+		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
 			BindAddress: net.ParseIP("192.168.4.21"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -193,12 +193,12 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "cloud-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 47,
-		},
-		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
+		}).WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",
-		},
+		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
 			CacheTTL:   10 * time.Second,
 			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
