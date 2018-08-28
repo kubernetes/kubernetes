@@ -712,7 +712,7 @@ message NetworkPolicyPeer {
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.
 message NetworkPolicyPort {
-  // Optional.  The protocol (TCP or UDP) which traffic must match.
+  // Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match.
   // If not specified, this field defaults to TCP.
   // +optional
   optional string protocol = 1;

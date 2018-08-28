@@ -749,7 +749,7 @@ message ContainerPort {
   // This must be a valid port number, 0 < x < 65536.
   optional int32 containerPort = 3;
 
-  // Protocol for port. Must be UDP or TCP.
+  // Protocol for port. Must be UDP, TCP, or SCTP.
   // Defaults to "TCP".
   // +optional
   optional string protocol = 4;
@@ -968,7 +968,7 @@ message EndpointPort {
   optional int32 port = 2;
 
   // The IP protocol for this port.
-  // Must be UDP or TCP.
+  // Must be UDP, TCP, or SCTP.
   // Default is TCP.
   // +optional
   optional string protocol = 3;
@@ -4148,7 +4148,7 @@ message ServicePort {
   // +optional
   optional string name = 1;
 
-  // The IP protocol for this port. Supports "TCP" and "UDP".
+  // The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
   // Default is TCP.
   // +optional
   optional string protocol = 2;

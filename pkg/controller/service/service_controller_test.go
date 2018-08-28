@@ -124,6 +124,24 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 			expectErr:           false,
 			expectCreateAttempt: true,
 		},
+		{
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "sctp-service",
+					Namespace: "default",
+					SelfLink:  testapi.Default.SelfLink("services", "sctp-service"),
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:     80,
+						Protocol: v1.ProtocolSCTP,
+					}},
+					Type: v1.ServiceTypeLoadBalancer,
+				},
+			},
+			expectErr:           false,
+			expectCreateAttempt: true,
+		},
 	}
 
 	for _, item := range table {

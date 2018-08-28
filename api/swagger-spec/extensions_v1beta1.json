@@ -8666,7 +8666,7 @@
      },
      "protocol": {
       "type": "string",
-      "description": "Protocol for port. Must be UDP or TCP. Defaults to \"TCP\"."
+      "description": "Protocol for port. Must be UDP, TCP, or SCTP. Defaults to \"TCP\"."
      },
      "hostIP": {
       "type": "string",
@@ -10280,7 +10280,7 @@
     "properties": {
      "protocol": {
       "$ref": "v1.Protocol",
-      "description": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP."
+      "description": "Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP."
      },
      "port": {
       "type": "string",

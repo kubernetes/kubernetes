@@ -4,7 +4,7 @@
 #
 # services "svc1" was not valid:
 # * spec.clusterIP: Invalid value: "10.0.0.10": field is immutable
-# * spec.ports[0].protocol: Unsupported value: "VHF": supported values: TCP, UDP
+# * spec.ports[0].protocol: Unsupported value: "VHF": supported values: TCP, UDP, SCTP
 #
 apiVersion: v1
 items:

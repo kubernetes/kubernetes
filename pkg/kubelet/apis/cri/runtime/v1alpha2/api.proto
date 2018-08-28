@@ -143,6 +143,7 @@ message DNSConfig {
 enum Protocol {
     TCP = 0;
     UDP = 1;
+    SCTP = 2;
 }
 
 // PortMapping specifies the port mapping configurations of a sandbox.

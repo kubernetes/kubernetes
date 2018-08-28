@@ -861,6 +861,8 @@ const (
 	ProtocolTCP Protocol = "TCP"
 	// ProtocolUDP is the UDP protocol.
 	ProtocolUDP Protocol = "UDP"
+	// ProtocolSCTP is the SCTP protocol.
+	ProtocolSCTP Protocol = "SCTP"
 )
 
 // Represents a Persistent Disk resource in Google Compute Engine.
@@ -1662,7 +1664,7 @@ type ContainerPort struct {
 	// Number of port to expose on the pod's IP address.
 	// This must be a valid port number, 0 < x < 65536.
 	ContainerPort int32 `json:"containerPort" protobuf:"varint,3,opt,name=containerPort"`
-	// Protocol for port. Must be UDP or TCP.
+	// Protocol for port. Must be UDP, TCP, or SCTP.
 	// Defaults to "TCP".
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,4,opt,name=protocol,casttype=Protocol"`
@@ -3515,7 +3517,7 @@ type ServicePort struct {
 	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
-	// The IP protocol for this port. Supports "TCP" and "UDP".
+	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
 	// Default is TCP.
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
@@ -3729,7 +3731,7 @@ type EndpointPort struct {
 	Port int32 `json:"port" protobuf:"varint,2,opt,name=port"`
 
 	// The IP protocol for this port.
-	// Must be UDP or TCP.
+	// Must be UDP, TCP, or SCTP.
 	// Default is TCP.
 	// +optional
 	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,3,opt,name=protocol,casttype=Protocol"`

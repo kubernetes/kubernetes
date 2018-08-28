@@ -419,7 +419,7 @@ func (NetworkPolicyPeer) SwaggerDoc() map[string]string {
 
 var map_NetworkPolicyPort = map[string]string{
 	"":         "DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.",
-	"protocol": "Optional.  The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP.",
+	"protocol": "Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
 	"port":     "If specified, the port on the given protocol.  This can either be a numerical or named port on a pod.  If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
 }
 

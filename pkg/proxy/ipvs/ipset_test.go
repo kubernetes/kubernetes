@@ -179,6 +179,26 @@ func TestSyncIPSetEntries(t *testing.T) {
 			currentEntries:  []string{"80", "9090", "8081", "8082"},
 			expectedEntries: []string{"8080"},
 		},
+		{ // case 12
+			set: &utilipset.IPSet{
+				Name: "sctp-1",
+			},
+			setType:         utilipset.HashIPPort,
+			ipv6:            false,
+			activeEntries:   []string{"172.17.0.4,sctp:80"},
+			currentEntries:  nil,
+			expectedEntries: []string{"172.17.0.4,sctp:80"},
+		},
+		{ // case 1
+			set: &utilipset.IPSet{
+				Name: "sctp-2",
+			},
+			setType:         utilipset.HashIPPort,
+			ipv6:            true,
+			activeEntries:   []string{"FE80::0202:B3FF:FE1E:8329,sctp:80"},
+			currentEntries:  []string{"FE80::0202:B3FF:FE1E:8329,sctp:80"},
+			expectedEntries: []string{"FE80::0202:B3FF:FE1E:8329,sctp:80"},
+		},
 	}
 
 	for i := range testCases {

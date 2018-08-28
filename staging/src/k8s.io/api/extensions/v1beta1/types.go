@@ -1275,7 +1275,7 @@ type NetworkPolicyEgressRule struct {
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.
 type NetworkPolicyPort struct {
-	// Optional.  The protocol (TCP or UDP) which traffic must match.
+	// Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match.
 	// If not specified, this field defaults to TCP.
 	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`

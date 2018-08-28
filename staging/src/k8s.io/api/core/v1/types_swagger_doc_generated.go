@@ -353,7 +353,7 @@ var map_ContainerPort = map[string]string{
 	"name":          "If specified, this must be an IANA_SVC_NAME and unique within the pod. Each named port in a pod must have a unique name. Name for the port that can be referred to by services.",
 	"hostPort":      "Number of port to expose on the host. If specified, this must be a valid port number, 0 < x < 65536. If HostNetwork is specified, this must match ContainerPort. Most containers do not need this.",
 	"containerPort": "Number of port to expose on the pod's IP address. This must be a valid port number, 0 < x < 65536.",
-	"protocol":      "Protocol for port. Must be UDP or TCP. Defaults to \"TCP\".",
+	"protocol":      "Protocol for port. Must be UDP, TCP, or SCTP. Defaults to \"TCP\".",
 	"hostIP":        "What host IP to bind the external port to.",
 }
 
@@ -488,7 +488,7 @@ var map_EndpointPort = map[string]string{
 	"":         "EndpointPort is a tuple that describes a single port.",
 	"name":     "The name of this port (corresponds to ServicePort.Name). Must be a DNS_LABEL. Optional only if one port is defined.",
 	"port":     "The port number of the endpoint.",
-	"protocol": "The IP protocol for this port. Must be UDP or TCP. Default is TCP.",
+	"protocol": "The IP protocol for this port. Must be UDP, TCP, or SCTP. Default is TCP.",
 }
 
 func (EndpointPort) SwaggerDoc() map[string]string {
@@ -2058,7 +2058,7 @@ func (ServiceList) SwaggerDoc() map[string]string {
 var map_ServicePort = map[string]string{
 	"":           "ServicePort contains information on service's port.",
 	"name":       "The name of this port within the service. This must be a DNS_LABEL. All ports within a ServiceSpec must have unique names. This maps to the 'Name' field in EndpointPort objects. Optional if only one ServicePort is defined on this service.",
-	"protocol":   "The IP protocol for this port. Supports \"TCP\" and \"UDP\". Default is TCP.",
+	"protocol":   "The IP protocol for this port. Supports \"TCP\", \"UDP\", and \"SCTP\". Default is TCP.",
 	"port":       "The port that will be exposed by this service.",
 	"targetPort": "Number or name of the port to access on the pods targeted by the service. Number must be in the range 1 to 65535. Name must be an IANA_SVC_NAME. If this is a string, it will be looked up as a named port in the target Pod's container ports. If this is not specified, the value of the 'port' field is used (an identity map). This field is ignored for services with clusterIP=None, and should be omitted or set equal to the 'port' field. More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service",
 	"nodePort":   "The port on each node on which this service is exposed when type=NodePort or LoadBalancer. Usually assigned by the system. If specified, it will be allocated to the service if unused or else creation of the service will fail. Default is to auto-allocate a port if the ServiceType of this Service requires one. More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport",
