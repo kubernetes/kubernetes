@@ -52,5 +52,9 @@ spec:
               - key: config
                 path: ip-masq-agent
       tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
       - key: "CriticalAddonsOnly"
         operator: "Exists"
