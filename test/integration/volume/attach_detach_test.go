@@ -415,7 +415,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
 		nil, /* csiClient */
-		nil, /* crdClient */
+		fakeApiExtensionsClient, /* crdClient */
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Core().V1().PersistentVolumeClaims(),
