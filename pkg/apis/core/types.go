@@ -415,10 +415,10 @@ type PersistentVolumeClaimSpec struct {
 	VolumeMode *PersistentVolumeMode
 	// If specified, volume will be prepopulated with data from the specified data source.
 	// This depends on the provisioner for this volume being able to use the specified source.
-	// If the provisioner failed to populate the volume with the source, it will return an
-	// error and fail the create volume operation. If the provisioner does not support the
-	// data source, it will also return an error and fail the create volume operation.
-	// It requires the VolumeSnapshotDataSource alpha feature gate to be enabled and
+	// If the provisioner failed to create volume from the data source, the behavior will be
+	// the same as the no data source case. In this failure case, PV will not be created, PVC
+	// will be in the pending state, and the controller will keep retrying to create the volume.
+	// This requires the VolumeSnapshotDataSource alpha feature gate to be enabled and
 	// currently VolumeSnapshot is the only supported data source.
 	// In the future, we will allow more data source types when new feature is ready.
 	// +optional
