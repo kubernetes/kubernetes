@@ -115,7 +115,6 @@ data:
       @type tail
       path /var/log/containers/*.log
       pos_file /var/log/es-containers.log.pos
-      time_format %Y-%m-%dT%H:%M:%S.%NZ
       tag raw.kubernetes.*
       read_from_head true
       <parse>
@@ -308,7 +307,7 @@ data:
     <source>
       @id journald-docker
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "docker.service" }]
+      matches [{ "_SYSTEMD_UNIT": "docker.service" }]
       <storage>
         @type local
         persistent true
@@ -321,7 +320,7 @@ data:
     <source>
       @id journald-container-runtime
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      matches [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
       <storage>
         @type local
         persistent true
@@ -334,7 +333,7 @@ data:
     <source>
       @id journald-kubelet
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
+      matches [{ "_SYSTEMD_UNIT": "kubelet.service" }]
       <storage>
         @type local
         persistent true
@@ -347,7 +346,7 @@ data:
     <source>
       @id journald-node-problem-detector
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
+      matches [{ "_SYSTEMD_UNIT": "node-problem-detector.service" }]
       <storage>
         @type local
         persistent true
@@ -360,7 +359,7 @@ data:
     <source>
       @id kernel
       @type systemd
-      filters [{ "_TRANSPORT": "kernel" }]
+      matches [{ "_TRANSPORT": "kernel" }]
       <storage>
         @type local
         persistent true
