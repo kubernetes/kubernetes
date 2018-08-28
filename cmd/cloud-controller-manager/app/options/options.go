@@ -61,9 +61,9 @@ type CloudControllerManagerOptions struct {
 	KubeCloudShared   *cmoptions.KubeCloudSharedOptions
 	ServiceController *cmoptions.ServiceControllerOptions
 
-	SecureServing *apiserveroptions.SecureServingOptions
+	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
 	// TODO: remove insecure serving mode
-	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptions
+	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
@@ -89,12 +89,12 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
 		},
-		SecureServing: apiserveroptions.NewSecureServingOptions(),
-		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
+		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.KubeCloudShared.Address),
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
-		},
+		}).WithLoopback(),
 		Authentication:            apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:             apiserveroptions.NewDelegatingAuthorizationOptions(),
 		NodeStatusUpdateFrequency: componentConfig.NodeStatusUpdateFrequency,
@@ -173,10 +173,10 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	if err = o.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
 		return err
 	}
-	if err = o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
+	if err = o.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err = o.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
+	if err = o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil {
