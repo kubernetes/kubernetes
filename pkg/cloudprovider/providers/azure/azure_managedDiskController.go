@@ -197,9 +197,11 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 		return oldSize, fmt.Errorf("DiskProperties of disk(%s) is nil", diskName)
 	}
 
-	requestBytes := newSize.Value()
 	// Azure resizes in chunks of GiB (not GB)
-	requestGiB := int32(util.RoundUpSize(requestBytes, 1024*1024*1024))
+	requestGiB, err := util.RoundUpToGiBInt32(newSize)
+	if err != nil {
+		return oldSize, err
+	}
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	glog.V(2).Infof("azureDisk - begin to resize disk(%s) with new size(%d), old size(%v)", diskName, requestGiB, oldSize)

@@ -581,9 +581,8 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, size int, err error) {
 	var output []byte
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
-	// Convert to MB that rbd defaults on.
-	sz, err := volutil.RoundUpSizeInt(volSizeBytes, 1024*1024)
+	// Convert to MiB that rbd defaults on.
+	sz, err := volutil.RoundUpToMiBInt(capacity)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -642,9 +641,11 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	var output []byte
 	var err error
-	volSizeBytes := newSize.Value()
-	// Convert to MB that rbd defaults on.
-	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
+	// Convert to MiB that rbd defaults on.
+	sz, err := volutil.RoundUpToMiBInt(newSize)
+	if err != nil {
+		return oldSize, err
+	}
 	newVolSz := fmt.Sprintf("%d", sz)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dMi", sz))
 

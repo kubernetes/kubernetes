@@ -169,7 +169,11 @@ func (plugin *azureFilePlugin) ExpandVolumeDevice(
 		return oldSize, err
 	}
 
-	if err := azure.ResizeFileShare(accountName, accountKey, shareName, int(volutil.RoundUpToGiB(newSize))); err != nil {
+	requestGiB, err := volutil.RoundUpToGiBInt(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+	if err := azure.ResizeFileShare(accountName, accountKey, shareName, requestGiB); err != nil {
 		return oldSize, err
 	}
 

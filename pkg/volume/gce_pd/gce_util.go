@@ -96,7 +96,10 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 	name := volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 63) // GCE PD name can have up to 63 characters
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// GCE PDs are allocated in chunks of GiBs
-	requestGB := volumeutil.RoundUpToGiB(capacity)
+	requestGiB, err := volumeutil.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return "", 0, nil, "", err
+	}
 
 	// Apply Parameters.
 	// Values for parameter "replication-type" are canonicalized to lower case.
@@ -158,7 +161,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 			name,
 			diskType,
 			selectedZones,
-			int64(requestGB),
+			int64(requestGiB),
 			*c.options.CloudTags); err != nil {
 			glog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
@@ -174,7 +177,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 			name,
 			diskType,
 			selectedZone,
-			int64(requestGB),
+			int64(requestGiB),
 			*c.options.CloudTags); err != nil {
 			glog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
 			return "", 0, nil, "", err
@@ -191,7 +194,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 		glog.Errorf("error getting labels for volume %q: %v", name, err)
 	}
 
-	return name, int(requestGB), labels, fstype, nil
+	return name, requestGiB, labels, fstype, nil
 }
 
 // Returns the first path that exists, or empty string if none exist.

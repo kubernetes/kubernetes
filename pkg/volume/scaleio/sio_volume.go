@@ -265,19 +265,15 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 
 	// setup volume attrributes
 	genName := v.generateName("k8svol", 11)
-	var oneGig int64 = 1024 * 1024 * 1024
-	var eightGig int64 = 8 * oneGig
 
 	capacity := v.options.PVC.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
-	volSizeBytes := capacity.Value()
-	volSizeGB := int64(util.RoundUpSize(volSizeBytes, oneGig))
-
-	if volSizeBytes == 0 {
-		return nil, fmt.Errorf("invalid volume size of 0 specified")
+	volSizeGB, err := util.RoundUpToGiB(capacity)
+	if err != nil {
+		return nil, err
 	}
 
-	if volSizeBytes < eightGig {
-		volSizeGB = int64(util.RoundUpSize(eightGig, oneGig))
+	if volSizeGB < 8 {
+		volSizeGB = 8
 		glog.V(4).Info(log("capacity less than 8Gi found, adjusted to %dGi", volSizeGB))
 
 	}

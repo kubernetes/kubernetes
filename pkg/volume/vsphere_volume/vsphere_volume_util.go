@@ -91,9 +91,8 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 	}
 
 	capacity := v.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// vSphere works with kilobytes, convert to KiB with rounding up
-	volSizeKiB, err := volumeutil.RoundUpSizeInt(volSizeBytes, 1024)
+	volSizeKiB, err := volumeutil.RoundUpToKiBInt(capacity)
 	if err != nil {
 		return nil, err
 	}

@@ -55,10 +55,12 @@ import (
 )
 
 const (
-	// GB - GigaByte size
-	GB = 1000 * 1000 * 1000
 	// GIB - GibiByte size
 	GIB = 1024 * 1024 * 1024
+	// MIB - MibiByte size
+	MIB = 1024 * 1024
+	// KIB - KibiByte size
+	KIB = 1024
 
 	readyFileName = "ready"
 
@@ -503,12 +505,12 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 	return timeout
 }
 
-// RoundUpSize calculates how many allocation units are needed to accommodate
+// roundUpSize calculates how many allocation units are needed to accommodate
 // a volume of given size. E.g. when user wants 1500MiB volume, while AWS EBS
 // allocates volumes in gibibyte-sized chunks,
 // RoundUpSize(1500 * 1024*1024, 1024*1024*1024) returns '2'
 // (2 GiB is the smallest allocatable volume that can hold 1500MiB)
-func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
+func roundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	roundedUp := volumeSizeBytes / allocationUnitBytes
 	if volumeSizeBytes%allocationUnitBytes > 0 {
 		roundedUp += 1
@@ -516,42 +518,78 @@ func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	return roundedUp
 }
 
-// RoundUpToGB rounds up given quantity to chunks of GB
-func RoundUpToGB(size resource.Quantity) int64 {
-	requestBytes := size.Value()
-	return RoundUpSize(requestBytes, GB)
-}
-
-// RoundUpToGiB rounds up given quantity upto chunks of GiB
-func RoundUpToGiB(size resource.Quantity) int64 {
-	requestBytes := size.Value()
-	return RoundUpSize(requestBytes, GIB)
-}
-
-// RoundUpSizeInt calculates how many allocation units are needed to accommodate
+// roundUpSizeInt calculates how many allocation units are needed to accommodate
 // a volume of given size. It returns an int instead of an int64 and an error if
 // there's overflow
-func RoundUpSizeInt(volumeSizeBytes int64, allocationUnitBytes int64) (int, error) {
-	roundedUp := RoundUpSize(volumeSizeBytes, allocationUnitBytes)
+func roundUpSizeInt(volumeSizeBytes int64, allocationUnitBytes int64) (int, error) {
+	roundedUp := roundUpSize(volumeSizeBytes, allocationUnitBytes)
 	roundedUpInt := int(roundedUp)
 	if int64(roundedUpInt) != roundedUp {
-		return 0, fmt.Errorf("capacity %v is too great, casting results in integer overflow", roundedUp)
+		return 0, fmt.Errorf("quantity %v is too great, overflows int", roundedUp)
 	}
 	return roundedUpInt, nil
 }
 
-// RoundUpToGBInt rounds up given quantity to chunks of GB. It returns an
-// int instead of an int64 and an error if there's overflow
-func RoundUpToGBInt(size resource.Quantity) (int, error) {
-	requestBytes := size.Value()
-	return RoundUpSizeInt(requestBytes, GB)
+// roundUpSizeInt32 calculates how many allocation units are needed to accommodate
+// a volume of given size. It returns an int32 instead of an int64 and an error if
+// there's overflow
+func roundUpSizeInt32(volumeSizeBytes int64, allocationUnitBytes int64) (int32, error) {
+	roundedUp := roundUpSize(volumeSizeBytes, allocationUnitBytes)
+	roundedUpInt32 := int32(roundedUp)
+	if int64(roundedUpInt32) != roundedUp {
+		return 0, fmt.Errorf("quantity %v is too great, overflows int32", roundedUp)
+	}
+	return roundedUpInt32, nil
 }
 
-// RoundUpToGiBInt rounds up given quantity upto chunks of GiB. It returns an
+// RoundUpToGiB rounds up given quantity up to chunks of GiB. It returns an
+// error if there's overflow
+func RoundUpToGiB(size resource.Quantity) (int64, error) {
+	requestBytes, ok := size.AsInt64()
+	if !ok {
+		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+	}
+	return roundUpSize(requestBytes, GIB), nil
+}
+
+// RoundUpToGiBInt rounds up given quantity up to chunks of GiB. It returns an
 // int instead of an int64 and an error if there's overflow
 func RoundUpToGiBInt(size resource.Quantity) (int, error) {
-	requestBytes := size.Value()
-	return RoundUpSizeInt(requestBytes, GIB)
+	requestBytes, ok := size.AsInt64()
+	if !ok {
+		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+	}
+	return roundUpSizeInt(requestBytes, GIB)
+}
+
+// RoundUpToMiBInt rounds up given quantity up to chunks of MiB. It returns an
+// int instead of an int64 and an error if there's overflow
+func RoundUpToMiBInt(size resource.Quantity) (int, error) {
+	requestBytes, ok := size.AsInt64()
+	if !ok {
+		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+	}
+	return roundUpSizeInt(requestBytes, MIB)
+}
+
+// RoundUpToKiBInt rounds up given quantity up to chunks of KiB. It returns an
+// int instead of an int64 and an error if there's overflow
+func RoundUpToKiBInt(size resource.Quantity) (int, error) {
+	requestBytes, ok := size.AsInt64()
+	if !ok {
+		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+	}
+	return roundUpSizeInt(requestBytes, KIB)
+}
+
+// RoundUpToGiBInt32 rounds up given quantity up to chunks of GiB. It returns an
+// int32 instead of an int64 and an error if there's overflow
+func RoundUpToGiBInt32(size resource.Quantity) (int32, error) {
+	requestBytes, ok := size.AsInt64()
+	if !ok {
+		return 0, fmt.Errorf("quantity %v is too great, overflows int64", size)
+	}
+	return roundUpSizeInt32(requestBytes, GIB)
 }
 
 // GenerateVolumeName returns a PV name with clusterName prefix. The function

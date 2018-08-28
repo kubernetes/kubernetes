@@ -59,7 +59,10 @@ func (util *PortworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GiB
-	requestGiB := volutil.RoundUpToGiB(capacity)
+	requestGiB, err := volutil.RoundUpToGiB(capacity)
+	if err != nil {
+		return "", 0, nil, err
+	}
 
 	// Perform a best-effort parsing of parameters. Portworx 1.2.9 and later parses volume parameters from
 	// spec.VolumeLabels. So even if below SpecFromOpts() fails to parse certain parameters or
@@ -208,7 +211,11 @@ func (util *PortworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	}
 
 	vol := vols[0]
-	newSizeInBytes := uint64(volutil.RoundUpToGiB(newSize) * volutil.GIB)
+	requestGiB, err := volutil.RoundUpToGiB(newSize)
+	if err != nil {
+		return err
+	}
+	newSizeInBytes := uint64(requestGiB * volutil.GIB)
 	if vol.Spec.Size >= newSizeInBytes {
 		glog.Infof("Portworx volume: %s already at size: %d greater than or equal to new "+
 			"requested size: %d. Skipping resize.", spec.Name(), vol.Spec.Size, newSizeInBytes)

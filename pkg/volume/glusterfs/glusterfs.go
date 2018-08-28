@@ -1178,12 +1178,19 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 		return oldSize, fmt.Errorf("failed to create glusterfs REST client, REST server authentication failed")
 	}
 
-	// Find out delta size
-	expansionSize := (newSize.Value() - oldSize.Value())
-	expansionSizeGiB := int(volutil.RoundUpSize(expansionSize, volutil.GIB))
-
 	// Find out requested Size
-	requestGiB := volutil.RoundUpToGiB(newSize)
+	requestGiB, err := volutil.RoundUpToGiB(newSize)
+	if err != nil {
+		return oldSize, err
+	}
+
+	// Find out delta size
+	expansionSize := newSize
+	expansionSize.Sub(oldSize)
+	expansionSizeGiB, err := volutil.RoundUpToGiBInt(expansionSize)
+	if err != nil {
+		return oldSize, err
+	}
 
 	//Check the existing volume size
 	currentVolumeInfo, err := cli.VolumeInfo(volumeID)
