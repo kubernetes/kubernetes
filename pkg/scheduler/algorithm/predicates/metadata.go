@@ -244,9 +244,11 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 	podNodeName := addedPod.Spec.NodeName
 	if affinity != nil && len(podNodeName) > 0 {
 		podNode := nodeInfo.Node()
-		affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
-		antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
+		// It is assumed that when the added pod matches affinity of the meta.pod, all the terms must match,
+		// this should be changed when the implementation of targetPodMatchesAffinityOfPod/podMatchesAffinityTermProperties
+		// is changed
 		if targetPodMatchesAffinityOfPod(meta.pod, addedPod) {
+			affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
 			for _, term := range affinityTerms {
 				if topologyValue, ok := podNode.Labels[term.TopologyKey]; ok {
 					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
@@ -255,6 +257,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 			}
 		}
 		if targetPodMatchesAntiAffinityOfPod(meta.pod, addedPod) {
+			antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
 			for _, term := range antiAffinityTerms {
 				if topologyValue, ok := podNode.Labels[term.TopologyKey]; ok {
 					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
