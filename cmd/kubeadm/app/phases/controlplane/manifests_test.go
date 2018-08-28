@@ -405,6 +405,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--audit-policy-file=/etc/kubernetes/audit/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes/audit/audit.log",
 				"--audit-log-maxage=0",
+				"--audit-log-maxbackup=0",
+				"--audit-log-maxsize=0",
 			},
 		},
 		{
@@ -496,6 +498,8 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--audit-policy-file=/etc/config/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes",
 				"--audit-log-maxage=2",
+				"--audit-log-maxbackup=1",
+				"--audit-log-maxsize=100",
 			},
 		},
 		{
