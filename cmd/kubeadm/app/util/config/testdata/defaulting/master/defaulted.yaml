@@ -56,7 +56,8 @@ conntrack:
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
 enableProfiling: false
-healthzBindAddress: 0.0.0.0:10256
+healthzBindAddress: 0.0.0.0
+healthzPort: 10256
 hostnameOverride: ""
 iptables:
   masqueradeAll: false

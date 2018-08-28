@@ -25,6 +25,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
@@ -60,8 +61,11 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
 	}
 
-	if config.HealthzBindAddress != "" {
-		allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, newPath.Child("HealthzBindAddress"))...)
+	if config.HealthzPort != 0 && utilvalidation.IsValidPortNum(int(config.HealthzPort)) != nil {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("HealthzPort"), config.HealthzPort, "must be between 1 and 65535"))
+	}
+	if config.HealthzPort != 0 && net.ParseIP(config.HealthzBindAddress) == nil {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("HealthzBindAddress"), config.HealthzBindAddress, "not a valid textual representation of an IP address"))
 	}
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 

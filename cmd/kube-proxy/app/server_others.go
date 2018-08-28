@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -130,8 +131,8 @@ func newProxyServer(
 
 	var healthzServer *healthcheck.HealthzServer
 	var healthzUpdater healthcheck.HealthzUpdater
-	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
+	if config.HealthzPort != 0 {
+		healthzServer = healthcheck.NewDefaultHealthzServer(net.JoinHostPort(config.HealthzBindAddress, strconv.Itoa(int(config.HealthzPort))), 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
 		healthzUpdater = healthzServer
 	}
 

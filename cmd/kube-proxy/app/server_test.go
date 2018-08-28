@@ -188,6 +188,7 @@ conntrack:
   min: 1
   tcpCloseWaitTimeout: 10s
   tcpEstablishedTimeout: 20s
+healthzPort: %d
 healthzBindAddress: "%s"
 hostnameOverride: "foo"
 iptables:
@@ -212,12 +213,13 @@ nodePortAddresses:
   - "10.20.30.40/16"
   - "fd00:1::0/64"
 `
-
+	testHealthzPort := int32(12345)
 	testCases := []struct {
 		name               string
 		mode               string
 		bindAddress        string
 		clusterCIDR        string
+		healthzPort        *int32
 		healthzBindAddress string
 		metricsBindAddress string
 	}{
@@ -226,7 +228,8 @@ nodePortAddresses:
 			mode:               "iptables",
 			bindAddress:        "0.0.0.0",
 			clusterCIDR:        "1.2.3.0/24",
-			healthzBindAddress: "1.2.3.4:12345",
+			healthzPort:        &testHealthzPort,
+			healthzBindAddress: "1.2.3.4",
 			metricsBindAddress: "2.3.4.5:23456",
 		},
 		{
@@ -234,7 +237,8 @@ nodePortAddresses:
 			mode:               "iptables",
 			bindAddress:        "9.8.7.6",
 			clusterCIDR:        "1.2.3.0/24",
-			healthzBindAddress: "1.2.3.4:12345",
+			healthzPort:        &testHealthzPort,
+			healthzBindAddress: "1.2.3.4",
 			metricsBindAddress: "2.3.4.5:23456",
 		},
 		{
@@ -245,7 +249,8 @@ nodePortAddresses:
 			mode:               "iptables",
 			bindAddress:        "\"::\"",
 			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
+			healthzPort:        &testHealthzPort,
+			healthzBindAddress: "[fd00:1::5]",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
 		{
@@ -257,7 +262,8 @@ nodePortAddresses:
 			mode:               "iptables",
 			bindAddress:        "\"[::]\"",
 			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
+			healthzPort:        &testHealthzPort,
+			healthzBindAddress: "[fd00:1::5]",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
 		{
@@ -267,7 +273,8 @@ nodePortAddresses:
 			mode:               "iptables",
 			bindAddress:        "::0",
 			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
+			healthzPort:        &testHealthzPort,
+			healthzBindAddress: "[fd00:1::5]",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
 		{
@@ -275,7 +282,8 @@ nodePortAddresses:
 			mode:               "ipvs",
 			bindAddress:        "2001:db8::1",
 			clusterCIDR:        "fd00:1::0/64",
-			healthzBindAddress: "[fd00:1::5]:12345",
+			healthzPort:        &testHealthzPort,
+			healthzBindAddress: "[fd00:1::5]",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
 	}
@@ -305,6 +313,7 @@ nodePortAddresses:
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 20 * time.Second},
 			},
 			FeatureGates:       map[string]bool{},
+			HealthzPort:        *tc.healthzPort,
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
 			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
@@ -330,7 +339,7 @@ nodePortAddresses:
 		options := NewOptions()
 
 		yaml := fmt.Sprintf(
-			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
+			yamlTemplate, tc.bindAddress, tc.clusterCIDR, *tc.healthzPort,
 			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
 		config, err := options.loadConfig([]byte(yaml))
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)

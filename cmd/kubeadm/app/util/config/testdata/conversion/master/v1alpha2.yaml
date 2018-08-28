@@ -46,7 +46,8 @@ kubeProxy:
     featureGates:
       ServiceNodeExclusion: true
       SupportIPVSProxyMode: true
-    healthzBindAddress: 0.0.0.0:10256
+    healthzBindAddress: 0.0.0.0
+    healthzPort: 10256
     hostnameOverride: ""
     iptables:
       masqueradeAll: false

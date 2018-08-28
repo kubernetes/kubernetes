@@ -36,10 +36,11 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}
+	if obj.HealthzPort == nil {
+		obj.HealthzPort = pointer.Int32Ptr(ports.ProxyHealthzPort)
+	}
 	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = fmt.Sprintf("0.0.0.0:%v", ports.ProxyHealthzPort)
-	} else if !strings.Contains(obj.HealthzBindAddress, ":") {
-		obj.HealthzBindAddress += fmt.Sprintf(":%v", ports.ProxyHealthzPort)
+		obj.HealthzBindAddress = "0.0.0.0"
 	}
 	if obj.MetricsBindAddress == "" {
 		obj.MetricsBindAddress = fmt.Sprintf("127.0.0.1:%v", ports.ProxyStatusPort)

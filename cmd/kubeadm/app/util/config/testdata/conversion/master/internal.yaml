@@ -43,7 +43,8 @@ ComponentConfigs:
     FeatureGates:
       ServiceNodeExclusion: true
       SupportIPVSProxyMode: true
-    HealthzBindAddress: 0.0.0.0:10256
+    HealthzBindAddress: 0.0.0.0
+    HealthzPort: 10256
     HostnameOverride: ""
     IPTables:
       MasqueradeAll: false

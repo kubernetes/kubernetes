@@ -120,6 +120,9 @@ func Convert_kubeproxyconfig_ClientConnectionConfiguration_To_v1alpha1_ClientCon
 func autoConvert_v1alpha1_KubeProxyConfiguration_To_kubeproxyconfig_KubeProxyConfiguration(in *KubeProxyConfiguration, out *kubeproxyconfig.KubeProxyConfiguration, s conversion.Scope) error {
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.BindAddress = in.BindAddress
+	if err := v1.Convert_Pointer_int32_To_int32(&in.HealthzPort, &out.HealthzPort, s); err != nil {
+		return err
+	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
 	out.EnableProfiling = in.EnableProfiling
@@ -155,6 +158,9 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_kubeproxyconfig_KubeProxyConfigu
 func autoConvert_kubeproxyconfig_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *kubeproxyconfig.KubeProxyConfiguration, out *KubeProxyConfiguration, s conversion.Scope) error {
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.BindAddress = in.BindAddress
+	if err := v1.Convert_int32_To_Pointer_int32(&in.HealthzPort, &out.HealthzPort, s); err != nil {
+		return err
+	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
 	out.EnableProfiling = in.EnableProfiling
