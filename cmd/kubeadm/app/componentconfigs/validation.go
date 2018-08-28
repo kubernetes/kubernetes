@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
-	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
+	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 )
 
 // ValidateKubeProxyConfiguration validates proxy configuration and collects all encountered errors

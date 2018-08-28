@@ -112,7 +112,7 @@
 				"k8s.io/kubernetes/pkg/master/reconcilers",
 				"k8s.io/kubernetes/pkg/printers",
 				"k8s.io/kubernetes/pkg/printers/internalversion",
-				"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig",
+				"k8s.io/kubernetes/pkg/proxy/apis/config",
 				"k8s.io/kubernetes/pkg/registry/core/endpoint",
 				"k8s.io/kubernetes/pkg/registry/core/service/allocator",
 				"k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
