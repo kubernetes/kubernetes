@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
 	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
+	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/labelmanager"
@@ -60,6 +61,7 @@ const (
 type csiPlugin struct {
 	host              volume.VolumeHost
 	blockEnabled      bool
+	csiDriverLister   csilister.CSIDriverLister
 	csiDriverInformer csiinformer.CSIDriverInformer
 }
 
@@ -145,6 +147,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		// Start informer for CSIDrivers.
 		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
 		p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
+		p.csiDriverLister = p.csiDriverInformer.Lister()
 		go factory.Start(wait.NeverStop)
 	}
 
