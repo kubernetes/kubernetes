@@ -2177,7 +2177,7 @@ var map_VolumeMount = map[string]string{
 	"readOnly":         "Mounted read-only if true, read-write otherwise (false or unspecified). Defaults to false.",
 	"mountPath":        "Path within the container at which the volume should be mounted.  Must not contain ':'.",
 	"subPath":          "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
-	"mountPropagation": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationHostToContainer is used. This field is beta in 1.10.",
+	"mountPropagation": "mountPropagation determines how mounts are propagated from the host to container and the other way around. When not set, MountPropagationNone is used. This field is beta in 1.10.",
 }
 
 func (VolumeMount) SwaggerDoc() map[string]string {
