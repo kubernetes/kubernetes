@@ -62,6 +62,9 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// bootstrapCheckpointPath is the path to the directory containing pod checkpoints to
+	// run on restore
+	BootstrapCheckpointPath string
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	StaticPodPath string

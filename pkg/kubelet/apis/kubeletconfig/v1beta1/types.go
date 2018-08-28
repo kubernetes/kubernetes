@@ -62,6 +62,9 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// bootstrapCheckpointPath is the path to the directory containing pod checkpoints to
+	// run on restore
+	BootstrapCheckpointPath string `json:"bootstrapCheckpointPath,omitempty"`
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
