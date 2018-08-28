@@ -80,3 +80,29 @@ options:
     description: |
       Docker image to use for the default backend. Auto will select an image
       based on architecture.
+  snapd_refresh:
+    default: "max"
+    type: string
+    description: |
+      How often snapd handles updates for installed snaps. Setting an empty
+      string will check 4x per day. Set to "max" to delay the refresh as long
+      as possible. You may also set a custom string as described in the
+      'refresh.timer' section here:
+        https://forum.snapcraft.io/t/system-options/87
+  kubelet-extra-config:
+    default: "{}"
+    type: string
+    description: |
+      Extra configuration to be passed to kubelet. Any values specified in this
+      config will be merged into a KubeletConfiguration file that is passed to
+      the kubelet service via the --config flag. This can be used to override
+      values provided by the charm.
+
+      Requires Kubernetes 1.10+.
+
+      The value for this config must be a YAML mapping that can be safely
+      merged with a KubeletConfiguration file. For example:
+        {evictionHard: {memory.available: 200Mi}}
+
+      For more information about KubeletConfiguration, see upstream docs:
+      https://kubernetes.io/docs/tasks/administer-cluster/kubelet-config-file/
