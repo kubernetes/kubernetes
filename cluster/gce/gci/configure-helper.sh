@@ -2193,6 +2193,17 @@ function update-prometheus-to-sd-parameters {
    fi
 }
 
+# Updates parameters in yaml file for prometheus-to-sd configuration in daemon sets, or
+# removes component if it is disabled.
+function update-daemon-set-prometheus-to-sd-parameters {
+  if [[ "${DISABLE_PROMETHEUS_TO_SD_IN_DS:-}" == "true" ]]; then
+    # Removes all lines between two patterns (throws away prometheus-to-sd)
+    sed -i -e "/# BEGIN_PROMETHEUS_TO_SD/,/# END_PROMETHEUS_TO_SD/d" "$1"
+  else
+    update-prometheus-to-sd-parameters $1
+  fi
+}
+
 # Updates parameters in yaml file for event-exporter configuration
 function update-event-exporter {
     local -r stackdriver_resource_model="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
@@ -2243,7 +2254,7 @@ function setup-fluentd {
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
   fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.3-1.5.34-1-k8s-1}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
-  update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
+  update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
   update-container-runtime ${fluentd_gcp_configmap_yaml}
   update-node-journal ${fluentd_gcp_configmap_yaml}
@@ -2329,7 +2340,7 @@ function start-kube-addons {
       cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
 $CUSTOM_KUBE_PROXY_YAML
 EOF
-      update-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
+      update-daemon-set-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     fi
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
@@ -2491,7 +2502,7 @@ EOF
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metadata-proxy/gce"
     local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
-    update-prometheus-to-sd-parameters ${metadata_proxy_yaml}
+    update-daemon-set-prometheus-to-sd-parameters ${metadata_proxy_yaml}
   fi
   if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
     if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
