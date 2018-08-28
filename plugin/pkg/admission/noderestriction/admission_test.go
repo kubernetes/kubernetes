@@ -23,12 +23,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -39,10 +41,12 @@ import (
 )
 
 var (
-	trEnabledFeature     = utilfeature.NewFeatureGate()
-	trDisabledFeature    = utilfeature.NewFeatureGate()
-	leaseEnabledFeature  = utilfeature.NewFeatureGate()
-	leaseDisabledFeature = utilfeature.NewFeatureGate()
+	trEnabledFeature              = utilfeature.NewFeatureGate()
+	trDisabledFeature             = utilfeature.NewFeatureGate()
+	leaseEnabledFeature           = utilfeature.NewFeatureGate()
+	leaseDisabledFeature          = utilfeature.NewFeatureGate()
+	pluginsWatcherEnabledFeature  = utilfeature.NewFeatureGate()
+	pluginsWatcherDisabledFeature = utilfeature.NewFeatureGate()
 )
 
 func init() {
@@ -56,6 +60,12 @@ func init() {
 		panic(err)
 	}
 	if err := leaseDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
+		panic(err)
+	}
+	if err := pluginsWatcherEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := pluginsWatcherDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -190,6 +200,33 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				HolderIdentity:       pointer.StringPtr("mynode"),
 				LeaseDurationSeconds: pointer.Int32Ptr(40),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
+			},
+		}
+
+		csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos").WithVersion("v1alpha1")
+		csiNodeInfoKind     = schema.GroupVersionKind{Group: "csi.storage.k8s.io", Version: "v1alpha1", Kind: "CSINodeInfo"}
+		nodeInfo            = &csiv1alpha1.CSINodeInfo{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "mynode",
+			},
+			CSIDrivers: []csiv1alpha1.CSIDriverInfo{
+				{
+					Driver:       "com.example.csi/mydriver",
+					NodeID:       "com.example.csi/mynode",
+					TopologyKeys: []string{"com.example.csi/zone"},
+				},
+			},
+		}
+		nodeInfoWrongName = &csiv1alpha1.CSINodeInfo{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			CSIDrivers: []csiv1alpha1.CSIDriverInfo{
+				{
+					Driver:       "com.example.csi/mydriver",
+					NodeID:       "com.example.csi/foo",
+					TopologyKeys: []string{"com.example.csi/zone"},
+				},
 			},
 		}
 
@@ -953,6 +990,49 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "allowed delete node lease - feature enabled",
 			attributes: admission.NewAttributesRecord(nil, nil, leaseKind, lease.Namespace, lease.Name, leaseResource, "", admission.Delete, false, mynode),
 			features:   leaseEnabledFeature,
+			err:        "",
+		},
+		// CSINodeInfo
+		{
+			name:       "disallowed create CSINodeInfo - feature disabled",
+			attributes: admission.NewAttributesRecord(nodeInfo, nil, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Create, false, mynode),
+			features:   pluginsWatcherDisabledFeature,
+			err:        "forbidden: disabled by feature gate KubeletPluginsWatcher",
+		},
+		{
+			name:       "disallowed create another node's CSINodeInfo - feature enabled",
+			attributes: admission.NewAttributesRecord(nodeInfoWrongName, nil, csiNodeInfoKind, nodeInfoWrongName.Namespace, nodeInfoWrongName.Name, csiNodeInfoResource, "", admission.Create, false, mynode),
+			features:   pluginsWatcherEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "disallowed update another node's CSINodeInfo - feature enabled",
+			attributes: admission.NewAttributesRecord(nodeInfoWrongName, nodeInfoWrongName, csiNodeInfoKind, nodeInfoWrongName.Namespace, nodeInfoWrongName.Name, csiNodeInfoResource, "", admission.Update, false, mynode),
+			features:   pluginsWatcherEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "disallowed delete another node's CSINodeInfo - feature enabled",
+			attributes: admission.NewAttributesRecord(nil, nil, csiNodeInfoKind, nodeInfoWrongName.Namespace, nodeInfoWrongName.Name, csiNodeInfoResource, "", admission.Delete, false, mynode),
+			features:   pluginsWatcherEnabledFeature,
+			err:        "forbidden: ",
+		},
+		{
+			name:       "allowed create node CSINodeInfo - feature enabled",
+			attributes: admission.NewAttributesRecord(nodeInfo, nil, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Create, false, mynode),
+			features:   pluginsWatcherEnabledFeature,
+			err:        "",
+		},
+		{
+			name:       "allowed update node CSINodeInfo - feature enabled",
+			attributes: admission.NewAttributesRecord(nodeInfo, nodeInfo, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Update, false, mynode),
+			features:   pluginsWatcherEnabledFeature,
+			err:        "",
+		},
+		{
+			name:       "allowed delete node CSINodeInfo - feature enabled",
+			attributes: admission.NewAttributesRecord(nil, nil, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Delete, false, mynode),
+			features:   pluginsWatcherEnabledFeature,
 			err:        "",
 		},
 	}
