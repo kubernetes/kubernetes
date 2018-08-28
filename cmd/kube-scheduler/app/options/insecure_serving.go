@@ -157,7 +157,7 @@ func (o *CombinedInsecureServingOptions) Validate() []error {
 	}
 
 	if len(o.BindAddress) > 0 && net.ParseIP(o.BindAddress) == nil {
-		errors = append(errors, fmt.Errorf("--address has no valid IP address"))
+		errors = append(errors, fmt.Errorf("--address %v is an invalid IP address", o.BindAddress))
 	}
 
 	return errors
