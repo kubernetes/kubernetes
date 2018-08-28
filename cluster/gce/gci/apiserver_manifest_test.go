@@ -56,8 +56,8 @@ readonly LOG_OWNER_GROUP=$(id -gn)
 ENCRYPTION_PROVIDER_CONFIG={{.EncryptionProviderConfig}}
 ENCRYPTION_PROVIDER_CONFIG_PATH={{.EncryptionProviderConfigPath}}
 readonly ETCD_KMS_KEY_ID={{.ETCDKMSKeyID}}
-readonly ENABLE_CACHE_MUTATION_DETECTOR=yes
-readonly ENABLE_PATCH_CONVERSION_DETECTOR=yes
+{{if .EnableCacheMutationDetector }}readonly ENABLE_CACHE_MUTATION_DETECTOR=yes{{end}}
+{{if .EnablePatchConversionDetector}}readonly ENABLE_PATCH_CONVERSION_DETECTOR=yes{{end}}
 `
 	kubeAPIServerManifestFileName = "kube-apiserver.manifest"
 	kmsPluginManifestFileName     = "kms-plugin-container.manifest"
@@ -83,6 +83,8 @@ type kubeAPIServerEnv struct {
 	EncryptionProviderConfig     string
 	EncryptionProviderConfigPath string
 	ETCDKMSKeyID                 string
+	EnableCacheMutationDetector  bool
+	EnablePatchConversionDetector bool
 }
 
 type kubeAPIServerManifestTestCase struct {
@@ -213,12 +215,76 @@ func TestKMSPluginAndAPIServerSharedVolume(t *testing.T) {
 	}
 }
 
+func TestEnvMutationDetector(t *testing.T) {
+	c := newKubeAPIServerManifestTestCase(t)
+	defer c.tearDown()
+
+	e := kubeAPIServerEnv{
+		KubeHome: c.kubeHome,
+		EnableCacheMutationDetector: true,
+	}
+
+	c.invokeTest(e)
+
+	if len(c.apiServerContainer.Env) != 1 {
+		t.Fatalf("Expected apiServerContainer's env to have one entry, actually has %d",
+			len(c.apiServerContainer.Env))
+	}
+
+	if c.apiServerContainer.Env[0].Name != "KUBE_CACHE_MUTATION_DETECTOR" {
+		t.Fatalf("Expected env var to be KUBE_CACHE_MUTATION_DETECTOR, actually %s",
+			c.apiServerContainer.Env[0].Name)
+	}
+}
+
+func TestEnvEmpty(t *testing.T) {
+	c := newKubeAPIServerManifestTestCase(t)
+	defer c.tearDown()
+
+	e := kubeAPIServerEnv{
+		KubeHome: c.kubeHome,
+		EnableCacheMutationDetector: true,
+	}
+
+	c.invokeTest(e)
+
+	if len(c.apiServerContainer.Env) != 1 {
+		t.Fatalf("Expected apiServerContainer's env to have no entries, actually has %d",
+			len(c.apiServerContainer.Env))
+	}
+}
+
+
+func TestEnvPatchConversionDetector(t *testing.T) {
+	c := newKubeAPIServerManifestTestCase(t)
+	defer c.tearDown()
+
+	e := kubeAPIServerEnv{
+		KubeHome: c.kubeHome,
+		EnablePatchConversionDetector: true,
+	}
+
+	c.invokeTest(e)
+
+	if len(c.apiServerContainer.Env) != 1 {
+		t.Fatalf("Expected apiServerContainer's env to have one entry, actually has %d",
+			len(c.apiServerContainer.Env))
+	}
+
+	if c.apiServerContainer.Env[0].Name != "KUBE_PATCH_CONVERSION_DETECTOR" {
+		t.Fatalf("Expected env var to be KUBE_PATCH_CONVERSION_DETECTOR, actually %s",
+			c.apiServerContainer.Env[0].Name)
+	}
+}
+
 func TestEnvConcatenation(t *testing.T) {
 	c := newKubeAPIServerManifestTestCase(t)
 	defer c.tearDown()
 
 	e := kubeAPIServerEnv{
 		KubeHome: c.kubeHome,
+		EnableCacheMutationDetector: true,
+		EnablePatchConversionDetector: true,
 	}
 
 	c.invokeTest(e)
