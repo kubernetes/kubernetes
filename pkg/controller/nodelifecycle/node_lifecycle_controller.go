@@ -30,6 +30,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensiosnclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -51,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -144,9 +148,10 @@ type nodeStatusData struct {
 type Controller struct {
 	taintManager *scheduler.NoExecuteTaintManager
 
-	podInformerSynced cache.InformerSynced
-	cloud             cloudprovider.Interface
-	kubeClient        clientset.Interface
+	podInformerSynced   cache.InformerSynced
+	cloud               cloudprovider.Interface
+	kubeClient          clientset.Interface
+	apiextensionsClient apiextensiosnclientset.Interface
 
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
 	// to aviod the problem with time skew across the cluster.
@@ -231,6 +236,7 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	daemonSetInformer extensionsinformers.DaemonSetInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
+	apiextensionsClient apiextensiosnclientset.Interface,
 	nodeMonitorPeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorGracePeriod time.Duration,
@@ -255,11 +261,12 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	}
 
 	nc := &Controller{
-		cloud:         cloud,
-		kubeClient:    kubeClient,
-		now:           metav1.Now,
-		knownNodeSet:  make(map[string]*v1.Node),
-		nodeStatusMap: make(map[string]nodeStatusData),
+		cloud:               cloud,
+		kubeClient:          kubeClient,
+		apiextensionsClient: apiextensionsClient,
+		now:                 metav1.Now,
+		knownNodeSet:        make(map[string]*v1.Node),
+		nodeStatusMap:       make(map[string]nodeStatusData),
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
 		},
@@ -385,6 +392,10 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 
 	if !controller.WaitForCacheSync("taint", stopCh, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		nc.registerRuntimeClassCRD()
 	}
 
 	if nc.runTaintManager {
@@ -1196,5 +1207,63 @@ func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) 
 		return notReadyNodes, statePartialDisruption
 	default:
 		return notReadyNodes, stateNormal
+	}
+}
+
+// Register the CustomResourceDefinition for the RuntimeClass API.
+func (nc *Controller) registerRuntimeClassCRD() {
+	if nc.apiextensionsClient == nil {
+		glog.Warningf("Failed to register node.k8s.io/RuntimeClass CRD due to missing apiextensions client")
+		return
+	}
+
+	const (
+		dns1123LabelFmt        string = "[a-z0-9]([-a-z0-9]*[a-z0-9])?"
+		dns1123SubdomainFmt    string = dns1123LabelFmt + "(\\." + dns1123LabelFmt + ")*"
+		dns1123SubdomainRegexp string = "^" + dns1123SubdomainFmt + "$"
+	)
+	runtimeClassCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "runtimeclasses.node.k8s.io",
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   "node.k8s.io",
+			Version: "v1alpha1",
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{{
+				Name:    "v1alpha1",
+				Served:  true,
+				Storage: true,
+			}},
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural:   "runtimeclasses",
+				Singular: "runtimeclass",
+				Kind:     "RuntimeClass",
+			},
+			Scope: apiextensionsv1beta1.ClusterScoped,
+			Validation: &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"spec": {
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"runtimeHandler": {
+									Type:    "string",
+									Pattern: dns1123SubdomainRegexp,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	glog.V(2).Infof("Registering node.k8s.io/RuntimeClass CRD")
+	_, err := nc.apiextensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(runtimeClassCRD)
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			glog.V(4).Infof("node.k8s.io/RuntimeClass CRD already registered")
+		} else {
+			glog.Warningf("Failed to create node.k8s.io/RuntimeClass CRD: %v", err)
+		}
 	}
 }

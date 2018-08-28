@@ -31,6 +31,7 @@ import (
 	"net/http"
 
 	"k8s.io/api/core/v1"
+	apiextensiosnclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
@@ -124,6 +125,7 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		apiextensiosnclientset.NewForConfigOrDie(ctx.ClientBuilder.ConfigOrDie("node-controller")),
 		ctx.ComponentConfig.KubeCloudShared.NodeMonitorPeriod.Duration,
 		ctx.ComponentConfig.NodeLifecycleController.NodeStartupGracePeriod.Duration,
 		ctx.ComponentConfig.NodeLifecycleController.NodeMonitorGracePeriod.Duration,

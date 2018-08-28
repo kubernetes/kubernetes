@@ -104,6 +104,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		informers.Extensions().V1beta1().DaemonSets(),
 		nil, // CloudProvider
 		cs,
+		nil,         // apiextensions client
 		time.Second, // Node monitor grace period
 		time.Second, // Node startup grace period
 		time.Second, // Node monitor period
