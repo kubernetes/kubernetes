@@ -42,6 +42,7 @@ import (
 	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
+
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
 
@@ -134,7 +135,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 			HorizontalPodAutoscalerSyncPeriod:               componentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod,
 			HorizontalPodAutoscalerUpscaleForbiddenWindow:   componentConfig.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow,
 			HorizontalPodAutoscalerDownscaleForbiddenWindow: componentConfig.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow,
-			HorizontalPodAutoscalerCPUTaintPeriod:           componentConfig.HPAController.HorizontalPodAutoscalerCPUTaintPeriod,
+			HorizontalPodAutoscalerCPUInitializationPeriod:  componentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod,
 			HorizontalPodAutoscalerInitialReadinessDelay:    componentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay,
 			HorizontalPodAutoscalerTolerance:                componentConfig.HPAController.HorizontalPodAutoscalerTolerance,
 			HorizontalPodAutoscalerUseRESTClients:           componentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients,

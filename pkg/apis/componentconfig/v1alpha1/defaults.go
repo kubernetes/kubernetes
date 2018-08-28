@@ -89,10 +89,8 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 	if obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow == zero {
 		obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow = metav1.Duration{Duration: 3 * time.Minute}
 	}
-	if obj.HPAController.HorizontalPodAutoscalerCPUTaintPeriod == zero {
-		// Assuming CPU is collected every minute and initialization takes another minute HPA should
-		// disregard samples from first two minutes as contaminated by initialization.
-		obj.HPAController.HorizontalPodAutoscalerCPUTaintPeriod = metav1.Duration{Duration: time.Minute}
+	if obj.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod == zero {
+		obj.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod = metav1.Duration{Duration: 5 * time.Minute}
 	}
 	if obj.HPAController.HorizontalPodAutoscalerInitialReadinessDelay == zero {
 		obj.HPAController.HorizontalPodAutoscalerInitialReadinessDelay = metav1.Duration{Duration: 30 * time.Second}

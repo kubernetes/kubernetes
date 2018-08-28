@@ -33,6 +33,10 @@ import (
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
 
+const (
+	metricServerDefaultMetricWindow = time.Minute
+)
+
 func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient, externalClient externalclient.ExternalMetricsClient) MetricsClient {
 	return &restMetricsClient{
 		&resourceMetricsClient{resourceClient},
@@ -84,7 +88,11 @@ func (c *resourceMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		}
 
 		if !missing {
-			res[m.Name] = int64(podSum)
+			res[m.Name] = PodMetric{
+				Timestamp: m.Timestamp.Time,
+				Window:    m.Window.Duration,
+				Value:     int64(podSum),
+			}
 		}
 	}
 
@@ -113,7 +121,17 @@ func (c *customMetricsClient) GetRawMetric(metricName string, namespace string, 
 
 	res := make(PodMetricsInfo, len(metrics.Items))
 	for _, m := range metrics.Items {
-		res[m.DescribedObject.Name] = m.Value.MilliValue()
+		window := metricServerDefaultMetricWindow
+		if m.WindowSeconds != nil {
+			window = time.Duration(*m.WindowSeconds) * time.Second
+		}
+		res[m.DescribedObject.Name] = PodMetric{
+			Timestamp: m.Timestamp.Time,
+			Window:    window,
+			Value:     int64(m.Value.MilliValue()),
+		}
+
+		m.Value.MilliValue()
 	}
 
 	timestamp := metrics.Items[0].Timestamp.Time
