@@ -349,7 +349,7 @@ func groupPods(pods []v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.
 	ignoredPods = sets.NewString()
 	glog.Errorf("groupPods stack: %v", string(debug.Stack()))
 	for _, pod := range pods {
-		if pod.Status.Phase == v1.PodFailed {
+		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
 			continue
 		}
 		if _, found := metrics[pod.Name]; !found {

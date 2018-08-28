@@ -89,9 +89,10 @@ type replicaCalcTestCase struct {
 	resource *resourceInfo
 	metric   *metricInfo
 
-	podReadiness []v1.ConditionStatus
-	podStartTime []metav1.Time
-	podPhase     []v1.PodPhase
+	podReadiness         []v1.ConditionStatus
+	podStartTime         []metav1.Time
+	podPhase             []v1.PodPhase
+	podDeletionTimestamp []bool
 }
 
 const (
@@ -122,6 +123,10 @@ func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 			if tc.podPhase != nil {
 				podPhase = tc.podPhase[i]
 			}
+			podDeletionTimestamp := false
+			if tc.podDeletionTimestamp != nil {
+				podDeletionTimestamp = tc.podDeletionTimestamp[i]
+			}
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := v1.Pod{
 				Status: v1.PodStatus{
@@ -144,6 +149,9 @@ func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{{}, {}},
 				},
+			}
+			if podDeletionTimestamp {
+				pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 			}
 
 			if tc.resource != nil && i < len(tc.resource.requests) {
@@ -517,6 +525,26 @@ func TestReplicaCalcScaleUpIgnoresFailedPods(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpIgnoresDeletionPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:      2,
+		expectedReplicas:     4,
+		podReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		podDeletionTimestamp: []bool{false, false, true, true},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{500, 700},
+
+			targetUtilization:   30,
+			expectedUtilization: 60,
+			expectedValue:       numContainersPerPod * 600,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleUpCM(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -794,6 +822,26 @@ func TestReplicaCalcScaleDownIgnoresFailedPods(t *testing.T) {
 		expectedReplicas: 3,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   []int64{100, 300, 500, 250, 250},
+
+			targetUtilization:   50,
+			expectedUtilization: 28,
+			expectedValue:       numContainersPerPod * 280,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownIgnoresDeletionPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:      5,
+		expectedReplicas:     3,
+		podReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		podDeletionTimestamp: []bool{false, false, false, false, false, true, true},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
 			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
