@@ -79,11 +79,11 @@ readonly ETCD_KMS_KEY_ID={{.ETCDKMSKeyID}}
 )
 
 type kubeAPIServerEnv struct {
-	KubeHome                     string
-	EncryptionProviderConfig     string
-	EncryptionProviderConfigPath string
-	ETCDKMSKeyID                 string
-	EnableCacheMutationDetector  bool
+	KubeHome                      string
+	EncryptionProviderConfig      string
+	EncryptionProviderConfigPath  string
+	ETCDKMSKeyID                  string
+	EnableCacheMutationDetector   bool
 	EnablePatchConversionDetector bool
 }
 
@@ -220,7 +220,7 @@ func TestEnvMutationDetector(t *testing.T) {
 	defer c.tearDown()
 
 	e := kubeAPIServerEnv{
-		KubeHome: c.kubeHome,
+		KubeHome:                    c.kubeHome,
 		EnableCacheMutationDetector: true,
 	}
 
@@ -242,7 +242,7 @@ func TestEnvEmpty(t *testing.T) {
 	defer c.tearDown()
 
 	e := kubeAPIServerEnv{
-		KubeHome: c.kubeHome,
+		KubeHome:                    c.kubeHome,
 		EnableCacheMutationDetector: true,
 	}
 
@@ -254,13 +254,12 @@ func TestEnvEmpty(t *testing.T) {
 	}
 }
 
-
 func TestEnvPatchConversionDetector(t *testing.T) {
 	c := newKubeAPIServerManifestTestCase(t)
 	defer c.tearDown()
 
 	e := kubeAPIServerEnv{
-		KubeHome: c.kubeHome,
+		KubeHome:                      c.kubeHome,
 		EnablePatchConversionDetector: true,
 	}
 
@@ -282,8 +281,8 @@ func TestEnvConcatenation(t *testing.T) {
 	defer c.tearDown()
 
 	e := kubeAPIServerEnv{
-		KubeHome: c.kubeHome,
-		EnableCacheMutationDetector: true,
+		KubeHome:                      c.kubeHome,
+		EnableCacheMutationDetector:   true,
 		EnablePatchConversionDetector: true,
 	}
 
