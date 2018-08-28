@@ -19,7 +19,6 @@ package proxy
 import (
 	"bytes"
 	"fmt"
-	"runtime"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -75,9 +74,8 @@ func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interf
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
-	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, Arch string }{
+	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image string }{
 		Image: images.GetKubeControlPlaneImage(constants.KubeProxy, &cfg.ClusterConfiguration),
-		Arch:  runtime.GOARCH,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
