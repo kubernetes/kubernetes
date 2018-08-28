@@ -37,6 +37,8 @@ import (
 	clientretry "k8s.io/client-go/util/retry"
 	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
+	nodectrlutil "k8s.io/kubernetes/pkg/controller/util/node"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -242,6 +244,24 @@ func (cnc *CloudNodeController) MonitorNode() {
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node immediately
 		if currentReadyCondition != nil {
 			if currentReadyCondition.Status != v1.ConditionTrue {
+				// we need to check this first to get taint working in similar in all cloudproviders
+				// current problem is that shutdown nodes are not working in similar way ie. all cloudproviders
+				// does not delete node from kubernetes cluster when instance it is shutdown see issue #46442
+				shutdown, err := nodectrlutil.ShutdownInCloudProvider(context.TODO(), cnc.cloud, node)
+				if err != nil {
+					glog.Errorf("Error getting data for node %s from cloud: %v", node.Name, err)
+				}
+
+				if shutdown && err == nil {
+					// if node is shutdown add shutdown taint
+					err = controller.AddOrUpdateTaintOnNode(cnc.kubeClient, node.Name, controller.ShutdownTaint)
+					if err != nil {
+						glog.Errorf("Error patching node taints: %v", err)
+					}
+					// Continue checking the remaining nodes since the current one is shutdown.
+					continue
+				}
+
 				// Check with the cloud provider to see if the node still exists. If it
 				// doesn't, delete the node immediately.
 				exists, err := ensureNodeExistsByProviderIDOrExternalID(instances, node)
@@ -274,6 +294,12 @@ func (cnc *CloudNodeController) MonitorNode() {
 					}
 				}(node.Name)
 
+			} else {
+				// if taint exist remove taint
+				err = controller.RemoveTaintOffNode(cnc.kubeClient, node.Name, node, controller.ShutdownTaint)
+				if err != nil {
+					glog.Errorf("Error patching node taints: %v", err)
+				}
 			}
 		}
 	}

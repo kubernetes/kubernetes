@@ -22,6 +22,7 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -153,9 +154,10 @@ type Controller struct {
 	daemonSetStore          extensionslisters.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
-	nodeLister                corelisters.NodeLister
-	nodeInformerSynced        cache.InformerSynced
-	nodeExistsInCloudProvider func(types.NodeName) (bool, error)
+	nodeLister                  corelisters.NodeLister
+	nodeInformerSynced          cache.InformerSynced
+	nodeExistsInCloudProvider   func(types.NodeName) (bool, error)
+	nodeShutdownInCloudProvider func(context.Context, *v1.Node) (bool, error)
 
 	recorder record.EventRecorder
 
@@ -240,6 +242,9 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		nodeStatusMap: make(map[string]nodeStatusData),
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return nodeutil.ExistsInCloudProvider(cloud, nodeName)
+		},
+		nodeShutdownInCloudProvider: func(ctx context.Context, node *v1.Node) (bool, error) {
+			return nodeutil.ShutdownInCloudProvider(ctx, cloud, node)
 		},
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
@@ -669,6 +674,11 @@ func (nc *Controller) monitorNodeStatus() error {
 						glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 					}
 				}
+				// remove shutdown taint this is needed always depending do we use taintbased or not
+				err := nc.markNodeAsNotShutdown(node)
+				if err != nil {
+					glog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
+				}
 			}
 
 			// Report node event.
@@ -682,6 +692,19 @@ func (nc *Controller) monitorNodeStatus() error {
 			// Check with the cloud provider to see if the node still exists. If it
 			// doesn't, delete the node immediately.
 			if currentReadyCondition.Status != v1.ConditionTrue && nc.cloud != nil {
+				// check is node shutdowned, if yes do not deleted it. Instead add taint
+				shutdown, err := nc.nodeShutdownInCloudProvider(context.TODO(), node)
+				if err != nil {
+					glog.Errorf("Error determining if node %v shutdown in cloud: %v", node.Name, err)
+				}
+				// node shutdown
+				if shutdown && err == nil {
+					err = controller.AddOrUpdateTaintOnNode(nc.kubeClient, node.Name, controller.ShutdownTaint)
+					if err != nil {
+						glog.Errorf("Error patching node taints: %v", err)
+					}
+					continue
+				}
 				exists, err := nc.nodeExistsInCloudProvider(types.NodeName(node.Name))
 				if err != nil {
 					glog.Errorf("Error determining if node %v exists in cloud: %v", node.Name, err)
@@ -1116,6 +1139,17 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 		return false, err
 	}
 	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil
+}
+
+func (nc *Controller) markNodeAsNotShutdown(node *v1.Node) error {
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, controller.ShutdownTaint)
+	if err != nil {
+		glog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
+		return err
+	}
+	return nil
 }
 
 // ComputeZoneState returns a slice of NodeReadyConditions for all Nodes in a given zone.

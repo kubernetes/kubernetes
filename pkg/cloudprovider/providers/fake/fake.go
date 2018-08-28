@@ -50,8 +50,10 @@ type FakeCloud struct {
 	Exists bool
 	Err    error
 
-	ExistsByProviderID bool
-	ErrByProviderID    error
+	ExistsByProviderID      bool
+	ErrByProviderID         error
+	NodeShutdown            bool
+	ErrShutdownByProviderID error
 
 	Calls         []string
 	Addresses     []v1.NodeAddress
@@ -239,6 +241,12 @@ func (f *FakeCloud) InstanceTypeByProviderID(ctx context.Context, providerID str
 func (f *FakeCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-exists-by-provider-id")
 	return f.ExistsByProviderID, f.ErrByProviderID
+}
+
+// InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
+func (f *FakeCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	f.addCall("instance-shutdown-by-provider-id")
+	return f.NodeShutdown, f.ErrShutdownByProviderID
 }
 
 // List is a test-spy implementation of Instances.List.

@@ -146,6 +146,11 @@ func (gce *GCECloud) instanceByProviderID(providerID string) (*gceInstance, erro
 	return instance, nil
 }
 
+// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+func (gce *GCECloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
 // with the specified unique providerID This method will not be called from the
 // node that is requesting this ID. i.e. metadata service and other local
