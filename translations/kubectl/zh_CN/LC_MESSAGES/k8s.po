@@ -317,7 +317,7 @@ msgstr ""
 "\t\t# 删除标签为 name=myLabel 的 pods 和 services.\n"
 "\t\tkubectl delete pods,services -l name=myLabel\n"
 "\n"
-"\t\t# 删除最小延迟的 pod\n"
+"\t\t# 以最小延迟删除 pod\n"
 "\t\tkubectl delete pod foo --now\n"
 "\n"
 "\t\t# 强制删除名为 foo 的 pod\n"
@@ -2400,12 +2400,12 @@ msgstr "查看资源的文档"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/drain.go#L176
 #: pkg/kubectl/cmd/drain.go:178
 msgid "Drain node in preparation for maintenance"
-msgstr "Drain node in preparation for maintenance"
+msgstr "Drain node 准备维护"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo_dump.go#L37
 #: pkg/kubectl/cmd/clusterinfo_dump.go:39
 msgid "Dump lots of relevant info for debugging and diagnosis"
-msgstr "Dump lots of relevant info for debugging and diagnosis"
+msgstr "转储大量相关信息以进行调试和诊断"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L100
 #: pkg/kubectl/cmd/edit.go:110
@@ -2415,7 +2415,7 @@ msgstr "在服务器上编辑一个资源"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L159
 #: pkg/kubectl/cmd/create_secret.go:160
 msgid "Email for Docker registry"
-msgstr "Email for Docker registry"
+msgstr "Docker registry 的 Email"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/exec.go#L68
 #: pkg/kubectl/cmd/exec.go:69
@@ -2430,17 +2430,17 @@ msgstr "Explicit policy for when to pull container images. Required when --image
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/portforward.go#L75
 #: pkg/kubectl/cmd/portforward.go:76
 msgid "Forward one or more local ports to a pod"
-msgstr "Forward one or more local ports to a pod"
+msgstr "将一个或多个本地端口转发到 pod"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/help.go#L36
 #: pkg/kubectl/cmd/help.go:37
 msgid "Help about any command"
-msgstr "Help about any command"
+msgstr "任何命令的帮助"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L105
 #: pkg/kubectl/cmd/expose.go:103
 msgid "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
-msgstr "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."
+msgstr "要分配给负载均衡器的IP. 如果为空,将创建并使用临时IP(云提供商特定)."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L114
 #: pkg/kubectl/cmd/expose.go:112
@@ -2495,17 +2495,17 @@ msgstr "修改 kubeconfig 文件"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L110
 #: pkg/kubectl/cmd/expose.go:108
 msgid "Name or number for the port on the container that the service should direct traffic to. Optional."
-msgstr "Name or number for the port on the container that the service should direct traffic to. Optional."
+msgstr "容器上端口的名称或编号, 服务应将流量定向到该端口. 可选."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/logs.go#L108
 #: pkg/kubectl/cmd/logs.go:113
 msgid "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
-msgstr "Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."
+msgstr "仅在特定日期之后返回日志(RFC3339). 默认为所有日志. since-time / since 只有一个会被使用."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go#L97
 #: pkg/kubectl/cmd/completion.go:104
 msgid "Output shell completion code for the specified shell (bash or zsh)"
-msgstr "Output shell completion code for the specified shell (bash or zsh)"
+msgstr "输出指定 shell 的 shell completion 代码(bash or zsh)"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/edit.go#L115
 #: pkg/kubectl/cmd/convert.go:85
@@ -2515,17 +2515,17 @@ msgstr "Output the formatted object with the given group version (for ex: 'exten
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L157
 #: pkg/kubectl/cmd/create_secret.go:158
 msgid "Password for Docker registry authentication"
-msgstr "Password for Docker registry authentication"
+msgstr "Docker registry 认证的密码"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L226
 #: pkg/kubectl/cmd/create_secret.go:226
 msgid "Path to PEM encoded public key certificate."
-msgstr "Path to PEM encoded public key certificate."
+msgstr "PEM编码公钥证书的路径."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L227
 #: pkg/kubectl/cmd/create_secret.go:227
 msgid "Path to private key associated with given certificate."
-msgstr "Path to private key associated with given certificate."
+msgstr "与给定证书关联的私钥路径."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/rollingupdate.go#L84
 #: pkg/kubectl/cmd/rollingupdate.go:85
@@ -2535,7 +2535,7 @@ msgstr "完成指定的 ReplicationController 的滚动升级"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L82
 #: pkg/kubectl/cmd/scale.go:83
 msgid "Precondition for resource version. Requires that the current resource version match this value in order to scale."
-msgstr "Precondition for resource version. Requires that the current resource version match this value in order to scale."
+msgstr "资源版本的前提条件. 要求当前资源版本与此值匹配才能进行扩展."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/version.go#L39
 #: pkg/kubectl/cmd/version.go:40
@@ -2580,7 +2580,7 @@ msgstr "运行一个 proxy 到 Kubernetes API server"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L161
 #: pkg/kubectl/cmd/create_secret.go:161
 msgid "Server location for Docker registry"
-msgstr "Server location for Docker registry"
+msgstr "Docker registry 的服务地址"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/scale.go#L71
 #: pkg/kubectl/cmd/scale.go:71
@@ -2594,7 +2594,7 @@ msgstr "为 objects 设置一个指定的特征"
 
 #: pkg/kubectl/cmd/apply_set_last_applied.go:83
 msgid "Set the last-applied-configuration annotation on a live object to match the contents of a file."
-msgstr "Set the last-applied-configuration annotation on a live object to match the contents of a file."
+msgstr "在活动对象上设置last-applied-configuration注释以匹配文件的内容."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/set/set_selector.go#L81
 #: pkg/kubectl/cmd/set/set_selector.go:82
@@ -2639,7 +2639,7 @@ msgstr "显示 rollout 的状态"
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L108
 #: pkg/kubectl/cmd/expose.go:106
 msgid "Synonym for --target-port"
-msgstr "Synonym for --target-port"
+msgstr "与 --target-port 同义"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/expose.go#L87
 #: pkg/kubectl/cmd/expose.go:88
@@ -2709,12 +2709,12 @@ msgstr "服务的端口应该被指定. 如果没有指定, 从被创建的资�
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L121
 #: pkg/kubectl/cmd/run.go:124
 msgid "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
-msgstr "The port that this container exposes.  If --expose is true, this is also the port used by the service that is created."
+msgstr "此容器公开的端口.  如果 --expose 为 true, 这也是创建的服务所使用的端口."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L131
 #: pkg/kubectl/cmd/run.go:134
 msgid "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
-msgstr "The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."
+msgstr "此容器的资源需求限制,  例如, 'cpu=200m,memory=512Mi'.  请注意,  服务器端组件可能会根据服务器配置（例如限制范围）分配限制."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L130
 #: pkg/kubectl/cmd/run.go:133
@@ -2724,7 +2724,7 @@ msgstr "资源为 container 请求 requests . 例如, 'cpu=100m,memory=256Mi'. �
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/run.go#L128
 #: pkg/kubectl/cmd/run.go:131
 msgid "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created, if set to 'OnFailure' a job is created, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always', for CronJobs `Never`."
-msgstr "这个 Pod 的 restart policy.  Legal values [Always, OnFailure, Never]. 如果设置为 'Always' 一个 deployment 被创建, 如果设置为 ’OnFailure' 一个 job 被创建, 如果设置为 'Never', 一个普通的 pod 被创建. 对于后面两个 --replicas 必须为 1.  默认 'Always', 为 CronJobs 设置为 `Never`."
+msgstr "这个 Pod 的 restart policy.  合法值为 [Always, OnFailure, Never]. 如果设置为 'Always' 一个 deployment 被创建, 如果设置为 ’OnFailure' 一个 job 被创建, 如果设置为 'Never', 一个普通的 pod 被创建. 对于后面两个 --replicas 必须为 1.  默认 'Always', 为 CronJobs 设置为 `Never`."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/create_secret.go#L87
 #: pkg/kubectl/cmd/create_secret.go:88
