@@ -32,7 +32,29 @@ import (
 func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	glog.V(10).Infof("ListRoutes: START clusterName=%q", clusterName)
 	routeTable, existsRouteTable, err := az.getRouteTable()
-	return processRoutes(routeTable, existsRouteTable, err)
+	routes, err := processRoutes(routeTable, existsRouteTable, err)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compose routes for unmanaged routes so that node controller won't retry creating routes for them.
+	unmanagedNodes, err := az.GetUnmanagedNodes()
+	if err != nil {
+		return nil, err
+	}
+	az.routeCIDRsLock.Lock()
+	defer az.routeCIDRsLock.Unlock()
+	for _, nodeName := range unmanagedNodes.List() {
+		if cidr, ok := az.routeCIDRs[nodeName]; ok {
+			routes = append(routes, &cloudprovider.Route{
+				Name:            nodeName,
+				TargetNode:      mapRouteNameToNodeName(nodeName),
+				DestinationCIDR: cidr,
+			})
+		}
+	}
+
+	return routes, nil
 }
 
 // Injectable for testing
@@ -108,12 +130,16 @@ func (az *Cloud) createRouteTable() error {
 // to create a more user-meaningful name.
 func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, kubeRoute *cloudprovider.Route) error {
 	// Returns  for unmanaged nodes because azure cloud provider couldn't fetch information for them.
-	unmanaged, err := az.IsNodeUnmanaged(string(kubeRoute.TargetNode))
+	nodeName := string(kubeRoute.TargetNode)
+	unmanaged, err := az.IsNodeUnmanaged(nodeName)
 	if err != nil {
 		return err
 	}
 	if unmanaged {
 		glog.V(2).Infof("CreateRoute: omitting unmanaged node %q", kubeRoute.TargetNode)
+		az.routeCIDRsLock.Lock()
+		defer az.routeCIDRsLock.Unlock()
+		az.routeCIDRs[nodeName] = kubeRoute.DestinationCIDR
 		return nil
 	}
 
@@ -161,12 +187,16 @@ func (az *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint s
 // Route should be as returned by ListRoutes
 func (az *Cloud) DeleteRoute(ctx context.Context, clusterName string, kubeRoute *cloudprovider.Route) error {
 	// Returns  for unmanaged nodes because azure cloud provider couldn't fetch information for them.
-	unmanaged, err := az.IsNodeUnmanaged(string(kubeRoute.TargetNode))
+	nodeName := string(kubeRoute.TargetNode)
+	unmanaged, err := az.IsNodeUnmanaged(nodeName)
 	if err != nil {
 		return err
 	}
 	if unmanaged {
 		glog.V(2).Infof("DeleteRoute: omitting unmanaged node %q", kubeRoute.TargetNode)
+		az.routeCIDRsLock.Lock()
+		defer az.routeCIDRsLock.Unlock()
+		delete(az.routeCIDRs, nodeName)
 		return nil
 	}
 
