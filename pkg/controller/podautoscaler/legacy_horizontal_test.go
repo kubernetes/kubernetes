@@ -485,7 +485,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		return true, obj, nil
 	})
 
-	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuTaintAfterStart, defaultTestingDelayOfInitialReadinessStatus)
+	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	defaultDownscaleForbiddenWindow := 5 * time.Minute

@@ -35,10 +35,11 @@ import (
 )
 
 const (
-	DefaultHeapsterNamespace = "kube-system"
-	DefaultHeapsterScheme    = "http"
-	DefaultHeapsterService   = "heapster"
-	DefaultHeapsterPort      = "" // use the first exposed port on the service
+	DefaultHeapsterNamespace    = "kube-system"
+	DefaultHeapsterScheme       = "http"
+	DefaultHeapsterService      = "heapster"
+	DefaultHeapsterPort         = "" // use the first exposed port on the service
+	heapsterDefaultMetricWindow = time.Minute
 )
 
 var heapsterQueryStart = -5 * time.Minute
@@ -100,7 +101,11 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		}
 
 		if !missing {
-			res[m.Name] = int64(podSum)
+			res[m.Name] = PodMetric{
+				Timestamp: m.Timestamp.Time,
+				Window:    m.Window.Duration,
+				Value:     int64(podSum),
+			}
 		}
 	}
 
@@ -159,7 +164,12 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 	for i, podMetrics := range metrics.Items {
 		val, podTimestamp, hadMetrics := collapseTimeSamples(podMetrics, time.Minute)
 		if hadMetrics {
-			res[podNames[i]] = val
+			res[podNames[i]] = PodMetric{
+				Timestamp: podTimestamp,
+				Window:    heapsterDefaultMetricWindow,
+				Value:     int64(val),
+			}
+
 			if timestamp == nil || podTimestamp.Before(*timestamp) {
 				timestamp = &podTimestamp
 			}
