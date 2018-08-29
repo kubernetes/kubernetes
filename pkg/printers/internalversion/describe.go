@@ -3474,12 +3474,47 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 		if sc.VolumeBindingMode != nil {
 			w.Write(LEVEL_0, "VolumeBindingMode:\t%s\n", *sc.VolumeBindingMode)
 		}
+		if sc.AllowedTopologies != nil {
+			printAllowedTopologies(w, sc.AllowedTopologies)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
 
 		return nil
 	})
+}
+
+func printAllowedTopologies(w PrefixWriter, topologies []api.TopologySelectorTerm) {
+	w.Write(LEVEL_0, "AllowedTopologies:\t")
+	if len(topologies) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+	w.WriteLine("")
+	for i, term := range topologies {
+		printTopologySelectorTermsMultilineWithIndent(w, LEVEL_1, fmt.Sprintf("Term %d", i), "\t", term.MatchLabelExpressions)
+	}
+}
+
+func printTopologySelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []api.TopologySelectorLabelRequirement) {
+	w.Write(indentLevel, "%s:%s", title, innerIndent)
+
+	if len(reqs) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	for i, req := range reqs {
+		if i != 0 {
+			w.Write(indentLevel, "%s", innerIndent)
+		}
+		exprStr := fmt.Sprintf("%s %s", req.Key, "in")
+		if len(req.Values) > 0 {
+			exprStr = fmt.Sprintf("%s [%s]", exprStr, strings.Join(req.Values, ", "))
+		}
+		w.Write(LEVEL_0, "%s\n", exprStr)
+	}
 }
 
 type PodDisruptionBudgetDescriber struct {

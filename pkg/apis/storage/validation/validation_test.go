@@ -827,73 +827,67 @@ func TestValidateAllowedTopologies(t *testing.T) {
 
 	cases := map[string]bindingTest{
 		"no topology": {
-			class:         makeClass(nil, nil),
+			class:         makeClass(&waitingMode, nil),
 			shouldSucceed: true,
 		},
 		"valid topology": {
-			class:         makeClass(nil, validTopology),
+			class:         makeClass(&waitingMode, validTopology),
 			shouldSucceed: true,
 		},
 		"topology invalid key": {
-			class:         makeClass(nil, topologyInvalidKey),
+			class:         makeClass(&waitingMode, topologyInvalidKey),
 			shouldSucceed: false,
 		},
 		"topology lack of values": {
-			class:         makeClass(nil, topologyLackOfValues),
+			class:         makeClass(&waitingMode, topologyLackOfValues),
 			shouldSucceed: false,
 		},
 		"duplicate TopologySelectorRequirement values": {
-			class:         makeClass(nil, topologyDupValues),
+			class:         makeClass(&waitingMode, topologyDupValues),
 			shouldSucceed: false,
 		},
 		"multiple TopologySelectorRequirement values": {
-			class:         makeClass(nil, topologyMultiValues),
+			class:         makeClass(&waitingMode, topologyMultiValues),
 			shouldSucceed: true,
 		},
 		"empty MatchLabelExpressions": {
-			class:         makeClass(nil, topologyEmptyMatchLabelExpressions),
+			class:         makeClass(&waitingMode, topologyEmptyMatchLabelExpressions),
 			shouldSucceed: false,
 		},
 		"duplicate MatchLabelExpression keys": {
-			class:         makeClass(nil, topologyDupKeys),
+			class:         makeClass(&waitingMode, topologyDupKeys),
 			shouldSucceed: false,
 		},
 		"duplicate MatchLabelExpression keys but across separate terms": {
-			class:         makeClass(nil, topologyMultiTerm),
+			class:         makeClass(&waitingMode, topologyMultiTerm),
 			shouldSucceed: true,
 		},
 		"duplicate AllowedTopologies terms - identical": {
-			class:         makeClass(nil, topologyDupTermsIdentical),
+			class:         makeClass(&waitingMode, topologyDupTermsIdentical),
 			shouldSucceed: false,
 		},
 		"two AllowedTopologies terms, with a pair of the same MatchLabelExpressions and a pair of different ones": {
-			class:         makeClass(nil, topologyExprsOneSameOneDiff),
+			class:         makeClass(&waitingMode, topologyExprsOneSameOneDiff),
 			shouldSucceed: true,
 		},
 		"two AllowedTopologies terms, with a pair of the same Values and a pair of different ones": {
-			class:         makeClass(nil, topologyValuesOneSameOneDiff),
+			class:         makeClass(&waitingMode, topologyValuesOneSameOneDiff),
 			shouldSucceed: true,
 		},
 		"duplicate AllowedTopologies terms - different MatchLabelExpressions order": {
-			class:         makeClass(nil, topologyDupTermsDiffExprOrder),
+			class:         makeClass(&waitingMode, topologyDupTermsDiffExprOrder),
 			shouldSucceed: false,
 		},
 		"duplicate AllowedTopologies terms - different TopologySelectorRequirement values order": {
-			class:         makeClass(nil, topologyDupTermsDiffValueOrder),
+			class:         makeClass(&waitingMode, topologyDupTermsDiffValueOrder),
 			shouldSucceed: false,
 		},
 	}
 
-	// Disable VolumeScheduling so nil VolumeBindingMode doesn't fail to validate.
-	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-	if err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
-	}
-
 	// TODO: remove when feature gate not required
-	err = utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=true")
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
 	if err != nil {
-		t.Fatalf("Failed to enable feature gate for DynamicProvisioningScheduling: %v", err)
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
 	}
 
 	for testName, testCase := range cases {
@@ -906,9 +900,9 @@ func TestValidateAllowedTopologies(t *testing.T) {
 		}
 	}
 
-	err = utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=false")
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 	if err != nil {
-		t.Fatalf("Failed to disable feature gate for DynamicProvisioningScheduling: %v", err)
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
 	}
 
 	for testName, testCase := range cases {

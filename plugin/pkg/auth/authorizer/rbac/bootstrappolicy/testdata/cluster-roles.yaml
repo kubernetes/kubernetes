@@ -1116,6 +1116,16 @@ items:
     - get
     - list
     - watch
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - aggregationRule:
     clusterRoleSelectors:
     - matchLabels:

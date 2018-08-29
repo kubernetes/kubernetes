@@ -345,7 +345,7 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 	var zoneFromNode string
 	// pick one zone from node if present
 	if node != nil {
-		// DynamicProvisioningScheduling implicit since node is not nil
+		// VolumeScheduling implicit since node is not nil
 		if zoneParameterPresent || zonesParameterPresent {
 			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if VolumeBindingMode is set to WaitForFirstConsumer. Please specify allowedTopologies in StorageClass for constraining zones")
 		}
@@ -373,7 +373,7 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 	}
 
 	if allowedZones.Len() > 0 {
-		// DynamicProvisioningScheduling implicit since allowedZones present
+		// VolumeScheduling implicit since allowedZones present
 		if zoneParameterPresent || zonesParameterPresent {
 			return nil, fmt.Errorf("zone[s] cannot be specified in StorageClass if allowedTopologies specified")
 		}
