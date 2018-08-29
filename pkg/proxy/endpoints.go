@@ -83,14 +83,15 @@ type makeEndpointFunc func(info *BaseEndpointInfo) Endpoint
 type EndpointChangeTracker struct {
 	// lock protects items.
 	lock sync.Mutex
-	// hostname is the host where kube-proxy is running.
+	// hostname is the host where kube-proxy is running on.
 	hostname string
-	// items maps a service to is endpointsChange.
+	// items maps a service to a endpointsChange.
 	items map[types.NamespacedName]*endpointsChange
 	// makeEndpointInfo allows proxier to inject customized information when processing endpoint.
 	makeEndpointInfo makeEndpointFunc
 	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
 	isIPv6Mode *bool
+	// recorder records events.
 	recorder   record.EventRecorder
 }
 
