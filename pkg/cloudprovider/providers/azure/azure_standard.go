@@ -346,6 +346,15 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	return *machine.ID, nil
 }
 
+func (as *availabilitySet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+	vm, err := as.getVirtualMachine(types.NodeName(name))
+	if err != nil {
+		return provisioningState, err
+	}
+
+	return *vm.ProvisioningState, nil
+}
+
 // GetNodeNameByProviderID gets the node name by provider ID.
 func (as *availabilitySet) GetNodeNameByProviderID(providerID string) (types.NodeName, error) {
 	// NodeName is part of providerID for standard instances.
