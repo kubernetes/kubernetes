@@ -388,6 +388,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		healthChecker:            newFakeHealthChecker(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),
+		existingFilterChainsData: bytes.NewBuffer(nil),
 		filterChains:             bytes.NewBuffer(nil),
 		filterRules:              bytes.NewBuffer(nil),
 		natChains:                bytes.NewBuffer(nil),
