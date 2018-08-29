@@ -1073,6 +1073,16 @@ EOF
 ETCD_EXTRA_ARGS: $(yaml-quote ${ETCD_EXTRA_ARGS})
 EOF
     fi
+    if [ -n "${ETCD_SERVERS:-}" ]; then
+    cat >>$file <<EOF
+ETCD_SERVERS: $(yaml-quote ${ETCD_SERVERS})
+EOF
+    fi
+    if [ -n "${ETCD_SERVERS_OVERRIDES:-}" ]; then
+    cat >>$file <<EOF
+ETCD_SERVERS_OVERRIDES: $(yaml-quote ${ETCD_SERVERS_OVERRIDES})
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
