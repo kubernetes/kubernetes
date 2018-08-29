@@ -114,7 +114,7 @@ func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 		return false, err
 	}
 
-	_, err := servers.Get(i.compute, instanceID).Extract()
+	_, err = servers.Get(i.compute, instanceID).Extract()
 	if err != nil {
 		if isNotFound(err) {
 			return false, nil
