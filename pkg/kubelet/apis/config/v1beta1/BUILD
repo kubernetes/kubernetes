@@ -16,9 +16,9 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1",
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/master/ports:go_default_library",

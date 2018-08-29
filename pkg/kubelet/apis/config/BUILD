@@ -15,7 +15,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/config",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -35,10 +35,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/apis/kubeletconfig/fuzzer:all-srcs",
-        "//pkg/kubelet/apis/kubeletconfig/scheme:all-srcs",
-        "//pkg/kubelet/apis/kubeletconfig/v1beta1:all-srcs",
-        "//pkg/kubelet/apis/kubeletconfig/validation:all-srcs",
+        "//pkg/kubelet/apis/config/fuzzer:all-srcs",
+        "//pkg/kubelet/apis/config/scheme:all-srcs",
+        "//pkg/kubelet/apis/config/v1beta1:all-srcs",
+        "//pkg/kubelet/apis/config/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

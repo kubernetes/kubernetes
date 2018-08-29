@@ -3,11 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/fuzzer",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/config/fuzzer",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
+        "//pkg/kubelet/apis/config/v1beta1:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/master/ports:go_default_library",
