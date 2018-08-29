@@ -23,12 +23,14 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -300,4 +302,122 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 			})
 		})
 	})
+
+	Describe("Default StorageClass", func() {
+		Context("pods that use multiple volumes", func() {
+
+			AfterEach(func() {
+				framework.DeleteAllStatefulSets(c, ns)
+			})
+
+			It("should be reschedulable", func() {
+				// Only run on providers with default storageclass
+				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
+
+				numVols := 4
+				ssTester := framework.NewStatefulSetTester(c)
+
+				By("Creating a StatefulSet pod to initialize data")
+				writeCmd := "true"
+				for i := 0; i < numVols; i++ {
+					writeCmd += fmt.Sprintf("&& touch %v", getVolumeFile(i))
+				}
+				writeCmd += "&& sleep 10000"
+
+				probe := &v1.Probe{
+					Handler: v1.Handler{
+						Exec: &v1.ExecAction{
+							// Check that the last file got created
+							Command: []string{"test", "-f", getVolumeFile(numVols - 1)},
+						},
+					},
+					InitialDelaySeconds: 1,
+					PeriodSeconds:       1,
+				}
+
+				mounts := []v1.VolumeMount{}
+				claims := []v1.PersistentVolumeClaim{}
+				for i := 0; i < numVols; i++ {
+					pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{}, ns)
+					pvc.Name = getVolName(i)
+					mounts = append(mounts, v1.VolumeMount{Name: pvc.Name, MountPath: getMountPath(i)})
+					claims = append(claims, *pvc)
+				}
+
+				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
+				ss, err := c.AppsV1beta1().StatefulSets(ns).Create(spec)
+				Expect(err).NotTo(HaveOccurred())
+				ssTester.WaitForRunningAndReady(1, ss)
+
+				By("Deleting the StatefulSet but not the volumes")
+				// Scale down to 0 first so that the Delete is quick
+				ss, err = ssTester.Scale(ss, 0)
+				Expect(err).NotTo(HaveOccurred())
+				ssTester.WaitForStatusReplicas(ss, 0)
+				// Set OrphanDependent=false so it's deleted synchronously
+				err = c.AppsV1beta1().StatefulSets(ns).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)})
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Creating a new Statefulset and validating the data")
+				validateCmd := "true"
+				for i := 0; i < numVols; i++ {
+					validateCmd += fmt.Sprintf("&& test -f %v", getVolumeFile(i))
+				}
+				validateCmd += "&& sleep 10000"
+
+				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
+				ss, err = c.AppsV1beta1().StatefulSets(ns).Create(spec)
+				Expect(err).NotTo(HaveOccurred())
+				ssTester.WaitForRunningAndReady(1, ss)
+			})
+		})
+	})
 })
+
+func getVolName(i int) string {
+	return fmt.Sprintf("vol%v", i)
+}
+
+func getMountPath(i int) string {
+	return fmt.Sprintf("/mnt/%v", getVolName(i))
+}
+
+func getVolumeFile(i int) string {
+	return fmt.Sprintf("%v/data%v", getMountPath(i), i)
+}
+
+func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v1.PersistentVolumeClaim, readyProbe *v1.Probe) *appsv1beta1.StatefulSet {
+	ssReplicas := int32(1)
+
+	labels := map[string]string{"app": "many-volumes-test"}
+	return &appsv1beta1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "many-volumes-test",
+			Namespace: ns,
+		},
+		Spec: appsv1beta1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "many-volumes-test"},
+			},
+			Replicas: &ssReplicas,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:           "nginx",
+							Image:          imageutils.GetE2EImage(imageutils.NginxSlim),
+							Command:        []string{"/bin/sh"},
+							Args:           []string{"-c", cmd},
+							VolumeMounts:   mounts,
+							ReadinessProbe: readyProbe,
+						},
+					},
+				},
+			},
+			VolumeClaimTemplates: claims,
+		},
+	}
+}
