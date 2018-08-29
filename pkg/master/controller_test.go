@@ -372,6 +372,20 @@ func TestReconcileEndpoints(t *testing.T) {
 				}},
 			},
 		},
+		{
+			testName:      "no existing sctp endpoints",
+			serviceName:   "boo",
+			ip:            "1.2.3.4",
+			endpointPorts: []api.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
+			endpoints:     nil,
+			expectCreate: &api.Endpoints{
+				ObjectMeta: om("boo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Name: "boo", Port: 7777, Protocol: "SCTP"}},
+				}},
+			},
+		},
 	}
 	for _, test := range reconcile_tests {
 		fakeClient := fake.NewSimpleClientset()

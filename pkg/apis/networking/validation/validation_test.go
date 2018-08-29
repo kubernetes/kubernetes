@@ -21,14 +21,20 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestValidateNetworkPolicy(t *testing.T) {
 	protocolTCP := api.ProtocolTCP
 	protocolUDP := api.ProtocolUDP
 	protocolICMP := api.Protocol("ICMP")
+	protocolSCTP := api.ProtocolSCTP
+
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 
 	successCases := []networking.NetworkPolicy{
 		{
@@ -78,6 +84,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 							{
 								Protocol: &protocolUDP,
 								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+							},
+							{
+								Protocol: &protocolSCTP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
 							},
 						},
 					},
@@ -262,6 +272,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								Protocol: &protocolUDP,
 								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
 							},
+							{
+								Protocol: &protocolSCTP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 7777},
+							},
 						},
 					},
 				},
@@ -270,6 +284,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	// Success cases are expected to pass validation.
+
 	for k, v := range successCases {
 		if errs := ValidateNetworkPolicy(&v); len(errs) != 0 {
 			t.Errorf("Expected success for %d, got %v", k, errs)

@@ -161,8 +161,9 @@ func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, port int, prot
 
 func TestDeleteEndpointConnections(t *testing.T) {
 	const (
-		UDP = v1.ProtocolUDP
-		TCP = v1.ProtocolTCP
+		UDP  = v1.ProtocolUDP
+		TCP  = v1.ProtocolTCP
+		SCTP = v1.ProtocolSCTP
 	)
 	testCases := []struct {
 		description  string
@@ -188,6 +189,13 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			svcPort:     80,
 			protocol:    TCP,
 			endpoint:    "10.240.0.4:80",
+		}, {
+			description: "V4 SCTP",
+			svcName:     "v4-sctp",
+			svcIP:       "10.96.3.3",
+			svcPort:     80,
+			protocol:    SCTP,
+			endpoint:    "10.240.0.5:80",
 		}, {
 			description:  "V4 UDP, nothing to delete, benign error",
 			svcName:      "v4-udp-nothing-to-delete",
@@ -218,6 +226,13 @@ func TestDeleteEndpointConnections(t *testing.T) {
 			svcPort:     80,
 			protocol:    TCP,
 			endpoint:    "[2001:db8::3]:80",
+		}, {
+			description: "V6 SCTP",
+			svcName:     "v6-sctp",
+			svcIP:       "fd00:1234::40",
+			svcPort:     80,
+			protocol:    SCTP,
+			endpoint:    "[2001:db8::4]:80",
 		},
 	}
 
@@ -1061,12 +1076,14 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 			svc.Spec.ClusterIP = "172.16.55.4"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "something", "UDP", 1234, 4321, 0)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "somethingelse", "UDP", 1235, 5321, 0)
+			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "sctpport", "SCTP", 1236, 6321, 0)
 		}),
 		makeTestService("somewhere-else", "node-port", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeNodePort
 			svc.Spec.ClusterIP = "172.16.55.10"
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "blahblah", "UDP", 345, 678, 0)
 			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "moreblahblah", "TCP", 344, 677, 0)
+			svc.Spec.Ports = addTestPort(svc.Spec.Ports, "muchmoreblah", "SCTP", 343, 676, 0)
 		}),
 		makeTestService("somewhere", "load-balancer", func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -1100,8 +1117,8 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 		fp.OnServiceAdd(services[i])
 	}
 	result := proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
-	if len(fp.serviceMap) != 8 {
-		t.Errorf("expected service map length 8, got %v", fp.serviceMap)
+	if len(fp.serviceMap) != 10 {
+		t.Errorf("expected service map length 10, got %v", fp.serviceMap)
 	}
 
 	// The only-local-loadbalancer ones get added

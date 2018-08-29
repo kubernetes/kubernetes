@@ -64,6 +64,12 @@ const (
 
 	kubeNodePortLocalSetUDPComment = "Kubernetes nodeport UDP port with externalTrafficPolicy=local"
 	kubeNodePortLocalSetUDP        = "KUBE-NODE-PORT-LOCAL-UDP"
+
+	kubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose"
+	kubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP"
+
+	kubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local"
+	kubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP"
 )
 
 // IPSetVersioner can query the current ipset version.

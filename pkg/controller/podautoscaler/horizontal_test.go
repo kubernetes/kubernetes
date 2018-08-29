@@ -97,22 +97,23 @@ type testCase struct {
 	initialReplicas int32
 
 	// CPU target utilization as a percentage of the requested resources.
-	CPUTarget               int32
-	CPUCurrent              int32
-	verifyCPUCurrent        bool
-	reportedLevels          []uint64
-	reportedCPURequests     []resource.Quantity
-	reportedPodReadiness    []v1.ConditionStatus
-	reportedPodStartTime    []metav1.Time
-	reportedPodPhase        []v1.PodPhase
-	scaleUpdated            bool
-	statusUpdated           bool
-	eventCreated            bool
-	verifyEvents            bool
-	useMetricsAPI           bool
-	metricsTarget           []autoscalingv2.MetricSpec
-	expectedDesiredReplicas int32
-	expectedConditions      []autoscalingv1.HorizontalPodAutoscalerCondition
+	CPUTarget                    int32
+	CPUCurrent                   int32
+	verifyCPUCurrent             bool
+	reportedLevels               []uint64
+	reportedCPURequests          []resource.Quantity
+	reportedPodReadiness         []v1.ConditionStatus
+	reportedPodStartTime         []metav1.Time
+	reportedPodPhase             []v1.PodPhase
+	reportedPodDeletionTimestamp []bool
+	scaleUpdated                 bool
+	statusUpdated                bool
+	eventCreated                 bool
+	verifyEvents                 bool
+	useMetricsAPI                bool
+	metricsTarget                []autoscalingv2.MetricSpec
+	expectedDesiredReplicas      int32
+	expectedConditions           []autoscalingv1.HorizontalPodAutoscalerCondition
 	// Channel with names of HPA objects which we have reconciled.
 	processed chan string
 
@@ -274,6 +275,11 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				podPhase = tc.reportedPodPhase[i]
 			}
 
+			podDeletionTimestamp := false
+			if tc.reportedPodDeletionTimestamp != nil {
+				podDeletionTimestamp = tc.reportedPodDeletionTimestamp[i]
+			}
+
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 
 			reportedCPURequest := resource.MustParse("1.0")
@@ -311,6 +317,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 						},
 					},
 				},
+			}
+			if podDeletionTimestamp {
+				pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 			}
 			obj.Items = append(obj.Items, pod)
 		}
@@ -812,6 +821,25 @@ func TestScaleUpIgnoresFailedPods(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpIgnoresDeletionPods(t *testing.T) {
+	tc := testCase{
+		minReplicas:                  2,
+		maxReplicas:                  6,
+		initialReplicas:              2,
+		expectedDesiredReplicas:      4,
+		CPUTarget:                    30,
+		CPUCurrent:                   60,
+		verifyCPUCurrent:             true,
+		reportedLevels:               []uint64{500, 700},
+		reportedCPURequests:          []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		reportedPodPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		reportedPodDeletionTimestamp: []bool{false, false, true, true},
+		useMetricsAPI:                true,
+	}
+	tc.runTest(t)
+}
+
 func TestScaleUpDeployment(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -1236,6 +1264,25 @@ func TestScaleDownIgnoresFailedPods(t *testing.T) {
 		useMetricsAPI:           true,
 		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		reportedPodPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownIgnoresDeletionPods(t *testing.T) {
+	tc := testCase{
+		minReplicas:                  2,
+		maxReplicas:                  6,
+		initialReplicas:              5,
+		expectedDesiredReplicas:      3,
+		CPUTarget:                    50,
+		CPUCurrent:                   28,
+		verifyCPUCurrent:             true,
+		reportedLevels:               []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests:          []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:                true,
+		reportedPodReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		reportedPodPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		reportedPodDeletionTimestamp: []bool{false, false, false, false, false, true, true},
 	}
 	tc.runTest(t)
 }

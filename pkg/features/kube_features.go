@@ -357,6 +357,12 @@ const (
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
 	NodeLease utilfeature.Feature = "NodeLease"
+
+	// owner: @janosi
+	// alpha: v1.12
+	//
+	// Enables SCTP as new protocol for Service ports, NetworkPolicy, and ContainerPort in Pod/Containers definition
+	SCTPSupport utilfeature.Feature = "SCTPSupport"
 )
 
 func init() {
@@ -417,6 +423,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
 	NodeLease:                                   {Default: false, PreRelease: utilfeature.Alpha},
+	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

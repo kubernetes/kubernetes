@@ -564,6 +564,8 @@ const (
 	ProtocolTCP Protocol = "TCP"
 	// ProtocolUDP is the UDP protocol.
 	ProtocolUDP Protocol = "UDP"
+	// ProtocolSCTP is the SCTP protocol.
+	ProtocolSCTP Protocol = "SCTP"
 )
 
 // Represents a Persistent Disk resource in Google Compute Engine.
@@ -1570,7 +1572,7 @@ type ContainerPort struct {
 	HostPort int32
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int32
-	// Required: Supports "TCP" and "UDP".
+	// Required: Supports "TCP", "UDP" and "SCTP"
 	// +optional
 	Protocol Protocol
 	// Optional: What host IP to bind the external port to.
@@ -3175,7 +3177,7 @@ type ServicePort struct {
 	// the 'Name' field in EndpointPort objects.
 	Name string
 
-	// The IP protocol for this port.  Supports "TCP" and "UDP".
+	// The IP protocol for this port.  Supports "TCP", "UDP", and "SCTP".
 	Protocol Protocol
 
 	// The port that will be exposed on the service.

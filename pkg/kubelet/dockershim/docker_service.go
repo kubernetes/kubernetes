@@ -515,6 +515,8 @@ func toAPIProtocol(protocol Protocol) v1.Protocol {
 		return v1.ProtocolTCP
 	case protocolUDP:
 		return v1.ProtocolUDP
+	case protocolSCTP:
+		return v1.ProtocolSCTP
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return v1.ProtocolTCP

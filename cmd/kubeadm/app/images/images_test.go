@@ -32,6 +32,19 @@ const (
 	gcrPrefix   = "k8s.gcr.io"
 )
 
+func TestGetGenericImage(t *testing.T) {
+	const (
+		prefix = "foo"
+		image  = "bar"
+		tag    = "baz"
+	)
+	expected := fmt.Sprintf("%s/%s:%s", prefix, image, tag)
+	actual := GetGenericImage(prefix, image, tag)
+	if actual != expected {
+		t.Errorf("failed GetGenericImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
+	}
+}
+
 func TestGetGenericArchImage(t *testing.T) {
 	const (
 		prefix = "foo"
@@ -59,7 +72,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		},
 		{
 			image:    constants.KubeAPIServer,
-			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
+			expected: GetGenericImage(gcrPrefix, "kube-apiserver", expected),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
@@ -67,7 +80,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		},
 		{
 			image:    constants.KubeControllerManager,
-			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
+			expected: GetGenericImage(gcrPrefix, "kube-controller-manager", expected),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
@@ -75,7 +88,7 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 		},
 		{
 			image:    constants.KubeScheduler,
-			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
+			expected: GetGenericImage(gcrPrefix, "kube-scheduler", expected),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,
@@ -110,7 +123,7 @@ func TestGetEtcdImage(t *testing.T) {
 			},
 		},
 		{
-			expected: GetGenericArchImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
+			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
 				KubernetesVersion: testversion,

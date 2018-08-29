@@ -428,6 +428,9 @@ func Enum(p v1.Protocol) uint16 {
 	if p == v1.ProtocolUDP {
 		return 17
 	}
+	if p == v1.ProtocolSCTP {
+		return 132
+	}
 	return 0
 }
 

@@ -606,7 +606,13 @@ func (vs *VSphere) getVMFromNodeName(ctx context.Context, nodeName k8stypes.Node
 func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
 	// Get local IP addresses if node is local node
 	if vs.hostName == convertToString(nodeName) {
-		return getLocalIP()
+		addrs, err := getLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		// add the hostname address
+		v1helper.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
+		return addrs, nil
 	}
 
 	if vs.cfg == nil {

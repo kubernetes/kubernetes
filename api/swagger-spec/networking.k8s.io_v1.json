@@ -1426,7 +1426,7 @@
     "properties": {
      "protocol": {
       "$ref": "v1.Protocol",
-      "description": "The protocol (TCP or UDP) which traffic must match. If not specified, this field defaults to TCP."
+      "description": "The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP."
      },
      "port": {
       "type": "string",
