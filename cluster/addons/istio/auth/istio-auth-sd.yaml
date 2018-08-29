@@ -5063,3 +5063,564 @@ spec:
         maxRequestsPerConnection: 10000
 ---
 
+apiVersion: "config.istio.io/v1alpha2"
+kind: stackdriver
+metadata:
+  name: handler
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  push_interval: 10s
+  metricInfo:
+    server-request-count.metric.istio-system:
+      # Due to a bug in gogoproto deserialization, Enums in maps must be
+      # specified by their integer value, not variant name. See
+      # https://github.com/googleapis/googleapis/blob/master/google/api/metric.proto
+      # MetricKind and ValueType for the values to provide.
+      kind: 3 # CUMULATIVE
+      value: 2 # INT64
+      metric_type: "istio.io/service/server/request_count"
+    server-request-bytes.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 5 # DISTRIBUTION
+      buckets:
+        exponentialBuckets:
+          numFiniteBuckets: 20
+          scale: 1
+          growthFactor: 2
+      metric_type: "istio.io/service/server/request_bytes"
+    server-response-bytes.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 5 # DISTRIBUTION
+      buckets:
+        exponentialBuckets:
+          numFiniteBuckets: 20
+          scale: 1
+          growthFactor: 2
+      metric_type: "istio.io/service/server/response_bytes"
+    server-response-latencies.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 5 # DISTRIBUTION
+      buckets:
+        exponentialBuckets:
+          numFiniteBuckets: 20
+          scale: 1
+          growthFactor: 2
+      metric_type: "istio.io/service/server/response_latencies"
+    server-received-bytes-count.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 2 # INT64
+      metric_type: "istio.io/service/server/received_bytes_count"
+    server-sent-bytes-count.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 2 # INT64
+      metric_type: "istio.io/service/server/sent_bytes_count"
+    client-request-count.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 2 # INT64
+      metric_type: "istio.io/service/client/request_count"
+    client-request-bytes.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 5 # DISTRIBUTION
+      buckets:
+        exponentialBuckets:
+          numFiniteBuckets: 20
+          scale: 1
+          growthFactor: 2
+      metric_type: "istio.io/service/client/request_bytes"
+    client-response-bytes.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 5 # DISTRIBUTION
+      buckets:
+        exponentialBuckets:
+          numFiniteBuckets: 20
+          scale: 1
+          growthFactor: 2
+      metric_type: "istio.io/service/client/response_bytes"
+    client-roundtrip-latencies.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 5 # DISTRIBUTION
+      buckets:
+        exponentialBuckets:
+          numFiniteBuckets: 20
+          scale: 1
+          growthFactor: 2
+      metric_type: "istio.io/service/client/roundtrip_latencies"
+    client-received-bytes-count.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 2 # INT64
+      metric_type: "istio.io/service/client/received_bytes_count"
+    client-sent-bytes-count.metric.istio-system:
+      kind: 3 # CUMULATIVE
+      value: 2 # INT64
+      metric_type: "istio.io/service/client/sent_bytes_count"
+---
+#################################################
+############## Metric Config ####################
+#################################################
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: stackdriver-server
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  match: (context.protocol == "http" || context.protocol == "grpc") && (context.reporter.kind | "inbound" == "inbound")
+  actions:
+  - handler: handler.stackdriver
+    instances:
+    - server-request-count.metric
+    - server-request-bytes.metric
+    - server-response-bytes.metric
+    - server-response-latencies.metric
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: stackdriver-client
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  match: (context.protocol == "http" || context.protocol == "grpc") && (context.reporter.kind | "inbound" == "outbound")
+  actions:
+  - handler: handler.stackdriver
+    instances:
+    - client-request-count.metric
+    - client-request-bytes.metric
+    - client-response-bytes.metric
+    - client-roundtrip-latencies.metric
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: stackdriver-tcp-server
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  match: context.protocol == "tcp" && (context.reporter.kind | "inbound" == "inbound")
+  actions:
+  - handler: handler.stackdriver
+    instances:
+    - server-received-bytes-count.metric
+    - server-sent-bytes-count.metric
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: stackdriver-tcp-client
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  match: context.protocol == "tcp" && (context.reporter.kind | "inbound" == "outbound")
+  actions:
+  - handler: handler.stackdriver
+    instances:
+    - client-received-bytes-count.metric
+    - client-sent-bytes-count.metric
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: server-request-count
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: "1"
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_container"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    container_name: conditional((destination.name | "unknown").startsWith("istio-telemetry") || (destination.name | "unknown").startsWith("istio-policy"), "mixer", destination.container.name | "unknown")
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: client-request-count
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: "1"
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_pod"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: server-request-bytes
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: request.total_size
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_container"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    container_name: conditional((destination.name | "unknown").startsWith("istio-telemetry") || (destination.name | "unknown").startsWith("istio-policy"), "mixer", destination.container.name | "unknown")
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: client-request-bytes
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: request.total_size
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_pod"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: server-response-bytes
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: response.total_size
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_container"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    container_name: conditional((destination.name | "unknown").startsWith("istio-telemetry") || (destination.name | "unknown").startsWith("istio-policy"), "mixer", destination.container.name | "unknown")
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: client-response-bytes
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: response.total_size
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_pod"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: server-response-latencies
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: response.duration
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_container"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    container_name: conditional((destination.name | "unknown").startsWith("istio-telemetry") || (destination.name | "unknown").startsWith("istio-policy"), "mixer", destination.container.name | "unknown")
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: client-roundtrip-latencies
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: response.duration
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_operation: conditional((context.protocol | "unknown") == "grpc", request.path | "unknown", request.method | "unknown")
+    request_protocol: context.protocol | "unknown"
+    api_version: api.version | "unknown"
+    api_name: api.service | "unknown"
+    response_code: response.code | 0
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_pod"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: server-received-bytes-count
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: connection.received.bytes | 0
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_protocol: context.protocol | "unknown"
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_container"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    container_name: conditional((destination.name | "unknown").startsWith("istio-telemetry") || (destination.name | "unknown").startsWith("istio-policy"), "mixer", destination.container.name | "unknown")
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: client-received-bytes-count
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: connection.received.bytes | 0
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_protocol: context.protocol | "unknown"
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_pod"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: server-sent-bytes-count
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: connection.sent.bytes | 0
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_protocol: context.protocol | "unknown"
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_container"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'
+    container_name: conditional((destination.name | "unknown").startsWith("istio-telemetry") || (destination.name | "unknown").startsWith("istio-policy"), "mixer", destination.container.name | "unknown")
+    pod_name: destination.name | "unknown"
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: client-sent-bytes-count
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  value: connection.sent.bytes | 0
+  dimensions:
+    destination_service_name: destination.service.name | "unknown"
+    destination_service_namespace: destination.service.namespace | "unknown"
+    destination_port: destination.port | 0
+    request_protocol: context.protocol | "unknown"
+    service_authentication_policy: conditional((context.reporter.kind | "inbound") == "outbound", "unknown", conditional(connection.mtls | false, "mutual_tls", "none"))
+    source_workload_namespace: source.workload.namespace | "unknown"
+    source_workload_name: source.workload.name | "unknown"
+    source_owner: source.owner | "unknown"
+    destination_workload_namespace: destination.workload.namespace | "unknown"
+    destination_workload_name: destination.workload.name | "unknown"
+    destination_owner: destination.owner | "unknown"
+  monitoredResourceType: '"k8s_pod"'
+  monitoredResourceDimensions:
+    project_id: '""'
+    cluster_name: '""'
+    namespace_name: destination.workload.namespace | "unknown"
+    location: '""'

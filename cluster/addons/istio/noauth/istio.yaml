@@ -36,7 +36,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.1
+    chart: galley-1.0.2
     release: istio
     heritage: Tiller
     istio: mixer
@@ -49,7 +49,7 @@ data:
       namespace: istio-system
       labels:
         app: istio-galley
-        chart: galley-1.0.1
+        chart: galley-1.0.2
         release: istio
         heritage: Tiller
     webhooks:
@@ -164,7 +164,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-statsd-prom-bridge
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     release: istio
     heritage: Tiller
     istio: mixer
@@ -182,7 +182,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: prometheus
-    chart: prometheus-1.0.1
+    chart: prometheus-1.0.2
     release: istio
     heritage: Tiller
 data:
@@ -425,7 +425,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-security
-    chart: security-1.0.1
+    chart: security-1.0.2
     release: istio
     heritage: Tiller
     istio: security
@@ -476,7 +476,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio
-    chart: istio-1.0.1
+    chart: istio-1.0.2
     release: istio
     heritage: Tiller
 data:
@@ -540,6 +540,10 @@ data:
       # for more details
       proxyAdminPort: 15000
       #
+      # Set concurrency to a specific number to control the number of Proxy worker threads.
+      # If set to 0 (default), then start worker thread for each CPU thread/core.
+      concurrency: 0
+      #
       # Zipkin trace collector
       zipkinAddress: zipkin.istio-system:9411
       #
@@ -564,7 +568,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio
-    chart: istio-1.0.1
+    chart: istio-1.0.2
     release: istio
     heritage: Tiller
     istio: sidecar-injector
@@ -574,7 +578,7 @@ data:
     template: |-
       initContainers:
       - name: istio-init
-        image: "gcr.io/gke-release/istio/proxy_init:1.0.1-gke.0"
+        image: "gcr.io/gke-release/istio/proxy_init:1.0.2-gke.0"
         args:
         - "-p"
         - [[ .MeshConfig.ProxyListenPort ]]
@@ -617,7 +621,7 @@ data:
         image: [[ if (isset .ObjectMeta.Annotations "sidecar.istio.io/proxyImage") -]]
         "[[ index .ObjectMeta.Annotations "sidecar.istio.io/proxyImage" ]]"
         [[ else -]]
-         "gcr.io/gke-release/istio/proxyv2:1.0.1-gke.0"
+         "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
         [[ end -]]
         args:
         - proxy
@@ -648,6 +652,10 @@ data:
         - [[ .ProxyConfig.StatsdUdpAddress ]]
         - --proxyAdminPort
         - [[ .ProxyConfig.ProxyAdminPort ]]
+        [[ if gt .ProxyConfig.Concurrency 0 -]]
+        - --concurrency
+        - [[ .ProxyConfig.Concurrency ]]
+        [[ end -]]
         - --controlPlaneAuthPolicy
         - [[ or (index .ObjectMeta.Annotations "sidecar.istio.io/controlPlaneAuthPolicy") .ProxyConfig.ControlPlaneAuthPolicy ]]
         env:
@@ -721,7 +729,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.1
+    chart: galley-1.0.2
     heritage: Tiller
     release: istio
 
@@ -737,7 +745,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: egressgateway
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     heritage: Tiller
     release: istio
 ---
@@ -750,7 +758,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: ingressgateway
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     heritage: Tiller
     release: istio
 ---
@@ -766,7 +774,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     heritage: Tiller
     release: istio
 
@@ -781,7 +789,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.1
+    chart: pilot-1.0.2
     heritage: Tiller
     release: istio
 
@@ -820,7 +828,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     heritage: Tiller
     release: istio
 ---
@@ -836,7 +844,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     heritage: Tiller
     release: istio
 rules:
@@ -856,7 +864,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     heritage: Tiller
     release: istio
 roleRef:
@@ -881,7 +889,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     release: istio
     heritage: Tiller
 spec:
@@ -918,7 +926,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     heritage: Tiller
     release: istio
 
@@ -933,7 +941,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.1
+    chart: sidecarInjectorWebhook-1.0.2
     heritage: Tiller
     release: istio
 
@@ -2127,7 +2135,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.1
+    chart: galley-1.0.2
     heritage: Tiller
     release: istio
 rules:
@@ -2156,7 +2164,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: gateways
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     heritage: Tiller
     release: istio
   name: istio-egressgateway-istio-system
@@ -2172,7 +2180,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: gateways
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     heritage: Tiller
     release: istio
   name: istio-ingressgateway-istio-system
@@ -2192,7 +2200,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     heritage: Tiller
     release: istio
 rules:
@@ -2225,7 +2233,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.1
+    chart: pilot-1.0.2
     heritage: Tiller
     release: istio
 rules:
@@ -2292,7 +2300,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     heritage: Tiller
     release: istio
 rules:
@@ -2316,7 +2324,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.1
+    chart: sidecarInjectorWebhook-1.0.2
     heritage: Tiller
     release: istio
 rules:
@@ -2337,7 +2345,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.1
+    chart: galley-1.0.2
     heritage: Tiller
     release: istio
 roleRef:
@@ -2395,7 +2403,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     heritage: Tiller
     release: istio
 roleRef:
@@ -2417,7 +2425,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.1
+    chart: pilot-1.0.2
     heritage: Tiller
     release: istio
 roleRef:
@@ -2457,7 +2465,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     heritage: Tiller
     release: istio
 roleRef:
@@ -2479,7 +2487,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.1
+    chart: sidecarInjectorWebhook-1.0.2
     heritage: Tiller
     release: istio
 roleRef:
@@ -2525,7 +2533,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     release: istio
     heritage: Tiller
     app: istio-egressgateway
@@ -2553,7 +2561,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     release: istio
     heritage: Tiller
     app: istio-ingressgateway
@@ -2611,7 +2619,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     release: istio
     istio: mixer
 spec:
@@ -2635,7 +2643,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     release: istio
     istio: mixer
 spec:
@@ -2666,7 +2674,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     release: istio
     istio: statsd-prom-bridge
 spec:
@@ -2689,7 +2697,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     release: istio
     istio: mixer
 spec:
@@ -2736,7 +2744,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
     app: istio-pilot
-    chart: pilot-1.0.1
+    chart: pilot-1.0.2
     release: istio
     heritage: Tiller
 spec:
@@ -2828,7 +2836,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: galley
-    chart: galley-1.0.1
+    chart: galley-1.0.2
     release: istio
     heritage: Tiller
     istio: galley
@@ -2849,7 +2857,7 @@ spec:
       serviceAccountName: istio-galley-service-account
       containers:
         - name: validator
-          image: "gcr.io/gke-release/istio/galley:1.0.1-gke.0"
+          image: "gcr.io/gke-release/istio/galley:1.0.2-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 443
@@ -2946,7 +2954,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     release: istio
     heritage: Tiller
     app: istio-egressgateway
@@ -2965,7 +2973,7 @@ spec:
       serviceAccountName: istio-egressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.1-gke.0"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -3084,7 +3092,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: gateways-1.0.1
+    chart: gateways-1.0.2
     release: istio
     heritage: Tiller
     app: istio-ingressgateway
@@ -3103,7 +3111,7 @@ spec:
       serviceAccountName: istio-ingressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.1-gke.0"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -3232,7 +3240,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     release: istio
     istio: mixer
 spec:
@@ -3290,7 +3298,7 @@ spec:
                 - s390x
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.1-gke.0"
+        image: "gcr.io/gke-release/istio/mixer:1.0.2-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -3315,7 +3323,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.1-gke.0"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
@@ -3364,7 +3372,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.1
+    chart: mixer-1.0.2
     release: istio
     istio: mixer
 spec:
@@ -3389,7 +3397,7 @@ spec:
         emptyDir: {}
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.1-gke.0"
+        image: "gcr.io/gke-release/istio/mixer:1.0.2-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -3414,7 +3422,7 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.1-gke.0"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
@@ -3468,7 +3476,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.1
+    chart: pilot-1.0.2
     release: istio
     heritage: Tiller
     istio: pilot
@@ -3488,7 +3496,7 @@ spec:
       serviceAccountName: istio-pilot-service-account
       containers:
         - name: discovery
-          image: "gcr.io/gke-release/istio/pilot:1.0.1-gke.0"
+          image: "gcr.io/gke-release/istio/pilot:1.0.2-gke.0"
           imagePullPolicy: IfNotPresent
           args:
           - "discovery"
@@ -3533,7 +3541,7 @@ spec:
             mountPath: /etc/certs
             readOnly: true
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.1-gke.0"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 15003
@@ -3626,7 +3634,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: prometheus
-    chart: prometheus-1.0.1
+    chart: prometheus-1.0.2
     release: istio
     heritage: Tiller
 spec:
@@ -3718,7 +3726,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.1
+    chart: security-1.0.2
     release: istio
     heritage: Tiller
     istio: citadel
@@ -3735,14 +3743,14 @@ spec:
       serviceAccountName: istio-citadel-service-account
       containers:
         - name: citadel
-          image: "gcr.io/gke-release/istio/citadel:1.0.1-gke.0"
+          image: "gcr.io/gke-release/istio/citadel:1.0.2-gke.0"
           imagePullPolicy: IfNotPresent
           args:
             - --append-dns-names=true
             - --grpc-port=8060
             - --grpc-hostname=citadel
             - --citadel-storage-namespace=istio-system
-            - --custom-dns-names=istio-pilot-service-account.istio-system:istio-pilot.istio-system,istio-ingressgateway-service-account.istio-system:istio-ingress.istio-system
+            - --custom-dns-names=istio-pilot-service-account.istio-system:istio-pilot.istio-system,istio-ingressgateway-service-account.istio-system:istio-ingressgateway.istio-system
             - --self-signed-ca=true
           resources:
             requests:
@@ -3793,7 +3801,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: sidecarInjectorWebhook
-    chart: sidecarInjectorWebhook-1.0.1
+    chart: sidecarInjectorWebhook-1.0.2
     release: istio
     heritage: Tiller
     istio: sidecar-injector
@@ -3810,7 +3818,7 @@ spec:
       serviceAccountName: istio-sidecar-injector-service-account
       containers:
         - name: sidecar-injector-webhook
-          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.1-gke.0"
+          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.2-gke.0"
           imagePullPolicy: IfNotPresent
           args:
             - --caCertFile=/etc/istio/certs/root-cert.pem
@@ -4047,9 +4055,9 @@ metadata:
   namespace: istio-system
   labels:
     k8s-app: istio
-    addonmanager.kubernetes.io/mode: EnsureExists
+    addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.1
+    chart: sidecarInjectorWebhook-1.0.2
     release: istio
     heritage: Tiller
 webhooks:
