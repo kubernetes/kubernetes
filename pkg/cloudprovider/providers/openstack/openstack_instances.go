@@ -36,6 +36,10 @@ type Instances struct {
 	opts    MetadataOpts
 }
 
+const (
+	instanceShutoff = "SHUTOFF"
+)
+
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(4).Info("openstack.Instances() called")
@@ -127,7 +131,21 @@ func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 
 // InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
 func (i *Instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return false, err
+	}
+
+	server, err := servers.Get(i.compute, instanceID).Extract()
+	if err != nil {
+		return false, err
+	}
+
+	// SHUTOFF is the only state where we can detach volumes immediately
+	if server.Status == instanceShutoff {
+		return true, nil
+	}
+	return false, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.
