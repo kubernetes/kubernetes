@@ -101,7 +101,7 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
-	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/, false)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
 		t.Fatalf(
@@ -153,7 +153,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
-	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/, false)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
 		t.Fatalf(
@@ -226,7 +226,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
-	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/, false)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
 		t.Fatalf(
@@ -299,7 +299,7 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
-	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/, false)
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
 		t.Fatalf(
@@ -378,8 +378,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	volumeSpec.PersistentVolume.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteMany}
 	nodeName1 := k8stypes.NodeName("node-name1")
 	nodeName2 := k8stypes.NodeName("node-name2")
-	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/)
-	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/, false)
+	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/, false)
 
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
 	if podAddErr != nil {
@@ -470,8 +470,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	volumeSpec.PersistentVolume.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	nodeName1 := k8stypes.NodeName("node-name1")
 	nodeName2 := k8stypes.NodeName("node-name2")
-	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/)
-	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/)
+	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/, false)
+	dsw.AddNode(nodeName2, false /*keepTerminatedPodVolumes*/, false)
 
 	// Add both pods at the same time to provoke a potential race condition in the reconciler
 	generatedVolumeName, podAddErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1, podName1), volumeSpec, nodeName1)
@@ -597,7 +597,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 
 		nodes := []k8stypes.NodeName{}
 		for _, n := range test.nodes {
-			dsw.AddNode(n.name, false /*keepTerminatedPodVolumes*/)
+			dsw.AddNode(n.name, false /*keepTerminatedPodVolumes*/, false)
 			nodes = append(nodes, n.name)
 			for _, podName := range n.podNames {
 				volumeName := v1.UniqueVolumeName("volume-name")
