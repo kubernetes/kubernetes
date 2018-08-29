@@ -35,18 +35,13 @@ import (
 )
 
 func NewCmdCertsRenewal() *cobra.Command {
-	cfg := &renewConfig{
-		kubeconfigPath: constants.GetAdminKubeConfigPath(),
-	}
-
 	cmd := &cobra.Command{
 		Use:   "renew",
 		Short: "Renews all known certificates for kubeadm",
 		Long:  "", // TODO EKF fill out
 	}
-	addFlags(cmd, cfg)
 
-	cmd.AddCommand(getRenewSubCommands(cfg)...)
+	cmd.AddCommand(getRenewSubCommands()...)
 
 	return cmd
 }
@@ -58,7 +53,10 @@ type renewConfig struct {
 	useAPI         bool
 }
 
-func getRenewSubCommands(cfg *renewConfig) []*cobra.Command {
+func getRenewSubCommands() []*cobra.Command {
+	cfg := &renewConfig{
+		kubeconfigPath: constants.GetAdminKubeConfigPath(),
+	}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(&cfg.cfg)
 
@@ -84,28 +82,31 @@ func addFlags(cmd *cobra.Command, cfg *renewConfig) {
 	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the kubernetes certificate API to renew certificates")
 }
 
-func generateCertCommand(name, longName string) *cobra.Command {
+// generateCertCommand takes mostly strings instead of structs to avoid using structs in a for loop
+func generateCertCommand(name, longName, baseName, caCertBaseName string, cfg *renewConfig) *cobra.Command {
 	return &cobra.Command{
 		Use:   name,
 		Short: fmt.Sprintf("Generates the %s", longName),
 		Long:  "", // TODO EKF fill out
+		Run: func(cmd *cobra.Command, args []string) {
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfg.cfgPath, &cfg.cfg)
+			kubeadmutil.CheckErr(err)
+			renewer, err := getRenewer(cfg, caCertBaseName)
+			kubeadmutil.CheckErr(err)
+
+			err = renewal.RenewExistingCert(internalcfg.CertificatesDir, baseName, renewer)
+			kubeadmutil.CheckErr(err)
+		},
 	}
 }
 
 func makeCommandForRenew(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfg *renewConfig) *cobra.Command {
-	certCmd := generateCertCommand(cert.Name, cert.LongName)
+	certCmd := generateCertCommand(cert.Name, cert.LongName, cert.BaseName, caCert.BaseName, cfg)
 	addFlags(certCmd, cfg)
-
-	certCmd.Run = func(cmd *cobra.Command, args []string) {
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfg.cfgPath, &cfg.cfg)
-		kubeadmutil.CheckErr(err)
-
-		renewer, err := getRenewer(cfg, caCert)
-	}
 	return certCmd
 }
 
-func getRenewer(cfg *renewConfig, caCertSpec *certsphase.KubeadmCert) (renewal.Interface, error) {
+func getRenewer(cfg *renewConfig, caCertBaseName string) (renewal.Interface, error) {
 	if cfg.useAPI {
 		kubeConfigPath := cmdutil.FindExistingKubeConfig(cfg.kubeconfigPath)
 		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigPath)
@@ -115,7 +116,7 @@ func getRenewer(cfg *renewConfig, caCertSpec *certsphase.KubeadmCert) (renewal.I
 		return renewal.NewCertsAPIRenawal(client), nil
 	}
 
-	caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.cfg.CertificatesDir, caCertSpec.BaseName)
+	caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.cfg.CertificatesDir, caCertBaseName)
 	if err != nil {
 		return nil, err
 	}

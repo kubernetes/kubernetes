@@ -24,7 +24,14 @@ go_test(
     name = "go_default_test",
     srcs = ["renewal_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
+        "//cmd/kubeadm/test:go_default_library",
+        "//cmd/kubeadm/test/certs:go_default_library",
+        "//cmd/kubeadm/test/cmd:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
+    ],
 )
 
 filegroup(

@@ -130,7 +130,7 @@ func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 
 // CertOrKeyExist returns a boolean whether the cert or the key exists
 func CertOrKeyExist(pkiPath, name string) bool {
-	certificatePath, privateKeyPath := pathsForCertAndKey(pkiPath, name)
+	certificatePath, privateKeyPath := PathsForCertAndKey(pkiPath, name)
 
 	_, certErr := os.Stat(certificatePath)
 	_, keyErr := os.Stat(privateKeyPath)
@@ -234,7 +234,8 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rs
 	return k, p, nil
 }
 
-func pathsForCertAndKey(pkiPath, name string) (string, string) {
+// PathsForCertAndKey returns the paths for the certificate and key given the path and basename.
+func PathsForCertAndKey(pkiPath, name string) (string, string) {
 	return pathForCert(pkiPath, name), pathForKey(pkiPath, name)
 }
 
