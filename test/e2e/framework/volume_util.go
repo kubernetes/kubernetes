@@ -68,7 +68,7 @@ const (
 	TiB int64 = 1024 * GiB
 
 	// Waiting period for volume server (Ceph, ...) to initialize itself.
-	VolumeServerPodStartupTimeout = 1 * time.Minute
+	VolumeServerPodStartupTimeout = 3 * time.Minute
 
 	// Waiting period for pod to be cleaned up and unmount its volumes so we
 	// don't tear down containers with NFS/Ceph/Gluster server too early.
@@ -356,16 +356,42 @@ func StartVolumeServer(client clientset.Interface, config VolumeTestConfig) *v1.
 	return pod
 }
 
+// Wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
+func CleanUpVolumeServer(f *Framework, serverPod *v1.Pod) {
+	CleanUpVolumeServerWithSecret(f, serverPod, nil)
+}
+
+// Wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
+func CleanUpVolumeServerWithSecret(f *Framework, serverPod *v1.Pod, secret *v1.Secret) {
+	cs := f.ClientSet
+	ns := f.Namespace
+
+	if secret != nil {
+		Logf("Deleting server secret %q...", secret.Name)
+		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			Logf("Delete secret failed: %v", err)
+		}
+	}
+
+	Logf("Deleting server pod %q...", serverPod.Name)
+	err := DeletePodWithWait(f, cs, serverPod)
+	if err != nil {
+		Logf("Server pod delete failed: %v", err)
+	}
+}
+
 // Clean both server and client pods.
 func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 	By(fmt.Sprint("cleaning the environment after ", config.Prefix))
 
 	defer GinkgoRecover()
 
-	client := f.ClientSet
-	podClient := client.CoreV1().Pods(config.Namespace)
+	cs := f.ClientSet
 
-	err := podClient.Delete(config.Prefix+"-client", nil)
+	pod, err := cs.CoreV1().Pods(config.Namespace).Get(config.Prefix+"-client", metav1.GetOptions{})
+	ExpectNoError(err, "Failed to get client pod: %v", err)
+	err = DeletePodWithWait(f, cs, pod)
 	if err != nil {
 		// Log the error before failing test: if the test has already failed,
 		// framework.ExpectNoError() won't print anything to logs!
@@ -374,15 +400,9 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 	}
 
 	if config.ServerImage != "" {
-		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
-			ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
-		}
-		// See issue #24100.
-		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
-		By("sleeping a bit so kubelet can unmount and detach the volume")
-		time.Sleep(PodCleanupTimeout)
-
-		err = podClient.Delete(config.Prefix+"-server", nil)
+		pod, err := cs.CoreV1().Pods(config.Namespace).Get(config.Prefix+"-server", metav1.GetOptions{})
+		ExpectNoError(err, "Failed to get server pod: %v", err)
+		err = DeletePodWithWait(f, cs, pod)
 		if err != nil {
 			glog.Warningf("Failed to delete server pod: %v", err)
 			ExpectNoError(err, "Failed to delete server pod: %v", err)
@@ -438,9 +458,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 	}
 	podsNamespacer := client.CoreV1().Pods(config.Namespace)
 
-	if fsGroup != nil {
-		clientPod.Spec.SecurityContext.FSGroup = fsGroup
-	}
+	clientPod.Spec.SecurityContext.FSGroup = fsGroup
 
 	for i, test := range tests {
 		volumeName := fmt.Sprintf("%s-%s-%d", config.Prefix, "volume", i)
@@ -520,6 +538,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 					VolumeSource: volume,
 				},
 			},
+			NodeName:     config.ClientNodeName,
 			NodeSelector: config.NodeSelector,
 		},
 	}
