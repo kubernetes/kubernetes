@@ -209,7 +209,7 @@ func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminat
 		dsw.nodesManaged[nodeName] = nodeManaged{
 			nodeName:                 nodeName,
 			volumesToAttach:          make(map[v1.UniqueVolumeName]volumeToAttach),
-			isShutdown: isShutdownNode,
+			isShutdown:               isShutdownNode,
 			keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		}
 	} else {
@@ -340,7 +340,6 @@ func (dsw *desiredStateOfWorld) NodeIsShutdown(nodeName k8stypes.NodeName) bool 
 
 	return nodeExists && node.isShutdown
 }
-
 
 func (dsw *desiredStateOfWorld) VolumeExists(
 	volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) bool {
