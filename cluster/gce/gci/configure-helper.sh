@@ -2679,10 +2679,28 @@ EOF
     update-daemon-set-prometheus-to-sd-parameters ${metadata_proxy_yaml}
   fi
   if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
-    if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
-      setup-addon-manifests "addons" "istio/auth"
+    local suffix=""
+    if [[ "${ENABLE_CLOUDRUN:-}" == "true" ]]; then
+      suffix="-customize"
+    fi
+    if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" || "${MONITORING_FLAG_SET}" == "true" ]]; then
+      if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+        setup-addon-manifests "addons" "istio/auth-sd${suffix}"
+      else
+        setup-addon-manifests "addons" "istio/noauth-sd${suffix}"
+      fi
     else
-      setup-addon-manifests "addons" "istio/noauth"
+      if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+        setup-addon-manifests "addons" "istio/auth${suffix}"
+      else
+        setup-addon-manifests "addons" "istio/noauth${suffix}"
+      fi
+    fi
+    # Configure Istio sidecar injector webhook. For Knative, Istio sidecar injection is turned on by default.
+    if [[ "${ENABLE_CLOUDRUN:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "istio/inject-on-default"
+    else
+      setup-addon-manifests "addons" "istio/inject-off-default"
     fi
   fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
