@@ -6765,6 +6765,9 @@
    "v1.PersistentVolumeClaimSpec": {
     "id": "v1.PersistentVolumeClaimSpec",
     "description": "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
+    "required": [
+     "dataSource"
+    ],
     "properties": {
      "accessModes": {
       "type": "array",
@@ -6792,6 +6795,10 @@
      "volumeMode": {
       "$ref": "v1.PersistentVolumeMode",
       "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec. This is an alpha feature and may change in the future."
+     },
+     "dataSource": {
+      "$ref": "v1.TypedLocalObjectReference",
+      "description": "This field requires the VolumeSnapshotDataSource alpha feature gate to be enabled and currently VolumeSnapshot is the only supported data source. If the provisioner can support VolumeSnapshot data source, it will create a new volume and data will be restored to the volume at the same time. If the provisioner does not support VolumeSnapshot data source, volume will not be created and the failure will be reported as an event. In the future, we plan to support more data source types and the behavior of the provisioner may change."
      }
     }
    },
@@ -6802,6 +6809,29 @@
    "v1.PersistentVolumeMode": {
     "id": "v1.PersistentVolumeMode",
     "properties": {}
+   },
+   "v1.TypedLocalObjectReference": {
+    "id": "v1.TypedLocalObjectReference",
+    "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
+    "required": [
+     "apiGroup",
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "apiGroup": {
+      "type": "string",
+      "description": "APIGroup is the group for the resource being referenced"
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind is the type of resource being referenced"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name is the name of resource being referenced"
+     }
+    }
    },
    "v1.PersistentVolumeClaimStatus": {
     "id": "v1.PersistentVolumeClaimStatus",

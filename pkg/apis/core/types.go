@@ -413,6 +413,16 @@ type PersistentVolumeClaimSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	VolumeMode *PersistentVolumeMode
+	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
+	// enabled and currently VolumeSnapshot is the only supported data source.
+	// If the provisioner can support VolumeSnapshot data source, it will create
+	// a new volume and data will be restored to the volume at the same time.
+	// If the provisioner does not support VolumeSnapshot data source, volume will
+	// not be created and the failure will be reported as an event.
+	// In the future, we plan to support more data source types and the behavior
+	// of the provisioner may change.
+	// +optional
+	DataSource *TypedLocalObjectReference
 }
 
 type PersistentVolumeClaimConditionType string
@@ -3957,6 +3967,16 @@ type ObjectReference struct {
 // LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.
 type LocalObjectReference struct {
 	//TODO: Add other useful fields.  apiVersion, kind, uid?
+	Name string
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.
+type TypedLocalObjectReference struct {
+	// APIGroup is the group for the resource being referenced
+	APIGroup string
+	// Kind is the type of resource being referenced
+	Kind string
+	// Name is the name of resource being referenced
 	Name string
 }
 

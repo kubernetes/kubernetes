@@ -82489,6 +82489,10 @@
        "type": "string"
       }
      },
+     "dataSource": {
+      "description": "This field requires the VolumeSnapshotDataSource alpha feature gate to be enabled and currently VolumeSnapshot is the only supported data source. If the provisioner can support VolumeSnapshot data source, it will create a new volume and data will be restored to the volume at the same time. If the provisioner does not support VolumeSnapshot data source, volume will not be created and the failure will be reported as an event. In the future, we plan to support more data source types and the behavior of the provisioner may change.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.TypedLocalObjectReference"
+     },
      "resources": {
       "description": "Resources represents the minimum resources the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources",
       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
@@ -84648,6 +84652,28 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.TopologySelectorLabelRequirement"
       }
+     }
+    }
+   },
+   "io.k8s.api.core.v1.TypedLocalObjectReference": {
+    "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
+    "required": [
+     "apiGroup",
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "apiGroup": {
+      "description": "APIGroup is the group for the resource being referenced",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is the type of resource being referenced",
+      "type": "string"
+     },
+     "name": {
+      "description": "Name is the name of resource being referenced",
+      "type": "string"
      }
     }
    },

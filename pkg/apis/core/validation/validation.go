@@ -1501,6 +1501,9 @@ var supportedReclaimPolicy = sets.NewString(string(core.PersistentVolumeReclaimD
 
 var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), string(core.PersistentVolumeFilesystem))
 
+var supportedDataSourceKinds = sets.NewString(string("VolumeSnapshot"))
+var supportedDataSourceAPIGroups = sets.NewString(string("snapshot.storage.k8s.io"))
+
 func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
@@ -1824,6 +1827,19 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	} else if spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*spec.VolumeMode)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumeMode"), *spec.VolumeMode, supportedVolumeModes.List()))
 	}
+
+	if spec.DataSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("dataSource"), "VolumeSnapshotDataSource is disabled by feature-gate"))
+	} else if spec.DataSource != nil {
+		if len(spec.DataSource.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "name"), ""))
+		} else if !supportedDataSourceKinds.Has(string(spec.DataSource.Kind)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), spec.DataSource.Kind, supportedDataSourceKinds.List()))
+		} else if !supportedDataSourceAPIGroups.Has(string(spec.DataSource.APIGroup)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), spec.DataSource.APIGroup, supportedDataSourceAPIGroups.List()))
+		}
+	}
+
 	return allErrs
 }
 
