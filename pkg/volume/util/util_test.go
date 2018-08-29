@@ -647,6 +647,17 @@ func TestChooseZoneForVolume(t *testing.T) {
 			VolumeName: "medium-henley--4",
 			Expected:   "c", // hash("") + 4 == 2 mod 3
 		},
+		// Test for no zones
+		{
+			Zones:      sets.NewString(),
+			VolumeName: "medium-henley--1",
+			Expected:   "",
+		},
+		{
+			Zones:      nil,
+			VolumeName: "medium-henley--2",
+			Expected:   "",
+		},
 	}
 
 	for _, test := range tests {
@@ -991,6 +1002,17 @@ func TestChooseZonesForVolume(t *testing.T) {
 			VolumeName: "henley-3",
 			NumZones:   3,
 			Expected:   sets.NewString("a" /* hash("henley") == 0 + 3 + 6(startingIndex) */, "b", "c"),
+		},
+		// Test for no zones
+		{
+			Zones:      sets.NewString(),
+			VolumeName: "henley-1",
+			Expected:   sets.NewString(),
+		},
+		{
+			Zones:      nil,
+			VolumeName: "henley-2",
+			Expected:   sets.NewString(),
 		},
 	}
 
