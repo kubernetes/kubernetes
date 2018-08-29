@@ -1159,7 +1159,7 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 	verifyDefaultStorageClass(c, scName, expectedDefault)
 }
 
-func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
+func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
@@ -1171,13 +1171,17 @@ func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(t.claimSize),
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
 				},
 			},
 		},
 	}
 
 	return &claim
+}
+
+func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
+	return getClaim(t.claimSize, ns)
 }
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
@@ -1271,6 +1275,20 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 	if t.delayBinding {
 		bindingMode = storage.VolumeBindingWaitForFirstConsumer
 	}
+	return getStorageClass(pluginName, t.parameters, &bindingMode, ns, suffix)
+}
+
+func getStorageClass(
+	provisioner string,
+	parameters map[string]string,
+	bindingMode *storage.VolumeBindingMode,
+	ns string,
+	suffix string,
+) *storage.StorageClass {
+	if bindingMode == nil {
+		defaultBindingMode := storage.VolumeBindingImmediate
+		bindingMode = &defaultBindingMode
+	}
 	return &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
@@ -1279,9 +1297,9 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 			// Name must be unique, so let's base it on namespace name
 			Name: ns + "-" + suffix,
 		},
-		Provisioner:       pluginName,
-		Parameters:        t.parameters,
-		VolumeBindingMode: &bindingMode,
+		Provisioner:       provisioner,
+		Parameters:        parameters,
+		VolumeBindingMode: bindingMode,
 	}
 }
 
