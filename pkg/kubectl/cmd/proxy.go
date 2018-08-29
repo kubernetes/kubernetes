@@ -44,30 +44,30 @@ var (
 	proxyExample = templates.Examples(i18n.T(`
 		# To proxy all of the kubernetes api and nothing else, use:
 
-		    $ kubectl proxy --api-prefix=/
+			$ kubectl proxy --api-prefix=/
 
 		# To proxy only part of the kubernetes api and also some static files:
 
-		    $ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
+			$ kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
 
 		# The above lets you 'curl localhost:8001/api/v1/pods'.
 
 		# To proxy the entire kubernetes api at a different root, use:
 
-		    $ kubectl proxy --api-prefix=/custom/
+			$ kubectl proxy --api-prefix=/custom/
 
 		# The above lets you 'curl localhost:8001/custom/api/v1/pods'
 
-		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
-		kubectl proxy --port=8011 --www=./local/www/
+		# To proxy the kubernetes apiserver on an arbitrary local port, use:
 
-		# Run a proxy to kubernetes apiserver on an arbitrary local port.
+			$ kubectl proxy --port=0
+
 		# The chosen port for the server will be output to stdout.
-		kubectl proxy --port=0
 
-		# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-		# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/
-		kubectl proxy --api-prefix=/k8s-api`))
+		# To proxy kubernetes apiserver on specific port and serving static content, use:
+
+			$ kubectl proxy --port=8011 --www=./local/www/
+        `))
 )
 
 func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
