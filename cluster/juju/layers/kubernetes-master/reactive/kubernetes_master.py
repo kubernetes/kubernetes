@@ -28,7 +28,6 @@ import ipaddress
 from charms.leadership import leader_get, leader_set
 
 from shutil import move
-from tempfile import TemporaryDirectory
 
 from pathlib import Path
 from shlex import split
