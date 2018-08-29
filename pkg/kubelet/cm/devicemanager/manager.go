@@ -499,7 +499,7 @@ func (m *ManagerImpl) writeCheckpoint() error {
 // m.allocatedDevices accordingly.
 func (m *ManagerImpl) readCheckpoint() error {
 	registeredDevs := make(map[string][]string)
-	devEntries := make([]checkpoint.PodDevicesEntry, 0)
+	var devEntries []checkpoint.PodDevicesEntry
 	cp := checkpoint.New(devEntries, registeredDevs)
 	err := m.checkpointManager.GetCheckpoint(kubeletDeviceManagerCheckpoint, cp)
 	if err != nil {

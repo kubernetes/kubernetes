@@ -63,7 +63,7 @@ func (mstore *MemStore) Delete(key string) error {
 func (mstore *MemStore) List() ([]string, error) {
 	mstore.Lock()
 	defer mstore.Unlock()
-	keys := make([]string, 0)
+	var keys []string
 	for key := range mstore.mem {
 		keys = append(keys, key)
 	}

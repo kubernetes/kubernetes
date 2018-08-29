@@ -81,7 +81,7 @@ func (f *FileStore) Delete(key string) error {
 
 // List returns all keys in the store.
 func (f *FileStore) List() ([]string, error) {
-	keys := make([]string, 0)
+	var keys []string
 	files, err := f.filesystem.ReadDir(f.directoryPath)
 	if err != nil {
 		return keys, err
