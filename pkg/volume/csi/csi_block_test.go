@@ -31,7 +31,7 @@ import (
 )
 
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	// TODO (vladimirvivien) specName with slashes will not work
@@ -77,12 +77,13 @@ func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 }
 
 func TestBlockMapperSetupDevice(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithNodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
+		nil,
 		nil,
 		"fakeNode",
 	)
@@ -134,12 +135,13 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 }
 
 func TestBlockMapperMapDevice(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithNodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
+		nil,
 		nil,
 		"fakeNode",
 	)
@@ -202,12 +204,13 @@ func TestBlockMapperMapDevice(t *testing.T) {
 }
 
 func TestBlockMapperTearDownDevice(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithNodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
+		nil,
 		nil,
 		"fakeNode",
 	)

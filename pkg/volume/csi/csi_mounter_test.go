@@ -30,20 +30,23 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	csiapi "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 var (
-	testDriver = "test-driver"
-	testVol    = "vol-123"
-	testns     = "test-ns"
-	testPodUID = types.UID("test-pod")
+	testDriver  = "test-driver"
+	testVol     = "vol-123"
+	testns      = "test-ns"
+	testPod     = "test-pod"
+	testPodUID  = types.UID("test-pod")
+	testAccount = "test-service-account"
 )
 
 func TestMounterGetPath(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 
 	// TODO (vladimirvivien) specName with slashes will not work
@@ -86,12 +89,13 @@ func TestMounterGetPath(t *testing.T) {
 }
 
 func TestMounterSetUp(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	fakeClient := fakeclient.NewSimpleClientset()
-	host := volumetest.NewFakeVolumeHostWithNodeName(
+	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,
 		fakeClient,
+		nil,
 		nil,
 		"fakeNode",
 	)
@@ -167,7 +171,7 @@ func TestMounterSetUp(t *testing.T) {
 }
 
 func TestUnmounterTeardown(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
@@ -216,7 +220,7 @@ func TestUnmounterTeardown(t *testing.T) {
 }
 
 func TestSaveVolumeData(t *testing.T) {
-	plug, tmpDir := newTestPlugin(t)
+	plug, tmpDir := newTestPlugin(t, nil, nil)
 	defer os.RemoveAll(tmpDir)
 	testCases := []struct {
 		name       string
@@ -260,5 +264,18 @@ func TestSaveVolumeData(t *testing.T) {
 		if string(data) != jsonData.String() {
 			t.Errorf("expecting encoded data %v, got %v", string(data), jsonData)
 		}
+	}
+}
+
+func getCSIDriver(name string, requiresPodInfo *bool, attachable *bool) *csiapi.CSIDriver {
+	return &csiapi.CSIDriver{
+		ObjectMeta: meta.ObjectMeta{
+			Name: name,
+		},
+		Spec: csiapi.CSIDriverSpec{
+			Driver:                 name,
+			PodInfoRequiredOnMount: requiresPodInfo,
+			AttachRequired:         attachable,
+		},
 	}
 }
