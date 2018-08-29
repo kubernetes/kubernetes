@@ -343,6 +343,12 @@ const (
 	//
 	// Enables CSI to use raw block storage volumes
 	CSIBlockVolume utilfeature.Feature = "CSIBlockVolume"
+
+	// owner: @yastij
+	// alpha: v1.12
+	//
+	// Enables detaching volumes when a node reports nodeShutdown taint
+	NodeShutdown utilfeature.Feature = "nodeShutdown"
 )
 
 func init() {
@@ -401,6 +407,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
 	ResourceQuotaScopeSelectors:                 {Default: false, PreRelease: utilfeature.Alpha},
 	CSIBlockVolume:                              {Default: false, PreRelease: utilfeature.Alpha},
+	NodeShutdown:                                {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

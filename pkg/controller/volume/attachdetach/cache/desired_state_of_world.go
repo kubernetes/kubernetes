@@ -48,7 +48,7 @@ type DesiredStateOfWorld interface {
 	// If the node already exists this is a no-op.
 	// keepTerminatedPodVolumes is a property of the node that determines
 	// if volumes should be mounted and attached for terminated pods.
-	AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool)
+	AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool, isShutdownNode bool)
 
 	// AddPod adds the given pod to the list of pods that reference the
 	// specified volume and is scheduled to the specified node.
@@ -83,6 +83,9 @@ type DesiredStateOfWorld interface {
 	// NodeExists returns true if the node with the specified name exists in
 	// the list of nodes managed by the attach/detach controller.
 	NodeExists(nodeName k8stypes.NodeName) bool
+
+	// NodeIsShutdown returns true if the node with the specified name is tainted as shutdown
+	NodeIsShutdown(nodeName k8stypes.NodeName) bool
 
 	// VolumeExists returns true if the volume with the specified name exists
 	// in the list of volumes that should be attached to the specified node by
@@ -154,6 +157,9 @@ type nodeManaged struct {
 	// nodeName contains the name of this node.
 	nodeName k8stypes.NodeName
 
+	// isShutdown determines if the node tainted shutdown or not
+	isShutdown bool
+
 	// volumesToAttach is a map containing the set of volumes that should be
 	// attached to this node. The key in the map is the name of the volume and
 	// the value is a volumeToAttach object containing more information about the volume.
@@ -195,16 +201,19 @@ type pod struct {
 	podObj *v1.Pod
 }
 
-func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool) {
+func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminatedPodVolumes bool, isShutdownNode bool) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
-	if _, nodeExists := dsw.nodesManaged[nodeName]; !nodeExists {
+	if node, nodeExists := dsw.nodesManaged[nodeName]; !nodeExists {
 		dsw.nodesManaged[nodeName] = nodeManaged{
 			nodeName:                 nodeName,
 			volumesToAttach:          make(map[v1.UniqueVolumeName]volumeToAttach),
+			isShutdown: isShutdownNode,
 			keepTerminatedPodVolumes: keepTerminatedPodVolumes,
 		}
+	} else {
+		node.isShutdown = isShutdownNode
 	}
 }
 
@@ -322,6 +331,16 @@ func (dsw *desiredStateOfWorld) NodeExists(nodeName k8stypes.NodeName) bool {
 	_, nodeExists := dsw.nodesManaged[nodeName]
 	return nodeExists
 }
+
+func (dsw *desiredStateOfWorld) NodeIsShutdown(nodeName k8stypes.NodeName) bool {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	node, nodeExists := dsw.nodesManaged[nodeName]
+
+	return nodeExists && node.isShutdown
+}
+
 
 func (dsw *desiredStateOfWorld) VolumeExists(
 	volumeName v1.UniqueVolumeName, nodeName k8stypes.NodeName) bool {
