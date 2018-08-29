@@ -112,6 +112,9 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 		period:        time.Second,
 		resyncPeriod:  resyncPeriod,
 		clock:         &clock.RealClock{},
+		// We set lastSyncResourceVersion to "0", because it's the value which
+		// we set as ResourceVersion to the first List() request.
+		lastSyncResourceVersion: "0",
 	}
 	return r
 }
@@ -169,10 +172,16 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	glog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
 	var resourceVersion string
 
-	// Explicitly set "0" as resource version - it's fine for the List()
-	// to be served from cache and potentially be delayed relative to
-	// etcd contents. Reflector framework will catch up via Watch() eventually.
-	options := metav1.ListOptions{ResourceVersion: "0"}
+	// Explicitly set resource version to have it list from cache for
+	// performance reasons.
+	// It's fine for the returned state to be stale (we will catch up via
+	// Watch() eventually), but can't set "0" to avoid going back in time
+	// if we hit apiserver that is significantly delayed compared to the
+	// state we already had.
+	// TODO: There is still a potential to go back in time after component
+	// restart when we set ResourceVersion: "0". For more details see:
+	// https://github.com/kubernetes/kubernetes/issues/59848
+	options := metav1.ListOptions{ResourceVersion: r.LastSyncResourceVersion()}
 	r.metrics.numberOfLists.Inc()
 	start := r.clock.Now()
 	list, err := r.listerWatcher.List(options)
