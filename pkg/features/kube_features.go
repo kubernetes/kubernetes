@@ -369,6 +369,12 @@ const (
 	//
 	// Enable volume snapshot data source support.
 	VolumeSnapshotDataSource utilfeature.Feature = "VolumeSnapshotDataSource"
+
+	// owner: @yastij
+	// alpha: v1.12
+	//
+	// Enables detaching volumes when a node reports nodeShutdown taint
+	NodeShutdown utilfeature.Feature = "nodeShutdown"
 )
 
 func init() {
@@ -431,6 +437,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	NodeLease:                                   {Default: false, PreRelease: utilfeature.Alpha},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
+	NodeShutdown:                                {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

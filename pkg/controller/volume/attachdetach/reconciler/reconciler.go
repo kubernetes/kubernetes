@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world with
@@ -228,6 +230,15 @@ func (rc *reconciler) reconcile() {
 			// If timeout is true, skip verifySafeToDetach check
 			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))
 			verifySafeToDetach := !timeout
+			if utilfeature.DefaultFeatureGate.Enabled(features.NodeShutdown) {
+				isShutdownNode := rc.desiredStateOfWorld.NodeIsShutdown(attachedVolume.NodeName)
+
+				if isShutdownNode {
+					glog.V(1).Infof("node %v is shutdown, the volume is safe to detach.", attachedVolume.NodeName)
+					verifySafeToDetach = !isShutdownNode
+				}
+
+			}
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !timeout {
