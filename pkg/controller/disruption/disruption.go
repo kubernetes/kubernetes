@@ -658,8 +658,8 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 		if expectedDeletion.Before(currentTime) {
 			glog.V(1).Infof("Pod %s/%s was expected to be deleted at %s but it wasn't, updating pdb %s/%s",
 				pod.Namespace, pod.Name, disruptionTime.String(), pdb.Namespace, pdb.Name)
-			dc.recorder.Eventf(pod, v1.EventTypeWarning, "NotDeleted", "Pod was expected by PDB %s/%s to be deleted but it wasn't",
-				pdb.Namespace, pdb.Namespace)
+			dc.recorder.Eventf(pod, v1.EventTypeWarning, "NotDeleted", "Pod %s/%s was expected by PDB %s/%s to be deleted but it wasn't",
+				pod.Namespace, pod.Name, pdb.Namespace, pdb.Name)
 		} else {
 			if recheckTime == nil || expectedDeletion.Before(*recheckTime) {
 				recheckTime = &expectedDeletion
