@@ -57,7 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"

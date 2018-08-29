@@ -31,7 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientcertificates "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/certificate"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 

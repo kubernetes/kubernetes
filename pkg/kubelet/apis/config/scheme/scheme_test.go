@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/fuzzer"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config/fuzzer"
 )
 
 func TestRoundTripTypes(t *testing.T) {
