@@ -1461,8 +1461,12 @@ function start-kube-apiserver {
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
-  params+=" --etcd-servers=http://127.0.0.1:2379"
-  params+=" --etcd-servers-overrides=/events#http://127.0.0.1:4002"
+  params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
+  if [[ -z "${ETCD_SERVERS:-}" ]]; then
+    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
+  elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
+    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
+  fi
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
