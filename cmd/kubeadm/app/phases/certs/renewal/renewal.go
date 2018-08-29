@@ -25,12 +25,17 @@ import (
 )
 
 func RenewExistingCert(certsDir, baseName string, impl Interface) error {
-	cert, err := pkiutil.TryLoadCertFromDisk(certsDir, baseName)
+	certificatePath, _ := pkiutil.PathsForCertAndKey(certsDir, baseName)
+	certs, err := certutil.CertsFromFile(certificatePath)
 	if err != nil {
 		return fmt.Errorf("failed to load existing certificate %s: %v", baseName, err)
 	}
 
-	cfg := certToConfig(cert)
+	if len(certs) != 1 {
+		return fmt.Errorf("wanted exactly one certificate, got %d", len(certs))
+	}
+
+	cfg := certToConfig(certs[0])
 	newCert, newKey, err := impl.Renew(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to renew certificate %s: %v", baseName, err)
