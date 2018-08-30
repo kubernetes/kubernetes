@@ -232,7 +232,7 @@ func (in *HPAControllerConfiguration) DeepCopyInto(out *HPAControllerConfigurati
 	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
 	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
-	out.HorizontalPodAutoscalerCPUTaintPeriod = in.HorizontalPodAutoscalerCPUTaintPeriod
+	out.HorizontalPodAutoscalerCPUInitializationPeriod = in.HorizontalPodAutoscalerCPUInitializationPeriod
 	out.HorizontalPodAutoscalerInitialReadinessDelay = in.HorizontalPodAutoscalerInitialReadinessDelay
 	return
 }
