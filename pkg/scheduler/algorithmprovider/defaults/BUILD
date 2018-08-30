@@ -15,6 +15,7 @@ go_library(
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
