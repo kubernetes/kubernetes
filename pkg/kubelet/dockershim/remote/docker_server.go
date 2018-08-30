@@ -28,6 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
+// maxMsgSize use 8MB as the default message size limit.
+// grpc library default is 4MB
+const maxMsgSize = 1024 * 1024 * 8
+
 // DockerServer is the grpc server of dockershim.
 type DockerServer struct {
 	// endpoint is the endpoint to serve on.
@@ -60,7 +64,10 @@ func (s *DockerServer) Start() error {
 		return fmt.Errorf("failed to listen on %q: %v", s.endpoint, err)
 	}
 	// Create the grpc server and register runtime and image services.
-	s.server = grpc.NewServer()
+	s.server = grpc.NewServer(
+		grpc.MaxRecvMsgSize(maxMsgSize),
+		grpc.MaxSendMsgSize(maxMsgSize),
+	)
 	runtimeapi.RegisterRuntimeServiceServer(s.server, s.service)
 	runtimeapi.RegisterImageServiceServer(s.server, s.service)
 	go func() {
