@@ -27,6 +27,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -214,6 +216,7 @@ func (dsw *desiredStateOfWorld) AddNode(nodeName k8stypes.NodeName, keepTerminat
 		}
 	} else {
 		node.isShutdown = isShutdownNode
+		dsw.nodesManaged[nodeName] = node
 	}
 }
 
@@ -392,16 +395,18 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 
 	volumesToAttach := make([]VolumeToAttach, 0 /* len */, len(dsw.nodesManaged) /* cap */)
 	for nodeName, nodeObj := range dsw.nodesManaged {
-		for volumeName, volumeObj := range nodeObj.volumesToAttach {
-			volumesToAttach = append(volumesToAttach,
-				VolumeToAttach{
-					VolumeToAttach: operationexecutor.VolumeToAttach{
-						MultiAttachErrorReported: volumeObj.multiAttachErrorReported,
-						VolumeName:               volumeName,
-						VolumeSpec:               volumeObj.spec,
-						NodeName:                 nodeName,
-						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
-					}})
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeShutdown) && !nodeObj.isShutdown {
+			for volumeName, volumeObj := range nodeObj.volumesToAttach {
+				volumesToAttach = append(volumesToAttach,
+					VolumeToAttach{
+						VolumeToAttach: operationexecutor.VolumeToAttach{
+							MultiAttachErrorReported: volumeObj.multiAttachErrorReported,
+							VolumeName:               volumeName,
+							VolumeSpec:               volumeObj.spec,
+							NodeName:                 nodeName,
+							ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
+						}})
+			}
 		}
 	}
 

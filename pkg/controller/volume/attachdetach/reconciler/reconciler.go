@@ -182,8 +182,15 @@ func (rc *reconciler) reconcile() {
 
 	// Ensure volumes that should be detached are detached.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
-		if !rc.desiredStateOfWorld.VolumeExists(
-			attachedVolume.VolumeName, attachedVolume.NodeName) {
+
+		shouldStartOperation := !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName, attachedVolume.NodeName)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeShutdown) {
+
+			shouldStartOperation = shouldStartOperation || rc.desiredStateOfWorld.NodeIsShutdown(attachedVolume.NodeName)
+
+		}
+		if shouldStartOperation {
 
 			// Don't even try to start an operation if there is already one running
 			// This check must be done before we do any other checks, as otherwise the other checks
@@ -202,8 +209,13 @@ func (rc *reconciler) reconcile() {
 			}
 			// Check whether timeout has reached the maximum waiting time
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
+			isSafeToDetach := timeout
+			if utilfeature.DefaultFeatureGate.Enabled(features.NodeShutdown) {
+
+				isSafeToDetach = timeout || rc.desiredStateOfWorld.NodeIsShutdown(attachedVolume.NodeName)
+			}
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
-			if attachedVolume.MountedByNode && !timeout {
+			if attachedVolume.MountedByNode && !isSafeToDetach {
 				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted", ""))
 				continue
 			}
@@ -227,21 +239,13 @@ func (rc *reconciler) reconcile() {
 			}
 
 			// Trigger detach volume which requires verifing safe to detach step
-			// If timeout is true, skip verifySafeToDetach check
+			// If isSafeToDetach is true, skip verifySafeToDetach check
 			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))
-			verifySafeToDetach := !timeout
-			if utilfeature.DefaultFeatureGate.Enabled(features.NodeShutdown) {
-				isShutdownNode := rc.desiredStateOfWorld.NodeIsShutdown(attachedVolume.NodeName)
-
-				if isShutdownNode {
-					glog.V(1).Infof("node %v is shutdown, the volume is safe to detach.", attachedVolume.NodeName)
-					verifySafeToDetach = !isShutdownNode
-				}
-
-			}
+			verifySafeToDetach := !isSafeToDetach
+			glog.V(1).Infof("node %v is shutdown, the volume is safe to detach.", attachedVolume.NodeName)
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
-				if !timeout {
+				if !isSafeToDetach {
 					glog.Infof(attachedVolume.GenerateMsgDetailed("attacherDetacher.DetachVolume started", ""))
 				} else {
 					metrics.RecordForcedDetachMetric()
