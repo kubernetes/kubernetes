@@ -967,6 +967,7 @@ type PodSecurityPolicySpec struct {
 	ForbiddenSysctls []string `json:"forbiddenSysctls,omitempty" protobuf:"bytes,20,rep,name=forbiddenSysctls"`
 	// AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
 	// Empty or nil indicates that only the DefaultProcMountType may be used.
+	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
 }

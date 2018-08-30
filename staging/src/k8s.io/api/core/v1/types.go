@@ -5198,9 +5198,10 @@ type SecurityContext struct {
 	// 2) has CAP_SYS_ADMIN
 	// +optional
 	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,7,opt,name=allowPrivilegeEscalation"`
-	// ProcMount denotes the type of proc mount to use for the containers.
+	// procMount denotes the type of proc mount to use for the containers.
 	// The default is DefaultProcMount which uses the container runtime defaults for
 	// readonly paths and masked paths.
+	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	ProcMount *ProcMountType `json:"procMount,omitEmpty" protobuf:"bytes,9,opt,name=procMount"`
 }
