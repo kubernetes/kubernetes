@@ -60,7 +60,7 @@ function get-master-disk-size() {
     suggested_master_disk_size="100GB"
   fi
   if [[ "${NUM_NODES}" -gt "2000" ]]; then
-    suggested_master_disk_size="200GB"
+    suggested_master_disk_size="500GB"
   fi
   echo "${suggested_master_disk_size}"
 }

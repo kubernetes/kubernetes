@@ -20,6 +20,9 @@
         "cpu": {{ cpulimit }}
       }
     },
+    "securityContext": {
+      "privileged": true
+    },
     "command": [
               "/bin/sh",
               "-c",
@@ -89,7 +92,7 @@
 "volumes":[
   { "name": "varetcd",
     "hostPath": {
-        "path": "/mnt/master-pd/var/etcd"}
+        "path": "{{ data_directory }}"}
   },
   { "name": "varlogetcd",
     "hostPath": {

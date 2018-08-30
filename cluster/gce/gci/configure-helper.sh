@@ -1323,6 +1323,11 @@ function prepare-etcd-manifest {
 
   local -r temp_file="/tmp/$5"
   cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/etcd.manifest" "${temp_file}"
+#  if [[ "$1" == "" ]]; then
+#    sed -i -e "s@{{ *data_directory *}}@/mnt/master-pd/var/etcd@g" "${temp_file}"
+#  else
+    sed -i -e "s@{{ *data_directory *}}@/tmp@g" "${temp_file}"
+#  fi
   sed -i -e "s@{{ *suffix *}}@$1@g" "${temp_file}"
   sed -i -e "s@{{ *port *}}@$2@g" "${temp_file}"
   sed -i -e "s@{{ *server_port *}}@$3@g" "${temp_file}"

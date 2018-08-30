@@ -72,7 +72,7 @@ func main() {
 		os.Exit(2)
 	}
 	t := newTester()
-	k, err := t.getKubetest(f.get, f.old)
+	k, err := t.getKubetest(false, f.old)
 	if err != nil {
 		log.Fatalf("err: %v", err)
 	}
