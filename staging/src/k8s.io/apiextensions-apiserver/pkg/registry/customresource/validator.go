@@ -37,7 +37,8 @@ import (
 
 type customResourceValidator struct {
 	namespaceScoped       bool
-	kind                  schema.GroupVersionKind
+	groupKind             schema.GroupKind
+	allowedAPIVersions    []string
 	schemaValidator       *validate.SchemaValidator
 	statusSchemaValidator *validate.SchemaValidator
 }
@@ -134,11 +135,19 @@ func (a customResourceValidator) ValidateTypeMeta(ctx context.Context, obj *unst
 	}
 
 	var allErrs field.ErrorList
-	if typeAccessor.GetKind() != a.kind.Kind {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("kind"), typeAccessor.GetKind(), fmt.Sprintf("must be %v", a.kind.Kind)))
+	if typeAccessor.GetKind() != a.groupKind.Kind {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("kind"), typeAccessor.GetKind(), fmt.Sprintf("must be %v", a.groupKind.Kind)))
 	}
-	if typeAccessor.GetAPIVersion() != a.kind.Group+"/"+a.kind.Version {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version)))
+	found := false
+	for _, v := range a.allowedAPIVersions {
+		if typeAccessor.GetAPIVersion() == v {
+			found = true
+			break
+		}
+	}
+	if !found {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be one of %v", a.allowedAPIVersions)))
+
 	}
 	return allErrs
 }
