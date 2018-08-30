@@ -103,6 +103,11 @@ func (s *StorageSerializationOptions) AddFlags(fs *pflag.FlagSet) {
 		"You only need to pass the groups you wish to change from the defaults. "+
 		"It defaults to a list of preferred versions of all known groups.")
 
+	fs.MarkDeprecated("storage-versions", ""+
+		"Please omit this flag to ensure the default storage versions are used ."+
+		"Otherwise the cluster is not safe to upgrade to a version newer than 1.12. "+
+		"This flag will be removed in 1.13.")
+
 }
 
 // ToPreferredVersionString returns the preferred versions of all registered
