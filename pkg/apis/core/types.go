@@ -4632,7 +4632,7 @@ const (
 	DefaultProcMount ProcMountType = "Default"
 
 	// UnmaskedProcMount bypasses the default masking behavior of the container
-	// runtime and ensures the newly created /proc the container stays in tact with
+	// runtime and ensures the newly created /proc the container stays intact with
 	// no modifications.
 	UnmaskedProcMount ProcMountType = "Unmasked"
 )
