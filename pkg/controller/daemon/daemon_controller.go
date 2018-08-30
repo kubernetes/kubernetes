@@ -1333,6 +1333,14 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *app
 		})
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
+		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
+			Key:      algorithm.TaintNodeUnschedulable,
+			Operator: v1.TolerationOpExists,
+			Effect:   v1.TaintEffectNoSchedule,
+		})
+	}
+
 	objects, err := dsc.podNodeIndex.ByIndex("nodeName", node.Name)
 	if err != nil {
 		return nil, nil, err
