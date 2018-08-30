@@ -729,6 +729,12 @@ func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string
 	}
 }
 
+func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UID) {
+	return func(types.UID) {
+		glog.Errorf("DeleteServiceAccountToken unsupported in attachDetachController")
+	}
+}
+
 func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
 	return mount.NewOsExec()
 }

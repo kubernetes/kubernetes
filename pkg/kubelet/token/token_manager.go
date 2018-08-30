@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -96,6 +97,18 @@ func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticat
 
 	m.set(key, tr)
 	return tr, nil
+}
+
+// DeleteServiceAccountToken should be invoked when pod got deleted. It simply
+// clean token manager cache.
+func (m *Manager) DeleteServiceAccountToken(podUID types.UID) {
+	m.cacheMutex.Lock()
+	defer m.cacheMutex.Unlock()
+	for k, tr := range m.cache {
+		if tr.Spec.BoundObjectRef.UID == podUID {
+			delete(m.cache, k)
+		}
+	}
 }
 
 func (m *Manager) cleanup() {

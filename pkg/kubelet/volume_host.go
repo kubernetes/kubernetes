@@ -200,6 +200,10 @@ func (kvh *kubeletVolumeHost) GetServiceAccountTokenFunc() func(namespace, name 
 	return kvh.tokenManager.GetServiceAccountToken
 }
 
+func (kvh *kubeletVolumeHost) DeleteServiceAccountTokenFunc() func(podUID types.UID) {
+	return kvh.tokenManager.DeleteServiceAccountToken
+}
+
 func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	node, err := kvh.kubelet.GetNode()
 	if err != nil {

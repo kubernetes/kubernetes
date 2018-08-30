@@ -47,10 +47,11 @@ const (
 )
 
 type projectedPlugin struct {
-	host                   volume.VolumeHost
-	getSecret              func(namespace, name string) (*v1.Secret, error)
-	getConfigMap           func(namespace, name string) (*v1.ConfigMap, error)
-	getServiceAccountToken func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	host                      volume.VolumeHost
+	getSecret                 func(namespace, name string) (*v1.Secret, error)
+	getConfigMap              func(namespace, name string) (*v1.ConfigMap, error)
+	getServiceAccountToken    func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
+	deleteServiceAccountToken func(podUID types.UID)
 }
 
 var _ volume.VolumePlugin = &projectedPlugin{}
@@ -74,6 +75,7 @@ func (plugin *projectedPlugin) Init(host volume.VolumeHost) error {
 	plugin.getSecret = host.GetSecretFunc()
 	plugin.getConfigMap = host.GetConfigMapFunc()
 	plugin.getServiceAccountToken = host.GetServiceAccountTokenFunc()
+	plugin.deleteServiceAccountToken = host.DeleteServiceAccountTokenFunc()
 	return nil
 }
 
@@ -368,7 +370,12 @@ func (c *projectedVolumeUnmounter) TearDownAt(dir string) error {
 	if err != nil {
 		return err
 	}
-	return wrapped.TearDownAt(dir)
+	if err = wrapped.TearDownAt(dir); err != nil {
+		return err
+	}
+
+	c.plugin.deleteServiceAccountToken(c.podUID)
+	return nil
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.ProjectedVolumeSource, bool, error) {

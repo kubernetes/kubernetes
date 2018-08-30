@@ -201,6 +201,10 @@ func (f *fakeVolumeHost) GetServiceAccountTokenFunc() func(string, string, *auth
 	}
 }
 
+func (f *fakeVolumeHost) DeleteServiceAccountTokenFunc() func(types.UID) {
+	return func(types.UID) {}
+}
+
 func (f *fakeVolumeHost) GetNodeLabels() (map[string]string, error) {
 	if f.nodeLabels == nil {
 		f.nodeLabels = map[string]string{"test-label": "test-value"}
