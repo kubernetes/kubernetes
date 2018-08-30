@@ -2722,9 +2722,10 @@ func TestDeleteWithOptions(t *testing.T) {
 
 	grace := int64(300)
 	item := &metav1.DeleteOptions{
+		TypeMeta:           metav1.TypeMeta{APIVersion: "foo/v4", Kind: "DeleteOptions"},
 		GracePeriodSeconds: &grace,
 	}
-	body, err := runtime.Encode(codec, item)
+	body, err := json.Marshal(item)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -2745,10 +2746,6 @@ func TestDeleteWithOptions(t *testing.T) {
 	}
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
-	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", diff.ObjectDiff(simpleStorage.deleteOptions, item))
 	}
 }
 
