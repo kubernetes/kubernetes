@@ -136,9 +136,8 @@ func (m *podContainerManagerImpl) killOnePid(pid int) error {
 			// also does this.
 			glog.V(3).Infof("process with pid %v no longer exists", pid)
 			return nil
-		} else {
-			return err
 		}
+		return err
 	}
 	return nil
 }
