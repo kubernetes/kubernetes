@@ -85,7 +85,7 @@ type EndpointChangeTracker struct {
 	lock sync.Mutex
 	// hostname is the host where kube-proxy is running on.
 	hostname string
-	// items maps a service to a endpointsChange.
+	// items maps a service to an endpointsChange.
 	items map[types.NamespacedName]*endpointsChange
 	// makeEndpointInfo allows proxier to inject customized information when processing endpoint.
 	makeEndpointInfo makeEndpointFunc
