@@ -176,6 +176,11 @@ users:
 			"--kubeconfig", apiserverConfig.Name(),
 			"--leader-elect=false",
 		}, "/healthz", true, false, intPtr(http.StatusOK), nil},
+		{"/metrics without auhn/z", []string{
+			"--kubeconfig", apiserverConfig.Name(),
+			"--kubeconfig", apiserverConfig.Name(),
+			"--leader-elect=false",
+		}, "/metrics", true, false, intPtr(http.StatusForbidden), intPtr(http.StatusOK)},
 		{"authorization skipped for /healthz with authn/authz", []string{
 			"--port=0",
 			"--authentication-kubeconfig", apiserverConfig.Name(),
@@ -199,12 +204,11 @@ users:
 			"--leader-elect=false",
 		}, "/metrics", false, false, intPtr(http.StatusForbidden), nil},
 		{"not authorized /metrics with BROKEN authn/authz", []string{
-			"--port=0",
 			"--authentication-kubeconfig", apiserverConfig.Name(),
 			"--authorization-kubeconfig", brokenApiserverConfig.Name(),
 			"--kubeconfig", apiserverConfig.Name(),
 			"--leader-elect=false",
-		}, "/metrics", false, false, intPtr(http.StatusInternalServerError), nil},
+		}, "/metrics", false, false, intPtr(http.StatusInternalServerError), intPtr(http.StatusOK)},
 		{"always-allowed /metrics with BROKEN authn/authz", []string{
 			"--port=0",
 			"--authentication-skip-lookup", // to survive unaccessible extensions-apiserver-authentication configmap

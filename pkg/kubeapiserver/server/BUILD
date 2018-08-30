@@ -10,7 +10,6 @@ go_library(
     srcs = ["insecure_handler.go"],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/server",
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:go_default_library",
