@@ -27,6 +27,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -38,7 +39,7 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apir
 	if longRunning == nil {
 		return handler
 	}
-	timeoutFunc := func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+	timeoutFunc := func(w http.ResponseWriter, req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
 		// TODO unify this with apiserver.MaxInFlightLimit
 		ctx := req.Context()
 
@@ -57,14 +58,18 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apir
 
 		postTimeoutFn := func() {
 			cancel()
-			metrics.Record(req, requestInfo, "", http.StatusGatewayTimeout, 0, 0)
+			contentType := w.Header().Get("Content-Type")
+			if contentType == "" {
+				contentType = runtime.ContentTypeJSON
+			}
+			metrics.Record(req, requestInfo, contentType, http.StatusGatewayTimeout, 0, 0)
 		}
 		return req, time.After(timeout), postTimeoutFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
 }
 
-type timeoutFunc = func(*http.Request) (req *http.Request, timeout <-chan time.Time, postTimeoutFunc func(), err *apierrors.StatusError)
+type timeoutFunc = func(http.ResponseWriter, *http.Request) (req *http.Request, timeout <-chan time.Time, postTimeoutFunc func(), err *apierrors.StatusError)
 
 // WithTimeout returns an http.Handler that runs h with a timeout
 // determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
@@ -85,7 +90,7 @@ type timeoutHandler struct {
 }
 
 func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r, after, postTimeoutFn, err := t.timeout(r)
+	r, after, postTimeoutFn, err := t.timeout(w, r)
 	if after == nil {
 		t.handler.ServeHTTP(w, r)
 		return

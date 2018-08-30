@@ -75,7 +75,7 @@ func TestTimeout(t *testing.T) {
 				panic("inner handler panics")
 			}
 		}),
-		func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+		func(_ http.ResponseWriter, req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
 			return req, timeout, record.Record, timeoutErr
 		})))
 	defer ts.Close()
