@@ -1046,23 +1046,23 @@ func deleteCinderVolume(name string) error {
 }
 
 // GCE
-type gceDriver struct {
+type gcePdDriver struct {
 	volumeName string
 
 	driverInfo DriverInfo
 }
 
-var _ TestDriver = &gceDriver{}
-var _ PreprovisionedVolumeTestDriver = &gceDriver{}
-var _ InlineVolumeTestDriver = &gceDriver{}
-var _ PreprovisionedPVTestDriver = &gceDriver{}
-var _ DynamicPVTestDriver = &gceDriver{}
+var _ TestDriver = &gcePdDriver{}
+var _ PreprovisionedVolumeTestDriver = &gcePdDriver{}
+var _ InlineVolumeTestDriver = &gcePdDriver{}
+var _ PreprovisionedPVTestDriver = &gcePdDriver{}
+var _ DynamicPVTestDriver = &gcePdDriver{}
 
-// InitGceDriver returns gceDriver that implements TestDriver interface
-func InitGceDriver() TestDriver {
-	return &gceDriver{
+// InitGceDriver returns gcePdDriver that implements TestDriver interface
+func InitGcePdDriver() TestDriver {
+	return &gcePdDriver{
 		driverInfo: DriverInfo{
-			Name:        "gce",
+			Name:        "gcepd",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1078,18 +1078,18 @@ func InitGceDriver() TestDriver {
 	}
 }
 
-func (g *gceDriver) GetDriverInfo() *DriverInfo {
+func (g *gcePdDriver) GetDriverInfo() *DriverInfo {
 	return &g.driverInfo
 }
 
-func (g *gceDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("gce", "gke")
 	if pattern.FsType == "xfs" {
 		framework.SkipUnlessNodeOSDistroIs("ubuntu", "custom")
 	}
 }
 
-func (g *gceDriver) GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSource {
+func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSource {
 	volSource := v1.VolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   g.volumeName,
@@ -1102,7 +1102,7 @@ func (g *gceDriver) GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSour
 	return &volSource
 }
 
-func (g *gceDriver) GetPersistentVolumeSource(readOnly bool, fsType string) *v1.PersistentVolumeSource {
+func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string) *v1.PersistentVolumeSource {
 	pvSource := v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   g.volumeName,
@@ -1115,7 +1115,7 @@ func (g *gceDriver) GetPersistentVolumeSource(readOnly bool, fsType string) *v1.
 	return &pvSource
 }
 
-func (g *gceDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
+func (g *gcePdDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/gce-pd"
 	parameters := map[string]string{}
 	if fsType != "" {
@@ -1127,13 +1127,13 @@ func (g *gceDriver) GetDynamicProvisionStorageClass(fsType string) *storagev1.St
 	return getStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (g *gceDriver) CreateDriver() {
+func (g *gcePdDriver) CreateDriver() {
 }
 
-func (g *gceDriver) CleanupDriver() {
+func (g *gcePdDriver) CleanupDriver() {
 }
 
-func (g *gceDriver) CreateVolume(volType testpatterns.TestVolType) {
+func (g *gcePdDriver) CreateVolume(volType testpatterns.TestVolType) {
 	if volType == testpatterns.InlineVolume {
 		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
 		// so pods should be also scheduled there.
@@ -1147,7 +1147,7 @@ func (g *gceDriver) CreateVolume(volType testpatterns.TestVolType) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func (g *gceDriver) DeleteVolume(volType testpatterns.TestVolType) {
+func (g *gcePdDriver) DeleteVolume(volType testpatterns.TestVolType) {
 	framework.DeletePDWithRetry(g.volumeName)
 }
 

@@ -89,6 +89,7 @@ func createSubPathTestInput(pattern testpatterns.TestPattern, resource subPathTe
 		filePathInVolume:  filepath.Join(subPathDir, fileName),
 		volType:           resource.volType,
 		pod:               resource.pod,
+		formatPod:         resource.formatPod,
 		volSource:         resource.genericVolumeTestResource.volSource,
 		roVol:             resource.roVolSource,
 	}
@@ -131,6 +132,7 @@ type subPathTestResource struct {
 
 	roVolSource *v1.VolumeSource
 	pod         *v1.Pod
+	formatPod   *v1.Pod
 }
 
 var _ TestResource = &subPathTestResource{}
@@ -171,9 +173,13 @@ func (s *subPathTestResource) setupResource(driver drivers.TestDriver, pattern t
 
 	subPath := f.Namespace.Name
 	config := dInfo.Config
-	s.pod = TestPodSubpath(f, subPath, s.volType, s.volSource, true)
+	s.pod = SubpathTestPod(f, subPath, s.volType, s.volSource, true)
 	s.pod.Spec.NodeName = config.ClientNodeName
 	s.pod.Spec.NodeSelector = config.NodeSelector
+
+	s.formatPod = volumeFormatPod(f, s.volSource)
+	s.formatPod.Spec.NodeName = config.ClientNodeName
+	s.formatPod.Spec.NodeSelector = config.NodeSelector
 }
 
 func (s *subPathTestResource) cleanupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
@@ -196,6 +202,7 @@ type subPathTestInput struct {
 	filePathInVolume  string
 	volType           string
 	pod               *v1.Pod
+	formatPod         *v1.Pod
 	volSource         *v1.VolumeSource
 	roVol             *v1.VolumeSource
 }
@@ -359,7 +366,7 @@ func testSubPath(input *subPathTestInput) {
 		}
 
 		// Format the volume while it's writable
-		formatVolume(input.f, input.volSource)
+		formatVolume(input.f, input.formatPod)
 
 		// Set volume source to read only
 		input.pod.Spec.Volumes[0].VolumeSource = *input.roVol
@@ -387,8 +394,8 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 	Expect(err).NotTo(HaveOccurred(), "while deleting pod")
 }
 
-// TestPodSubpath runs pod subpath test
-func TestPodSubpath(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource, privilegedSecurityContext bool) *v1.Pod {
+// SubpathTestPod returns a pod spec for subpath tests
+func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *v1.VolumeSource, privilegedSecurityContext bool) *v1.Pod {
 	var (
 		suffix          = strings.ToLower(fmt.Sprintf("%s-%s", volumeType, rand.String(4)))
 		gracePeriod     = int64(1)
@@ -473,6 +480,38 @@ func TestPodSubpath(f *framework.Framework, subpath, volumeType string, source *
 			SecurityContext: &v1.PodSecurityContext{
 				SELinuxOptions: &v1.SELinuxOptions{
 					Level: "s0:c0,c1",
+				},
+			},
+		},
+	}
+}
+
+// volumeFormatPod returns a Pod that does nothing but will cause the plugin to format a filesystem
+// on first use
+func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: fmt.Sprintf("volume-prep-%s", f.Namespace.Name),
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Command: []string{"/bin/sh", "-ec", "echo nothing"},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      volumeName,
+							MountPath: "/vol",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name:         volumeName,
+					VolumeSource: *volumeSource,
 				},
 			},
 		},
@@ -686,38 +725,9 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
 }
 
-func formatVolume(f *framework.Framework, volumeSource *v1.VolumeSource) {
-	var err error
-	// Launch pod to format the volume
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("volume-prep-%s", f.Namespace.Name),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-					Command: []string{"/bin/sh", "-ec", "echo nothing"},
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      volumeName,
-							MountPath: "/vol",
-						},
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyNever,
-			Volumes: []v1.Volume{
-				{
-					Name:         volumeName,
-					VolumeSource: *volumeSource,
-				},
-			},
-		},
-	}
+func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	By(fmt.Sprintf("Creating pod to format volume %s", pod.Name))
-	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating volume init pod")
 
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)

@@ -38,7 +38,7 @@ var testDrivers = []func() drivers.TestDriver{
 	drivers.InitHostpathSymlinkDriver,
 	drivers.InitEmptydirDriver,
 	drivers.InitCinderDriver,
-	drivers.InitGceDriver,
+	drivers.InitGcePdDriver,
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDriver,
 	drivers.InitAwsDriver,
