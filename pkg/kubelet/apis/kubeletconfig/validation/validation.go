@@ -105,11 +105,19 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ServerTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+
+	var (
+		containsKubeReserved   bool
+		containsSystemReserved bool
+	)
+
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:
 		case kubetypes.SystemReservedEnforcementKey:
+			containsSystemReserved = true
 		case kubetypes.KubeReservedEnforcementKey:
+			containsKubeReserved = true
 		case kubetypes.NodeAllocatableNoneKey:
 			if len(kc.EnforceNodeAllocatable) > 1 {
 				allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) may not contain additional enforcements when '%s' is specified", kubetypes.NodeAllocatableNoneKey))
@@ -119,6 +127,22 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 				val, kubetypes.NodeAllocatableEnforcementKey, kubetypes.SystemReservedEnforcementKey, kubetypes.KubeReservedEnforcementKey, kubetypes.NodeAllocatableNoneKey))
 		}
 	}
+
+	if len(kc.KubeReserved) > 0 && len(kc.KubeReservedCgroup) == 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: KubeReserved (--kube-reserved) %v requires KubeReservedCgroup (--kube-reserved-cgroup)", kc.KubeReservedCgroup))
+	}
+	if len(kc.SystemReserved) > 0 && len(kc.SystemReservedCgroup) == 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: SystemReserved (--system-reserved) %v requires SystemReservedCgroup (--system-reserved-cgroup)", kc.KubeReservedCgroup))
+	}
+	if len(kc.KubeReserved) > 0 && !containsKubeReserved {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) must contain option %q when KubeReserved (--kube-reserved) was specified",
+			kubetypes.KubeReservedEnforcementKey))
+	}
+	if len(kc.SystemReserved) > 0 && !containsSystemReserved {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: EnforceNodeAllocatable (--enforce-node-allocatable) must contain option %q when SystemReserved (--system-reserved) was specified",
+			kubetypes.SystemReservedEnforcementKey))
+	}
+
 	switch kc.HairpinMode {
 	case kubeletconfig.HairpinNone:
 	case kubeletconfig.HairpinVeth:
