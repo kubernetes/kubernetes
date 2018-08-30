@@ -530,7 +530,7 @@ def set_final_status():
 
     components_started = is_state('kubernetes-master.components.started')
     addons_configured = is_state('cdk-addons.configured')
-    if components_started and not addons_configured:
+    if is_leader and components_started and not addons_configured:
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         return
 
