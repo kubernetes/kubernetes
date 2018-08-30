@@ -309,6 +309,15 @@ type HostPriority struct {
 	Score int
 }
 
+// FeatureDependencies provides the feature and its dependent predicates and priorities.
+type FeatureDependency struct {
+	Name                  string   // Name of the feature gate.
+	NeededPredicateList   []string // List of predicates needed if we enable this predicate or priority
+	NeededPriorityList    []string // List of priorities needed if we enable this predicate or priority.
+	ExcludedPredicateList []string // List of predicates that should be excluded if we enable this predicate/priority.
+	ExcludedPriorityList  []string // List of priorities that should be excluded if we enable this predicate/priority
+}
+
 // HostPriorityList declares a []HostPriority type.
 type HostPriorityList []HostPriority
 

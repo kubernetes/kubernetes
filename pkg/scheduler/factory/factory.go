@@ -1047,11 +1047,11 @@ func (c *configFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 }
 
 // Creates a scheduler from the configuration file
-func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
+func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy, featureDependencies []schedulerapi.FeatureDependency) (*scheduler.Config, error) {
 	glog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
-	if err := validation.ValidatePolicy(policy); err != nil {
+	if err := validation.ValidatePolicy(policy, featureDependencies); err != nil {
 		return nil, err
 	}
 

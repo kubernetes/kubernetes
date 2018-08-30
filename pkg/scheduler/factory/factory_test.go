@@ -104,7 +104,7 @@ func TestCreateFromConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	factory.CreateFromConfig(policy)
+	factory.CreateFromConfig(policy, nil)
 	hpa := factory.GetHardPodAffinitySymmetricWeight()
 	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
@@ -150,7 +150,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
-	factory.CreateFromConfig(policy)
+	factory.CreateFromConfig(policy, nil)
 	hpa := factory.GetHardPodAffinitySymmetricWeight()
 	if hpa != 10 {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", 10, hpa)
@@ -176,7 +176,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	factory.CreateFromConfig(policy)
+	factory.CreateFromConfig(policy, nil)
 }
 
 // Test configures a scheduler from a policy that does not specify any
@@ -207,7 +207,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
-	config, err := factory.CreateFromConfig(policy)
+	config, err := factory.CreateFromConfig(policy, nil)
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
-	config, err := factory.CreateFromConfig(policy)
+	config, err := factory.CreateFromConfig(policy, nil)
 	if err != nil {
 		t.Fatalf("Failed to create scheduler from configuration: %v", err)
 	}

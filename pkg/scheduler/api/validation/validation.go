@@ -28,14 +28,66 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
+// checkIfExists checks if the given name exists in the string slice.
+func checkIfExistsInList(name string, nameList []string) bool {
+	for _, itemName := range nameList {
+		if name == itemName {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidatePolicy checks for errors in the Config
 // It does not return early so that it can find as many errors as possible
-func ValidatePolicy(policy schedulerapi.Policy) error {
+func ValidatePolicy(policy schedulerapi.Policy, featureDependencies []schedulerapi.FeatureDependency) error {
 	var validationErrors []error
 
 	for _, priority := range policy.Priorities {
 		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
 			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
+		}
+	}
+	for _, schedulerDependency := range featureDependencies {
+		for _, predicate := range policy.Predicates {
+			if len(schedulerDependency.ExcludedPredicateList) > 0 && checkIfExistsInList(predicate.Name, schedulerDependency.ExcludedPredicateList) {
+				validationErrors = append(validationErrors, fmt.Errorf("Predicate %s shouldn't be in when %s is enabled", predicate.Name, schedulerDependency.Name))
+			}
+		}
+		for _, priority := range policy.Priorities {
+			if len(schedulerDependency.ExcludedPriorityList) > 0 && checkIfExistsInList(priority.Name, schedulerDependency.ExcludedPriorityList) {
+				validationErrors = append(validationErrors, fmt.Errorf("Priority %s shouldn't be in when %s is enabled", priority.Name, schedulerDependency.Name))
+			}
+		}
+	}
+	for _, schedulerDependency := range featureDependencies {
+		if len(schedulerDependency.NeededPredicateList) > 0 {
+			for _, neededPredicate := range schedulerDependency.NeededPredicateList {
+				found := false
+				for _, predicate := range policy.Predicates {
+					if predicate.Name == neededPredicate {
+						found = true
+					}
+				}
+				if !found {
+					validationErrors = append(validationErrors, fmt.Errorf("Predicate %s should be in when %s is enabled", neededPredicate, schedulerDependency.Name))
+				}
+			}
+
+		}
+		if len(schedulerDependency.NeededPriorityList) > 0 {
+			for _, neededPriority := range schedulerDependency.NeededPriorityList {
+				found := false
+				for _, priority := range policy.Priorities {
+					if priority.Name == neededPriority {
+						found = true
+					}
+				}
+				if !found {
+					validationErrors = append(validationErrors, fmt.Errorf("Priority %s should be in when %s is enabled", neededPriority, schedulerDependency.Name))
+				}
+			}
+
 		}
 	}
 

@@ -128,7 +128,7 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 
 	// Apply algorithms based on feature gates.
 	// TODO: make configurable?
-	algorithmprovider.ApplyFeatureGates()
+	schedulerFeatureGateDependencies := algorithmprovider.ApplyFeatureGates()
 
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
@@ -138,7 +138,7 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 	}
 
 	// Build a scheduler config from the provided algorithm source.
-	schedulerConfig, err := NewSchedulerConfig(c)
+	schedulerConfig, err := NewSchedulerConfig(c, schedulerFeatureGateDependencies)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 }
 
 // NewSchedulerConfig creates the scheduler configuration. This is exposed for use by tests.
-func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Config, error) {
+func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig, featureDependencies []schedulerapi.FeatureDependency) (*scheduler.Config, error) {
 	var storageClassInformer storageinformers.StorageClassInformer
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		storageClassInformer = s.InformerFactory.Storage().V1().StorageClasses()
@@ -305,7 +305,6 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 		DisablePreemption:              s.ComponentConfig.DisablePreemption,
 		PercentageOfNodesToScore:       s.ComponentConfig.PercentageOfNodesToScore,
 	})
-
 	source := s.ComponentConfig.AlgorithmSource
 	var config *scheduler.Config
 	switch {
@@ -351,7 +350,7 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 				return nil, fmt.Errorf("invalid policy: %v", err)
 			}
 		}
-		sc, err := configurator.CreateFromConfig(*policy)
+		sc, err := configurator.CreateFromConfig(*policy, featureDependencies)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}

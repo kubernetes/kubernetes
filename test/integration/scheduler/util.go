@@ -181,7 +181,7 @@ func initTestSchedulerWithOptions(
 	var err error
 
 	if policy != nil {
-		context.schedulerConfig, err = context.schedulerConfigFactory.CreateFromConfig(*policy)
+		context.schedulerConfig, err = context.schedulerConfigFactory.CreateFromConfig(*policy, nil)
 	} else {
 		context.schedulerConfig, err = context.schedulerConfigFactory.Create()
 	}

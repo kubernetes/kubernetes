@@ -26,8 +26,9 @@ import (
 
 func TestValidatePolicy(t *testing.T) {
 	tests := []struct {
-		policy   api.Policy
-		expected error
+		policy              api.Policy
+		expected            error
+		featureDependencies []api.FeatureDependency
 	}{
 		{
 			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority"}}},
@@ -88,10 +89,35 @@ func TestValidatePolicy(t *testing.T) {
 				}},
 			expected: errors.New("kubernetes.io/foo is an invalid extended resource name"),
 		},
+		{
+			policy:              api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: 10}}},
+			featureDependencies: []api.FeatureDependency{{Name: "TestFeature", NeededPriorityList: []string{"WeightPriority", "TestPriority"}}},
+			expected:            errors.New("Priority TestPriority should be in when TestFeature is enabled"),
+		},
+		{
+			policy:              api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: 10}}},
+			featureDependencies: []api.FeatureDependency{{Name: "TestFeature", ExcludedPriorityList: []string{"WeightPriority", "TestPriority"}}},
+			expected:            errors.New("Priority WeightPriority shouldn't be in when TestFeature is enabled"),
+		},
+		{
+			policy:              api.Policy{Predicates: []api.PredicatePolicy{{Name: "MyPredicate"}}},
+			featureDependencies: []api.FeatureDependency{{Name: "TestFeature", ExcludedPriorityList: []string{"MyPredicate", "TestPredicate"}}},
+			expected:            nil,
+		},
+		{
+			policy:              api.Policy{Predicates: []api.PredicatePolicy{{Name: "MyPredicate"}}},
+			featureDependencies: []api.FeatureDependency{{Name: "TestFeature", NeededPredicateList: []string{"TestPredicate"}}},
+			expected:            errors.New("Predicate TestPredicate should be in when TestFeature is enabled"),
+		},
+		{
+			policy:              api.Policy{Predicates: []api.PredicatePolicy{{Name: "MyPredicate"}}},
+			featureDependencies: []api.FeatureDependency{{Name: "TestFeature", ExcludedPredicateList: []string{"MyPredicate", "TestPredicate"}}},
+			expected:            errors.New("Predicate MyPredicate shouldn't be in when TestFeature is enabled"),
+		},
 	}
 
 	for _, test := range tests {
-		actual := ValidatePolicy(test.policy)
+		actual := ValidatePolicy(test.policy, test.featureDependencies)
 		if fmt.Sprint(test.expected) != fmt.Sprint(actual) {
 			t.Errorf("expected: %s, actual: %s", test.expected, actual)
 		}
