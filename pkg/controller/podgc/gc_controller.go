@@ -17,6 +17,7 @@ limitations under the License.
 package podgc
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -25,13 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/util/metrics"
 
 	"github.com/golang/glog"
@@ -47,11 +48,14 @@ type PodGCController struct {
 	podLister       corelisters.PodLister
 	podListerSynced cache.InformerSynced
 
+	nodeLister       corelisters.NodeLister
+	nodeListerSynced cache.InformerSynced
+
 	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int
 }
 
-func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer, terminatedPodThreshold int) *PodGCController {
+func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -67,6 +71,12 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 	gcc.podLister = podInformer.Lister()
 	gcc.podListerSynced = podInformer.Informer().HasSynced
 
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(gcc.gcOrphanedFromNode),
+	})
+	gcc.nodeLister = nodeInformer.Lister()
+	gcc.nodeListerSynced = nodeInformer.Informer().HasSynced
+
 	return gcc
 }
 
@@ -76,7 +86,7 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	glog.Infof("Starting GC controller")
 	defer glog.Infof("Shutting down GC controller")
 
-	if !controller.WaitForCacheSync("GC", stop, gcc.podListerSynced) {
+	if !controller.WaitForCacheSync("GC", stop, gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
 	}
 
@@ -94,7 +104,6 @@ func (gcc *PodGCController) gc() {
 	if gcc.terminatedPodThreshold > 0 {
 		gcc.gcTerminated(pods)
 	}
-	gcc.gcOrphaned(pods)
 	gcc.gcUnscheduledTerminating(pods)
 }
 
@@ -139,33 +148,28 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 	wait.Wait()
 }
 
-// gcOrphaned deletes pods that are bound to nodes that don't exist.
-func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod) {
+// gcOrphanedFromNode deletes pods that are bound to a given node.
+func (gcc *PodGCController) gcOrphanedFromNode(node *v1.Node) error {
 	glog.V(4).Infof("GC'ing orphaned")
-	// We want to get list of Nodes from the etcd, to make sure that it's as fresh as possible.
-	nodes, err := gcc.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+
+	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
-		return
-	}
-	nodeNames := sets.NewString()
-	for i := range nodes.Items {
-		nodeNames.Insert(nodes.Items[i].Name)
+		return fmt.Errorf("Error while listing all Pods: %v", err)
 	}
 
 	for _, pod := range pods {
-		if pod.Spec.NodeName == "" {
+		if pod.Spec.NodeName != node.Name {
 			continue
 		}
-		if nodeNames.Has(pod.Spec.NodeName) {
-			continue
-		}
-		glog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, pod.Spec.NodeName)
+		glog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, node.Name)
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
 			glog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
 		}
 	}
+
+	return nil
 }
 
 // gcUnscheduledTerminating deletes pods that are terminating and haven't been scheduled to a particular node.
