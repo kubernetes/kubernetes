@@ -2545,6 +2545,13 @@
        "type": "string"
       },
       "description": "forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none. Each entry is either a plain sysctl name or ends in \"*\" in which case it is considered as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.\n\nExamples: e.g. \"foo/*\" forbids \"foo/bar\", \"foo/baz\", etc. e.g. \"foo.*\" forbids \"foo.bar\", \"foo.baz\", etc."
+     },
+     "allowedProcMountTypes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.ProcMountType"
+      },
+      "description": "AllowedProcMountTypes is a whitelist of allowed ProcMountTypes. Empty or nil indicates that only the DefaultProcMountType may be used. This requires the ProcMountType feature flag to be enabled."
      }
     }
    },
@@ -2715,6 +2722,10 @@
       "description": "driver is the name of the Flexvolume driver."
      }
     }
+   },
+   "v1.ProcMountType": {
+    "id": "v1.ProcMountType",
+    "properties": {}
    },
    "v1.APIResourceList": {
     "id": "v1.APIResourceList",
