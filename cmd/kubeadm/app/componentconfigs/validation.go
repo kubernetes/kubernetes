@@ -19,7 +19,7 @@ package componentconfigs
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
+	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 )
 

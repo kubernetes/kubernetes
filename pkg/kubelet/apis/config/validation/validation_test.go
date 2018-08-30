@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 func TestValidateKubeletConfiguration(t *testing.T) {

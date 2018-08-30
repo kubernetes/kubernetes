@@ -14,19 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheme
+// +k8s:deepcopy-gen=package
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/kubelet/apis/config
+// +k8s:openapi-gen=true
+// +k8s:defaulter-gen=TypeMeta
 
-import (
-	"testing"
-
-	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/fuzzer"
-)
-
-func TestRoundTripTypes(t *testing.T) {
-	scheme, _, err := NewSchemeAndCodecs()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	roundtrip.RoundTripTestForScheme(t, scheme, fuzzer.Funcs)
-}
+package v1beta1 // import "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"

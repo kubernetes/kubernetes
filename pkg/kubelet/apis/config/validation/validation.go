@@ -23,7 +23,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 

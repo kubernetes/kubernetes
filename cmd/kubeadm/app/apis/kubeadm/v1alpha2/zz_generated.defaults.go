@@ -22,7 +22,7 @@ package v1alpha2
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 )
 

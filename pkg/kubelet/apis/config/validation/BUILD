@@ -13,10 +13,10 @@ go_library(
         "validation_others.go",
         "validation_windows.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/config/validation",
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
@@ -42,7 +42,7 @@ go_test(
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )

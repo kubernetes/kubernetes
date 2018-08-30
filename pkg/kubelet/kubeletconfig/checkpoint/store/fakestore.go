@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 )
 

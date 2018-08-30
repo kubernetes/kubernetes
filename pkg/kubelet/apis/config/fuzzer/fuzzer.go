@@ -23,8 +23,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"

@@ -16,4 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 
-package kubeletconfig // import "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+package config // import "k8s.io/kubernetes/pkg/kubelet/apis/config"

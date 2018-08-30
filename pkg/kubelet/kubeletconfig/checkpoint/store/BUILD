@@ -14,9 +14,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
+        "//pkg/kubelet/apis/config/scheme:go_default_library",
+        "//pkg/kubelet/apis/config/v1beta1:go_default_library",
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
@@ -38,7 +38,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store",
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/kubeletconfig/checkpoint:go_default_library",
         "//pkg/kubelet/kubeletconfig/configfiles:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",

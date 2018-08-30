@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
 // validateKubeletOSConfiguration validates os specific kubelet configuration and returns an error if it is invalid.
