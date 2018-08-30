@@ -36,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
@@ -625,7 +626,15 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			container:          &v1.Container{},
 			masterServiceNs:    "kubernetes",
 			nilLister:          false,
-			expectedEnvs:       nil,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "1.2.3.6"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "8086"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://1.2.3.6:8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP", Value: "tcp://1.2.3.6:8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
+				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
+			},
 		},
 		{
 			name:               "pod in master service ns, service env vars",

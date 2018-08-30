@@ -514,24 +514,14 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks *bool) (map
 		}
 		serviceName := service.Name
 
-		switch service.Namespace {
 		// for the case whether the master service namespace is the namespace the pod
 		// is in, the pod should receive all the services in the namespace.
-		//
-		// ordering of the case clauses below enforces this
-		case ns:
-			// If service links are not enabled, we shouldn't add services from
-			// the same namespace.
-			if !*enableServiceLinks {
-				continue
+		if service.Namespace == kl.masterServiceNamespace && masterServices.Has(serviceName) {
+			if _, exists := serviceMap[serviceName]; !exists {
+				serviceMap[serviceName] = service
 			}
+		} else if service.Namespace == ns && *enableServiceLinks {
 			serviceMap[serviceName] = service
-		case kl.masterServiceNamespace:
-			if masterServices.Has(serviceName) {
-				if _, exists := serviceMap[serviceName]; !exists {
-					serviceMap[serviceName] = service
-				}
-			}
 		}
 	}
 
