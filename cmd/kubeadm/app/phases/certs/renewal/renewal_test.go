@@ -128,7 +128,7 @@ func getCertReq(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) *
 		},
 		Status: certsapi.CertificateSigningRequestStatus{
 			Conditions: []certsapi.CertificateSigningRequestCondition{
-				certsapi.CertificateSigningRequestCondition{
+				{
 					Type: certsapi.CertificateApproved,
 				},
 			},

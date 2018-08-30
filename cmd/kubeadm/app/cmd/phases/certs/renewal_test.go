@@ -45,8 +45,7 @@ func TestCommandsGenerated(t *testing.T) {
 	}
 
 	expectedCommands := []string{
-		// TODO(EKF): add `renew all`
-		// "renew",
+		"renew all",
 
 		"renew apiserver",
 		"renew apiserver-kubelet-client",
@@ -82,44 +81,61 @@ func TestCommandsGenerated(t *testing.T) {
 
 func TestRunRenewCommands(t *testing.T) {
 	tests := []struct {
-		command    string
-		baseName   string
-		caBaseName string
+		command     string
+		baseNames   []string
+		caBaseNames []string
 	}{
 		{
-			command:    "apiserver",
-			baseName:   kubeadmconstants.APIServerCertAndKeyBaseName,
-			caBaseName: kubeadmconstants.CACertAndKeyBaseName,
+			command: "all",
+			baseNames: []string{
+				kubeadmconstants.APIServerCertAndKeyBaseName,
+				kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+				kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
+				kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
+				kubeadmconstants.EtcdServerCertAndKeyBaseName,
+				kubeadmconstants.EtcdPeerCertAndKeyBaseName,
+				kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
+			},
+			caBaseNames: []string{
+				kubeadmconstants.CACertAndKeyBaseName,
+				kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+				kubeadmconstants.EtcdCACertAndKeyBaseName,
+			},
 		},
 		{
-			command:    "apiserver-kubelet-client",
-			baseName:   kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
-			caBaseName: kubeadmconstants.CACertAndKeyBaseName,
+			command:     "apiserver",
+			baseNames:   []string{kubeadmconstants.APIServerCertAndKeyBaseName},
+			caBaseNames: []string{kubeadmconstants.CACertAndKeyBaseName},
 		},
 		{
-			command:    "apiserver-etcd-client",
-			baseName:   kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
-			caBaseName: kubeadmconstants.EtcdCACertAndKeyBaseName,
+			command:     "apiserver-kubelet-client",
+			baseNames:   []string{kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName},
+			caBaseNames: []string{kubeadmconstants.CACertAndKeyBaseName},
 		},
 		{
-			command:    "front-proxy-client",
-			baseName:   kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
-			caBaseName: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+			command:     "apiserver-etcd-client",
+			baseNames:   []string{kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName},
+			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
 		},
 		{
-			command:    "etcd-server",
-			baseName:   kubeadmconstants.EtcdServerCertAndKeyBaseName,
-			caBaseName: kubeadmconstants.EtcdCACertAndKeyBaseName,
+			command:     "front-proxy-client",
+			baseNames:   []string{kubeadmconstants.FrontProxyClientCertAndKeyBaseName},
+			caBaseNames: []string{kubeadmconstants.FrontProxyCACertAndKeyBaseName},
 		},
 		{
-			command:    "etcd-peer",
-			baseName:   kubeadmconstants.EtcdPeerCertAndKeyBaseName,
-			caBaseName: kubeadmconstants.EtcdCACertAndKeyBaseName,
+			command:     "etcd-server",
+			baseNames:   []string{kubeadmconstants.EtcdServerCertAndKeyBaseName},
+			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
 		},
 		{
-			command:    "etcd-healthcheck-client",
-			baseName:   kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
-			caBaseName: kubeadmconstants.EtcdCACertAndKeyBaseName,
+			command:     "etcd-peer",
+			baseNames:   []string{kubeadmconstants.EtcdPeerCertAndKeyBaseName},
+			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
+		},
+		{
+			command:     "etcd-healthcheck-client",
+			baseNames:   []string{kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName},
+			caBaseNames: []string{kubeadmconstants.EtcdCACertAndKeyBaseName},
 		},
 	}
 
@@ -132,8 +148,10 @@ func TestRunRenewCommands(t *testing.T) {
 
 			caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
 
-			if err := pkiutil.WriteCertAndKey(tmpDir, test.caBaseName, caCert, caKey); err != nil {
-				t.Fatalf("couldn't write out CA: %v", err)
+			for _, caBaseName := range test.caBaseNames {
+				if err := pkiutil.WriteCertAndKey(tmpDir, caBaseName, caCert, caKey); err != nil {
+					t.Fatalf("couldn't write out CA: %v", err)
+				}
 			}
 
 			certTmpl := x509.Certificate{
@@ -163,36 +181,40 @@ func TestRunRenewCommands(t *testing.T) {
 				t.Fatalf("couldn't generate private key: %v", err)
 			}
 
-			if err := pkiutil.WriteCertAndKey(tmpDir, test.baseName, cert, key); err != nil {
-				t.Fatalf("couldn't write out initial certificate")
+			for _, baseName := range test.baseNames {
+				if err := pkiutil.WriteCertAndKey(tmpDir, baseName, cert, key); err != nil {
+					t.Fatalf("couldn't write out initial certificate")
+				}
 			}
 
 			cmdtestutil.RunSubCommand(t, renewCmds, test.command, fmt.Sprintf("--cert-dir=%s", tmpDir))
 
-			newCert, newKey, err := pkiutil.TryLoadCertAndKeyFromDisk(tmpDir, test.baseName)
-			if err != nil {
-				t.Fatalf("couldn't load renewed certificate: %v", err)
-			}
+			for _, baseName := range test.baseNames {
+				newCert, newKey, err := pkiutil.TryLoadCertAndKeyFromDisk(tmpDir, baseName)
+				if err != nil {
+					t.Fatalf("couldn't load renewed certificate: %v", err)
+				}
 
-			certstestutil.AssertCertificateIsSignedByCa(t, newCert, caCert)
+				certstestutil.AssertCertificateIsSignedByCa(t, newCert, caCert)
 
-			pool := x509.NewCertPool()
-			pool.AddCert(caCert)
+				pool := x509.NewCertPool()
+				pool.AddCert(caCert)
 
-			_, err = newCert.Verify(x509.VerifyOptions{
-				DNSName:   "test-domain.space",
-				Roots:     pool,
-				KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-			})
-			if err != nil {
-				t.Errorf("couldn't verify renewed cert: %v", err)
-			}
+				_, err = newCert.Verify(x509.VerifyOptions{
+					DNSName:   "test-domain.space",
+					Roots:     pool,
+					KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				})
+				if err != nil {
+					t.Errorf("couldn't verify renewed cert: %v", err)
+				}
 
-			pubKey, ok := newCert.PublicKey.(*rsa.PublicKey)
-			if !ok {
-				t.Errorf("unknown public key type %T", newCert.PublicKey)
-			} else if pubKey.N.Cmp(newKey.N) != 0 {
-				t.Error("private key does not match public key")
+				pubKey, ok := newCert.PublicKey.(*rsa.PublicKey)
+				if !ok {
+					t.Errorf("unknown public key type %T", newCert.PublicKey)
+				} else if pubKey.N.Cmp(newKey.N) != 0 {
+					t.Error("private key does not match public key")
+				}
 			}
 
 		})

@@ -23,6 +23,7 @@ import (
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -30,15 +31,28 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
+var (
+	genericLongDesc = normalizer.LongDesc(`
+		Renews the %[1]s, and saves them into %[2]s.cert and %[2]s.key files.
+
+    Extra attributes such as SANs will be based on the existing certificates, there is no need to resupply them.
+`)
+	allLongDesc = normalizer.LongDesc(`
+    Renews all known certificates necessary to run the control plan. Renewals are run unconditionally, regardless
+    of expiration date. Renewals can also be run individually for more control.
+`)
+)
+
+// NewCmdCertsRenewal creates a new `cert renew` command.
 func NewCmdCertsRenewal() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
-		Short: "Renews all known certificates for kubeadm",
-		Long:  "", // TODO EKF fill out
+		Short: "Renews certificates for a kubernetes cluster",
+		Long:  cmdutil.MacroCommandLongDescription,
+		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
 
 	cmd.AddCommand(getRenewSubCommands()...)
@@ -64,14 +78,31 @@ func getRenewSubCommands() []*cobra.Command {
 	kubeadmutil.CheckErr(err)
 
 	cmdList := []*cobra.Command{}
+	allCmds := []func() error{}
 
 	for caCert, certs := range certTree {
 		// Don't offer to renew CAs; would cause serious consequences
 		for _, cert := range certs {
-			cmdList = append(cmdList, makeCommandForRenew(cert, caCert, cfg))
+			cmd := makeCommandForRenew(cert, caCert, cfg)
+			cmdList = append(cmdList, cmd)
+			allCmds = append(allCmds, cmd.Execute)
 		}
 	}
 
+	allCmd := &cobra.Command{
+		Use:   "all",
+		Short: "renew all available certificates",
+		Long:  allLongDesc,
+		Run: func(*cobra.Command, []string) {
+			for _, cmd := range allCmds {
+				err := cmd()
+				kubeadmutil.CheckErr(err)
+			}
+		},
+	}
+	addFlags(allCmd, cfg)
+
+	cmdList = append(cmdList, allCmd)
 	return cmdList
 }
 
@@ -87,7 +118,7 @@ func generateCertCommand(name, longName, baseName, caCertBaseName string, cfg *r
 	return &cobra.Command{
 		Use:   name,
 		Short: fmt.Sprintf("Generates the %s", longName),
-		Long:  "", // TODO EKF fill out
+		Long:  fmt.Sprintf(genericLongDesc, longName, baseName),
 		Run: func(cmd *cobra.Command, args []string) {
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfg.cfgPath, &cfg.cfg)
 			kubeadmutil.CheckErr(err)

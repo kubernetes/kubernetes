@@ -20,10 +20,13 @@ import (
 	"crypto/x509"
 	"fmt"
 
+	"github.com/pkg/errors"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 )
 
+// RenewExistingCert loads a certificate file, uses the renew interface to renew it,
+// and saves the resulting certificate and key over the old one.
 func RenewExistingCert(certsDir, baseName string, impl Interface) error {
 	certificatePath, _ := pkiutil.PathsForCertAndKey(certsDir, baseName)
 	certs, err := certutil.CertsFromFile(certificatePath)
@@ -38,11 +41,11 @@ func RenewExistingCert(certsDir, baseName string, impl Interface) error {
 	cfg := certToConfig(certs[0])
 	newCert, newKey, err := impl.Renew(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to renew certificate %s: %v", baseName, err)
+		return errors.Wrapf(err, "failed to renew certificate %s", baseName)
 	}
 
 	if err := pkiutil.WriteCertAndKey(certsDir, baseName, newCert, newKey); err != nil {
-		return fmt.Errorf("failed to write new certificate %s: %v", baseName, err)
+		return errors.Wrapf(err, "failed to write new certificate %s", baseName)
 	}
 	return nil
 }

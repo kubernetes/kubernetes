@@ -186,7 +186,7 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 
 func addFlags(cmd *cobra.Command, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration, addAPIFlags bool) {
 	options.AddCertificateDirFlag(cmd.Flags(), &cfg.CertificatesDir)
-	options.AddKubeConfigFlag(cmd.Flags(), cfgPath)
+	options.AddConfigFlag(cmd.Flags(), cfgPath)
 	if addAPIFlags {
 		cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, "Alternative domain for services, to use for the API server serving cert")
 		cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "Alternative range of IP address for service VIPs, from which derives the internal API server VIP that will be added to the API Server serving cert")

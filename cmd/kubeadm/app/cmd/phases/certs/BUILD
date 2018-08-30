@@ -16,6 +16,7 @@ go_library(
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//pkg/util/normalizer:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )

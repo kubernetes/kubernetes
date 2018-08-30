@@ -21,9 +21,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"errors"
 	"fmt"
 	"time"
+
+	"github.com/pkg/errors"
 
 	certsapi "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +48,7 @@ type CertsAPIRenewal struct {
 	client certstype.CertificatesV1beta1Interface
 }
 
-// NewCertsAPIRenawal takes a certificate pair to construct the Interface.
+// NewCertsAPIRenawal takes a Kubernetes interface and returns a renewal Interface.
 func NewCertsAPIRenawal(client kubernetes.Interface) Interface {
 	return &CertsAPIRenewal{
 		client: client.CertificatesV1beta1(),
@@ -67,19 +68,19 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
-		return nil, nil, fmt.Errorf("Couldn't create new private key: %v", err)
+		return nil, nil, errors.Wrap(err, "couldn't create new private key")
 	}
 
 	csr, err := x509.CreateCertificateRequest(rand.Reader, reqTmp, key)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Couldn't create csr: %v", err)
+		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
 
 	usages := make([]certsapi.KeyUsage, len(cfg.Usages))
 	for i, usage := range cfg.Usages {
 		certsAPIUsage, ok := usageMap[usage]
 		if !ok {
-			return nil, nil, fmt.Errorf("unknown key usage %v", usage)
+			return nil, nil, fmt.Errorf("unknown key usage: %v", usage)
 		}
 		usages[i] = certsAPIUsage
 	}
@@ -96,7 +97,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 
 	req, err := r.client.CertificateSigningRequests().Create(k8sCSR)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't create certificate signing request: %v", err)
+		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
 
 	watcher, err := r.client.CertificateSigningRequests().Watch(metav1.ListOptions{
@@ -104,14 +105,14 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		FieldSelector: fields.Set{"metadata.name": req.Name}.String(),
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't watch for certificate creation: %v", err)
+		return nil, nil, errors.Wrap(err, "couldn't watch for certificate creation")
 	}
 	defer watcher.Stop()
 
 	select {
 	case ev := <-watcher.ResultChan():
 		if ev.Type != watch.Modified {
-			return nil, nil, fmt.Errorf("unexpected event receieved: %q", ev.Type)
+			return nil, nil, fmt.Errorf("unexpected event received: %q", ev.Type)
 		}
 	case <-time.After(watchTimeout):
 		return nil, nil, errors.New("timeout trying to sign certificate")
@@ -124,12 +125,12 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 
 	// TODO: under what circumstances are there more than one?
 	if status := req.Status.Conditions[0].Type; status != certsapi.CertificateApproved {
-		return nil, nil, fmt.Errorf("Unexpected certificate status %v", status)
+		return nil, nil, fmt.Errorf("unexpected certificate status: %v", status)
 	}
 
 	cert, err := x509.ParseCertificate(req.Status.Certificate)
 	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't parse issued certificate: %v", err)
+		return nil, nil, errors.Wrap(err, "couldn't parse issued certificate")
 	}
 
 	return cert, key, nil
