@@ -23,6 +23,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -325,6 +326,15 @@ type HostPriority struct {
 	Host string `json:"host"`
 	// Score associated with the host
 	Score int `json:"score"`
+}
+
+// FeatureDependency provides the feature and its dependent predicates and priorities.
+type FeatureDependency struct {
+	Name                  string      // Name of the feature gate.
+	NeededPredicateList   sets.String // List of predicates needed if we enable this predicate or priority
+	NeededPriorityList    sets.String // List of priorities needed if we enable this predicate or priority.
+	ExcludedPredicateList sets.String // List of predicates that should be excluded if we enable this predicate/priority.
+	ExcludedPriorityList  sets.String // List of priorities that should be excluded if we enable this predicate/priority
 }
 
 // HostPriorityList declares a []HostPriority type.

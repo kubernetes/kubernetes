@@ -30,12 +30,48 @@ import (
 
 // ValidatePolicy checks for errors in the Config
 // It does not return early so that it can find as many errors as possible
-func ValidatePolicy(policy schedulerapi.Policy) error {
+func ValidatePolicy(policy schedulerapi.Policy, featureDependencies []schedulerapi.FeatureDependency) error {
 	var validationErrors []error
 
 	for _, priority := range policy.Priorities {
 		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
 			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
+		}
+	}
+	for _, schedulerDependency := range featureDependencies {
+		for _, predicate := range policy.Predicates {
+			if schedulerDependency.ExcludedPredicateList.Has(predicate.Name) {
+				validationErrors = append(validationErrors, fmt.Errorf("Predicate %s shouldn't be present when %s is enabled", predicate.Name, schedulerDependency.Name))
+			}
+		}
+		for _, priority := range policy.Priorities {
+			if schedulerDependency.ExcludedPriorityList.Has(priority.Name) {
+				validationErrors = append(validationErrors, fmt.Errorf("Priority %s shouldn't be present when %s is enabled", priority.Name, schedulerDependency.Name))
+			}
+		}
+
+		for _, neededPredicate := range schedulerDependency.NeededPredicateList.List() {
+			found := false
+			for _, predicate := range policy.Predicates {
+				if predicate.Name == neededPredicate {
+					found = true
+				}
+			}
+			if !found {
+				validationErrors = append(validationErrors, fmt.Errorf("Predicate %s should be present when %s is enabled", neededPredicate, schedulerDependency.Name))
+			}
+		}
+
+		for _, neededPriority := range schedulerDependency.NeededPriorityList.List() {
+			found := false
+			for _, priority := range policy.Priorities {
+				if priority.Name == neededPriority {
+					found = true
+				}
+			}
+			if !found {
+				validationErrors = append(validationErrors, fmt.Errorf("Priority %s should be present when %s is enabled", neededPriority, schedulerDependency.Name))
+			}
 		}
 	}
 

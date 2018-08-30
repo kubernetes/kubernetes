@@ -22,6 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -333,6 +334,20 @@ type HostPriority struct {
 	Host string
 	// Score associated with the host
 	Score int
+}
+
+// FeatureDependency provides the feature and its dependent predicates and priorities.
+type FeatureDependency struct {
+	// Name of the feature gate.
+	Name string
+	// List of predicates needed if we enable this predicate or priority
+	NeededPredicateList sets.String
+	// List of priorities needed if we enable this predicate or priority.
+	NeededPriorityList sets.String
+	// List of predicates that should be excluded if we enable this predicate/priority.
+	ExcludedPredicateList sets.String
+	// List of priorities that should be excluded if we enable this predicate/priority
+	ExcludedPriorityList sets.String
 }
 
 // HostPriorityList declares a []HostPriority type.

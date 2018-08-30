@@ -268,6 +268,7 @@ priorities: []
 			schedulerframework.NewRegistry(),
 			nil,
 			[]kubeschedulerconfig.PluginConfig{},
+			[]schedulerapi.FeatureDependency{},
 			scheduler.WithName(v1.DefaultSchedulerName),
 			scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
@@ -341,6 +342,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		schedulerframework.NewRegistry(),
 		nil,
 		[]kubeschedulerconfig.PluginConfig{},
+		[]schedulerapi.FeatureDependency{},
 		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))

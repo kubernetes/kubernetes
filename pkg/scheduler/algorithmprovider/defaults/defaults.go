@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
+	"k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
@@ -56,11 +57,13 @@ func defaultPredicates() sets.String {
 	)
 }
 
-// ApplyFeatureGates applies algorithm by feature gates.
-func ApplyFeatureGates() {
+// ApplyFeatureGates applies algorithm by feature gates and returns a list of feature dependencies.
+func ApplyFeatureGates() []api.FeatureDependency {
+	featureDependency := []api.FeatureDependency{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressure"
 		// and "CheckNodeDiskPressure" predicates
+		var excludedPredicates, neededPredicates sets.String
 		factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
 		factory.RemoveFitPredicate(predicates.CheckNodeMemoryPressurePred)
 		factory.RemoveFitPredicate(predicates.CheckNodeDiskPressurePred)
@@ -74,6 +77,11 @@ func ApplyFeatureGates() {
 		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeDiskPressurePred)
 		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodePIDPressurePred)
 
+		excludedPredicates = sets.NewString(predicates.CheckNodeConditionPred,
+			predicates.CheckNodeMemoryPressurePred,
+			predicates.CheckNodeDiskPressurePred,
+			predicates.CheckNodePIDPressurePred,
+		)
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
 		factory.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
 		// Fit is determined based on whether a pod can tolerate unschedulable of node
@@ -84,7 +92,17 @@ func ApplyFeatureGates() {
 		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.PodToleratesNodeTaintsPred)
 		factory.InsertPredicateKeyToAlgorithmProviderMap(predicates.CheckNodeUnschedulablePred)
 
-		klog.Infof("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
+		neededPredicates = sets.NewString(predicates.PodToleratesNodeTaintsPred)
+
+		TaintNodeCondition := api.FeatureDependency{
+			Name:                  "TaintNodesByCondition",
+			NeededPredicateList:   neededPredicates,
+			NeededPriorityList:    nil,
+			ExcludedPredicateList: excludedPredicates,
+			ExcludedPriorityList:  nil,
+		}
+		featureDependency = append(featureDependency, TaintNodeCondition)
+		klog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
@@ -94,6 +112,7 @@ func ApplyFeatureGates() {
 		// Register the priority function to specific provider too.
 		factory.InsertPriorityKeyToAlgorithmProviderMap(factory.RegisterPriorityMapReduceFunction(priorities.ResourceLimitsPriority, priorities.ResourceLimitsPriorityMap, nil, 1))
 	}
+	return featureDependency
 }
 
 func registerAlgorithmProvider(predSet, priSet sets.String) {

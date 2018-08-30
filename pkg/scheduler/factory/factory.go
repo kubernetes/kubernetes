@@ -158,7 +158,7 @@ type Configurator interface {
 
 	Create() (*Config, error)
 	CreateFromProvider(providerName string) (*Config, error)
-	CreateFromConfig(policy schedulerapi.Policy) (*Config, error)
+	CreateFromConfig(policy schedulerapi.Policy, featureDependencies []schedulerapi.FeatureDependency) (*Config, error)
 	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
 }
 
@@ -360,11 +360,11 @@ func (c *configFactory) CreateFromProvider(providerName string) (*Config, error)
 }
 
 // Creates a scheduler from the configuration file
-func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, error) {
+func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy, featureDependencies []schedulerapi.FeatureDependency) (*Config, error) {
 	klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
 
 	// validate the policy configuration
-	if err := validation.ValidatePolicy(policy); err != nil {
+	if err := validation.ValidatePolicy(policy, featureDependencies); err != nil {
 		return nil, err
 	}
 

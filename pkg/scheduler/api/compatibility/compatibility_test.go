@@ -1113,7 +1113,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			DisablePreemption:              false,
 			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		}).CreateFromConfig(policy); err != nil {
+		}).CreateFromConfig(policy, nil); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}

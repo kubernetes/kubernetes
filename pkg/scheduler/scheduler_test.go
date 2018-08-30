@@ -207,6 +207,7 @@ func TestSchedulerCreation(t *testing.T) {
 		EmptyPluginRegistry,
 		nil,
 		EmptyPluginConfig,
+		[]schedulerapi.FeatureDependency{},
 		WithBindTimeoutSeconds(defaultBindTimeout))
 
 	if err != nil {

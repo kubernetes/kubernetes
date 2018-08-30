@@ -143,10 +143,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
-	// Apply algorithms based on feature gates.
-	// TODO: make configurable?
-	algorithmprovider.ApplyFeatureGates()
-
 	// Configz registration.
 	if cz, err := configz.New("componentconfig"); err == nil {
 		cz.Set(cc.ComponentConfig)
@@ -169,6 +165,10 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		}
 	}
 
+	// Apply algorithms based on feature gates.
+	// TODO: make configurable?
+	schedulerFeatureGateDependencies := algorithmprovider.ApplyFeatureGates()
+
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory.Core().V1().Nodes(),
@@ -188,6 +188,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		registry,
 		cc.ComponentConfig.Plugins,
 		cc.ComponentConfig.PluginConfig,
+		schedulerFeatureGateDependencies,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
