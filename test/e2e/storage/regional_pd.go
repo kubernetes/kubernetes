@@ -66,15 +66,15 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 			testVolumeProvisioning(c, ns)
 		})
 
-		It("should provision storage with delayed binding [Slow] [Feature:DynamicProvisioningScheduling]", func() {
+		It("should provision storage with delayed binding [Slow]", func() {
 			testRegionalDelayedBinding(c, ns)
 		})
 
-		It("should provision storage in the allowedTopologies [Slow] [Feature:DynamicProvisioningScheduling]", func() {
+		It("should provision storage in the allowedTopologies [Slow]", func() {
 			testRegionalAllowedTopologies(c, ns)
 		})
 
-		It("should provision storage in the allowedTopologies with delayed binding [Slow] [Feature:DynamicProvisioningScheduling]", func() {
+		It("should provision storage in the allowedTopologies with delayed binding [Slow]", func() {
 			testRegionalAllowedTopologiesWithDelayedBinding(c, ns)
 		})
 
