@@ -14,7 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A utility for deleting target pools and forwarding rules that are unattached to VMs
+# A utility for cleaning up GCE networking resources created through a
+# LoadBalancer Service and orphaned upon deletion of the cluster before deletion
+# of the Service.
+
 PROJECT=${PROJECT:-kubernetes-jenkins}
 REGION=${REGION:-us-central1}
 
