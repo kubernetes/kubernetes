@@ -47,12 +47,14 @@ func (*FakeController) LastSyncResourceVersion() string {
 
 func alwaysReady() bool { return true }
 
-func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer) {
+func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
-	controller := NewPodGC(kubeClient, podInformer, terminatedPodThreshold)
+	nodeInformer := informerFactory.Core().V1().Nodes()
+	controller := NewPodGC(kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady
-	return controller, podInformer
+	controller.nodeListerSynced = alwaysReady
+	return controller, podInformer, nodeInformer
 }
 
 func TestGCTerminated(t *testing.T) {
@@ -113,7 +115,10 @@ func TestGCTerminated(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
-		gcc, podInformer := NewFromClient(client, test.threshold)
+		gcc, podInformer, nodeInformer := NewFromClient(client, test.threshold)
+
+		nodeInformer.Informer().GetStore().Add(testutil.NewNode("node"))
+
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
@@ -180,7 +185,7 @@ func TestGCOrphaned(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset()
-		gcc, podInformer := NewFromClient(client, test.threshold)
+		gcc, podInformer, _ := NewFromClient(client, test.threshold)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
@@ -257,7 +262,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 
 	for i, test := range testCases {
 		client := fake.NewSimpleClientset()
-		gcc, podInformer := NewFromClient(client, -1)
+		gcc, podInformer, _ := NewFromClient(client, -1)
 		deletedPodNames := make([]string, 0)
 		var lock sync.Mutex
 		gcc.deletePod = func(_, name string) error {
