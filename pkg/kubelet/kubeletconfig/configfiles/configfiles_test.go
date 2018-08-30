@@ -24,7 +24,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
