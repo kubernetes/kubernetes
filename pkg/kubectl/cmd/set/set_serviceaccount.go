@@ -44,7 +44,7 @@ var (
 	serviceaccountLong = templates.LongDesc(i18n.T(`
 	Update ServiceAccount of pod template resources.
 
-	Possible resources (case insensitive) can be: 
+	Possible resources (case insensitive) can be:
 	` + serviceaccountResources))
 
 	serviceaccountExample = templates.Examples(i18n.T(`
@@ -202,7 +202,7 @@ func (o *SetServiceAccountOptions) Run() error {
 			}
 			continue
 		}
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			patchErrs = append(patchErrs, fmt.Errorf("failed to patch ServiceAccountName %v", err))
 			continue

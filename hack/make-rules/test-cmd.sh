@@ -40,12 +40,16 @@ function run_kube_apiserver() {
   # Include RBAC (to exercise bootstrapping), and AlwaysAllow to allow all actions
   AUTHORIZATION_MODE="RBAC,AlwaysAllow"
 
+  # Enable features
+  ENABLE_FEATURE_GATES="DryRun=true"
+
   "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
     --insecure-bind-address="127.0.0.1" \
     --bind-address="127.0.0.1" \
     --insecure-port="${API_PORT}" \
     --authorization-mode="${AUTHORIZATION_MODE}" \
     --secure-port="${SECURE_API_PORT}" \
+    --feature-gates="${ENABLE_FEATURE_GATES}" \
     --enable-admission-plugins="${ENABLE_ADMISSION_PLUGINS}" \
     --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
     --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \

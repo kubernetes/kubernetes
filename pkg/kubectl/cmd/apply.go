@@ -66,6 +66,7 @@ type ApplyOptions struct {
 
 	Selector                   string
 	DryRun                     bool
+	ServerDryRun               bool
 	Prune                      bool
 	PruneResources             []pruneResource
 	cmdBaseName                string
@@ -172,6 +173,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenApiPatch, "openapi-patch", o.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
+	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
@@ -186,13 +188,19 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
+	if o.DryRun && o.ServerDryRun {
+		return fmt.Errorf("--dry-run and --server-dry-run can't be used together")
+	}
+
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
 		if o.DryRun {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
-
+		if o.ServerDryRun {
+			o.PrintFlags.Complete("%s (server dry run)")
+		}
 		return o.PrintFlags.ToPrinter()
 	}
 
@@ -354,7 +362,11 @@ func (o *ApplyOptions) Run() error {
 
 			if !o.DryRun {
 				// Then create the resource and skip the three-way merge
-				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+				options := metav1.CreateOptions{}
+				if o.ServerDryRun {
+					options.DryRun = []string{metav1.DryRunAll}
+				}
+				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, &options)
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
@@ -402,6 +414,7 @@ func (o *ApplyOptions) Run() error {
 				cascade:       o.DeleteOptions.Cascade,
 				timeout:       o.DeleteOptions.Timeout,
 				gracePeriod:   o.DeleteOptions.GracePeriod,
+				serverDryRun:  o.ServerDryRun,
 				openapiSchema: openapiSchema,
 			}
 
@@ -483,9 +496,10 @@ func (o *ApplyOptions) Run() error {
 		labelSelector: o.Selector,
 		visitedUids:   visitedUids,
 
-		cascade:     o.DeleteOptions.Cascade,
-		dryRun:      o.DryRun,
-		gracePeriod: o.DeleteOptions.GracePeriod,
+		cascade:      o.DeleteOptions.Cascade,
+		dryRun:       o.DryRun,
+		serverDryRun: o.ServerDryRun,
+		gracePeriod:  o.DeleteOptions.GracePeriod,
 
 		toPrinter: o.ToPrinter,
 
@@ -572,9 +586,10 @@ type pruner struct {
 	labelSelector string
 	fieldSelector string
 
-	cascade     bool
-	dryRun      bool
-	gracePeriod int
+	cascade      bool
+	serverDryRun bool
+	dryRun       bool
+	gracePeriod  int
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
 
@@ -629,13 +644,16 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod)
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.serverDryRun)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int) error {
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, serverDryRun bool) error {
 	options := &metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
 		options = metav1.NewDeleteOptions(int64(gracePeriod))
+	}
+	if serverDryRun {
+		options.DryRun = []string{metav1.DryRunAll}
 	}
 	policy := metav1.DeletePropagationForeground
 	if !cascade {
@@ -646,7 +664,7 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Inte
 }
 
 func (p *patcher) delete(namespace, name string) error {
-	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod)
+	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.serverDryRun)
 }
 
 type patcher struct {
@@ -657,10 +675,11 @@ type patcher struct {
 	overwrite bool
 	backOff   clockwork.Clock
 
-	force       bool
-	cascade     bool
-	timeout     time.Duration
-	gracePeriod int
+	force        bool
+	cascade      bool
+	timeout      time.Duration
+	gracePeriod  int
+	serverDryRun bool
 
 	openapiSchema openapi.Resources
 }
@@ -736,7 +755,12 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return patch, obj, nil
 	}
 
-	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch)
+	options := metav1.UpdateOptions{}
+	if p.serverDryRun {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
+
+	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch, &options)
 	return patch, patchedObj, err
 }
 
@@ -776,11 +800,15 @@ func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err != nil {
 		return modified, nil, err
 	}
-	createdObject, err := p.helper.Create(namespace, true, versionedObject)
+	options := metav1.CreateOptions{}
+	if p.serverDryRun {
+		options.DryRun = []string{metav1.DryRunAll}
+	}
+	createdObject, err := p.helper.Create(namespace, true, versionedObject, &options)
 	if err != nil {
 		// restore the original object if we fail to create the new one
 		// but still propagate and advertise error to user
-		recreated, recreateErr := p.helper.Create(namespace, true, original)
+		recreated, recreateErr := p.helper.Create(namespace, true, original, &options)
 		if recreateErr != nil {
 			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
 		} else {

@@ -317,7 +317,7 @@ func (o *ReplaceOptions) forceReplace() error {
 			glog.V(4).Infof("error recording current command: %v", err)
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, nil)
 		if err != nil {
 			return err
 		}

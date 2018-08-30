@@ -304,7 +304,7 @@ func (o *LabelOptions) RunLabel() error {
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes)
+				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
 			} else {
 				outputObj, err = helper.Replace(namespace, name, false, obj)
 			}
