@@ -34,6 +34,10 @@ const (
 	maxThreshold int64 = 1000 * mb
 )
 
+// alpha is used to fine-tune the image score scaling
+// TODO: expose the alpha parameter to config map
+const alpha float64 = 0
+
 // ImageLocalityPriorityMap is a priority function that favors nodes that already have requested pod container's images.
 // It will detect whether the requested images are present on a node, and then calculate a score ranging from 0 to 10
 // based on the total size of those images.
@@ -88,12 +92,17 @@ func sumImageScores(nodeInfo *schedulercache.NodeInfo, containers []v1.Container
 }
 
 // scaledImageScore returns an adaptively scaled score for the given state of an image.
-// The size of the image is used as the base score, scaled by a factor which considers how much nodes the image has "spread" to.
-// This heuristic aims to mitigate the undesirable "node heating problem", i.e., pods get assigned to the same or
-// a few nodes due to image locality.
+// The size of the image is used as the base score, scaled by a factor instantiates the following heuristics:
+// - Image-spread: a heuristic that aims to mitigate the undesirable "node heating problem", i.e., pods get assigned
+// 	 to the same or a few nodes due to image locality.
+// - TODO: consider more heuristics, e.g., node's allocable resources
+// An alpha parameter is used to weight-average the original score and the scaled score. This allows user to
+// make customized trade-off between how much they care about image locality vs. the above heuristics.
+// The higher the alpha, the more it cares about image locality. The default value of alpha is 0, i.e., we assume users
+// are conservative about image locality utmost.
 func scaledImageScore(imageState *schedulercache.ImageStateSummary, totalNumNodes int) int64 {
-	spread := float64(imageState.NumNodes) / float64(totalNumNodes)
-	return int64(float64(imageState.Size) * spread)
+	score, spread := float64(imageState.Size), float64(imageState.NumNodes)/float64(totalNumNodes)
+	return int64(alpha*score + (1-alpha)*score*spread)
 }
 
 // normalizedImageName returns the CRI compliant name for a given image.
