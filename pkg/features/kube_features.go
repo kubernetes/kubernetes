@@ -17,6 +17,8 @@ limitations under the License.
 package features
 
 import (
+	"github.com/golang/glog"
+
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -367,6 +369,10 @@ const (
 
 func init() {
 	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	err := utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	if err != nil {
+		glog.Fatal(err)
+	}
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.

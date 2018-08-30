@@ -13,6 +13,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
 
