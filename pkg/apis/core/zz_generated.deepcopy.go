@@ -4589,6 +4589,11 @@ func (in *SecurityContext) DeepCopyInto(out *SecurityContext) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.ProcMount != nil {
+		in, out := &in.ProcMount, &out.ProcMount
+		*out = new(ProcMountType)
+		**out = **in
+	}
 	return
 }
 
