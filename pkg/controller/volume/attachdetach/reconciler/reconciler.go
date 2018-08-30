@@ -242,7 +242,7 @@ func (rc *reconciler) reconcile() {
 			// If isSafeToDetach is true, skip verifySafeToDetach check
 			glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting attacherDetacher.DetachVolume", ""))
 			verifySafeToDetach := !isSafeToDetach
-			glog.V(1).Infof("node %v is shutdown, the volume is safe to detach.", attachedVolume.NodeName)
+			glog.V(1).Infof("the volume in node %v is safe to detach.", attachedVolume.NodeName)
 			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
 			if err == nil {
 				if !isSafeToDetach {

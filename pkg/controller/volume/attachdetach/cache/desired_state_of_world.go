@@ -395,7 +395,11 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 
 	volumesToAttach := make([]VolumeToAttach, 0 /* len */, len(dsw.nodesManaged) /* cap */)
 	for nodeName, nodeObj := range dsw.nodesManaged {
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeShutdown) && !nodeObj.isShutdown {
+		isShutdown := false
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeShutdown) {
+			isShutdown = nodeObj.isShutdown
+		}
+		if !isShutdown {
 			for volumeName, volumeObj := range nodeObj.volumesToAttach {
 				volumesToAttach = append(volumesToAttach,
 					VolumeToAttach{
