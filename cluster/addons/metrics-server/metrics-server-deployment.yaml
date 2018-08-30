@@ -49,10 +49,11 @@ spec:
       serviceAccountName: metrics-server
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server-amd64:v0.2.1
+        image: gcr.io/siarkowicz-images/metrics-server-amd64:v0.3.0-alpha.1
         command:
         - /metrics-server
-        - --source=kubernetes.summary_api:''
+        - --deprecated-kubelet-completely-insecure=true
+        - --kubelet-port=10255
         ports:
         - containerPort: 443
           name: https
