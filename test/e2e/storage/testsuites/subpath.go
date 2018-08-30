@@ -589,7 +589,9 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	By(fmt.Sprintf("Creating pod %s", pod.Name))
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
-
+	defer func() {
+		framework.DeletePodWithWait(f, f.ClientSet, pod)
+	}()
 	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	Expect(err).ToNot(HaveOccurred(), "while waiting for pod to be running")
 
