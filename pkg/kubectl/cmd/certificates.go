@@ -29,7 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/client-go/kubernetes"
+	certificatesv1beta1client "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -62,7 +62,7 @@ type CertificateOptions struct {
 	csrNames    []string
 	outputStyle string
 
-	clientSet kubernetes.Interface
+	clientSet certificatesv1beta1client.CertificatesV1beta1Interface
 	builder   *resource.Builder
 
 	genericclioptions.IOStreams
@@ -82,7 +82,12 @@ func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	o.builder = f.NewBuilder()
-	o.clientSet, err = f.KubernetesClientSet()
+
+	clientConfig, err := f.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+	o.clientSet, err = certificatesv1beta1client.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
@@ -206,7 +211,7 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 	})
 }
 
-func (options *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet kubernetes.Interface, force bool, modify func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool)) error {
+func (options *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet certificatesv1beta1client.CertificatesV1beta1Interface, force bool, modify func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool)) error {
 	var found int
 	r := builder.
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
@@ -225,9 +230,7 @@ func (options *CertificateOptions) modifyCertificateCondition(builder *resource.
 			csr := info.Object.(*certificatesv1beta1.CertificateSigningRequest)
 			csr, hasCondition := modify(csr)
 			if !hasCondition || force {
-				csr, err = clientSet.Certificates().
-					CertificateSigningRequests().
-					UpdateApproval(csr)
+				csr, err = clientSet.CertificateSigningRequests().UpdateApproval(csr)
 				if errors.IsConflict(err) && i < 10 {
 					if err := info.Get(); err != nil {
 						return err
