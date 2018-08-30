@@ -401,7 +401,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		namespaceParamName := "namespaces"
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		namespaceParam := ws.PathParameter("namespace", "object name and auth scope, such as for teams and projects").DataType("string")
-		namespacedPath := namespaceParamName + "/{" + "namespace" + "}/" + resource
+		namespacedPath := namespaceParamName + "/{namespace}/" + resource
 		namespaceParams := []*restful.Parameter{namespaceParam}
 
 		resourcePath := namespacedPath
