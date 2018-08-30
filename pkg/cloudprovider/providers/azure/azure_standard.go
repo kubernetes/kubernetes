@@ -625,7 +625,7 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 	}
 
 	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
-		glog.V(3).Infof("ensureHostInPool skips node %s because its primdary nic %s is in Failed state", nodeName, nic.Name)
+		glog.V(3).Infof("ensureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
 		return nil
 	}
 

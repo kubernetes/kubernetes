@@ -217,11 +217,12 @@ type Proxier struct {
 	ipGetter IPGetter
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
-	iptablesData *bytes.Buffer
-	natChains    *bytes.Buffer
-	filterChains *bytes.Buffer
-	natRules     *bytes.Buffer
-	filterRules  *bytes.Buffer
+	iptablesData     *bytes.Buffer
+	filterChainsData *bytes.Buffer
+	natChains        *bytes.Buffer
+	filterChains     *bytes.Buffer
+	natRules         *bytes.Buffer
+	filterRules      *bytes.Buffer
 	// Added as a member to the struct to allow injection for testing.
 	netlinkHandle NetLinkHandle
 	// ipsetList is the list of ipsets that ipvs proxier used.
@@ -369,6 +370,7 @@ func NewProxier(ipt utiliptables.Interface,
 		ipvsScheduler:     scheduler,
 		ipGetter:          &realIPGetter{nl: NewNetLinkHandle()},
 		iptablesData:      bytes.NewBuffer(nil),
+		filterChainsData:  bytes.NewBuffer(nil),
 		natChains:         bytes.NewBuffer(nil),
 		natRules:          bytes.NewBuffer(nil),
 		filterChains:      bytes.NewBuffer(nil),
@@ -1357,10 +1359,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 
 // createAndLinkeKubeChain create all kube chains that ipvs proxier need and write basic link.
 func (proxier *Proxier) createAndLinkeKubeChain() {
-	// TODO: Filter table is small so we're not reusing this buffer over rounds.
-	// However, to optimize it further, we should do that.
-	filterBuffer := bytes.NewBuffer(nil)
-	existingFilterChains := proxier.getExistingChains(filterBuffer, utiliptables.TableFilter)
+	existingFilterChains := proxier.getExistingChains(proxier.filterChainsData, utiliptables.TableFilter)
 	existingNATChains := proxier.getExistingChains(proxier.iptablesData, utiliptables.TableNAT)
 
 	// Make sure we keep stats for the top-level chains

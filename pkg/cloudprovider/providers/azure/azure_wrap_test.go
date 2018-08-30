@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestExtractNotFound(t *testing.T) {
@@ -49,5 +51,59 @@ func TestExtractNotFound(t *testing.T) {
 		if !reflect.DeepEqual(test.expectedErr, err) {
 			t.Errorf("expected err: %v, saw: %v", test.expectedErr, err)
 		}
+	}
+}
+
+func TestIsNodeUnmanaged(t *testing.T) {
+	tests := []struct {
+		name           string
+		unmanagedNodes sets.String
+		node           string
+		expected       bool
+		expectErr      bool
+	}{
+		{
+			name:           "unmanaged node should return true",
+			unmanagedNodes: sets.NewString("node1", "node2"),
+			node:           "node1",
+			expected:       true,
+		},
+		{
+			name:           "managed node should return false",
+			unmanagedNodes: sets.NewString("node1", "node2"),
+			node:           "node3",
+			expected:       false,
+		},
+		{
+			name:           "empty unmanagedNodes should return true",
+			unmanagedNodes: sets.NewString(),
+			node:           "node3",
+			expected:       false,
+		},
+		{
+			name:           "no synced informer should report error",
+			unmanagedNodes: sets.NewString(),
+			node:           "node1",
+			expectErr:      true,
+		},
+	}
+
+	az := getTestCloud()
+	for _, test := range tests {
+		az.unmanagedNodes = test.unmanagedNodes
+		if test.expectErr {
+			az.nodeInformerSynced = func() bool {
+				return false
+			}
+		}
+
+		real, err := az.IsNodeUnmanaged(test.node)
+		if test.expectErr {
+			assert.Error(t, err, test.name)
+			continue
+		}
+
+		assert.NoError(t, err, test.name)
+		assert.Equal(t, test.expected, real, test.name)
 	}
 }

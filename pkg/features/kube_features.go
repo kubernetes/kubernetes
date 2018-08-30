@@ -312,12 +312,6 @@ const (
 	// Support Pod Ready++
 	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
 
-	// owner: @lichuqiang
-	// alpha: v1.11
-	//
-	// Extend the default scheduler to be aware of volume topology and handle PV provisioning
-	DynamicProvisioningScheduling utilfeature.Feature = "DynamicProvisioningScheduling"
-
 	// owner: @kevtaylor
 	// alpha: v1.11
 	//
@@ -363,6 +357,12 @@ const (
 	//
 	// Enables SCTP as new protocol for Service ports, NetworkPolicy, and ContainerPort in Pod/Containers definition
 	SCTPSupport utilfeature.Feature = "SCTPSupport"
+
+	// owner: @xing-yang
+	// alpha: v1.12
+	//
+	// Enable volume snapshot data source support.
+	VolumeSnapshotDataSource utilfeature.Feature = "VolumeSnapshotDataSource"
 )
 
 func init() {
@@ -415,7 +415,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
-	DynamicProvisioningScheduling:               {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.Beta},
 	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
 	KubeletPluginsWatcher:                       {Default: false, PreRelease: utilfeature.Alpha},
@@ -424,6 +423,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	RuntimeClass:                                {Default: false, PreRelease: utilfeature.Alpha},
 	NodeLease:                                   {Default: false, PreRelease: utilfeature.Alpha},
 	SCTPSupport:                                 {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

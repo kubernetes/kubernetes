@@ -46,10 +46,10 @@ var (
 	badPVC                      = makeBadPVC()
 	immediateUnboundPVC         = makeTestPVC("immediate-unbound-pvc", "1G", pvcUnbound, "", "1", &immediateClass)
 	immediateBoundPVC           = makeTestPVC("immediate-bound-pvc", "1G", pvcBound, "pv-bound-immediate", "1", &immediateClass)
-	provisionedPVC              = makeTestPVC("provisioned-pvc", "1Gi", pvcUnbound, "", "1", &waitClass)
-	provisionedPVC2             = makeTestPVC("provisioned-pvc2", "1Gi", pvcUnbound, "", "1", &waitClass)
-	provisionedPVCHigherVersion = makeTestPVC("provisioned-pvc2", "1Gi", pvcUnbound, "", "2", &waitClass)
-	noProvisionerPVC            = makeTestPVC("no-provisioner-pvc", "1Gi", pvcUnbound, "", "1", &provisionNotSupportClass)
+	provisionedPVC              = makeTestPVC("provisioned-pvc", "1Gi", pvcUnbound, "", "1", &waitClassWithProvisioner)
+	provisionedPVC2             = makeTestPVC("provisioned-pvc2", "1Gi", pvcUnbound, "", "1", &waitClassWithProvisioner)
+	provisionedPVCHigherVersion = makeTestPVC("provisioned-pvc2", "1Gi", pvcUnbound, "", "2", &waitClassWithProvisioner)
+	noProvisionerPVC            = makeTestPVC("no-provisioner-pvc", "1Gi", pvcUnbound, "", "1", &waitClass)
 	topoMismatchPVC             = makeTestPVC("topo-mismatch-pvc", "1Gi", pvcUnbound, "", "1", &topoMismatchClass)
 
 	pvNoNode                   = makeTestPV("pv-no-node", "", "1G", "1", nil, waitClass)
@@ -74,7 +74,7 @@ var (
 
 	waitClass                = "waitClass"
 	immediateClass           = "immediateClass"
-	provisionNotSupportClass = "provisionNotSupportedClass"
+	waitClassWithProvisioner = "waitClassWithProvisioner"
 	topoMismatchClass        = "topoMismatchClass"
 
 	nodeLabelKey   = "nodeKey"
@@ -110,7 +110,7 @@ func newTestBinder(t *testing.T) *testEnv {
 	classes := []*storagev1.StorageClass{
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: waitClass,
+				Name: waitClassWithProvisioner,
 			},
 			VolumeBindingMode: &waitMode,
 			Provisioner:       "test-provisioner",
@@ -133,7 +133,7 @@ func newTestBinder(t *testing.T) *testEnv {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: provisionNotSupportClass,
+				Name: waitClass,
 			},
 			VolumeBindingMode: &waitMode,
 			Provisioner:       "kubernetes.io/no-provisioner",
@@ -776,9 +776,9 @@ func TestFindPodVolumesWithProvisioning(t *testing.T) {
 		},
 	}
 
-	// Set VolumeScheduling and DynamicProvisioningScheduling feature gate
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true,DynamicProvisioningScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,DynamicProvisioningScheduling=false")
+	// Set VolumeScheduling feature gate
+	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 
 	testNode := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
