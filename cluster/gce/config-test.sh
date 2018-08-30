@@ -404,10 +404,6 @@ ENABLE_LEGACY_ABAC="${ENABLE_LEGACY_ABAC:-false}" # true, false
 ENABLE_APISERVER_ADVANCED_AUDIT="${ENABLE_APISERVER_ADVANCED_AUDIT:-true}" # true, false
 ADVANCED_AUDIT_LOG_MODE="${ADVANCED_AUDIT_LOG_MODE:-batch}" # batch, blocking
 
-if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
-  echo "Warning: Basic audit logging is deprecated and will be removed. Please use advanced auditing instead."
-fi
-
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
