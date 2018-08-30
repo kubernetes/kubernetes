@@ -1052,13 +1052,14 @@ func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) 
 	return cache
 }
 
-func makePDB(name, namespace string, labels map[string]string, minAvailable int) *v1beta1.PodDisruptionBudget {
+func makePDB(name, namespace string, uid types.UID, labels map[string]string, minAvailable int) *v1beta1.PodDisruptionBudget {
 	intstrMin := intstr.FromInt(minAvailable)
 	pdb := &v1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 			Labels:    labels,
+			UID:       uid,
 		},
 		Spec: v1beta1.PodDisruptionBudgetSpec{
 			MinAvailable: &intstrMin,
@@ -1073,14 +1074,14 @@ func makePDB(name, namespace string, labels map[string]string, minAvailable int)
 func TestPDBOperations(t *testing.T) {
 	ttl := 10 * time.Second
 	testPDBs := []*v1beta1.PodDisruptionBudget{
-		makePDB("pdb0", "ns1", map[string]string{"tkey1": "tval1"}, 3),
-		makePDB("pdb1", "ns1", map[string]string{"tkey1": "tval1", "tkey2": "tval2"}, 1),
-		makePDB("pdb2", "ns3", map[string]string{"tkey3": "tval3", "tkey2": "tval2"}, 10),
+		makePDB("pdb0", "ns1", "uid0", map[string]string{"tkey1": "tval1"}, 3),
+		makePDB("pdb1", "ns1", "uid1", map[string]string{"tkey1": "tval1", "tkey2": "tval2"}, 1),
+		makePDB("pdb2", "ns3", "uid2", map[string]string{"tkey3": "tval3", "tkey2": "tval2"}, 10),
 	}
 	updatedPDBs := []*v1beta1.PodDisruptionBudget{
-		makePDB("pdb0", "ns1", map[string]string{"tkey4": "tval4"}, 8),
-		makePDB("pdb1", "ns1", map[string]string{"tkey1": "tval1"}, 1),
-		makePDB("pdb2", "ns3", map[string]string{"tkey3": "tval3", "tkey1": "tval1", "tkey2": "tval2"}, 10),
+		makePDB("pdb0", "ns1", "uid0", map[string]string{"tkey4": "tval4"}, 8),
+		makePDB("pdb1", "ns1", "uid1", map[string]string{"tkey1": "tval1"}, 1),
+		makePDB("pdb2", "ns3", "uid2", map[string]string{"tkey3": "tval3", "tkey1": "tval1", "tkey2": "tval2"}, 10),
 	}
 	tests := []struct {
 		pdbsToAdd    []*v1beta1.PodDisruptionBudget
@@ -1140,7 +1141,7 @@ func TestPDBOperations(t *testing.T) {
 			found := false
 			// find it among the cached ones
 			for _, cpdb := range cachedPDBs {
-				if pdb.Name == cpdb.Name {
+				if pdb.UID == cpdb.UID {
 					found = true
 					if !reflect.DeepEqual(pdb, cpdb) {
 						t.Errorf("%v is not equal to %v", pdb, cpdb)
@@ -1149,7 +1150,7 @@ func TestPDBOperations(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("PDB with name '%v' was not found in the cache.", pdb.Name)
+				t.Errorf("PDB with uid '%v' was not found in the cache.", pdb.UID)
 			}
 
 		}
