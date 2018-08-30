@@ -606,7 +606,7 @@ func autoConvert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAContr
 	if err := v1.Convert_Pointer_bool_To_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
 		return err
 	}
-	out.HorizontalPodAutoscalerCPUTaintPeriod = in.HorizontalPodAutoscalerCPUTaintPeriod
+	out.HorizontalPodAutoscalerCPUInitializationPeriod = in.HorizontalPodAutoscalerCPUInitializationPeriod
 	out.HorizontalPodAutoscalerInitialReadinessDelay = in.HorizontalPodAutoscalerInitialReadinessDelay
 	return nil
 }
@@ -624,7 +624,7 @@ func autoConvert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAContr
 	if err := v1.Convert_bool_To_Pointer_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
 		return err
 	}
-	out.HorizontalPodAutoscalerCPUTaintPeriod = in.HorizontalPodAutoscalerCPUTaintPeriod
+	out.HorizontalPodAutoscalerCPUInitializationPeriod = in.HorizontalPodAutoscalerCPUInitializationPeriod
 	out.HorizontalPodAutoscalerInitialReadinessDelay = in.HorizontalPodAutoscalerInitialReadinessDelay
 	return nil
 }
