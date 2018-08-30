@@ -65,7 +65,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 
 	context.clientSet = clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL})
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, 0)
-	podInformer := factory.NewPodInformer(context.clientSet, 12*time.Hour, v1.DefaultSchedulerName)
+	podInformer := factory.NewPodInformer(context.clientSet, 12*time.Hour)
 	context.schedulerConfigFactory = factory.NewConfigFactory(
 		v1.DefaultSchedulerName,
 		context.clientSet,
