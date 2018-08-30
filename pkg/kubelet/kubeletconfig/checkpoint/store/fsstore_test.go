@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
-	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
