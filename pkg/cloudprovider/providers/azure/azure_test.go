@@ -958,6 +958,7 @@ func getTestCloud() (az *Cloud) {
 		nodeInformerSynced: func() bool { return true },
 		nodeResourceGroups: map[string]string{},
 		unmanagedNodes:     sets.NewString(),
+		routeCIDRs:         map[string]string{},
 	}
 	az.DisksClient = newFakeDisksClient()
 	az.InterfacesClient = newFakeAzureInterfacesClient()

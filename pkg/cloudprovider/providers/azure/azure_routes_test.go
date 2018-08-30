@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
@@ -38,6 +39,8 @@ func TestDeleteRoute(t *testing.T) {
 			RouteTableName: "bar",
 			Location:       "location",
 		},
+		unmanagedNodes:     sets.NewString(),
+		nodeInformerSynced: func() bool { return true },
 	}
 	route := cloudprovider.Route{TargetNode: "node", DestinationCIDR: "1.2.3.4/24"}
 	routeName := mapNodeNameToRouteName(route.TargetNode)
@@ -62,6 +65,28 @@ func TestDeleteRoute(t *testing.T) {
 	ob, found := mp[routeName]
 	if found {
 		t.Errorf("unexpectedly found: %v that should have been deleted.", ob)
+		t.FailNow()
+	}
+
+	// test delete route for unmanaged nodes.
+	nodeName := "node1"
+	nodeCIDR := "4.3.2.1/24"
+	cloud.unmanagedNodes.Insert(nodeName)
+	cloud.routeCIDRs = map[string]string{
+		nodeName: nodeCIDR,
+	}
+	route1 := cloudprovider.Route{
+		TargetNode:      mapRouteNameToNodeName(nodeName),
+		DestinationCIDR: nodeCIDR,
+	}
+	err = cloud.DeleteRoute(context.TODO(), "cluster", &route1)
+	if err != nil {
+		t.Errorf("unexpected error deleting route: %v", err)
+		t.FailNow()
+	}
+	cidr, found := cloud.routeCIDRs[nodeName]
+	if found {
+		t.Errorf("unexpected CIDR item (%q) for %s", cidr, nodeName)
 	}
 }
 
@@ -79,6 +104,8 @@ func TestCreateRoute(t *testing.T) {
 			RouteTableName: "bar",
 			Location:       "location",
 		},
+		unmanagedNodes:     sets.NewString(),
+		nodeInformerSynced: func() bool { return true },
 	}
 	cache, _ := cloud.newRouteTableCache()
 	cloud.rtCache = cache
@@ -121,6 +148,29 @@ func TestCreateRoute(t *testing.T) {
 	}
 	if *routeInfo.NextHopIPAddress != nodeIP {
 		t.Errorf("Expected IP address: %s, saw %s", nodeIP, *routeInfo.NextHopIPAddress)
+	}
+
+	// test create route for unmanaged nodes.
+	nodeName := "node1"
+	nodeCIDR := "4.3.2.1/24"
+	cloud.unmanagedNodes.Insert(nodeName)
+	cloud.routeCIDRs = map[string]string{}
+	route1 := cloudprovider.Route{
+		TargetNode:      mapRouteNameToNodeName(nodeName),
+		DestinationCIDR: nodeCIDR,
+	}
+	err = cloud.CreateRoute(context.TODO(), "cluster", "unused", &route1)
+	if err != nil {
+		t.Errorf("unexpected error creating route: %v", err)
+		t.FailNow()
+	}
+	cidr, found := cloud.routeCIDRs[nodeName]
+	if !found {
+		t.Errorf("unexpected missing item for %s", nodeName)
+		t.FailNow()
+	}
+	if cidr != nodeCIDR {
+		t.Errorf("unexpected cidr %s, saw %s", nodeCIDR, cidr)
 	}
 }
 
