@@ -25,7 +25,7 @@ kube::util::array_contains() {
   local element
   shift
   for element; do
-    if [[ "$element" == "$search" ]]; then
+    if [[ "${element}" == "${search}" ]]; then
       return 0
      fi
   done
