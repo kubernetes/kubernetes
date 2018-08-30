@@ -191,10 +191,6 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		// TODO: bring it down to 750MB again, when we lower Kubelet verbosity level. I.e. revert #19164
 		MemoryConstraint: 5000 * (1024 * 1024),
 	}
-	constraints["heapster"] = framework.ResourceConstraint{
-		CPUConstraint:    2,
-		MemoryConstraint: 1800 * (1024 * 1024),
-	}
 	constraints["kibana-logging"] = framework.ResourceConstraint{
 		CPUConstraint:    0.2,
 		MemoryConstraint: 100 * (1024 * 1024),

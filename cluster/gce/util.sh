@@ -343,10 +343,6 @@ function detect-node-names() {
         --format='value(instance)'))
     done
   fi
-  # Add heapster node name to the list too (if it exists).
-  if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    NODE_NAMES+=("${NODE_INSTANCE_PREFIX}-heapster")
-  fi
 
   echo "INSTANCE_GROUPS=${INSTANCE_GROUPS[*]:-}" >&2
   echo "NODE_NAMES=${NODE_NAMES[*]:-}" >&2
@@ -2326,14 +2322,6 @@ function set_num_migs() {
 function create-nodes() {
   local template_name="${NODE_INSTANCE_PREFIX}-template"
 
-  if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    local -r nodes="${NUM_NODES}"
-  else
-    echo "Creating a special node for heapster with machine-type ${HEAPSTER_MACHINE_TYPE}"
-    create-heapster-node
-    local -r nodes=$(( NUM_NODES - 1 ))
-  fi
-
   local instances_left=${nodes}
 
   #TODO: parallelize this loop to speed up the process
@@ -2361,55 +2349,6 @@ function create-nodes() {
         --project "${PROJECT}" \
         --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true;
   done
-}
-
-# Assumes:
-# - NODE_INSTANCE_PREFIX
-# - PROJECT
-# - NETWORK_PROJECT
-# - REGION
-# - ZONE
-# - HEAPSTER_MACHINE_TYPE
-# - NODE_DISK_TYPE
-# - NODE_DISK_SIZE
-# - NODE_IMAGE_PROJECT
-# - NODE_IMAGE
-# - NODE_SERVICE_ACCOUNT
-# - NODE_TAG
-# - NETWORK
-# - ENABLE_IP_ALIASES
-# - SUBNETWORK
-# - IP_ALIAS_SIZE
-function create-heapster-node() {
-  local gcloud="gcloud"
-
-  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud beta"
-  fi
-
-  local network=$(make-gcloud-network-argument \
-      "${NETWORK_PROJECT}" \
-      "${REGION}" \
-      "${NETWORK}" \
-      "${SUBNETWORK:-}" \
-      "" \
-      "${ENABLE_IP_ALIASES:-}" \
-      "${IP_ALIAS_SIZE:-}")
-
-  ${gcloud} compute instances \
-      create "${NODE_INSTANCE_PREFIX}-heapster" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --machine-type="${HEAPSTER_MACHINE_TYPE}" \
-      --boot-disk-type "${NODE_DISK_TYPE}" \
-      --boot-disk-size "${NODE_DISK_SIZE}" \
-      --image-project="${NODE_IMAGE_PROJECT}" \
-      --image "${NODE_IMAGE}" \
-      --service-account "${NODE_SERVICE_ACCOUNT}" \
-      --tags "${NODE_TAG}" \
-      ${network} \
-      $(get-scope-flags) \
-      --metadata-from-file "$(get-node-instance-metadata)"
 }
 
 # Assumes:
@@ -2614,20 +2553,6 @@ function kube-down() {
           "${template}"
       fi
     done
-
-    # Delete the special heapster node (if it exists).
-    if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-      local -r heapster_machine_name="${NODE_INSTANCE_PREFIX}-heapster"
-      if gcloud compute instances describe "${heapster_machine_name}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
-        # Now we can safely delete the VM.
-        gcloud compute instances delete \
-          --project "${PROJECT}" \
-          --quiet \
-          --delete-disks all \
-          --zone "${ZONE}" \
-          "${heapster_machine_name}"
-      fi
-    fi
   fi
 
   local -r REPLICA_NAME="${KUBE_REPLICA_NAME:-$(get-replica-name)}"

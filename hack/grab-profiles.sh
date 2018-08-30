@@ -64,15 +64,13 @@ profile_components=""
 output_dir="."
 tunnel_port="${tunnel_port:-1234}"
 
-args=$(getopt -o s:mho:k:c -l server:,master,heapster,output:,kubelet:,scheduler,controller-manager,help,inuse-space,inuse-objects,alloc-space,alloc-objects,cpu,kubelet-binary:,master-binary:,scheduler-binary:,controller-manager-binary:,scheduler-port:,controller-manager-port: -- "$@")
+args=$(getopt -o s:mho:k:c -l server:,master,output:,kubelet:,scheduler,controller-manager,help,inuse-space,inuse-objects,alloc-space,alloc-objects,cpu,kubelet-binary:,master-binary:,scheduler-binary:,controller-manager-binary:,scheduler-port:,controller-manager-port: -- "$@")
 if [[ $? -ne 0 ]]; then
   >&2 echo "Error in getopt"
   exit 1
 fi
 
-HEAPSTER_VERSION="v0.18.2"
 MASTER_PPROF_PATH=""
-HEAPSTER_PPROF_PATH="/api/v1/namespaces/kube-system/services/monitoring-heapster/proxy"
 KUBELET_PPROF_PATH_PREFIX="/api/v1/proxy/nodes"
 SCHEDULER_PPROF_PATH_PREFIX="/api/v1/namespaces/kube-system/pods/kube-scheduler/proxy"
 CONTROLLER_MANAGER_PPROF_PATH_PREFIX="/api/v1/namespaces/kube-system/pods/kube-controller-manager/proxy"
@@ -102,10 +100,6 @@ while true; do
       fi
       master_binary=$1
       shift
-      ;;
-    -h|--heapster)
-      shift
-      profile_components="heapster ${profile_components}"
       ;;
     -k|--kubelet)
       shift
@@ -209,7 +203,6 @@ while true; do
         -o/--output,
         -s/--server,
         -m/--master,
-        -h/--heapster,
         --inuse-space,
         --inuse-objects,
         --alloc-space,
@@ -271,14 +264,6 @@ for component in ${profile_components}; do
     scheduler)
       path="${SCHEDULER_PPROF_PATH_PREFIX}-${server_addr}:${scheduler_port}"
       binary=${scheduler_binary}
-      ;;
-    heapster)
-      rm heapster
-      wget https://github.com/kubernetes/heapster/releases/download/${HEAPSTER_VERSION}/heapster
-      kube::util::trap_add 'rm -f heapster' EXIT
-      kube::util::trap_add 'rm -f heapster' SIGTERM
-      binary=heapster
-      path=${HEAPSTER_PPROF_PATH}
       ;;
     kubelet)
       path="${KUBELET_PPROF_PATH_PREFIX}"

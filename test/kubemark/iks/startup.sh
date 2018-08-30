@@ -21,7 +21,7 @@ KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
 
 # Generate secret and configMap for the hollow-node pods to work, prepare
-# manifests of the hollow-node and heapster replication controllers from
+# manifests of the hollow-node from
 # templates, and finally create these resources through kubectl.
 function create-kube-hollow-node-resources {
   # Create kubeconfig for Kubelet.
@@ -61,26 +61,6 @@ contexts:
 - context:
     cluster: kubemark
     user: kube-proxy
-  name: kubemark-context
-current-context: kubemark-context")
-
-  # Create kubeconfig for Heapster.
-  HEAPSTER_KUBECONFIG_CONTENTS=$(echo "apiVersion: v1
-kind: Config
-users:
-- name: heapster
-  user:
-    client-certificate-data: "${KUBELET_CERT_BASE64}"
-    client-key-data: "${KUBELET_KEY_BASE64}"
-clusters:
-- name: kubemark
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://${MASTER_IP}
-contexts:
-- context:
-    cluster: kubemark
-    user: heapster
   name: kubemark-context
 current-context: kubemark-context")
 
@@ -163,25 +143,9 @@ current-context: kubemark-context")
   "${KUBECTL}" create secret generic "kubeconfig" --type=Opaque --namespace="kubemark" \
     --from-literal=kubelet.kubeconfig="${KUBELET_KUBECONFIG_CONTENTS}" \
     --from-literal=kubeproxy.kubeconfig="${KUBEPROXY_KUBECONFIG_CONTENTS}" \
-    --from-literal=heapster.kubeconfig="${HEAPSTER_KUBECONFIG_CONTENTS}" \
     --from-literal=cluster_autoscaler.kubeconfig="${CLUSTER_AUTOSCALER_KUBECONFIG_CONTENTS}" \
     --from-literal=npd.kubeconfig="${NPD_KUBECONFIG_CONTENTS}" \
     --from-literal=dns.kubeconfig="${KUBE_DNS_KUBECONFIG_CONTENTS}"
-
-  # Create addon pods.
-  # Heapster.
-  mkdir -p "${RESOURCE_DIRECTORY}/addons"
-  sed "s/{{MASTER_IP}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/heapster_template.json" > "${RESOURCE_DIRECTORY}/addons/heapster.json"
-  metrics_mem_per_node=4
-  metrics_mem=$((200 + ${metrics_mem_per_node}*${NUM_NODES}))
-  sed -i'' -e "s/{{METRICS_MEM}}/${metrics_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
-  metrics_cpu_per_node_numerator=${NUM_NODES}
-  metrics_cpu_per_node_denominator=2
-  metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denominator))
-  sed -i'' -e "s/{{METRICS_CPU}}/${metrics_cpu}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
-  eventer_mem_per_node=500
-  eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES}))
-  sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
   # Cluster Autoscaler.
   if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
