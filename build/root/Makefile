@@ -386,6 +386,24 @@ release-in-a-container:
 	build/release-in-a-container.sh
 endif
 
+define RELEASE_IMAGES_HELP_INFO
+# Build release images
+#
+# Args:
+#   KUBE_BUILD_HYPERKUBE: Whether to build hyperkube image as well. Set to 'n' to skip.
+#
+# Example:
+#   make release-images
+endef
+.PHONY: release-images
+ifeq ($(PRINT_HELP),y)
+release-images:
+	@echo "$$RELEASE_IMAGES_HELP_INFO"
+else
+release-images:
+	build/release-images.sh
+endif
+
 define RELEASE_SKIP_TESTS_HELP_INFO
 # Build a release, but skip tests
 #
@@ -406,6 +424,26 @@ release-skip-tests quick-release: KUBE_RELEASE_RUN_TESTS = n
 release-skip-tests quick-release: KUBE_FASTBUILD = true
 release-skip-tests quick-release:
 	build/release.sh
+endif
+
+define QUICK_RELEASE_IMAGES_HELP_INFO
+# Build release images, but only for linux/amd64
+#
+# Args:
+#   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
+#   KUBE_BUILD_HYPERKUBE: Whether to build hyperkube image as well. Set to 'n' to skip.
+#
+# Example:
+#   make quick-release-images
+endef
+.PHONY: quick-release-images
+ifeq ($(PRINT_HELP),y)
+quick-release-images:
+	@echo "$$QUICK_RELEASE_IMAGES_HELP_INFO"
+else
+quick-release-images: KUBE_FASTBUILD = true
+quick-release-images:
+	build/release-images.sh
 endif
 
 define PACKAGE_HELP_INFO
