@@ -50,6 +50,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/versioning:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
@@ -98,6 +99,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ],
 )

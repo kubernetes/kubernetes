@@ -17,12 +17,16 @@ limitations under the License.
 package testing
 
 import (
+	encodingjson "encoding/json"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"testing"
 
 	"github.com/google/gofuzz"
+	"github.com/stretchr/testify/require"
 
+	"k8s.io/api/certificates/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -73,48 +77,57 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 
 	data, err := json.Marshal(item)
 	if err != nil {
-		t.Errorf("Error when marshaling object: %v", err)
-		return
+		t.Fatalf("Error when marshaling object: %v", err)
 	}
 	unstr := make(map[string]interface{})
 	err = json.Unmarshal(data, &unstr)
 	if err != nil {
-		t.Errorf("Error when unmarshaling to unstructured: %v", err)
-		return
+		t.Fatalf("Error when unmarshaling to unstructured: %v", err)
 	}
 
 	data, err = json.Marshal(unstr)
 	if err != nil {
-		t.Errorf("Error when marshaling unstructured: %v", err)
-		return
+		t.Fatalf("Error when marshaling unstructured: %v", err)
 	}
 	unmarshalledObj := reflect.New(reflect.TypeOf(item).Elem()).Interface()
-	err = json.Unmarshal(data, &unmarshalledObj)
+	err = json.Unmarshal(data, unmarshalledObj)
 	if err != nil {
-		t.Errorf("Error when unmarshaling to object: %v", err)
-		return
+		t.Fatalf("Error when unmarshaling to object: %v", err)
 	}
 	if !apiequality.Semantic.DeepEqual(item, unmarshalledObj) {
-		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
-		return
+		t.Fatalf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
 	}
 
 	newUnstr, err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).ToUnstructured(item)
 	if err != nil {
-		t.Errorf("ToUnstructured failed: %v", err)
-		return
+		t.Fatalf("ToUnstructured failed: %v", err)
 	}
 
 	newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(newUnstr, newObj)
 	if err != nil {
-		t.Errorf("FromUnstructured failed: %v", err)
-		return
+		t.Fatalf("FromUnstructured failed: %v", err)
 	}
 
 	if !apiequality.Semantic.DeepEqual(item, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+		t.Fatalf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
 	}
+}
+
+func TestSlice(t *testing.T) {
+	var x v1beta1.CertificateSigningRequestSpec
+	data, err := encodingjson.Marshal(&x)
+	require.NoError(t, err)
+
+	var m1 map[string]interface{}
+	err = encodingjson.Unmarshal(data, &m1)
+	require.NoError(t, err)
+
+	var m2 map[string]interface{}
+	err = json.Unmarshal(data, &m2)
+	require.NoError(t, err)
+
+	t.Fatalf("%s", diff.ObjectGoPrintDiff(m1, m2))
 }
 
 func TestRoundTrip(t *testing.T) {
@@ -123,13 +136,11 @@ func TestRoundTrip(t *testing.T) {
 			if nonRoundTrippableTypes.Has(kind) {
 				continue
 			}
-			t.Logf("Testing: %v in %v", kind, groupKey)
-			for i := 0; i < 50; i++ {
-				doRoundTrip(t, schema.GroupVersion{Group: groupKey, Version: runtime.APIVersionInternal}, *group.GroupVersion(), kind)
-				if t.Failed() {
-					break
+			t.Run(fmt.Sprintf("%v/%v", groupKey, kind), func(t *testing.T) {
+				for i := 0; i < 50; i++ {
+					doRoundTrip(t, schema.GroupVersion{Group: groupKey, Version: runtime.APIVersionInternal}, *group.GroupVersion(), kind)
 				}
-			}
+			})
 		}
 	}
 }

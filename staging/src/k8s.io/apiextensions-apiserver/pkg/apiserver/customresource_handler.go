@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
@@ -832,8 +833,6 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	return nil
 }
 
-var encodingjson = json.CaseSensitiveJsonIterator()
-
 func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*metav1.ObjectMeta, bool, error) {
 	metadata, found := u.UnstructuredContent()["metadata"]
 	if !found {
@@ -842,11 +841,11 @@ func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*met
 
 	// round-trip through JSON first, hoping that unmarshaling just works
 	objectMeta := &metav1.ObjectMeta{}
-	metadataBytes, err := encodingjson.Marshal(metadata)
+	metadataBytes, err := utiljson.Marshal(metadata)
 	if err != nil {
 		return nil, false, err
 	}
-	if err = encodingjson.Unmarshal(metadataBytes, objectMeta); err == nil {
+	if err = utiljson.Unmarshal(metadataBytes, objectMeta); err == nil {
 		// if successful, return
 		return objectMeta, true, nil
 	}
@@ -867,11 +866,11 @@ func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*met
 	testObjectMeta := &metav1.ObjectMeta{}
 	for k, v := range metadataMap {
 		// serialize a single field
-		if singleFieldBytes, err := encodingjson.Marshal(map[string]interface{}{k: v}); err == nil {
+		if singleFieldBytes, err := utiljson.Marshal(map[string]interface{}{k: v}); err == nil {
 			// do a test unmarshal
-			if encodingjson.Unmarshal(singleFieldBytes, testObjectMeta) == nil {
+			if utiljson.Unmarshal(singleFieldBytes, testObjectMeta) == nil {
 				// if that succeeds, unmarshal for real
-				encodingjson.Unmarshal(singleFieldBytes, accumulatedObjectMeta)
+				utiljson.Unmarshal(singleFieldBytes, accumulatedObjectMeta)
 			}
 		}
 	}

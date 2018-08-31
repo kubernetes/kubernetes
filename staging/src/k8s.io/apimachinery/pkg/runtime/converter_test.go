@@ -141,7 +141,7 @@ func doRoundTrip(t *testing.T, item interface{}) {
 		return
 	}
 	if !reflect.DeepEqual(item, unmarshalledObj) {
-		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
+		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectGoPrintDiff(item, unmarshalledObj))
 		return
 	}
 
@@ -274,7 +274,7 @@ func TestRoundTrip(t *testing.T) {
 		{
 			// Test slice of interface{} with different values.
 			obj: &D{
-				A: []interface{}{3.0, "3.0", nil},
+				A: []interface{}{3.1, int64(4), "3.0", nil},
 			},
 		},
 	}
@@ -311,7 +311,7 @@ func doUnrecognized(t *testing.T, jsonData string, item interface{}, expectedErr
 	}
 
 	if expectedErr == nil && !reflect.DeepEqual(unmarshalledObj, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(unmarshalledObj, newObj))
+		t.Errorf("Object changed, diff: %v", diff.ObjectGoPrintDiff(unmarshalledObj, newObj))
 	}
 }
 
@@ -322,11 +322,11 @@ func TestUnrecognized(t *testing.T) {
 		err  error
 	}{
 		{
-			data: "{\"da\":[3.0,\"3.0\",null]}",
+			data: "{\"da\":[3.1,\"3.0\",null]}",
 			obj:  &D{},
 		},
 		{
-			data: "{\"ea\":[3.0,\"3.0\",null]}",
+			data: "{\"ea\":[3.1,\"3.0\",null]}",
 			obj:  &E{},
 		},
 		{

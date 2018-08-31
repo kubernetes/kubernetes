@@ -17,103 +17,92 @@ limitations under the License.
 package json
 
 import (
-	"bytes"
-	"encoding/json"
 	"io"
+	"strconv"
+	"unsafe"
+
+	"github.com/json-iterator/go"
+	"github.com/modern-go/reflect2"
 )
 
-// NewEncoder delegates to json.NewEncoder
-// It is only here so this package can be a drop-in for common encoding/json uses
-func NewEncoder(w io.Writer) *json.Encoder {
-	return json.NewEncoder(w)
+var (
+	// Private copy of jsoniter to try to shield against possible mutations
+	// from outside. Still does not protect from package level jsoniter.Register*() functions - someone calling them
+	// in some other library will mess with every usage of the jsoniter library in the whole program.
+	// See https://github.com/json-iterator/go/issues/265
+	caseSensitiveJSONIterator = CaseSensitiveJSONIterator()
+)
+
+type customNumberExtension struct {
+	jsoniter.DummyExtension
 }
 
-// Marshal delegates to json.Marshal
-// It is only here so this package can be a drop-in for common encoding/json uses
-func Marshal(v interface{}) ([]byte, error) {
-	return json.Marshal(v)
+func (cne *customNumberExtension) CreateDecoder(typ reflect2.Type) jsoniter.ValDecoder {
+	if typ.String() == "interface {}" {
+		return customNumberDecoder{}
+	}
+	return nil
 }
 
-// Unmarshal unmarshals the given data
-// If v is a *map[string]interface{}, numbers are converted to int64 or float64
-func Unmarshal(data []byte, v interface{}) error {
-	switch v := v.(type) {
-	case *map[string]interface{}:
-		// Build a decoder from the given data
-		decoder := json.NewDecoder(bytes.NewBuffer(data))
-		// Preserve numbers, rather than casting to float64 automatically
-		decoder.UseNumber()
-		// Run the decode
-		if err := decoder.Decode(v); err != nil {
-			return err
-		}
-		// If the decode succeeds, post-process the map to convert json.Number objects to int64 or float64
-		return convertMapNumbers(*v)
+type customNumberDecoder struct {
+}
 
-	case *[]interface{}:
-		// Build a decoder from the given data
-		decoder := json.NewDecoder(bytes.NewBuffer(data))
-		// Preserve numbers, rather than casting to float64 automatically
-		decoder.UseNumber()
-		// Run the decode
-		if err := decoder.Decode(v); err != nil {
-			return err
+func (customNumberDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
+	switch iter.WhatIsNext() {
+	case jsoniter.NumberValue:
+		var number jsoniter.Number
+		iter.ReadVal(&number)
+		i64, err := strconv.ParseInt(string(number), 10, 64)
+		if err == nil {
+			*(*interface{})(ptr) = i64
+			return
 		}
-		// If the decode succeeds, post-process the map to convert json.Number objects to int64 or float64
-		return convertSliceNumbers(*v)
-
+		f64, err := strconv.ParseFloat(string(number), 64)
+		if err == nil {
+			*(*interface{})(ptr) = f64
+			return
+		}
+		iter.ReportError("DecodeNumber", err.Error())
 	default:
-		return json.Unmarshal(data, v)
+		*(*interface{})(ptr) = iter.Read()
 	}
 }
 
-// convertMapNumbers traverses the map, converting any json.Number values to int64 or float64.
-// values which are map[string]interface{} or []interface{} are recursively visited
-func convertMapNumbers(m map[string]interface{}) error {
-	var err error
-	for k, v := range m {
-		switch v := v.(type) {
-		case json.Number:
-			m[k], err = convertNumber(v)
-		case map[string]interface{}:
-			err = convertMapNumbers(v)
-		case []interface{}:
-			err = convertSliceNumbers(v)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+// CaseSensitiveJSONIterator returns a jsoniterator API that's configured to be
+// case-sensitive when unmarshalling, and otherwise compatible with
+// the encoding/json standard library.
+func CaseSensitiveJSONIterator() jsoniter.API {
+	config := jsoniter.Config{
+		EscapeHTML:             true,
+		SortMapKeys:            true,
+		ValidateJsonRawMessage: true,
+		CaseSensitive:          true,
+	}.Froze()
+	// Force jsoniter to decode number to interface{} via int64/float64, if possible.
+	config.RegisterExtension(&customNumberExtension{})
+	return config
 }
 
-// convertSliceNumbers traverses the slice, converting any json.Number values to int64 or float64.
-// values which are map[string]interface{} or []interface{} are recursively visited
-func convertSliceNumbers(s []interface{}) error {
-	var err error
-	for i, v := range s {
-		switch v := v.(type) {
-		case json.Number:
-			s[i], err = convertNumber(v)
-		case map[string]interface{}:
-			err = convertMapNumbers(v)
-		case []interface{}:
-			err = convertSliceNumbers(v)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+// NewEncoder mirrors json.NewEncoder().
+// It is here so this package can be a drop-in for common encoding/json uses.
+func NewEncoder(w io.Writer) *jsoniter.Encoder {
+	return caseSensitiveJSONIterator.NewEncoder(w)
 }
 
-// convertNumber converts a json.Number to an int64 or float64, or returns an error
-func convertNumber(n json.Number) (interface{}, error) {
-	// Attempt to convert to an int64 first
-	if i, err := n.Int64(); err == nil {
-		return i, nil
-	}
-	// Return a float64 (default json.Decode() behavior)
-	// An overflow will return an error
-	return n.Float64()
+// Marshal mirrors json.Marshal().
+// It is here so this package can be a drop-in for common encoding/json uses.
+func Marshal(v interface{}) ([]byte, error) {
+	return caseSensitiveJSONIterator.Marshal(v)
+}
+
+// MarshalIndent mirrors json.MarshalIndent().
+// It is here so this package can be a drop-in for common encoding/json uses.
+func MarshalIndent(v interface{}, prefix, indent string) ([]byte, error) {
+	return caseSensitiveJSONIterator.MarshalIndent(v, prefix, indent)
+}
+
+// Unmarshal mirrors json.Unmarshal().
+// Numbers are converted to int64 or float64.
+func Unmarshal(data []byte, v interface{}) error {
+	return caseSensitiveJSONIterator.Unmarshal(data, v)
 }
