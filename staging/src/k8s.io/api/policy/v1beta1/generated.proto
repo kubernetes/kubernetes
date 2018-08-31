@@ -297,6 +297,12 @@ message PodSecurityPolicySpec {
   // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
   // +optional
   repeated string forbiddenSysctls = 20;
+
+  // AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+  // Empty or nil indicates that only the DefaultProcMountType may be used.
+  // This requires the ProcMountType feature flag to be enabled.
+  // +optional
+  repeated string allowedProcMountTypes = 21;
 }
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.

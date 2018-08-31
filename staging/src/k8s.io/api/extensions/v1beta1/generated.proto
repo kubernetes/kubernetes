@@ -902,6 +902,12 @@ message PodSecurityPolicySpec {
   // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
   // +optional
   repeated string forbiddenSysctls = 20;
+
+  // AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+  // Empty or nil indicates that only the DefaultProcMountType may be used.
+  // This requires the ProcMountType feature flag to be enabled.
+  // +optional
+  repeated string allowedProcMountTypes = 21;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for

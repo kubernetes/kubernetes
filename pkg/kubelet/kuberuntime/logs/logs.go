@@ -28,7 +28,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/docker/docker/pkg/jsonlog"
+	"github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog"
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
 

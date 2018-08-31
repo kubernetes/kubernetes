@@ -39,6 +39,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/golang.org/x/sys/windows/registry:all-srcs",
         "//vendor/golang.org/x/sys/windows/svc:all-srcs",
     ],
     tags = ["automanaged"],

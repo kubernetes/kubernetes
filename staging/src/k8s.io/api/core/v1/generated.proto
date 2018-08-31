@@ -4040,6 +4040,13 @@ message SecurityContext {
   // 2) has CAP_SYS_ADMIN
   // +optional
   optional bool allowPrivilegeEscalation = 7;
+
+  // procMount denotes the type of proc mount to use for the containers.
+  // The default is DefaultProcMount which uses the container runtime defaults for
+  // readonly paths and masked paths.
+  // This requires the ProcMountType feature flag to be enabled.
+  // +optional
+  optional string procMount = 9;
 }
 
 // SerializedReference is a reference to serialized object.

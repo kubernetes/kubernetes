@@ -7,7 +7,7 @@ package container
 // See hack/generate-swagger-api.sh
 // ----------------------------------------------------------------------------
 
-// ContainerUpdateOKBody container update o k body
+// ContainerUpdateOKBody OK response to ContainerUpdate operation
 // swagger:model ContainerUpdateOKBody
 type ContainerUpdateOKBody struct {
 

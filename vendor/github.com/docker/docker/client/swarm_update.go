@@ -1,12 +1,12 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strconv"
 
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // SwarmUpdate updates the swarm.

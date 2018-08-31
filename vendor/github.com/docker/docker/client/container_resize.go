@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // ContainerResize changes the size of the tty for a container.
