@@ -694,6 +694,7 @@ staging/src/k8s.io/code-generator/cmd/client-gen/types
 staging/src/k8s.io/code-generator/cmd/conversion-gen/generators
 staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
+staging/src/k8s.io/controller-manager/pkg/apis/config/v1alpha1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
