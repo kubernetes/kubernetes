@@ -390,6 +390,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
   cp "${src_dir}/e2e-image-puller.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
+  cp "${src_dir}/gcp-controller-manager.manifest" "${dst_dir}"
   local internal_manifest
   for internal_manifest in $(ls "${src_dir}" | grep "^internal-*"); do
     cp "${src_dir}/${internal_manifest}" "${dst_dir}"

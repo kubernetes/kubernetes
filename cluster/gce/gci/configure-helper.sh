@@ -1216,6 +1216,11 @@ EOF
   systemctl start node-problem-detector.service
 }
 
+function start-gcp-controller-manager {
+  echo "Starting GCP controller manager"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gcp-controller-manager.manifest" /etc/kubernetes/manifests
+}
+
 # Create the log file and set its properties.
 #
 # $1 is the file to create.
@@ -2722,6 +2727,7 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
+    start-gcp-controller-manager
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy

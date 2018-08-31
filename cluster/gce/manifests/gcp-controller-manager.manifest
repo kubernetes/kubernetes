@@ -1,0 +1,50 @@
+kind: Pod
+metadata:
+  name: gcp-controller-manager
+  namespace: kube-system
+  labels:
+    tier: control-plane
+    component: gcp-controller-manager
+spec:
+  hostNetwork: true
+  initContainers:
+    - name: write-config
+      image: gcr.io/google_containers/busybox:1.27.2
+      command:
+        - /bin/sh
+        - "-c"
+        - |
+          echo -e "apiVersion: v1\nkind: Config\nclusters:\n- name: local\n  cluster:\n    server: http://localhost:8080\ncontexts:\n- context:\n    cluster: local\n  name: localhost-8080\ncurrent-context: localhost-8080\n" > /etc/srv/kubernetes/gcp-controller-manager/kubeconfig
+      volumeMounts:
+        - name: srvkube
+          mountPath: /etc/srv/kubernetes/gcp-controller-manager
+          readOnly: false
+  containers:
+  - name: gcp-controller-manager
+    image: gcr.io/google-containers/gcp-controller-manager:b30912607c944f0b7935f24aa1fc391e0b112101
+    resources:
+      requests:
+        cpu: 10m
+    command:
+      - /gcp-controller-manager
+      - --kubeconfig=/etc/srv/kubernetes/gcp-controller-manager/kubeconfig
+      - --metrics-port=10253
+      - --controllers=node-annotator
+      - --logtostderr
+    resources:
+      requests:
+        cpu: 5m
+        memory: 50Mi
+    volumeMounts:
+    - name: srvkube
+      mountPath: /etc/srv/kubernetes/gcp-controller-manager
+      readOnly: true
+    - name: etcssl
+      mountPath: /etc/ssl
+      readOnly: true
+  volumes:
+  - name: srvkube
+    emptyDir: {}
+  - name: etcssl
+    hostPath:
+      path: /etc/ssl
