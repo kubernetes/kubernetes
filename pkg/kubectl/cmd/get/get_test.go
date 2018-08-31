@@ -19,6 +19,7 @@ package get
 import (
 	"bytes"
 	encjson "encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -34,6 +35,7 @@ import (
 	api "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
@@ -524,6 +526,150 @@ c         0/0                 0          <unknown>
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+}
+
+func sortTestData() []runtime.Object {
+	return []runtime.Object{
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
+			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
+			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
+			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+		},
+	}
+}
+
+func sortTestTableData() []runtime.Object {
+	return []runtime.Object{
+		&metav1beta1.Table{
+			TypeMeta: metav1.TypeMeta{Kind: "Table"},
+			Rows: []metav1beta1.TableRow{
+				{
+					Object: runtime.RawExtension{
+						Object: &api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
+							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+						},
+					},
+				},
+				{
+					Object: runtime.RawExtension{
+						Object: &api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
+							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+						},
+					},
+				},
+				{
+					Object: runtime.RawExtension{
+						Object: &api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
+							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestRuntimeSorter(t *testing.T) {
+	tests := []struct {
+		name        string
+		field       string
+		objs        []runtime.Object
+		op          func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error
+		expect      string
+		expectError string
+	}{
+		{
+			name:  "ensure sorter returns original position",
+			field: "metadata.name",
+			objs:  sortTestData(),
+			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
+				for idx := range objs {
+					p := sorter.OriginalPosition(idx)
+					fmt.Fprintf(out, "%v,", p)
+				}
+				return nil
+			},
+			expect: "2,1,0,",
+		},
+		{
+			name:  "ensure sorter handles table object position",
+			field: "metadata.name",
+			objs:  sortTestTableData(),
+			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
+				for idx := range objs {
+					p := sorter.OriginalPosition(idx)
+					fmt.Fprintf(out, "%v,", p)
+				}
+				return nil
+			},
+			expect: "0,",
+		},
+		{
+			name:  "ensure sorter sorts table objects",
+			field: "metadata.name",
+			objs:  sortTestData(),
+			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
+				for _, o := range objs {
+					fmt.Fprintf(out, "%s,", o.(*api.Pod).Name)
+				}
+				return nil
+			},
+			expect: "a,b,c,",
+		},
+		{
+			name:        "ensure sorter rejects mixed Table + non-Table object lists",
+			field:       "metadata.name",
+			objs:        append(sortTestData(), sortTestTableData()...),
+			op:          func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error { return nil },
+			expectError: "sorting is not supported on mixed Table",
+		},
+		{
+			name:        "ensure sorter errors out on invalid jsonpath",
+			field:       "metadata.unknown",
+			objs:        sortTestData(),
+			op:          func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error { return nil },
+			expectError: "couldn't find any field with path",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sorter := NewRuntimeSorter(tc.objs, tc.field)
+			if err := sorter.Sort(); err != nil {
+				if len(tc.expectError) > 0 && strings.Contains(err.Error(), tc.expectError) {
+					return
+				}
+
+				if len(tc.expectError) > 0 {
+					t.Fatalf("unexpected error: expecting %s, but got %s", tc.expectError, err)
+				}
+
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			out := bytes.NewBuffer([]byte{})
+			err := tc.op(sorter, tc.objs, out)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tc.expect != out.String() {
+				t.Fatalf("unexpected output: expecting %s, but got %s", tc.expect, out.String())
+			}
+
+		})
+	}
+
 }
 
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
