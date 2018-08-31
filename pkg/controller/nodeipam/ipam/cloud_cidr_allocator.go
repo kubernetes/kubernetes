@@ -18,6 +18,7 @@ package ipam
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -211,9 +212,9 @@ func nodeUpdateRetryTimeout(count int) time.Duration {
 		timeout *= 2
 	}
 	if timeout > maxUpdateRetryTimeout {
-		return maxUpdateRetryTimeout
+		timeout = maxUpdateRetryTimeout
 	}
-	return timeout
+	return time.Duration(timeout.Nanoseconds()/2 + rand.Int63n(timeout.Nanoseconds()))
 }
 
 func (ca *cloudCIDRAllocator) removeNodeFromProcessing(nodeName string) {
