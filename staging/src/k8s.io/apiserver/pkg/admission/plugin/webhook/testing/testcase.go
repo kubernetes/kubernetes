@@ -43,10 +43,10 @@ var matchEverythingRules = []registrationv1beta1.RuleWithOperations{{
 	},
 }}
 
-var sideEffectsUnknown registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassUnknown
-var sideEffectsNone registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassNone
-var sideEffectsSome registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassSome
-var sideEffectsNoneOnDryRun registrationv1beta1.SideEffectClass = registrationv1beta1.SideEffectClassNoneOnDryRun
+var sideEffectsUnknown = registrationv1beta1.SideEffectClassUnknown
+var sideEffectsNone = registrationv1beta1.SideEffectClassNone
+var sideEffectsSome = registrationv1beta1.SideEffectClassSome
+var sideEffectsNoneOnDryRun = registrationv1beta1.SideEffectClassNoneOnDryRun
 
 // NewFakeDataSource returns a mock client and informer returning the given webhooks.
 func NewFakeDataSource(name string, webhooks []registrationv1beta1.Webhook, mutating bool, stopCh <-chan struct{}) (clientset kubernetes.Interface, factory informers.SharedInformerFactory) {
