@@ -311,7 +311,9 @@ data:
         prometheus :9153
         proxy . {{ .UpstreamNameserver }}
         cache 30
+        loop
         reload
+        loadbalance
     }{{ .StubDomain }}
 `
 	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
