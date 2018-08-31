@@ -2498,10 +2498,14 @@ EOF
       setup-addon-manifests "addons" "istio/noauth"
     fi
   fi
+  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
+    setup-addon-manifests "addons" "runtimeclass"
+  fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
     download-extra-addons
     setup-addon-manifests "addons" "gce-extras"
   fi
+
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
