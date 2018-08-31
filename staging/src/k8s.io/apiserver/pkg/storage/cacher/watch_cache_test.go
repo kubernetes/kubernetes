@@ -19,6 +19,7 @@ package cacher
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -275,6 +276,41 @@ func TestEvents(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
+	}
+}
+
+func TestMarker(t *testing.T) {
+	store := newTestWatchCache(3)
+
+	// First thing that is called when propagated from storage is Replace.
+	store.Replace([]interface{}{
+		makeTestPod("pod1", 5),
+		makeTestPod("pod2", 9),
+	}, "9")
+
+	_, err := store.GetAllEventsSince(8)
+	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Getting events from 8 should return no events,
+	// even though there is a marker there.
+	result, err := store.GetAllEventsSince(9)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("unexpected result: %#v, expected no events", result)
+	}
+
+	pod := makeTestPod("pods", 12)
+	store.Add(pod)
+	// Getting events from 8 should still work and return one event.
+	result, err = store.GetAllEventsSince(9)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 || !apiequality.Semantic.DeepEqual(result[0].Object, pod) {
+		t.Errorf("unexpected result: %#v, expected %v", result, pod)
 	}
 }
 
