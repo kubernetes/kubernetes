@@ -37,6 +37,14 @@ MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+
+# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
+# To avoid situation during cluster upgrade when there are two instances
+# of fluentd running on a node, kubelet need to mark node on which
+# fluentd is not running as a manifest pod with appropriate label.
+# TODO(piosz): remove this in 1.8
+NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
+
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
 # Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
 # configurations by separating them by a semi-colon ex. "2,scsi,fs;1,nvme,block"
@@ -47,6 +55,9 @@ REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
+if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
+    NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
+fi
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
 CREATE_CUSTOM_NETWORK=${CREATE_CUSTOM_NETWORK:-false}
@@ -200,13 +211,6 @@ APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-} --vmodule=httplog=3 --runtime-conf
 CONTROLLER_MANAGER_TEST_ARGS="${CONTROLLER_MANAGER_TEST_ARGS:-} ${TEST_CLUSTER_RESYNC_PERIOD} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
-
-# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
-# To avoid situation during cluster upgrade when there are two instances
-# of fluentd running on a node, kubelet need to mark node on which
-# fluentd is not running as a manifest pod with appropriate label.
-# TODO(piosz): remove this in 1.8
-NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
@@ -471,4 +475,12 @@ if [[ "${ENABLE_TOKENREQUEST:-}" == "true" ]]; then
   FEATURE_GATES="${FEATURE_GATES},TokenRequest=true"
   SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
   SERVICEACCOUNT_API_AUDIENCES="https://kubernetes.default.svc"
+fi
+
+# Optional: Enable Node termination Handler for Preemptible and GPU VMs.
+# https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
+ENABLE_NODE_TERMINATION_HANDLER="${ENABLE_NODE_TERMINATION_HANDLER:-false}"
+# Override default Node Termination Handler Image
+if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
 fi
