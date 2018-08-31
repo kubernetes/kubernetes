@@ -379,10 +379,14 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return err
 	}
 	var sorter *kubectl.RuntimeSort
-	if o.Sort && len(objs) > 1 {
-		// TODO: questionable
-		if sorter, err = kubectl.SortObjects(cmdutil.InternalVersionDecoder(), objs, sorting); err != nil {
-			return err
+	if len(objs) > 1 {
+		if o.Sort {
+			// TODO: questionable
+			if sorter, err = kubectl.SortObjects(cmdutil.InternalVersionDecoder(), objs, sorting); err != nil {
+				return err
+			}
+		} else {
+			sorter, err = kubectl.SortObjects(cmdutil.InternalVersionDecoder(), objs, "{.lastTimestamp}")
 		}
 	}
 
