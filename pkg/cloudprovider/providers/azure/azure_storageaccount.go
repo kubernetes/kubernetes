@@ -30,16 +30,16 @@ type accountWithLocation struct {
 }
 
 // getStorageAccounts gets name, type, location of all storage accounts in a resource group which matches matchingAccountType, matchingLocation
-func (az *Cloud) getStorageAccounts(matchingAccountType, matchingLocation string) ([]accountWithLocation, error) {
+func (az *Cloud) getStorageAccounts(matchingAccountType, resourceGroup, matchingLocation string) ([]accountWithLocation, error) {
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("StorageAccountClient.ListByResourceGroup(%v): start", az.ResourceGroup)
-	result, err := az.StorageAccountClient.ListByResourceGroup(az.ResourceGroup)
-	glog.V(10).Infof("StorageAccountClient.ListByResourceGroup(%v): end", az.ResourceGroup)
+	glog.V(10).Infof("StorageAccountClient.ListByResourceGroup(%v): start", resourceGroup)
+	result, err := az.StorageAccountClient.ListByResourceGroup(resourceGroup)
+	glog.V(10).Infof("StorageAccountClient.ListByResourceGroup(%v): end", resourceGroup)
 	if err != nil {
 		return nil, err
 	}
 	if result.Value == nil {
-		return nil, fmt.Errorf("unexpected error when listing storage accounts from resource group %s", az.ResourceGroup)
+		return nil, fmt.Errorf("unexpected error when listing storage accounts from resource group %s", resourceGroup)
 	}
 
 	accounts := []accountWithLocation{}
@@ -62,10 +62,10 @@ func (az *Cloud) getStorageAccounts(matchingAccountType, matchingLocation string
 }
 
 // getStorageAccesskey gets the storage account access key
-func (az *Cloud) getStorageAccesskey(account string) (string, error) {
+func (az *Cloud) getStorageAccesskey(account, resourceGroup string) (string, error) {
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("StorageAccountClient.ListKeys(%q): start", account)
-	result, err := az.StorageAccountClient.ListKeys(az.ResourceGroup, account)
+	result, err := az.StorageAccountClient.ListKeys(resourceGroup, account)
 	glog.V(10).Infof("StorageAccountClient.ListKeys(%q): end", account)
 	if err != nil {
 		return "", err
@@ -87,10 +87,10 @@ func (az *Cloud) getStorageAccesskey(account string) (string, error) {
 }
 
 // ensureStorageAccount search storage account, create one storage account(with genAccountNamePrefix) if not found, return accountName, accountKey
-func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAccountNamePrefix string) (string, string, error) {
+func (az *Cloud) ensureStorageAccount(accountName, accountType, resourceGroup, location, genAccountNamePrefix string) (string, string, error) {
 	if len(accountName) == 0 {
 		// find a storage account that matches accountType
-		accounts, err := az.getStorageAccounts(accountType, location)
+		accounts, err := az.getStorageAccounts(accountType, resourceGroup, location)
 		if err != nil {
 			return "", "", fmt.Errorf("could not list storage accounts for account type %s: %v", accountType, err)
 		}
@@ -111,14 +111,14 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAcc
 			}
 
 			glog.V(2).Infof("azure - no matching account found, begin to create a new account %s in resource group %s, location: %s, accountType: %s",
-				accountName, az.ResourceGroup, location, accountType)
+				accountName, resourceGroup, location, accountType)
 			cp := storage.AccountCreateParameters{
 				Sku:      &storage.Sku{Name: storage.SkuName(accountType)},
 				Tags:     &map[string]*string{"created-by": to.StringPtr("azure")},
 				Location: &location}
 			cancel := make(chan struct{})
 
-			_, errchan := az.StorageAccountClient.Create(az.ResourceGroup, accountName, cp, cancel)
+			_, errchan := az.StorageAccountClient.Create(resourceGroup, accountName, cp, cancel)
 			err := <-errchan
 			if err != nil {
 				return "", "", fmt.Errorf(fmt.Sprintf("Failed to create storage account %s, error: %s", accountName, err))
@@ -127,7 +127,7 @@ func (az *Cloud) ensureStorageAccount(accountName, accountType, location, genAcc
 	}
 
 	// find the access key with this account
-	accountKey, err := az.getStorageAccesskey(accountName)
+	accountKey, err := az.getStorageAccesskey(accountName, resourceGroup)
 	if err != nil {
 		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}

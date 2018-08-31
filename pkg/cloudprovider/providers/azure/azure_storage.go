@@ -31,8 +31,12 @@ const (
 )
 
 // CreateFileShare creates a file share, using a matching storage account
-func (az *Cloud) CreateFileShare(shareName, accountName, accountType, location string, requestGiB int) (string, string, error) {
-	account, key, err := az.ensureStorageAccount(accountName, accountType, location, fileShareAccountNamePrefix)
+func (az *Cloud) CreateFileShare(shareName, accountName, accountType, resourceGroup, location string, requestGiB int) (string, string, error) {
+	if resourceGroup == "" {
+		resourceGroup = az.resourceGroup
+	}
+
+	account, key, err := az.ensureStorageAccount(accountName, accountType, resourceGroup, location, fileShareAccountNamePrefix)
 	if err != nil {
 		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
