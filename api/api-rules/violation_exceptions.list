@@ -93,7 +93,7 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleForbiddenWindow
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUseRESTClients
-API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerCPUTaintPeriod
+API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerCPUInitializationPeriod
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerInitialReadinessDelay
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,KubeCloudSharedConfiguration,Port

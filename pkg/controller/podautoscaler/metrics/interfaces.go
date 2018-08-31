@@ -24,9 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// PodMetricsInfo contains pod metric values as a map from pod names to
-// metric values (the metric values are expected to be the metric as a milli-value)
-type PodMetricsInfo map[string]int64
+// PodMetric contains pod metric value (the metric values are expected to be the metric as a milli-value)
+type PodMetric struct {
+	Timestamp time.Time
+	Window    time.Duration
+	Value     int64
+}
+
+// PodMetricsInfo contains pod metrics as a map from pod names to PodMetricsInfo
+type PodMetricsInfo map[string]PodMetric
 
 // MetricsClient knows how to query a remote interface to retrieve container-level
 // resource metrics as well as pod-level arbitrary metrics

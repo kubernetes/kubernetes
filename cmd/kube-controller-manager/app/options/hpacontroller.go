@@ -30,7 +30,7 @@ type HPAControllerOptions struct {
 	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
 	HorizontalPodAutoscalerUpscaleForbiddenWindow   metav1.Duration
 	HorizontalPodAutoscalerSyncPeriod               metav1.Duration
-	HorizontalPodAutoscalerCPUTaintPeriod           metav1.Duration
+	HorizontalPodAutoscalerCPUInitializationPeriod  metav1.Duration
 	HorizontalPodAutoscalerInitialReadinessDelay    metav1.Duration
 }
 
@@ -46,7 +46,7 @@ func (o *HPAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "horizontal-pod-autoscaler-downscale-delay", o.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "The period since last downscale, before another downscale can be performed in horizontal pod autoscaler.")
 	fs.Float64Var(&o.HorizontalPodAutoscalerTolerance, "horizontal-pod-autoscaler-tolerance", o.HorizontalPodAutoscalerTolerance, "The minimum change (from 1.0) in the desired-to-actual metrics ratio for the horizontal pod autoscaler to consider scaling.")
 	fs.BoolVar(&o.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", o.HorizontalPodAutoscalerUseRESTClients, "If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizontal pod autoscaler.")
-	fs.DurationVar(&o.HorizontalPodAutoscalerCPUTaintPeriod.Duration, "horizontal-pod-autoscaler-cpu-taint-period", o.HorizontalPodAutoscalerCPUTaintPeriod.Duration, "The period after pod start for which CPU samples are considered tainted by initialization.")
+	fs.DurationVar(&o.HorizontalPodAutoscalerCPUInitializationPeriod.Duration, "horizontal-pod-autoscaler-cpu-initialization-period", o.HorizontalPodAutoscalerCPUInitializationPeriod.Duration, "The period after pod start when CPU samples might be skipped.")
 	fs.DurationVar(&o.HorizontalPodAutoscalerInitialReadinessDelay.Duration, "horizontal-pod-autoscaler-initial-readiness-delay", o.HorizontalPodAutoscalerInitialReadinessDelay.Duration, "The period after pod start during which readiness changes will be treated as initial readiness.")
 }
 
@@ -60,6 +60,8 @@ func (o *HPAControllerOptions) ApplyTo(cfg *componentconfig.HPAControllerConfigu
 	cfg.HorizontalPodAutoscalerDownscaleForbiddenWindow = o.HorizontalPodAutoscalerDownscaleForbiddenWindow
 	cfg.HorizontalPodAutoscalerTolerance = o.HorizontalPodAutoscalerTolerance
 	cfg.HorizontalPodAutoscalerUseRESTClients = o.HorizontalPodAutoscalerUseRESTClients
+	cfg.HorizontalPodAutoscalerCPUInitializationPeriod = o.HorizontalPodAutoscalerCPUInitializationPeriod
+	cfg.HorizontalPodAutoscalerInitialReadinessDelay = o.HorizontalPodAutoscalerInitialReadinessDelay
 
 	return nil
 }
