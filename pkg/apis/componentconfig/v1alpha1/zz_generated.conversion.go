@@ -601,6 +601,7 @@ func Convert_componentconfig_GroupResource_To_v1alpha1_GroupResource(in *compone
 func autoConvert_v1alpha1_HPAControllerConfiguration_To_componentconfig_HPAControllerConfiguration(in *HPAControllerConfiguration, out *componentconfig.HPAControllerConfiguration, s conversion.Scope) error {
 	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
 	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
+	out.HorizontalPodAutoscalerDownscaleStabilizationWindow = in.HorizontalPodAutoscalerDownscaleStabilizationWindow
 	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
 	out.HorizontalPodAutoscalerTolerance = in.HorizontalPodAutoscalerTolerance
 	if err := v1.Convert_Pointer_bool_To_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
@@ -620,6 +621,7 @@ func autoConvert_componentconfig_HPAControllerConfiguration_To_v1alpha1_HPAContr
 	out.HorizontalPodAutoscalerSyncPeriod = in.HorizontalPodAutoscalerSyncPeriod
 	out.HorizontalPodAutoscalerUpscaleForbiddenWindow = in.HorizontalPodAutoscalerUpscaleForbiddenWindow
 	out.HorizontalPodAutoscalerDownscaleForbiddenWindow = in.HorizontalPodAutoscalerDownscaleForbiddenWindow
+	out.HorizontalPodAutoscalerDownscaleStabilizationWindow = in.HorizontalPodAutoscalerDownscaleStabilizationWindow
 	out.HorizontalPodAutoscalerTolerance = in.HorizontalPodAutoscalerTolerance
 	if err := v1.Convert_bool_To_Pointer_bool(&in.HorizontalPodAutoscalerUseRESTClients, &out.HorizontalPodAutoscalerUseRESTClients, s); err != nil {
 		return err
