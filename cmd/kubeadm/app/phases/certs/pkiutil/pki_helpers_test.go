@@ -405,7 +405,7 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 }
 
 func TestPathsForCertAndKey(t *testing.T) {
-	crtPath, keyPath := pathsForCertAndKey("/foo", "bar")
+	crtPath, keyPath := PathsForCertAndKey("/foo", "bar")
 	if crtPath != "/foo/bar.crt" {
 		t.Errorf("unexpected certificate path: %s", crtPath)
 	}
