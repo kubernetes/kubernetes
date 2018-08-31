@@ -1616,7 +1616,7 @@ function validate-node-local-ssds-ext(){
   ssdopts="${1}"
 
   if [[ -z "${ssdopts[0]}" || -z "${ssdopts[1]}" || -z "${ssdopts[2]}" ]]; then
-	  echo -e "${color_red}Local SSD: NODE_LOCAL_SSDS_EXT is malformed, found ${ssdopts[0]-_},${ssdopts[1]-_},${ssdopts[2]-_} ${color_norm}" >&2
+    echo -e "${color_red}Local SSD: NODE_LOCAL_SSDS_EXT is malformed, found ${ssdopts[0]-_},${ssdopts[1]-_},${ssdopts[2]-_} ${color_norm}" >&2
     exit 2
   fi
   if [[ "${ssdopts[1]}" != "scsi" && "${ssdopts[1]}" != "nvme" ]]; then
@@ -2961,75 +2961,6 @@ function check-resources() {
 
   # No resources found.
   return 0
-}
-
-# Prepare to push new binaries to kubernetes cluster
-#  $1 - whether prepare push to node
-function prepare-push() {
-  local node="${1-}"
-  #TODO(dawnchen): figure out how to upgrade a Container Linux node
-  if [[ "${node}" == "true" && "${NODE_OS_DISTRIBUTION}" != "debian" ]]; then
-    echo "Updating nodes in a kubernetes cluster with ${NODE_OS_DISTRIBUTION} is not supported yet." >&2
-    exit 1
-  fi
-  if [[ "${node}" != "true" && "${MASTER_OS_DISTRIBUTION}" != "debian" ]]; then
-    echo "Updating the master in a kubernetes cluster with ${MASTER_OS_DISTRIBUTION} is not supported yet." >&2
-    exit 1
-  fi
-
-  OUTPUT=${KUBE_ROOT}/_output/logs
-  mkdir -p ${OUTPUT}
-
-  kube::util::ensure-temp-dir
-  detect-project
-  detect-master
-  detect-node-names
-  get-kubeconfig-basicauth
-  get-kubeconfig-bearertoken
-
-  # Make sure we have the tar files staged on Google Storage
-  tars_from_version
-
-  # Prepare node env vars and update MIG template
-  if [[ "${node}" == "true" ]]; then
-    write-node-env
-
-    local scope_flags=$(get-scope-flags)
-
-    # Ugly hack: Since it is not possible to delete instance-template that is currently
-    # being used, create a temp one, then delete the old one and recreate it once again.
-    local tmp_template_name="${NODE_INSTANCE_PREFIX}-template-tmp"
-    create-node-instance-template $tmp_template_name
-
-    local template_name="${NODE_INSTANCE_PREFIX}-template"
-    for group in ${INSTANCE_GROUPS[@]:-}; do
-      gcloud compute instance-groups managed \
-        set-instance-template "${group}" \
-        --template "$tmp_template_name" \
-        --zone "${ZONE}" \
-        --project "${PROJECT}" || true;
-    done
-
-    gcloud compute instance-templates delete \
-      --project "${PROJECT}" \
-      --quiet \
-      "$template_name" || true
-
-    create-node-instance-template "$template_name"
-
-    for group in ${INSTANCE_GROUPS[@]:-}; do
-      gcloud compute instance-groups managed \
-        set-instance-template "${group}" \
-        --template "$template_name" \
-        --zone "${ZONE}" \
-        --project "${PROJECT}" || true;
-    done
-
-    gcloud compute instance-templates delete \
-      --project "${PROJECT}" \
-      --quiet \
-      "$tmp_template_name" || true
-  fi
 }
 
 # -----------------------------------------------------------------------------
