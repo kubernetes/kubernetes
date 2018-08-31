@@ -25,19 +25,19 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	"net/http"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/mux"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
@@ -160,7 +160,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	}
 	if c.InsecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Debugging)
-		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
+		insecureSuperuserAuthn := server.AuthenticationInfo{Authenticator: &server.InsecureSuperuser{}}
+		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, nil, &insecureSuperuserAuthn)
 		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}

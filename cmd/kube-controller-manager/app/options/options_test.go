@@ -250,7 +250,7 @@ func TestAddFlags(t *testing.T) {
 			ConcurrentServiceSyncs: 2,
 		},
 		Controllers: []string{"foo", "bar"},
-		SecureServing: &apiserveroptions.SecureServingOptions{
+		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
 			BindAddress: net.ParseIP("192.168.4.21"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -258,11 +258,27 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "kube-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 47,
-		},
-		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
+		}).WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",
+		}).WithLoopback(),
+		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+			CacheTTL:   10 * time.Second,
+			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+				UsernameHeaders:     []string{"x-remote-user"},
+				GroupHeaders:        []string{"x-remote-group"},
+				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			},
+			RemoteKubeConfigFileOptional: true,
+		},
+		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+			AllowCacheTTL:                10 * time.Second,
+			DenyCacheTTL:                 10 * time.Second,
+			RemoteKubeConfigFileOptional: true,
+			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 		},
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",
