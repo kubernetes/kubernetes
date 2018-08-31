@@ -83,6 +83,7 @@ go_test(
         "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/fake:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/custom_metrics/fake:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics/fake:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/heapster/metrics/api/v1/types:go_default_library",
