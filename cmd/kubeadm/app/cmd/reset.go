@@ -186,10 +186,10 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := containerRuntime.RemoveContainers(containers); err != nil {
-		return err
-	}
-	return nil
+
+	err = containerRuntime.RemoveContainers(containers)
+	return err
+
 }
 
 // cleanDir removes everything in a directory, but not the directory itself
