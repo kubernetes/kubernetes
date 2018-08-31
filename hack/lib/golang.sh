@@ -453,7 +453,7 @@ kube::golang::outfile_for_binary() {
 # Argument: the name of a Kubernetes package.
 # Returns 0 if the binary can be built with coverage, 1 otherwise.
 # NB: this ignores whether coverage is globally enabled or not.
-kube::golang::is_covered_binary() {
+kube::golang::is_instrumented_package() {
   return $(kube::util::array_contains "$1" "${KUBE_COVERAGE_INSTRUMENTED_PACKAGES[@]}")
 }
 
@@ -514,7 +514,7 @@ kube::golang::build_some_binaries() {
   if [[ -n "${build_with_coverage:-}" ]]; then
     local -a uncovered=()
     for package in "$@"; do
-      if kube::golang::is_covered_binary "${package}"; then
+      if kube::golang::is_instrumented_package "${package}"; then
         V=2 kube::log::info "Building ${package} with coverage..."
 
         kube::golang::create_coverage_dummy_test "${package}"

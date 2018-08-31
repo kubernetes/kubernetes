@@ -49,8 +49,8 @@ func InitCoverage(name string) {
 		coverageFile = "/tmp/k8s-" + name + ".cov"
 	}
 
-	// Set up the unit test framework with the arguments we want.
-	flag.CommandLine.Parse([]string{"-test.coverprofile=" + tempCoveragePath()})
+	// Set up the unit test framework with the required arguments to activate test coverage.
+	flag.CommandLine.Parse([]string{"-test.coverprofile", tempCoveragePath()})
 
 	// Begin periodic logging
 	go wait.Forever(FlushCoverage, flushInterval)
@@ -76,8 +76,6 @@ func FlushCoverage() {
 	// This gets us atomic updates from the perspective of another process trying to access
 	// the file.
 	if err := os.Rename(tempCoveragePath(), coverageFile); err != nil {
-		// This should never fail, because we're in the same directory. There's also little that
-		// we can do if it does.
 		glog.Errorf("Couldn't move coverage file from %s to %s", coverageFile, tempCoveragePath())
 	}
 }
