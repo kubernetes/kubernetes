@@ -255,13 +255,13 @@ const (
 	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
 
 	// owner: @mikedanese
-	// alpha: v1.10
+	// beta: v1.12
 	//
 	// Implement TokenRequest endpoint on service account resources.
 	TokenRequest utilfeature.Feature = "TokenRequest"
 
 	// owner: @mikedanese
-	// alpha: v1.11
+	// beta: v1.12
 	//
 	// Enable ServiceAccountTokenVolumeProjection support in ProjectedVolumes.
 	TokenRequestProjection utilfeature.Feature = "TokenRequestProjection"
@@ -408,8 +408,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	SupportPodPidsLimit:                         {Default: false, PreRelease: utilfeature.Alpha},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: false, PreRelease: utilfeature.Alpha},
-	TokenRequest:                                {Default: false, PreRelease: utilfeature.Alpha},
-	TokenRequestProjection:                      {Default: false, PreRelease: utilfeature.Alpha},
+	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
+	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.Beta},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
