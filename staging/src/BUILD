@@ -60,6 +60,7 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/waitgroup:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/util/webhook:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/version:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/watch:all-srcs",

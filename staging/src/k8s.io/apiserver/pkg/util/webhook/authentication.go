@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package webhook
 
 import (
 	"fmt"
@@ -47,10 +47,12 @@ type AuthenticationInfoResolverDelegator struct {
 	ClientConfigForServiceFunc func(serviceName, serviceNamespace string) (*rest.Config, error)
 }
 
+// ClientConfigFor returns client config for given server.
 func (a *AuthenticationInfoResolverDelegator) ClientConfigFor(server string) (*rest.Config, error) {
 	return a.ClientConfigForFunc(server)
 }
 
+// ClientConfigForService returns client config for given service.
 func (a *AuthenticationInfoResolverDelegator) ClientConfigForService(serviceName, serviceNamespace string) (*rest.Config, error) {
 	return a.ClientConfigForServiceFunc(serviceName, serviceNamespace)
 }
