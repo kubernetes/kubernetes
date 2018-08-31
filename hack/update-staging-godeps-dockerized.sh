@@ -120,6 +120,7 @@ for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
 
   if [ "${DRY_RUN}" != true ]; then
     cp "${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps/Godeps.json"
+    cp "${KUBE_ROOT}/Godeps/OWNERS" "${KUBE_ROOT}/staging/src/k8s.io/${repo}/Godeps/OWNERS"
     # Assume Godeps.json is not updated, as the working tree needs to be clean
     # Without this, the script would pause after each staging repo to prompt the
     # user to commit all changes (difficult inside a container). It's safe to
