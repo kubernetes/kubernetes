@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/server"
@@ -238,34 +239,45 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 	}
 
 	authConfigMap, err := client.CoreV1().ConfigMaps(authenticationConfigMapNamespace).Get(authenticationConfigMapName, metav1.GetOptions{})
-	if err != nil {
+	switch {
+	case errors.IsNotFound(err):
+		// ignore, authConfigMap is nil now
+	case errors.IsForbidden(err):
 		glog.Warningf("Unable to get configmap/%s in %s.  Usually fixed by "+
 			"'kubectl create rolebinding -n %s ROLE_NAME --role=%s --serviceaccount=YOUR_NS:YOUR_SA'",
 			authenticationConfigMapName, authenticationConfigMapNamespace, authenticationConfigMapNamespace, authenticationRoleName)
 		return err
+	case err != nil:
+		return err
 	}
 
 	if len(s.ClientCert.ClientCA) == 0 {
-		opt, err := inClusterClientCA(authConfigMap)
-		if err != nil {
-			return err
+		if authConfigMap != nil {
+			opt, err := inClusterClientCA(authConfigMap)
+			if err != nil {
+				return err
+			}
+			if opt != nil {
+				s.ClientCert = *opt
+			}
 		}
-		if opt == nil {
+		if len(s.ClientCert.ClientCA) == 0 {
 			glog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
-		} else {
-			s.ClientCert = *opt
 		}
 	}
 
 	if len(s.RequestHeader.ClientCAFile) == 0 {
-		opt, err := inClusterRequestHeader(authConfigMap)
-		if err != nil {
-			return err
+		if authConfigMap != nil {
+			opt, err := inClusterRequestHeader(authConfigMap)
+			if err != nil {
+				return err
+			}
+			if opt != nil {
+				s.RequestHeader = *opt
+			}
 		}
-		if opt == nil {
+		if len(s.RequestHeader.ClientCAFile) == 0 {
 			glog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
-		} else {
-			s.RequestHeader = *opt
 		}
 	}
 

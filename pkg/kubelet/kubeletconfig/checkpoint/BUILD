@@ -33,9 +33,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint",
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
+        "//pkg/kubelet/apis/config/scheme:go_default_library",
+        "//pkg/kubelet/apis/config/v1beta1:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",

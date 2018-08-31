@@ -33,9 +33,7 @@ import (
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	pluginbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
 	plugintruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
@@ -59,17 +57,12 @@ func appendBackend(existing, newBackend audit.Backend) audit.Backend {
 	return audit.Union(existing, newBackend)
 }
 
-func advancedAuditingEnabled() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing)
-}
-
 type AuditOptions struct {
 	// Policy configuration file for filtering audit events that are captured.
 	// If unspecified, a default is provided.
 	PolicyFile string
 
 	// Plugin options
-
 	LogOptions     AuditLogOptions
 	WebhookOptions AuditWebhookOptions
 }
@@ -110,8 +103,6 @@ type AuditTruncateOptions struct {
 }
 
 // AuditLogOptions determines the output of the structured audit log by default.
-// If the AdvancedAuditing feature is set to false, AuditLogOptions holds the legacy
-// audit log writer.
 type AuditLogOptions struct {
 	Path       string
 	MaxAge     int
@@ -179,17 +170,7 @@ func (o *AuditOptions) Validate() []error {
 		return nil
 	}
 
-	allErrors := []error{}
-
-	if !advancedAuditingEnabled() {
-		if len(o.PolicyFile) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-policy-file", features.AdvancedAuditing))
-		}
-		if len(o.WebhookOptions.ConfigFile) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("feature '%s' must be enabled to set option --audit-webhook-config-file", features.AdvancedAuditing))
-		}
-	}
-
+	var allErrors []error
 	allErrors = append(allErrors, o.LogOptions.Validate()...)
 	allErrors = append(allErrors, o.WebhookOptions.Validate()...)
 
@@ -263,8 +244,7 @@ func (o *AuditOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.StringVar(&o.PolicyFile, "audit-policy-file", o.PolicyFile,
-		"Path to the file that defines the audit policy configuration. Requires the 'AdvancedAuditing' feature gate."+
-			" With AdvancedAuditing, a profile is required to enable auditing.")
+		"Path to the file that defines the audit policy configuration.")
 
 	o.LogOptions.AddFlags(fs)
 	o.LogOptions.BatchOptions.AddFlags(pluginlog.PluginName, fs)
@@ -279,19 +259,14 @@ func (o *AuditOptions) ApplyTo(c *server.Config) error {
 		return nil
 	}
 
-	// Apply legacy audit options if advanced audit is not enabled.
-	if !advancedAuditingEnabled() {
-		return o.LogOptions.legacyApplyTo(c)
-	}
-
-	// Apply advanced options if advanced audit is enabled.
+	// Apply advanced options.
 	// 1. Apply generic options.
 	if err := o.applyTo(c); err != nil {
 		return err
 	}
 
 	// 2. Apply plugin options.
-	if err := o.LogOptions.advancedApplyTo(c); err != nil {
+	if err := o.LogOptions.applyTo(c); err != nil {
 		return err
 	}
 	if err := o.WebhookOptions.applyTo(c); err != nil {
@@ -390,8 +365,8 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
 	fs.StringVar(&o.Format, "audit-log-format", o.Format,
 		"Format of saved audits. \"legacy\" indicates 1-line text format for each event."+
-			" \"json\" indicates structured json format. Requires the 'AdvancedAuditing' feature"+
-			" gate. Known formats are "+strings.Join(pluginlog.AllowedFormats, ",")+".")
+			" \"json\" indicates structured json format. Known formats are "+
+			strings.Join(pluginlog.AllowedFormats, ",")+".")
 	fs.StringVar(&o.GroupVersionString, "audit-log-version", o.GroupVersionString,
 		"API group and version used for serializing audit events written to log.")
 }
@@ -403,29 +378,28 @@ func (o *AuditLogOptions) Validate() []error {
 	}
 
 	var allErrors []error
-	if advancedAuditingEnabled() {
-		if err := validateBackendBatchOptions(pluginlog.PluginName, o.BatchOptions); err != nil {
-			allErrors = append(allErrors, err)
-		}
-		if err := o.TruncateOptions.Validate(pluginlog.PluginName); err != nil {
-			allErrors = append(allErrors, err)
-		}
 
-		if err := validateGroupVersionString(o.GroupVersionString); err != nil {
-			allErrors = append(allErrors, err)
-		}
+	if err := validateBackendBatchOptions(pluginlog.PluginName, o.BatchOptions); err != nil {
+		allErrors = append(allErrors, err)
+	}
+	if err := o.TruncateOptions.Validate(pluginlog.PluginName); err != nil {
+		allErrors = append(allErrors, err)
+	}
 
-		// Check log format
-		validFormat := false
-		for _, f := range pluginlog.AllowedFormats {
-			if f == o.Format {
-				validFormat = true
-				break
-			}
+	if err := validateGroupVersionString(o.GroupVersionString); err != nil {
+		allErrors = append(allErrors, err)
+	}
+
+	// Check log format
+	validFormat := false
+	for _, f := range pluginlog.AllowedFormats {
+		if f == o.Format {
+			validFormat = true
+			break
 		}
-		if !validFormat {
-			allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.Format, strings.Join(pluginlog.AllowedFormats, ",")))
-		}
+	}
+	if !validFormat {
+		allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.Format, strings.Join(pluginlog.AllowedFormats, ",")))
 	}
 
 	// Check validities of MaxAge, MaxBackups and MaxSize of log options, if file log backend is enabled.
@@ -464,7 +438,7 @@ func (o *AuditLogOptions) getWriter() io.Writer {
 	return w
 }
 
-func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
+func (o *AuditLogOptions) applyTo(c *server.Config) error {
 	if w := o.getWriter(); w != nil {
 		groupVersion, _ := schema.ParseGroupVersion(o.GroupVersionString)
 		log := pluginlog.NewBackend(w, o.Format, groupVersion)
@@ -475,15 +449,9 @@ func (o *AuditLogOptions) advancedApplyTo(c *server.Config) error {
 	return nil
 }
 
-func (o *AuditLogOptions) legacyApplyTo(c *server.Config) error {
-	c.LegacyAuditWriter = o.getWriter()
-	return nil
-}
-
 func (o *AuditWebhookOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ConfigFile, "audit-webhook-config-file", o.ConfigFile,
-		"Path to a kubeconfig formatted file that defines the audit webhook configuration."+
-			" Requires the 'AdvancedAuditing' feature gate.")
+		"Path to a kubeconfig formatted file that defines the audit webhook configuration.")
 	fs.DurationVar(&o.InitialBackoff, "audit-webhook-initial-backoff",
 		o.InitialBackoff, "The amount of time to wait before retrying the first failed request.")
 	fs.DurationVar(&o.InitialBackoff, "audit-webhook-batch-initial-backoff",
@@ -500,17 +468,15 @@ func (o *AuditWebhookOptions) Validate() []error {
 	}
 
 	var allErrors []error
-	if advancedAuditingEnabled() {
-		if err := validateBackendBatchOptions(pluginwebhook.PluginName, o.BatchOptions); err != nil {
-			allErrors = append(allErrors, err)
-		}
-		if err := o.TruncateOptions.Validate(pluginwebhook.PluginName); err != nil {
-			allErrors = append(allErrors, err)
-		}
+	if err := validateBackendBatchOptions(pluginwebhook.PluginName, o.BatchOptions); err != nil {
+		allErrors = append(allErrors, err)
+	}
+	if err := o.TruncateOptions.Validate(pluginwebhook.PluginName); err != nil {
+		allErrors = append(allErrors, err)
+	}
 
-		if err := validateGroupVersionString(o.GroupVersionString); err != nil {
-			allErrors = append(allErrors, err)
-		}
+	if err := validateGroupVersionString(o.GroupVersionString); err != nil {
+		allErrors = append(allErrors, err)
 	}
 	return allErrors
 }
