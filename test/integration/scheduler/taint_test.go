@@ -639,7 +639,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 				t.Errorf("Failed to create node, err: %v", err)
 			}
 			if err := waitForNodeTaints(cs, node, test.expectedTaints); err != nil {
-				t.Errorf("Failed to taint node, err: %v", err)
+				t.Errorf("Failed to taint node <%s>, err: %v", node.Name, err)
 			}
 
 			var pods []*v1.Pod
