@@ -488,7 +488,8 @@ func TestMain(m *testing.M) {
 
   // Make sure we actually write the profiling information to disk, if we make it here.
   // On long-running services, or anything that calls os.Exit(), this is insufficient,
-  // so be sure to call this from inside the binary too.
+  // so we also flush periodically with a default period of five seconds (configurable by
+  // the KUBE_COVERAGE_FLUSH_INTERVAL environment variable).
   coverage.FlushCoverage()
 }
 EOF
