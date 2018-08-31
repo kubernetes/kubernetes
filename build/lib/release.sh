@@ -206,7 +206,6 @@ function kube::release::build_server_images() {
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
     rm -rf "${release_stage}"
     mkdir -p "${release_stage}/server/bin"
-    mkdir -p "${release_stage}/addons"
 
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
@@ -225,15 +224,15 @@ function kube::release::build_server_images() {
 
 # Package up all of the server binaries
 function kube::release::package_server_tarballs() {
+  kube::release::build_server_images
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local arch=$(basename "${platform}")
     kube::log::status "Building tarball: server $platform_tag"
 
+    # NOTE: this directory was setup in kube::release::build_server_images
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
-    rm -rf "${release_stage}"
-    mkdir -p "${release_stage}/server/bin"
     mkdir -p "${release_stage}/addons"
 
     # This fancy expression will expand to prepend a path
@@ -241,8 +240,6 @@ function kube::release::package_server_tarballs() {
     # KUBE_SERVER_BINARIES array.
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
-
-    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
