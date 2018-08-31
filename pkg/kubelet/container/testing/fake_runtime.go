@@ -405,7 +405,7 @@ type FakeContainerCommandRunner struct {
 
 var _ ContainerCommandRunner = &FakeContainerCommandRunner{}
 
-func (f *FakeContainerCommandRunner) RunInContainer(containerID ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+func (f *FakeContainerCommandRunner) RunInContainer(containerID ContainerID, cmd []string, timeout time.Duration, tty bool) ([]byte, error) {
 	// record invoked values
 	f.ContainerID = containerID
 	f.Cmd = cmd

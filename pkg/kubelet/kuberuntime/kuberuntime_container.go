@@ -784,8 +784,8 @@ func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdi
 }
 
 // RunInContainer synchronously executes the command in the container, and returns the output.
-func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
-	stdout, stderr, err := m.runtimeService.ExecSync(id.ID, cmd, timeout)
+func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration, tty bool) ([]byte, error) {
+	stdout, stderr, err := m.runtimeService.ExecSync(id.ID, cmd, timeout, tty)
 	// NOTE(tallclair): This does not correctly interleave stdout & stderr, but should be sufficient
 	// for logging purposes. A combined output option will need to be added to the ExecSyncRequest
 	// if more precise output ordering is ever required.

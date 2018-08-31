@@ -157,7 +157,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 	if p.Exec != nil {
 		klog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod, container, p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
-		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
+		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout, p.Tty))
 	}
 	if p.HTTPGet != nil {
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
@@ -248,9 +248,9 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (pb *prober) newExecInContainer(container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
+func (pb *prober) newExecInContainer(container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration, tty bool) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
-		return pb.runner.RunInContainer(containerID, cmd, timeout)
+		return pb.runner.RunInContainer(containerID, cmd, timeout, tty)
 	}}
 }
 

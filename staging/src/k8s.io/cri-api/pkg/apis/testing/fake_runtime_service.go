@@ -410,7 +410,7 @@ func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.LinuxC
 	return nil
 }
 
-func (r *FakeRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+func (r *FakeRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration, tty bool) (stdout []byte, stderr []byte, err error) {
 	r.Lock()
 	defer r.Unlock()
 

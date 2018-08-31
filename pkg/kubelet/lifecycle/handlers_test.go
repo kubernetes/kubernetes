@@ -83,7 +83,7 @@ type fakeContainerCommandRunner struct {
 	Msg string
 }
 
-func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+func (f *fakeContainerCommandRunner) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration, tty bool) ([]byte, error) {
 	f.Cmd = cmd
 	f.ID = id
 	return []byte(f.Msg), f.Err

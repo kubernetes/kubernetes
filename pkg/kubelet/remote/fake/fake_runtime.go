@@ -201,7 +201,7 @@ func (f *RemoteRuntime) ContainerStatus(ctx context.Context, req *kubeapi.Contai
 // ExecSync runs a command in a container synchronously.
 func (f *RemoteRuntime) ExecSync(ctx context.Context, req *kubeapi.ExecSyncRequest) (*kubeapi.ExecSyncResponse, error) {
 	var exitCode int32
-	stdout, stderr, err := f.RuntimeService.ExecSync(req.ContainerId, req.Cmd, time.Duration(req.Timeout)*time.Second)
+	stdout, stderr, err := f.RuntimeService.ExecSync(req.ContainerId, req.Cmd, time.Duration(req.Timeout)*time.Second, req.Tty)
 	if err != nil {
 		exitError, ok := err.(utilexec.ExitError)
 		if !ok {

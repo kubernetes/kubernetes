@@ -47,7 +47,7 @@ type ContainerManager interface {
 	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error
 	// ExecSync executes a command in the container, and returns the stdout output.
 	// If command exits with a non-zero exit code, an error is returned.
-	ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error)
+	ExecSync(containerID string, cmd []string, timeout time.Duration, tty bool) (stdout []byte, stderr []byte, err error)
 	// Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
 	Exec(*runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error)
 	// Attach prepares a streaming endpoint to attach to a running container, and returns the address.

@@ -356,7 +356,7 @@ func (r *RemoteRuntimeService) UpdateContainerResources(containerID string, reso
 
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
-func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
+func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration, tty bool) (stdout []byte, stderr []byte, err error) {
 	// Do not set timeout when timeout is 0.
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -374,6 +374,7 @@ func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 		ContainerId: containerID,
 		Cmd:         cmd,
 		Timeout:     timeoutSeconds,
+		Tty:         tty,
 	}
 	resp, err := r.runtimeClient.ExecSync(ctx, req)
 	if err != nil {

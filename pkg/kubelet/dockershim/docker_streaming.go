@@ -84,8 +84,8 @@ func (ds *dockerService) ExecSync(_ context.Context, req *runtimeapi.ExecSyncReq
 		nil, // in
 		ioutils.WriteCloserWrapper(&stdoutBuffer),
 		ioutils.WriteCloserWrapper(&stderrBuffer),
-		false, // tty
-		nil,   // resize
+		req.Tty, // tty
+		nil,     // resize
 		timeout)
 
 	var exitCode int32

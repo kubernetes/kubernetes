@@ -85,6 +85,46 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
+		Testname: Pod readiness probe, with tty set to true for probe exec commands
+		Description: Create a test with a readiness probe exec command that uses "/bin/sh -i -c" and ensure that an ioctl error does't occur and the pod runs successfully
+	*/
+	framework.ConformanceIt("with readiness probe tty set to true for exec commands that use /bin/bash -i -c [NodeConformance]", func() {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "readiness-exec-with-tty",
+				Labels: map[string]string{"test": "readiness"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "readiness",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh", "-c", "sleep 1000"},
+						ReadinessProbe: &v1.Probe{
+							Handler: v1.Handler{
+								Exec: &v1.ExecAction{
+									Command: []string{"/bin/sh", "-i", "-c", "busybox", "ls"},
+								},
+							},
+							InitialDelaySeconds: 5,
+							FailureThreshold:    1,
+							Tty:                 true,
+						},
+					},
+				},
+			},
+		}
+		p := podClient.Create(pod)
+		f.WaitForPodReady(p.Name)
+
+		p, err := podClient.Get(p.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		isReady, err := testutils.PodRunningReady(p)
+		framework.ExpectNoError(err)
+		Expect(isReady).To(BeTrue(), "pod should be ready")
+	})
+
+	/*
 		Release : v1.9
 		Testname: Pod readiness probe, failure
 		Description: Create a Pod with a readiness probe that fails consistently. When this Pod is created,

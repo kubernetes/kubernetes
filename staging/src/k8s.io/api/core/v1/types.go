@@ -2023,6 +2023,9 @@ type Probe struct {
 	// Defaults to 3. Minimum value is 1.
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty" protobuf:"varint,6,opt,name=failureThreshold"`
+	// Set tty for container running probe exec command.
+	// +optional
+	Tty bool `json:"tty,omitempty" protobuf:"varint,7,opt,name=tty"`
 }
 
 // PullPolicy describes a policy for if/when to pull a container image

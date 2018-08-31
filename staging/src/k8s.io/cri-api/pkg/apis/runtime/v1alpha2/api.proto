@@ -930,6 +930,8 @@ message ExecSyncRequest {
     repeated string cmd = 2;
     // Timeout in seconds to stop the command. Default: 0 (run forever).
     int64 timeout = 3;
+    // Tty for exec request.
+    bool tty = 4;
 }
 
 message ExecSyncResponse {

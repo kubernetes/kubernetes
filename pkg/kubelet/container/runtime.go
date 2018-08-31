@@ -144,8 +144,8 @@ type ContainerAttacher interface {
 
 type ContainerCommandRunner interface {
 	// RunInContainer synchronously executes the command in the container, and returns the output.
-	// If the command completes with a non-0 exit code, a k8s.io/utils/exec.ExitError will be returned.
-	RunInContainer(id ContainerID, cmd []string, timeout time.Duration) ([]byte, error)
+	// If the command completes with a non-0 exit code, a pkg/util/exec.ExitError will be returned.
+	RunInContainer(id ContainerID, cmd []string, timeout time.Duration, tty bool) ([]byte, error)
 }
 
 // Pod is a group of containers.
