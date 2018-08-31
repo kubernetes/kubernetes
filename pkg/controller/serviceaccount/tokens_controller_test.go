@@ -22,22 +22,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/glog"
-	"gopkg.in/square/go-jose.v2/jwt"
-
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
+
+	"github.com/davecgh/go-spew/spew"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
+
+var fakeAuthenticator = authenticator.TokenFunc(func(data string) (user.Info, bool, error) {
+	return nil, len(data) > 0 && data != "invalid", nil
+})
 
 type testGenerator struct {
 	Token string
@@ -173,6 +178,13 @@ func serviceAccountTokenSecretWithoutTokenData() *v1.Secret {
 func serviceAccountTokenSecretWithoutCAData() *v1.Secret {
 	secret := serviceAccountTokenSecret()
 	delete(secret.Data, v1.ServiceAccountRootCAKey)
+	return secret
+}
+
+// serviceAccountTokenSecretWithoutTokenData returns an existing ServiceAccountToken secret that lacks token data
+func serviceAccountTokenSecretWithInvalidTokenData() *v1.Secret {
+	secret := serviceAccountTokenSecret()
+	secret.Data[v1.ServiceAccountTokenKey] = []byte("invalid")
 	return secret
 }
 
@@ -513,6 +525,16 @@ func TestTokenCreation(t *testing.T) {
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
 			},
 		},
+		"updated token secret with invalid data": {
+			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithInvalidTokenData()},
+			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
+
+			UpdatedSecret: serviceAccountTokenSecretWithInvalidTokenData(),
+			ExpectedActions: []core.Action{
+				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, "token-secret-1"),
+				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, serviceAccountTokenSecret()),
+			},
+		},
 		"updated token secret with mismatched ca data": {
 			ClientObjects:          []runtime.Object{serviceAccountTokenSecretWithCAData([]byte("mismatched"))},
 			ExistingServiceAccount: serviceAccount(tokenSecretReferences()),
@@ -568,124 +590,130 @@ func TestTokenCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		glog.Infof(k)
+		t.Run(k, func(t *testing.T) {
 
-		// Re-seed to reset name generation
-		utilrand.Seed(1)
+			// Re-seed to reset name generation
+			utilrand.Seed(1)
 
-		generator := &testGenerator{Token: "ABC"}
+			generator := &testGenerator{Token: "ABC"}
 
-		client := fake.NewSimpleClientset(tc.ClientObjects...)
-		for _, reactor := range tc.Reactors {
-			client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactor(t))
-		}
-		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-		secretInformer := informers.Core().V1().Secrets().Informer()
-		secrets := secretInformer.GetStore()
-		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
-		if err != nil {
-			t.Fatalf("error creating Tokens controller: %v", err)
-		}
-
-		if tc.ExistingServiceAccount != nil {
-			serviceAccounts.Add(tc.ExistingServiceAccount)
-		}
-		for _, s := range tc.ExistingSecrets {
-			secrets.Add(s)
-		}
-
-		if tc.AddedServiceAccount != nil {
-			serviceAccounts.Add(tc.AddedServiceAccount)
-			controller.queueServiceAccountSync(tc.AddedServiceAccount)
-		}
-		if tc.UpdatedServiceAccount != nil {
-			serviceAccounts.Add(tc.UpdatedServiceAccount)
-			controller.queueServiceAccountUpdateSync(nil, tc.UpdatedServiceAccount)
-		}
-		if tc.DeletedServiceAccount != nil {
-			serviceAccounts.Delete(tc.DeletedServiceAccount)
-			controller.queueServiceAccountSync(tc.DeletedServiceAccount)
-		}
-		if tc.AddedSecret != nil {
-			secrets.Add(tc.AddedSecret)
-			controller.queueSecretSync(tc.AddedSecret)
-		}
-		if tc.AddedSecretLocal != nil {
-			controller.updatedSecrets.Mutation(tc.AddedSecretLocal)
-		}
-		if tc.UpdatedSecret != nil {
-			secrets.Add(tc.UpdatedSecret)
-			controller.queueSecretUpdateSync(nil, tc.UpdatedSecret)
-		}
-		if tc.DeletedSecret != nil {
-			secrets.Delete(tc.DeletedSecret)
-			controller.queueSecretSync(tc.DeletedSecret)
-		}
-
-		// This is the longest we'll wait for async tests
-		timeout := time.Now().Add(30 * time.Second)
-		waitedForAdditionalActions := false
-
-		for {
-			if controller.syncServiceAccountQueue.Len() > 0 {
-				controller.syncServiceAccount()
+			client := fake.NewSimpleClientset(tc.ClientObjects...)
+			for _, reactor := range tc.Reactors {
+				client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 			}
-			if controller.syncSecretQueue.Len() > 0 {
-				controller.syncSecret()
+			informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+			secretInformer := informers.Core().V1().Secrets().Informer()
+			secrets := secretInformer.GetStore()
+			serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
+			controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{
+				TokenGenerator:     generator,
+				TokenAuthenticator: fakeAuthenticator,
+				RootCA:             []byte("CA Data"),
+				MaxRetries:         tc.MaxRetries,
+			})
+			if err != nil {
+				t.Fatalf("error creating Tokens controller: %v", err)
 			}
 
-			// The queues still have things to work on
-			if controller.syncServiceAccountQueue.Len() > 0 || controller.syncSecretQueue.Len() > 0 {
-				continue
+			if tc.ExistingServiceAccount != nil {
+				serviceAccounts.Add(tc.ExistingServiceAccount)
+			}
+			for _, s := range tc.ExistingSecrets {
+				secrets.Add(s)
 			}
 
-			// If we expect this test to work asynchronously...
-			if tc.IsAsync {
-				// if we're still missing expected actions within our test timeout
-				if len(client.Actions()) < len(tc.ExpectedActions) && time.Now().Before(timeout) {
-					// wait for the expected actions (without hotlooping)
-					time.Sleep(time.Millisecond)
+			if tc.AddedServiceAccount != nil {
+				serviceAccounts.Add(tc.AddedServiceAccount)
+				controller.queueServiceAccountSync(tc.AddedServiceAccount)
+			}
+			if tc.UpdatedServiceAccount != nil {
+				serviceAccounts.Add(tc.UpdatedServiceAccount)
+				controller.queueServiceAccountUpdateSync(nil, tc.UpdatedServiceAccount)
+			}
+			if tc.DeletedServiceAccount != nil {
+				serviceAccounts.Delete(tc.DeletedServiceAccount)
+				controller.queueServiceAccountSync(tc.DeletedServiceAccount)
+			}
+			if tc.AddedSecret != nil {
+				secrets.Add(tc.AddedSecret)
+				controller.queueSecretSync(tc.AddedSecret)
+			}
+			if tc.AddedSecretLocal != nil {
+				controller.updatedSecrets.Mutation(tc.AddedSecretLocal)
+			}
+			if tc.UpdatedSecret != nil {
+				secrets.Add(tc.UpdatedSecret)
+				controller.queueSecretUpdateSync(nil, tc.UpdatedSecret)
+			}
+			if tc.DeletedSecret != nil {
+				secrets.Delete(tc.DeletedSecret)
+				controller.queueSecretSync(tc.DeletedSecret)
+			}
+
+			// This is the longest we'll wait for async tests
+			timeout := time.Now().Add(30 * time.Second)
+			waitedForAdditionalActions := false
+
+			for {
+				if controller.syncServiceAccountQueue.Len() > 0 {
+					controller.syncServiceAccount()
+				}
+				if controller.syncSecretQueue.Len() > 0 {
+					controller.syncSecret()
+				}
+
+				// The queues still have things to work on
+				if controller.syncServiceAccountQueue.Len() > 0 || controller.syncSecretQueue.Len() > 0 {
 					continue
 				}
 
-				// if we exactly match our expected actions, wait a bit to make sure no other additional actions show up
-				if len(client.Actions()) == len(tc.ExpectedActions) && !waitedForAdditionalActions {
-					time.Sleep(time.Second)
-					waitedForAdditionalActions = true
-					continue
+				// If we expect this test to work asynchronously...
+				if tc.IsAsync {
+					// if we're still missing expected actions within our test timeout
+					if len(client.Actions()) < len(tc.ExpectedActions) && time.Now().Before(timeout) {
+						// wait for the expected actions (without hotlooping)
+						time.Sleep(time.Millisecond)
+						continue
+					}
+
+					// if we exactly match our expected actions, wait a bit to make sure no other additional actions show up
+					if len(client.Actions()) == len(tc.ExpectedActions) && !waitedForAdditionalActions {
+						time.Sleep(time.Second)
+						waitedForAdditionalActions = true
+						continue
+					}
 				}
-			}
 
-			break
-		}
-
-		if controller.syncServiceAccountQueue.Len() > 0 {
-			t.Errorf("%s: unexpected items in service account queue: %d", k, controller.syncServiceAccountQueue.Len())
-		}
-		if controller.syncSecretQueue.Len() > 0 {
-			t.Errorf("%s: unexpected items in secret queue: %d", k, controller.syncSecretQueue.Len())
-		}
-
-		actions := client.Actions()
-		for i, action := range actions {
-			if len(tc.ExpectedActions) < i+1 {
-				t.Errorf("%s: %d unexpected actions: %+v", k, len(actions)-len(tc.ExpectedActions), actions[i:])
 				break
 			}
 
-			expectedAction := tc.ExpectedActions[i]
-			if !reflect.DeepEqual(expectedAction, action) {
-				t.Errorf("%s:\nExpected:\n%s\ngot:\n%s", k, spew.Sdump(expectedAction), spew.Sdump(action))
-				continue
+			if controller.syncServiceAccountQueue.Len() > 0 {
+				t.Errorf("%s: unexpected items in service account queue: %d", k, controller.syncServiceAccountQueue.Len())
 			}
-		}
+			if controller.syncSecretQueue.Len() > 0 {
+				t.Errorf("%s: unexpected items in secret queue: %d", k, controller.syncSecretQueue.Len())
+			}
 
-		if len(tc.ExpectedActions) > len(actions) {
-			t.Errorf("%s: %d additional expected actions", k, len(tc.ExpectedActions)-len(actions))
-			for _, a := range tc.ExpectedActions[len(actions):] {
-				t.Logf("    %+v", a)
+			actions := client.Actions()
+			for i, action := range actions {
+				if len(tc.ExpectedActions) < i+1 {
+					t.Errorf("%s: %d unexpected actions: %+v", k, len(actions)-len(tc.ExpectedActions), actions[i:])
+					break
+				}
+
+				expectedAction := tc.ExpectedActions[i]
+				if !reflect.DeepEqual(expectedAction, action) {
+					t.Errorf("%s:\nExpected:\n%s\ngot:\n%s", k, spew.Sdump(expectedAction), spew.Sdump(action))
+					continue
+				}
 			}
-		}
+
+			if len(tc.ExpectedActions) > len(actions) {
+				t.Errorf("%s: %d additional expected actions", k, len(tc.ExpectedActions)-len(actions))
+				for _, a := range tc.ExpectedActions[len(actions):] {
+					t.Logf("    %+v", a)
+				}
+			}
+		})
 	}
 }

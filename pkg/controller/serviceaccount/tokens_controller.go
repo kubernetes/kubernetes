@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
@@ -40,6 +40,8 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/secret"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/metrics"
+
+	"github.com/golang/glog"
 )
 
 // RemoveTokenBackoff is the recommended (empirical) retry interval for removing
@@ -55,6 +57,8 @@ var RemoveTokenBackoff = wait.Backoff{
 type TokensControllerOptions struct {
 	// TokenGenerator is the generator to use to create new tokens
 	TokenGenerator serviceaccount.TokenGenerator
+	// TokenAuthenticator is used to check the validity of existing tokens.
+	TokenAuthenticator authenticator.Token
 	// ServiceAccountResync is the time.Duration at which to fully re-list service accounts.
 	// If zero, re-list will be delayed as long as possible
 	ServiceAccountResync time.Duration
@@ -77,9 +81,10 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 	}
 
 	e := &TokensController{
-		client: cl,
-		token:  options.TokenGenerator,
-		rootCA: options.RootCA,
+		client:   cl,
+		tokGen:   options.TokenGenerator,
+		tokAuthN: options.TokenAuthenticator,
+		rootCA:   options.RootCA,
 
 		syncServiceAccountQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_service"),
 		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
@@ -131,8 +136,9 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 
 // TokensController manages ServiceAccountToken secrets for ServiceAccount objects
 type TokensController struct {
-	client clientset.Interface
-	token  serviceaccount.TokenGenerator
+	client   clientset.Interface
+	tokGen   serviceaccount.TokenGenerator
+	tokAuthN authenticator.Token
 
 	rootCA []byte
 
@@ -395,7 +401,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 
 	// Generate the token
-	token, err := e.token.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *secret))
+	token, err := e.tokGen.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *secret))
 	if err != nil {
 		// retriable error
 		return true, err
@@ -494,14 +500,14 @@ func (e *TokensController) hasReferencedToken(serviceAccount *v1.ServiceAccount)
 	return false, nil
 }
 
-func (e *TokensController) secretUpdateNeeded(secret *v1.Secret) (bool, bool, bool) {
+func (e *TokensController) secretUpdateNeeded(secret *v1.Secret) (needsCA, needsNamespace, needsToken bool) {
 	caData := secret.Data[v1.ServiceAccountRootCAKey]
-	needsCA := len(e.rootCA) > 0 && bytes.Compare(caData, e.rootCA) != 0
+	needsCA = len(e.rootCA) > 0 && bytes.Compare(caData, e.rootCA) != 0
 
-	needsNamespace := len(secret.Data[v1.ServiceAccountNamespaceKey]) == 0
+	needsNamespace = len(secret.Data[v1.ServiceAccountNamespaceKey]) == 0
 
-	tokenData := secret.Data[v1.ServiceAccountTokenKey]
-	needsToken := len(tokenData) == 0
+	_, tokenOk, err := e.tokAuthN.AuthenticateToken(string(secret.Data[v1.ServiceAccountTokenKey]))
+	needsToken = !tokenOk || err != nil
 
 	return needsCA, needsNamespace, needsToken
 }
@@ -551,7 +557,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 
 	// Generate the token
 	if needsToken {
-		token, err := e.token.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *liveSecret))
+		token, err := e.tokGen.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *liveSecret))
 		if err != nil {
 			return false, err
 		}
