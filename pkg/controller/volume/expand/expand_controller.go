@@ -37,6 +37,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
@@ -323,4 +324,9 @@ func (expc *expandController) GetNodeName() types.NodeName {
 
 func (expc *expandController) GetEventRecorder() record.EventRecorder {
 	return expc.recorder
+}
+
+func (expc *expandController) GetCSIClient() csiclientset.Interface {
+	// No volume plugin in expand controller needs csi.storage.k8s.io
+	return nil
 }

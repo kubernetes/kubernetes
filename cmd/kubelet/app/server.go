@@ -55,6 +55,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -387,6 +388,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		DockerClientConfig:  dockerClientConfig,
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
+		CSIClient:           nil,
 		EventClient:         nil,
 		Mounter:             mounter,
 		OOMAdjuster:         oom.NewOOMAdjuster(),
@@ -607,6 +609,13 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 			glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
 		}
 
+		// csiClient works with CRDs that support json only
+		clientConfig.ContentType = "application/json"
+		csiClient, err := csiclientset.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Warningf("Failed to create CSI API client: %v", err)
+		}
+
 		kubeDeps.KubeClient = kubeClient
 		if heartbeatClient != nil {
 			kubeDeps.HeartbeatClient = heartbeatClient
@@ -615,6 +624,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		if eventClient != nil {
 			kubeDeps.EventClient = eventClient
 		}
+		kubeDeps.CSIClient = csiClient
 	}
 
 	// If the kubelet config controller is available, and dynamic config is enabled, start the config and status sync loops

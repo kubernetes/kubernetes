@@ -121,6 +121,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/client-go/util/certificate:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

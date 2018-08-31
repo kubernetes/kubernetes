@@ -31,11 +31,13 @@ import (
 	"net/http"
 
 	"k8s.io/api/core/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -192,9 +194,17 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
 		return nil, true, fmt.Errorf("Duration time must be greater than one second as set via command line option reconcile-sync-loop-period.")
 	}
+	csiClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
+	// csiClient works with CRDs that support json only
+	csiClientConfig.ContentType = "application/json"
+
+	crdClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
+			csiclientset.NewForConfigOrDie(csiClientConfig),
+			apiextensionsclient.NewForConfigOrDie(crdClientConfig),
 			ctx.InformerFactory.Core().V1().Pods(),
 			ctx.InformerFactory.Core().V1().Nodes(),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
