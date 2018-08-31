@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-const flushInterval = 5 * time.Second
+var flushInterval = 5 * time.Second
 
 var coverageFile string
 
@@ -47,6 +47,10 @@ func InitCoverage(name string) {
 	coverageFile = os.Getenv("KUBE_COVERAGE_FILE")
 	if coverageFile == "" {
 		coverageFile = "/tmp/k8s-" + name + ".cov"
+	}
+
+	if duration, err := time.ParseDuration(os.Getenv("KUBE_COVERAGE_FLUSH_INTERVAL")); err == nil {
+		flushInterval = duration
 	}
 
 	// Set up the unit test framework with the required arguments to activate test coverage.
