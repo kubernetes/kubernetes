@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import hashlib
 import json
 import os
@@ -1370,6 +1371,10 @@ def _cloud_config_path(component):
     return _snap_common_path(component) / 'cloud-config.conf'
 
 
+def _cloud_endpoint_ca_path(component):
+    return _snap_common_path(component) / 'cloud-endpoint-ca.crt'
+
+
 def _gcp_creds_path(component):
     return _snap_common_path(component) / 'gcp-creds.json'
 
@@ -1412,14 +1417,22 @@ def _write_openstack_snap_config(component):
     openstack = endpoint_from_flag('endpoint.openstack.ready')
 
     cloud_config_path = _cloud_config_path(component)
-    cloud_config_path.write_text('\n'.join([
+    lines = [
         '[Global]',
         'auth-url = {}'.format(openstack.auth_url),
         'username = {}'.format(openstack.username),
         'password = {}'.format(openstack.password),
         'tenant-name = {}'.format(openstack.project_name),
         'domain-name = {}'.format(openstack.user_domain_name),
-    ]))
+    ]
+    if openstack.endpoint_tls_ca:
+        cloud_endpoint_ca_path = _cloud_endpoint_ca_path(component)
+        cloud_endpoint_ca_path.write_text(base64.b64decode(
+            openstack.endpoint_tls_ca
+        ))
+        lines.append('ca-file = {}'.format(str(cloud_endpoint_ca_path)))
+
+    cloud_config_path.write_text('\n'.join(lines))
 
 
 def _write_azure_snap_config(component):

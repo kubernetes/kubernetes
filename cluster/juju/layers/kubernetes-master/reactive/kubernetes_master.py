@@ -28,7 +28,6 @@ import ipaddress
 from charms.leadership import leader_get, leader_set
 
 from shutil import move
-from tempfile import TemporaryDirectory
 
 from pathlib import Path
 from shlex import split
@@ -531,7 +530,7 @@ def set_final_status():
 
     components_started = is_state('kubernetes-master.components.started')
     addons_configured = is_state('cdk-addons.configured')
-    if components_started and not addons_configured:
+    if is_leader and components_started and not addons_configured:
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         return
 
@@ -1795,6 +1794,10 @@ def _cloud_config_path(component):
     return _snap_common_path(component) / 'cloud-config.conf'
 
 
+def _cloud_endpoint_ca_path(component):
+    return _snap_common_path(component) / 'cloud-endpoint-ca.crt'
+
+
 def _gcp_creds_path(component):
     return _snap_common_path(component) / 'gcp-creds.json'
 
@@ -1841,14 +1844,22 @@ def _write_openstack_snap_config(component):
     openstack = endpoint_from_flag('endpoint.openstack.ready')
 
     cloud_config_path = _cloud_config_path(component)
-    cloud_config_path.write_text('\n'.join([
+    lines = [
         '[Global]',
         'auth-url = {}'.format(openstack.auth_url),
         'username = {}'.format(openstack.username),
         'password = {}'.format(openstack.password),
         'tenant-name = {}'.format(openstack.project_name),
         'domain-name = {}'.format(openstack.user_domain_name),
-    ]))
+    ]
+    if openstack.endpoint_tls_ca:
+        cloud_endpoint_ca_path = _cloud_endpoint_ca_path(component)
+        cloud_endpoint_ca_path.write_text(base64.b64decode(
+            openstack.endpoint_tls_ca
+        ))
+        lines.append('ca-file = {}'.format(str(cloud_endpoint_ca_path)))
+
+    cloud_config_path.write_text('\n'.join(lines))
 
 
 def _write_vsphere_snap_config(component):
