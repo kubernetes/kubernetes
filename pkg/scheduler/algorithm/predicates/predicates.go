@@ -378,7 +378,7 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 }
 
 func getMaxEBSVolume(nodeInstanceType string) int {
-	if ok, _ := regexp.MatchString("^[cm]5.*", nodeInstanceType); ok {
+	if ok, _ := regexp.MatchString("^[cmr]5.*|t3|z1d", nodeInstanceType); ok {
 		return DefaultMaxEBSM5VolumeLimit
 	}
 	return DefaultMaxEBSVolumes

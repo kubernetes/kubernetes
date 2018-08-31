@@ -127,7 +127,7 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, e
 		return volumeLimits, nil
 	}
 
-	if ok, _ := regexp.MatchString("^[cm]5.*", instanceType); ok {
+	if ok, _ := regexp.MatchString("^[cmr]5.*|t3|z1d", instanceType); ok {
 		volumeLimits[util.EBSVolumeLimitKey] = 25
 	}
 
