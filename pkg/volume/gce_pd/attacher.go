@@ -175,7 +175,7 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking GCE PD %q is attached.", pdName)
-			path, err := verifyDevicePath(devicePaths, sdBeforeSet, pdName)
+			path, err := verifyDevicePath(devicePaths, sdBeforeSet, deviceName)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
 				glog.Errorf("Error verifying GCE PD (%q) is attached: %v", pdName, err)

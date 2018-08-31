@@ -51,7 +51,7 @@ const (
 	// Replication type constants must be lower case.
 	replicationTypeNone       = "none"
 	replicationTypeRegionalPD = "regional-pd"
-	volNameRegionalSuffix = "_regional"
+	volNameRegionalSuffix     = "_regional"
 
 	// scsi_id output should be in the form of:
 	// 0Google PersistentDisk <disk name>
@@ -214,7 +214,7 @@ func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *
 }
 
 // Returns the first path that exists, or empty string if none exist.
-func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName string) (string, error) {
+func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, deviceName string) (string, error) {
 	if err := udevadmChangeToNewDrives(sdBeforeSet); err != nil {
 		// It's possible udevadm was called on other disks so it should not block this
 		// call. If it did fail on this disk, then the devicePath will either
@@ -227,11 +227,11 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			// validate that the path actually resolves to the correct disk
-			serial, err := getScsiSerial(path, diskName)
+			serial, err := getScsiSerial(path, deviceName)
 			if err != nil {
 				return "", fmt.Errorf("failed to get scsi serial %v", err)
 			}
-			if serial != diskName {
+			if serial != deviceName {
 				// The device link is not pointing to the correct device
 				// Trigger udev on this device to try to fix the link
 				if udevErr := udevadmChangeToDrive(path); udevErr != nil {
@@ -239,7 +239,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 				}
 
 				// Return error to retry WaitForAttach and verifyDevicePath
-				return "", fmt.Errorf("scsi_id serial %q for device %q doesn't match disk %q", serial, path, diskName)
+				return "", fmt.Errorf("scsi_id serial %q for device %q doesn't match deviceName %q", serial, path, deviceName)
 			}
 			// The device link is correct
 			return path, nil
@@ -250,7 +250,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 }
 
 // Calls scsi_id on the given devicePath to get the serial number reported by that device.
-func getScsiSerial(devicePath, diskName string) (string, error) {
+func getScsiSerial(devicePath, deviceName string) (string, error) {
 	exists, err := utilfile.FileExists("/lib/udev/scsi_id")
 	if err != nil {
 		return "", fmt.Errorf("failed to check scsi_id existence: %v", err)
@@ -258,7 +258,7 @@ func getScsiSerial(devicePath, diskName string) (string, error) {
 
 	if !exists {
 		glog.V(6).Infof("scsi_id doesn't exist; skipping check for %v", devicePath)
-		return diskName, nil
+		return deviceName, nil
 	}
 
 	out, err := exec.New().Command(

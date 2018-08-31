@@ -61,12 +61,14 @@ const (
 
 	NumZonesSingleZoneDisk = 1
 	NumZonesRegionalDisk   = 2
+
+	diskResourceInUseError = "resourceInUseByAnotherResource"
 )
 
 type diskServiceManager interface {
 	// Creates a new persistent disk on GCE with the given disk spec.
 	CreateDiskOnCloudProvider(
-		name string,
+		diskName string,
 		sizeGb int64,
 		tagsStr string,
 		diskType string,
@@ -74,7 +76,7 @@ type diskServiceManager interface {
 
 	// Creates a new regional persistent disk on GCE with the given disk spec.
 	CreateRegionalDiskOnCloudProvider(
-		name string,
+		diskName string,
 		sizeGb int64,
 		tagsStr string,
 		diskType string,
@@ -117,7 +119,7 @@ type gceServiceManager struct {
 var _ diskServiceManager = &gceServiceManager{}
 
 func (manager *gceServiceManager) CreateDiskOnCloudProvider(
-	name string,
+	diskName string,
 	sizeGb int64,
 	tagsStr string,
 	diskType string,
@@ -129,7 +131,7 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 	}
 
 	diskToCreateV1 := &compute.Disk{
-		Name:        name,
+		Name:        diskName,
 		SizeGb:      sizeGb,
 		Description: tagsStr,
 		Type:        diskTypeURI,
@@ -137,11 +139,11 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
-	return manager.gce.c.Disks().Insert(ctx, meta.ZonalKey(name, zone), diskToCreateV1)
+	return manager.gce.c.Disks().Insert(ctx, meta.ZonalKey(diskName, zone), diskToCreateV1)
 }
 
 func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
-	name string,
+	diskName string,
 	sizeGb int64,
 	tagsStr string,
 	diskType string,
@@ -163,7 +165,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 	}
 
 	diskToCreateBeta := &computebeta.Disk{
-		Name:         name,
+		Name:         diskName,
 		SizeGb:       sizeGb,
 		Description:  tagsStr,
 		Type:         diskTypeURI,
@@ -172,7 +174,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
-	return manager.gce.c.BetaRegionDisks().Insert(ctx, meta.RegionalKey(name, manager.gce.region), diskToCreateBeta)
+	return manager.gce.c.BetaRegionDisks().Insert(ctx, meta.RegionalKey(diskName, manager.gce.region), diskToCreateBeta)
 }
 
 func (manager *gceServiceManager) AttachDiskOnCloudProvider(
@@ -457,24 +459,24 @@ type Disks interface {
 
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
-	CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error
+	CreateDisk(diskName string, diskType string, zone string, sizeGb int64, tags map[string]string) error
 
 	// CreateRegionalDisk creates a new Regional Persistent Disk, with the
 	// specified properties, replicated to the specified zones. Tags are
 	// serialized as JSON into Description field.
-	CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error
+	CreateRegionalDisk(diskName string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error
 
 	// DiskExists checks whether a zonal disk exists with the given name in the given zone.
-	DiskExists(name string, zone string) (bool, error)
+	DiskExists(diskName string, zone string) (bool, error)
 
 	// DeleteDisk deletes PD. Zone can be empty, in which case the operation searches through all available zones.
-	DeleteDisk(name string, zone string) error
+	DeleteDisk(diskName string, zone string) error
 
 	// DeleteRegionalDisk deletes the regional disk matching the given name.
-	DeleteRegionalDisk(name string) error
+	DeleteRegionalDisk(diskName string) error
 
 	// ResizeDisk resizes PD and returns new disk size
-	ResizeDisk(diskToResize string, zoneSet sets.String, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+	ResizeDisk(diskName string, zoneSet sets.String, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 
 	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
 	// representing this PD, namely failure domain and zone.
@@ -483,7 +485,7 @@ type Disks interface {
 	// and if there is a name collision, an error is returned.
 	// If zone is provided, the function gets the disk matching the name and the zone string, and
 	// this disk could be either regional or zonal depending on the format of the zone string.
-	GetAutoLabelsForPD(name string, zone string) (map[string]string, error)
+	GetAutoLabelsForPD(diskName string, zone string) (map[string]string, error)
 }
 
 // GCECloud implements Disks.
@@ -517,20 +519,22 @@ func (m multiZone) isZoneType()  {}
 func (s singleZone) isZoneType() {}
 
 type DiskNotFoundError struct {
-	regional bool
+	regional bool // Indicates whether the error is about a zonal or regional disk.
 	diskName string
-	diskZone string // for zonal disks only
+	diskZone string // For zonal disks only
 }
+
+var _ error = &DiskNotFoundError{}
 
 func (err *DiskNotFoundError) Error() string {
 	if err.regional {
+		return fmt.Sprintf("GCE regional persistent disk not found: diskName=%q", err.diskName)
+	} else {
 		if err.diskZone == "" {
 			return fmt.Sprintf("GCE persistent disk not found in any zone: diskName=%q", err.diskName)
 		} else {
 			return fmt.Sprintf("GCE persistent disk not found: diskName=%q zone=%q", err.diskName, err.diskZone)
 		}
-	} else {
-		return fmt.Sprintf("GCE regional persistent disk not found: diskName=%q", err.diskName)
 	}
 }
 
@@ -673,7 +677,7 @@ func (gce *GCECloud) DisksAreAttached(deviceNames []string, nodeName types.NodeN
 // size, in the specified zone. It stores specified tags encoded in
 // JSON in Description field.
 func (gce *GCECloud) CreateDisk(
-	name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
+	diskName string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
 	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
 	// are not currently usable.
 	curZones, err := gce.GetAllCurrentZones()
@@ -697,11 +701,11 @@ func (gce *GCECloud) CreateDisk(
 	mc := newDiskMetricContextZonal("create", gce.region, zone)
 
 	err = gce.manager.CreateDiskOnCloudProvider(
-		name, sizeGb, tagsStr, diskType, zone)
+		diskName, sizeGb, tagsStr, diskType, zone)
 
 	mc.Observe(err)
 	if isGCEError(err, "alreadyExists") {
-		glog.Warningf("GCE PD %q already exists, reusing", name)
+		glog.Warningf("GCE PD %q already exists, reusing", diskName)
 		return nil
 	}
 	return err
@@ -711,7 +715,7 @@ func (gce *GCECloud) CreateDisk(
 // name & size, replicated to the specified zones. It stores specified tags
 // encoded in JSON in Description field.
 func (gce *GCECloud) CreateRegionalDisk(
-	name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error {
+	diskName string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error {
 
 	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
 	// are not currently usable. This functionality should be reverted to checking
@@ -738,22 +742,22 @@ func (gce *GCECloud) CreateRegionalDisk(
 	mc := newDiskMetricContextRegional("create", gce.region)
 
 	err = gce.manager.CreateRegionalDiskOnCloudProvider(
-		name, sizeGb, tagsStr, diskType, replicaZones)
+		diskName, sizeGb, tagsStr, diskType, replicaZones)
 
 	mc.Observe(err)
 	if isGCEError(err, "alreadyExists") {
-		glog.Warningf("GCE PD %q already exists, reusing", name)
+		glog.Warningf("GCE PD %q already exists, reusing", diskName)
 		return nil
 	}
 	return err
 }
 
-func (gce *GCECloud) DiskExists(name string, zone string) (bool, error) {
+func (gce *GCECloud) DiskExists(diskName string, zone string) (bool, error) {
 	if zone == "" {
 		return false, fmt.Errorf("a zone must be specified")
 	}
 
-	_, err := gce.getDiskByName(name, zone)
+	_, err := gce.getDiskByName(diskName, zone)
 	if _, ok := err.(*DiskNotFoundError); ok {
 		return false, nil
 	}
@@ -772,14 +776,14 @@ func getDiskType(diskType string) (string, error) {
 	}
 }
 
-func (gce *GCECloud) DeleteDisk(name string, zone string) error {
+func (gce *GCECloud) DeleteDisk(diskName string, zone string) error {
 	if zone == "" {
 		return fmt.Errorf("a zone must be specified")
 	}
 
-	err := gce.deleteDiskByName(name, zone)
+	err := gce.deleteDiskByName(diskName, zone)
 
-	if isGCEError(err, "resourceInUseByAnotherResource") {
+	if isGCEError(err, diskResourceInUseError) {
 		return volume.NewDeletedVolumeInUseError(err.Error())
 	}
 
@@ -789,10 +793,10 @@ func (gce *GCECloud) DeleteDisk(name string, zone string) error {
 	return err
 }
 
-func (gce *GCECloud) DeleteRegionalDisk(name string) error {
-	err := gce.deleteRegionalDiskByName(name)
+func (gce *GCECloud) DeleteRegionalDisk(diskName string) error {
+	err := gce.deleteRegionalDiskByName(diskName)
 
-	if isGCEError(err, "resourceInUseByAnotherResource") {
+	if isGCEError(err, diskResourceInUseError) {
 		return volume.NewDeletedVolumeInUseError(err.Error())
 	}
 
@@ -803,18 +807,19 @@ func (gce *GCECloud) DeleteRegionalDisk(name string) error {
 }
 
 // ResizeDisk expands given disk and returns new disk size
-func (gce *GCECloud) ResizeDisk(diskToResize string, zoneSet sets.String, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+func (gce *GCECloud) ResizeDisk(diskName string, zoneSet sets.String, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	var disk *GCEDisk
 	var err error
-	switch zoneSet.Len() {
+	l := zoneSet.Len()
+	switch l {
 	case 0:
 		return oldSize, fmt.Errorf("zone information must be specified")
 	case NumZonesSingleZoneDisk:
-		disk, err = gce.getDiskByName(diskToResize, zoneSet.UnsortedList()[0])
+		disk, err = gce.getDiskByName(diskName, zoneSet.UnsortedList()[0])
 	case NumZonesRegionalDisk:
-		disk, err = gce.getRegionalDiskByName(diskToResize)
+		disk, err = gce.getRegionalDiskByName(diskName)
 	default:
-		return oldSize, fmt.Errorf("unsupported number of zones")
+		return oldSize, fmt.Errorf("unsupported number of zones: %d", l)
 	}
 	if err != nil {
 		return oldSize, err
@@ -864,7 +869,7 @@ func (gce *GCECloud) ResizeDisk(diskToResize string, zoneSet sets.String, oldSiz
 // Builds the labels that should be automatically added to a PersistentVolume backed by a GCE PD
 // Specifically, this builds FailureDomain (zone) and Region labels.
 // The PersistentVolumeLabel admission controller calls this and adds the labels when a PV is created.
-func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
+func (gce *GCECloud) GetAutoLabelsForPD(diskName string, zone string) (map[string]string, error) {
 	var disk *GCEDisk
 	var diskErr error
 
@@ -879,7 +884,7 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 		// However, wherever possible the zone should be passed (and it is passed
 		// for most cases that we can control, e.g. dynamic volume provisioning).
 
-		zonalDisk, zonalDiskErr := gce.GetDiskByNameUnknownZone(name)
+		zonalDisk, zonalDiskErr := gce.GetDiskByNameUnknownZone(diskName)
 
 		// Ignore DiskNotFoundError because we try to get regional disk next.
 		_, isDiskNotFoundErr := zonalDiskErr.(*DiskNotFoundError)
@@ -887,12 +892,12 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 			return nil, zonalDiskErr
 		}
 
-		regionalDisk, regionalDiskErr := gce.getRegionalDiskByName(name)
+		regionalDisk, regionalDiskErr := gce.getRegionalDiskByName(diskName)
 
 		if zonalDisk == nil {
 			disk, diskErr = regionalDisk, regionalDiskErr
 		} else if regionalDisk != nil {
-			return nil, fmt.Errorf("both regional and regular PDs were found with name %q", name)
+			return nil, fmt.Errorf("both regional and regular PDs were found with name %q", diskName)
 		} else { // zonalDisk != nil && regionalDisk == nil
 			disk, diskErr = zonalDisk, zonalDiskErr
 		}
@@ -904,9 +909,9 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 		}
 
 		if len(zoneSet) == NumZonesRegionalDisk {
-			disk, diskErr = gce.getRegionalDiskByName(name)
+			disk, diskErr = gce.getRegionalDiskByName(diskName)
 		} else if len(zoneSet) == NumZonesSingleZoneDisk {
-			disk, diskErr = gce.getDiskByName(name, zone)
+			disk, diskErr = gce.getDiskByName(diskName, zone)
 		} else {
 			return nil, fmt.Errorf("unsupported number of zones")
 		}
@@ -950,12 +955,13 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 func (gce *GCECloud) getDiskByName(diskName string, zone string) (*GCEDisk, error) {
 	mc := newDiskMetricContextZonal("get", gce.region, zone)
 	disk, err := gce.manager.GetDiskFromCloudProvider(zone, diskName)
-	mc.Observe(err)
 
 	if isHTTPErrorCode(err, http.StatusNotFound) {
+		mc.Observe(nil)
 		return nil, &DiskNotFoundError{regional: false, diskName: diskName, diskZone: zone}
 	}
 
+	mc.Observe(err)
 	if err != nil {
 		return nil, err
 	}
@@ -967,12 +973,13 @@ func (gce *GCECloud) getDiskByName(diskName string, zone string) (*GCEDisk, erro
 func (gce *GCECloud) getRegionalDiskByName(diskName string) (*GCEDisk, error) {
 	mc := newDiskMetricContextRegional("get", gce.region)
 	disk, err := gce.manager.GetRegionalDiskFromCloudProvider(diskName)
-	mc.Observe(err)
 
 	if isHTTPErrorCode(err, http.StatusNotFound) {
+		mc.Observe(nil)
 		return nil, &DiskNotFoundError{regional: true, diskName: diskName}
 	}
 
+	mc.Observe(err)
 	if err != nil {
 		return nil, err
 	}
@@ -984,13 +991,13 @@ func (gce *GCECloud) getRegionalDiskByName(diskName string) (*GCEDisk, error) {
 func (gce *GCECloud) deleteDiskByName(diskName string, zone string) error {
 	mc := newDiskMetricContextZonal("delete", gce.region, zone)
 	err := gce.manager.DeleteDiskOnCloudProvider(zone, diskName)
-	mc.Observe(err)
 
 	if isHTTPErrorCode(err, http.StatusNotFound) {
+		mc.Observe(nil)
 		return &DiskNotFoundError{regional: false, diskName: diskName, diskZone: zone}
 	}
 
-	return err
+	return mc.Observe(err)
 }
 
 // deleteRegionalDiskByName deletes the regional disk matching the given name, if it exists.
@@ -998,13 +1005,13 @@ func (gce *GCECloud) deleteDiskByName(diskName string, zone string) error {
 func (gce *GCECloud) deleteRegionalDiskByName(diskName string) error {
 	mc := newDiskMetricContextRegional("delete", gce.region)
 	err := gce.manager.DeleteRegionalDiskOnCloudProvider(diskName)
-	mc.Observe(err)
 
 	if isHTTPErrorCode(err, http.StatusNotFound) {
+		mc.Observe(nil)
 		return &DiskNotFoundError{regional: true, diskName: diskName}
 	}
 
-	return err
+	return mc.Observe(err)
 }
 
 // GetDiskByNameUnknownZone scans all managed zones to return the GCE PD.

@@ -273,7 +273,7 @@ func TestPlugin(t *testing.T) {
 
 	fakePDManager := &fakePDManager{
 		labels: map[string]string{
-			"fakepdmanager":             "yes",
+			"fakepdmanager":                    "yes",
 			kubeletapis.LabelZoneFailureDomain: "zone1__zone2",
 		},
 		expectedZones: sets.NewString("zone1", "zone2"),
