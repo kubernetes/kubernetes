@@ -99,7 +99,7 @@ func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool 
 
 func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.EBSVolumeLimitKey: 39,
+		util.EBSVolumeLimitKey: util.DefaultMaxEBSVolumes,
 	}
 	cloud := plugin.host.GetCloudProvider()
 
@@ -127,8 +127,8 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, e
 		return volumeLimits, nil
 	}
 
-	if ok, _ := regexp.MatchString("^[cmr]5.*|t3|z1d", instanceType); ok {
-		volumeLimits[util.EBSVolumeLimitKey] = 25
+	if ok, _ := regexp.MatchString(util.EBSNitroLimitRegex, instanceType); ok {
+		volumeLimits[util.EBSVolumeLimitKey] = util.DefaultMaxEBSNitroVolumeLimit
 	}
 
 	return volumeLimits, nil
