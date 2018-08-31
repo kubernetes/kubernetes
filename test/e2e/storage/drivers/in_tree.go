@@ -649,21 +649,21 @@ func (c *cephFSDriver) DeleteVolume(volType testpatterns.TestVolType) {
 }
 
 // Hostpath
-type hostpathDriver struct {
+type hostPathDriver struct {
 	node v1.Node
 
 	driverInfo DriverInfo
 }
 
-var _ TestDriver = &hostpathDriver{}
-var _ PreprovisionedVolumeTestDriver = &hostpathDriver{}
-var _ InlineVolumeTestDriver = &hostpathDriver{}
+var _ TestDriver = &hostPathDriver{}
+var _ PreprovisionedVolumeTestDriver = &hostPathDriver{}
+var _ InlineVolumeTestDriver = &hostPathDriver{}
 
-// InitHostpathDriver returns hostpathDriver that implements TestDriver interface
-func InitHostpathDriver() TestDriver {
-	return &hostpathDriver{
+// InitHostpathDriver returns hostPathDriver that implements TestDriver interface
+func InitHostPathDriver() TestDriver {
+	return &hostPathDriver{
 		driverInfo: DriverInfo{
-			Name:        "hostpath",
+			Name:        "hostPath",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -675,15 +675,15 @@ func InitHostpathDriver() TestDriver {
 	}
 }
 
-func (h *hostpathDriver) GetDriverInfo() *DriverInfo {
+func (h *hostPathDriver) GetDriverInfo() *DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostpathDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+func (h *hostPathDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (h *hostpathDriver) GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSource {
-	// hostpath doesn't support readOnly volume
+func (h *hostPathDriver) GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSource {
+	// hostPath doesn't support readOnly volume
 	if readOnly {
 		return nil
 	}
@@ -694,13 +694,13 @@ func (h *hostpathDriver) GetVolumeSource(readOnly bool, fsType string) *v1.Volum
 	}
 }
 
-func (h *hostpathDriver) CreateDriver() {
+func (h *hostPathDriver) CreateDriver() {
 }
 
-func (h *hostpathDriver) CleanupDriver() {
+func (h *hostPathDriver) CleanupDriver() {
 }
 
-func (h *hostpathDriver) CreateVolume(volType testpatterns.TestVolType) {
+func (h *hostPathDriver) CreateVolume(volType testpatterns.TestVolType) {
 	f := h.driverInfo.Framework
 	cs := f.ClientSet
 
@@ -710,11 +710,11 @@ func (h *hostpathDriver) CreateVolume(volType testpatterns.TestVolType) {
 	h.driverInfo.Config.ClientNodeName = node.Name
 }
 
-func (h *hostpathDriver) DeleteVolume(volType testpatterns.TestVolType) {
+func (h *hostPathDriver) DeleteVolume(volType testpatterns.TestVolType) {
 }
 
-// HostpathSymlink
-type hostpathSymlinkDriver struct {
+// HostPathSymlink
+type hostPathSymlinkDriver struct {
 	node       v1.Node
 	sourcePath string
 	targetPath string
@@ -723,15 +723,15 @@ type hostpathSymlinkDriver struct {
 	driverInfo DriverInfo
 }
 
-var _ TestDriver = &hostpathSymlinkDriver{}
-var _ PreprovisionedVolumeTestDriver = &hostpathSymlinkDriver{}
-var _ InlineVolumeTestDriver = &hostpathSymlinkDriver{}
+var _ TestDriver = &hostPathSymlinkDriver{}
+var _ PreprovisionedVolumeTestDriver = &hostPathSymlinkDriver{}
+var _ InlineVolumeTestDriver = &hostPathSymlinkDriver{}
 
-// InitHostpathSymlinkDriver returns hostpathSymlinkDriver that implements TestDriver interface
-func InitHostpathSymlinkDriver() TestDriver {
-	return &hostpathSymlinkDriver{
+// InitHostPathSymlinkDriver returns hostPathSymlinkDriver that implements TestDriver interface
+func InitHostPathSymlinkDriver() TestDriver {
+	return &hostPathSymlinkDriver{
 		driverInfo: DriverInfo{
-			Name:        "hostpathSymlink",
+			Name:        "hostPathSymlink",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -743,15 +743,15 @@ func InitHostpathSymlinkDriver() TestDriver {
 	}
 }
 
-func (h *hostpathSymlinkDriver) GetDriverInfo() *DriverInfo {
+func (h *hostPathSymlinkDriver) GetDriverInfo() *DriverInfo {
 	return &h.driverInfo
 }
 
-func (h *hostpathSymlinkDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
-func (h *hostpathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSource {
-	// hostpath doesn't support readOnly volume
+func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSource {
+	// hostPathSymlink doesn't support readOnly volume
 	if readOnly {
 		return nil
 	}
@@ -762,13 +762,13 @@ func (h *hostpathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string) *v
 	}
 }
 
-func (h *hostpathSymlinkDriver) CreateDriver() {
+func (h *hostPathSymlinkDriver) CreateDriver() {
 }
 
-func (h *hostpathSymlinkDriver) CleanupDriver() {
+func (h *hostPathSymlinkDriver) CleanupDriver() {
 }
 
-func (h *hostpathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) {
+func (h *hostPathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) {
 	f := h.driverInfo.Framework
 	cs := f.ClientSet
 
@@ -784,7 +784,7 @@ func (h *hostpathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) {
 	cmd := fmt.Sprintf("mkdir %v -m 777 && ln -s %v %v", h.sourcePath, h.sourcePath, h.targetPath)
 	privileged := true
 
-	// Launch pod to initialize hostpath directory and symlink
+	// Launch pod to initialize hostPath directory and symlink
 	h.prepPod = &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("hostpath-symlink-prep-%s", f.Namespace.Name),
@@ -822,29 +822,29 @@ func (h *hostpathSymlinkDriver) CreateVolume(volType testpatterns.TestVolType) {
 	}
 	// h.prepPod will be reused in cleanupDriver.
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(h.prepPod)
-	Expect(err).ToNot(HaveOccurred(), "while creating hostpath init pod")
+	Expect(err).ToNot(HaveOccurred(), "while creating hostPath init pod")
 
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-	Expect(err).ToNot(HaveOccurred(), "while waiting for hostpath init pod to succeed")
+	Expect(err).ToNot(HaveOccurred(), "while waiting for hostPath init pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).ToNot(HaveOccurred(), "while deleting hostpath init pod")
+	Expect(err).ToNot(HaveOccurred(), "while deleting hostPath init pod")
 }
 
-func (h *hostpathSymlinkDriver) DeleteVolume(volType testpatterns.TestVolType) {
+func (h *hostPathSymlinkDriver) DeleteVolume(volType testpatterns.TestVolType) {
 	f := h.driverInfo.Framework
 
 	cmd := fmt.Sprintf("rm -rf %v&& rm -rf %v", h.targetPath, h.sourcePath)
 	h.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(h.prepPod)
-	Expect(err).ToNot(HaveOccurred(), "while creating hostpath teardown pod")
+	Expect(err).ToNot(HaveOccurred(), "while creating hostPath teardown pod")
 
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-	Expect(err).ToNot(HaveOccurred(), "while waiting for hostpath teardown pod to succeed")
+	Expect(err).ToNot(HaveOccurred(), "while waiting for hostPath teardown pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).ToNot(HaveOccurred(), "while deleting hostpath teardown pod")
+	Expect(err).ToNot(HaveOccurred(), "while deleting hostPath teardown pod")
 }
 
 // emptydir
