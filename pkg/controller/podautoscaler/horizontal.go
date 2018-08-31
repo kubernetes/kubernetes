@@ -53,6 +53,11 @@ var (
 	scaleUpLimitMinimum = 4.0
 )
 
+type timestampedRecommendation struct {
+	recommendation int32
+	timestamp      time.Time
+}
+
 // HorizontalController is responsible for the synchronizing HPA objects stored
 // in the system with the actual deployments/replication controllers they
 // control.
@@ -64,7 +69,7 @@ type HorizontalController struct {
 	replicaCalc   *ReplicaCalculator
 	eventRecorder record.EventRecorder
 
-	downscaleForbiddenWindow time.Duration
+	downscaleStabilisationWindow time.Duration
 
 	// hpaLister is able to list/get HPAs from the shared cache from the informer passed in to
 	// NewHorizontalController.
@@ -73,6 +78,9 @@ type HorizontalController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
+
+	// Latest unstabilized recommendations for each autoscaler.
+	recommendations map[string][]timestampedRecommendation
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -84,7 +92,7 @@ func NewHorizontalController(
 	replicaCalc *ReplicaCalculator,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
 	resyncPeriod time.Duration,
-	downscaleForbiddenWindow time.Duration,
+	downscaleStabilisationWindow time.Duration,
 
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
@@ -93,13 +101,14 @@ func NewHorizontalController(
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
-		replicaCalc:              replicaCalc,
-		eventRecorder:            recorder,
-		scaleNamespacer:          scaleNamespacer,
-		hpaNamespacer:            hpaNamespacer,
-		downscaleForbiddenWindow: downscaleForbiddenWindow,
-		queue:  workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
-		mapper: mapper,
+		replicaCalc:                  replicaCalc,
+		eventRecorder:                recorder,
+		scaleNamespacer:              scaleNamespacer,
+		hpaNamespacer:                hpaNamespacer,
+		downscaleStabilisationWindow: downscaleStabilisationWindow,
+		queue:           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		mapper:          mapper,
+		recommendations: map[string][]timestampedRecommendation{},
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -275,10 +284,11 @@ func (a *HorizontalController) reconcileKey(key string) error {
 	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		glog.Infof("Horizontal Pod Autoscaler %s has been deleted in %s", name, namespace)
+		delete(a.recommendations, key)
 		return nil
 	}
 
-	return a.reconcileAutoscaler(hpa)
+	return a.reconcileAutoscaler(hpa, key)
 }
 
 // computeStatusForObjectMetric computes the desired number of replicas for the specified metric of type ObjectMetricSourceType.
@@ -431,7 +441,7 @@ func (a *HorizontalController) computeStatusForExternalMetric(currentReplicas in
 	return 0, time.Time{}, "", fmt.Errorf(errMsg)
 }
 
-func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler) error {
+func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler, key string) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpav1 := hpav1Shared.DeepCopy()
 	// then, convert to autoscaling/v2, which makes our lives easier when calculating metrics
@@ -527,24 +537,8 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		if desiredReplicas < currentReplicas {
 			rescaleReason = "All metrics below target"
 		}
-
-		desiredReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, desiredReplicas)
-
-		rescale = a.shouldScale(hpa, currentReplicas, desiredReplicas, timestamp)
-		backoffDown := false
-		backoffUp := false
-		if hpa.Status.LastScaleTime != nil {
-			if !hpa.Status.LastScaleTime.Add(a.downscaleForbiddenWindow).Before(timestamp) {
-				setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "BackoffDownscale", "the time since the previous scale is still within the downscale forbidden window")
-				backoffDown = true
-			}
-		}
-
-		if !backoffDown && !backoffUp {
-			// mark that we're not backing off
-			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "ReadyForNewScale", "the last scale time was sufficiently old as to warrant a new scale")
-		}
-
+		desiredReplicas = a.normalizeDesiredReplicas(hpa, key, currentReplicas, desiredReplicas)
+		rescale = desiredReplicas != currentReplicas
 	}
 
 	if rescale {
@@ -572,9 +566,39 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	return a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
 }
 
+// stabilizeRecommendation:
+// - replaces old recommendation with the newest recommendation,
+// - returns max of recommendations that are not older than downscaleStabilisationWindow.
+func (a *HorizontalController) stabilizeRecommendation(key string, prenormalizedDesiredReplicas int32) int32 {
+	maxRecommendation := prenormalizedDesiredReplicas
+	foundOldSample := false
+	oldSampleIndex := 0
+	cutoff := time.Now().Add(-a.downscaleStabilisationWindow)
+	for i, rec := range a.recommendations[key] {
+		if rec.timestamp.Before(cutoff) {
+			foundOldSample = true
+			oldSampleIndex = i
+		} else if rec.recommendation > maxRecommendation {
+			maxRecommendation = rec.recommendation
+		}
+	}
+	if foundOldSample {
+		a.recommendations[key][oldSampleIndex] = timestampedRecommendation{prenormalizedDesiredReplicas, time.Now()}
+	} else {
+		a.recommendations[key] = append(a.recommendations[key], timestampedRecommendation{prenormalizedDesiredReplicas, time.Now()})
+	}
+	return maxRecommendation
+}
+
 // normalizeDesiredReplicas takes the metrics desired replicas value and normalizes it based on the appropriate conditions (i.e. < maxReplicas, >
 // minReplicas, etc...)
-func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas int32, prenormalizedDesiredReplicas int32) int32 {
+func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.HorizontalPodAutoscaler, key string, currentReplicas int32, prenormalizedDesiredReplicas int32) int32 {
+	stabilizedRecommendation := a.stabilizeRecommendation(key, prenormalizedDesiredReplicas)
+	if stabilizedRecommendation != prenormalizedDesiredReplicas {
+		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "ScaleDownStabilized", "recent recommendations were higher than current one, applying the highest recent recommendation")
+	} else {
+		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "ReadyForNewScale", "recommended size matches current size")
+	}
 	var minReplicas int32
 	if hpa.Spec.MinReplicas != nil {
 		minReplicas = *hpa.Spec.MinReplicas
@@ -582,9 +606,9 @@ func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.Horiz
 		minReplicas = 0
 	}
 
-	desiredReplicas, condition, reason := convertDesiredReplicasWithRules(currentReplicas, prenormalizedDesiredReplicas, minReplicas, hpa.Spec.MaxReplicas)
+	desiredReplicas, condition, reason := convertDesiredReplicasWithRules(currentReplicas, stabilizedRecommendation, minReplicas, hpa.Spec.MaxReplicas)
 
-	if desiredReplicas == prenormalizedDesiredReplicas {
+	if desiredReplicas == stabilizedRecommendation {
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, condition, reason)
 	} else {
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, condition, reason)
@@ -639,29 +663,6 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 
 func calculateScaleUpLimit(currentReplicas int32) int32 {
 	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
-}
-
-func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
-	if desiredReplicas == currentReplicas {
-		return false
-	}
-
-	if hpa.Status.LastScaleTime == nil {
-		return true
-	}
-
-	// Going down only if the usageRatio dropped significantly below the target
-	// and there was no rescaling in the last downscaleForbiddenWindow.
-	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(a.downscaleForbiddenWindow).Before(timestamp) {
-		return true
-	}
-
-	// Going up only if the usage ratio increased significantly above the target.
-	if desiredReplicas > currentReplicas {
-		return true
-	}
-
-	return false
 }
 
 // scaleForResourceMappings attempts to fetch the scale for the

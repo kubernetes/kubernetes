@@ -51,6 +51,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/golang/glog"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )
@@ -129,6 +130,8 @@ type testCase struct {
 	testCMClient      *cmfake.FakeCustomMetricsClient
 	testEMClient      *emfake.FakeExternalMetricsClient
 	testScaleClient   *scalefake.FakeScaleClient
+
+	recommendations []timestampedRecommendation
 }
 
 // Needs to be called under a lock.
@@ -662,7 +665,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
-	defaultDownscaleForbiddenWindow := 5 * time.Minute
+	defaultDownscalestabilizationWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
 		eventClient.Core(),
@@ -672,9 +675,12 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		replicaCalc,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		controller.NoResyncPeriodFunc(),
-		defaultDownscaleForbiddenWindow,
+		defaultDownscalestabilizationWindow,
 	)
 	hpaController.hpaListerSynced = alwaysReady
+	if tc.recommendations != nil {
+		hpaController.recommendations["test-namespace/test-hpa"] = tc.recommendations
+	}
 
 	return hpaController, informerFactory
 }
@@ -709,6 +715,7 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 func (tc *testCase) runTest(t *testing.T) {
 	hpaController, informerFactory := tc.setupController(t)
 	tc.runTestWithController(t, hpaController, informerFactory)
+	glog.Errorf("recommendations: %+v", hpaController.recommendations)
 }
 
 func TestScaleUp(t *testing.T) {
@@ -2080,8 +2087,7 @@ func TestNoBackoffUpscaleCMNoBackoffCpu(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestBackoffDownscale(t *testing.T) {
-	time := metav1.Time{Time: time.Now().Add(-4 * time.Minute)}
+func TestStabilizeDownscale(t *testing.T) {
 	tc := testCase{
 		minReplicas:             1,
 		maxReplicas:             5,
@@ -2091,16 +2097,19 @@ func TestBackoffDownscale(t *testing.T) {
 		reportedLevels:          []uint64{50, 50, 50},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
 		useMetricsAPI:           true,
-		lastScaleTime:           &time,
 		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
 			Status: v1.ConditionTrue,
 			Reason: "ReadyForNewScale",
 		}, autoscalingv2.HorizontalPodAutoscalerCondition{
 			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionFalse,
-			Reason: "BackoffDownscale",
+			Status: v1.ConditionTrue,
+			Reason: "ScaleDownStabilized",
 		}),
+		recommendations: []timestampedRecommendation{
+			{10, time.Now().Add(-10 * time.Minute)},
+			{4, time.Now().Add(-1 * time.Minute)},
+		},
 	}
 	tc.runTest(t)
 }
@@ -2278,7 +2287,7 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := controller.reconcileAutoscaler(&initialHPAs.Items[0]); err != nil {
+	if err := controller.reconcileAutoscaler(&initialHPAs.Items[0], ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -2350,6 +2359,87 @@ func TestConvertDesiredReplicasWithRules(t *testing.T) {
 
 		assert.Equal(t, ctc.expectedConvertedDesiredReplicas, actualConvertedDesiredReplicas, ctc.annotation)
 		assert.Equal(t, ctc.expectedCondition, actualCondition, ctc.annotation)
+	}
+}
+
+func TestNormalizeDesiredReplicas(t *testing.T) {
+	tests := []struct {
+		name                         string
+		key                          string
+		recommendations              []timestampedRecommendation
+		prenormalizedDesiredReplicas int32
+		expectedStabilizedReplicas   int32
+		expectedLogLength            int
+	}{
+		{
+			"empty log",
+			"",
+			[]timestampedRecommendation{},
+			5,
+			5,
+			1,
+		},
+		{
+			"stabilize",
+			"",
+			[]timestampedRecommendation{
+				{4, time.Now().Add(-2 * time.Minute)},
+				{5, time.Now().Add(-1 * time.Minute)},
+			},
+			3,
+			5,
+			3,
+		},
+		{
+			"no stabilize",
+			"",
+			[]timestampedRecommendation{
+				{1, time.Now().Add(-2 * time.Minute)},
+				{2, time.Now().Add(-1 * time.Minute)},
+			},
+			3,
+			3,
+			3,
+		},
+		{
+			"no stabilize - old recommendations",
+			"",
+			[]timestampedRecommendation{
+				{10, time.Now().Add(-10 * time.Minute)},
+				{9, time.Now().Add(-9 * time.Minute)},
+			},
+			3,
+			3,
+			2,
+		},
+		{
+			"stabilize - old recommendations",
+			"",
+			[]timestampedRecommendation{
+				{10, time.Now().Add(-10 * time.Minute)},
+				{4, time.Now().Add(-1 * time.Minute)},
+				{5, time.Now().Add(-2 * time.Minute)},
+				{9, time.Now().Add(-9 * time.Minute)},
+			},
+			3,
+			5,
+			4,
+		},
+	}
+	for _, tc := range tests {
+		hc := HorizontalController{
+			downscaleStabilisationWindow: 5 * time.Minute,
+			recommendations: map[string][]timestampedRecommendation{
+				tc.key: tc.recommendations,
+			},
+		}
+		r := hc.stabilizeRecommendation(tc.key, tc.prenormalizedDesiredReplicas)
+		if r != tc.expectedStabilizedReplicas {
+			t.Errorf("[%s] got %d stabilized replicas, expected %d", tc.name, r, tc.expectedStabilizedReplicas)
+		}
+		if len(hc.recommendations[tc.key]) != tc.expectedLogLength {
+			t.Errorf("[%s] after  stabilization recommendations log has %d entries, expected %d", tc.name, len(hc.recommendations[tc.key]), tc.expectedLogLength)
+		}
 	}
 }
 

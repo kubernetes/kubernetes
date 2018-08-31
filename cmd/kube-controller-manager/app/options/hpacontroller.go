@@ -25,13 +25,14 @@ import (
 
 // HPAControllerOptions holds the HPAController options.
 type HPAControllerOptions struct {
-	HorizontalPodAutoscalerUseRESTClients           bool
-	HorizontalPodAutoscalerTolerance                float64
-	HorizontalPodAutoscalerDownscaleForbiddenWindow metav1.Duration
-	HorizontalPodAutoscalerUpscaleForbiddenWindow   metav1.Duration
-	HorizontalPodAutoscalerSyncPeriod               metav1.Duration
-	HorizontalPodAutoscalerCPUInitializationPeriod  metav1.Duration
-	HorizontalPodAutoscalerInitialReadinessDelay    metav1.Duration
+	HorizontalPodAutoscalerUseRESTClients               bool
+	HorizontalPodAutoscalerTolerance                    float64
+	HorizontalPodAutoscalerDownscaleStabilizationWindow metav1.Duration
+	HorizontalPodAutoscalerDownscaleForbiddenWindow     metav1.Duration
+	HorizontalPodAutoscalerUpscaleForbiddenWindow       metav1.Duration
+	HorizontalPodAutoscalerSyncPeriod                   metav1.Duration
+	HorizontalPodAutoscalerCPUInitializationPeriod      metav1.Duration
+	HorizontalPodAutoscalerInitialReadinessDelay        metav1.Duration
 }
 
 // AddFlags adds flags related to HPAController for controller manager to the specified FlagSet.
@@ -43,7 +44,9 @@ func (o *HPAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.HorizontalPodAutoscalerSyncPeriod.Duration, "horizontal-pod-autoscaler-sync-period", o.HorizontalPodAutoscalerSyncPeriod.Duration, "The period for syncing the number of pods in horizontal pod autoscaler.")
 	fs.DurationVar(&o.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration, "horizontal-pod-autoscaler-upscale-delay", o.HorizontalPodAutoscalerUpscaleForbiddenWindow.Duration, "The period since last upscale, before another upscale can be performed in horizontal pod autoscaler.")
 	fs.MarkDeprecated("horizontal-pod-autoscaler-upscale-delay", "This flag is currently no-op and will be deleted.")
+	fs.DurationVar(&o.HorizontalPodAutoscalerDownscaleStabilizationWindow.Duration, "horizontal-pod-autoscaler-downscale-stabilization", o.HorizontalPodAutoscalerDownscaleStabilizationWindow.Duration, "The period for which autoscaler will look backwards and not scale down below any recommendation it made during that period.")
 	fs.DurationVar(&o.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "horizontal-pod-autoscaler-downscale-delay", o.HorizontalPodAutoscalerDownscaleForbiddenWindow.Duration, "The period since last downscale, before another downscale can be performed in horizontal pod autoscaler.")
+	fs.MarkDeprecated("horizontal-pod-autoscaler-downscale-delay", "This flag is currently no-op and will be deleted.")
 	fs.Float64Var(&o.HorizontalPodAutoscalerTolerance, "horizontal-pod-autoscaler-tolerance", o.HorizontalPodAutoscalerTolerance, "The minimum change (from 1.0) in the desired-to-actual metrics ratio for the horizontal pod autoscaler to consider scaling.")
 	fs.BoolVar(&o.HorizontalPodAutoscalerUseRESTClients, "horizontal-pod-autoscaler-use-rest-clients", o.HorizontalPodAutoscalerUseRESTClients, "If set to true, causes the horizontal pod autoscaler controller to use REST clients through the kube-aggregator, instead of using the legacy metrics client through the API server proxy.  This is required for custom metrics support in the horizontal pod autoscaler.")
 	fs.DurationVar(&o.HorizontalPodAutoscalerCPUInitializationPeriod.Duration, "horizontal-pod-autoscaler-cpu-initialization-period", o.HorizontalPodAutoscalerCPUInitializationPeriod.Duration, "The period after pod start when CPU samples might be skipped.")
@@ -57,7 +60,7 @@ func (o *HPAControllerOptions) ApplyTo(cfg *componentconfig.HPAControllerConfigu
 	}
 
 	cfg.HorizontalPodAutoscalerSyncPeriod = o.HorizontalPodAutoscalerSyncPeriod
-	cfg.HorizontalPodAutoscalerDownscaleForbiddenWindow = o.HorizontalPodAutoscalerDownscaleForbiddenWindow
+	cfg.HorizontalPodAutoscalerDownscaleStabilizationWindow = o.HorizontalPodAutoscalerDownscaleStabilizationWindow
 	cfg.HorizontalPodAutoscalerTolerance = o.HorizontalPodAutoscalerTolerance
 	cfg.HorizontalPodAutoscalerUseRESTClients = o.HorizontalPodAutoscalerUseRESTClients
 	cfg.HorizontalPodAutoscalerCPUInitializationPeriod = o.HorizontalPodAutoscalerCPUInitializationPeriod
