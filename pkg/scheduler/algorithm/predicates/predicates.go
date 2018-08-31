@@ -96,12 +96,6 @@ const (
 	// CheckNodePIDPressurePred defines the name of predicate CheckNodePIDPressure.
 	CheckNodePIDPressurePred = "CheckNodePIDPressure"
 
-	// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
-	// Amazon recommends no more than 40; the system root volume uses at least one.
-	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
-	DefaultMaxEBSVolumes = 39
-	// DefaultMaxEBSM5VolumeLimit is default EBS volume limit on m5 and c5 instances
-	DefaultMaxEBSM5VolumeLimit = 25
 	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
 	DefaultMaxGCEPDVolumes = 16
@@ -380,10 +374,10 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 }
 
 func getMaxEBSVolume(nodeInstanceType string) int {
-	if ok, _ := regexp.MatchString("^[cm]5.*", nodeInstanceType); ok {
-		return DefaultMaxEBSM5VolumeLimit
+	if ok, _ := regexp.MatchString(volumeutil.EBSNitroLimitRegex, nodeInstanceType); ok {
+		return volumeutil.DefaultMaxEBSNitroVolumeLimit
 	}
-	return DefaultMaxEBSVolumes
+	return volumeutil.DefaultMaxEBSVolumes
 }
 
 // getMaxVolLimitFromEnv checks the max PD volumes environment variable, otherwise returning a default value
