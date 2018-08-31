@@ -17,6 +17,8 @@ limitations under the License.
 package factory
 
 import (
+	"time"
+
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 	"golang.org/x/net/context"
@@ -25,6 +27,11 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
+)
+
+var (
+	// dialTimeout is the timeout for failing to establish a connection.
+	dialTimeout = 10 * time.Second
 )
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
@@ -43,8 +50,9 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		tlsConfig = nil
 	}
 	cfg := clientv3.Config{
-		Endpoints: c.ServerList,
-		TLS:       tlsConfig,
+		DialTimeout: dialTimeout,
+		Endpoints:   c.ServerList,
+		TLS:         tlsConfig,
 	}
 	client, err := clientv3.New(cfg)
 	if err != nil {
