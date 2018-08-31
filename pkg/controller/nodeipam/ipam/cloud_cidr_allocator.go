@@ -157,7 +157,6 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 			}
 			if err := ca.updateCIDRAllocation(workItem); err == nil {
 				glog.V(3).Infof("Updated CIDR for %q", workItem)
-				ca.removeNodeFromProcessing(workItem)
 			} else {
 				glog.Errorf("Error updating CIDR for %q: %v", workItem, err)
 				if canRetry, timeout := ca.retryParams(workItem); canRetry {
@@ -170,6 +169,7 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 				}
 				glog.Errorf("Exceeded retry count for %q, dropping from queue", workItem)
 			}
+			ca.removeNodeFromProcessing(workItem)
 		case <-stopChan:
 			return
 		}
