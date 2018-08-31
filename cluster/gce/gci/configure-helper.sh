@@ -1771,29 +1771,11 @@ function start-kube-apiserver {
     container_env="\"env\":[{${container_env}}],"
   fi
 
-  if [[ -n "${ETCD_KMS_KEY_ID:-}" ]]; then
-    ENCRYPTION_PROVIDER_CONFIG=$(cat << EOM | base64 | tr -d '\r\n'
-kind: EncryptionConfig
-apiVersion: v1
-resources:
-  - resources:
-    - secrets
-    providers:
-    - kms:
-       name: grpc-kms-provider
-       cachesize: 1000
-       endpoint: unix:///var/run/kmsplugin/socket.sock
-EOM
-)
-  fi
+  local -r src_file="${src_dir}/kube-apiserver.manifest"
 
-  if [[ -n "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
-    ENCRYPTION_PROVIDER_CONFIG_PATH="${ENCRYPTION_PROVIDER_CONFIG_PATH:-/etc/srv/kubernetes/encryption-provider-config.yml}"
-    echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${ENCRYPTION_PROVIDER_CONFIG_PATH}"
-    params+=" --experimental-encryption-provider-config=${ENCRYPTION_PROVIDER_CONFIG_PATH}"
-  fi
+  # params is passed by reference, so no "$"
+  setup-etcd-encryption "${src_file}" params
 
-  src_file="${src_dir}/kube-apiserver.manifest"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
@@ -1822,67 +1804,116 @@ EOM
   sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{image_policy_webhook_config_volume}}@${image_policy_webhook_config_volume}@g" "${src_file}"
 
-  if [[ -z "${ETCD_KMS_KEY_ID:-}" ]]; then
-    # Removing KMS related placeholders.
-    sed -i -e " {
-      s@{{kms_plugin_container}}@@
+  cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
+}
 
-      s@{{kms_socket_mount}}@@
+# Sets-up etcd encryption.
+# Configuration of etcd level encryption consists of the following steps:
+# 1. Writing encryption provider config to disk
+# 2. Adding experimental-encryption-provider-config flag to kube-apiserver
+# 3. Add kms-socket-vol and kms-socket-vol-mnt to enable communication with kms-plugin (if requested)
+#
+# Expects parameters:
+# $1 - path to kube-apiserver template
+# $2 - kube-apiserver startup flags (must be passed by reference)
+#
+# Assumes vars (supplied via kube-env):
+# ENCRYPTION_PROVIDER_CONFIG
+# CLOUD_KMS_INTEGRATION
+# ENCRYPTION_PROVIDER_CONFIG_PATH (will default to /etc/srv/kubernetes/encryption-provider-config.yml)
+function setup-etcd-encryption {
+  local kube_apiserver_template_path
+  local -n kube_api_server_params
+  local default_encryption_provider_config_vol
+  local default_encryption_provider_config_vol_mnt
+  local encryption_provider_config_vol_mnt
+  local encryption_provider_config_vol
+  local default_kms_socket_dir
+  local default_kms_socket_vol_mnt
+  local default_kms_socket_vol
+  local kms_socket_vol_mnt
+  local kms_socket_vol
+  local encryption_provider_config_path
+
+  kube_apiserver_template_path="$1"
+  if [[ -z "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
+    sed -i -e " {
       s@{{encryption_provider_mount}}@@
-
-      s@{{kms_socket_volume}}@@
       s@{{encryption_provider_volume}}@@
-    } " "${src_file}"
-  else
-    local kms_plugin_src_file="${src_dir}/kms-plugin-container.manifest"
-
-    if [[ ! -f "${kms_plugin_src_file}" ]]; then
-      echo "Error: KMS Integration was requested, but "${kms_plugin_src_file}" is missing."
-      exit 1
-    fi
-
-    if [[ ! -f "${ENCRYPTION_PROVIDER_CONFIG_PATH}" ]]; then
-      echo "Error: KMS Integration was requested, but "${ENCRYPTION_PROVIDER_CONFIG_PATH}" is missing."
-      exit 1
-    fi
-
-    # TODO: Validate that the encryption config is for KMS.
-
-    local kms_socket_dir="/var/run/kmsplugin"
-
-    # kms_socket_mnt is used by both kms_plugin and kube-apiserver - this is how these containers talk.
-    local kms_socket_mnt="{ \"name\": \"kmssocket\", \"mountPath\": \"${kms_socket_dir}\", \"readOnly\": false}"
-
-    local kms_socket_vol="{ \"name\": \"kmssocket\", \"hostPath\": {\"path\": \"${kms_socket_dir}\", \"type\": \"DirectoryOrCreate\"}}"
-    local kms_path_to_socket="${kms_socket_dir}/socket.sock"
-
-    local encryption_provider_mnt="{ \"name\": \"encryptionconfig\", \"mountPath\": \"${ENCRYPTION_PROVIDER_CONFIG_PATH}\", \"readOnly\": true}"
-    local encryption_provider_vol="{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${ENCRYPTION_PROVIDER_CONFIG_PATH}\", \"type\": \"File\"}}"
-
-    # TODO these are used in other places, convert to global.
-    local gce_conf_path="/etc/gce.conf"
-    local cloud_config_mount="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true}"
-
-    local kms_plugin_container=$(echo $(sed " {
-      s@{{kms_key_uri}}@${ETCD_KMS_KEY_ID}@
-      s@{{gce_conf_path}}@${gce_conf_path}@
-      s@{{kms_path_to_socket}}@${kms_path_to_socket}@
-      s@{{kms_socket_mount}}@${kms_socket_mnt}@
-      s@{{cloud_config_mount}}@${cloud_config_mount}@
-    } " "${kms_plugin_src_file}") | tr "\n" "\\n")
-
-    sed -i -e " {
-      s@{{kms_plugin_container}}@${kms_plugin_container},@
-
-      s@{{kms_socket_mount}}@${kms_socket_mnt},@
-      s@{{encryption_provider_mount}}@${encryption_provider_mnt},@
-
-      s@{{kms_socket_volume}}@${kms_socket_vol},@
-      s@{{encryption_provider_volume}}@${encryption_provider_vol},@
-    } " "${src_file}"
+      s@{{kms_socket_mount}}@@
+      s@{{kms_socket_volume}}@@
+    } " "${kube_apiserver_template_path}"
+    return
   fi
 
-  cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
+  kube_api_server_params="$2"
+  encryption_provider_config_path=${ENCRYPTION_PROVIDER_CONFIG_PATH:-/etc/srv/kubernetes/encryption-provider-config.yml}
+
+  echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
+  kube_api_server_params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
+
+  default_encryption_provider_config_vol=$(echo "{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${encryption_provider_config_path}\", \"type\": \"File\"}}" | base64 | tr -d '\r\n')
+  default_encryption_provider_config_vol_mnt=$(echo "{ \"name\": \"encryptionconfig\", \"mountPath\": \"${encryption_provider_config_path}\", \"readOnly\": true}" | base64 | tr -d '\r\n')
+
+  encryption_provider_config_vol_mnt=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL_MNT:-"${default_encryption_provider_config_vol_mnt}"}" | base64 --decode)
+  encryption_provider_config_vol=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL:-"${default_encryption_provider_config_vol}"}" | base64 --decode)
+  sed -i -e " {
+    s@{{encryption_provider_mount}}@${encryption_provider_config_vol_mnt},@
+    s@{{encryption_provider_volume}}@${encryption_provider_config_vol},@
+  } " "${kube_apiserver_template_path}"
+
+  if [[ -n "${CLOUD_KMS_INTEGRATION:-}" ]]; then
+    default_kms_socket_dir="/var/run/kmsplugin"
+    default_kms_socket_vol_mnt=$(echo "{ \"name\": \"kmssocket\", \"mountPath\": \"${default_kms_socket_dir}\", \"readOnly\": false}" | base64 | tr -d '\r\n')
+    default_kms_socket_vol=$(echo "{ \"name\": \"kmssocket\", \"hostPath\": {\"path\": \"${default_kms_socket_dir}\", \"type\": \"DirectoryOrCreate\"}}" | base64 | tr -d '\r\n')
+
+    kms_socket_vol_mnt=$(echo "${KMS_PLUGIN_SOCKET_VOL_MNT:-"${default_kms_socket_vol_mnt}"}" | base64 --decode)
+    kms_socket_vol=$(echo "${KMS_PLUGIN_SOCKET_VOL:-"${default_kms_socket_vol}"}" | base64 --decode)
+    sed -i -e " {
+      s@{{kms_socket_mount}}@${kms_socket_vol_mnt},@
+      s@{{kms_socket_volume}}@${kms_socket_vol},@
+    } " "${kube_apiserver_template_path}"
+  else
+    sed -i -e " {
+      s@{{kms_socket_mount}}@@
+      s@{{kms_socket_volume}}@@
+    } " "${kube_apiserver_template_path}"
+  fi
+}
+
+
+# Applies encryption provider config.
+# This function may be triggered in two scenarios:
+# 1. Decryption of etcd
+# 2. Encryption of etcd is added after the cluster is deployed
+# Both cases require that the existing secrets in etcd be re-proceeded.
+#
+# Assumes vars (supplied via kube-env):
+# ENCRYPTION_PROVIDER_CONFIG_FORCE
+function apply-encryption-config() {
+  if [[ "${ENCRYPTION_PROVIDER_CONFIG_FORCE:-false}" == "false" ]]; then
+    return
+  fi
+
+  # need kube-apiserver to be ready
+  until kubectl get secret; do
+    sleep ${ENCRYPTION_PROVIDER_CONFIG_FORCE_DELAY:-5}
+  done
+
+  retries=${ENCRYPTION_PROVIDER_CONFIG_FORCE_RETRIES:-5}
+  # The command below may fail when a conflict is detected during an update on a secret (something
+  # else updated the secret in the middle of our update).
+  # TODO: Retry only on errors caused by a conflict.
+  until (( retries == 0 )); do
+    # forces all secrets to be re-written to etcd, and in the process either encrypting or decrypting them
+    # https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/
+    if kubectl get secrets --all-namespaces -o json | kubectl replace -f -; then
+      break
+    fi
+
+    (( retries-- ))
+    sleep "${ENCRYPTION_PROVIDER_CONFIG_FORCE_RETRY_SLEEP:-3}"
+  done
 }
 
 # Starts kubernetes controller manager.
@@ -2778,6 +2809,7 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
+    apply-encryption-config &
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy
