@@ -22,6 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	testutils "k8s.io/kubernetes/test/utils"
+	"strings"
 )
 
 // This file tests the scheduler priority functions.
@@ -171,4 +172,65 @@ func TestPodAffinity(t *testing.T) {
 		}
 	}
 	t.Errorf("Pod %v got scheduled on an unexpected node: %v.", podName, pod.Spec.NodeName)
+}
+
+// TestImageLocality verifies that the scheduler's image locality priority function
+// works correctly, i.e., the pod gets scheduled to the node where its container images are ready.
+func TestImageLocality(t *testing.T) {
+	context := initTest(t, "image-locality")
+	defer cleanupTest(t, context)
+
+	// Add a few nodes.
+	_, err := createNodes(context.clientSet, "testnode", nil, 10)
+	if err != nil {
+		t.Fatalf("cannot create nodes: %v", err)
+	}
+
+	// We use a fake large image as the test image used by the pod, which has relatively large image size.
+	image := v1.ContainerImage{
+		Names: []string{
+			"fake-large-image:v1",
+		},
+		SizeBytes: 3000 * 1024 * 1024,
+	}
+
+	// Create a node with the large image
+	nodeWithLargeImage, err := createNodeWithImages(context.clientSet, "testnode-large-image", nil, []v1.ContainerImage{image})
+	if err != nil {
+		t.Fatalf("cannot create node with a large image: %v", err)
+	}
+
+	// Create a pod with containers each having the specified image.
+	podName := "pod-using-large-image"
+	pod, err := runPodWithContainers(context.clientSet, initPodWithContainers(context.clientSet, &podWithContainersConfig{
+		Name:       podName,
+		Namespace:  context.ns.Name,
+		Containers: makeContainersWithImages(image.Names),
+	}))
+	if err != nil {
+		t.Fatalf("error running pod with images: %v", err)
+	}
+	if pod.Spec.NodeName != nodeWithLargeImage.Name {
+		t.Errorf("pod %v got scheduled on an unexpected node: %v. Expected node: %v.", podName, pod.Spec.NodeName, nodeWithLargeImage.Name)
+	} else {
+		t.Logf("pod %v got successfully scheduled on node %v.", podName, pod.Spec.NodeName)
+	}
+}
+
+// makeContainerWithImage returns a list of v1.Container objects for each given image. Duplicates of an image are ignored,
+// i.e., each image is used only once.
+func makeContainersWithImages(images []string) []v1.Container {
+	var containers []v1.Container
+	usedImages := make(map[string]struct{})
+
+	for _, image := range images {
+		if _, ok := usedImages[image]; !ok {
+			containers = append(containers, v1.Container{
+				Name:  strings.Replace(image, ":", "-", -1) + "-container",
+				Image: image,
+			})
+			usedImages[image] = struct{}{}
+		}
+	}
+	return containers
 }
