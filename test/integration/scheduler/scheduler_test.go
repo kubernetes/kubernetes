@@ -154,6 +154,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
 				"TaintTolerationPriority",
+				"ImageLocalityPriority",
 			),
 		},
 		{
