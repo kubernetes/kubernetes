@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	apiextensiosnfakeclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,6 +124,7 @@ func newNodeLifecycleControllerFromClient(
 		daemonSetInformer,
 		cloud,
 		kubeClient,
+		nil, // dynamicClient
 		nodeMonitorPeriod,
 		nodeStartupGracePeriod,
 		nodeMonitorGracePeriod,
@@ -2590,5 +2592,18 @@ func TestFixDeprecatedTaintKey(t *testing.T) {
 				t.Errorf("%s: Can't find taint %v in %v", test.Name, taint, node.Spec.Taints)
 			}
 		}
+	}
+}
+
+func TestRegisterRuntimeClassCRD(t *testing.T) {
+	client := apiextensiosnfakeclientset.NewSimpleClientset()
+	controller := &Controller{
+		apiextensionsClient: client,
+	}
+	controller.registerRuntimeClassCRD()
+
+	_, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get("runtimeclasses.node.k8s.io", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("RuntimeClass CRD not found: %v", err)
 	}
 }
