@@ -148,7 +148,7 @@ func NewAttachDetachController(
 	}
 
 	// Install required CSI CRDs on API server
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSICrdAutoInstall) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSICRDAutoInstall) {
 		adc.installCRDs()
 	}
 
@@ -685,15 +685,16 @@ func (adc *attachDetachController) installCRDs() error {
 	}
 	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		glog.Errorf("failed to create CSIDrivers CRD: %#v, err: %#v",
-			res, err)
+	if err == nil {
+		glog.Infof("CSIDrivers CRD created successfully: %#v",
+			res)
 	} else if apierrors.IsAlreadyExists(err) {
 		glog.Warningf("CSIDrivers CRD already exists: %#v, err: %#v",
 			res, err)
 	} else {
-		glog.Infof("CSIDrivers CRD created successfully: %#v",
-			res)
+		glog.Errorf("failed to create CSIDrivers CRD: %#v, err: %#v",
+			res, err)
+		return err
 	}
 
 	crd = &apiextensionsv1beta1.CustomResourceDefinition{
@@ -712,15 +713,16 @@ func (adc *attachDetachController) installCRDs() error {
 	}
 	res, err = adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
-	if err != nil && !apierrors.IsAlreadyExists(err) {
-		glog.Errorf("failed to create CSINodeInfo CRD: %#v, err: %#v",
-			res, err)
+	if err == nil {
+		glog.Infof("CSINodeInfo CRD created successfully: %#v",
+			res)
 	} else if apierrors.IsAlreadyExists(err) {
 		glog.Warningf("CSINodeInfo CRD already exists: %#v, err: %#v",
 			res, err)
 	} else {
-		glog.Infof("CSINodeInfo CRD created successfully: %#v",
-			res)
+		glog.Errorf("failed to create CSINodeInfo CRD: %#v, err: %#v",
+			res, err)
+		return err
 	}
 
 	return nil

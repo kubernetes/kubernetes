@@ -201,9 +201,8 @@ const (
 
 	// owner: @saad-ali
 	// alpha: v1.12
-	//
 	// Enable automatic installation of CRD for csi.storage.k8s.io API objects.
-	CSICrdAutoInstall utilfeature.Feature = "CSICrdAutoInstall"
+	CSICRDAutoInstall utilfeature.Feature = "CSICRDAutoInstall"
 
 	// owner @MrHohn
 	// beta: v1.10
@@ -412,7 +411,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeScheduling:                            {Default: true, PreRelease: utilfeature.Beta},
 	CSIPersistentVolume:                         {Default: true, PreRelease: utilfeature.Beta},
-	CSICrdAutoInstall:                           {Default: false, PreRelease: utilfeature.Alpha},
+	CSICRDAutoInstall:                           {Default: false, PreRelease: utilfeature.Alpha},
 	CustomPodDNS:                                {Default: true, PreRelease: utilfeature.Beta},
 	BlockVolume:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: utilfeature.GA},
