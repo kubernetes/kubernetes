@@ -515,7 +515,19 @@ func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
 
 func (adc *attachDetachController) podDelete(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
-	if pod == nil || !ok {
+	if !ok {
+		tombstone, ok := obj.(kcache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.V(2).Infof("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		pod, ok = tombstone.Obj.(*v1.Pod)
+		if !ok {
+			glog.V(2).Infof("tombstone contained object that is not a pod %+v", obj)
+			return
+		}
+	}
+	if pod == nil {
 		return
 	}
 
@@ -553,7 +565,19 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {
 	node, ok := obj.(*v1.Node)
-	if node == nil || !ok {
+	if !ok {
+		tombstone, ok := obj.(kcache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.V(2).Infof("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		node, ok = tombstone.Obj.(*v1.Node)
+		if !ok {
+			glog.V(2).Infof("tombstone contained object that is not a node %+v", obj)
+			return
+		}
+	}
+	if node == nil {
 		return
 	}
 
