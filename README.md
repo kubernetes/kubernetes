@@ -6,7 +6,7 @@
 
 ----
 
-Kubernetes is an open source container orchestration system for running microservices (i.e. [containerized applications]) across multiple hosts; providing basic mechanisms for end to end deployment, scheduling, scaling, and networking of microservices, with examples of similar systems, you can check out Mesos, Docker Swarm, Nomad.
+Kubernetes is a canonical, open source implementation of a container orchestration system for running microservices in containers, across multiple hosts, with provisioning basic mechanisms for end to end deployment, scheduling, scaling, and networking of microservices, with examples of similar systems, you can check out Mesos, Docker Swarm, Nomad.
 
 Kubernetes builds upon 17 years of experience at Google running
 production workloads at scale using a system called [Borg],
