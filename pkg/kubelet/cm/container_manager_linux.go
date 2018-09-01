@@ -307,6 +307,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			cgroupManager:     cm.cgroupManager,
 			podPidsLimit:      cm.ExperimentalPodPidsLimit,
 			enforceCPULimits:  cm.EnforceCPULimits,
+			cpuCFSQuotaPeriod: uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
 		}
 	}
 	return &podContainerManagerNoop{

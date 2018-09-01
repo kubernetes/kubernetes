@@ -78,6 +78,7 @@ ComponentConfigs:
         CacheAuthorizedTTL: 5m0s
         CacheUnauthorizedTTL: 30s
     CPUCFSQuota: true
+    CPUCFSQuotaPeriod: 0s
     CPUManagerPolicy: none
     CPUManagerReconcilePeriod: 10s
     CgroupDriver: cgroupfs

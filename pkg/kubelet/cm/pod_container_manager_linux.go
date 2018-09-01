@@ -51,6 +51,9 @@ type podContainerManagerImpl struct {
 	podPidsLimit int64
 	// enforceCPULimits controls whether cfs quota is enforced or not
 	enforceCPULimits bool
+	// cpuCFSQuotaPeriod is the cfs period value, cfs_period_us, setting per
+	// node for all containers in usec
+	cpuCFSQuotaPeriod uint64
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -81,7 +84,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 		// Create the pod container
 		containerConfig := &CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits),
+			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod),
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && m.podPidsLimit > 0 {
 			containerConfig.ResourceParameters.PodPidsLimit = &m.podPidsLimit
