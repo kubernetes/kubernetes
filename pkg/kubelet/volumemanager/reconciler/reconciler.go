@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/golang/glog"
@@ -344,6 +345,7 @@ type podVolume struct {
 	mountPath      string
 	pluginName     string
 	volumeMode     v1.PersistentVolumeMode
+	devicePath     string
 }
 
 type reconstructedVolume struct {
@@ -367,7 +369,7 @@ type reconstructedVolume struct {
 // mount points since the volume is no long needed (removed from desired state)
 func (rc *reconciler) syncStates() {
 	// Get volumes information by reading the pod's directory
-	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
+	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir, rc.mounter)
 	if err != nil {
 		glog.Errorf("Cannot get volumes from disk %v", err)
 		return
@@ -546,7 +548,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volumeGidValue:      "",
 		// devicePath is updated during updateStates() by checking node status's VolumesAttached data.
 		// TODO: get device path directly from the volume mount path.
-		devicePath:        "",
+		devicePath:        volume.devicePath,
 		mounter:           volumeMounter,
 		blockVolumeMapper: volumeMapper,
 	}
@@ -560,7 +562,21 @@ func (rc *reconciler) updateDevicePath(volumesNeedUpdate map[v1.UniqueVolumeName
 		glog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
 	} else {
 		for _, attachedVolume := range node.Status.VolumesAttached {
+			if attachedVolume.DevicePath == "" {
+				continue
+			}
 			if volume, exists := volumesNeedUpdate[attachedVolume.Name]; exists {
+				// If volume devicePath is already known from previous mount checking, no need to update it again.
+				if volume.devicePath != "" {
+					target, err := filepath.EvalSymlinks(attachedVolume.DevicePath)
+					if err != nil {
+						target = attachedVolume.DevicePath
+					}
+					if volume.devicePath != target {
+						glog.Warningf("The volume %q device path obtained from node status (%q) does not match with the actual devicePath (%q) from /proc/mounts",
+							attachedVolume.Name, volume.devicePath, attachedVolume.DevicePath)
+					}
+				}
 				volume.devicePath = attachedVolume.DevicePath
 				volumesNeedUpdate[attachedVolume.Name] = volume
 				glog.V(4).Infof("Update devicePath from node status for volume (%q): %q", attachedVolume.Name, volume.devicePath)
@@ -636,7 +652,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 // getVolumesFromPodDir scans through the volumes directories under the given pod directory.
 // It returns a list of pod volume information including pod's uid, volume's plugin name, mount path,
 // and volume spec name.
-func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
+func getVolumesFromPodDir(podDir string, mounter mount.Interface) ([]podVolume, error) {
 	podsDirInfo, err := ioutil.ReadDir(podDir)
 	if err != nil {
 		return nil, err
@@ -686,6 +702,20 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 						volumeMode:     volumeMode,
 					})
 				}
+			}
+		}
+	}
+	// get mountpaths and their devices from /proc/mounts
+	mps, err := mounter.List()
+	if err != nil {
+		glog.Errorf("Could not get mount paths %v", err)
+	}
+	// update volume's device path
+	for i := range mps {
+		for j := range volumes {
+			volume := &volumes[j]
+			if mps[i].Path == volume.mountPath {
+				volume.devicePath = mps[i].Device
 			}
 		}
 	}
