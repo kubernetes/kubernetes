@@ -61,9 +61,9 @@ type CloudControllerManagerOptions struct {
 	KubeCloudShared   *cmoptions.KubeCloudSharedOptions
 	ServiceController *cmoptions.ServiceControllerOptions
 
-	SecureServing *apiserveroptions.SecureServingOptions
+	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
 	// TODO: remove insecure serving mode
-	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptions
+	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
 
@@ -89,23 +89,24 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
 		},
-		SecureServing: apiserveroptions.NewSecureServingOptions(),
-		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
+		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.KubeCloudShared.Address),
 			BindPort:    int(componentConfig.KubeCloudShared.Port),
 			BindNetwork: "tcp",
-		},
-		Authentication:            nil, // TODO: enable with apiserveroptions.NewDelegatingAuthenticationOptions()
-		Authorization:             nil, // TODO: enable with apiserveroptions.NewDelegatingAuthorizationOptions()
+		}).WithLoopback(),
+		Authentication:            apiserveroptions.NewDelegatingAuthenticationOptions(),
+		Authorization:             apiserveroptions.NewDelegatingAuthorizationOptions(),
 		NodeStatusUpdateFrequency: componentConfig.NodeStatusUpdateFrequency,
 	}
 
+	s.Authentication.RemoteKubeConfigFileOptional = true
+	s.Authorization.RemoteKubeConfigFileOptional = true
+	s.Authorization.AlwaysAllowPaths = []string{"/healthz"}
+
 	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
 	s.SecureServing.ServerCert.PairName = "cloud-controller-manager"
-
-	// disable secure serving for now
-	// TODO: enable HTTPS by default
-	s.SecureServing.BindPort = 0
+	s.SecureServing.BindPort = ports.CloudControllerManagerPort
 
 	return &s, nil
 }
@@ -172,17 +173,19 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	if err = o.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
 		return err
 	}
-	if err = o.SecureServing.ApplyTo(&c.SecureServing); err != nil {
+	if err = o.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err = o.InsecureServing.ApplyTo(&c.InsecureServing); err != nil {
+	if err = o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err = o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
-		return err
-	}
-	if err = o.Authorization.ApplyTo(&c.Authorization); err != nil {
-		return err
+	if o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil {
+		if err = o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+			return err
+		}
+		if err = o.Authorization.ApplyTo(&c.Authorization); err != nil {
+			return err
+		}
 	}
 
 	c.Kubeconfig, err = clientcmd.BuildConfigFromFlags(o.Master, o.Kubeconfig)
@@ -261,6 +264,10 @@ func resyncPeriod(c *cloudcontrollerconfig.Config) func() time.Duration {
 func (o *CloudControllerManagerOptions) Config() (*cloudcontrollerconfig.Config, error) {
 	if err := o.Validate(); err != nil {
 		return nil, err
+	}
+
+	if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
 	c := &cloudcontrollerconfig.Config{}
