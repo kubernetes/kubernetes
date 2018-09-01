@@ -67,7 +67,8 @@ func (tc *legacyReplicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clien
 			podName := fmt.Sprintf("%s-%d", podNamePrefix, i)
 			pod := v1.Pod{
 				Status: v1.PodStatus{
-					Phase: v1.PodRunning,
+					Phase:     v1.PodRunning,
+					StartTime: &metav1.Time{Time: time.Now().Add(-3 * time.Minute)},
 					Conditions: []v1.PodCondition{
 						{
 							Type:   v1.PodReady,
@@ -185,11 +186,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 	testClient := tc.prepareTestClient(t)
 	metricsClient := metrics.NewHeapsterMetricsClient(testClient, metrics.DefaultHeapsterNamespace, metrics.DefaultHeapsterScheme, metrics.DefaultHeapsterService, metrics.DefaultHeapsterPort)
 
-	replicaCalc := &ReplicaCalculator{
-		metricsClient: metricsClient,
-		podsGetter:    testClient.Core(),
-		tolerance:     defaultTestingTolerance,
-	}
+	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
@@ -213,7 +210,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 		assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
 
 	} else {
-		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector)
+		outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUtilization, tc.metric.name, testNamespace, selector, nil)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -310,10 +307,10 @@ func TestLegacyReplicaCalcScaleUpCM(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestLegacyReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
+func TestLegacyReplicaCalcScaleUpCMUnreadyNoLessScale(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
-		expectedReplicas: 4,
+		expectedReplicas: 6,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse},
 		metric: &metricInfo{
 			name:                "qps",
@@ -325,16 +322,16 @@ func TestLegacyReplicaCalcScaleUpCMUnreadyLessScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestLegacyReplicaCalcScaleUpCMUnreadyNoScaleWouldScaleDown(t *testing.T) {
+func TestLegacyReplicaCalcScaleUpCMUnreadyScale(t *testing.T) {
 	tc := legacyReplicaCalcTestCase{
 		currentReplicas:  3,
-		expectedReplicas: 3,
+		expectedReplicas: 7,
 		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionFalse},
 		metric: &metricInfo{
 			name:                "qps",
 			levels:              []int64{50000, 15000, 30000},
 			targetUtilization:   15000,
-			expectedUtilization: 15000,
+			expectedUtilization: 31666,
 		},
 	}
 	tc.runTest(t)

@@ -127,6 +127,9 @@ type watchCache struct {
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
 
+	// ResourceVersion of the last list result (populated via Replace() method).
+	listResourceVersion uint64
+
 	// This handler is run at the end of every successful Replace() method.
 	onReplace func()
 
@@ -147,16 +150,17 @@ func newWatchCache(
 	getAttrsFunc func(runtime.Object) (labels.Set, fields.Set, bool, error),
 	versioner storage.Versioner) *watchCache {
 	wc := &watchCache{
-		capacity:        capacity,
-		keyFunc:         keyFunc,
-		getAttrsFunc:    getAttrsFunc,
-		cache:           make([]watchCacheElement, capacity),
-		startIndex:      0,
-		endIndex:        0,
-		store:           cache.NewStore(storeElementKey),
-		resourceVersion: 0,
-		clock:           clock.RealClock{},
-		versioner:       versioner,
+		capacity:            capacity,
+		keyFunc:             keyFunc,
+		getAttrsFunc:        getAttrsFunc,
+		cache:               make([]watchCacheElement, capacity),
+		startIndex:          0,
+		endIndex:            0,
+		store:               cache.NewStore(storeElementKey),
+		resourceVersion:     0,
+		listResourceVersion: 0,
+		clock:               clock.RealClock{},
+		versioner:           versioner,
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc
@@ -390,6 +394,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	if err := w.store.Replace(toReplace, resourceVersion); err != nil {
 		return err
 	}
+	w.listResourceVersion = version
 	w.resourceVersion = version
 	if w.onReplace != nil {
 		w.onReplace()
@@ -412,12 +417,26 @@ func (w *watchCache) SetOnEvent(onEvent func(*watchCacheEvent)) {
 
 func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*watchCacheEvent, error) {
 	size := w.endIndex - w.startIndex
-	// if we have no watch events in our cache, the oldest one we can successfully deliver to a watcher
-	// is the *next* event we'll receive, which will be at least one greater than our current resourceVersion
-	oldest := w.resourceVersion + 1
-	if size > 0 {
+	var oldest uint64
+	switch {
+	case size >= w.capacity:
+		// Once the watch event buffer is full, the oldest watch event we can deliver
+		// is the first one in the buffer.
 		oldest = w.cache[w.startIndex%w.capacity].resourceVersion
+	case w.listResourceVersion > 0:
+		// If the watch event buffer isn't full, the oldest watch event we can deliver
+		// is one greater than the resource version of the last full list.
+		oldest = w.listResourceVersion + 1
+	case size > 0:
+		// If we've never completed a list, use the resourceVersion of the oldest event
+		// in the buffer.
+		// This should only happen in unit tests that populate the buffer without
+		// performing list/replace operations.
+		oldest = w.cache[w.startIndex%w.capacity].resourceVersion
+	default:
+		return nil, fmt.Errorf("watch cache isn't correctly initialized")
 	}
+
 	if resourceVersion == 0 {
 		// resourceVersion = 0 means that we don't require any specific starting point
 		// and we would like to start watching from ~now.

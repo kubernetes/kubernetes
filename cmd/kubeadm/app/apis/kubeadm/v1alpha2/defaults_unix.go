@@ -18,5 +18,9 @@ limitations under the License.
 
 package v1alpha2
 
-// DefaultCACertPath defines default location of CA certificate on Linux
-const DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
+const (
+	// DefaultCACertPath defines default location of CA certificate on Linux
+	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
+	// DefaultCRISocket defines the default cri socket
+	DefaultCRISocket = "/var/run/dockershim.sock"
+)

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
@@ -249,12 +250,24 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 		return allErrs
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
+	rawTopologies := make([]map[string]sets.String, len(topologies))
 	for i, term := range topologies {
-		allErrs = append(allErrs, apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))...)
+		idxPath := fldPath.Index(i)
+		exprMap, termErrs := apivalidation.ValidateTopologySelectorTerm(term, fldPath.Index(i))
+		allErrs = append(allErrs, termErrs...)
+
+		// TODO (verult) consider improving runtime
+		for _, t := range rawTopologies {
+			if helper.Semantic.DeepEqual(exprMap, t) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("matchLabelExpressions"), ""))
+			}
+		}
+
+		rawTopologies = append(rawTopologies, exprMap)
 	}
 
 	return allErrs

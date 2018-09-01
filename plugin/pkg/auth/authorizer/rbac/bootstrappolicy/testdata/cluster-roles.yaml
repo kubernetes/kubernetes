@@ -951,6 +951,12 @@ items:
     - patch
     - update
   - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
+  - apiGroups:
     - storage.k8s.io
     resources:
     - volumeattachments
@@ -1115,6 +1121,16 @@ items:
     verbs:
     - get
     - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - get
+    - list
+    - patch
+    - update
     - watch
 - aggregationRule:
     clusterRoleSelectors:

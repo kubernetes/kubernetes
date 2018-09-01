@@ -23,6 +23,7 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/policy:go_default_library",
@@ -84,6 +85,7 @@ go_test(
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/gopkg.in/square/go-jose.v2/jwt:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

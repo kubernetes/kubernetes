@@ -46,7 +46,7 @@ func TestComponentResources(t *testing.T) {
 func TestComponentProbe(t *testing.T) {
 	var tests = []struct {
 		name      string
-		cfg       *kubeadmapi.ClusterConfiguration
+		cfg       *kubeadmapi.InitConfiguration
 		component string
 		port      int
 		path      string
@@ -55,8 +55,8 @@ func TestComponentProbe(t *testing.T) {
 	}{
 		{
 			name: "default apiserver advertise address with http",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API: kubeadmapi.API{
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
 				},
 			},
@@ -68,12 +68,14 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "default apiserver advertise address with http",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API: kubeadmapi.API{
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
-				FeatureGates: map[string]bool{
-					features.SelfHosting: true,
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					FeatureGates: map[string]bool{
+						features.SelfHosting: true,
+					},
 				},
 			},
 			component: kubeadmconstants.KubeAPIServer,
@@ -84,8 +86,8 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "default apiserver advertise address with https",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API: kubeadmapi.API{
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "",
 				},
 			},
@@ -97,8 +99,8 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid ipv4 apiserver advertise address with http",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API: kubeadmapi.API{
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 				},
 			},
@@ -110,8 +112,8 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid ipv6 apiserver advertise address with http",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				API: kubeadmapi.API{
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "2001:db8::1",
 				},
 			},
@@ -123,8 +125,10 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv4 controller-manager probe",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				ControllerManagerExtraArgs: map[string]string{"address": "1.2.3.4"},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControllerManagerExtraArgs: map[string]string{"address": "1.2.3.4"},
+				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
 			port:      1,
@@ -134,8 +138,10 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv6 controller-manager probe",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				ControllerManagerExtraArgs: map[string]string{"address": "2001:db8::1"},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControllerManagerExtraArgs: map[string]string{"address": "2001:db8::1"},
+				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
 			port:      1,
@@ -145,8 +151,10 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv4 scheduler probe",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				SchedulerExtraArgs: map[string]string{"address": "1.2.3.4"},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					SchedulerExtraArgs: map[string]string{"address": "1.2.3.4"},
+				},
 			},
 			component: kubeadmconstants.KubeScheduler,
 			port:      1,
@@ -156,8 +164,10 @@ func TestComponentProbe(t *testing.T) {
 		},
 		{
 			name: "valid IPv6 scheduler probe",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				SchedulerExtraArgs: map[string]string{"address": "2001:db8::1"},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					SchedulerExtraArgs: map[string]string{"address": "2001:db8::1"},
+				},
 			},
 			component: kubeadmconstants.KubeScheduler,
 			port:      1,
@@ -167,11 +177,7 @@ func TestComponentProbe(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		// TODO: Make ComponentProbe accept a ClusterConfiguration object instead of InitConfiguration
-		initcfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: *rt.cfg,
-		}
-		actual := ComponentProbe(initcfg, rt.component, rt.port, rt.path, rt.scheme)
+		actual := ComponentProbe(rt.cfg, rt.component, rt.port, rt.path, rt.scheme)
 		if actual.Handler.HTTPGet.Host != rt.expected {
 			t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
 				rt.name, rt.expected,

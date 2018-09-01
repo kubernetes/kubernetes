@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
@@ -37,7 +37,7 @@ type DeprecatedOptions struct {
 }
 
 // AddFlags adds flags for the deprecated options.
-func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *componentconfig.KubeSchedulerConfiguration) {
+func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) {
 	if o == nil {
 		return
 	}
@@ -46,7 +46,7 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *componentconfig.Kub
 
 	fs.StringVar(&o.AlgorithmProvider, "algorithm-provider", o.AlgorithmProvider, "DEPRECATED: the scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
 	fs.StringVar(&o.PolicyConfigFile, "policy-config-file", o.PolicyConfigFile, "DEPRECATED: file with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config=true")
-	usage := fmt.Sprintf("DEPRECATED: name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config=false. The config must be provided as the value of an element in 'Data' map with the key='%v'", componentconfig.SchedulerPolicyConfigMapKey)
+	usage := fmt.Sprintf("DEPRECATED: name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config=false. The config must be provided as the value of an element in 'Data' map with the key='%v'", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
 	fs.StringVar(&o.PolicyConfigMapName, "policy-configmap", o.PolicyConfigMapName, usage)
 	fs.StringVar(&o.PolicyConfigMapNamespace, "policy-configmap-namespace", o.PolicyConfigMapNamespace, "DEPRECATED: the namespace where policy ConfigMap is located. The kube-system namespace will be used if this is not provided or is empty.")
 	fs.BoolVar(&o.UseLegacyPolicyConfig, "use-legacy-policy-config", o.UseLegacyPolicyConfig, "DEPRECATED: when set to true, scheduler will ignore policy ConfigMap and uses policy config file")
@@ -82,31 +82,31 @@ func (o *DeprecatedOptions) Validate() []error {
 // 1. --use-legacy-policy-config to use a policy file.
 // 2. --policy-configmap to use a policy config map value.
 // 3. --algorithm-provider to use a named algorithm provider.
-func (o *DeprecatedOptions) ApplyTo(cfg *componentconfig.KubeSchedulerConfiguration) error {
+func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if o == nil {
 		return nil
 	}
 
 	switch {
 	case o.UseLegacyPolicyConfig || (len(o.PolicyConfigFile) > 0 && o.PolicyConfigMapName == ""):
-		cfg.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
-			Policy: &componentconfig.SchedulerPolicySource{
-				File: &componentconfig.SchedulerPolicyFileSource{
+		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
+			Policy: &kubeschedulerconfig.SchedulerPolicySource{
+				File: &kubeschedulerconfig.SchedulerPolicyFileSource{
 					Path: o.PolicyConfigFile,
 				},
 			},
 		}
 	case len(o.PolicyConfigMapName) > 0:
-		cfg.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
-			Policy: &componentconfig.SchedulerPolicySource{
-				ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
+			Policy: &kubeschedulerconfig.SchedulerPolicySource{
+				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
 					Name:      o.PolicyConfigMapName,
 					Namespace: o.PolicyConfigMapNamespace,
 				},
 			},
 		}
 	case len(o.AlgorithmProvider) > 0:
-		cfg.AlgorithmSource = componentconfig.SchedulerAlgorithmSource{
+		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
 			Provider: &o.AlgorithmProvider,
 		}
 	}

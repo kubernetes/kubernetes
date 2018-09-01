@@ -18,10 +18,11 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/configuration:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/metrics:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/util:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )

@@ -264,6 +264,12 @@ func (hm *hostportManager) openHostports(podPortMapping *PodPortMapping) (map[ho
 		if pm.HostPort <= 0 {
 			continue
 		}
+
+		// We do not open host ports for SCTP ports, as we agreed in the Support of SCTP KEP
+		if pm.Protocol == v1.ProtocolSCTP {
+			continue
+		}
+
 		hp := portMappingToHostport(pm)
 		socket, err := hm.portOpener(&hp)
 		if err != nil {

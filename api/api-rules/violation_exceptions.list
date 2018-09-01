@@ -93,6 +93,8 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleForbiddenWindow
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUseRESTClients
+API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerCPUInitializationPeriod
+API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerInitialReadinessDelay
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,JobControllerConfiguration,ConcurrentJobSyncs
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,KubeCloudSharedConfiguration,Port
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,KubeCloudSharedConfiguration,Address
@@ -165,10 +167,8 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,VolumeConfiguration,EnableDynamicProvisioning
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,VolumeConfiguration,PersistentVolumeRecyclerConfiguration
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,VolumeConfiguration,FlexVolumePluginDir
-API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1,KubeletConfiguration,ResolverConfig
-API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
-API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1,KubeletConfiguration,IPTablesDropBit
-API rule violation: names_match,k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1,ClientConnectionConfiguration,KubeConfigFile
-API rule violation: names_match,k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1,KubeProxyConfiguration,IPTables
+API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1,KubeletConfiguration,ResolverConfig
+API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
+API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/metrics/pkg/apis/custom_metrics/v1beta1,MetricValue,WindowSeconds
 API rule violation: names_match,k8s.io/metrics/pkg/apis/external_metrics/v1beta1,ExternalMetricValue,WindowSeconds

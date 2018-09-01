@@ -456,26 +456,35 @@ function wait-for-hollow-nodes-to-run-or-timeout {
 
 ############################### Main Function ########################################
 detect-project &> /dev/null
+find-release-tars
+
+# We need master IP to generate PKI and kubeconfig for cluster.
+get-or-create-master-ip
+generate-pki-config
+write-local-kubeconfig
 
 # Setup for master.
-echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
-find-release-tars
-create-master-environment-file
-create-master-instance-with-resources
-generate-pki-config
-wait-for-master-reachability
-write-pki-config-to-master
-write-local-kubeconfig
-copy-resource-files-to-master
-start-master-components
+function start-master {
+  echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
+  create-master-environment-file
+  create-master-instance-with-resources
+  wait-for-master-reachability
+  write-pki-config-to-master
+  copy-resource-files-to-master
+  start-master-components
+}
+start-master &
 
 # Setup for hollow-nodes.
-echo ""
-echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
-create-and-upload-hollow-node-image
-create-kube-hollow-node-resources
-wait-for-hollow-nodes-to-run-or-timeout
+function start-hollow-nodes {
+  echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
+  create-and-upload-hollow-node-image
+  create-kube-hollow-node-resources
+  wait-for-hollow-nodes-to-run-or-timeout
+}
+start-hollow-nodes &
 
+wait
 echo ""
 echo "Master IP: ${MASTER_IP}"
 echo "Password to kubemark master: ${KUBE_PASSWORD}"

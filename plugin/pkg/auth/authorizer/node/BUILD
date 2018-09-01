@@ -41,6 +41,7 @@ go_library(
     deps = [
         "//pkg/api/v1/persistentvolume:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",

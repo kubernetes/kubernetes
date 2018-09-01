@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -49,6 +50,7 @@ import (
 type fakeVolumeHost struct {
 	rootDir    string
 	kubeClient clientset.Interface
+	csiClient  csiclientset.Interface
 	pluginMgr  VolumePluginMgr
 	cloud      cloudprovider.Interface
 	mounter    mount.Interface
@@ -111,6 +113,10 @@ func (f *fakeVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) st
 
 func (f *fakeVolumeHost) GetKubeClient() clientset.Interface {
 	return f.kubeClient
+}
+
+func (f *fakeVolumeHost) GetCSIClient() csiclientset.Interface {
+	return f.csiClient
 }
 
 func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {

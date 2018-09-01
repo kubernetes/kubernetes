@@ -68,6 +68,8 @@ func newProxySocket(protocol v1.Protocol, ip net.IP, port int) (ProxySocket, err
 			return nil, err
 		}
 		return &udpProxySocket{UDPConn: conn, port: port}, nil
+	case "SCTP":
+		return nil, fmt.Errorf("SCTP is not supported for user space proxy")
 	}
 	return nil, fmt.Errorf("unknown protocol %q", protocol)
 }

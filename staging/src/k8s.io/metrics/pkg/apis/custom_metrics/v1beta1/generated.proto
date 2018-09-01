@@ -49,6 +49,13 @@ message MetricValue {
 
   // the value of the metric for this
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 5;
+
+  // selector represents the label selector that could be used to select
+  // this metric, and will generally just be the selector passed in to
+  // the query used to fetch this metric.
+  // When left blank, only the metric's Name will be used to gather metrics.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 6;
 }
 
 // a list of values for a given metric for some set of objects

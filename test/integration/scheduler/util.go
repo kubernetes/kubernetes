@@ -679,3 +679,15 @@ func cleanupPodsInNamespace(cs clientset.Interface, t *testing.T, ns string) {
 		t.Errorf("error while waiting for pods in namespace %v: %v", ns, err)
 	}
 }
+
+func waitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
+	schedulerCacheIsEmpty := func() (bool, error) {
+		snapshot := sched.Cache().Snapshot()
+
+		return len(snapshot.Nodes) == 0 && len(snapshot.AssumedPods) == 0, nil
+	}
+
+	if err := wait.Poll(time.Second, wait.ForeverTestTimeout, schedulerCacheIsEmpty); err != nil {
+		t.Errorf("Failed to wait for scheduler cache cleanup: %v", err)
+	}
+}

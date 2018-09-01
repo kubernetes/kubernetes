@@ -44,6 +44,9 @@ type InitConfiguration struct {
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
+
+	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
+	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -52,15 +55,27 @@ type InitConfiguration struct {
 type ClusterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// API holds configuration for the k8s apiserver.
-	API API `json:"api"`
 	// Etcd holds configuration for etcd.
 	Etcd Etcd `json:"etcd"`
+
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking `json:"networking"`
 
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
+
+	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
+	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
+	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
+	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
+	// the BindPort is used.
+	// Possible usages are:
+	// e.g. In an cluster with more than one control plane instances, this field should be
+	// assigned the address of the external load balancer in front of the
+	// control plane instances.
+	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
+	// could be used for assigning a stable DNS to the control plane.
+	ControlPlaneEndpoint string `json:"controlPlaneEndpoint"`
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -107,22 +122,23 @@ type ClusterConfiguration struct {
 	ClusterName string `json:"clusterName,omitempty"`
 }
 
-// API struct contains elements of API server address.
-type API struct {
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
+// ConfigMap in the cluster, and then updated by kubeadm when additional control plane instance joins or leaves the cluster.
+type ClusterStatus struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// APIEndpoints currently available in the cluster, one for each control plane/api server instance.
+	// The key of the map is the IP of the host's default interface
+	APIEndpoints map[string]APIEndpoint `json:"apiEndpoints"`
+}
+
+// APIEndpoint struct contains elements of API server instance deployed on a node.
+type APIEndpoint struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string `json:"advertiseAddress"`
-	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
-	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
-	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
-	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
-	// the BindPort is used.
-	// Possible usages are:
-	// e.g. In an cluster with more than one control plane instances, this field should be
-	// assigned the address of the external load balancer in front of the
-	// control plane instances.
-	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
-	// could be used for assigning a stable DNS to the control plane.
-	ControlPlaneEndpoint string `json:"controlPlaneEndpoint"`
+
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
 	BindPort int32 `json:"bindPort"`
@@ -284,9 +300,8 @@ type JoinConfiguration struct {
 	// control plane instance.
 	ControlPlane bool `json:"controlPlane,omitempty"`
 
-	// AdvertiseAddress sets the IP address for the API server to advertise; the
-	// API server will be installed only on nodes hosting an additional control plane instance.
-	AdvertiseAddress string `json:"advertiseAddress,omitempty"`
+	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
+	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`

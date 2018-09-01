@@ -164,8 +164,8 @@ func getAllAPIObjectNames() []string {
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
 	return configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.InitConfiguration{
 		// TODO: Probably move to getDefaultedClusterConfig?
+		APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
-			API:               kubeadmapiv1alpha3.API{AdvertiseAddress: "1.2.3.4"},
 			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		},
 		BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{sillyToken},
@@ -434,7 +434,7 @@ func NewCmdConfigImagesPull() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 			containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), internalcfg.GetCRISocket())
 			kubeadmutil.CheckErr(err)
-			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(internalcfg))
+			imagesPull := NewImagesPull(containerRuntime, images.GetAllImages(&internalcfg.ClusterConfiguration))
 			kubeadmutil.CheckErr(imagesPull.PullAll())
 		},
 	}
@@ -516,7 +516,7 @@ type ImagesList struct {
 
 // Run runs the images command and writes the result to the io.Writer passed in
 func (i *ImagesList) Run(out io.Writer) error {
-	imgs := images.GetAllImages(i.cfg)
+	imgs := images.GetAllImages(&i.cfg.ClusterConfiguration)
 	for _, img := range imgs {
 		fmt.Fprintln(out, img)
 	}

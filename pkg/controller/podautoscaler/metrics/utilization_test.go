@@ -67,7 +67,7 @@ func (tc *metricUtilizationRatioTestCase) runTest(t *testing.T) {
 func TestGetResourceUtilizationRatioBaseCase(t *testing.T) {
 	tc := resourceUtilizationRatioTestCase{
 		metrics: PodMetricsInfo{
-			"test-pod-0": 50, "test-pod-1": 76,
+			"test-pod-0": {Value: 50}, "test-pod-1": {Value: 76},
 		},
 		requests: map[string]int64{
 			"test-pod-0": 100, "test-pod-1": 100,
@@ -85,7 +85,7 @@ func TestGetResourceUtilizationRatioBaseCase(t *testing.T) {
 func TestGetResourceUtilizationRatioIgnorePodsWithNoRequest(t *testing.T) {
 	tc := resourceUtilizationRatioTestCase{
 		metrics: PodMetricsInfo{
-			"test-pod-0": 50, "test-pod-1": 76, "test-pod-no-request": 100,
+			"test-pod-0": {Value: 50}, "test-pod-1": {Value: 76}, "test-pod-no-request": {Value: 100},
 		},
 		requests: map[string]int64{
 			"test-pod-0": 100, "test-pod-1": 100,
@@ -103,7 +103,7 @@ func TestGetResourceUtilizationRatioIgnorePodsWithNoRequest(t *testing.T) {
 func TestGetResourceUtilizationRatioExtraRequest(t *testing.T) {
 	tc := resourceUtilizationRatioTestCase{
 		metrics: PodMetricsInfo{
-			"test-pod-0": 50, "test-pod-1": 76,
+			"test-pod-0": {Value: 50}, "test-pod-1": {Value: 76},
 		},
 		requests: map[string]int64{
 			"test-pod-0": 100, "test-pod-1": 100, "test-pod-extra-request": 500,
@@ -121,7 +121,7 @@ func TestGetResourceUtilizationRatioExtraRequest(t *testing.T) {
 func TestGetResourceUtilizationRatioNoRequests(t *testing.T) {
 	tc := resourceUtilizationRatioTestCase{
 		metrics: PodMetricsInfo{
-			"test-pod-0": 50, "test-pod-1": 76,
+			"test-pod-0": {Value: 50}, "test-pod-1": {Value: 76},
 		},
 		requests:          map[string]int64{},
 		targetUtilization: 50,
@@ -138,7 +138,7 @@ func TestGetResourceUtilizationRatioNoRequests(t *testing.T) {
 func TestGetMetricUtilizationRatioBaseCase(t *testing.T) {
 	tc := metricUtilizationRatioTestCase{
 		metrics: PodMetricsInfo{
-			"test-pod-0": 5000, "test-pod-1": 10000,
+			"test-pod-0": {Value: 5000}, "test-pod-1": {Value: 10000},
 		},
 		targetUtilization:          10000,
 		expectedUtilizationRatio:   .75,

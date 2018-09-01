@@ -1336,7 +1336,7 @@ func (c *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 	return extractNodeAddresses(instance)
 }
 
-// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
@@ -1360,8 +1360,8 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	}
 
 	state := instances[0].State.Name
-	if *state != "running" {
-		glog.Warningf("the instance %s is not running", instanceID)
+	if *state == ec2.InstanceStateNameTerminated {
+		glog.Warningf("the instance %s is terminated", instanceID)
 		return false, nil
 	}
 
@@ -1370,7 +1370,36 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	instanceID, err := kubernetesInstanceID(providerID).mapToAWSInstanceID()
+	if err != nil {
+		return false, err
+	}
+
+	request := &ec2.DescribeInstancesInput{
+		InstanceIds: []*string{instanceID.awsString()},
+	}
+
+	instances, err := c.ec2.DescribeInstances(request)
+	if err != nil {
+		return false, err
+	}
+	if len(instances) == 0 {
+		glog.Warningf("the instance %s does not exist anymore", providerID)
+		return true, nil
+	}
+	if len(instances) > 1 {
+		return false, fmt.Errorf("multiple instances found for instance: %s", instanceID)
+	}
+
+	instance := instances[0]
+	if instance.State != nil {
+		state := aws.StringValue(instance.State.Name)
+		// valid state for detaching volumes
+		if state == ec2.InstanceStateNameStopped || state == ec2.InstanceStateNameTerminated {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified nodeName.
@@ -4291,13 +4320,22 @@ func mapInstanceToNodeName(i *ec2.Instance) types.NodeName {
 	return types.NodeName(aws.StringValue(i.PrivateDnsName))
 }
 
+var aliveFilter = []string{
+	ec2.InstanceStateNamePending,
+	ec2.InstanceStateNameRunning,
+	ec2.InstanceStateNameShuttingDown,
+	ec2.InstanceStateNameStopping,
+	ec2.InstanceStateNameStopped,
+}
+
 // Returns the instance with the specified node name
 // Returns nil if it does not exist
 func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
 	privateDNSName := mapNodeNameToPrivateDNSName(nodeName)
 	filters := []*ec2.Filter{
 		newEc2Filter("private-dns-name", privateDNSName),
-		newEc2Filter("instance-state-name", "running"),
+		// exclude instances in "terminated" state
+		newEc2Filter("instance-state-name", aliveFilter...),
 	}
 
 	instances, err := c.describeInstances(filters)

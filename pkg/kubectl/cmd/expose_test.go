@@ -425,6 +425,11 @@ func TestRunExposeService(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       8082,
+							TargetPort: intstr.FromInt(8082),
+						},
 					},
 				},
 			},
@@ -451,11 +456,143 @@ func TestRunExposeService(t *testing.T) {
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
 						},
+						{
+							Name:       "port-4",
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       8082,
+							TargetPort: intstr.FromInt(8082),
+						},
 					},
 					Selector: map[string]string{"svc": "fromfoo"},
 				},
 			},
 			status: 200,
+		},
+		{
+			name: "expose-service-from-service-no-selector-defined-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			expected: "service/foo exposed",
+			status:   200,
+		},
+		{
+			name: "expose-service-from-service-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector: map[string]string{"func": "stream"},
+				},
+			},
+			expected: "service/foo exposed",
+			status:   200,
+		},
+		{
+			name: "expose-service-cluster-ip-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "true"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector:  map[string]string{"func": "stream"},
+					ClusterIP: "10.10.10.10",
+				},
+			},
+			expected: "service /foo exposed",
+			status:   200,
+		},
+		{
+			name: "expose-headless-service-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector:  map[string]string{"func": "stream"},
+					ClusterIP: corev1.ClusterIPNone,
+				},
+			},
+			expected: "service/foo exposed",
+			status:   200,
 		},
 	}
 

@@ -131,7 +131,7 @@ type Validator interface {
 	// Validate validates a token and returns user information or an error.
 	// Validator can assume that the issuer and signature of a token are already
 	// verified when this function is called.
-	Validate(tokenData string, public *jwt.Claims, private interface{}) (namespace, name, uid string, err error)
+	Validate(tokenData string, public *jwt.Claims, private interface{}) (*ServiceAccountInfo, error)
 	// NewPrivateClaims returns a struct that the authenticator should
 	// deserialize the JWT payload into. The authenticator may then pass this
 	// struct back to the Validator as the 'private' argument to a Validate()
@@ -172,12 +172,12 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(tokenData string) (user.Info, 
 
 	// If we get here, we have a token with a recognized signature and
 	// issuer string.
-	ns, name, uid, err := j.validator.Validate(tokenData, public, private)
+	sa, err := j.validator.Validate(tokenData, public, private)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return UserInfo(ns, name, uid), true, nil
+	return sa.UserInfo(), true, nil
 }
 
 // hasCorrectIssuer returns true if tokenData is a valid JWT in compact

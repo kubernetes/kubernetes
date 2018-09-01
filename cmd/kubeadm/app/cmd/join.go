@@ -72,7 +72,7 @@ var (
 		{{.Error}}
 
 		Please ensure that:
-		* The cluster has a stable api.controlPlaneEndpoint address.
+		* The cluster has a stable controlPlaneEndpoint address.
 		* The cluster uses an external etcd.
 		* The certificates that must be shared among control plane instances are provided.
 
@@ -235,8 +235,12 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfi
 		&cfg.ControlPlane, "experimental-control-plane", cfg.ControlPlane,
 		"Create a new control plane instance on this node")
 	flagSet.StringVar(
-		&cfg.AdvertiseAddress, "apiserver-advertise-address", cfg.AdvertiseAddress,
+		&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress,
 		"If the node should host a new control plane instance, the IP address the API Server will advertise it's listening on.",
+	)
+	flagSet.Int32Var(
+		&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort,
+		"If the node should host a new control plane instance, the port for the API Server to bind to.",
 	)
 }
 
@@ -265,7 +269,7 @@ func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha3.JoinC
 		glog.V(1).Infoln("[join] found NodeName empty; using OS hostname as NodeName")
 	}
 
-	if defaultcfg.AdvertiseAddress == "" {
+	if defaultcfg.APIEndpoint.AdvertiseAddress == "" {
 		glog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
 	}
 
@@ -306,7 +310,7 @@ func (j *Join) Run(out io.Writer) error {
 
 		// injects into the kubeadm configuration used for init the information about the joining node
 		clusterConfiguration.NodeRegistration = j.cfg.NodeRegistration
-		clusterConfiguration.API.AdvertiseAddress = j.cfg.AdvertiseAddress
+		clusterConfiguration.APIEndpoint.AdvertiseAddress = j.cfg.APIEndpoint.AdvertiseAddress
 
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
@@ -388,8 +392,8 @@ func (j *Join) FetchInitClusterConfiguration(tlsBootstrapCfg *clientcmdapi.Confi
 // joining an additional control plane instance and if the node is ready to join
 func (j *Join) CheckIfReadyForAdditionalControlPlane(clusterConfiguration *kubeadmapi.InitConfiguration) error {
 	// blocks if the cluster was created without a stable control plane endpoint
-	if clusterConfiguration.API.ControlPlaneEndpoint == "" {
-		return fmt.Errorf("unable to add a new control plane instance a cluster that doesn't have a stable api.controlPlaneEndpoint address")
+	if clusterConfiguration.ControlPlaneEndpoint == "" {
+		return fmt.Errorf("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
 	// blocks if the cluster was created without an external etcd cluster

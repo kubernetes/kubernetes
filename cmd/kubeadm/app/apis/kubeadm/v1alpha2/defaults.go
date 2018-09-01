@@ -22,11 +22,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -47,8 +47,6 @@ const (
 	DefaultImageRepository = "k8s.gcr.io"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
-	// DefaultCRISocket defines the default cri socket
-	DefaultCRISocket = "/var/run/dockershim.sock"
 	// DefaultClusterName defines the default cluster name
 	DefaultClusterName = "kubernetes"
 
@@ -136,8 +134,8 @@ func SetDefaults_ProxyConfiguration(obj *InitConfiguration) {
 		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet
 	}
 
-	if obj.KubeProxy.Config.ClientConnection.KubeConfigFile == "" {
-		obj.KubeProxy.Config.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
+	if obj.KubeProxy.Config.ClientConnection.Kubeconfig == "" {
+		obj.KubeProxy.Config.ClientConnection.Kubeconfig = KubeproxyKubeConfigFileName
 	}
 
 	kubeproxyscheme.Scheme.Default(obj.KubeProxy.Config)
@@ -168,6 +166,10 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	}
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
+	}
+
+	if obj.BindPort == 0 {
+		obj.BindPort = DefaultAPIBindPort
 	}
 
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)

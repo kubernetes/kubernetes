@@ -34,7 +34,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&KubeControllerManagerConfiguration{}, func(obj interface{}) {
 		SetObjectDefaults_KubeControllerManagerConfiguration(obj.(*KubeControllerManagerConfiguration))
 	})
-	scheme.AddTypeDefaultingFunc(&KubeSchedulerConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeSchedulerConfiguration(obj.(*KubeSchedulerConfiguration)) })
 	return nil
 }
 
@@ -50,8 +49,4 @@ func SetObjectDefaults_KubeControllerManagerConfiguration(in *KubeControllerMana
 	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 	SetDefaults_VolumeConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration)
 	SetDefaults_PersistentVolumeRecyclerConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration.PersistentVolumeRecyclerConfiguration)
-}
-
-func SetObjectDefaults_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration) {
-	SetDefaults_KubeSchedulerConfiguration(in)
 }

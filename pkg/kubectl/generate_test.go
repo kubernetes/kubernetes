@@ -366,10 +366,12 @@ func TestMakeParseProtocols(t *testing.T) {
 			protocols: map[string]string{
 				"102": "UDP",
 				"101": "TCP",
+				"103": "SCTP",
 			},
 			expected: map[string]string{
 				"102": "UDP",
 				"101": "TCP",
+				"103": "SCTP",
 			},
 		},
 	}

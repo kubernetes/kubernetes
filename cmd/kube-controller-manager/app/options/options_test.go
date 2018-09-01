@@ -34,9 +34,11 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
-	f := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	s, _ := NewKubeControllerManagerOptions()
-	s.AddFlags(f, []string{""}, []string{""})
+	for _, f := range s.Flags([]string{""}, []string{""}).FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	args := []string{
 		"--address=192.168.4.10",
@@ -73,6 +75,8 @@ func TestAddFlags(t *testing.T) {
 		"--horizontal-pod-autoscaler-downscale-delay=2m",
 		"--horizontal-pod-autoscaler-sync-period=45s",
 		"--horizontal-pod-autoscaler-upscale-delay=1m",
+		"--horizontal-pod-autoscaler-cpu-initialization-period=90s",
+		"--horizontal-pod-autoscaler-initial-readiness-delay=50s",
 		"--http2-max-streams-per-connection=47",
 		"--kube-api-burst=100",
 		"--kube-api-content-type=application/json",
@@ -111,7 +115,7 @@ func TestAddFlags(t *testing.T) {
 		"--bind-address=192.168.4.21",
 		"--secure-port=10001",
 	}
-	f.Parse(args)
+	fs.Parse(args)
 	// Sort GCIgnoredResources because it's built from a map, which means the
 	// insertion order is random.
 	sort.Sort(sortedGCIgnoredResources(s.GarbageCollectorController.GCIgnoredResources))
@@ -185,6 +189,8 @@ func TestAddFlags(t *testing.T) {
 			HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 45 * time.Second},
 			HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 1 * time.Minute},
 			HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
+			HorizontalPodAutoscalerCPUInitializationPeriod:  metav1.Duration{Duration: 90 * time.Second},
+			HorizontalPodAutoscalerInitialReadinessDelay:    metav1.Duration{Duration: 50 * time.Second},
 			HorizontalPodAutoscalerTolerance:                0.1,
 			HorizontalPodAutoscalerUseRESTClients:           true,
 		},
@@ -244,7 +250,7 @@ func TestAddFlags(t *testing.T) {
 			ConcurrentServiceSyncs: 2,
 		},
 		Controllers: []string{"foo", "bar"},
-		SecureServing: &apiserveroptions.SecureServingOptions{
+		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
 			BindAddress: net.ParseIP("192.168.4.21"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -252,11 +258,27 @@ func TestAddFlags(t *testing.T) {
 				PairName:      "kube-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 47,
-		},
-		InsecureServing: &apiserveroptions.DeprecatedInsecureServingOptions{
+		}).WithLoopback(),
+		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("192.168.4.10"),
 			BindPort:    int(10000),
 			BindNetwork: "tcp",
+		}).WithLoopback(),
+		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
+			CacheTTL:   10 * time.Second,
+			ClientCert: apiserveroptions.ClientCertAuthenticationOptions{},
+			RequestHeader: apiserveroptions.RequestHeaderAuthenticationOptions{
+				UsernameHeaders:     []string{"x-remote-user"},
+				GroupHeaders:        []string{"x-remote-group"},
+				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			},
+			RemoteKubeConfigFileOptional: true,
+		},
+		Authorization: &apiserveroptions.DelegatingAuthorizationOptions{
+			AllowCacheTTL:                10 * time.Second,
+			DenyCacheTTL:                 10 * time.Second,
+			RemoteKubeConfigFileOptional: true,
+			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 		},
 		Kubeconfig: "/kubeconfig",
 		Master:     "192.168.4.20",

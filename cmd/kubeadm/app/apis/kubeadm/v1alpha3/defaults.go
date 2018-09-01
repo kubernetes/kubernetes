@@ -42,8 +42,6 @@ const (
 	DefaultImageRepository = "k8s.gcr.io"
 	// DefaultManifestsDir defines default manifests directory
 	DefaultManifestsDir = "/etc/kubernetes/manifests"
-	// DefaultCRISocket defines the default cri socket
-	DefaultCRISocket = "/var/run/dockershim.sock"
 	// DefaultClusterName defines the default cluster name
 	DefaultClusterName = "kubernetes"
 
@@ -72,16 +70,13 @@ func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_BootstrapTokens(obj)
+	SetDefaults_APIEndpoint(&obj.APIEndpoint)
 }
 
 // SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
 func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = DefaultKubernetesVersion
-	}
-
-	if obj.API.BindPort == 0 {
-		obj.API.BindPort = DefaultAPIBindPort
 	}
 
 	if obj.Networking.ServiceSubnet == "" {
@@ -148,6 +143,7 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	}
 
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
+	SetDefaults_APIEndpoint(&obj.APIEndpoint)
 }
 
 func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
@@ -195,5 +191,12 @@ func SetDefaults_BootstrapToken(bt *BootstrapToken) {
 
 	if len(bt.Groups) == 0 {
 		bt.Groups = constants.DefaultTokenGroups
+	}
+}
+
+// SetDefaults_APIEndpoint sets the defaults for the API server instance deployed on a node.
+func SetDefaults_APIEndpoint(obj *APIEndpoint) {
+	if obj.BindPort == 0 {
+		obj.BindPort = DefaultAPIBindPort
 	}
 }

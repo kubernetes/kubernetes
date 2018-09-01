@@ -37,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	"k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -108,6 +109,9 @@ func (s *serviceStorage) New() runtime.Object {
 }
 
 func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	if dryrun.IsDryRun(options.DryRun) {
+		return obj, s.Err
+	}
 	svc := obj.(*api.Service)
 	s.CreatedID = obj.(metav1.Object).GetName()
 	s.Service = svc.DeepCopy()
@@ -121,17 +125,21 @@ func (s *serviceStorage) Create(ctx context.Context, obj runtime.Object, createV
 }
 
 func (s *serviceStorage) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	s.UpdatedID = name
 	obj, err := objInfo.UpdatedObject(ctx, s.OldService)
 	if err != nil {
 		return nil, false, err
 	}
-	s.Service = obj.(*api.Service)
-	return s.Service, s.Created, s.Err
+	if !dryrun.IsDryRun(options.DryRun) {
+		s.UpdatedID = name
+		s.Service = obj.(*api.Service)
+	}
+	return obj, s.Created, s.Err
 }
 
 func (s *serviceStorage) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	s.DeletedID = name
+	if !dryrun.IsDryRun(options.DryRun) {
+		s.DeletedID = name
+	}
 	return s.Service, s.DeletedImmediately, s.Err
 }
 
@@ -276,6 +284,154 @@ func TestServiceRegistryCreate(t *testing.T) {
 	}
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.Name)
+	}
+}
+
+func TestServiceRegistryCreateDryRun(t *testing.T) {
+	storage, registry, server := NewTestREST(t, nil)
+	defer server.Terminate(t)
+
+	// Test dry run create request with cluster ip
+	svc := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeClusterIP,
+			ClusterIP:       "1.2.3.4",
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}
+	ctx := genericapirequest.NewDefaultContext()
+	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if storage.serviceIPs.Has(net.ParseIP("1.2.3.4")) {
+		t.Errorf("unexpected side effect: ip allocated")
+	}
+	srv, err := registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if srv != nil {
+		t.Errorf("unexpected service found: %v", srv)
+	}
+
+	// Test dry run create request with a node port
+	svc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{
+				NodePort:   30010,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}
+	_, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if storage.serviceNodePorts.Has(30010) {
+		t.Errorf("unexpected side effect: NodePort allocated")
+	}
+	srv, err = registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if srv != nil {
+		t.Errorf("unexpected service found: %v", srv)
+	}
+
+	// Test dry run create request with multi node port
+	svc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{
+				{
+					Name:       "port-tcp",
+					Port:       53,
+					NodePort:   30053,
+					TargetPort: intstr.FromInt(6503),
+					Protocol:   api.ProtocolTCP,
+				},
+				{
+					Name:       "port-udp",
+					Port:       53,
+					NodePort:   30053,
+					TargetPort: intstr.FromInt(6503),
+					Protocol:   api.ProtocolUDP,
+				},
+			},
+		},
+	}
+	expectNodePorts := collectServiceNodePorts(svc)
+	created_svc, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	created_service := created_svc.(*api.Service)
+	serviceNodePorts := collectServiceNodePorts(created_service)
+	if !reflect.DeepEqual(serviceNodePorts, expectNodePorts) {
+		t.Errorf("Expected %v, but got %v", expectNodePorts, serviceNodePorts)
+	}
+	if storage.serviceNodePorts.Has(30053) {
+		t.Errorf("unexpected side effect: NodePort allocated")
+	}
+	srv, err = registry.GetService(ctx, svc.Name, &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if srv != nil {
+		t.Errorf("unexpected service found: %v", srv)
+	}
+
+	// Test dry run create request with multiple unspecified node ports,
+	// so PortAllocationOperation.AllocateNext() will be called multiple times.
+	svc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{
+				{
+					Name:       "port-a",
+					Port:       53,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6503),
+				},
+				{
+					Name:       "port-b",
+					Port:       54,
+					Protocol:   api.ProtocolTCP,
+					TargetPort: intstr.FromInt(6504),
+				},
+			},
+		},
+	}
+	created_svc, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	created_service = created_svc.(*api.Service)
+	serviceNodePorts = collectServiceNodePorts(created_service)
+	if len(serviceNodePorts) != 2 {
+		t.Errorf("Expected service to have 2 ports, but got %v", serviceNodePorts)
+	} else if serviceNodePorts[0] == serviceNodePorts[1] {
+		t.Errorf("Expected unique port numbers, but got %v", serviceNodePorts)
 	}
 }
 
@@ -515,6 +671,171 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	}
 }
 
+func TestServiceRegistryUpdateDryRun(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	storage, registry, server := NewTestREST(t, nil)
+	defer server.Terminate(t)
+
+	obj, err := registry.Create(ctx, &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeExternalName,
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	svc := obj.(*api.Service)
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+
+	// Test dry run update request external name to node port
+	updated_svc, created, err := storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            svc.Name,
+			ResourceVersion: svc.ResourceVersion},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{
+				NodePort:   30020,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	if updated_svc == nil {
+		t.Errorf("Expected non-nil object")
+	}
+	if created {
+		t.Errorf("expected not created")
+	}
+	if storage.serviceNodePorts.Has(30020) {
+		t.Errorf("unexpected side effect: NodePort allocated")
+	}
+	if e, a := "", registry.UpdatedID; e != a {
+		t.Errorf("Expected %q, but got %q", e, a)
+	}
+
+	// Test dry run update request external name to cluster ip
+	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            svc.Name,
+			ResourceVersion: svc.ResourceVersion},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeClusterIP,
+			ClusterIP:       "1.2.3.4",
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	if storage.serviceIPs.Has(net.ParseIP("1.2.3.4")) {
+		t.Errorf("unexpected side effect: ip allocated")
+	}
+
+	// Test dry run update request remove node port
+	obj, err = storage.Create(ctx, &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo2", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{
+				NodePort:   30020,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	svc = obj.(*api.Service)
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            svc.Name,
+			ResourceVersion: svc.ResourceVersion},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeExternalName,
+			ExternalName:    "foo-svc",
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	if !storage.serviceNodePorts.Has(30020) {
+		t.Errorf("unexpected side effect: NodePort unallocated")
+	}
+
+	// Test dry run update request remove cluster ip
+	obj, err = storage.Create(ctx, &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo3", ResourceVersion: "1", Namespace: metav1.NamespaceDefault},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeClusterIP,
+			ClusterIP:       "1.2.3.4",
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	svc = obj.(*api.Service)
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	_, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(&api.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            svc.Name,
+			ResourceVersion: svc.ResourceVersion},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeExternalName,
+			ExternalName:    "foo-svc",
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	if !storage.serviceIPs.Has(net.ParseIP("1.2.3.4")) {
+		t.Errorf("unexpected side effect: ip unallocated")
+	}
+}
+
 func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	storage, registry, server := NewTestREST(t, nil)
@@ -627,6 +948,72 @@ func TestServiceRegistryDelete(t *testing.T) {
 	storage.Delete(ctx, svc.Name, &metav1.DeleteOptions{})
 	if e, a := "foo", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
+	}
+}
+
+func TestServiceRegistryDeleteDryRun(t *testing.T) {
+	ctx := genericapirequest.NewDefaultContext()
+	storage, registry, server := NewTestREST(t, nil)
+	defer server.Terminate(t)
+
+	// Test dry run delete request with cluster ip
+	svc := &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeClusterIP,
+			ClusterIP:       "1.2.3.4",
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}
+	_, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	_, _, err = storage.Delete(ctx, svc.Name, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	if e, a := "", registry.DeletedID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if !storage.serviceIPs.Has(net.ParseIP("1.2.3.4")) {
+		t.Errorf("unexpected side effect: ip unallocated")
+	}
+
+	// Test dry run delete request with node port
+	svc = &api.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo2"},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{
+				NodePort:   30030,
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}
+	_, err = storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	_, _, err = storage.Delete(ctx, svc.Name, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
+	if e, a := "", registry.DeletedID; e != a {
+		t.Errorf("Expected %v, but got %v", e, a)
+	}
+	if !storage.serviceNodePorts.Has(30030) {
+		t.Errorf("unexpected side effect: NodePort unallocated")
 	}
 }
 
@@ -1436,7 +1823,7 @@ func TestInitClusterIP(t *testing.T) {
 func TestInitNodePorts(t *testing.T) {
 	storage, _, server := NewTestREST(t, nil)
 	defer server.Terminate(t)
-	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts)
+	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
 	defer nodePortOp.Finish()
 
 	testCases := []struct {
@@ -1618,7 +2005,7 @@ func TestInitNodePorts(t *testing.T) {
 func TestUpdateNodePorts(t *testing.T) {
 	storage, _, server := NewTestREST(t, nil)
 	defer server.Terminate(t)
-	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts)
+	nodePortOp := portallocator.StartOperation(storage.serviceNodePorts, false)
 	defer nodePortOp.Finish()
 
 	testCases := []struct {

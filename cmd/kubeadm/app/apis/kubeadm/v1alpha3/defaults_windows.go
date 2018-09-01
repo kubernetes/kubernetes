@@ -18,8 +18,11 @@ limitations under the License.
 
 package v1alpha3
 
-// DefaultCACertPath defines default location of CA certificate on Windows
-const DefaultCACertPath = "C:/etc/kubernetes/pki/ca.crt"
-
-// DefaultSocketUrlScheme defines default socket url prefix
-const DefaultUrlScheme = "tcp"
+const (
+	// DefaultCACertPath defines default location of CA certificate on Windows
+	DefaultCACertPath = "C:/etc/kubernetes/pki/ca.crt"
+	// DefaultSocketUrlScheme defines default socket url prefix
+	DefaultUrlScheme = "tcp"
+	// DefaultCRISocket defines the default cri socket
+	DefaultCRISocket = "tcp://localhost:2375"
+)

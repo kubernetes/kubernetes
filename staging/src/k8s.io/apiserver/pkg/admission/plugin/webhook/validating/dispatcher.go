@@ -29,17 +29,18 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
+	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 type validatingDispatcher struct {
-	cm *config.ClientManager
+	cm *webhook.ClientManager
 }
 
-func newValidatingDispatcher(cm *config.ClientManager) generic.Dispatcher {
+func newValidatingDispatcher(cm *webhook.ClientManager) generic.Dispatcher {
 	return &validatingDispatcher{cm}
 }
 
@@ -61,7 +62,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 			}
 
 			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
-			if callErr, ok := err.(*webhookerrors.ErrCallingWebhook); ok {
+			if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 					utilruntime.HandleError(callErr)
@@ -99,7 +100,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
 	if attr.IsDryRun() {
 		if h.SideEffects == nil {
-			return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
+			return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
 		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
 			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
@@ -108,17 +109,17 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook,
 
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr)
-	client, err := d.cm.HookClient(h)
+	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(h))
 	if err != nil {
-		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1beta1.AdmissionReview{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
-		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
 	if response.Response == nil {
-		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
 	}
 	for k, v := range response.Response.AuditAnnotations {
 		key := h.Name + "/" + k

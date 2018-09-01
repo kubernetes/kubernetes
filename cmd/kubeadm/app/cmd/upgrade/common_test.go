@@ -43,15 +43,12 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
-	api:
-	  advertiseAddress: ""
-	  bindPort: 0
-	  controlPlaneEndpoint: ""
 	apiVersion: kubeadm.k8s.io/v1alpha3
 	auditPolicy:
 	  logDir: ""
 	  path: ""
 	certificatesDir: ""
+	controlPlaneEndpoint: ""
 	etcd:
 	  local:
 	    dataDir: /some/path
@@ -79,15 +76,12 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
-	api:
-	  advertiseAddress: ""
-	  bindPort: 0
-	  controlPlaneEndpoint: ""
 	apiVersion: kubeadm.k8s.io/v1alpha3
 	auditPolicy:
 	  logDir: ""
 	  path: ""
 	certificatesDir: ""
+	controlPlaneEndpoint: ""
 	etcd:
 	  external:
 	    caFile: ""

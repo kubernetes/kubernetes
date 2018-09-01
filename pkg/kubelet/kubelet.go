@@ -53,11 +53,12 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
@@ -79,6 +80,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
+	"k8s.io/kubernetes/pkg/kubelet/nodelease"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
@@ -239,10 +241,10 @@ type Dependencies struct {
 	ContainerManager        cm.ContainerManager
 	DockerClientConfig      *dockershim.ClientConfig
 	EventClient             v1core.EventsGetter
-	HeartbeatClient         v1core.CoreV1Interface
+	HeartbeatClient         clientset.Interface
 	OnHeartbeatFailure      func()
 	KubeClient              clientset.Interface
-	ExternalKubeClient      clientset.Interface
+	CSIClient               csiclientset.Interface
 	Mounter                 mount.Interface
 	OOMAdjuster             *oom.OOMAdjuster
 	OSInterface             kubecontainer.OSInterface
@@ -481,8 +483,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet := &Kubelet{
 		hostname:                       hostname,
+		hostnameOverridden:             len(hostnameOverride) > 0,
 		nodeName:                       nodeName,
 		kubeClient:                     kubeDeps.KubeClient,
+		csiClient:                      kubeDeps.CSIClient,
 		heartbeatClient:                kubeDeps.HeartbeatClient,
 		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
 		rootDirectory:                  rootDirectory,
@@ -756,6 +760,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
+		glog.Warning("Mount propagation feature gate has been deprecated and will be removed in the next release")
+	}
+
 	klet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(klet, secretManager, configMapManager, tokenManager, kubeDeps.VolumePlugins, kubeDeps.DynamicPluginProber)
 	if err != nil {
@@ -843,6 +851,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.appArmorValidator = apparmor.NewValidator(containerRuntime)
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewNoNewPrivsAdmitHandler(klet.containerRuntime))
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+		klet.nodeLeaseController = nodelease.NewController(klet.clock, klet.heartbeatClient, string(klet.nodeName), kubeCfg.NodeLeaseDurationSeconds, klet.onRepeatedHeartbeatFailure)
+	}
+
+	klet.softAdmitHandlers.AddPodAdmitHandler(lifecycle.NewProcMountAdmitHandler(klet.containerRuntime))
+
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfiguration = *kubeCfg
@@ -862,11 +877,16 @@ type serviceLister interface {
 type Kubelet struct {
 	kubeletConfiguration kubeletconfiginternal.KubeletConfiguration
 
-	hostname        string
+	// hostname is the hostname the kubelet detected or was given via flag/config
+	hostname string
+	// hostnameOverridden indicates the hostname was overridden via flag/config
+	hostnameOverridden bool
+
 	nodeName        types.NodeName
 	runtimeCache    kubecontainer.RuntimeCache
 	kubeClient      clientset.Interface
-	heartbeatClient v1core.CoreV1Interface
+	csiClient       csiclientset.Interface
+	heartbeatClient clientset.Interface
 	iptClient       utilipt.Interface
 	rootDirectory   string
 
@@ -1029,6 +1049,9 @@ type Kubelet struct {
 	// updateRuntimeMux is a lock on updating runtime, because this path is not thread-safe.
 	// This lock is used by Kublet.updateRuntimeUp function and shouldn't be used anywhere else.
 	updateRuntimeMux sync.Mutex
+
+	// nodeLeaseController claims and renews the node lease for this Kubelet
+	nodeLeaseController nodelease.Controller
 
 	// Generates pod events.
 	pleg pleg.PodLifecycleEventGenerator
@@ -1367,6 +1390,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
 		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
 		go kl.fastStatusUpdateOnce()
+
+		// start syncing lease
+		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+			go kl.nodeLeaseController.Run(wait.NeverStop)
+		}
 	}
 	go wait.Until(kl.updateRuntimeUp, 5*time.Second, wait.NeverStop)
 

@@ -25,12 +25,10 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -169,13 +167,11 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 			return false, false, err
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-			// Try to provision for unbound volumes
-			if !unboundVolumesSatisfied {
-				unboundVolumesSatisfied, err = b.checkVolumeProvisions(pod, claimsToProvision, node)
-				if err != nil {
-					return false, false, err
-				}
+		// Try to provision for unbound volumes
+		if !unboundVolumesSatisfied {
+			unboundVolumesSatisfied, err = b.checkVolumeProvisions(pod, claimsToProvision, node)
+			if err != nil {
+				return false, false, err
 			}
 		}
 	}

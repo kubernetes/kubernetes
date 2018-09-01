@@ -228,6 +228,10 @@ type PodSecurityPolicySpec struct {
 	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
 	// +optional
 	ForbiddenSysctls []string
+	// AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+	// Empty or nil indicates that only the DefaultProcMountType may be used.
+	// +optional
+	AllowedProcMountTypes []api.ProcMountType
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy

@@ -30,8 +30,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -515,6 +515,8 @@ func toAPIProtocol(protocol Protocol) v1.Protocol {
 		return v1.ProtocolTCP
 	case protocolUDP:
 		return v1.ProtocolUDP
+	case protocolSCTP:
+		return v1.ProtocolSCTP
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return v1.ProtocolTCP

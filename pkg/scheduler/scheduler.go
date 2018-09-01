@@ -74,6 +74,11 @@ func (sched *Scheduler) StopEverything() {
 	close(sched.config.StopEverything)
 }
 
+// Cache returns the cache in scheduler for test to check the data in scheduler.
+func (sched *Scheduler) Cache() schedulercache.Cache {
+	return sched.config.SchedulerCache
+}
+
 // Configurator defines I/O, caching, and other functionality needed to
 // construct a new scheduler. An implementation of this can be seen in
 // factory.go.

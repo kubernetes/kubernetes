@@ -508,10 +508,11 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithLimit(pred.Limit))
 	}
 
-	var returnedRV int64
+	var returnedRV, continueRV int64
+	var continueKey string
 	switch {
 	case s.pagingEnabled && len(pred.Continue) > 0:
-		continueKey, continueRV, err := decodeContinue(pred.Continue, keyPrefix)
+		continueKey, continueRV, err = decodeContinue(pred.Continue, keyPrefix)
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
@@ -524,9 +525,13 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithRange(rangeEnd))
 		key = continueKey
 
-		options = append(options, clientv3.WithRev(continueRV))
-		returnedRV = continueRV
-
+		// If continueRV > 0, the LIST request needs a specific resource version.
+		// continueRV==0 is invalid.
+		// If continueRV < 0, the request is for the latest resource version.
+		if continueRV > 0 {
+			options = append(options, clientv3.WithRev(continueRV))
+			returnedRV = continueRV
+		}
 	case s.pagingEnabled && pred.Limit > 0:
 		if len(resourceVersion) > 0 {
 			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
@@ -563,7 +568,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	for {
 		getResp, err := s.client.KV.Get(ctx, key, options...)
 		if err != nil {
-			return interpretListError(err, len(pred.Continue) > 0)
+			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
 		hasMore = getResp.More
 

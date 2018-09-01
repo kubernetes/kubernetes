@@ -4,15 +4,12 @@ package winterm
 
 import (
 	"bytes"
-	"io/ioutil"
+	"log"
 	"os"
 	"strconv"
 
 	"github.com/Azure/go-ansiterm"
-	"github.com/sirupsen/logrus"
 )
-
-var logger *logrus.Logger
 
 type windowsAnsiEventHandler struct {
 	fd             uintptr
@@ -28,32 +25,52 @@ type windowsAnsiEventHandler struct {
 	marginByte     byte
 	curInfo        *CONSOLE_SCREEN_BUFFER_INFO
 	curPos         COORD
+	logf           func(string, ...interface{})
 }
 
-func CreateWinEventHandler(fd uintptr, file *os.File) ansiterm.AnsiEventHandler {
-	logFile := ioutil.Discard
+type Option func(*windowsAnsiEventHandler)
 
-	if isDebugEnv := os.Getenv(ansiterm.LogEnv); isDebugEnv == "1" {
-		logFile, _ = os.Create("winEventHandler.log")
+func WithLogf(f func(string, ...interface{})) Option {
+	return func(w *windowsAnsiEventHandler) {
+		w.logf = f
 	}
+}
 
-	logger = &logrus.Logger{
-		Out:       logFile,
-		Formatter: new(logrus.TextFormatter),
-		Level:     logrus.DebugLevel,
-	}
-
+func CreateWinEventHandler(fd uintptr, file *os.File, opts ...Option) ansiterm.AnsiEventHandler {
 	infoReset, err := GetConsoleScreenBufferInfo(fd)
 	if err != nil {
 		return nil
 	}
 
-	return &windowsAnsiEventHandler{
+	h := &windowsAnsiEventHandler{
 		fd:         fd,
 		file:       file,
 		infoReset:  infoReset,
 		attributes: infoReset.Attributes,
 	}
+	for _, o := range opts {
+		o(h)
+	}
+
+	if isDebugEnv := os.Getenv(ansiterm.LogEnv); isDebugEnv == "1" {
+		logFile, _ := os.Create("winEventHandler.log")
+		logger := log.New(logFile, "", log.LstdFlags)
+		if h.logf != nil {
+			l := h.logf
+			h.logf = func(s string, v ...interface{}) {
+				l(s, v...)
+				logger.Printf(s, v...)
+			}
+		} else {
+			h.logf = logger.Printf
+		}
+	}
+
+	if h.logf == nil {
+		h.logf = func(string, ...interface{}) {}
+	}
+
+	return h
 }
 
 type scrollRegion struct {
@@ -96,7 +113,7 @@ func (h *windowsAnsiEventHandler) simulateLF(includeCR bool) (bool, error) {
 		if err := h.Flush(); err != nil {
 			return false, err
 		}
-		logger.Info("Simulating LF inside scroll region")
+		h.logf("Simulating LF inside scroll region")
 		if err := h.scrollUp(1); err != nil {
 			return false, err
 		}
@@ -119,7 +136,7 @@ func (h *windowsAnsiEventHandler) simulateLF(includeCR bool) (bool, error) {
 	} else {
 		// The cursor is at the bottom of the screen but outside the scroll
 		// region. Skip the LF.
-		logger.Info("Simulating LF outside scroll region")
+		h.logf("Simulating LF outside scroll region")
 		if includeCR {
 			if err := h.Flush(); err != nil {
 				return false, err
@@ -151,7 +168,7 @@ func (h *windowsAnsiEventHandler) executeLF() error {
 			if err := h.Flush(); err != nil {
 				return err
 			}
-			logger.Info("Resetting cursor position for LF without CR")
+			h.logf("Resetting cursor position for LF without CR")
 			if err := SetConsoleCursorPosition(h.fd, pos); err != nil {
 				return err
 			}
@@ -186,7 +203,7 @@ func (h *windowsAnsiEventHandler) Print(b byte) error {
 func (h *windowsAnsiEventHandler) Execute(b byte) error {
 	switch b {
 	case ansiterm.ANSI_TAB:
-		logger.Info("Execute(TAB)")
+		h.logf("Execute(TAB)")
 		// Move to the next tab stop, but preserve auto-wrap if already set.
 		if !h.wrapNext {
 			pos, info, err := h.getCurrentInfo()
@@ -269,7 +286,7 @@ func (h *windowsAnsiEventHandler) CUU(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CUU: [%v]", []string{strconv.Itoa(param)})
+	h.logf("CUU: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.moveCursorVertical(-param)
 }
@@ -278,7 +295,7 @@ func (h *windowsAnsiEventHandler) CUD(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CUD: [%v]", []string{strconv.Itoa(param)})
+	h.logf("CUD: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.moveCursorVertical(param)
 }
@@ -287,7 +304,7 @@ func (h *windowsAnsiEventHandler) CUF(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CUF: [%v]", []string{strconv.Itoa(param)})
+	h.logf("CUF: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.moveCursorHorizontal(param)
 }
@@ -296,7 +313,7 @@ func (h *windowsAnsiEventHandler) CUB(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CUB: [%v]", []string{strconv.Itoa(param)})
+	h.logf("CUB: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.moveCursorHorizontal(-param)
 }
@@ -305,7 +322,7 @@ func (h *windowsAnsiEventHandler) CNL(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CNL: [%v]", []string{strconv.Itoa(param)})
+	h.logf("CNL: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.moveCursorLine(param)
 }
@@ -314,7 +331,7 @@ func (h *windowsAnsiEventHandler) CPL(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CPL: [%v]", []string{strconv.Itoa(param)})
+	h.logf("CPL: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.moveCursorLine(-param)
 }
@@ -323,7 +340,7 @@ func (h *windowsAnsiEventHandler) CHA(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CHA: [%v]", []string{strconv.Itoa(param)})
+	h.logf("CHA: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.moveCursorColumn(param)
 }
@@ -332,7 +349,7 @@ func (h *windowsAnsiEventHandler) VPA(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("VPA: [[%d]]", param)
+	h.logf("VPA: [[%d]]", param)
 	h.clearWrap()
 	info, err := GetConsoleScreenBufferInfo(h.fd)
 	if err != nil {
@@ -348,7 +365,7 @@ func (h *windowsAnsiEventHandler) CUP(row int, col int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("CUP: [[%d %d]]", row, col)
+	h.logf("CUP: [[%d %d]]", row, col)
 	h.clearWrap()
 	info, err := GetConsoleScreenBufferInfo(h.fd)
 	if err != nil {
@@ -364,7 +381,7 @@ func (h *windowsAnsiEventHandler) HVP(row int, col int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("HVP: [[%d %d]]", row, col)
+	h.logf("HVP: [[%d %d]]", row, col)
 	h.clearWrap()
 	return h.CUP(row, col)
 }
@@ -373,7 +390,7 @@ func (h *windowsAnsiEventHandler) DECTCEM(visible bool) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("DECTCEM: [%v]", []string{strconv.FormatBool(visible)})
+	h.logf("DECTCEM: [%v]", []string{strconv.FormatBool(visible)})
 	h.clearWrap()
 	return nil
 }
@@ -382,7 +399,7 @@ func (h *windowsAnsiEventHandler) DECOM(enable bool) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("DECOM: [%v]", []string{strconv.FormatBool(enable)})
+	h.logf("DECOM: [%v]", []string{strconv.FormatBool(enable)})
 	h.clearWrap()
 	h.originMode = enable
 	return h.CUP(1, 1)
@@ -392,7 +409,7 @@ func (h *windowsAnsiEventHandler) DECCOLM(use132 bool) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("DECCOLM: [%v]", []string{strconv.FormatBool(use132)})
+	h.logf("DECCOLM: [%v]", []string{strconv.FormatBool(use132)})
 	h.clearWrap()
 	if err := h.ED(2); err != nil {
 		return err
@@ -407,7 +424,7 @@ func (h *windowsAnsiEventHandler) DECCOLM(use132 bool) error {
 	}
 	if info.Size.X < targetWidth {
 		if err := SetConsoleScreenBufferSize(h.fd, COORD{targetWidth, info.Size.Y}); err != nil {
-			logger.Info("set buffer failed:", err)
+			h.logf("set buffer failed: %v", err)
 			return err
 		}
 	}
@@ -415,12 +432,12 @@ func (h *windowsAnsiEventHandler) DECCOLM(use132 bool) error {
 	window.Left = 0
 	window.Right = targetWidth - 1
 	if err := SetConsoleWindowInfo(h.fd, true, window); err != nil {
-		logger.Info("set window failed:", err)
+		h.logf("set window failed: %v", err)
 		return err
 	}
 	if info.Size.X > targetWidth {
 		if err := SetConsoleScreenBufferSize(h.fd, COORD{targetWidth, info.Size.Y}); err != nil {
-			logger.Info("set buffer failed:", err)
+			h.logf("set buffer failed: %v", err)
 			return err
 		}
 	}
@@ -431,7 +448,7 @@ func (h *windowsAnsiEventHandler) ED(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("ED: [%v]", []string{strconv.Itoa(param)})
+	h.logf("ED: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 
 	// [J  -- Erases from the cursor to the end of the screen, including the cursor position.
@@ -490,7 +507,7 @@ func (h *windowsAnsiEventHandler) EL(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("EL: [%v]", strconv.Itoa(param))
+	h.logf("EL: [%v]", strconv.Itoa(param))
 	h.clearWrap()
 
 	// [K  -- Erases from the cursor to the end of the line, including the cursor position.
@@ -531,7 +548,7 @@ func (h *windowsAnsiEventHandler) IL(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("IL: [%v]", strconv.Itoa(param))
+	h.logf("IL: [%v]", strconv.Itoa(param))
 	h.clearWrap()
 	return h.insertLines(param)
 }
@@ -540,7 +557,7 @@ func (h *windowsAnsiEventHandler) DL(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("DL: [%v]", strconv.Itoa(param))
+	h.logf("DL: [%v]", strconv.Itoa(param))
 	h.clearWrap()
 	return h.deleteLines(param)
 }
@@ -549,7 +566,7 @@ func (h *windowsAnsiEventHandler) ICH(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("ICH: [%v]", strconv.Itoa(param))
+	h.logf("ICH: [%v]", strconv.Itoa(param))
 	h.clearWrap()
 	return h.insertCharacters(param)
 }
@@ -558,7 +575,7 @@ func (h *windowsAnsiEventHandler) DCH(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("DCH: [%v]", strconv.Itoa(param))
+	h.logf("DCH: [%v]", strconv.Itoa(param))
 	h.clearWrap()
 	return h.deleteCharacters(param)
 }
@@ -572,7 +589,7 @@ func (h *windowsAnsiEventHandler) SGR(params []int) error {
 		strings = append(strings, strconv.Itoa(v))
 	}
 
-	logger.Infof("SGR: [%v]", strings)
+	h.logf("SGR: [%v]", strings)
 
 	if len(params) <= 0 {
 		h.attributes = h.infoReset.Attributes
@@ -606,7 +623,7 @@ func (h *windowsAnsiEventHandler) SU(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("SU: [%v]", []string{strconv.Itoa(param)})
+	h.logf("SU: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.scrollUp(param)
 }
@@ -615,13 +632,13 @@ func (h *windowsAnsiEventHandler) SD(param int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("SD: [%v]", []string{strconv.Itoa(param)})
+	h.logf("SD: [%v]", []string{strconv.Itoa(param)})
 	h.clearWrap()
 	return h.scrollDown(param)
 }
 
 func (h *windowsAnsiEventHandler) DA(params []string) error {
-	logger.Infof("DA: [%v]", params)
+	h.logf("DA: [%v]", params)
 	// DA cannot be implemented because it must send data on the VT100 input stream,
 	// which is not available to go-ansiterm.
 	return nil
@@ -631,7 +648,7 @@ func (h *windowsAnsiEventHandler) DECSTBM(top int, bottom int) error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Infof("DECSTBM: [%d, %d]", top, bottom)
+	h.logf("DECSTBM: [%d, %d]", top, bottom)
 
 	// Windows is 0 indexed, Linux is 1 indexed
 	h.sr.top = int16(top - 1)
@@ -646,7 +663,7 @@ func (h *windowsAnsiEventHandler) RI() error {
 	if err := h.Flush(); err != nil {
 		return err
 	}
-	logger.Info("RI: []")
+	h.logf("RI: []")
 	h.clearWrap()
 
 	info, err := GetConsoleScreenBufferInfo(h.fd)
@@ -663,21 +680,21 @@ func (h *windowsAnsiEventHandler) RI() error {
 }
 
 func (h *windowsAnsiEventHandler) IND() error {
-	logger.Info("IND: []")
+	h.logf("IND: []")
 	return h.executeLF()
 }
 
 func (h *windowsAnsiEventHandler) Flush() error {
 	h.curInfo = nil
 	if h.buffer.Len() > 0 {
-		logger.Infof("Flush: [%s]", h.buffer.Bytes())
+		h.logf("Flush: [%s]", h.buffer.Bytes())
 		if _, err := h.buffer.WriteTo(h.file); err != nil {
 			return err
 		}
 	}
 
 	if h.wrapNext && !h.drewMarginByte {
-		logger.Infof("Flush: drawing margin byte '%c'", h.marginByte)
+		h.logf("Flush: drawing margin byte '%c'", h.marginByte)
 
 		info, err := GetConsoleScreenBufferInfo(h.fd)
 		if err != nil {

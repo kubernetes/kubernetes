@@ -26,11 +26,15 @@ import (
 	"time"
 
 	"context"
+
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
+	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/labelmanager"
@@ -48,11 +52,15 @@ const (
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
 	fsTypeBlockName = "block"
+
+	// TODO: increase to something useful
+	csiResyncPeriod = time.Minute
 )
 
 type csiPlugin struct {
-	host         volume.VolumeHost
-	blockEnabled bool
+	host              volume.VolumeHost
+	blockEnabled      bool
+	csiDriverInformer csiinformer.CSIDriverInformer
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -131,6 +139,14 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	// Initializing csiDrivers map and label management channels
 	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
 	lm = labelmanager.NewLabelManager(host.GetNodeName(), host.GetKubeClient())
+
+	csiClient := host.GetCSIClient()
+	if csiClient != nil {
+		// Start informer for CSIDrivers.
+		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
+		p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
+		go factory.Start(wait.NeverStop)
+	}
 
 	return nil
 }

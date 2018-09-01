@@ -5,7 +5,7 @@ type escapeIntermediateState struct {
 }
 
 func (escState escapeIntermediateState) Handle(b byte) (s state, e error) {
-	logger.Infof("escapeIntermediateState::Handle %#x", b)
+	escState.parser.logf("escapeIntermediateState::Handle %#x", b)
 	nextState, err := escState.baseState.Handle(b)
 	if nextState != nil || err != nil {
 		return nextState, err
@@ -24,7 +24,7 @@ func (escState escapeIntermediateState) Handle(b byte) (s state, e error) {
 }
 
 func (escState escapeIntermediateState) Transition(s state) error {
-	logger.Infof("escapeIntermediateState::Transition %s --> %s", escState.Name(), s.Name())
+	escState.parser.logf("escapeIntermediateState::Transition %s --> %s", escState.Name(), s.Name())
 	escState.baseState.Transition(s)
 
 	switch s {

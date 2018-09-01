@@ -25,6 +25,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -152,11 +153,9 @@ func makeCmd(certSpec *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
 	defaultConfig := &kubeadmapiv1alpha3.InitConfiguration{
-		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
-			API: kubeadmapiv1alpha3.API{
-				// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
-				AdvertiseAddress: "127.0.0.1",
-			},
+		APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{
+			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
+			AdvertiseAddress: "127.0.0.1",
 		},
 	}
 	defaultInternalConfig := &kubeadmapi.InitConfiguration{}
@@ -186,13 +185,13 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 }
 
 func addFlags(cmd *cobra.Command, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration, addAPIFlags bool) {
-	cmd.Flags().StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
-	cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where to save the certificates")
+	options.AddCertificateDirFlag(cmd.Flags(), &cfg.CertificatesDir)
+	options.AddConfigFlag(cmd.Flags(), cfgPath)
 	if addAPIFlags {
 		cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, "Alternative domain for services, to use for the API server serving cert")
 		cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "Alternative range of IP address for service VIPs, from which derives the internal API server VIP that will be added to the API Server serving cert")
 		cmd.Flags().StringSliceVar(&cfg.APIServerCertSANs, "apiserver-cert-extra-sans", []string{}, "Optional extra altnames to use for the API server serving cert. Can be both IP addresses and DNS names")
-		cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address the API server is accessible on, to use for the API server serving cert")
+		cmd.Flags().StringVar(&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress, "The IP address the API server is accessible on, to use for the API server serving cert")
 	}
 }
 

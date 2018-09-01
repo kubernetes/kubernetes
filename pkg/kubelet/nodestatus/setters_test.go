@@ -55,6 +55,7 @@ const (
 func TestNodeAddress(t *testing.T) {
 	cases := []struct {
 		name              string
+		hostnameOverride  bool
 		nodeIP            net.IP
 		nodeAddresses     []v1.NodeAddress
 		expectedAddresses []v1.NodeAddress
@@ -151,6 +152,85 @@ func TestNodeAddress(t *testing.T) {
 			expectedAddresses: nil,
 			shouldError:       true,
 		},
+		{
+			name:          "no cloud reported hostnames",
+			nodeAddresses: []v1.NodeAddress{},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeHostName, Address: testKubeletHostname}, // detected hostname is auto-added in the absence of cloud-reported hostnames
+			},
+			shouldError: false,
+		},
+		{
+			name: "cloud reports hostname, no override",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: "cloud-host"},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: "cloud-host"}, // cloud-reported hostname wins over detected hostname
+			},
+			shouldError: false,
+		},
+		{
+			name: "cloud reports hostname, overridden",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: "cloud-host"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname}, // hostname-override wins over cloud-reported hostname
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+			},
+			hostnameOverride: true,
+			shouldError:      false,
+		},
+		{
+			name: "cloud doesn't report hostname, no override, detected hostname mismatch",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				// detected hostname is not auto-added if it doesn't match any cloud-reported addresses
+			},
+			shouldError: false,
+		},
+		{
+			name: "cloud doesn't report hostname, no override, detected hostname match",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalDNS, Address: testKubeletHostname}, // cloud-reported address value matches detected hostname
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeExternalDNS, Address: testKubeletHostname},
+				{Type: v1.NodeHostName, Address: testKubeletHostname}, // detected hostname gets auto-added
+			},
+			shouldError: false,
+		},
+		{
+			name: "cloud doesn't report hostname, hostname override, hostname mismatch",
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname}, // overridden hostname gets auto-added
+			},
+			hostnameOverride: true,
+			shouldError:      false,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -178,6 +258,7 @@ func TestNodeAddress(t *testing.T) {
 			setter := NodeAddress(nodeIP,
 				nodeIPValidator,
 				hostname,
+				testCase.hostnameOverride,
 				externalCloudProvider,
 				cloud,
 				nodeAddressesFunc)

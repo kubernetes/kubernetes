@@ -357,23 +357,14 @@ func cleanupDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPha
 	By("Deleting created Collections")
 	numberOfClients := len(dtc.ClientSets)
 	// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
-	wg := sync.WaitGroup{}
-	wg.Add(len(dtc.Configs))
 	for i := range dtc.Configs {
 		name := dtc.Configs[i].GetName()
 		namespace := dtc.Configs[i].GetNamespace()
 		kind := dtc.Configs[i].GetKind()
-		client := dtc.ClientSets[i%numberOfClients]
-		go func() {
-			defer GinkgoRecover()
-			// Call wg.Done() in defer to avoid blocking whole test
-			// in case of error from RunRC.
-			defer wg.Done()
-			err := framework.DeleteResourceAndWaitForGC(client, kind, namespace, name)
-			framework.ExpectNoError(err)
-		}()
+		By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
+		err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
+		framework.ExpectNoError(err)
 	}
-	wg.Wait()
 	podCleanupPhase.End()
 
 	dtc.deleteSecrets(testPhaseDurations.StartPhase(910, "secrets deletion"))
@@ -404,6 +395,7 @@ var _ = SIGDescribe("Density", func() {
 	missingMeasurements := 0
 	var testPhaseDurations *timer.TestPhaseTimer
 	var profileGathererStopCh chan struct{}
+	var etcdMetricsCollector *framework.EtcdMetricsCollector
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
@@ -435,7 +427,7 @@ var _ = SIGDescribe("Density", func() {
 			summaries = append(summaries, metrics)
 		}
 
-		// Verify scheduler metrics.
+		// Summarize scheduler metrics.
 		latency, err := framework.VerifySchedulerLatency(c)
 		framework.ExpectNoError(err)
 		if err == nil {
@@ -452,10 +444,11 @@ var _ = SIGDescribe("Density", func() {
 			summaries = append(summaries, latency)
 		}
 
-		etcdMetrics, err := framework.VerifyEtcdMetrics(c)
+		// Summarize etcd metrics.
+		err = etcdMetricsCollector.StopAndSummarize()
 		framework.ExpectNoError(err)
 		if err == nil {
-			summaries = append(summaries, etcdMetrics)
+			summaries = append(summaries, etcdMetricsCollector.GetMetrics())
 		}
 
 		summaries = append(summaries, testPhaseDurations)
@@ -518,6 +511,10 @@ var _ = SIGDescribe("Density", func() {
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
 		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "density", profileGatheringDelay)
+
+		// Start etcs metrics collection.
+		etcdMetricsCollector = framework.NewEtcdMetricsCollector()
+		etcdMetricsCollector.StartCollecting(time.Minute)
 	})
 
 	type Density struct {

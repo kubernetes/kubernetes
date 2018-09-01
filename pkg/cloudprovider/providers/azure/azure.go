@@ -159,7 +159,7 @@ type Cloud struct {
 	metadata                *InstanceMetadata
 	vmSet                   VMSet
 
-	// Lock for access to node caches
+	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
 	nodeCachesLock sync.Mutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
 	// it is updated by the nodeInformer
@@ -171,9 +171,17 @@ type Cloud struct {
 	// nodeInformerSynced is for determining if the informer has synced.
 	nodeInformerSynced cache.InformerSynced
 
+	// routeCIDRsLock holds lock for routeCIDRs cache.
+	routeCIDRsLock sync.Mutex
+	// routeCIDRs holds cache for route CIDRs.
+	routeCIDRs map[string]string
+
 	// Clients for vmss.
 	VirtualMachineScaleSetsClient   VirtualMachineScaleSetsClient
 	VirtualMachineScaleSetVMsClient VirtualMachineScaleSetVMsClient
+
+	// client for vm sizes list
+	VirtualMachineSizesClient VirtualMachineSizesClient
 
 	vmCache  *timedCache
 	lbCache  *timedCache
@@ -267,6 +275,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		nodeZones:          map[string]sets.String{},
 		nodeResourceGroups: map[string]string{},
 		unmanagedNodes:     sets.NewString(),
+		routeCIDRs:         map[string]string{},
 
 		DisksClient:                     newAzDisksClient(azClientConfig),
 		RoutesClient:                    newAzRoutesClient(azClientConfig),
@@ -278,6 +287,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		StorageAccountClient:            newAzStorageAccountClient(azClientConfig),
 		VirtualMachinesClient:           newAzVirtualMachinesClient(azClientConfig),
 		PublicIPAddressesClient:         newAzPublicIPAddressesClient(azClientConfig),
+		VirtualMachineSizesClient:       newAzVirtualMachineSizesClient(azClientConfig),
 		VirtualMachineScaleSetsClient:   newAzVirtualMachineScaleSetsClient(azClientConfig),
 		VirtualMachineScaleSetVMsClient: newAzVirtualMachineScaleSetVMsClient(azClientConfig),
 		FileClient:                      &azureFileClient{env: *env},

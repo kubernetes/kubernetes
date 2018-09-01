@@ -124,6 +124,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",

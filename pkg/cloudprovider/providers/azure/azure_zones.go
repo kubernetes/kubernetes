@@ -103,6 +103,12 @@ func (az *Cloud) getZoneFromFaultDomain() (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (az *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
+	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	if az.IsNodeUnmanagedByProviderID(providerID) {
+		glog.V(2).Infof("GetZoneByProviderID: omitting unmanaged node %q", providerID)
+		return cloudprovider.Zone{}, nil
+	}
+
 	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return cloudprovider.Zone{}, err
@@ -115,6 +121,16 @@ func (az *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cl
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (az *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
+	// Returns "" for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	unmanaged, err := az.IsNodeUnmanaged(string(nodeName))
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
+	if unmanaged {
+		glog.V(2).Infof("GetZoneByNodeName: omitting unmanaged node %q", nodeName)
+		return cloudprovider.Zone{}, nil
+	}
+
 	return az.vmSet.GetZoneByNodeName(string(nodeName))
 }
 

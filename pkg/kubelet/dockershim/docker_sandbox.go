@@ -672,6 +672,8 @@ func toCheckpointProtocol(protocol runtimeapi.Protocol) Protocol {
 		return protocolTCP
 	case runtimeapi.Protocol_UDP:
 		return protocolUDP
+	case runtimeapi.Protocol_SCTP:
+		return protocolSCTP
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return protocolTCP

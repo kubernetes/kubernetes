@@ -59,7 +59,7 @@ const (
 
 func (plugin *localVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.volumeLocks = keymutex.NewKeyMutex()
+	plugin.volumeLocks = keymutex.NewHashed(0)
 	plugin.recorder = host.GetEventRecorder()
 	return nil
 }

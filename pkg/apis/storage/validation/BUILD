@@ -12,6 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/storage/validation",
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/features:go_default_library",

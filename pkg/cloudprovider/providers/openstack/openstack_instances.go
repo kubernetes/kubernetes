@@ -36,6 +36,10 @@ type Instances struct {
 	opts    MetadataOpts
 }
 
+const (
+	instanceShutoff = "SHUTOFF"
+)
+
 // Instances returns an implementation of Instances for OpenStack.
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	glog.V(4).Info("openstack.Instances() called")
@@ -106,7 +110,7 @@ func (i *Instances) NodeAddressesByProviderID(ctx context.Context, providerID st
 	return addresses, nil
 }
 
-// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exist.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	instanceID, err := instanceIDFromProviderID(providerID)
@@ -114,7 +118,7 @@ func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 		return false, err
 	}
 
-	server, err := servers.Get(i.compute, instanceID).Extract()
+	_, err = servers.Get(i.compute, instanceID).Extract()
 	if err != nil {
 		if isNotFound(err) {
 			return false, nil
@@ -122,17 +126,26 @@ func (i *Instances) InstanceExistsByProviderID(ctx context.Context, providerID s
 		return false, err
 	}
 
-	if server.Status != "ACTIVE" {
-		glog.Warningf("the instance %s is not active", instanceID)
-		return false, nil
-	}
-
 	return true, nil
 }
 
 // InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
 func (i *Instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	instanceID, err := instanceIDFromProviderID(providerID)
+	if err != nil {
+		return false, err
+	}
+
+	server, err := servers.Get(i.compute, instanceID).Extract()
+	if err != nil {
+		return false, err
+	}
+
+	// SHUTOFF is the only state where we can detach volumes immediately
+	if server.Status == instanceShutoff {
+		return true, nil
+	}
+	return false, nil
 }
 
 // InstanceID returns the kubelet's cloud provider ID.

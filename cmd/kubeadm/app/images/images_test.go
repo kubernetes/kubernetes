@@ -32,6 +32,19 @@ const (
 	gcrPrefix   = "k8s.gcr.io"
 )
 
+func TestGetGenericImage(t *testing.T) {
+	const (
+		prefix = "foo"
+		image  = "bar"
+		tag    = "baz"
+	)
+	expected := fmt.Sprintf("%s/%s:%s", prefix, image, tag)
+	actual := GetGenericImage(prefix, image, tag)
+	if actual != expected {
+		t.Errorf("failed GetGenericImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
+	}
+}
+
 func TestGetGenericArchImage(t *testing.T) {
 	const (
 		prefix = "foo"
@@ -49,44 +62,36 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 	var tests = []struct {
 		image    string
 		expected string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
 			expected: "override",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					UnifiedControlPlaneImage: "override",
-				},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				UnifiedControlPlaneImage: "override",
 			},
 		},
 		{
 			image:    constants.KubeAPIServer,
-			expected: GetGenericArchImage(gcrPrefix, "kube-apiserver", expected),
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ImageRepository:   gcrPrefix,
-					KubernetesVersion: testversion,
-				},
+			expected: GetGenericImage(gcrPrefix, "kube-apiserver", expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
 			},
 		},
 		{
 			image:    constants.KubeControllerManager,
-			expected: GetGenericArchImage(gcrPrefix, "kube-controller-manager", expected),
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ImageRepository:   gcrPrefix,
-					KubernetesVersion: testversion,
-				},
+			expected: GetGenericImage(gcrPrefix, "kube-controller-manager", expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
 			},
 		},
 		{
 			image:    constants.KubeScheduler,
-			expected: GetGenericArchImage(gcrPrefix, "kube-scheduler", expected),
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ImageRepository:   gcrPrefix,
-					KubernetesVersion: testversion,
-				},
+			expected: GetGenericImage(gcrPrefix, "kube-scheduler", expected),
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
 			},
 		},
 	}
@@ -105,27 +110,23 @@ func TestGetKubeControlPlaneImage(t *testing.T) {
 func TestGetEtcdImage(t *testing.T) {
 	var tests = []struct {
 		expected string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
 			expected: "override",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{
-						Local: &kubeadmapi.LocalEtcd{
-							Image: "override",
-						},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{
+						Image: "override",
 					},
 				},
 			},
 		},
 		{
-			expected: GetGenericArchImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ImageRepository:   gcrPrefix,
-					KubernetesVersion: testversion,
-				},
+			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository:   gcrPrefix,
+				KubernetesVersion: testversion,
 			},
 		},
 	}
@@ -144,78 +145,64 @@ func TestGetEtcdImage(t *testing.T) {
 func TestGetAllImages(t *testing.T) {
 	testcases := []struct {
 		name   string
-		cfg    *kubeadmapi.InitConfiguration
 		expect string
+		cfg    *kubeadmapi.ClusterConfiguration
 	}{
 		{
 			name: "defined CIImageRepository",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					CIImageRepository: "test.repo",
-				},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CIImageRepository: "test.repo",
 			},
 			expect: "test.repo",
 		},
 		{
 			name: "undefined CIImagerRepository should contain the default image prefix",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ImageRepository: "real.repo",
-				},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "real.repo",
 			},
 			expect: "real.repo",
 		},
 		{
 			name: "test that etcd is returned when it is not external",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Etcd: kubeadmapi.Etcd{
-						Local: &kubeadmapi.LocalEtcd{},
-					},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					Local: &kubeadmapi.LocalEtcd{},
 				},
 			},
 			expect: constants.Etcd,
 		},
 		{
 			name: "CoreDNS image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					FeatureGates: map[string]bool{
-						"CoreDNS": true,
-					},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": true,
 				},
 			},
 			expect: constants.CoreDNS,
 		},
 		{
 			name: "main kube-dns image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					FeatureGates: map[string]bool{
-						"CoreDNS": false,
-					},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
 				},
 			},
 			expect: "k8s-dns-kube-dns",
 		},
 		{
 			name: "kube-dns sidecar image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					FeatureGates: map[string]bool{
-						"CoreDNS": false,
-					},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
 				},
 			},
 			expect: "k8s-dns-sidecar",
 		},
 		{
 			name: "kube-dns dnsmasq-nanny image is returned",
-			cfg: &kubeadmapi.InitConfiguration{
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					FeatureGates: map[string]bool{
-						"CoreDNS": false,
-					},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				FeatureGates: map[string]bool{
+					"CoreDNS": false,
 				},
 			},
 			expect: "k8s-dns-dnsmasq-nanny",

@@ -264,9 +264,8 @@ func TestVolumeBinding(t *testing.T) {
 // TestVolumeBindingRescheduling tests scheduler will retry scheduling when needed.
 func TestVolumeBindingRescheduling(t *testing.T) {
 	features := map[string]bool{
-		"VolumeScheduling":              true,
-		"PersistentLocalVolumes":        true,
-		"DynamicProvisioningScheduling": true,
+		"VolumeScheduling":       true,
+		"PersistentLocalVolumes": true,
 	}
 	config := setupCluster(t, "volume-scheduling", 2, features, 0)
 	defer config.teardown()

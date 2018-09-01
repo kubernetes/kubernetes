@@ -9,7 +9,7 @@ import (
 	"os"
 	"sync"
 
-	ansiterm "github.com/Azure/go-ansiterm"
+	"github.com/Azure/go-ansiterm"
 	"github.com/sirupsen/logrus"
 )
 

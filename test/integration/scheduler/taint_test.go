@@ -104,7 +104,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		informers.Extensions().V1beta1().DaemonSets(),
 		nil, // CloudProvider
 		cs,
-		time.Second, // Node monitor grace period
+		time.Hour,   // Node monitor grace period
 		time.Second, // Node startup grace period
 		time.Second, // Node monitor period
 		time.Second, // Pod eviction timeout
@@ -125,6 +125,8 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Waiting for all controller sync.
 	internalInformers.Start(controllerCh)
 	internalInformers.WaitForCacheSync(controllerCh)
+	informers.Start(controllerCh)
+	informers.WaitForCacheSync(controllerCh)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
@@ -669,6 +671,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 			cleanupPods(cs, t, pods)
 			cleanupNodes(cs, t)
+			waitForSchedulerCacheCleanup(context.scheduler, t)
 		})
 	}
 }

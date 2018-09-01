@@ -56,6 +56,13 @@ type MetricValue struct {
 
 	// the value of the metric for this
 	Value resource.Quantity `json:"value" protobuf:"bytes,5,name=value"`
+
+	// selector represents the label selector that could be used to select
+	// this metric, and will generally just be the selector passed in to
+	// the query used to fetch this metric.
+	// When left blank, only the metric's Name will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector" protobuf:"bytes,6,opt,name=selector"`
 }
 
 // allObjects is a wildcard used to select metrics

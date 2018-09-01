@@ -49,4 +49,4 @@ reviewers:
 - yujuhong
 - zmerlynn
 labels:
-- sig/api-machinery
+- sig/architecture

@@ -19,8 +19,8 @@ package v1alpha2
 import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -284,6 +284,10 @@ type JoinConfiguration struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise; the
 	// API server will be installed only on nodes hosting an additional control plane instance.
 	AdvertiseAddress string `json:"advertiseAddress,omitempty"`
+
+	// BindPort sets the secure port for the API Server to bind to.
+	// Defaults to 6443.
+	BindPort int32 `json:"bindPort,omitempty"`
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`

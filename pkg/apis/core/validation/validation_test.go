@@ -713,6 +713,67 @@ func testVolumeClaimStorageClassInSpec(name, namespace, scName string, spec core
 	}
 }
 
+func testVolumeSnapshotDataSourceInSpec(name string, kind string, apiGroup string) *core.PersistentVolumeClaimSpec {
+	scName := "csi-plugin"
+	dataSourceInSpec := core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		StorageClassName: &scName,
+		DataSource: &core.TypedLocalObjectReference{
+			APIGroup: apiGroup,
+			Kind:     kind,
+			Name:     name,
+		},
+	}
+
+	return &dataSourceInSpec
+}
+
+func TestAlphaVolumeSnapshotDataSource(t *testing.T) {
+	successTestCases := []core.PersistentVolumeClaimSpec{
+		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+	}
+	failedTestCases := []core.PersistentVolumeClaimSpec{
+		*testVolumeSnapshotDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "PersistentVolumeClaim", "snapshot.storage.k8s.io"),
+		*testVolumeSnapshotDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
+	}
+
+	// Enable alpha feature VolumeSnapshotDataSource
+	err := utilfeature.DefaultFeatureGate.Set("VolumeSnapshotDataSource=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for VolumeSnapshotDataSource: %v", err)
+		return
+	}
+	for _, tc := range successTestCases {
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	for _, tc := range failedTestCases {
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
+			t.Errorf("expected failure: %v", errs)
+		}
+	}
+	// Disable alpha feature VolumeSnapshotDataSource
+	err = utilfeature.DefaultFeatureGate.Set("VolumeSnapshotDataSource=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for VolumeSnapshotDataSource: %v", err)
+		return
+	}
+	for _, tc := range successTestCases {
+		if errs := ValidatePersistentVolumeClaimSpec(&tc, field.NewPath("spec")); len(errs) == 0 {
+			t.Errorf("expected failure: %v", errs)
+		}
+	}
+}
+
 func testVolumeClaimStorageClassInAnnotationAndSpec(name, namespace, scNameInAnn, scName string, spec core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
 	spec.StorageClassName = &scName
 	return &core.PersistentVolumeClaim{
@@ -4060,6 +4121,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 }
 
 func TestValidatePorts(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 	successCase := []core.ContainerPort{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
@@ -4125,12 +4187,12 @@ func TestValidatePorts(t *testing.T) {
 		"invalid protocol case": {
 			[]core.ContainerPort{{ContainerPort: 80, Protocol: "tcp"}},
 			field.ErrorTypeNotSupported,
-			"protocol", `supported values: "TCP", "UDP"`,
+			"protocol", `supported values: "SCTP", "TCP", "UDP"`,
 		},
 		"invalid protocol": {
 			[]core.ContainerPort{{ContainerPort: 80, Protocol: "ICMP"}},
 			field.ErrorTypeNotSupported,
-			"protocol", `supported values: "TCP", "UDP"`,
+			"protocol", `supported values: "SCTP", "TCP", "UDP"`,
 		},
 		"protocol required": {
 			[]core.ContainerPort{{Name: "abc", ContainerPort: 80}},
@@ -8590,6 +8652,8 @@ func makeValidService() core.Service {
 }
 
 func TestValidateService(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
+
 	testCases := []struct {
 		name     string
 		tweakSvc func(svc *core.Service) // given a basic valid service, each test case can customize it
@@ -8947,6 +9011,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeNodePort
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 2, Protocol: "UDP", NodePort: 1, TargetPort: intstr.FromInt(2)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 3, Protocol: "SCTP", NodePort: 1, TargetPort: intstr.FromInt(3)})
 			},
 			numErrs: 0,
 		},
@@ -8965,6 +9030,7 @@ func TestValidateService(t *testing.T) {
 				s.Spec.Type = core.ServiceTypeClusterIP
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "r", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(80)})
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "s", Port: 12345, Protocol: "SCTP", TargetPort: intstr.FromInt(8088)})
 			},
 			numErrs: 0,
 		},
