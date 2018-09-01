@@ -18,9 +18,9 @@ limitations under the License.
 
 package coverage
 
-// InitCoverage is a no-op when not running with coverage.
+// InitCoverage is illegal when not running with coverage.
 func InitCoverage(name string) {
-
+	panic("Called InitCoverage when not built with coverage instrumentation.")
 }
 
 // FlushCoverage is a no-op when not running with coverage.
