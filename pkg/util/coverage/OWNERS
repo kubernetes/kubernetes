@@ -1,0 +1,8 @@
+approvers:
+  - katharine
+  - spiffxp
+reviewers:
+  - katharine
+  - spiffxp
+labels:
+  - sig/testing
