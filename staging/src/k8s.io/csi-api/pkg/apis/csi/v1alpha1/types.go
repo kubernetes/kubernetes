@@ -50,29 +50,34 @@ type CSIDriverList struct {
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of CSIDriver
+	// items is the list of CSIDriver
 	Items []CSIDriver `json:"items"`
 }
 
 // CSIDriverSpec is the specification of a CSIDriver.
 type CSIDriverSpec struct {
-	// Indicates this CSI volume driver requires an attach operation (because it
-	// implements the CSI ControllerPublishVolume() method), and that Kubernetes
-	// should call attach and wait for any attach operation to complete before
-	// proceeding to mounting.
+	// attachRequired indicates this CSI volume driver requires an attach
+	// operation (because it implements the CSI ControllerPublishVolume()
+	// method), and that Kubernetes should call attach and wait for any attach
+	// operation to complete before proceeding to mounting.
 	// If value is not specified, default is false -- meaning attach will not be
 	// called.
 	// +optional
 	AttachRequired *bool `json:"attachRequired"`
 
-	// Indicates this CSI volume driver requires additional pod information
-	// (like podName, podUID, etc.) during mount operations.
-	// If this is set to true, Kubelet will pass pod information as
+	// If specified, podInfoRequiredOnMount indicates this CSI volume driver
+	// requires additional pod information (like podName, podUID, etc.) during
+	// mount operations.
+	// If value is not specified, pod information will not be passed on mount.
+	// If value is set to a valid version, Kubelet will pass pod information as
 	// VolumeAttributes in the CSI NodePublishVolume() calls.
-	// If value is not specified, default is false -- meaning pod information
-	// will not be passed on mount.
+	// Supported versions:
+	// Version "v1" will pass the following ValueAttributes
+	// "csi.storage.k8s.io/pod.name": pod.Name
+	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
+	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
 	// +optional
-	PodInfoRequiredOnMount *bool `json:"podInfoRequiredOnMount"`
+	PodInfoOnMountVersion *string `json:"podInfoOnMountVersion"`
 }
 
 // +genclient
@@ -82,24 +87,42 @@ type CSIDriverSpec struct {
 // CSINodeInfo holds information about all CSI drivers installed on a node.
 type CSINodeInfo struct {
 	metav1.TypeMeta `json:",inline"`
-	// ObjectMeta.Name must be node name.
+
+	// metadata.name must be the Kubernetes node name.
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// List of CSI drivers running on the node and their properties.
-	CSIDrivers []CSIDriverInfo `json:"csiDrivers"`
+	// +patchMergeKey=driver
+	// +patchStrategy=merge
+	CSIDrivers []CSIDriverInfo `json:"csiDrivers" patchStrategy:"merge" patchMergeKey:"driver"`
 }
 
 // CSIDriverInfo contains information about one CSI driver installed on a node.
 type CSIDriverInfo struct {
-	// Driver is the name of the CSI driver that this object refers to.
+	// driver is the name of the CSI driver that this object refers to.
 	// This MUST be the same name returned by the CSI GetPluginName() call for
 	// that driver.
 	Driver string `json:"driver"`
 
-	// ID of the node from the driver point of view.
+	// nodeID of the node from the driver point of view.
+	// This field enables Kubernetes to communicate with storage systems that do
+	// not share the same nomenclature for nodes. For example, Kubernetes may
+	// refer to a given node as "node1", but the storage system may refer to
+	// the same node as "nodeA". When Kubernetes issues a command to the storage
+	// system to attach a volume to a specific node, it can use this field to
+	// refer to the node name using the ID that the storage system will
+	// understand, e.g. "nodeA" instead of "node1".
 	NodeID string `json:"nodeID"`
 
-	// Topology keys reported by the driver on the node.
+	// topologyKeys is the list of keys supported by the driver.
+	// When a driver is initialized on a cluster, it provides a set of topology
+	// keys that it understands (e.g. "company.com/zone", "company.com/region").
+	// When a driver is initialized on a node it provides the same topology keys
+	// along with values that kubelet applies to the coresponding node API
+	// object as labels.
+	// When Kubernetes does topology aware provisioning, it can use this list to
+	// determine which labels it should retrieve from the node object and pass
+	// back to the driver.
 	TopologyKeys []string `json:"topologyKeys"`
 }
 
@@ -108,10 +131,12 @@ type CSIDriverInfo struct {
 // CSINodeInfoList is a collection of CSINodeInfo objects.
 type CSINodeInfoList struct {
 	metav1.TypeMeta `json:",inline"`
+
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
-	// Items is the list of CSINodeInfo
+
+	// items is the list of CSINodeInfo
 	Items []CSINodeInfo `json:"items"`
 }
