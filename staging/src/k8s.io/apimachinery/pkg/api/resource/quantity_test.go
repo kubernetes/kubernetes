@@ -728,6 +728,21 @@ func TestQuantityString(t *testing.T) {
 	}
 }
 
+// TestQuantityAString that quantity doesn't cache the string value it computes.
+func TestQuantityAString(t *testing.T) {
+	q := MustParse("100Gi")
+
+	// MustParse could potentially cache the string value, so set it back to an empty string.
+	q.s = ""
+	if expected, actual := "100Gi", q.AString(); expected != actual {
+		t.Errorf("Expected %v, actual %v", expected, actual)
+	}
+
+	if q.s != "" {
+		t.Errorf("'quantity.s' was modified. Expected '', actual '%v'", q.s)
+	}
+}
+
 func TestQuantityParseEmit(t *testing.T) {
 	table := []struct {
 		in     string

@@ -589,16 +589,22 @@ func (q *Quantity) Neg() {
 const int64QuantityExpectedBytes = 18
 
 // String formats the Quantity as a string, caching the result if not calculated.
-// String is an expensive operation and caching this result significantly reduces the cost of
-// normal parse / marshal operations on Quantity.
 func (q *Quantity) String() string {
 	if len(q.s) == 0 {
-		result := make([]byte, 0, int64QuantityExpectedBytes)
-		number, suffix := q.CanonicalizeBytes(result)
-		number = append(number, suffix...)
-		q.s = string(number)
+		q.s = q.AString()
 	}
 	return q.s
+}
+
+// AString formats the Quantity as a string, dynamically calculating the result.
+// AString is an expensive operation and caching this result significantly reduces the cost of
+// normal parse / marshal operations on Quantity. If caching is desired, please use the
+// original String function above.
+func (q *Quantity) AString() string {
+	result := make([]byte, 0, int64QuantityExpectedBytes)
+	number, suffix := q.CanonicalizeBytes(result)
+	number = append(number, suffix...)
+	return string(number)
 }
 
 // MarshalJSON implements the json.Marshaller interface.
