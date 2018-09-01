@@ -1,8 +1,8 @@
 approvers:
-  - katharine
+  - bentheelder
   - spiffxp
 reviewers:
-  - katharine
+  - bentheelder
   - spiffxp
 labels:
   - sig/testing
