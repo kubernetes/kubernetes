@@ -393,7 +393,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		diskPressureCondition:   n.diskPressureCondition,
 		pidPressureCondition:    n.pidPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
-		imageStates:             make(map[string]*ImageStateSummary),
+		imageStates:             n.imageStates,
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
