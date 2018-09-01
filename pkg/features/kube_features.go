@@ -137,7 +137,7 @@ const (
 	TaintNodesByCondition utilfeature.Feature = "TaintNodesByCondition"
 
 	// owner: @jsafrane
-	// beta: v1.10
+	// GA: v1.12
 	//
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
@@ -402,7 +402,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
 	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
-	MountPropagation:                            {Default: true, PreRelease: utilfeature.Beta},
+	MountPropagation:                            {Default: true, PreRelease: utilfeature.GA},
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
 	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
