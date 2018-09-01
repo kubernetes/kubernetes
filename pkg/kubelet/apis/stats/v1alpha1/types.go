@@ -133,6 +133,9 @@ type ContainerStats struct {
 	// Stats pertaining to memory (RAM) resources.
 	// +optional
 	Memory *MemoryStats `json:"memory,omitempty"`
+	// Stats pertaining to disk io resources.
+	// +optional
+	DiskIo *DiskIoStats `json:"diskio,omitempty"`
 	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
 	Accelerators []AcceleratorStats `json:"accelerators,omitempty"`
 	// Stats pertaining to container rootfs usage of filesystem resources.
@@ -172,6 +175,24 @@ type InterfaceStats struct {
 	// Cumulative count of transmit errors encountered.
 	// +optional
 	TxErrors *uint64 `json:"txErrors,omitempty"`
+}
+
+// PerDiskStats contains data about a single disk partition.
+type PerDiskStats struct {
+	Device string            `json:"device"`
+	Major  uint64            `json:"major"`
+	Minor  uint64            `json:"minor"`
+	Stats  map[string]uint64 `json:"stats"`
+}
+
+// DiskIoStats contains data about disk io resources.
+type DiskIoStats struct {
+	// The time at which these stats were updated.
+	Time metav1.Time `json:"time"`
+
+	// Number of bytes transferred to/from disks.
+	// unit: bytes
+	IoServiceBytes []PerDiskStats `json:"io_service_bytes,omitempty"`
 }
 
 // NetworkStats contains data about network resources.

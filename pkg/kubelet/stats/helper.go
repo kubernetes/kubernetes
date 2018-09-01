@@ -72,6 +72,33 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 	return cpuStats, memoryStats
 }
 
+func cadvisorInfoToDiskIoStats(info *cadvisorapiv2.ContainerInfo) *statsapi.DiskIoStats {
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return nil
+	}
+
+	var diskIoStats *statsapi.DiskIoStats
+	if info.Spec.HasDiskIo {
+		diskIoStats = &statsapi.DiskIoStats{
+			Time: metav1.NewTime(cstat.Timestamp),
+		}
+
+		if cstat.DiskIo != nil {
+			for _, perDiskIoServiceBytes := range cstat.DiskIo.IoServiceBytes {
+				diskIoStats.IoServiceBytes = append(diskIoStats.IoServiceBytes, statsapi.PerDiskStats{
+					Device: perDiskIoServiceBytes.Device,
+					Major:  perDiskIoServiceBytes.Major,
+					Minor:  perDiskIoServiceBytes.Minor,
+					Stats:  perDiskIoServiceBytes.Stats,
+				})
+			}
+		}
+	}
+
+	return diskIoStats
+}
+
 // cadvisorInfoToContainerStats returns the statsapi.ContainerStats converted
 // from the container and filesystem info.
 func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo, rootFs, imageFs *cadvisorapiv2.FsInfo) *statsapi.ContainerStats {
@@ -87,6 +114,9 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	cpu, memory := cadvisorInfoToCPUandMemoryStats(info)
 	result.CPU = cpu
 	result.Memory = memory
+
+	diskIo := cadvisorInfoToDiskIoStats(info)
+	result.DiskIo = diskIo
 
 	if rootFs != nil {
 		// The container logs live on the node rootfs device
