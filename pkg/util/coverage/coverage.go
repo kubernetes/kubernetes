@@ -22,14 +22,13 @@ package coverage
 
 import (
 	"flag"
+	"fmt"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 	"testing"
 	"time"
 )
-
-var flushInterval = 5 * time.Second
 
 var coverageFile string
 
@@ -48,9 +47,16 @@ func InitCoverage(name string) {
 	if coverageFile == "" {
 		coverageFile = "/tmp/k8s-" + name + ".cov"
 	}
+	fmt.Println("Dumping coverage information to " + coverageFile)
 
-	if duration, err := time.ParseDuration(os.Getenv("KUBE_COVERAGE_FLUSH_INTERVAL")); err == nil {
-		flushInterval = duration
+	flushInterval := 5 * time.Second
+	requestedInterval := os.Getenv("KUBE_COVERAGE_FLUSH_INTERVAL")
+	if requestedInterval != "" {
+		if duration, err := time.ParseDuration(requestedInterval); err == nil {
+			flushInterval = duration
+		} else {
+			panic("Invalid KUBE_COVERAGE_FLUSH_INTERVAL value; try something like '30s'.")
+		}
 	}
 
 	// Set up the unit test framework with the required arguments to activate test coverage.
