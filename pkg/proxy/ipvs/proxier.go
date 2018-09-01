@@ -74,9 +74,6 @@ const (
 	// KubeLoadBalancerChain is the kubernetes chain for loadbalancer type service
 	KubeLoadBalancerChain utiliptables.Chain = "KUBE-LOAD-BALANCER"
 
-	// DefaultScheduler is the default ipvs scheduler algorithm - round robin.
-	DefaultScheduler = "rr"
-
 	// DefaultDummyDevice is the default dummy interface which ipvs service address will bind to it.
 	DefaultDummyDevice = "kube-ipvs0"
 )
@@ -360,11 +357,6 @@ func NewProxier(ipt utiliptables.Interface,
 		glog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
 	} else if utilnet.IsIPv6CIDR(clusterCIDR) != isIPv6 {
 		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, isIPv6)
-	}
-
-	if len(scheduler) == 0 {
-		glog.Warningf("IPVS scheduler not specified, use %s by default", DefaultScheduler)
-		scheduler = DefaultScheduler
 	}
 
 	healthChecker := healthcheck.NewServer(hostname, recorder, nil, nil) // use default implementations of deps

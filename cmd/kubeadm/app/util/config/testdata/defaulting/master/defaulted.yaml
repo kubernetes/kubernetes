@@ -69,7 +69,7 @@ iptables:
 ipvs:
   excludeCIDRs: null
   minSyncPeriod: 0s
-  scheduler: ""
+  scheduler: rr
   syncPeriod: 30s
 kind: KubeProxyConfiguration
 metricsBindAddress: 127.0.0.1:10249

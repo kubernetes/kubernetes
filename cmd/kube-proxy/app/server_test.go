@@ -317,6 +317,7 @@ nodePortAddresses:
 			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+				Scheduler:     "rr",
 				ExcludeCIDRs:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 			},
 			MetricsBindAddress: tc.metricsBindAddress,

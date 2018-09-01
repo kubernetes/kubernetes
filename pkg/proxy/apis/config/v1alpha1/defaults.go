@@ -26,6 +26,7 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/pointer"
 )
 
@@ -59,6 +60,9 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	}
 	if obj.IPVS.SyncPeriod.Duration == 0 {
 		obj.IPVS.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	}
+	if len(obj.IPVS.Scheduler) == 0 {
+		obj.IPVS.Scheduler = string(kubeproxyconfig.RoundRobin)
 	}
 	zero := metav1.Duration{}
 	if obj.UDPIdleTimeout == zero {

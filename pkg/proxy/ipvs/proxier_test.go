@@ -160,7 +160,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		portsMap:          make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:        &fakePortOpener{[]*utilproxy.LocalPort{}},
 		healthChecker:     newFakeHealthChecker(),
-		ipvsScheduler:     DefaultScheduler,
+		ipvsScheduler:     "rr",
 		ipGetter:          &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:      bytes.NewBuffer(nil),
 		filterChainsData:  bytes.NewBuffer(nil),
@@ -2827,7 +2827,7 @@ func TestCleanLegacyService(t *testing.T) {
 		net.ParseIP("127.0.0.1"),
 		nil,
 		nil,
-		DefaultScheduler,
+		"rr",
 		make([]string, 0),
 	)
 	if err != nil {

@@ -64,7 +64,7 @@ ComponentConfigs:
     IPVS:
       ExcludeCIDRs: null
       MinSyncPeriod: 0s
-      Scheduler: ""
+      Scheduler: rr
       SyncPeriod: 30s
     MetricsBindAddress: 127.0.0.1:10249
     Mode: iptables

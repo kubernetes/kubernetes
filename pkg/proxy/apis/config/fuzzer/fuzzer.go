@@ -47,6 +47,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.ResourceContainer = "foo"
 			obj.ClientConnection.ContentType = "bar"
 			obj.NodePortAddresses = []string{"1.2.3.0/24"}
+			obj.IPVS.Scheduler = "rr"
 		},
 	}
 }
