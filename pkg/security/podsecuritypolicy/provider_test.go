@@ -1265,52 +1265,6 @@ func TestValidateAllowPrivilegeEscalation(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("directly allowing privilege escalation expected no errors but got %v", errs)
 	}
-}
-
-// TestValidateDefaultAllowPrivilegeEscalation will test that when the podSecurityPolicy
-// DefaultAllowPrivilegeEscalation is false we cannot set a container's
-// securityContext to allowPrivilegeEscalation but when it is true we can.
-func TestValidateDefaultAllowPrivilegeEscalation(t *testing.T) {
-	pod := defaultPod()
-	pe := true
-	pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &pe
-
-	// create a PSP that does not allow privilege escalation
-	psp := defaultPSP()
-	dpe := false
-	psp.Spec.DefaultAllowPrivilegeEscalation = &dpe
-	psp.Spec.AllowPrivilegeEscalation = false
-
-	provider, err := NewSimpleProvider(psp, "namespace", NewSimpleStrategyFactory())
-	if err != nil {
-		t.Errorf("error creating provider: %v", err.Error())
-	}
-
-	// expect a denial for this PSP and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs := provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 1 {
-		t.Errorf("expected exactly 1 error but got %v", errs)
-	} else {
-		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
-			t.Errorf("did not find the expected error, received: %v", errs)
-		}
-	}
-
-	// now add DefaultAllowPrivilegeEscalation to the podSecurityPolicy
-	dpe = true
-	psp.Spec.DefaultAllowPrivilegeEscalation = &dpe
-	psp.Spec.AllowPrivilegeEscalation = false
-
-	// expect a denial for this PSP because we did not allowPrivilege Escalation via the PodSecurityPolicy
-	// and test the error message to ensure it's related to allowPrivilegeEscalation
-	errs = provider.ValidateContainer(pod, &pod.Spec.Containers[0], field.NewPath(""))
-	if len(errs) != 1 {
-		t.Errorf("expected exactly 1 error but got %v", errs)
-	} else {
-		if !strings.Contains(errs.ToAggregate().Error(), "Allowing privilege escalation for containers is not allowed") {
-			t.Errorf("did not find the expected error, received: %v", errs)
-		}
-	}
 
 	// Now set AllowPrivilegeEscalation
 	psp.Spec.AllowPrivilegeEscalation = true
