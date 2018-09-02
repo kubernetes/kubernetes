@@ -26,8 +26,8 @@ import (
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
 // and cloud-controller-manager.
 type KubeCloudSharedOptions struct {
-	Port                         int32
-	Address                      string
+	CloudProvider                *CloudProviderOptions
+	ExternalCloudVolumePlugin    string
 	UseServiceAccountCredentials bool
 	AllowUntaggedCloud           bool
 	RouteReconciliationPeriod    metav1.Duration
@@ -45,12 +45,13 @@ type KubeCloudSharedOptions struct {
 // be made here. Any individual changes should be made in that controller.
 func NewKubeCloudSharedOptions(cfg componentconfig.KubeCloudSharedConfiguration) *KubeCloudSharedOptions {
 	o := &KubeCloudSharedOptions{
-		Port:                      cfg.Port,
-		Address:                   cfg.Address,
-		RouteReconciliationPeriod: cfg.RouteReconciliationPeriod,
-		NodeMonitorPeriod:         cfg.NodeMonitorPeriod,
-		ClusterName:               cfg.ClusterName,
-		ConfigureCloudRoutes:      cfg.ConfigureCloudRoutes,
+		CloudProvider:                &CloudProviderOptions{},
+		ExternalCloudVolumePlugin:    cfg.ExternalCloudVolumePlugin,
+		UseServiceAccountCredentials: cfg.UseServiceAccountCredentials,
+		RouteReconciliationPeriod:    cfg.RouteReconciliationPeriod,
+		NodeMonitorPeriod:            cfg.NodeMonitorPeriod,
+		ClusterName:                  cfg.ClusterName,
+		ConfigureCloudRoutes:         cfg.ConfigureCloudRoutes,
 	}
 
 	return o
@@ -62,6 +63,8 @@ func (o *KubeCloudSharedOptions) AddFlags(fs *pflag.FlagSet) {
 		return
 	}
 
+	o.CloudProvider.AddFlags(fs)
+	fs.StringVar(&o.ExternalCloudVolumePlugin, "external-cloud-volume-plugin", o.ExternalCloudVolumePlugin, "The plugin to use when cloud provider is set to external. Can be empty, should only be set when cloud-provider is external. Currently used to allow node and volume controllers to work for in tree cloud providers.")
 	fs.BoolVar(&o.UseServiceAccountCredentials, "use-service-account-credentials", o.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
 	fs.BoolVar(&o.AllowUntaggedCloud, "allow-untagged-cloud", false, "Allow the cluster to run without the cluster-id on cloud instances. This is a legacy mode of operation and a cluster-id will be required in the future.")
 	fs.MarkDeprecated("allow-untagged-cloud", "This flag is deprecated and will be removed in a future release. A cluster-id will be required on cloud instances.")
@@ -86,8 +89,10 @@ func (o *KubeCloudSharedOptions) ApplyTo(cfg *componentconfig.KubeCloudSharedCon
 		return nil
 	}
 
-	cfg.Port = o.Port
-	cfg.Address = o.Address
+	if err := o.CloudProvider.ApplyTo(&cfg.CloudProvider); err != nil {
+		return err
+	}
+	cfg.ExternalCloudVolumePlugin = o.ExternalCloudVolumePlugin
 	cfg.UseServiceAccountCredentials = o.UseServiceAccountCredentials
 	cfg.AllowUntaggedCloud = o.AllowUntaggedCloud
 	cfg.RouteReconciliationPeriod = o.RouteReconciliationPeriod
@@ -109,5 +114,7 @@ func (o *KubeCloudSharedOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	errs = append(errs, o.CloudProvider.Validate()...)
+
 	return errs
 }
