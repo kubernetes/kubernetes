@@ -57,6 +57,9 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentT
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,Type
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,IntVal
 API rule violation: names_match,k8s.io/apimachinery/pkg/util/intstr,IntOrString,StrVal
+API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig
+API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
+API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,AttachDetachControllerConfiguration,DisableAttachDetachReconcilerSync
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,AttachDetachControllerConfiguration,ReconcilerSyncLoopPeriod
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,CSRSigningControllerConfiguration,ClusterSigningCertFile
@@ -167,8 +170,5 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,VolumeConfiguration,EnableDynamicProvisioning
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,VolumeConfiguration,PersistentVolumeRecyclerConfiguration
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,VolumeConfiguration,FlexVolumePluginDir
-API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1,KubeletConfiguration,ResolverConfig
-API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
-API rule violation: names_match,k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/metrics/pkg/apis/custom_metrics/v1beta1,MetricValue,WindowSeconds
 API rule violation: names_match,k8s.io/metrics/pkg/apis/external_metrics/v1beta1,ExternalMetricValue,WindowSeconds
