@@ -22,16 +22,17 @@ package v1beta1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	v1beta1 "k8s.io/kubelet/config/v1beta1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&KubeletConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeletConfiguration(obj.(*KubeletConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.KubeletConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeletConfiguration(obj.(*v1beta1.KubeletConfiguration)) })
 	return nil
 }
 
-func SetObjectDefaults_KubeletConfiguration(in *KubeletConfiguration) {
+func SetObjectDefaults_KubeletConfiguration(in *v1beta1.KubeletConfiguration) {
 	SetDefaults_KubeletConfiguration(in)
 }

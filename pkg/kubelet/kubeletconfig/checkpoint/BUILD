@@ -35,7 +35,6 @@ go_library(
     deps = [
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/config/scheme:go_default_library",
-        "//pkg/kubelet/apis/config/v1beta1:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",
@@ -47,6 +46,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
     ],
 )
 

@@ -30,7 +30,7 @@ var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1
 var (
 	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
 	localSchemeBuilder = &SchemeBuilder
-	AddToScheme = localSchemeBuilder.AddToScheme
+	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
 func init() {

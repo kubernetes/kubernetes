@@ -13,6 +13,7 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
     ],
 )
