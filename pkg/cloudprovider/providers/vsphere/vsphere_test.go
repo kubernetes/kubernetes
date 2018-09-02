@@ -36,6 +36,7 @@ import (
 	vapi "github.com/vmware/govmomi/vapi/simulator"
 	"github.com/vmware/govmomi/vapi/tags"
 	"github.com/vmware/govmomi/vim25/mo"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -526,6 +527,15 @@ func TestInstances(t *testing.T) {
 	addrs, err := i.NodeAddresses(context.TODO(), nodeName)
 	if err != nil {
 		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", nodeName, err)
+	}
+	found := false
+	for _, addr := range addrs {
+		if addr.Type == v1.NodeHostName {
+			found = true
+		}
+	}
+	if found == false {
+		t.Fatalf("NodeAddresses does not report hostname, %s %s", nodeName, addrs)
 	}
 	t.Logf("Found NodeAddresses(%s) = %s\n", nodeName, addrs)
 }
