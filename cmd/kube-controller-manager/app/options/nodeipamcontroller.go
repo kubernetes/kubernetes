@@ -22,14 +22,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
-// NodeIpamControllerOptions holds the NodeIpamController options.
-type NodeIpamControllerOptions struct {
+// NodeIPAMControllerOptions holds the NodeIpamController options.
+type NodeIPAMControllerOptions struct {
 	ServiceCIDR      string
 	NodeCIDRMaskSize int32
 }
 
 // AddFlags adds flags related to NodeIpamController for controller manager to the specified FlagSet.
-func (o *NodeIpamControllerOptions) AddFlags(fs *pflag.FlagSet) {
+func (o *NodeIPAMControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
@@ -39,7 +39,7 @@ func (o *NodeIpamControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up NodeIpamController config with options.
-func (o *NodeIpamControllerOptions) ApplyTo(cfg *componentconfig.NodeIpamControllerConfiguration) error {
+func (o *NodeIPAMControllerOptions) ApplyTo(cfg *componentconfig.NodeIPAMControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
@@ -50,8 +50,8 @@ func (o *NodeIpamControllerOptions) ApplyTo(cfg *componentconfig.NodeIpamControl
 	return nil
 }
 
-// Validate checks validation of NodeIpamControllerOptions.
-func (o *NodeIpamControllerOptions) Validate() []error {
+// Validate checks validation of NodeIPAMControllerOptions.
+func (o *NodeIPAMControllerOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}
