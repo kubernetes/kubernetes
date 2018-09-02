@@ -200,7 +200,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch)
+			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch, nil)
 			if err != nil {
 				return err
 			}

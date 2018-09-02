@@ -108,13 +108,16 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 		Get()
 }
 
-func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
+func (m *Helper) Create(namespace string, modify bool, obj runtime.Object, options *metav1.CreateOptions) (runtime.Object, error) {
+	if options == nil {
+		options = &metav1.CreateOptions{}
+	}
 	if modify {
 		// Attempt to version the object based on client logic.
 		version, err := metadataAccessor.ResourceVersion(obj)
 		if err != nil {
 			// We don't know how to clear the version on this object, so send it to the server as is
-			return m.createResource(m.RESTClient, m.Resource, namespace, obj)
+			return m.createResource(m.RESTClient, m.Resource, namespace, obj, options)
 		}
 		if version != "" {
 			if err := metadataAccessor.SetResourceVersion(obj, ""); err != nil {
@@ -123,17 +126,27 @@ func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runt
 		}
 	}
 
-	return m.createResource(m.RESTClient, m.Resource, namespace, obj)
+	return m.createResource(m.RESTClient, m.Resource, namespace, obj, options)
 }
 
-func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object) (runtime.Object, error) {
-	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(obj).Do().Get()
+func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object, options *metav1.CreateOptions) (runtime.Object, error) {
+	return c.Post().
+		NamespaceIfScoped(namespace, m.NamespaceScoped).
+		Resource(resource).
+		VersionedParams(options, metav1.ParameterCodec).
+		Body(obj).
+		Do().
+		Get()
 }
-func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
+func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.UpdateOptions) (runtime.Object, error) {
+	if options == nil {
+		options = &metav1.UpdateOptions{}
+	}
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
+		VersionedParams(options, metav1.ParameterCodec).
 		Body(data).
 		Do().
 		Get()
