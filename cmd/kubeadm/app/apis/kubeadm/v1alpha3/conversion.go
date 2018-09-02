@@ -19,11 +19,11 @@ package v1alpha3
 import (
 	"k8s.io/apimachinery/pkg/conversion"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 )

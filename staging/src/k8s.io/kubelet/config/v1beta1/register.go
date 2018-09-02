@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 )
 
 // GroupName is the group name use in this package
@@ -28,7 +28,8 @@ const GroupName = "kubelet.config.k8s.io"
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
 
 var (
-	localSchemeBuilder = &kubeletconfigv1beta1.SchemeBuilder
+	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
+	localSchemeBuilder = &SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
@@ -36,5 +37,14 @@ func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addDefaultingFuncs)
+	localSchemeBuilder.Register(addKnownTypes)
+}
+
+// Adds the list of known types to the given scheme.
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&KubeletConfiguration{},
+		&SerializedNodeConfigSource{},
+	)
+	return nil
 }

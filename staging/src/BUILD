@@ -209,6 +209,7 @@ filegroup(
         "//staging/src/k8s.io/kube-aggregator:all-srcs",
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:all-srcs",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/kubelet/config/v1beta1:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/external_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics:all-srcs",

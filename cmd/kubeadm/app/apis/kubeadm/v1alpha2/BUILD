@@ -35,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
         "//staging/src/k8s.io/client-go/tools/bootstrap/token/util:go_default_library",
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
