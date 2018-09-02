@@ -147,7 +147,7 @@ func (gce *GCECloud) instanceByProviderID(providerID string) (*gceInstance, erro
 	instance, err := gce.getInstanceFromProjectInZoneByName(project, zone, name)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
-			return nil, cloudprovider.InstanceNotFound
+			return nil, cloudprovider.ErrInstanceNotFound
 		}
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (gce *GCECloud) instanceByProviderID(providerID string) (*gceInstance, erro
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (gce *GCECloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node
@@ -178,7 +178,7 @@ func (gce *GCECloud) InstanceTypeByProviderID(ctx context.Context, providerID st
 func (gce *GCECloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	_, err := gce.instanceByProviderID(providerID)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			return false, nil
 		}
 		return false, err
@@ -421,7 +421,7 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 	return mc.Observe(err)
 }
 
-// Gets the named instances, returning cloudprovider.InstanceNotFound if any
+// Gets the named instances, returning cloudprovider.ErrInstanceNotFound if any
 // instance is not found
 func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -478,7 +478,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 			}
 		}
 		glog.Errorf("Failed to retrieve instances: %v", failed)
-		return nil, cloudprovider.InstanceNotFound
+		return nil, cloudprovider.ErrInstanceNotFound
 	}
 
 	var ret []*gceInstance
@@ -489,7 +489,7 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 	return ret, nil
 }
 
-// Gets the named instance, returning cloudprovider.InstanceNotFound if the instance is not found
+// Gets the named instance, returning cloudprovider.ErrInstanceNotFound if the instance is not found
 func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 	// Avoid changing behaviour when not managing multiple zones
 	for _, zone := range gce.managedZones {
@@ -504,7 +504,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 		return instance, nil
 	}
 
-	return nil, cloudprovider.InstanceNotFound
+	return nil, cloudprovider.ErrInstanceNotFound
 }
 
 func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name string) (*gceInstance, error) {

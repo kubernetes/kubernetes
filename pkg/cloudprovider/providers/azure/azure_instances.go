@@ -132,7 +132,7 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 	_, err = az.InstanceID(ctx, name)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			return false, nil
 		}
 		return false, err
@@ -143,7 +143,7 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // getComputeMetadata gets compute information from instance metadata.
@@ -173,7 +173,7 @@ func (az *Cloud) isCurrentInstance(name types.NodeName, metadataVMName string) (
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
-// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.ErrInstanceNotFound)
 func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	nodeName := mapNodeNameToVMName(name)
 	unmanaged, err := az.IsNodeUnmanaged(nodeName)
@@ -248,7 +248,7 @@ func (az *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string
 }
 
 // InstanceType returns the type of the specified instance.
-// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
+// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.ErrInstanceNotFound)
 // (Implementer Note): This is used by kubelet. Kubelet will label the node. Real log from kubelet:
 //       Adding node label from cloud provider: beta.kubernetes.io/instance-type=[value]
 func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
@@ -285,7 +285,7 @@ func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string,
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 // expected format for the key is standard ssh-keygen format: <protocol> <blob>
 func (az *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.

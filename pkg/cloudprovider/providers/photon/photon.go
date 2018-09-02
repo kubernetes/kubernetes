@@ -422,11 +422,11 @@ func (pc *PCCloud) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (pc *PCCloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, cloudprovider.NotImplemented
+	return []v1.NodeAddress{}, cloudprovider.ErrNotImplemented
 }
 
 func (pc *PCCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 func (pc *PCCloud) CurrentNodeName(ctx context.Context, hostname string) (k8stypes.NodeName, error) {
@@ -448,7 +448,7 @@ func getInstanceID(pc *PCCloud, name string) (string, error) {
 	}
 
 	if vmID == "" {
-		err = cloudprovider.InstanceNotFound
+		err = cloudprovider.ErrInstanceNotFound
 	}
 
 	return vmID, err
@@ -457,12 +457,12 @@ func getInstanceID(pc *PCCloud, name string) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (pc *PCCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (pc *PCCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
@@ -486,7 +486,7 @@ func (pc *PCCloud) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (pc *PCCloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
-	return "", cloudprovider.NotImplemented
+	return "", cloudprovider.ErrNotImplemented
 }
 
 func (pc *PCCloud) InstanceType(ctx context.Context, nodeName k8stypes.NodeName) (string, error) {
@@ -621,7 +621,7 @@ func (pc *PCCloud) DiskIsAttached(ctx context.Context, pdID string, nodeName k8s
 	}
 
 	vmID, err := pc.InstanceID(ctx, nodeName)
-	if err == cloudprovider.InstanceNotFound {
+	if err == cloudprovider.ErrInstanceNotFound {
 		glog.Infof("Instance %q does not exist, disk %s will be detached automatically.", nodeName, pdID)
 		return false, nil
 	}
@@ -653,7 +653,7 @@ func (pc *PCCloud) DisksAreAttached(ctx context.Context, pdIDs []string, nodeNam
 	}
 
 	vmID, err := pc.InstanceID(ctx, nodeName)
-	if err == cloudprovider.InstanceNotFound {
+	if err == cloudprovider.ErrInstanceNotFound {
 		glog.Infof("Instance %q does not exist, its disks will be detached automatically.", nodeName)
 		// make all the disks as detached.
 		return attached, nil

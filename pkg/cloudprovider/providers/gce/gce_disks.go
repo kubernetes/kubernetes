@@ -563,7 +563,7 @@ func (gce *GCECloud) DetachDisk(devicePath string, nodeName types.NodeName) erro
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	inst, err := gce.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DetachDisk will assume PD %q is not attached to it.",
@@ -583,7 +583,7 @@ func (gce *GCECloud) DiskIsAttached(diskName string, nodeName types.NodeName) (b
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DiskIsAttached will assume PD %q is not attached to it.",
@@ -613,7 +613,7 @@ func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName types.NodeNam
 	instanceName := mapNodeNameToInstanceName(nodeName)
 	instance, err := gce.getInstanceByName(instanceName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// If instance no longer exists, safe to assume volume is not attached.
 			glog.Warningf(
 				"Instance %q does not exist. DisksAreAttached will assume PD %v are not attached to it.",
@@ -733,7 +733,7 @@ func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 		return volume.NewDeletedVolumeInUseError(err.Error())
 	}
 
-	if err == cloudprovider.DiskNotFound {
+	if err == cloudprovider.ErrDiskNotFound {
 		return nil
 	}
 	return err
@@ -915,7 +915,7 @@ func (gce *GCECloud) getRegionalDiskByName(diskName string) (*GCEDisk, error) {
 
 // Scans all managed zones to return the GCE PD
 // Prefer getDiskByName, if the zone can be established
-// Return cloudprovider.DiskNotFound if the given disk cannot be found in any zone
+// Return cloudprovider.ErrDiskNotFound if the given disk cannot be found in any zone
 func (gce *GCECloud) GetDiskByNameUnknownZone(diskName string) (*GCEDisk, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
 		regionalDisk, err := gce.getRegionalDiskByName(diskName)
@@ -966,7 +966,7 @@ func (gce *GCECloud) GetDiskByNameUnknownZone(diskName string) (*GCEDisk, error)
 	glog.Warningf("GCE persistent disk %q not found in managed zones (%s)",
 		diskName, strings.Join(gce.managedZones, ","))
 
-	return nil, cloudprovider.DiskNotFound
+	return nil, cloudprovider.ErrDiskNotFound
 }
 
 // encodeDiskTags encodes requested volume tags into JSON string, as GCE does

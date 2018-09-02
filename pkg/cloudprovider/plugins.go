@@ -83,7 +83,7 @@ func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 	return f(config)
 }
 
-// Detects if the string is an external cloud provider
+// IsExternal detects if the string is an external cloud provider
 func IsExternal(name string) bool {
 	return name == externalCloudProvider
 }
