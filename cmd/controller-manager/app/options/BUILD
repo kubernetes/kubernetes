@@ -14,8 +14,11 @@ go_library(
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/leaderelectionconfig:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
