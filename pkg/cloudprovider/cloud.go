@@ -191,9 +191,9 @@ var (
 	// ErrInstanceNotFound - The cloud provider ID of the node not found
 	ErrInstanceNotFound = errors.New("instance not found")
 	// ErrDiskNotFound - The cloud provider ID of the volume/disk not found
-	ErrDiskNotFound     = errors.New("disk is not found")
+	ErrDiskNotFound = errors.New("disk is not found")
 	// ErrNotImplemented - Feature is not implemented yet
-	ErrNotImplemented   = errors.New("unimplemented")
+	ErrNotImplemented = errors.New("unimplemented")
 )
 
 // Zone represents the location of a particular machine.
