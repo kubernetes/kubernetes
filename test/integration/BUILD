@@ -41,6 +41,7 @@ filegroup(
         "//test/integration/benchmark/jsonify:all-srcs",
         "//test/integration/client:all-srcs",
         "//test/integration/configmap:all-srcs",
+        "//test/integration/controllermanager:all-srcs",
         "//test/integration/daemonset:all-srcs",
         "//test/integration/defaulttolerationseconds:all-srcs",
         "//test/integration/deployment:all-srcs",

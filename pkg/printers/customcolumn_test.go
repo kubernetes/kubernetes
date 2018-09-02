@@ -286,8 +286,8 @@ bar
 				},
 			},
 			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
-			expectedOutput: `NAME      API_VERSION
-foo       baz
+			expectedOutput: `NAME   API_VERSION
+foo    baz
 `,
 		},
 		{
@@ -306,8 +306,8 @@ foo       baz
 				},
 			},
 			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
-			expectedOutput: `NAME      API_VERSION   NOT_FOUND
-foo       baz           <none>
+			expectedOutput: `NAME   API_VERSION   NOT_FOUND
+foo    baz           <none>
 `,
 		},
 	}
@@ -349,9 +349,9 @@ func TestIndividualPrintObjOnExistingTabWriter(t *testing.T) {
 		{ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"label1": "foo", "label2": "foo"}}},
 		{ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{"label1": "bar", "label2": "bar"}}},
 	}
-	expectedOutput := `NAME      LONG COLUMN NAME   LABEL 2
-foo       foo                foo
-bar       bar                bar
+	expectedOutput := `NAME   LONG COLUMN NAME   LABEL 2
+foo    foo                foo
+bar    bar                bar
 `
 
 	buffer := &bytes.Buffer{}

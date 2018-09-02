@@ -334,19 +334,19 @@ export KUBE_PROXY_MODE=ipvs
 
 ### Cluster Created by Kubeadm
 
-Kube-proxy will run in iptables mode by default in a cluster deployed by [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/).
-
-If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you can specify the ipvs mode adding `SupportIPVSProxyMode: true` below the `kubeProxy` field.
+If you are using kubeadm with a [configuration file](https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-init/#config-file), you have to add `mode: ipvs` and also add `SupportIPVSProxyMode: true` below the `kubeProxy` field as part of the kubeadm configuration.
 
 ```json
-kind: MasterConfiguration
-apiVersion: kubeadm.k8s.io/v1alpha1
 ...
 kubeProxy:
   config:
+    featureGates:
+      SupportIPVSProxyMode: true
     mode: ipvs
 ...
 ```
+Note that in Kubernetes 1.11 and later, `SupportIPVSProxyMode` is set to `true` by default.
+
 before running
 
 `kube init --config <path_to_configuration_file>`

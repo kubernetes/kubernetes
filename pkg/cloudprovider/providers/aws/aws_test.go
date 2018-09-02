@@ -798,6 +798,18 @@ func TestIpPermissionExistsHandlesMultipleGroupIdsWithUserIds(t *testing.T) {
 }
 
 func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
+	awsStates := []struct {
+		id       int64
+		state    string
+		expected bool
+	}{
+		{0, ec2.InstanceStateNamePending, true},
+		{16, ec2.InstanceStateNameRunning, true},
+		{32, ec2.InstanceStateNameShuttingDown, true},
+		{48, ec2.InstanceStateNameTerminated, false},
+		{64, ec2.InstanceStateNameStopping, true},
+		{80, ec2.InstanceStateNameStopped, true},
+	}
 	awsServices := newMockedFakeAWSServices(TestClusterId)
 
 	nodeName := types.NodeName("my-dns.internal")
@@ -807,36 +819,41 @@ func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 	tag.Value = aws.String(TestClusterId)
 	tags := []*ec2.Tag{&tag}
 
-	var runningInstance ec2.Instance
-	runningInstance.InstanceId = aws.String("i-running")
-	runningInstance.PrivateDnsName = aws.String(string(nodeName))
-	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
-	runningInstance.Tags = tags
+	var testInstance ec2.Instance
+	testInstance.PrivateDnsName = aws.String(string(nodeName))
+	testInstance.Tags = tags
 
-	var terminatedInstance ec2.Instance
-	terminatedInstance.InstanceId = aws.String("i-terminated")
-	terminatedInstance.PrivateDnsName = aws.String(string(nodeName))
-	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
-	terminatedInstance.Tags = tags
+	awsDefaultInstances := awsServices.instances
+	for _, awsState := range awsStates {
+		id := "i-" + awsState.state
+		testInstance.InstanceId = aws.String(id)
+		testInstance.State = &ec2.InstanceState{Code: aws.Int64(awsState.id), Name: aws.String(awsState.state)}
 
-	instances := []*ec2.Instance{&terminatedInstance, &runningInstance}
-	awsServices.instances = append(awsServices.instances, instances...)
+		awsServices.instances = append(awsDefaultInstances, &testInstance)
 
-	c, err := newAWSCloud(CloudConfig{}, awsServices)
-	if err != nil {
-		t.Errorf("Error building aws cloud: %v", err)
-		return
-	}
+		c, err := newAWSCloud(CloudConfig{}, awsServices)
+		if err != nil {
+			t.Errorf("Error building aws cloud: %v", err)
+			return
+		}
 
-	instance, err := c.findInstanceByNodeName(nodeName)
+		resultInstance, err := c.findInstanceByNodeName(nodeName)
 
-	if err != nil {
-		t.Errorf("Failed to find instance: %v", err)
-		return
-	}
-
-	if *instance.InstanceId != "i-running" {
-		t.Errorf("Expected running instance but got %v", *instance.InstanceId)
+		if awsState.expected {
+			if err != nil || resultInstance == nil {
+				t.Errorf("Expected to find instance %v", *testInstance.InstanceId)
+				return
+			}
+			if *resultInstance.InstanceId != *testInstance.InstanceId {
+				t.Errorf("Wrong instance returned by findInstanceByNodeName() expected: %v, actual: %v", *testInstance.InstanceId, *resultInstance.InstanceId)
+				return
+			}
+		} else {
+			if err == nil && resultInstance != nil {
+				t.Errorf("Did not expect to find instance %v", *resultInstance.InstanceId)
+				return
+			}
+		}
 	}
 }
 

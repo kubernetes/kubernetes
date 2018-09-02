@@ -26,6 +26,7 @@ spec:
       priorityClassName: system-node-critical
       serviceAccountName: fluentd-gcp
       dnsPolicy: Default
+      hostNetwork: true
       containers:
       - name: fluentd-gcp
         image: gcr.io/stackdriver-agents/stackdriver-logging-agent:{{ fluentd_gcp_version }}

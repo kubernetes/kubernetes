@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // SecretCreate creates a new Secret.

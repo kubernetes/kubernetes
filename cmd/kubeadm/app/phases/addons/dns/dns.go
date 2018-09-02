@@ -310,6 +310,7 @@ func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigM
 			pStanza["body"] = [][]string{
 				{"errors"},
 				{"cache", "30"},
+				{"loop"},
 				append([]string{"proxy", "."}, proxyIP...),
 			}
 			proxyStanza = append(proxyStanza, pStanza)

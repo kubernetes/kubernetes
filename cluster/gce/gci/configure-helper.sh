@@ -1461,8 +1461,12 @@ function start-kube-apiserver {
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
-  params+=" --etcd-servers=http://127.0.0.1:2379"
-  params+=" --etcd-servers-overrides=/events#http://127.0.0.1:4002"
+  params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
+  if [[ -z "${ETCD_SERVERS:-}" ]]; then
+    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
+  elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
+    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
+  fi
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
@@ -2019,6 +2023,12 @@ function setup-addon-manifests {
       copy-manifests "${psp_dir}" "${dst_dir}"
     fi
   fi
+  if [[ "${ENABLE_NODE_TERMINATION_HANDLER}" == "true" ]]; then
+      local -r nth_dir="${src_dir}/${3:-$2}/node-termination-handler"
+      if [[ -d "${nth_dir}" ]]; then
+          copy-manifests "${nth_dir}" "${dst_dir}"
+      fi
+  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
@@ -2424,6 +2434,10 @@ EOF
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
+  if [[ "${ENABLE_NODE_TERMINATION_HANDLER}" == "true" ]]; then
+      setup-addon-manifests "addons" "node-termination-handler"
+      setup-node-termination-handler-manifest
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
       setup-addon-manifests "addons" "dns/coredns"
@@ -2500,7 +2514,16 @@ EOF
   fi
 
   # Place addon manager pod manifest.
-  cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
+  src_file="${src_dir}/kube-addon-manager.yaml"
+  sed -i -e "s@{{kubectl_extra_prune_whitelist}}@${ADDON_MANAGER_PRUNE_WHITELIST:-}@g" "${src_file}"
+  cp "${src_file}" /etc/kubernetes/manifests
+}
+
+function setup-node-termination-handler-manifest {
+    local -r nth_manifest="/etc/kubernetes/$1/$2/daemonset.yaml"
+    if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
+        sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
+    fi 
 }
 
 # Starts an image-puller - used in test clusters.

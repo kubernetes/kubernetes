@@ -1,13 +1,13 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/registry"
-	"golang.org/x/net/context"
 )
 
 // RegistryLogin authenticates the docker server with a given docker registry.

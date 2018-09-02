@@ -28,6 +28,29 @@
 
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 KUBECTL_OPTS=${KUBECTL_OPTS:-}
+# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by
+# default.
+# This is currently the same with the default in:
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go
+KUBECTL_PRUNE_WHITELIST=(
+  core/v1/ConfigMap
+  core/v1/Endpoints
+  core/v1/Namespace
+  core/v1/PersistentVolumeClaim
+  core/v1/PersistentVolume
+  core/v1/Pod
+  core/v1/ReplicationController
+  core/v1/Secret
+  core/v1/Service
+  batch/v1/Job
+  batch/v1beta1/CronJob
+  extensions/v1beta1/DaemonSet
+  extensions/v1beta1/Deployment
+  extensions/v1beta1/Ingress
+  extensions/v1beta1/ReplicaSet
+  apps/v1beta1/StatefulSet
+  apps/v1beta1/Deployment
+)
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}
 ADDON_PATH=${ADDON_PATH:-/etc/kubernetes/addons}
@@ -82,6 +105,25 @@ function log() {
   esac
 }
 
+# Generate kubectl prune-whitelist flags from provided resource list.
+function generate_prune_whitelist_flags() {
+  local -r resources=($@)
+  for resource in "${resources[@]}"; do
+    printf "%s" "--prune-whitelist ${resource} "
+  done
+}
+
+# KUBECTL_EXTRA_PRUNE_WHITELIST is a list of extra whitelisted resources
+# besides the default ones.
+extra_prune_whitelist=
+if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
+  extra_prune_whitelist=( ${KUBECTL_EXTRA_PRUNE_WHITELIST:-} )
+fi
+prune_whitelist=( ${KUBECTL_PRUNE_WHITELIST[@]}  ${extra_prune_whitelist[@]} )
+prune_whitelist_flags=$(generate_prune_whitelist_flags ${prune_whitelist[@]})
+
+log INFO "== Generated kubectl prune whitelist flags: $prune_whitelist_flags =="
+
 # $1 filename of addon to start.
 # $2 count of tries to start the addon.
 # $3 delay in seconds between two consecutive tries
@@ -126,12 +168,12 @@ function reconcile_addons() {
   log INFO "== Reconciling with deprecated label =="
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}=true,${ADDON_MANAGER_LABEL}!=EnsureExists \
-    --prune=true --recursive | grep -v configured
+    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
 
   log INFO "== Reconciling with addon-manager label =="
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}!=true,${ADDON_MANAGER_LABEL}=Reconcile \
-    --prune=true --recursive | grep -v configured
+    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
 
   log INFO "== Kubernetes addon reconcile completed at $(date -Is) =="
 }

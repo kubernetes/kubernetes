@@ -466,6 +466,13 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	CPUCFSQuota *bool `json:"cpuCFSQuota,omitempty"`
+	// CPUCFSQuotaPeriod is the CPU CFS quota period value, cpu.cfs_period_us.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// limits set for containers will result in different cpu.cfs_quota settings. This
+	// will trigger container restarts on the node being reconfigured.
+	// Default: "100ms"
+	// +optional
+	CPUCFSQuotaPeriod *metav1.Duration `json:"cpuCFSQuotaPeriod,omitempty"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
 	// it may impact the ability of the Kubelet to interact with the node's filesystem.
