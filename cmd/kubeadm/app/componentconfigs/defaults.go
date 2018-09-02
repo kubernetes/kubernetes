@@ -24,7 +24,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -51,7 +50,7 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 	}
 
 	// Run the rest of the kube-proxy defaulting code
-	v1alpha1.SetDefaults_KubeProxyConfiguration(externalproxycfg)
+	Scheme.Default(externalproxycfg)
 
 	if internalcfg.ComponentConfigs.KubeProxy == nil {
 		internalcfg.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
@@ -109,7 +108,7 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	externalkubeletcfg.HealthzBindAddress = "127.0.0.1"
 	externalkubeletcfg.HealthzPort = utilpointer.Int32Ptr(constants.KubeletHealthzPort)
 
-	kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(externalkubeletcfg)
+	Scheme.Default(externalkubeletcfg)
 
 	if internalcfg.ComponentConfigs.Kubelet == nil {
 		internalcfg.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
