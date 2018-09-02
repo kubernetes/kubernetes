@@ -1,4 +1,3 @@
-
 cluster/images/etcd-version-monitor
 cmd/hyperkube
 cmd/kube-apiserver/app
@@ -101,7 +100,6 @@ pkg/capabilities
 pkg/client/chaosclient
 pkg/client/leaderelectionconfig
 pkg/client/tests
-pkg/cloudprovider
 pkg/cloudprovider/providers/aws
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/gce

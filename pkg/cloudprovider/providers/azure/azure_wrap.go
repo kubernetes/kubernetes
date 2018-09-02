@@ -82,7 +82,7 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 	}
 
 	if cachedVM == nil {
-		return vm, cloudprovider.InstanceNotFound
+		return vm, cloudprovider.ErrInstanceNotFound
 	}
 
 	return *(cachedVM.(*compute.VirtualMachine)), nil

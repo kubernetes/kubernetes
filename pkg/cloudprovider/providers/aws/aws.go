@@ -753,7 +753,7 @@ func newEc2Filter(name string, values ...string) *ec2.Filter {
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (c *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // CurrentNodeName returns the name of the current node
@@ -1411,8 +1411,8 @@ func (c *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string
 	}
 	inst, err := c.getInstanceByNodeName(nodeName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
-			// The Instances interface requires that we return InstanceNotFound (without wrapping)
+		if err == cloudprovider.ErrInstanceNotFound {
+			// The Instances interface requires that we return ErrInstanceNotFound (without wrapping)
 			return "", err
 		}
 		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %q", nodeName, err)
@@ -4215,7 +4215,7 @@ func (c *Cloud) getInstanceByID(instanceID string) (*ec2.Instance, error) {
 	}
 
 	if len(instances) == 0 {
-		return nil, cloudprovider.InstanceNotFound
+		return nil, cloudprovider.ErrInstanceNotFound
 	}
 	if len(instances) > 1 {
 		return nil, fmt.Errorf("multiple instances found for instance: %s", instanceID)
@@ -4357,7 +4357,7 @@ func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, 
 func (c *Cloud) getInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
 	instance, err := c.findInstanceByNodeName(nodeName)
 	if err == nil && instance == nil {
-		return nil, cloudprovider.InstanceNotFound
+		return nil, cloudprovider.ErrInstanceNotFound
 	}
 	return instance, err
 }

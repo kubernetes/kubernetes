@@ -166,7 +166,7 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 
 	disks, err := c.getNodeDataDisks(nodeName)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			// if host doesn't exist, no need to detach
 			glog.Warningf("azureDisk - Cannot find node %q, DisksAreAttached will assume disks %v are not attached to it.",
 				nodeName, diskNames)

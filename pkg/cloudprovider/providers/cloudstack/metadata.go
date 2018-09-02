@@ -112,7 +112,7 @@ func (m *metadata) InstanceTypeByProviderID(ctx context.Context, providerID stri
 
 // AddSSHKeyToAllInstances is currently not implemented.
 func (m *metadata) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // CurrentNodeName returns the name of the node we are currently running on.
@@ -127,7 +127,7 @@ func (m *metadata) InstanceExistsByProviderID(ctx context.Context, providerID st
 
 // InstanceShutdownByProviderID returns if the instance is shutdown.
 func (m *metadata) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	return false, cloudprovider.ErrNotImplemented
 }
 
 // GetZone returns the Zone containing the region that the program is running in.
