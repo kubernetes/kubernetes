@@ -39,13 +39,13 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_CloudControllerManagerConfiguration(in *CloudControllerManagerConfiguration) {
 	SetDefaults_CloudControllerManagerConfiguration(in)
-	SetDefaults_GenericComponentConfiguration(&in.GenericComponent)
+	SetDefaults_GenericControllerManagerConfiguration(&in.Generic)
 	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 }
 
 func SetObjectDefaults_KubeControllerManagerConfiguration(in *KubeControllerManagerConfiguration) {
 	SetDefaults_KubeControllerManagerConfiguration(in)
-	SetDefaults_GenericComponentConfiguration(&in.GenericComponent)
+	SetDefaults_GenericControllerManagerConfiguration(&in.Generic)
 	SetDefaults_KubeCloudSharedConfiguration(&in.KubeCloudShared)
 	SetDefaults_VolumeConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration)
 	SetDefaults_PersistentVolumeRecyclerConfiguration(&in.PersistentVolumeBinderController.VolumeConfiguration.PersistentVolumeRecyclerConfiguration)

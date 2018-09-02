@@ -55,9 +55,7 @@ const (
 
 // CloudControllerManagerOptions is the main context object for the controller manager.
 type CloudControllerManagerOptions struct {
-	CloudProvider     *cmoptions.CloudProviderOptions
-	Debugging         *cmoptions.DebuggingOptions
-	GenericComponent  *cmoptions.GenericComponentConfigOptions
+	Generic           *cmoptions.GenericControllerManagerConfigurationOptions
 	KubeCloudShared   *cmoptions.KubeCloudSharedOptions
 	ServiceController *cmoptions.ServiceControllerOptions
 
@@ -82,17 +80,15 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 	}
 
 	s := CloudControllerManagerOptions{
-		CloudProvider:    &cmoptions.CloudProviderOptions{},
-		Debugging:        &cmoptions.DebuggingOptions{},
-		GenericComponent: cmoptions.NewGenericComponentConfigOptions(componentConfig.GenericComponent),
-		KubeCloudShared:  cmoptions.NewKubeCloudSharedOptions(componentConfig.KubeCloudShared),
+		Generic:         cmoptions.NewGenericControllerManagerConfigurationOptions(componentConfig.Generic),
+		KubeCloudShared: cmoptions.NewKubeCloudSharedOptions(componentConfig.KubeCloudShared),
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
 		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
-			BindAddress: net.ParseIP(componentConfig.KubeCloudShared.Address),
-			BindPort:    int(componentConfig.KubeCloudShared.Port),
+			BindAddress: net.ParseIP(componentConfig.Generic.Address),
+			BindPort:    int(componentConfig.Generic.Port),
 			BindNetwork: "tcp",
 		}).WithLoopback(),
 		Authentication:            apiserveroptions.NewDelegatingAuthenticationOptions(),
@@ -112,31 +108,35 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 }
 
 // NewDefaultComponentConfig returns cloud-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) (componentconfig.CloudControllerManagerConfiguration, error) {
+func NewDefaultComponentConfig(insecurePort int32) (*componentconfig.CloudControllerManagerConfiguration, error) {
+	// TODO: This code will be fixed up/improved when the ccm API types are moved to their own, real API group out of
+	// pkg/apis/componentconfig to cmd/cloud-controller-manager/app/apis/
 	scheme := runtime.NewScheme()
 	if err := componentconfigv1alpha1.AddToScheme(scheme); err != nil {
-		return componentconfig.CloudControllerManagerConfiguration{}, err
+		return nil, err
 	}
 	if err := componentconfig.AddToScheme(scheme); err != nil {
-		return componentconfig.CloudControllerManagerConfiguration{}, err
+		return nil, err
 	}
+	scheme.AddKnownTypes(componentconfigv1alpha1.SchemeGroupVersion, &componentconfigv1alpha1.CloudControllerManagerConfiguration{})
+	scheme.AddKnownTypes(componentconfig.SchemeGroupVersion, &componentconfig.CloudControllerManagerConfiguration{})
 
-	versioned := componentconfigv1alpha1.CloudControllerManagerConfiguration{}
-	scheme.Default(&versioned)
-
-	internal := componentconfig.CloudControllerManagerConfiguration{}
-	if err := scheme.Convert(&versioned, &internal, nil); err != nil {
+	versioned := &componentconfigv1alpha1.CloudControllerManagerConfiguration{}
+	internal := &componentconfig.CloudControllerManagerConfiguration{}
+	scheme.Default(versioned)
+	if err := scheme.Convert(versioned, internal, nil); err != nil {
 		return internal, err
 	}
-	internal.KubeCloudShared.Port = insecurePort
+	internal.Generic.Port = insecurePort
 	return internal, nil
 }
 
 // Flags returns flags for a specific APIServer by section name
-func (o *CloudControllerManagerOptions) Flags() (fss apiserverflag.NamedFlagSets) {
-	o.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
-	o.Debugging.AddFlags(fss.FlagSet("debugging"))
-	o.GenericComponent.AddFlags(fss.FlagSet("generic"))
+func (o *CloudControllerManagerOptions) Flags() apiserverflag.NamedFlagSets {
+	fss := apiserverflag.NamedFlagSets{}
+	o.Generic.AddFlags(&fss, []string{}, []string{})
+	// TODO: Implement the --controllers flag fully for the ccm
+	fss.FlagSet("generic").MarkHidden("controllers")
 	o.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
 	o.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
@@ -158,13 +158,7 @@ func (o *CloudControllerManagerOptions) Flags() (fss apiserverflag.NamedFlagSets
 // ApplyTo fills up cloud controller manager config with options.
 func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config, userAgent string) error {
 	var err error
-	if err = o.CloudProvider.ApplyTo(&c.ComponentConfig.CloudProvider); err != nil {
-		return err
-	}
-	if err = o.Debugging.ApplyTo(&c.ComponentConfig.Debugging); err != nil {
-		return err
-	}
-	if err = o.GenericComponent.ApplyTo(&c.ComponentConfig.GenericComponent); err != nil {
+	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
 		return err
 	}
 	if err = o.KubeCloudShared.ApplyTo(&c.ComponentConfig.KubeCloudShared); err != nil {
@@ -192,9 +186,9 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 	if err != nil {
 		return err
 	}
-	c.Kubeconfig.ContentConfig.ContentType = o.GenericComponent.ContentType
-	c.Kubeconfig.QPS = o.GenericComponent.KubeAPIQPS
-	c.Kubeconfig.Burst = int(o.GenericComponent.KubeAPIBurst)
+	c.Kubeconfig.ContentConfig.ContentType = o.Generic.ClientConnection.ContentType
+	c.Kubeconfig.QPS = o.Generic.ClientConnection.QPS
+	c.Kubeconfig.Burst = int(o.Generic.ClientConnection.Burst)
 
 	c.Client, err = clientset.NewForConfig(restclient.AddUserAgent(c.Kubeconfig, userAgent))
 	if err != nil {
@@ -213,7 +207,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 			ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
 			CoreClient:           c.Client.CoreV1(),
 			AuthenticationClient: c.Client.AuthenticationV1(),
-			Namespace:            "kube-system",
+			Namespace:            metav1.NamespaceSystem,
 		}
 	} else {
 		c.ClientBuilder = rootClientBuilder
@@ -223,8 +217,8 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 
 	// sync back to component config
 	// TODO: find more elegant way than syncing back the values.
-	c.ComponentConfig.KubeCloudShared.Port = int32(o.InsecureServing.BindPort)
-	c.ComponentConfig.KubeCloudShared.Address = o.InsecureServing.BindAddress.String()
+	c.ComponentConfig.Generic.Port = int32(o.InsecureServing.BindPort)
+	c.ComponentConfig.Generic.Address = o.InsecureServing.BindAddress.String()
 
 	c.ComponentConfig.NodeStatusUpdateFrequency = o.NodeStatusUpdateFrequency
 
@@ -235,9 +229,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *cloudcontrollerconfig.Config,
 func (o *CloudControllerManagerOptions) Validate() error {
 	errors := []error{}
 
-	errors = append(errors, o.CloudProvider.Validate()...)
-	errors = append(errors, o.Debugging.Validate()...)
-	errors = append(errors, o.GenericComponent.Validate()...)
+	errors = append(errors, o.Generic.Validate(nil, nil)...)
 	errors = append(errors, o.KubeCloudShared.Validate()...)
 	errors = append(errors, o.ServiceController.Validate()...)
 	errors = append(errors, o.SecureServing.Validate()...)
@@ -245,7 +237,7 @@ func (o *CloudControllerManagerOptions) Validate() error {
 	errors = append(errors, o.Authentication.Validate()...)
 	errors = append(errors, o.Authorization.Validate()...)
 
-	if len(o.CloudProvider.Name) == 0 {
+	if len(o.KubeCloudShared.CloudProvider.Name) == 0 {
 		errors = append(errors, fmt.Errorf("--cloud-provider cannot be empty"))
 	}
 
@@ -256,7 +248,7 @@ func (o *CloudControllerManagerOptions) Validate() error {
 func resyncPeriod(c *cloudcontrollerconfig.Config) func() time.Duration {
 	return func() time.Duration {
 		factor := rand.Float64() + 1
-		return time.Duration(float64(c.ComponentConfig.GenericComponent.MinResyncPeriod.Nanoseconds()) * factor)
+		return time.Duration(float64(c.ComponentConfig.Generic.MinResyncPeriod.Nanoseconds()) * factor)
 	}
 }
 
