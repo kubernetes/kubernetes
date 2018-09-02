@@ -60,7 +60,7 @@ type PatchOptions struct {
 
 	namespace                    string
 	enforceNamespace             bool
-	dryRun                       bool
+	dryRun                       *cmdutil.DryRun
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -125,7 +125,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&o.Patch, "patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().StringVar(&o.PatchType, "type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 
@@ -141,11 +141,11 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.dryRun = cmdutil.NewDryRunFromCmd(cmd)
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryRun {
+		if o.dryRun.IsDryRun() {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
 
@@ -212,7 +212,7 @@ func (o *PatchOptions) RunPatch() error {
 		count++
 		name, namespace := info.Name, info.Namespace
 
-		if !o.Local && !o.dryRun {
+		if !o.Local && !o.dryRun.Client {
 			mapping := info.ResourceMapping()
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
@@ -220,7 +220,7 @@ func (o *PatchOptions) RunPatch() error {
 			}
 
 			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
+			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, o.dryRun.UpdateOptions(nil))
 			if err != nil {
 				return err
 			}
@@ -231,7 +231,7 @@ func (o *PatchOptions) RunPatch() error {
 			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
 				glog.V(4).Infof("error recording current command: %v", err)
 			} else if len(mergePatch) > 0 {
-				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
+				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, o.dryRun.UpdateOptions(nil)); err != nil {
 					glog.V(4).Infof("error recording reason: %v", err)
 				} else {
 					patchedObj = recordedObj

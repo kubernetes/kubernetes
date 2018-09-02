@@ -56,7 +56,7 @@ type LabelOptions struct {
 	overwrite       bool
 	list            bool
 	local           bool
-	dryrun          bool
+	dryrun          *cmdutil.DryRun
 	all             bool
 	resourceVersion string
 	selector        string
@@ -149,7 +149,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.resourceVersion, "resource-version", o.resourceVersion, i18n.T("If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	usage := "identifying the resource to update the labels"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd
@@ -166,11 +166,11 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.dryrun = cmdutil.NewDryRunFromCmd(cmd)
 
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.dryrun {
+		if o.dryrun.IsDryRun() {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
 
@@ -253,7 +253,7 @@ func (o *LabelOptions) RunLabel() error {
 
 		var outputObj runtime.Object
 		dataChangeMsg := "not labeled"
-		if o.dryrun || o.local || o.list {
+		if o.dryrun.Client || o.local || o.list {
 			err = labelFunc(info.Object, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
@@ -304,9 +304,9 @@ func (o *LabelOptions) RunLabel() error {
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes)
+				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, o.dryrun.UpdateOptions(nil))
 			} else {
-				outputObj, err = helper.Replace(namespace, name, false, obj)
+				outputObj, err = helper.Replace(namespace, name, false, obj, o.dryrun.UpdateOptions(nil))
 			}
 			if err != nil {
 				return err

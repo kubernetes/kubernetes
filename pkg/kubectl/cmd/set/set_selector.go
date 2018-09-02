@@ -43,7 +43,7 @@ type SetSelectorOptions struct {
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 	PrintFlags           *genericclioptions.PrintFlags
 	RecordFlags          *genericclioptions.RecordFlags
-	dryrun               bool
+	dryrun               *cmdutil.DryRun
 
 	// set by args
 	resources []string
@@ -112,7 +112,7 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o.RecordFlags.AddFlags(cmd)
 
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 
 	return cmd
 }
@@ -127,7 +127,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 		return err
 	}
 
-	o.dryrun = cmdutil.GetDryRunFlag(cmd)
+	o.dryrun = cmdutil.NewDryRunFromCmd(cmd)
 
 	o.resources, o.selector, err = getResourcesAndSelector(args)
 	if err != nil {
@@ -135,9 +135,9 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	}
 
 	o.ResourceFinder = o.ResourceBuilderFlags.ToBuilder(f, o.resources)
-	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryrun)
+	o.WriteToServer = !(*o.ResourceBuilderFlags.Local || o.dryrun.Client)
 
-	if o.dryrun {
+	if o.dryrun.IsDryRun() {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
 	printer, err := o.PrintFlags.ToPrinter()
@@ -184,7 +184,7 @@ func (o *SetSelectorOptions) RunSelector() error {
 			return o.PrintObj(info.Object, o.Out)
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, o.dryrun.UpdateOptions(nil))
 		if err != nil {
 			return err
 		}

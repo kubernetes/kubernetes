@@ -108,13 +108,13 @@ func (m *Helper) DeleteWithOptions(namespace, name string, options *metav1.Delet
 		Get()
 }
 
-func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runtime.Object, error) {
+func (m *Helper) Create(namespace string, modify bool, obj runtime.Object, options *metav1.CreateOptions) (runtime.Object, error) {
 	if modify {
 		// Attempt to version the object based on client logic.
 		version, err := metadataAccessor.ResourceVersion(obj)
 		if err != nil {
 			// We don't know how to clear the version on this object, so send it to the server as is
-			return m.createResource(m.RESTClient, m.Resource, namespace, obj)
+			return m.createResource(m.RESTClient, m.Resource, namespace, obj, options)
 		}
 		if version != "" {
 			if err := metadataAccessor.SetResourceVersion(obj, ""); err != nil {
@@ -123,37 +123,44 @@ func (m *Helper) Create(namespace string, modify bool, obj runtime.Object) (runt
 		}
 	}
 
-	return m.createResource(m.RESTClient, m.Resource, namespace, obj)
+	return m.createResource(m.RESTClient, m.Resource, namespace, obj, options)
 }
 
-func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object) (runtime.Object, error) {
-	return c.Post().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Body(obj).Do().Get()
+func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object, options *metav1.CreateOptions) (runtime.Object, error) {
+	return c.Post().
+		NamespaceIfScoped(namespace, m.NamespaceScoped).
+		Resource(resource).
+		Body(obj).
+		VersionedParams(options, metav1.ParameterCodec).
+		Do().
+		Get()
 }
-func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
+func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.UpdateOptions) (runtime.Object, error) {
 	return m.RESTClient.Patch(pt).
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		Name(name).
 		Body(data).
+		VersionedParams(options, metav1.ParameterCodec).
 		Do().
 		Get()
 }
 
-func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {
+func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object, options *metav1.UpdateOptions) (runtime.Object, error) {
 	c := m.RESTClient
 
 	// Attempt to version the object based on client logic.
 	version, err := metadataAccessor.ResourceVersion(obj)
 	if err != nil {
 		// We don't know how to version this object, so send it to the server as is
-		return m.replaceResource(c, m.Resource, namespace, name, obj)
+		return m.replaceResource(c, m.Resource, namespace, name, obj, options)
 	}
 	if version == "" && overwrite {
 		// Retrieve the current version of the object to overwrite the server object
 		serverObj, err := c.Get().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(m.Resource).Name(name).Do().Get()
 		if err != nil {
 			// The object does not exist, but we want it to be created
-			return m.replaceResource(c, m.Resource, namespace, name, obj)
+			return m.replaceResource(c, m.Resource, namespace, name, obj, options)
 		}
 		serverVersion, err := metadataAccessor.ResourceVersion(serverObj)
 		if err != nil {
@@ -164,9 +171,16 @@ func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Obj
 		}
 	}
 
-	return m.replaceResource(c, m.Resource, namespace, name, obj)
+	return m.replaceResource(c, m.Resource, namespace, name, obj, options)
 }
 
-func (m *Helper) replaceResource(c RESTClient, resource, namespace, name string, obj runtime.Object) (runtime.Object, error) {
-	return c.Put().NamespaceIfScoped(namespace, m.NamespaceScoped).Resource(resource).Name(name).Body(obj).Do().Get()
+func (m *Helper) replaceResource(c RESTClient, resource, namespace, name string, obj runtime.Object, options *metav1.UpdateOptions) (runtime.Object, error) {
+	return c.Put().
+		NamespaceIfScoped(namespace, m.NamespaceScoped).
+		Resource(resource).
+		Name(name).
+		Body(obj).
+		VersionedParams(options, metav1.ParameterCodec).
+		Do().
+		Get()
 }

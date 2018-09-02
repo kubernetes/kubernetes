@@ -44,7 +44,7 @@ var (
 	serviceaccountLong = templates.LongDesc(i18n.T(`
 	Update ServiceAccount of pod template resources.
 
-	Possible resources (case insensitive) can be: 
+	Possible resources (case insensitive) can be:
 	` + serviceaccountResources))
 
 	serviceaccountExample = templates.Examples(i18n.T(`
@@ -62,7 +62,7 @@ type SetServiceAccountOptions struct {
 	RecordFlags *genericclioptions.RecordFlags
 
 	fileNameOptions        resource.FilenameOptions
-	dryRun                 bool
+	dryRun                 *cmdutil.DryRun
 	shortOutput            bool
 	all                    bool
 	output                 string
@@ -112,7 +112,7 @@ func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams
 	cmdutil.AddFilenameOptionFlags(cmd, &o.fileNameOptions, usage)
 	cmd.Flags().BoolVar(&o.all, "all", o.all, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, set serviceaccount will NOT contact api-server but run locally.")
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
@@ -128,11 +128,11 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRun = cmdutil.NewDryRunFromCmd(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 
-	if o.dryRun {
+	if o.dryRun.IsDryRun() {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
 	printer, err := o.PrintFlags.ToPrinter()
@@ -196,13 +196,13 @@ func (o *SetServiceAccountOptions) Run() error {
 			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
 			continue
 		}
-		if o.local || o.dryRun {
+		if o.local || o.dryRun.Client {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				patchErrs = append(patchErrs, err)
 			}
 			continue
 		}
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, o.dryRun.UpdateOptions(nil))
 		if err != nil {
 			patchErrs = append(patchErrs, fmt.Errorf("failed to patch ServiceAccountName %v", err))
 			continue

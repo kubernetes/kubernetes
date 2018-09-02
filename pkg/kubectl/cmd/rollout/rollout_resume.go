@@ -49,6 +49,9 @@ type ResumeOptions struct {
 	EnforceNamespace bool
 
 	resource.FilenameOptions
+
+	DryRun *cmdutil.DryRun
+
 	genericclioptions.IOStreams
 }
 
@@ -101,6 +104,7 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	o.PrintFlags.AddFlags(cmd)
+	cmdutil.SetupDryRun(cmd)
 	return cmd
 }
 
@@ -115,6 +119,13 @@ func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	var err error
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+
+	o.DryRun = cmdutil.NewDryRunFromCmd(cmd)
+
+	if o.DryRun.IsDryRun() {
+		o.PrintFlags.Complete("%s (dry run)")
+	}
+
 	if err != nil {
 		return err
 	}
@@ -178,7 +189,7 @@ func (o ResumeOptions) RunResume() error {
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, o.DryRun.UpdateOptions(nil))
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch: %v", err))
 			continue

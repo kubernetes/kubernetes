@@ -65,7 +65,7 @@ type ApplyOptions struct {
 	DeleteOptions *DeleteOptions
 
 	Selector                   string
-	DryRun                     bool
+	DryRun                     *cmdutil.DryRun
 	Prune                      bool
 	PruneResources             []pruneResource
 	cmdBaseName                string
@@ -172,7 +172,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&o.PruneWhitelist, "prune-whitelist", o.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&o.OpenApiPatch, "openapi-patch", o.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	// apply subcommands
@@ -184,12 +184,12 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 }
 
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.NewDryRunFromCmd(cmd)
 
 	// allow for a success message operation to be specified at print time
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
 		o.PrintFlags.NamePrintFlags.Operation = operation
-		if o.DryRun {
+		if o.DryRun.IsDryRun() {
 			o.PrintFlags.Complete("%s (dry run)")
 		}
 
@@ -352,9 +352,9 @@ func (o *ApplyOptions) Run() error {
 				return cmdutil.AddSourceToErr("creating", info.Source, err)
 			}
 
-			if !o.DryRun {
+			if !o.DryRun.Client {
 				// Then create the resource and skip the three-way merge
-				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+				obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, o.DryRun.CreateOptions(nil))
 				if err != nil {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
@@ -380,7 +380,7 @@ func (o *ApplyOptions) Run() error {
 			return printer.PrintObj(info.Object, o.Out)
 		}
 
-		if !o.DryRun {
+		if !o.DryRun.Client {
 			metadata, err := meta.Accessor(info.Object)
 			if err != nil {
 				return err
@@ -403,6 +403,7 @@ func (o *ApplyOptions) Run() error {
 				timeout:       o.DeleteOptions.Timeout,
 				gracePeriod:   o.DeleteOptions.GracePeriod,
 				openapiSchema: openapiSchema,
+				dryRun:        o.DryRun,
 			}
 
 			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
@@ -573,7 +574,7 @@ type pruner struct {
 	fieldSelector string
 
 	cascade     bool
-	dryRun      bool
+	dryRun      *cmdutil.DryRun
 	gracePeriod int
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
@@ -613,7 +614,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 			continue
 		}
 		name := metadata.GetName()
-		if !p.dryRun {
+		if !p.dryRun.Client {
 			if err := p.delete(namespace, name, mapping); err != nil {
 				return err
 			}
@@ -629,10 +630,10 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod)
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.dryRun)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int) error {
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, dryRun *cmdutil.DryRun) error {
 	options := &metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
 		options = metav1.NewDeleteOptions(int64(gracePeriod))
@@ -642,11 +643,11 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Inte
 		policy = metav1.DeletePropagationOrphan
 	}
 	options.PropagationPolicy = &policy
-	return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, options)
+	return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, dryRun.DeleteOptions(options))
 }
 
 func (p *patcher) delete(namespace, name string) error {
-	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod)
+	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.dryRun)
 }
 
 type patcher struct {
@@ -657,6 +658,7 @@ type patcher struct {
 	overwrite bool
 	backOff   clockwork.Clock
 
+	dryRun      *cmdutil.DryRun
 	force       bool
 	cascade     bool
 	timeout     time.Duration
@@ -736,7 +738,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return patch, obj, nil
 	}
 
-	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch)
+	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch, p.dryRun.UpdateOptions(nil))
 	return patch, patchedObj, err
 }
 
@@ -776,11 +778,11 @@ func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err != nil {
 		return modified, nil, err
 	}
-	createdObject, err := p.helper.Create(namespace, true, versionedObject)
+	createdObject, err := p.helper.Create(namespace, true, versionedObject, p.dryRun.CreateOptions(nil))
 	if err != nil {
 		// restore the original object if we fail to create the new one
 		// but still propagate and advertise error to user
-		recreated, recreateErr := p.helper.Create(namespace, true, original)
+		recreated, recreateErr := p.helper.Create(namespace, true, original, p.dryRun.CreateOptions(nil))
 		if recreateErr != nil {
 			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
 		} else {

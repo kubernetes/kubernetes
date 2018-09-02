@@ -388,7 +388,7 @@ func TestGenerateService(t *testing.T) {
 			addRunFlags(cmd, opts)
 
 			if !test.expectPOST {
-				opts.DryRun = true
+				opts.DryRun.Client = true
 			}
 
 			if len(test.port) > 0 {

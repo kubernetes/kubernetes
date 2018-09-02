@@ -404,6 +404,11 @@ func AddDryRunFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 }
 
+// AddServerDryRunFlag adds server-dry-run flag to a command.
+func AddServerDryRunFlag(cmd *cobra.Command) {
+	cmd.Flags().Bool("server-dry-run", false, "If true, requests dry-run from server")
+}
+
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
 	cmd.Flags().Bool(IncludeUninitializedFlag, false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
 }
@@ -478,6 +483,10 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 
 func GetDryRunFlag(cmd *cobra.Command) bool {
 	return GetFlagBool(cmd, "dry-run")
+}
+
+func GetServerDryRunFlag(cmd *cobra.Command) bool {
+	return GetFlagBool(cmd, "server-dry-run")
 }
 
 // GetResourcesAndPairs retrieves resources and "KEY=VALUE or KEY-" pair args from given args

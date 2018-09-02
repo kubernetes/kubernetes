@@ -104,7 +104,7 @@ type RunOptions struct {
 	DeleteOptions *DeleteOptions
 	RecordFlags   *genericclioptions.RecordFlags
 
-	DryRun bool
+	DryRun *cmdutil.DryRun
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
@@ -164,7 +164,7 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 }
 
 func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmd.Flags().StringVar(&opt.Generator, "generator", opt.Generator, i18n.T("The name of the API generator to use, see http://kubernetes.io/docs/user-guide/kubectl-conventions/#generators for a list."))
 	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("The image for the container to run."))
 	cmd.MarkFlagRequired("image")
@@ -207,14 +207,14 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	o.ArgsLenAtDash = cmd.ArgsLenAtDash()
-	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
+	o.DryRun = cmdutil.NewDryRunFromCmd(cmd)
 
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
 		o.Attach = true
 	}
 
-	if o.DryRun {
+	if o.DryRun.IsDryRun() {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
 	printer, err := o.PrintFlags.ToPrinter()
@@ -284,7 +284,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		return cmdutil.UsageErrorf(cmd, "--rm should only be used for attached containers")
 	}
 
-	if o.Attach && o.DryRun {
+	if o.Attach && o.DryRun.IsDryRun() {
 		return cmdutil.UsageErrorf(cmd, "--dry-run can't be used with attached containers options (--attach, --stdin, or --tty)")
 	}
 
@@ -659,7 +659,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	actualObj := obj
-	if !o.DryRun {
+	if !o.DryRun.Client {
 		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {
 			return nil, err
 		}
@@ -667,7 +667,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		if err != nil {
 			return nil, err
 		}
-		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj)
+		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj, o.DryRun.CreateOptions(nil))
 		if err != nil {
 			return nil, err
 		}

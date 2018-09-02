@@ -46,7 +46,7 @@ type SetImageOptions struct {
 
 	Infos        []*resource.Info
 	Selector     string
-	DryRun       bool
+	DryRun       *cmdutil.DryRun
 	All          bool
 	Output       string
 	Local        bool
@@ -121,7 +121,7 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set image will NOT contact api-server but run locally.")
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
@@ -136,11 +136,11 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	o.UpdatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
-	o.DryRun = cmdutil.GetDryRunFlag(cmd)
+	o.DryRun = cmdutil.NewDryRunFromCmd(cmd)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = resolveImageFunc
 
-	if o.DryRun {
+	if o.DryRun.IsDryRun() {
 		o.PrintFlags.Complete("%s (dry run)")
 	}
 	printer, err := o.PrintFlags.ToPrinter()
@@ -274,7 +274,7 @@ func (o *SetImageOptions) Run() error {
 			continue
 		}
 
-		if o.Local || o.DryRun {
+		if o.Local || o.DryRun.Client {
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -282,7 +282,7 @@ func (o *SetImageOptions) Run() error {
 		}
 
 		// patch the change
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, o.DryRun.UpdateOptions(nil))
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
 			continue

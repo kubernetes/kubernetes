@@ -48,7 +48,7 @@ type SetLastAppliedOptions struct {
 	infoList                     []*resource.Info
 	namespace                    string
 	enforceNamespace             bool
-	dryRun                       bool
+	dryRun                       *cmdutil.DryRun
 	shortOutput                  bool
 	output                       string
 	patchBufferList              []PatchBuffer
@@ -105,7 +105,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 
 	o.PrintFlags.AddFlags(cmd)
 
-	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.SetupDryRun(cmd)
 	cmd.Flags().BoolVar(&o.CreateAnnotation, "create-annotation", o.CreateAnnotation, "Will create 'last-applied-configuration' annotations if current objects doesn't have one")
 	cmdutil.AddJsonFilenameFlag(cmd.Flags(), &o.FilenameOptions.Filenames, "Filename, directory, or URL to files that contains the last-applied-configuration annotations")
 
@@ -113,7 +113,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 }
 
 func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
-	o.dryRun = cmdutil.GetDryRunFlag(cmd)
+	o.dryRun = cmdutil.NewDryRunFromCmd(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.shortOutput = o.output == "name"
 
@@ -125,7 +125,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	o.builder = f.NewBuilder()
 	o.unstructuredClientForMapping = f.UnstructuredClientForMapping
 
-	if o.dryRun {
+	if o.dryRun.IsDryRun() {
 		// TODO(juanvallejo): This can be cleaned up even further by creating
 		// a PrintFlags struct that binds the --dry-run flag, and whose
 		// ToPrinter method returns a printer that understands how to print
@@ -193,14 +193,14 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 		info := o.infoList[i]
 		finalObj := info.Object
 
-		if !o.dryRun {
+		if !o.dryRun.Client {
 			mapping := info.ResourceMapping()
 			client, err := o.unstructuredClientForMapping(mapping)
 			if err != nil {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch)
+			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch, o.dryRun.UpdateOptions(nil))
 			if err != nil {
 				return err
 			}

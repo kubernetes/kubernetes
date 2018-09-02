@@ -655,8 +655,8 @@ func RetrieveLazy(info *Info, err error) error {
 }
 
 // CreateAndRefresh creates an object from input info and refreshes info with that object
-func CreateAndRefresh(info *Info) error {
-	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+func CreateAndRefresh(info *Info, options *metav1.CreateOptions) error {
+	obj, err := NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, options)
 	if err != nil {
 		return err
 	}
