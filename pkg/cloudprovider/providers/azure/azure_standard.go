@@ -321,15 +321,15 @@ func newAvailabilitySet(az *Cloud) VMSet {
 }
 
 // GetInstanceIDByNodeName gets the cloud provider ID by node name.
-// It must return ("", cloudprovider.InstanceNotFound) if the instance does
+// It must return ("", cloudprovider.ErrInstanceNotFound) if the instance does
 // not exist or is no longer running.
 func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) {
 	var machine compute.VirtualMachine
 	var err error
 
 	machine, err = as.getVirtualMachine(types.NodeName(name))
-	if err == cloudprovider.InstanceNotFound {
-		return "", cloudprovider.InstanceNotFound
+	if err == cloudprovider.ErrInstanceNotFound {
+		return "", cloudprovider.ErrInstanceNotFound
 	}
 	if err != nil {
 		if as.CloudProviderBackoff {

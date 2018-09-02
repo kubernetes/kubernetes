@@ -616,7 +616,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 	}
 
 	if vs.cfg == nil {
-		return nil, cloudprovider.InstanceNotFound
+		return nil, cloudprovider.ErrInstanceNotFound
 	}
 
 	// Below logic can be executed only on master as VC details are present.
@@ -674,7 +674,7 @@ func (vs *VSphere) NodeAddressesByProviderID(ctx context.Context, providerID str
 
 // AddSSHKeyToAllInstances add SSH key to all instances
 func (vs *VSphere) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // CurrentNodeName gives the current node name
@@ -762,6 +762,9 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 		}
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
+			if err == vclib.ErrNoVMFound {
+				return "", cloudprovider.ErrInstanceNotFound
+			}
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
@@ -774,7 +777,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 			return vs.vmUUID, nil
 		}
 		glog.Warningf("The VM: %s is not in %s state", convertToString(nodeName), vclib.ActivePowerState)
-		return "", cloudprovider.InstanceNotFound
+		return "", cloudprovider.ErrInstanceNotFound
 	}
 
 	instanceID, err := instanceIDInternal()
@@ -785,7 +788,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 				glog.V(4).Infof("InstanceID: Found node %q", convertToString(nodeName))
 				instanceID, err = instanceIDInternal()
 			} else if err == vclib.ErrNoVMFound {
-				return "", cloudprovider.InstanceNotFound
+				return "", cloudprovider.ErrInstanceNotFound
 			}
 		}
 	}
@@ -1409,9 +1412,9 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 }
 
 func (vs *VSphere) GetZoneByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, cloudprovider.NotImplemented
+	return cloudprovider.Zone{}, cloudprovider.ErrNotImplemented
 }
 
 func (vs *VSphere) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, cloudprovider.NotImplemented
+	return cloudprovider.Zone{}, cloudprovider.ErrNotImplemented
 }

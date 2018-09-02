@@ -201,7 +201,7 @@ func (f *FakeCloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName s
 }
 
 func (f *FakeCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
-	return cloudprovider.NotImplemented
+	return cloudprovider.ErrNotImplemented
 }
 
 // Implementation of Instances.CurrentNodeName

@@ -29,7 +29,7 @@ import (
 // set) should be implemented.
 type VMSet interface {
 	// GetInstanceIDByNodeName gets the cloud provider ID by node name.
-	// It must return ("", cloudprovider.InstanceNotFound) if the instance does
+	// It must return ("", cloudprovider.ErrInstanceNotFound) if the instance does
 	// not exist or is no longer running.
 	GetInstanceIDByNodeName(name string) (string, error)
 	// GetInstanceTypeByNodeName gets the instance type by node name.
