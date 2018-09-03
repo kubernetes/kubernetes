@@ -72,7 +72,7 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerCo
 		obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}
 	if obj.HPAController.HorizontalPodAutoscalerSyncPeriod == zero {
-		obj.HPAController.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+		obj.HPAController.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}
 	if obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow == zero {
 		obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow = metav1.Duration{Duration: 3 * time.Minute}
