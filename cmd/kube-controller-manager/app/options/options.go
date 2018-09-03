@@ -33,11 +33,12 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	kubectrlmgrschemev1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
 
@@ -189,9 +190,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.SecureServing.ServerCert.PairName = "kube-controller-manager"
 	s.SecureServing.BindPort = ports.KubeControllerManagerPort
 
-	gcIgnoredResources := make([]componentconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
+	gcIgnoredResources := make([]kubectrlmgrconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
 	for r := range garbagecollector.DefaultIgnoredResources() {
-		gcIgnoredResources = append(gcIgnoredResources, componentconfig.GroupResource{Group: r.Group, Resource: r.Resource})
+		gcIgnoredResources = append(gcIgnoredResources, kubectrlmgrconfig.GroupResource{Group: r.Group, Resource: r.Resource})
 	}
 
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
@@ -200,19 +201,19 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 }
 
 // NewDefaultComponentConfig returns kube-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) (componentconfig.KubeControllerManagerConfiguration, error) {
+func NewDefaultComponentConfig(insecurePort int32) (kubectrlmgrconfig.KubeControllerManagerConfiguration, error) {
 	scheme := runtime.NewScheme()
-	if err := componentconfigv1alpha1.AddToScheme(scheme); err != nil {
-		return componentconfig.KubeControllerManagerConfiguration{}, err
+	if err := kubectrlmgrschemev1alpha1.AddToScheme(scheme); err != nil {
+		return kubectrlmgrconfig.KubeControllerManagerConfiguration{}, err
 	}
-	if err := componentconfig.AddToScheme(scheme); err != nil {
-		return componentconfig.KubeControllerManagerConfiguration{}, err
+	if err := kubectrlmgrconfig.AddToScheme(scheme); err != nil {
+		return kubectrlmgrconfig.KubeControllerManagerConfiguration{}, err
 	}
 
-	versioned := componentconfigv1alpha1.KubeControllerManagerConfiguration{}
+	versioned := kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration{}
 	scheme.Default(&versioned)
 
-	internal := componentconfig.KubeControllerManagerConfiguration{}
+	internal := kubectrlmgrconfig.KubeControllerManagerConfiguration{}
 	if err := scheme.Convert(&versioned, &internal, nil); err != nil {
 		return internal, err
 	}

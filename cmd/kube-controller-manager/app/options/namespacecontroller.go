@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // NamespaceControllerOptions holds the NamespaceController options.
@@ -40,7 +40,7 @@ func (o *NamespaceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up NamespaceController config with options.
-func (o *NamespaceControllerOptions) ApplyTo(cfg *componentconfig.NamespaceControllerConfiguration) error {
+func (o *NamespaceControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.NamespaceControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
