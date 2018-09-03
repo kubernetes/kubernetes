@@ -34,8 +34,12 @@ type CustomResourceDefinitionSpec struct {
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope
 	// Validation describes the validation methods for CustomResources
+	// Optional, and correspond to the first version in the versions list
+	// +optional
 	Validation *CustomResourceValidation
 	// Subresources describes the subresources for CustomResources
+	// Optional, and correspond to the first version in the versions list
+	// +optional
 	Subresources *CustomResourceSubresources
 	// Versions is the list of all supported versions for this resource.
 	// If Version field is provided, this field is optional.
@@ -50,6 +54,8 @@ type CustomResourceDefinitionSpec struct {
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	Versions []CustomResourceDefinitionVersion
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Optional, and correspond to the first version in the versions list
+	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
 }
 
@@ -61,6 +67,18 @@ type CustomResourceDefinitionVersion struct {
 	// Storage flags the version as storage version. There must be exactly one flagged
 	// as storage version.
 	Storage bool
+	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	// +optional
+	Schema *JSONSchemaProps
+	// Subresources describes the subresources for CustomResources
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	// +optional
+	Subresources *CustomResourceSubresources
+	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	// +optional
+	AdditionalPrinterColumns []CustomResourceColumnDefinition
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.
