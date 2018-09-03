@@ -92,7 +92,7 @@ type EndpointChangeTracker struct {
 	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
 	isIPv6Mode *bool
 	// recorder records events.
-	recorder   record.EventRecorder
+	recorder record.EventRecorder
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
