@@ -32,6 +32,7 @@ import (
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"strconv"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -344,6 +345,26 @@ func (cephfsVolume *cephfsMounter) checkFuseMount() bool {
 	return false
 }
 
+func (cephfsVolume *cephfs) checkFuseVersion() (bool, error) {
+	command := exec.Command("ceph-fuse", "--version")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("Ceph-fuse failed: %v\n", err)
+	}
+
+	arr := strings.Split(string(output), " ")
+	ver, err := strconv.Atoi(strings.Split(arr[2], ".")[0])
+	if err != nil {
+		return false, fmt.Errorf("Ceph-fuse failed: %v\n", err)
+	}
+	if ver >= 12 {
+		return false, nil
+	}
+
+	glog.V(4).Info("Ceph-fuse %d version is before Luminous.", ver)
+	return true, nil
+}
+
 func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	// cephfs keyring file
 	keyringFile := ""
@@ -407,7 +428,11 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	mountArgs = append(mountArgs, cephfsVolume.path)
 	mountArgs = append(mountArgs, "--id")
 	mountArgs = append(mountArgs, cephfsVolume.id)
-	mountArgs = append(mountArgs, "--client-quota")
+
+	//check if ceph client is before luminous(not included). If true, add the quota arg.
+	if ok, err:= cephfsVolume.checkFuseVersion(); err == nil && ok {
+		mountArgs = append(mountArgs, "--client-quota")
+	}
 
 	// build option array
 	opt := []string{}
