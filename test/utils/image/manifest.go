@@ -54,7 +54,7 @@ var (
 	CheckMetadataConcealment = ImageConfig{e2eRegistry, "metadata-concealment", "1.0"}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0"}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1"}
-	EchoServer               = ImageConfig{e2eRegistry, "echoserver", "2.1"}
+	EchoServer               = ImageConfig{e2eRegistry, "echoserver", "2.2"}
 	EntrypointTester         = ImageConfig{e2eRegistry, "entrypoint-tester", "1.0"}
 	Fakegitserver            = ImageConfig{e2eRegistry, "fakegitserver", "1.0"}
 	GBFrontend               = ImageConfig{sampleRegistry, "gb-frontend", "v6"}

@@ -17,77 +17,112 @@ limitations under the License.
 package options
 
 import (
-	"github.com/spf13/pflag"
+	"fmt"
+	"strings"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 )
 
-// GenericComponentConfigOptions holds the options which are generic.
-type GenericComponentConfigOptions struct {
+// GenericControllerManagerConfigurationOptions holds the options which are generic.
+type GenericControllerManagerConfigurationOptions struct {
+	Port                    int32
+	Address                 string
 	MinResyncPeriod         metav1.Duration
-	ContentType             string
-	KubeAPIQPS              float32
-	KubeAPIBurst            int32
+	ClientConnection        apimachineryconfig.ClientConnectionConfiguration
 	ControllerStartInterval metav1.Duration
 	LeaderElection          apiserverconfig.LeaderElectionConfiguration
+	Debugging               *DebuggingOptions
+	Controllers             []string
 }
 
-// NewGenericComponentConfigOptions returns generic configuration default values for both
+// NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericComponentConfigOptions(cfg componentconfig.GenericComponentConfiguration) *GenericComponentConfigOptions {
-	o := &GenericComponentConfigOptions{
+func NewGenericControllerManagerConfigurationOptions(cfg componentconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
+	o := &GenericControllerManagerConfigurationOptions{
+		Port:                    cfg.Port,
+		Address:                 cfg.Address,
 		MinResyncPeriod:         cfg.MinResyncPeriod,
-		ContentType:             cfg.ContentType,
-		KubeAPIQPS:              cfg.KubeAPIQPS,
-		KubeAPIBurst:            cfg.KubeAPIBurst,
+		ClientConnection:        cfg.ClientConnection,
 		ControllerStartInterval: cfg.ControllerStartInterval,
 		LeaderElection:          cfg.LeaderElection,
+		Debugging:               &DebuggingOptions{},
+		Controllers:             cfg.Controllers,
 	}
 
 	return o
 }
 
 // AddFlags adds flags related to generic for controller manager to the specified FlagSet.
-func (o *GenericComponentConfigOptions) AddFlags(fs *pflag.FlagSet) {
+func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverflag.NamedFlagSets, allControllers, disabledByDefaultControllers []string) {
 	if o == nil {
 		return
 	}
 
-	fs.DurationVar(&o.MinResyncPeriod.Duration, "min-resync-period", o.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod.")
-	fs.StringVar(&o.ContentType, "kube-api-content-type", o.ContentType, "Content type of requests sent to apiserver.")
-	fs.Float32Var(&o.KubeAPIQPS, "kube-api-qps", o.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver.")
-	fs.Int32Var(&o.KubeAPIBurst, "kube-api-burst", o.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver.")
-	fs.DurationVar(&o.ControllerStartInterval.Duration, "controller-start-interval", o.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+	o.Debugging.AddFlags(fss.FlagSet("debugging"))
+	genericfs := fss.FlagSet("generic")
+	genericfs.DurationVar(&o.MinResyncPeriod.Duration, "min-resync-period", o.MinResyncPeriod.Duration, "The resync period in reflectors will be random between MinResyncPeriod and 2*MinResyncPeriod.")
+	genericfs.StringVar(&o.ClientConnection.ContentType, "kube-api-content-type", o.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
+	genericfs.Float32Var(&o.ClientConnection.QPS, "kube-api-qps", o.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver.")
+	genericfs.Int32Var(&o.ClientConnection.Burst, "kube-api-burst", o.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver.")
+	genericfs.DurationVar(&o.ControllerStartInterval.Duration, "controller-start-interval", o.ControllerStartInterval.Duration, "Interval between starting controller managers.")
+	// TODO: complete the work of the cloud-controller-manager (and possibly other consumers of this code) respecting the --controllers flag
+	genericfs.StringSliceVar(&o.Controllers, "controllers", o.Controllers, fmt.Sprintf(""+
+		"A list of controllers to enable. '*' enables all on-by-default controllers, 'foo' enables the controller "+
+		"named 'foo', '-foo' disables the controller named 'foo'.\nAll controllers: %s\nDisabled-by-default controllers: %s",
+		strings.Join(allControllers, ", "), strings.Join(disabledByDefaultControllers, ", ")))
 
-	leaderelectionconfig.BindFlags(&o.LeaderElection, fs)
+	leaderelectionconfig.BindFlags(&o.LeaderElection, genericfs)
 }
 
 // ApplyTo fills up generic config with options.
-func (o *GenericComponentConfigOptions) ApplyTo(cfg *componentconfig.GenericComponentConfiguration) error {
+func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *componentconfig.GenericControllerManagerConfiguration) error {
 	if o == nil {
 		return nil
 	}
 
+	if err := o.Debugging.ApplyTo(&cfg.Debugging); err != nil {
+		return err
+	}
+
+	cfg.Port = o.Port
+	cfg.Address = o.Address
 	cfg.MinResyncPeriod = o.MinResyncPeriod
-	cfg.ContentType = o.ContentType
-	cfg.KubeAPIQPS = o.KubeAPIQPS
-	cfg.KubeAPIBurst = o.KubeAPIBurst
+	cfg.ClientConnection = o.ClientConnection
 	cfg.ControllerStartInterval = o.ControllerStartInterval
 	cfg.LeaderElection = o.LeaderElection
+	cfg.Controllers = o.Controllers
 
 	return nil
 }
 
 // Validate checks validation of GenericOptions.
-func (o *GenericComponentConfigOptions) Validate() []error {
+func (o *GenericControllerManagerConfigurationOptions) Validate(allControllers []string, disabledByDefaultControllers []string) []error {
 	if o == nil {
 		return nil
 	}
 
 	errs := []error{}
+	errs = append(errs, o.Debugging.Validate()...)
+
+	allControllersSet := sets.NewString(allControllers...)
+	for _, controller := range o.Controllers {
+		if controller == "*" {
+			continue
+		}
+		if strings.HasPrefix(controller, "-") {
+			controller = controller[1:]
+		}
+		if !allControllersSet.Has(controller) {
+			errs = append(errs, fmt.Errorf("%q is not in the list of known controllers", controller))
+		}
+	}
+
 	return errs
 }

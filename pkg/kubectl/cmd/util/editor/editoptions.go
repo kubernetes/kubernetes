@@ -503,7 +503,7 @@ func (o *EditOptions) annotationPatch(update *resource.Info) error {
 		return err
 	}
 	helper := resource.NewHelper(client, mapping)
-	_, err = helper.Patch(o.CmdNamespace, update.Name, patchType, patch)
+	_, err = helper.Patch(o.CmdNamespace, update.Name, patchType, patch, nil)
 	if err != nil {
 		return err
 	}
@@ -632,7 +632,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 			fmt.Fprintf(o.Out, "Patch: %s\n", string(patch))
 		}
 
-		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch)
+		patched, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch, nil)
 		if err != nil {
 			fmt.Fprintln(o.ErrOut, results.addError(err, info))
 			return nil

@@ -22,13 +22,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
-// EndPointControllerOptions holds the EndPointController options.
-type EndPointControllerOptions struct {
+// EndpointControllerOptions holds the EndPointController options.
+type EndpointControllerOptions struct {
 	ConcurrentEndpointSyncs int32
 }
 
 // AddFlags adds flags related to EndPointController for controller manager to the specified FlagSet.
-func (o *EndPointControllerOptions) AddFlags(fs *pflag.FlagSet) {
+func (o *EndpointControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
@@ -37,7 +37,7 @@ func (o *EndPointControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up EndPointController config with options.
-func (o *EndPointControllerOptions) ApplyTo(cfg *componentconfig.EndPointControllerConfiguration) error {
+func (o *EndpointControllerOptions) ApplyTo(cfg *componentconfig.EndpointControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
@@ -47,8 +47,8 @@ func (o *EndPointControllerOptions) ApplyTo(cfg *componentconfig.EndPointControl
 	return nil
 }
 
-// Validate checks validation of EndPointControllerOptions.
-func (o *EndPointControllerOptions) Validate() []error {
+// Validate checks validation of EndpointControllerOptions.
+func (o *EndpointControllerOptions) Validate() []error {
 	if o == nil {
 		return nil
 	}

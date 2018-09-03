@@ -311,6 +311,9 @@ const (
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
+
+	// DefaultAPIServerBindAddress is the default bind address for the API Server
+	DefaultAPIServerBindAddress = "0.0.0.0"
 )
 
 var (

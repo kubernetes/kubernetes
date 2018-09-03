@@ -3072,3 +3072,8 @@ function ssh-to-node() {
 function prepare-e2e() {
   detect-project
 }
+
+# Delete the image given by $1.
+function delete-image() {
+  gcloud container images delete --quiet "$1"
+}

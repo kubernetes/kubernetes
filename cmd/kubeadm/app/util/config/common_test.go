@@ -223,3 +223,53 @@ func TestLowercaseSANs(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyAPIServerBindAddress(t *testing.T) {
+	tests := []struct {
+		name          string
+		address       string
+		expectedError bool
+	}{
+		{
+			name:    "valid address: IPV4",
+			address: "192.168.0.1",
+		},
+		{
+			name:    "valid address: IPV6",
+			address: "2001:db8:85a3::8a2e:370:7334",
+		},
+		{
+			name:          "invalid address: not a global unicast 0.0.0.0",
+			address:       "0.0.0.0",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: not a global unicast 127.0.0.1",
+			address:       "127.0.0.1",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: not a global unicast ::",
+			address:       "::",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: cannot parse IPV4",
+			address:       "255.255.255.255.255",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: cannot parse IPV6",
+			address:       "2a00:800::2a00:800:10102a00",
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := VerifyAPIServerBindAddress(test.address); (err != nil) != test.expectedError {
+				t.Errorf("expected error: %v, got %v, error: %v", test.expectedError, (err != nil), err)
+			}
+		})
+	}
+}

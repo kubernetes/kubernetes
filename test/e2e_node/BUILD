@@ -21,7 +21,6 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
-        "//pkg/kubelet/apis/config/v1beta1:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1beta1:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",

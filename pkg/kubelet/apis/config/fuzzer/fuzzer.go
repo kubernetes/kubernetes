@@ -23,8 +23,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -88,11 +89,11 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 			obj.MakeIPTablesUtilChains = true
-			obj.IPTablesMasqueradeBit = v1beta1.DefaultIPTablesMasqueradeBit
-			obj.IPTablesDropBit = v1beta1.DefaultIPTablesDropBit
+			obj.IPTablesMasqueradeBit = kubeletconfigv1beta1.DefaultIPTablesMasqueradeBit
+			obj.IPTablesDropBit = kubeletconfigv1beta1.DefaultIPTablesDropBit
 			obj.CgroupsPerQOS = true
 			obj.CgroupDriver = "cgroupfs"
-			obj.EnforceNodeAllocatable = v1beta1.DefaultNodeAllocatableEnforcement
+			obj.EnforceNodeAllocatable = kubeletconfigv1beta1.DefaultNodeAllocatableEnforcement
 			obj.StaticPodURLHeader = make(map[string][]string)
 			obj.ContainerLogMaxFiles = 5
 			obj.ContainerLogMaxSize = "10Mi"

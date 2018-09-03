@@ -17,6 +17,7 @@ limitations under the License.
 package componentconfig
 
 import (
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 )
@@ -33,13 +34,8 @@ type GroupResource struct {
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
-	// CloudProviderConfiguration holds configuration for CloudProvider related features.
-	CloudProvider CloudProviderConfiguration
-	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfig.DebuggingConfiguration
-	// GenericComponentConfiguration holds configuration for GenericComponent
-	// related features both in cloud controller manager and kube-controller manager.
-	GenericComponent GenericComponentConfiguration
+	// Generic holds configuration for a generic controller-manager
+	Generic GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
@@ -59,9 +55,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeprecatedControllerConfiguration holds configuration for some deprecated
 	// features.
 	DeprecatedController DeprecatedControllerConfiguration
-	// EndPointControllerConfiguration holds configuration for EndPointController
+	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
-	EndPointController EndPointControllerConfiguration
+	EndpointController EndpointControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController GarbageCollectorControllerConfiguration
@@ -69,12 +65,12 @@ type KubeControllerManagerConfiguration struct {
 	HPAController HPAControllerConfiguration
 	// JobControllerConfiguration holds configuration for JobController related features.
 	JobController JobControllerConfiguration
-	// NamespaceControllerConfiguration holds configuration for
-	// NamespaceController related features.
-	NamespaceController NamespaceControllerConfiguration
-	// NodeIpamControllerConfiguration holds configuration for NodeIpamController
+	// NamespaceControllerConfiguration holds configuration for NamespaceController
 	// related features.
-	NodeIpamController NodeIpamControllerConfiguration
+	NamespaceController NamespaceControllerConfiguration
+	// NodeIPAMControllerConfiguration holds configuration for NodeIPAMController
+	// related features.
+	NodeIPAMController NodeIPAMControllerConfiguration
 	// NodeLifecycleControllerConfiguration holds configuration for
 	// NodeLifecycleController related features.
 	NodeLifecycleController NodeLifecycleControllerConfiguration
@@ -98,16 +94,6 @@ type KubeControllerManagerConfiguration struct {
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration
-
-	// Controllers is the list of controllers to enable or disable
-	// '*' means "all enabled by default controllers"
-	// 'foo' means "enable 'foo'"
-	// '-foo' means "disable 'foo'"
-	// first item for a particular name wins
-	Controllers []string
-	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
-	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
-	ExternalCloudVolumePlugin string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -115,16 +101,12 @@ type KubeControllerManagerConfiguration struct {
 type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
-	// CloudProviderConfiguration holds configuration for CloudProvider related features.
-	CloudProvider CloudProviderConfiguration
-	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging apiserverconfig.DebuggingConfiguration
-	// GenericComponentConfiguration holds configuration for GenericComponent
-	// related features both in cloud controller manager and kube-controller manager.
-	GenericComponent GenericComponentConfiguration
+	// Generic holds configuration for a generic controller-manager
+	Generic GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
+
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration
@@ -132,34 +114,37 @@ type CloudControllerManagerConfiguration struct {
 	NodeStatusUpdateFrequency metav1.Duration
 }
 
-type CloudProviderConfiguration struct {
-	// Name is the provider for cloud services.
-	Name string
-	// cloudConfigFile is the path to the cloud provider configuration file.
-	CloudConfigFile string
-}
-
-type GenericComponentConfiguration struct {
-	// minResyncPeriod is the resync period in reflectors; will be random between
-	// minResyncPeriod and 2*minResyncPeriod.
-	MinResyncPeriod metav1.Duration
-	// contentType is contentType of requests sent to apiserver.
-	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
-	KubeAPIQPS float32
-	// kubeAPIBurst is the burst to use while talking with kubernetes apiserver.
-	KubeAPIBurst int32
-	// How long to wait between starting controller managers
-	ControllerStartInterval metav1.Duration
-	// leaderElection defines the configuration of leader election client.
-	LeaderElection apiserverconfig.LeaderElectionConfiguration
-}
-
-type KubeCloudSharedConfiguration struct {
+type GenericControllerManagerConfiguration struct {
 	// port is the port that the controller-manager's http service runs on.
 	Port int32
 	// address is the IP address to serve on (set to 0.0.0.0 for all interfaces).
 	Address string
+	// minResyncPeriod is the resync period in reflectors; will be random between
+	// minResyncPeriod and 2*minResyncPeriod.
+	MinResyncPeriod metav1.Duration
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection apimachineryconfig.ClientConnectionConfiguration
+	// How long to wait between starting controller managers
+	ControllerStartInterval metav1.Duration
+	// leaderElection defines the configuration of leader election client.
+	LeaderElection apiserverconfig.LeaderElectionConfiguration
+	// Controllers is the list of controllers to enable or disable
+	// '*' means "all enabled by default controllers"
+	// 'foo' means "enable 'foo'"
+	// '-foo' means "disable 'foo'"
+	// first item for a particular name wins
+	Controllers []string
+	// DebuggingConfiguration holds configuration for Debugging related features.
+	Debugging apiserverconfig.DebuggingConfiguration
+}
+
+type KubeCloudSharedConfiguration struct {
+	// CloudProviderConfiguration holds configuration for CloudProvider related features.
+	CloudProvider CloudProviderConfiguration
+	// externalCloudVolumePlugin specifies the plugin to use when cloudProvider is "external".
+	// It is currently used by the in repo cloud providers to handle node and volume control in the KCM.
+	ExternalCloudVolumePlugin string
 	// useServiceAccountCredentials indicates whether controllers should be run with
 	// individual service account credentials.
 	UseServiceAccountCredentials bool
@@ -195,6 +180,13 @@ type AttachDetachControllerConfiguration struct {
 	// ReconcilerSyncLoopPeriod is the amount of time the reconciler sync states loop
 	// wait between successive executions. Is set to 5 sec by default.
 	ReconcilerSyncLoopPeriod metav1.Duration
+}
+
+type CloudProviderConfiguration struct {
+	// Name is the provider for cloud services.
+	Name string
+	// cloudConfigFile is the path to the cloud provider configuration file.
+	CloudConfigFile string
 }
 
 type CSRSigningControllerConfiguration struct {
@@ -237,7 +229,7 @@ type DeprecatedControllerConfiguration struct {
 	RegisterRetryCount int32
 }
 
-type EndPointControllerConfiguration struct {
+type EndpointControllerConfiguration struct {
 	// concurrentEndpointSyncs is the number of endpoint syncing operations
 	// that will be done concurrently. Larger number = faster endpoint updating,
 	// but more CPU (and network) load.
@@ -297,7 +289,7 @@ type NamespaceControllerConfiguration struct {
 	ConcurrentNamespaceSyncs int32
 }
 
-type NodeIpamControllerConfiguration struct {
+type NodeIPAMControllerConfiguration struct {
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
 	// NodeCIDRMaskSize is the mask size for node cidr in cluster.

@@ -25,10 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )

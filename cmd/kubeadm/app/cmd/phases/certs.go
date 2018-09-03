@@ -223,6 +223,8 @@ func makeCommandForCert(cert *certsphase.KubeadmCert, caCert *certsphase.Kubeadm
 	certCmd.Run = func(cmd *cobra.Command, args []string) {
 		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
+		err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
+		kubeadmutil.CheckErr(err)
 
 		err = certsphase.CreateCertAndKeyFilesWithCA(cert, caCert, internalcfg)
 		kubeadmutil.CheckErr(err)

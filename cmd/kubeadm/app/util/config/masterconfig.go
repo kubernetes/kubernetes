@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	netutil "k8s.io/apimachinery/pkg/util/net"
 	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -107,9 +106,9 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	if addressIP == nil && cfg.AdvertiseAddress != "" {
 		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}
-	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
-	// This is the same logic as the API Server uses
-	ip, err := netutil.ChooseBindAddress(addressIP)
+	// This is the same logic as the API Server uses, except that if no interface is found the address is set to 0.0.0.0, which is invalid and cannot be used
+	// for bootstrapping a cluster.
+	ip, err := ChooseAPIServerBindAddress(addressIP)
 	if err != nil {
 		return err
 	}

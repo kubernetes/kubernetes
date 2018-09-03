@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -314,17 +313,23 @@ func DefaultKubernetesUserAgent() string {
 // running inside a pod running on kubernetes. It will return ErrNotInCluster
 // if called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
+	const (
+		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	)
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {
 		return nil, ErrNotInCluster
 	}
 
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-	if err != nil {
+	ts := newCachedPathTokenSource(tokenFile)
+
+	if _, err := ts.Token(); err != nil {
 		return nil, err
 	}
+
 	tlsClientConfig := TLSClientConfig{}
-	rootCAFile := "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
 	if _, err := certutil.NewPool(rootCAFile); err != nil {
 		glog.Errorf("Expected to load root CA config from %s, but got err: %v", rootCAFile, err)
 	} else {
@@ -334,8 +339,8 @@ func InClusterConfig() (*Config, error) {
 	return &Config{
 		// TODO: switch to using cluster DNS.
 		Host:            "https://" + net.JoinHostPort(host, port),
-		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
+		WrapTransport:   TokenSourceWrapTransport(ts),
 	}, nil
 }
 

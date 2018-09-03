@@ -52,6 +52,7 @@ spec:
         image: k8s.gcr.io/metrics-server-amd64:v0.3.0
         command:
         - /metrics-server
+        - --metric-resolution=30s
         # These are needed for GKE, which doesn't support secure communication yet.
         # Remove these lines for non-GKE clusters, and when GKE supports token-based auth.
         - --kubelet-port=10255
