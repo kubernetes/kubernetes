@@ -135,7 +135,7 @@ type WebhookThrottleConfig struct {
 // WebhookClientConfig contains the information to make a connection with the webhook
 type WebhookClientConfig struct {
 	// `url` gives the location of the webhook, in standard URL form
-	// (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+	// (`scheme://host:port/path`). Exactly one of `url` or `service`
 	// must be specified.
 	//
 	// The `host` should not refer to a service running in the cluster; use
