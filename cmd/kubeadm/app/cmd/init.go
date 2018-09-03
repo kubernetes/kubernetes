@@ -231,6 +231,9 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha3.InitConfiguration, 
 	if err != nil {
 		return nil, err
 	}
+	if err := configutil.VerifyAPIServerBindAddress(cfg.APIEndpoint.AdvertiseAddress); err != nil {
+		return nil, err
+	}
 
 	glog.V(1).Infof("[init] validating feature gates")
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {

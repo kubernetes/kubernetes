@@ -188,6 +188,8 @@ func runCmdControlPlane(cmdFunc func(outDir string, cfg *kubeadmapi.InitConfigur
 		// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
+		err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
+		kubeadmutil.CheckErr(err)
 
 		if err := features.ValidateVersion(features.InitFeatureGates, internalcfg.FeatureGates, internalcfg.KubernetesVersion); err != nil {
 			kubeadmutil.CheckErr(err)
