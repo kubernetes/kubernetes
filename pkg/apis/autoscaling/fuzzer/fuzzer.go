@@ -51,18 +51,31 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				return q
 			}
 
+			var podMetricID autoscaling.MetricIdentifier
+			var objMetricID autoscaling.MetricIdentifier
+			c.Fuzz(&podMetricID)
+			c.Fuzz(&objMetricID)
+
 			targetUtilization := int32(c.RandUint64())
 			averageValue := randomQuantity()
 			s.Metrics = []autoscaling.MetricSpec{
 				{
 					Type: autoscaling.PodsMetricSourceType,
 					Pods: &autoscaling.PodsMetricSource{
-						Metric: autoscaling.MetricIdentifier{
-							Name: c.RandString(),
-						},
+						Metric: podMetricID,
 						Target: autoscaling.MetricTarget{
 							Type:         autoscaling.AverageValueMetricType,
 							AverageValue: &averageValue,
+						},
+					},
+				},
+				{
+					Type: autoscaling.ObjectMetricSourceType,
+					Object: &autoscaling.ObjectMetricSource{
+						Metric: objMetricID,
+						Target: autoscaling.MetricTarget{
+							Type:  autoscaling.ValueMetricType,
+							Value: &averageValue,
 						},
 					},
 				},

@@ -111,6 +111,7 @@ func Convert_autoscaling_ObjectMetricSource_To_v1_ObjectMetricSource(in *autosca
 		APIVersion: in.DescribedObject.APIVersion,
 	}
 	out.MetricName = in.Metric.Name
+	out.Selector = in.Metric.Selector
 	return nil
 }
 
