@@ -21,12 +21,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // Config is the main context object for the controller manager.
 type Config struct {
-	ComponentConfig componentconfig.KubeControllerManagerConfiguration
+	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo
 	// LoopbackClientConfig is a config for a privileged loopback connection

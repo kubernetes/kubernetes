@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // HPAControllerOptions holds the HPAController options.
@@ -54,7 +54,7 @@ func (o *HPAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up HPAController config with options.
-func (o *HPAControllerOptions) ApplyTo(cfg *componentconfig.HPAControllerConfiguration) error {
+func (o *HPAControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.HPAControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
