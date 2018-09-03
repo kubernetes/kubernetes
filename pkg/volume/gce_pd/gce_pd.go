@@ -298,7 +298,19 @@ func (plugin *gcePersistentDiskPlugin) ExpandVolumeDevice(
 			zoneSet, _ = util.LabelZonesToSet(zones)
 		}
 	}
-	updatedQuantity, err := cloud.ResizeDisk(pdName, zoneSet, oldSize, newSize)
+
+	var updatedQuantity resource.Quantity
+	l := zoneSet.Len()
+	switch l {
+	case 0:
+		return oldSize, fmt.Errorf("zone information must be specified")
+	case gcecloud.NumZonesSingleZoneDisk:
+		updatedQuantity, err = cloud.ResizeDisk(pdName, zoneSet.UnsortedList()[0], oldSize, newSize)
+	case gcecloud.NumZonesRegionalDisk:
+		updatedQuantity, err = cloud.ResizeRegionalDisk(pdName, oldSize, newSize)
+	default:
+		return oldSize, fmt.Errorf("unsupported number of zones: %d", l)
+	}
 
 	if err != nil {
 		return oldSize, err

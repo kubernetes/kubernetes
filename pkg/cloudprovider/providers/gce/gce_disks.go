@@ -442,9 +442,13 @@ func (manager *gceServiceManager) RegionalResizeDiskOnCloudProvider(disk *GCEDis
 
 // Disks is interface for manipulation with GCE PDs.
 type Disks interface {
-	// AttachDisk attaches given disk to the node with the specified NodeName.
+	// AttachDisk attaches given zonal disk to the node with the specified NodeName.
 	// Current instance is used when instanceID is empty string.
-	AttachDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool, regional bool) error
+	AttachDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool) error
+
+	// AttachRegionalDisk attaches given regional disk to the node with the specified NodeName.
+	// Current instance is used when instanceID is empty string.
+	AttachRegionalDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool) error
 
 	// DetachDisk detaches given disk to the node with the specified NodeName.
 	// Current instance is used when nodeName is empty string.
@@ -475,8 +479,11 @@ type Disks interface {
 	// DeleteRegionalDisk deletes the regional disk matching the given name.
 	DeleteRegionalDisk(diskName string) error
 
-	// ResizeDisk resizes PD and returns new disk size
-	ResizeDisk(diskName string, zoneSet sets.String, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+	// ResizeDisk resizes a zonal PD and returns new disk size
+	ResizeDisk(diskName string, zone string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+
+	// ResizeRegionalDisk resizes a regional PD and returns new disk size
+	ResizeRegionalDisk(diskName string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
 
 	// GetAutoLabelsForPD returns labels to apply to PersistentVolume
 	// representing this PD, namely failure domain and zone.
@@ -563,36 +570,12 @@ func (gce *GCECloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 	return labels, nil
 }
 
-func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool, regional bool) error {
-	instanceName := mapNodeNameToInstanceName(nodeName)
-	instance, err := gce.getInstanceByName(instanceName)
-	if err != nil {
-		return fmt.Errorf("error getting instance %q", instanceName)
-	}
+func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool) error {
+	return gce.attachDisk(diskName, nodeName, deviceName, readOnly, false /* regional */)
+}
 
-	// Try fetching as regional PD
-	var disk *GCEDisk
-	var mc *metricContext
-	if regional && utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
-		disk, err = gce.getRegionalDiskByName(diskName)
-		if err != nil {
-			return err
-		}
-		mc = newDiskMetricContextRegional("attach", gce.region)
-	} else {
-		disk, err = gce.getDiskByName(diskName, instance.Zone)
-		if err != nil {
-			return err
-		}
-		mc = newDiskMetricContextZonal("attach", gce.region, instance.Zone)
-	}
-
-	readWrite := "READ_WRITE"
-	if readOnly {
-		readWrite = "READ_ONLY"
-	}
-
-	return mc.Observe(gce.manager.AttachDiskOnCloudProvider(disk, deviceName, readWrite, instance.Zone, instance.Name))
+func (gce *GCECloud) AttachRegionalDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool) error {
+	return gce.attachDisk(diskName, nodeName, deviceName, readOnly, true /* regional */)
 }
 
 func (gce *GCECloud) DetachDisk(deviceName string, nodeName types.NodeName) error {
@@ -806,64 +789,12 @@ func (gce *GCECloud) DeleteRegionalDisk(diskName string) error {
 	return err
 }
 
-// ResizeDisk expands given disk and returns new disk size
-func (gce *GCECloud) ResizeDisk(diskName string, zoneSet sets.String, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
-	var disk *GCEDisk
-	var err error
-	l := zoneSet.Len()
-	switch l {
-	case 0:
-		return oldSize, fmt.Errorf("zone information must be specified")
-	case NumZonesSingleZoneDisk:
-		disk, err = gce.getDiskByName(diskName, zoneSet.UnsortedList()[0])
-	case NumZonesRegionalDisk:
-		disk, err = gce.getRegionalDiskByName(diskName)
-	default:
-		return oldSize, fmt.Errorf("unsupported number of zones: %d", l)
-	}
-	if err != nil {
-		return oldSize, err
-	}
+func (gce *GCECloud) ResizeDisk(diskName string, zone string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	return gce.resizeDisk(diskName, false /* regional */, zone, oldSize, newSize)
+}
 
-	// GCE resizes in chunks of GiBs
-	requestGIB := volumeutil.RoundUpToGiB(newSize)
-	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
-
-	// If disk is already of size equal or greater than requested size, we simply return
-	if disk.SizeGb >= requestGIB {
-		return newSizeQuant, nil
-	}
-
-	var mc *metricContext
-
-	switch zoneInfo := disk.ZoneInfo.(type) {
-	case singleZone:
-		mc = newDiskMetricContextZonal("resize", disk.Region, zoneInfo.zone)
-		err := gce.manager.ResizeDiskOnCloudProvider(disk, requestGIB, zoneInfo.zone)
-
-		if err != nil {
-			return oldSize, mc.Observe(err)
-		} else {
-			return newSizeQuant, mc.Observe(err)
-		}
-	case multiZone:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
-			return oldSize, fmt.Errorf("disk.ZoneInfo has unexpected type %T", zoneInfo)
-		}
-
-		mc = newDiskMetricContextRegional("resize", disk.Region)
-		err := gce.manager.RegionalResizeDiskOnCloudProvider(disk, requestGIB)
-
-		if err != nil {
-			return oldSize, mc.Observe(err)
-		} else {
-			return newSizeQuant, mc.Observe(err)
-		}
-	case nil:
-		return oldSize, fmt.Errorf("PD has nil ZoneInfo: %v", disk)
-	default:
-		return oldSize, fmt.Errorf("disk.ZoneInfo has unexpected type %T", zoneInfo)
-	}
+func (gce *GCECloud) ResizeRegionalDisk(diskName string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	return gce.resizeDisk(diskName, true /* regional */, "", oldSize, newSize)
 }
 
 // Builds the labels that should be automatically added to a PersistentVolume backed by a GCE PD
@@ -950,6 +881,38 @@ func (gce *GCECloud) GetAutoLabelsForPD(diskName string, zone string) (map[strin
 	return labels, nil
 }
 
+func (gce *GCECloud) attachDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool, regional bool) error {
+	instanceName := mapNodeNameToInstanceName(nodeName)
+	instance, err := gce.getInstanceByName(instanceName)
+	if err != nil {
+		return fmt.Errorf("error getting instance %q", instanceName)
+	}
+
+	// Try fetching as regional PD
+	var disk *GCEDisk
+	var mc *metricContext
+	if regional && utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
+		disk, err = gce.getRegionalDiskByName(diskName)
+		if err != nil {
+			return err
+		}
+		mc = newDiskMetricContextRegional("attach", gce.region)
+	} else {
+		disk, err = gce.getDiskByName(diskName, instance.Zone)
+		if err != nil {
+			return err
+		}
+		mc = newDiskMetricContextZonal("attach", gce.region, instance.Zone)
+	}
+
+	readWrite := "READ_WRITE"
+	if readOnly {
+		readWrite = "READ_ONLY"
+	}
+
+	return mc.Observe(gce.manager.AttachDiskOnCloudProvider(disk, deviceName, readWrite, instance.Zone, instance.Name))
+}
+
 // getDiskByName returns a GCEDisk for the disk, if it is found in the specified zone.
 // Otherwise returns a DiskNotFoundError.
 func (gce *GCECloud) getDiskByName(diskName string, zone string) (*GCEDisk, error) {
@@ -1012,6 +975,60 @@ func (gce *GCECloud) deleteRegionalDiskByName(diskName string) error {
 	}
 
 	return mc.Observe(err)
+}
+
+// resizeDisk expands given disk and returns new disk size
+func (gce *GCECloud) resizeDisk(diskName string, regional bool, zone string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+	var disk *GCEDisk
+	var err error
+	if regional {
+		disk, err = gce.getRegionalDiskByName(diskName)
+	} else {
+		disk, err = gce.getDiskByName(diskName, zone)
+	}
+	if err != nil {
+		return oldSize, err
+	}
+
+	// GCE resizes in chunks of GiBs
+	requestGIB := volumeutil.RoundUpToGiB(newSize)
+	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
+
+	// If disk is already of size equal or greater than requested size, we simply return
+	if disk.SizeGb >= requestGIB {
+		return newSizeQuant, nil
+	}
+
+	var mc *metricContext
+
+	switch zoneInfo := disk.ZoneInfo.(type) {
+	case singleZone:
+		mc = newDiskMetricContextZonal("resize", disk.Region, zoneInfo.zone)
+		err := gce.manager.ResizeDiskOnCloudProvider(disk, requestGIB, zoneInfo.zone)
+
+		if err != nil {
+			return oldSize, mc.Observe(err)
+		} else {
+			return newSizeQuant, mc.Observe(err)
+		}
+	case multiZone:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
+			return oldSize, fmt.Errorf("disk.ZoneInfo has unexpected type %T", zoneInfo)
+		}
+
+		mc = newDiskMetricContextRegional("resize", disk.Region)
+		err := gce.manager.RegionalResizeDiskOnCloudProvider(disk, requestGIB)
+
+		if err != nil {
+			return oldSize, mc.Observe(err)
+		} else {
+			return newSizeQuant, mc.Observe(err)
+		}
+	case nil:
+		return oldSize, fmt.Errorf("PD has nil ZoneInfo: %v", disk)
+	default:
+		return oldSize, fmt.Errorf("disk.ZoneInfo has unexpected type %T", zoneInfo)
+	}
 }
 
 // GetDiskByNameUnknownZone scans all managed zones to return the GCE PD.

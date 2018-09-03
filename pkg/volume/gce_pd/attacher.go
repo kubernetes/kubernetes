@@ -99,7 +99,12 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 		// Volume is already attached to node.
 		glog.Infof("Attach operation is successful. PD %q is already attached to node %q.", pdName, nodeName)
 	} else {
-		if err := attacher.gceDisks.AttachDisk(pdName, nodeName, deviceName, readOnly, isRegionalPD(spec)); err != nil {
+		if isRegionalPD(spec) {
+			err = attacher.gceDisks.AttachRegionalDisk(pdName, nodeName, deviceName, readOnly)
+		} else {
+			err = attacher.gceDisks.AttachDisk(pdName, nodeName, deviceName, readOnly)
+		}
+		if err != nil {
 			glog.Errorf("Error attaching PD %q to node %q: %+v", pdName, nodeName, err)
 			return "", err
 		}

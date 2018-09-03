@@ -440,7 +440,7 @@ type diskIsAttachedCall struct {
 
 var _ gce.Disks = &testcase{}
 
-func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool, regional bool) error {
+func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool) error {
 	expected := &testcase.attach
 
 	if expected.diskName == "" && expected.nodeName == "" {
@@ -470,12 +470,52 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName, d
 		return errors.New("Unexpected AttachDisk call: wrong readOnly")
 	}
 
-	if expected.regional != regional {
-		testcase.t.Errorf("Unexpected AttachDisk call: expected regional %v, got %v", expected.regional, regional)
-		return errors.New("Unexpected AttachDisk call: wrong regional")
+	if expected.regional {
+		testcase.t.Errorf("Unexpected AttachDisk call: expected AttachRegionalDisk call")
+		return errors.New("Unexpected AttachDisk call: expected AttachRegionalDisk call")
 	}
 
 	glog.V(4).Infof("AttachDisk call: %s, %s, %v, returning %v", diskName, nodeName, readOnly, expected.ret)
+
+	return expected.ret
+}
+
+func (testcase *testcase) AttachRegionalDisk(diskName string, nodeName types.NodeName, deviceName string, readOnly bool) error {
+	expected := &testcase.attach
+
+	if expected.diskName == "" && expected.nodeName == "" {
+		// testcase.attach looks uninitialized, test did not expect to call
+		// AttachRegionalDisk
+		testcase.t.Errorf("Unexpected AttachRegionalDisk call!")
+		return errors.New("Unexpected AttachRegionalDisk call!")
+	}
+
+	if expected.diskName != diskName {
+		testcase.t.Errorf("Unexpected AttachRegionalDisk call: expected diskName %s, got %s", expected.diskName, diskName)
+		return errors.New("Unexpected AttachRegionalDisk call: wrong diskName")
+	}
+
+	if expected.nodeName != nodeName {
+		testcase.t.Errorf("Unexpected AttachRegionalDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
+		return errors.New("Unexpected AttachRegionalDisk call: wrong nodeName")
+	}
+
+	if expected.deviceName != deviceName {
+		testcase.t.Errorf("Unexpected AttachRegionalDisk call: expected deviceName %s, got %s", expected.deviceName, deviceName)
+		return errors.New("Unexpected AttachRegionalDisk call: wrong deviceName")
+	}
+
+	if expected.readOnly != readOnly {
+		testcase.t.Errorf("Unexpected AttachRegionalDisk call: expected readOnly %v, got %v", expected.readOnly, readOnly)
+		return errors.New("Unexpected AttachRegionalDisk call: wrong readOnly")
+	}
+
+	if !expected.regional {
+		testcase.t.Errorf("Unexpected AttachRegionalDisk call: expected AttachDisk call")
+		return errors.New("Unexpected AttachRegionalDisk call: expected AttachDisk call")
+	}
+
+	glog.V(4).Infof("AttachRegionalDisk call: %s, %s, %v, returning %v", diskName, nodeName, readOnly, expected.ret)
 
 	return expected.ret
 }
@@ -556,7 +596,14 @@ func (testcase *testcase) GetAutoLabelsForPD(name string, zone string) (map[stri
 
 func (testcase *testcase) ResizeDisk(
 	diskName string,
-	zoneSet sets.String,
+	zone string,
+	oldSize resource.Quantity,
+	newSize resource.Quantity) (resource.Quantity, error) {
+	return oldSize, errors.New("Not implemented")
+}
+
+func (testcase *testcase) ResizeRegionalDisk(
+	diskName string,
 	oldSize resource.Quantity,
 	newSize resource.Quantity) (resource.Quantity, error) {
 	return oldSize, errors.New("Not implemented")
