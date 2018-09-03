@@ -81,12 +81,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.KubeAPIQPS = 5
 			obj.KubeAPIBurst = 10
 			obj.HairpinMode = v1beta1.PromiscuousBridge
-			obj.EvictionHard = map[string]string{
-				"memory.available":  "100Mi",
-				"nodefs.available":  "10%",
-				"nodefs.inodesFree": "5%",
-				"imagefs.available": "15%",
-			}
+			obj.EvictionHard = kubeletconfigv1beta1.DefaultEvictionHard
 			obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
 			obj.MakeIPTablesUtilChains = true
 			obj.IPTablesMasqueradeBit = kubeletconfigv1beta1.DefaultIPTablesMasqueradeBit
