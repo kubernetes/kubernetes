@@ -185,6 +185,7 @@ pkg/kubelet/apis/cri/testing
 pkg/kubelet/apis/deviceplugin/v1alpha
 pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/apis/pluginregistration/v1alpha1
+pkg/kubelet/apis/pluginregistration/v1beta1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
 pkg/kubelet/checkpoint
