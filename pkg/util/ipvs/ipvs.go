@@ -93,9 +93,11 @@ func (svc *VirtualServer) String() string {
 
 // RealServer is an user-oriented definition of an IPVS real server in its entirety.
 type RealServer struct {
-	Address net.IP
-	Port    uint16
-	Weight  int
+	Address      net.IP
+	Port         uint16
+	Weight       int
+	ActiveConn   int
+	InactiveConn int
 }
 
 func (rs *RealServer) String() string {
