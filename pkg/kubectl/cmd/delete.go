@@ -321,8 +321,9 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 	// TODO: Remove this in or after 1.12 release.
 	//       Server version >= 1.11 no longer needs this hack.
 	mapping := info.ResourceMapping()
-	if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "extensions", Resource: "daemonsets"}) ||
-		mapping.Resource.GroupResource() == (schema.GroupResource{Group: "apps", Resource: "daemonsets"}) {
+	if (mapping.Resource.GroupResource() == (schema.GroupResource{Group: "extensions", Resource: "daemonsets"}) ||
+		mapping.Resource.GroupResource() == (schema.GroupResource{Group: "apps", Resource: "daemonsets"})) &&
+		(deleteOptions.PropagationPolicy != nil && *deleteOptions.PropagationPolicy != metav1.DeletePropagationOrphan) {
 		if err := updateDaemonSet(info.Namespace, info.Name, o.DynamicClient); err != nil {
 			return nil, err
 		}
