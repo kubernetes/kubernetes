@@ -23,6 +23,7 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strconv"
 
 	"github.com/golang/glog"
 
@@ -52,7 +53,7 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration) error {
 	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
 		return err
 	}
-	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.APIEndpoint.AdvertiseAddress); err != nil {
+	if err := SetClusterDynamicDefaults(&cfg.ClusterConfiguration, cfg.APIEndpoint.AdvertiseAddress, cfg.APIEndpoint.BindPort); err != nil {
 		return err
 	}
 	return nil
@@ -119,7 +120,7 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 }
 
 // SetClusterDynamicDefaults checks and sets configuration values for the InitConfiguration object
-func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAddress string) error {
+func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAddress string, bindPort int32) error {
 	// Default all the embedded ComponentConfig structs
 	componentconfigs.Known.Default(cfg)
 
@@ -133,6 +134,19 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 	// Resolve possible version labels and validate version string
 	if err := NormalizeKubernetesVersion(cfg); err != nil {
 		return err
+	}
+
+	// If ControlPlaneEndpoint is specified without a port number defaults it to
+	// the bindPort number of the APIEndpoint.
+	// This will allow join of additional control plane instances with different bindPort number
+	if cfg.ControlPlaneEndpoint != "" {
+		host, port, err := kubeadmutil.ParseHostPort(cfg.ControlPlaneEndpoint)
+		if err != nil {
+			return err
+		}
+		if port == "" {
+			cfg.ControlPlaneEndpoint = net.JoinHostPort(host, strconv.FormatInt(int64(bindPort), 10))
+		}
 	}
 
 	// Downcase SANs. Some domain names (like ELBs) have capitals in them.

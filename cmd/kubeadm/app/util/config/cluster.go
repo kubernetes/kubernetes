@@ -17,60 +17,244 @@ limitations under the License.
 package config
 
 import (
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"path/filepath"
+	"strings"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
-// TODO: This func should be renamed FetchClusterConfigFromFileOrCluster, and return a ClusterConfiguration instead of an InitConfiguration
-func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string) (*kubeadmapi.InitConfiguration, error) {
+func FetchConfigFromFileOrCluster(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// Load the configuration from a file or the cluster
-	configBytes, err := loadConfigurationBytes(client, w, logPrefix, cfgPath)
+	initcfg, err := loadConfiguration(client, w, logPrefix, cfgPath, newControlPlane)
 	if err != nil {
 		return nil, err
 	}
 
-	// Unmarshal the versioned configuration populated from the file or ConfigMap, convert it to the internal API types, then default and validate
-	initcfg, err := BytesToInternalConfig(configBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	//TODO: this will be reviewed in the following PR for reading/storing the kubeadm-config ConfigMap
+	// Apply dynamic defaults
 	if err := SetInitDynamicDefaults(initcfg); err != nil {
 		return nil, err
 	}
 	return initcfg, err
 }
 
-// loadConfigurationBytes loads the configuration byte slice from either a file or the cluster ConfigMap
-func loadConfigurationBytes(client clientset.Interface, w io.Writer, logPrefix, cfgPath string) ([]byte, error) {
+// loadConfiguration loads the configuration byte slice from either a file or the cluster ConfigMap
+func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPath string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// The config file has the highest priority
 	if cfgPath != "" {
 		fmt.Fprintf(w, "[%s] Reading configuration options from a file: %s\n", logPrefix, cfgPath)
-		return ioutil.ReadFile(cfgPath)
+		return loadInitConfigurationFromFile(cfgPath)
 	}
 
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
-
-	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
-	// Also, the key really should be ClusterConfiguration...
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		// Return the apierror directly so the caller of this function can know what type of error occurred and act based on that
-		return []byte{}, err
-	} else if err != nil {
-		return []byte{}, fmt.Errorf("an unexpected error happened when trying to get the ConfigMap %q in the %s namespace: %v", constants.InitConfigurationConfigMap, metav1.NamespaceSystem, err)
-	}
-	// TODO: Load the kube-proxy and kubelet ComponentConfig ConfigMaps here as different YAML documents and append to the byte slice
-
 	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.InitConfigurationConfigMap)
-	return []byte(configMap.Data[constants.InitConfigurationConfigMapKey]), nil
+	return getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
+}
+
+func loadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguration, error) {
+	configBytes, err := ioutil.ReadFile(cfgPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal the versioned configuration populated from the file,
+	// convert it to the internal API types, then default and validate
+	// NB the file can be one of
+	// - a single YAML, with a v1alpha2.MasterConfiguration object (with embedded component configs)
+	// - multiple YAML, with a combination of
+	// 		- a YAML with a v1alpha3.InitConfiguration object
+	// 		- a YAML with a v1alpha3.ClusterConfiguration object (without embedded component configs)
+	//		- separated YAML for components configs
+	initcfg, err := BytesToInternalConfig(configBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return initcfg, nil
+}
+
+func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
+	// Also, the config map really should be KubeadmConfigConfigMap...
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: remove in V1.13
+	// If InitConfigurationConfigMapKey exist, the kubeadm-config was created with v1.11
+	if _, ok := configMap.Data[constants.InitConfigurationConfigMapKey]; ok {
+		return getInitConfigurationFromConfigMapV11(configMap.Data)
+	}
+
+	return getInitConfigurationFromConfigMaps(kubeconfigDir, client, configMap.Data, newControlPlane)
+}
+
+func getInitConfigurationFromConfigMapV11(data map[string]string) (*kubeadmapi.InitConfiguration, error) {
+	configBytes := []byte(data[constants.InitConfigurationConfigMapKey])
+
+	// Unmarshal the versioned configuration populated from the file,
+	// convert it to the internal API types, then default and validate
+	// NB the config map created with v11 is a single YAML, with a v1alpha2.MasterConfiguration object (with embedded component configs)
+	initcfg, err := BytesToInternalConfig(configBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return initcfg, nil
+}
+
+func getInitConfigurationFromConfigMaps(kubeconfigDir string, client clientset.Interface, data map[string]string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
+	// In case of cluster crated with v1.12 InitConfiguration is composed with data from different places
+	initcfg := &kubeadmapi.InitConfiguration{}
+
+	// gets ClusterConfiguration from kubeadm-config
+	clusterConfigurationData, ok := data[constants.ClusterConfigurationConfigMapKey]
+	if !ok {
+		return nil, fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
+	}
+	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterConfigurationData), &initcfg.ClusterConfiguration); err != nil {
+		return nil, err
+	}
+
+	// gets the component configs from the corresponding config maps
+	if err := getComponentConfigs(client, &initcfg.ClusterConfiguration); err != nil {
+		return nil, err
+	}
+
+	// if this isn't a new controlplane instance (e.g. in case of kubeadm upgrades)
+	// get nodes specific information as well
+	if !newControlPlane {
+		// gets the nodeRegistration for the current from the node object
+		if err := getNodeRegistration(kubeconfigDir, client, &initcfg.NodeRegistration); err != nil {
+			return nil, err
+		}
+		// gets the APIEndpoint for the current node from then ClusterStatus in the kubeadm-config ConfigMap
+		if err := getAPIEndpoint(data, initcfg.NodeRegistration.Name, &initcfg.APIEndpoint); err != nil {
+			return nil, err
+		}
+	}
+
+	return initcfg, nil
+}
+
+// getNodeRegistration returns the nodeRegistration for the current node
+func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
+	// gets the name of the current node
+	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigDir)
+	if err != nil {
+		return err
+	}
+
+	// gets the corresponding node and retrives attributes stored there.
+	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
+	if !ok {
+		return fmt.Errorf("Node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
+	}
+
+	// returns the nodeRegistration attributes
+	nodeRegistration.Name = nodeName
+	nodeRegistration.CRISocket = criSocket
+	nodeRegistration.Taints = node.Spec.Taints
+	// NB. currently nodeRegistration.KubeletExtraArgs isn't stored at node level but only in the kubeadm-flags.env
+	//     that isn't modified during upgrades
+	//     in future we might reconsider this thus enabling changes to the kubeadm-flags.env during upgrades as well
+	return nil
+}
+
+// getNodeNameFromConfig gets the node name from a kubelet config file
+// TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
+//       information in the local kubelet config.yaml
+func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
+	// loads the kubelet.conf file
+	fileName := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
+	config, err := clientcmd.LoadFromFile(fileName)
+	if err != nil {
+		return "", err
+	}
+
+	// gets the info about the current user
+	authInfo := config.AuthInfos[config.Contexts[config.CurrentContext].AuthInfo]
+
+	// gets the X509 certificate with current user credentials
+	var certs []*x509.Certificate
+	if len(authInfo.ClientCertificateData) > 0 {
+		// if the config file uses an embedded x509 certificate (e.g. kubelet.conf created by kubeadm), parse it
+		if certs, err = certutil.ParseCertsPEM(authInfo.ClientCertificateData); err != nil {
+			return "", err
+		}
+	} else if len(authInfo.ClientCertificate) > 0 {
+		// if the config file links an external x509 certificate (e.g. kubelet.conf created by TLS bootstrap), load it
+		if certs, err = certutil.CertsFromFile(authInfo.ClientCertificate); err != nil {
+			return "", err
+		}
+	} else {
+		return "", errors.New("Invalid kubelet.conf. X509 certificate expected")
+	}
+
+	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
+	// TODO: Support multiple certs here in order to be able to rotate certs
+	cert := certs[0]
+
+	// gets the node name from the certificate common name
+	return strings.TrimPrefix(cert.Subject.CommonName, constants.NodesUserPrefix), nil
+}
+
+// getAPIEndpoint returns the APIEndpoint for the current node
+func getAPIEndpoint(data map[string]string, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
+	// gets the ClusterStatus from kubeadm-config
+	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
+	if !ok {
+		return fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)
+	}
+	clusterStatus := &kubeadmapi.ClusterStatus{}
+	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterStatusData), clusterStatus); err != nil {
+		return err
+	}
+
+	// gets the APIEndpoint for the current machine from the ClusterStatus
+	e, ok := clusterStatus.APIEndpoints[nodeName]
+	if !ok {
+		return errors.New("failed to get APIEndpoint information for this node")
+	}
+
+	apiEndpoint.AdvertiseAddress = e.AdvertiseAddress
+	apiEndpoint.BindPort = e.BindPort
+	return nil
+}
+
+// getComponentConfigs gets the component configs from the corresponding config maps
+func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubeadmapi.ClusterConfiguration) error {
+	// some config maps is versioned, so we need the KubernetesVersion for getting the right config map
+	k8sVersion := version.MustParseGeneric(clusterConfiguration.KubernetesVersion)
+	for kind, registration := range componentconfigs.Known {
+		obj, err := registration.GetFromConfigMap(client, k8sVersion)
+		if err != nil {
+			return err
+		}
+
+		if ok := registration.SetToInternalConfig(obj, clusterConfiguration); !ok {
+			return fmt.Errorf("couldn't save componentconfig value for kind %q", string(kind))
+		}
+	}
+	return nil
 }

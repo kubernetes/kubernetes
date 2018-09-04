@@ -56,7 +56,7 @@ func CreateConfigMap(cfg *kubeadmapi.InitConfiguration, client clientset.Interfa
 		return err
 	}
 
-	configMapName := configMapName(k8sVersion)
+	configMapName := kubeadmconstants.GetKubeletConfigMapName(k8sVersion)
 	fmt.Printf("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
 
 	kubeletBytes, err := getConfigBytes(cfg.ComponentConfigs.Kubelet)
@@ -90,7 +90,7 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(configMapName(k8sVersion)).RuleOrDie(),
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.GetKubeletConfigMapName(k8sVersion)).RuleOrDie(),
 		},
 	}); err != nil {
 		return err
@@ -124,7 +124,7 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version, kubeletDir string) error {
 
 	// Download the ConfigMap from the cluster based on what version the kubelet is
-	configMapName := configMapName(kubeletVersion)
+	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
 
 	fmt.Printf("[kubelet] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
 		configMapName, metav1.NamespaceSystem)
@@ -140,11 +140,6 @@ func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version,
 	}
 
 	return writeConfigBytesToDisk([]byte(kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]), kubeletDir)
-}
-
-// configMapName returns the right ConfigMap name for the right branch of k8s
-func configMapName(k8sVersion *version.Version) string {
-	return fmt.Sprintf("%s%d.%d", kubeadmconstants.KubeletBaseConfigurationConfigMapPrefix, k8sVersion.Major(), k8sVersion.Minor())
 }
 
 // configMapRBACName returns the name for the Role/RoleBinding for the kubelet config configmap for the right branch of k8s
