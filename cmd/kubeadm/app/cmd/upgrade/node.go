@@ -150,10 +150,6 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output the actions that would be performed.")
-
-	//TODO: following values should retrieved form the kubeadm-config config map; remove as soon as the new config wil be in place
-	cmd.Flags().StringVar(&flags.advertiseAddress, "apiserver-advertise-address", flags.advertiseAddress, "If the node is joining as a master, the IP address the API Server will advertise it's listening on.")
-	cmd.Flags().StringVar(&flags.nodeName, "node-name", flags.nodeName, "Specify the node name.")
 	return cmd
 }
 
@@ -231,15 +227,10 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 	waiter := apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
 
 	// Fetches the cluster configuration
-	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade", "")
+	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade", "", false)
 	if err != nil {
 		return fmt.Errorf("Unable to fetch the kubeadm-config ConfigMap: %v", err)
 	}
-
-	//TODO: as soon as the new config wil be in place check if the node is a known control plane instance
-	//      and retrive corresponding infos (now are temporary managed as flag)
-	cfg.NodeRegistration.Name = flags.nodeName
-	cfg.APIEndpoint.AdvertiseAddress = flags.advertiseAddress
 
 	// Rotate API server certificate if needed
 	if err := upgrade.BackupAPIServerCertIfNeeded(cfg, flags.dryRun); err != nil {
