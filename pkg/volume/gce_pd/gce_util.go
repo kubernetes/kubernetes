@@ -37,7 +37,6 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
 	"k8s.io/kubernetes/pkg/util/version"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -394,16 +393,21 @@ func getDeviceName(spec *volume.Spec, host volume.VolumeHost) (string, error) {
 
 	deviceName := volumeSource.PDName
 	if spec.PersistentVolume != nil && isRegionalPD(spec) {
-		nodes, err := host.GetKubeClient().CoreV1().Nodes().List(metav1.ListOptions{})
+		gceCloud, err := getCloudProvider(host.GetCloudProvider()) // TODO (verult)
+		if err != nil {
+			return "", fmt.Errorf("error checking max node version: %v", err)
+		}
+
+		nodeVersions, err := gceCloud.GetNodeVersions()
 		if err != nil {
 			return "", fmt.Errorf("error checking max node version: %v", err)
 		}
 
 		allNodesAboveVersion := true
-		for _, node := range nodes.Items {
-			nodeVersion, err := version.ParseGeneric(node.Status.NodeInfo.KubeletVersion)
+		for nodeName, v := range nodeVersions {
+			nodeVersion, err := version.ParseGeneric(v)
 			if err != nil {
-				return "", fmt.Errorf("error checking node version for node %q: %v", node.Name, err)
+				return "", fmt.Errorf("error checking node version for node %q: %v", nodeName, err)
 			}
 
 			if nodeVersion.LessThan(version.MustParseGeneric(regionalSuffixMinNodeVersion))  {

@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"errors"
 )
 
 const (
@@ -315,6 +316,22 @@ func (gce *GCECloud) GetAllZonesFromCloudProvider() (sets.String, error) {
 		}
 	}
 	return zones, nil
+}
+
+func (gce *GCECloud) GetNodeVersions() (map[types.NodeName]string, error) {
+	if gce.nodeInformerSynced == nil {
+		return nil, errors.New("GCECloud object does not have informers set")
+	}
+	gce.nodeVersionsLock.Lock()
+	defer gce.nodeVersionsLock.Unlock()
+	if !gce.nodeInformerSynced() {
+		return nil, fmt.Errorf("node informer is not synced when trying to GetNodeVersions")
+	}
+	nodeVersions := make(map[types.NodeName]string)
+	for nodeName, version := range gce.nodeVersions {
+		nodeVersions[nodeName] = version
+	}
+	return nodeVersions, nil
 }
 
 // InsertInstance creates a new instance on GCP

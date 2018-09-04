@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -138,6 +139,11 @@ type GCECloud struct {
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
 	// it is updated by the nodeInformer
 	nodeZones          map[string]sets.String
+	// Lock for access to nodeVersions
+	nodeVersionsLock sync.Mutex
+	// nodeVersions is a mapping from node name to the corresponding node's kubelet version.
+	// it is updated by the nodeInformer
+	nodeVersions       map[types.NodeName]string
 	nodeInformerSynced cache.InformerSynced
 	// sharedResourceLock is used to serialize GCE operations that may mutate shared state to
 	// prevent inconsistencies. For example, load balancers manipulation methods will take the
@@ -508,6 +514,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		operationPollRateLimiter: operationPollRateLimiter,
 		AlphaFeatureGate:         config.AlphaFeatureGate,
 		nodeZones:                map[string]sets.String{},
+		nodeVersions:             map[types.NodeName]string{},
 	}
 
 	gce.manager = &gceServiceManager{gce}
@@ -668,6 +675,7 @@ func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactor
 		AddFunc: func(obj interface{}) {
 			node := obj.(*v1.Node)
 			gce.updateNodeZones(nil, node)
+			gce.updateNodeVersions(nil, node)
 		},
 		UpdateFunc: func(prev, obj interface{}) {
 			prevNode := prev.(*v1.Node)
@@ -677,6 +685,7 @@ func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactor
 				return
 			}
 			gce.updateNodeZones(prevNode, newNode)
+			gce.updateNodeVersions(prevNode, newNode)
 		},
 		DeleteFunc: func(obj interface{}) {
 			node, isNode := obj.(*v1.Node)
@@ -695,6 +704,7 @@ func (gce *GCECloud) SetInformers(informerFactory informers.SharedInformerFactor
 				}
 			}
 			gce.updateNodeZones(node, nil)
+			gce.updateNodeVersions(node, nil)
 		},
 	})
 	gce.nodeInformerSynced = nodeInformer.HasSynced
@@ -720,6 +730,17 @@ func (gce *GCECloud) updateNodeZones(prevNode, newNode *v1.Node) {
 			}
 			gce.nodeZones[newZone].Insert(newNode.ObjectMeta.Name)
 		}
+	}
+}
+
+func (gce *GCECloud) updateNodeVersions(prevNode, newNode *v1.Node) {
+	gce.nodeVersionsLock.Lock()
+	defer gce.nodeVersionsLock.Unlock()
+	if prevNode != nil {
+		delete(gce.nodeVersions, types.NodeName(prevNode.Name))
+	}
+	if newNode != nil {
+		gce.nodeVersions[types.NodeName(newNode.Name)] = newNode.Status.NodeInfo.KubeletVersion
 	}
 }
 
