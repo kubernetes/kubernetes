@@ -51,10 +51,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	clientset "k8s.io/client-go/kubernetes"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 	vspheretest "k8s.io/kubernetes/test/e2e/storage/vsphere"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -144,80 +144,7 @@ func (n *nfsDriver) CreateDriver() {
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
 
 	By("creating an external dynamic provisioner pod")
-	n.externalProvisionerPod = startExternalProvisioner(cs, ns.Name, n.externalPluginName)
-}
-
-func startExternalProvisioner(c clientset.Interface, ns string, externalPluginName string) *v1.Pod {
-	podClient := c.CoreV1().Pods(ns)
-
-	provisionerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "external-provisioner-",
-		},
-
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9",
-					SecurityContext: &v1.SecurityContext{
-						Capabilities: &v1.Capabilities{
-							Add: []v1.Capability{"DAC_READ_SEARCH"},
-						},
-					},
-					Args: []string{
-						"-provisioner=" + externalPluginName,
-						"-grace-period=0",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "nfs", ContainerPort: 2049},
-						{Name: "mountd", ContainerPort: 20048},
-						{Name: "rpcbind", ContainerPort: 111},
-						{Name: "rpcbind-udp", ContainerPort: 111, Protocol: v1.ProtocolUDP},
-					},
-					Env: []v1.EnvVar{
-						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
-						},
-					},
-					ImagePullPolicy: v1.PullIfNotPresent,
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "export-volume",
-							MountPath: "/export",
-						},
-					},
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "export-volume",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	provisionerPod, err := podClient.Create(provisionerPod)
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
-
-	By("locating the provisioner pod")
-	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-
-	return pod
+	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
 }
 
 func (n *nfsDriver) CleanupDriver() {
