@@ -14,25 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
-import hashlib
 import json
 import os
 import random
 import re
 import shutil
 import subprocess
-import time
 import traceback
 import yaml
 
 from charms.leadership import leader_get, leader_set
 
 from pathlib import Path
-from shlex import split
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
-from socket import gethostname, getfqdn
 
 from charms import layer
 from charms.layer import snap
@@ -50,6 +45,20 @@ from charmhelpers.core import hookenv, unitdata
 from charmhelpers.core.host import service_stop, service_restart
 from charmhelpers.contrib.charmsupport import nrpe
 
+from charms.layer.kubernetes_common import kubeclientconfig_path
+from charms.layer.kubernetes_common import migrate_resource_checksums
+from charms.layer.kubernetes_common import check_resources_for_upgrade_needed
+from charms.layer.kubernetes_common import calculate_and_store_resource_checksums # noqa
+from charms.layer.kubernetes_common import get_ingress_address
+from charms.layer.kubernetes_common import create_kubeconfig
+from charms.layer.kubernetes_common import kubectl_manifest, kubectl_success
+from charms.layer.kubernetes_common import kubectl
+from charms.layer.kubernetes_common import ApplyNodeLabelFailed
+from charms.layer.kubernetes_common import arch, get_node_name
+from charms.layer.kubernetes_common import gethostname
+from charms.layer.kubernetes_common import set_label, remove_label
+from charms.layer.kubernetes_common import configure_kubernetes_service
+
 # Override the default nagios shortname regex to allow periods, which we
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
 # default regex in charmhelpers doesn't allow periods, but nagios itself does.
@@ -57,9 +66,10 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 kubeconfig_path = '/root/cdk/kubeconfig'
 kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
-kubeclientconfig_path = '/root/.kube/config'
 gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 snap_resources = ['kubectl', 'kubelet', 'kube-proxy']
+checksum_prefix = 'kubernetes-worker.resource-checksums.'
+configure_prefix = 'kubernetes-worker.prev_args.'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 db = unitdata.kv()
@@ -81,8 +91,9 @@ def upgrade_charm():
     hookenv.atexit(remove_state, 'config.changed.install_from_upstream')
 
     cleanup_pre_snap_services()
-    migrate_resource_checksums()
-    check_resources_for_upgrade_needed()
+    migrate_resource_checksums(checksum_prefix, snap_resources)
+    if check_resources_for_upgrade_needed(checksum_prefix, snap_resources):
+        set_upgrade_needed()
 
     # Remove the RC for nginx ingress if it exists
     if hookenv.config().get('ingress'):
@@ -104,58 +115,6 @@ def upgrade_charm():
     remove_state('kubernetes-worker.ingress.available')
     remove_state('worker.auth.bootstrapped')
     set_state('kubernetes-worker.restart-needed')
-
-
-def get_resource_checksum_db_key(resource):
-    ''' Convert a resource name to a resource checksum database key. '''
-    return 'kubernetes-worker.resource-checksums.' + resource
-
-
-def calculate_resource_checksum(resource):
-    ''' Calculate a checksum for a resource '''
-    md5 = hashlib.md5()
-    path = hookenv.resource_get(resource)
-    if path:
-        with open(path, 'rb') as f:
-            data = f.read()
-        md5.update(data)
-    return md5.hexdigest()
-
-
-def migrate_resource_checksums():
-    ''' Migrate resource checksums from the old schema to the new one '''
-    for resource in snap_resources:
-        new_key = get_resource_checksum_db_key(resource)
-        if not db.get(new_key):
-            path = hookenv.resource_get(resource)
-            if path:
-                # old key from charms.reactive.helpers.any_file_changed
-                old_key = 'reactive.files_changed.' + path
-                old_checksum = db.get(old_key)
-                db.set(new_key, old_checksum)
-            else:
-                # No resource is attached. Previously, this meant no checksum
-                # would be calculated and stored. But now we calculate it as if
-                # it is a 0-byte resource, so let's go ahead and do that.
-                zero_checksum = hashlib.md5().hexdigest()
-                db.set(new_key, zero_checksum)
-
-
-def check_resources_for_upgrade_needed():
-    hookenv.status_set('maintenance', 'Checking resources')
-    for resource in snap_resources:
-        key = get_resource_checksum_db_key(resource)
-        old_checksum = db.get(key)
-        new_checksum = calculate_resource_checksum(resource)
-        if new_checksum != old_checksum:
-            set_upgrade_needed()
-
-
-def calculate_and_store_resource_checksums():
-    for resource in snap_resources:
-        key = get_resource_checksum_db_key(resource)
-        checksum = calculate_resource_checksum(resource)
-        db.set(key, checksum)
 
 
 def set_upgrade_needed():
@@ -213,7 +172,7 @@ def install_snaps():
     snap.install('kubelet', channel=channel, classic=True)
     hookenv.status_set('maintenance', 'Installing kube-proxy snap')
     snap.install('kube-proxy', channel=channel, classic=True)
-    calculate_and_store_resource_checksums()
+    calculate_and_store_resource_checksums(checksum_prefix, snap_resources)
     set_state('kubernetes-worker.snaps.installed')
     set_state('kubernetes-worker.restart-needed')
     remove_state('kubernetes-worker.snaps.upgrade-needed')
@@ -442,21 +401,6 @@ def update_kubelet_status():
     hookenv.status_set('active', 'Kubernetes worker running.')
 
 
-def get_ingress_address(relation):
-    try:
-        network_info = hookenv.network_get(relation.relation_name)
-    except NotImplementedError:
-        network_info = []
-
-    if network_info and 'ingress-addresses' in network_info:
-        # just grab the first one for now, maybe be more robust here?
-        return network_info['ingress-addresses'][0]
-    else:
-        # if they don't have ingress-addresses they are running a juju that
-        # doesn't support spaces, so just return the private address
-        return hookenv.unit_get('private-address')
-
-
 @when('certificates.available', 'kube-control.connected')
 def send_data(tls, kube_control):
     '''Send the data that is required to create a server certificate for
@@ -464,7 +408,7 @@ def send_data(tls, kube_control):
     # Use the public ip of this unit as the Common Name for the certificate.
     common_name = hookenv.unit_public_ip()
 
-    ingress_ip = get_ingress_address(kube_control)
+    ingress_ip = get_ingress_address(kube_control.relation_name)
 
     # Create SANs that the tls layer will add to the server cert.
     sans = [
@@ -514,7 +458,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     # the correct DNS even though the server isn't ready yet.
 
     dns = kube_control.get_dns()
-    ingress_ip = get_ingress_address(kube_control)
+    ingress_ip = get_ingress_address(kube_control.relation_name)
     cluster_cidr = cni.get_config()['cidr']
 
     if cluster_cidr is None:
@@ -681,16 +625,6 @@ def run_docker_login():
     set_state('kubernetes-worker.restart-needed')
 
 
-def arch():
-    '''Return the package architecture as a string. Raise an exception if the
-    architecture is not supported by kubernetes.'''
-    # Get the package architecture for this system.
-    architecture = check_output(['dpkg', '--print-architecture']).rstrip()
-    # Convert the binary result into a string.
-    architecture = architecture.decode('utf-8')
-    return architecture
-
-
 def create_config(server, creds):
     '''Create a kubernetes configuration for the worker unit.'''
     # Get the options from the tls-client layer.
@@ -712,43 +646,6 @@ def create_config(server, creds):
                       token=creds['kubelet_token'], user='kubelet')
     create_kubeconfig(kubeproxyconfig_path, server, ca,
                       token=creds['proxy_token'], user='kube-proxy')
-
-
-def parse_extra_args(config_key):
-    elements = hookenv.config().get(config_key, '').split()
-    args = {}
-
-    for element in elements:
-        if '=' in element:
-            key, _, value = element.partition('=')
-            args[key] = value
-        else:
-            args[element] = 'true'
-
-    return args
-
-
-def configure_kubernetes_service(service, base_args, extra_args_key):
-    db = unitdata.kv()
-
-    prev_args_key = 'kubernetes-worker.prev_args.' + service
-    prev_args = db.get(prev_args_key) or {}
-
-    extra_args = parse_extra_args(extra_args_key)
-
-    args = {}
-    for arg in prev_args:
-        # remove previous args by setting to null
-        args[arg] = 'null'
-    for k, v in base_args.items():
-        args[k] = v
-    for k, v in extra_args.items():
-        args[k] = v
-
-    cmd = ['snap', 'set', service] + ['%s=%s' % item for item in args.items()]
-    check_call(cmd)
-
-    db.set(prev_args_key, args)
 
 
 def merge_kubelet_extra_config(config, extra_config):
@@ -864,7 +761,8 @@ def configure_kubelet(dns, ingress_ip):
     if get_version('kubelet') >= (1, 11):
         kubelet_opts['dynamic-config-dir'] = '/root/cdk/kubelet/dynamic-config'
 
-    configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
+    configure_kubernetes_service(configure_prefix, 'kubelet', kubelet_opts,
+                                 'kubelet-extra-args')
 
 
 def configure_kube_proxy(api_servers, cluster_cidr):
@@ -879,51 +777,8 @@ def configure_kube_proxy(api_servers, cluster_cidr):
     if b'lxc' in check_output('virt-what', shell=True):
         kube_proxy_opts['conntrack-max-per-core'] = '0'
 
-    configure_kubernetes_service('kube-proxy', kube_proxy_opts,
+    configure_kubernetes_service(configure_prefix, 'kube-proxy', kube_proxy_opts,
                                  'proxy-extra-args')
-
-
-def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
-                      user='ubuntu', context='juju-context',
-                      cluster='juju-cluster', password=None, token=None):
-    '''Create a configuration for Kubernetes based on path using the supplied
-    arguments for values of the Kubernetes server, CA, key, certificate, user
-    context and cluster.'''
-    if not key and not certificate and not password and not token:
-        raise ValueError('Missing authentication mechanism.')
-
-    # token and password are mutually exclusive. Error early if both are
-    # present. The developer has requested an impossible situation.
-    # see: kubectl config set-credentials --help
-    if token and password:
-        raise ValueError('Token and Password are mutually exclusive.')
-    # Create the config file with the address of the master server.
-    cmd = 'kubectl config --kubeconfig={0} set-cluster {1} ' \
-          '--server={2} --certificate-authority={3} --embed-certs=true'
-    check_call(split(cmd.format(kubeconfig, cluster, server, ca)))
-    # Delete old users
-    cmd = 'kubectl config --kubeconfig={0} unset users'
-    check_call(split(cmd.format(kubeconfig)))
-    # Create the credentials using the client flags.
-    cmd = 'kubectl config --kubeconfig={0} ' \
-          'set-credentials {1} '.format(kubeconfig, user)
-
-    if key and certificate:
-        cmd = '{0} --client-key={1} --client-certificate={2} '\
-              '--embed-certs=true'.format(cmd, key, certificate)
-    if password:
-        cmd = "{0} --username={1} --password={2}".format(cmd, user, password)
-    # This is mutually exclusive from password. They will not work together.
-    if token:
-        cmd = "{0} --token={1}".format(cmd, token)
-    check_call(split(cmd))
-    # Create a default context with the cluster.
-    cmd = 'kubectl config --kubeconfig={0} set-context {1} ' \
-          '--cluster={2} --user={3}'
-    check_call(split(cmd.format(kubeconfig, context, cluster, user)))
-    # Make the config use this new context.
-    cmd = 'kubectl config --kubeconfig={0} use-context {1}'
-    check_call(split(cmd.format(kubeconfig, context)))
 
 
 @when_any('config.changed.default-backend-image',
@@ -1007,7 +862,7 @@ def restart_unit_services():
     hookenv.log('Restarting kubelet and kube-proxy.')
     services = ['kube-proxy', 'kubelet']
     for service in services:
-        service_restart('snap.%s.daemon' % service)
+        service_restart(services)
 
 
 def get_kube_api_servers(kube_api):
@@ -1020,46 +875,6 @@ def get_kube_api_servers(kube_api):
             hosts.append('https://{0}:{1}'.format(unit['hostname'],
                                                   unit['port']))
     return hosts
-
-
-def kubectl(*args):
-    ''' Run a kubectl cli command with a config file. Returns stdout and throws
-    an error if the command fails. '''
-    command = ['kubectl', '--kubeconfig=' + kubeclientconfig_path] + list(args)
-    hookenv.log('Executing {}'.format(command))
-    return check_output(command)
-
-
-def kubectl_success(*args):
-    ''' Runs kubectl with the given args. Returns True if successful, False if
-    not. '''
-    try:
-        kubectl(*args)
-        return True
-    except CalledProcessError:
-        return False
-
-
-def kubectl_manifest(operation, manifest):
-    ''' Wrap the kubectl creation command when using filepath resources
-    :param operation - one of get, create, delete, replace
-    :param manifest - filepath to the manifest
-     '''
-    # Deletions are a special case
-    if operation == 'delete':
-        # Ensure we immediately remove requested resources with --now
-        return kubectl_success(operation, '-f', manifest, '--now')
-    else:
-        # Guard against an error re-creating the same manifest multiple times
-        if operation == 'create':
-            # If we already have the definition, its probably safe to assume
-            # creation was true.
-            if kubectl_success('get', '-f', manifest):
-                hookenv.log('Skipping definition for {}'.format(manifest))
-                return True
-        # Execute the requested command that did not match any of the special
-        # cases above
-        return kubectl_success(operation, '-f', manifest)
 
 
 @when('nrpe-external-master.available')
@@ -1273,61 +1088,6 @@ def _systemctl_is_active(application):
         return b'active' in raw
     except Exception:
         return False
-
-
-def get_node_name():
-    kubelet_extra_args = parse_extra_args('kubelet-extra-args')
-    cloud_provider = kubelet_extra_args.get('cloud-provider', '')
-    if is_state('endpoint.aws.ready'):
-        cloud_provider = 'aws'
-    elif is_state('endpoint.gcp.ready'):
-        cloud_provider = 'gce'
-    elif is_state('endpoint.openstack.ready'):
-        cloud_provider = 'openstack'
-    elif is_state('endpoint.vsphere.ready'):
-        cloud_provider = 'vsphere'
-    elif is_state('endpoint.azure.ready'):
-        cloud_provider = 'azure'
-    if cloud_provider == 'aws':
-        return getfqdn().lower()
-    else:
-        return gethostname().lower()
-
-
-class ApplyNodeLabelFailed(Exception):
-    pass
-
-
-def persistent_call(cmd, retry_message):
-    deadline = time.time() + 180
-    while time.time() < deadline:
-        code = subprocess.call(cmd)
-        if code == 0:
-            return True
-        hookenv.log(retry_message)
-        time.sleep(1)
-    else:
-        return False
-
-
-def set_label(label, value):
-    nodename = get_node_name()
-    cmd = 'kubectl --kubeconfig={0} label node {1} {2}={3} --overwrite'
-    cmd = cmd.format(kubeconfig_path, nodename, label, value)
-    cmd = cmd.split()
-    retry = 'Failed to apply label %s=%s. Will retry.' % (label, value)
-    if not persistent_call(cmd, retry):
-        raise ApplyNodeLabelFailed(retry)
-
-
-def remove_label(label):
-    nodename = get_node_name()
-    cmd = 'kubectl --kubeconfig={0} label node {1} {2}-'
-    cmd = cmd.format(kubeconfig_path, nodename, label)
-    cmd = cmd.split()
-    retry = 'Failed to remove label {0}. Will retry.'.format(label)
-    if not persistent_call(cmd, retry):
-        raise ApplyNodeLabelFailed(retry)
 
 
 @when_any('endpoint.aws.joined',
