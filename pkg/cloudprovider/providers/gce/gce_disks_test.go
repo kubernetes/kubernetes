@@ -787,7 +787,7 @@ func (manager *FakeServiceManager) GetDiskFromCloudProvider(
 	zone string, diskName string) (*GCEDisk, error) {
 
 	if manager.zonalDisks[zone] == "" {
-		return nil, cloudprovider.DiskNotFound
+		return nil, cloudprovider.ErrDiskNotFound
 	}
 
 	if manager.resourceInUse {
@@ -812,7 +812,7 @@ func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
 	diskName string) (*GCEDisk, error) {
 
 	if _, ok := manager.regionalDisks[diskName]; !ok {
-		return nil, cloudprovider.DiskNotFound
+		return nil, cloudprovider.ErrDiskNotFound
 	}
 
 	if manager.resourceInUse {

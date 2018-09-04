@@ -92,7 +92,7 @@ func newScaleSet(az *Cloud) (VMSet, error) {
 }
 
 // getVmssVM gets virtualMachineScaleSetVM by nodeName from cache.
-// It returns cloudprovider.InstanceNotFound if node does not belong to any scale sets.
+// It returns cloudprovider.ErrInstanceNotFound if node does not belong to any scale sets.
 func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm compute.VirtualMachineScaleSetVM, err error) {
 	instanceID, err = getScaleSetVMInstanceID(nodeName)
 	if err != nil {
@@ -105,7 +105,7 @@ func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm co
 	}
 
 	if ssName == "" {
-		return "", "", vm, cloudprovider.InstanceNotFound
+		return "", "", vm, cloudprovider.ErrInstanceNotFound
 	}
 
 	resourceGroup, err := ss.GetNodeResourceGroup(nodeName)
@@ -122,7 +122,7 @@ func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm co
 
 	if cachedVM == nil {
 		glog.Errorf("Can't find node (%q) in any scale sets", nodeName)
-		return ssName, instanceID, vm, cloudprovider.InstanceNotFound
+		return ssName, instanceID, vm, cloudprovider.ErrInstanceNotFound
 	}
 
 	return ssName, instanceID, *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
@@ -140,14 +140,14 @@ func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceI
 
 	if cachedVM == nil {
 		glog.Errorf("cound't find vmss virtual machine by scaleSetName (%q) and instanceID (%q)", scaleSetName, instanceID)
-		return vm, cloudprovider.InstanceNotFound
+		return vm, cloudprovider.ErrInstanceNotFound
 	}
 
 	return *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
 }
 
 // GetInstanceIDByNodeName gets the cloud provider ID by node name.
-// It must return ("", cloudprovider.InstanceNotFound) if the instance does
+// It must return ("", cloudprovider.ErrInstanceNotFound) if the instance does
 // not exist or is no longer running.
 func (ss *scaleSet) GetInstanceIDByNodeName(name string) (string, error) {
 	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name)
