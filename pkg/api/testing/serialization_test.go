@@ -286,7 +286,7 @@ func TestUnversionedTypes(t *testing.T) {
 		}
 		// Make sure it decodes correctly
 		if !reflect.DeepEqual(obj, versionDecodedObject) {
-			t.Errorf("%v: expected %#v, got %#v", obj, obj, versionDecodedObject)
+			t.Errorf("expected %#v, got %#v", obj, versionDecodedObject)
 			continue
 		}
 	}
