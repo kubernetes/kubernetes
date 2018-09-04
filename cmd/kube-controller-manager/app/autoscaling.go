@@ -80,22 +80,19 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 		return nil, false, err
 	}
 
-	replicaCalc := podautoscaler.NewReplicaCalculator(
-		metricsClient,
-		hpaClient.CoreV1(),
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
-	)
 	go podautoscaler.NewHorizontalController(
 		hpaClient.CoreV1(),
 		scaleClient,
 		hpaClient.AutoscalingV1(),
 		ctx.RESTMapper,
-		replicaCalc,
+		metricsClient,
 		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
+		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
 		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow.Duration,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerTolerance,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod.Duration,
+		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerInitialReadinessDelay.Duration,
 	).Run(ctx.Stop)
 	return nil, true, nil
 }
