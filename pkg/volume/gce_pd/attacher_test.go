@@ -75,7 +75,7 @@ func TestGetDeviceName_PersistentVolumeRegional(t *testing.T) {
 	if err != nil {
 		t.Errorf("GetDeviceName error: %v", err)
 	}
-	if deviceName != name+volNameRegionalSuffix {
+	if deviceName != name+deviceNameRegionalSuffix {
 		t.Errorf("GetDeviceName error: expected %s, got %s", name, deviceName)
 	}
 }
@@ -98,7 +98,7 @@ type testcase struct {
 func TestAttachDetachRegional(t *testing.T) {
 	diskName := "disk"
 	nodeName := types.NodeName("instance")
-	deviceName := diskName + volNameRegionalSuffix
+	deviceName := diskName + deviceNameRegionalSuffix
 	readOnly := false
 	regional := true
 	spec := createPVSpec(diskName, readOnly, []string{"zone1", "zone2"})

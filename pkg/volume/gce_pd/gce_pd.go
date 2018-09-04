@@ -86,7 +86,7 @@ func (plugin *gcePersistentDiskPlugin) GetPluginName() string {
 }
 
 func (plugin *gcePersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	return getDeviceName(spec)
+	return getDeviceName(spec, plugin.host)
 }
 
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
@@ -190,7 +190,7 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 		return nil, err
 	}
 
-	deviceName, err := getDeviceName(spec)
+	deviceName, err := getDeviceName(spec, plugin.host)
 	if err != nil {
 		return nil, err
 	}

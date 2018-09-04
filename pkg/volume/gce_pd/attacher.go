@@ -82,7 +82,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 
 	pdName := volumeSource.PDName
 
-	deviceName, err := getDeviceName(spec)
+	deviceName, err := getDeviceName(spec, attacher.host)
 	if err != nil {
 		return "", err
 	}
@@ -118,7 +118,7 @@ func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Sp
 	volumePdNameMap := make(map[string]*volume.Spec)
 	deviceNameList := []string{}
 	for _, spec := range specs {
-		deviceName, err := getDeviceName(spec)
+		deviceName, err := getDeviceName(spec, attacher.host)
 		// If error is occurred, skip this volume and move to the next one
 		if err != nil {
 			glog.Errorf("Error computing device name for volume (specName: %q) source : %v", spec.Name(), err)
@@ -158,7 +158,7 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 		return "", err
 	}
 
-	deviceName, err := getDeviceName(spec)
+	deviceName, err := getDeviceName(spec, attacher.host)
 	if err != nil {
 		return "", err
 	}
@@ -197,7 +197,7 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 
 func (attacher *gcePersistentDiskAttacher) GetDeviceMountPath(
 	spec *volume.Spec) (string, error) {
-	deviceName, err := getDeviceName(spec)
+	deviceName, err := getDeviceName(spec, attacher.host)
 	if err != nil {
 		return "", err
 	}

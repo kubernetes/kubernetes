@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	"k8s.io/kubernetes/pkg/util/version"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -51,7 +53,8 @@ const (
 	// Replication type constants must be lower case.
 	replicationTypeNone       = "none"
 	replicationTypeRegionalPD = "regional-pd"
-	volNameRegionalSuffix     = "_regional"
+	deviceNameRegionalSuffix  = "_regional"
+	regionalSuffixMinNodeVersion = "v1.12.0"
 
 	// scsi_id output should be in the form of:
 	// 0Google PersistentDisk <disk name>
@@ -376,7 +379,14 @@ func isRegionalPD(spec *volume.Spec) bool {
 	return false
 }
 
-func getDeviceName(spec *volume.Spec) (string, error) {
+// getDeviceName constructs the device name from the given spec.
+// If the spec contains a zonal disk, the device name is just the disk name.
+// If the spec contains a regional disk, the device name is the disk name + the regional suffix.
+// If a non-empty nodeName is given, regional suffix is only appended if the version of ALL nodes
+// in the cluster are 1.12 or above, in order to ensure backward compatibility.
+//
+// Only k8s versions 1.12 or above contain this function.
+func getDeviceName(spec *volume.Spec, host volume.VolumeHost) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
@@ -384,7 +394,28 @@ func getDeviceName(spec *volume.Spec) (string, error) {
 
 	deviceName := volumeSource.PDName
 	if spec.PersistentVolume != nil && isRegionalPD(spec) {
-		deviceName += volNameRegionalSuffix
+		nodes, err := host.GetKubeClient().CoreV1().Nodes().List(metav1.ListOptions{})
+		if err != nil {
+			return "", fmt.Errorf("error checking max node version: %v", err)
+		}
+
+		allNodesAboveVersion := true
+		for _, node := range nodes.Items {
+			nodeVersion, err := version.ParseGeneric(node.Status.NodeInfo.KubeletVersion)
+			if err != nil {
+				return "", fmt.Errorf("error checking node version for node %q: %v", node.Name, err)
+			}
+
+			if nodeVersion.LessThan(version.MustParseGeneric(regionalSuffixMinNodeVersion))  {
+				allNodesAboveVersion = false
+				break
+			}
+		}
+
+		if allNodesAboveVersion {
+			deviceName += deviceNameRegionalSuffix
+		}
 	}
+
 	return deviceName, nil
 }
