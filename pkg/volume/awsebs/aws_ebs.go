@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_ebs
+package awsebs
 
 import (
 	"context"
@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&awsElasticBlockStorePlugin{nil}}
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_ebs
+package awsebs
 
 import (
 	"fmt"
@@ -163,7 +163,7 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 	}
 
 	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for AWS Volume %q: devicePath is empty.", volumeID)
+		return "", fmt.Errorf("waitForAttach failed for AWS Volume %q: devicePath is empty", volumeID)
 	}
 
 	ticker := time.NewTicker(checkSleepDuration)
@@ -175,7 +175,7 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking AWS Volume %q is attached.", volumeID)
-			devicePaths := getDiskByIdPaths(aws.KubernetesVolumeID(volumeSource.VolumeID), partition, devicePath)
+			devicePaths := getDiskByIDPaths(aws.KubernetesVolumeID(volumeSource.VolumeID), partition, devicePath)
 			path, err := verifyDevicePath(devicePaths)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
@@ -186,7 +186,7 @@ func (attacher *awsElasticBlockStoreAttacher) WaitForAttach(spec *volume.Spec, d
 				return path, nil
 			}
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached AWS Volume %q. Timeout waiting for mount paths to be created.", volumeID)
+			return "", fmt.Errorf("could not find attached AWS Volume %q. Timeout waiting for mount paths to be created", volumeID)
 		}
 	}
 }

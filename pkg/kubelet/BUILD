@@ -210,7 +210,7 @@ go_test(
         "//pkg/util/taints:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
-        "//pkg/volume/aws_ebs:go_default_library",
+        "//pkg/volume/awsebs:go_default_library",
         "//pkg/volume/azure_dd:go_default_library",
         "//pkg/volume/gce_pd:go_default_library",
         "//pkg/volume/host_path:go_default_library",

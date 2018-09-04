@@ -401,7 +401,6 @@ pkg/util/tolerations
 pkg/util/workqueue/prometheus
 pkg/version/verflag
 pkg/volume
-pkg/volume/aws_ebs
 pkg/volume/azure_dd
 pkg/volume/azure_file
 pkg/volume/cephfs
