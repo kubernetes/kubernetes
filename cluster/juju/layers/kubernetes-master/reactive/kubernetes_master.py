@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import base64
-import hashlib
 import os
 import re
 import random
@@ -28,9 +27,11 @@ import ipaddress
 from charms.leadership import leader_get, leader_set
 
 from shutil import move
+<<<<<<< HEAD
 
+=======
+>>>>>>> Pulling out common library functions
 from pathlib import Path
-from shlex import split
 from subprocess import check_call
 from subprocess import check_output
 from subprocess import CalledProcessError
@@ -58,6 +59,18 @@ from charmhelpers.core.templating import render
 from charmhelpers.fetch import apt_install
 from charmhelpers.contrib.charmsupport import nrpe
 
+from charms.layer.kubernetes_common import kubeclientconfig_path
+from charms.layer.kubernetes_common import migrate_resource_checksums
+from charms.layer.kubernetes_common import check_resources_for_upgrade_needed
+from charms.layer.kubernetes_common import rename_file_idempotent
+from charms.layer.kubernetes_common import calculate_and_store_resource_checksums # noqa
+from charms.layer.kubernetes_common import touch, arch
+from charms.layer.kubernetes_common import service_restart
+from charms.layer.kubernetes_common import get_ingress_address
+from charms.layer.kubernetes_common import create_kubeconfig
+from charms.layer.kubernetes_common import get_service_ip
+from charms.layer.kubernetes_common import remove_if_exists
+from charms.layer.kubernetes_common import configure_kubernetes_service
 
 # Override the default nagios shortname regex to allow periods, which we
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
@@ -70,6 +83,8 @@ snap_resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 db = unitdata.kv()
+checksum_prefix = 'kubernetes-master.resource-checksums.'
+configure_prefix = 'kubernetes-master.prev_args.'
 
 
 def set_upgrade_needed(forced=False):
@@ -127,66 +142,15 @@ def check_for_upgrade_needed():
         # Forcibly means we do not prompt the user to call the upgrade action.
         set_upgrade_needed(forced=True)
 
-    migrate_resource_checksums()
-    check_resources_for_upgrade_needed()
+    migrate_resource_checksums(checksum_prefix, snap_resources)
+    if check_resources_for_upgrade_needed(checksum_prefix, snap_resources):
+        set_upgrade_needed()
 
     # Set the auto storage backend to etcd2.
     auto_storage_backend = leader_get('auto_storage_backend')
     is_leader = is_state('leadership.is_leader')
     if not auto_storage_backend and is_leader:
         leader_set(auto_storage_backend='etcd2')
-
-
-def get_resource_checksum_db_key(resource):
-    ''' Convert a resource name to a resource checksum database key. '''
-    return 'kubernetes-master.resource-checksums.' + resource
-
-
-def calculate_resource_checksum(resource):
-    ''' Calculate a checksum for a resource '''
-    md5 = hashlib.md5()
-    path = hookenv.resource_get(resource)
-    if path:
-        with open(path, 'rb') as f:
-            data = f.read()
-        md5.update(data)
-    return md5.hexdigest()
-
-
-def migrate_resource_checksums():
-    ''' Migrate resource checksums from the old schema to the new one '''
-    for resource in snap_resources:
-        new_key = get_resource_checksum_db_key(resource)
-        if not db.get(new_key):
-            path = hookenv.resource_get(resource)
-            if path:
-                # old key from charms.reactive.helpers.any_file_changed
-                old_key = 'reactive.files_changed.' + path
-                old_checksum = db.get(old_key)
-                db.set(new_key, old_checksum)
-            else:
-                # No resource is attached. Previously, this meant no checksum
-                # would be calculated and stored. But now we calculate it as if
-                # it is a 0-byte resource, so let's go ahead and do that.
-                zero_checksum = hashlib.md5().hexdigest()
-                db.set(new_key, zero_checksum)
-
-
-def check_resources_for_upgrade_needed():
-    hookenv.status_set('maintenance', 'Checking resources')
-    for resource in snap_resources:
-        key = get_resource_checksum_db_key(resource)
-        old_checksum = db.get(key)
-        new_checksum = calculate_resource_checksum(resource)
-        if new_checksum != old_checksum:
-            set_upgrade_needed()
-
-
-def calculate_and_store_resource_checksums():
-    for resource in snap_resources:
-        key = get_resource_checksum_db_key(resource)
-        checksum = calculate_resource_checksum(resource)
-        db.set(key, checksum)
 
 
 def add_rbac_roles():
@@ -219,11 +183,6 @@ def add_rbac_roles():
                 ftokens.write('{}'.format(line))
 
 
-def rename_file_idempotent(source, destination):
-    if os.path.isfile(source):
-        os.rename(source, destination)
-
-
 def migrate_from_pre_snaps():
     # remove old states
     remove_state('kubernetes.components.installed')
@@ -236,8 +195,7 @@ def migrate_from_pre_snaps():
                 'kube-controller-manager',
                 'kube-scheduler']
     for service in services:
-        hookenv.log('Stopping {0} service.'.format(service))
-        host.service_stop(service)
+        service_stop(service)
 
     # rename auth files
     os.makedirs('/root/cdk', exist_ok=True)
@@ -294,7 +252,7 @@ def install_snaps():
     snap.install('kube-scheduler', channel=channel)
     hookenv.status_set('maintenance', 'Installing cdk-addons snap')
     snap.install('cdk-addons', channel=channel)
-    calculate_and_store_resource_checksums()
+    calculate_and_store_resource_checksums(checksum_prefix, snap_resources)
     db.set('snap.resources.fingerprint.initialised', True)
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
@@ -674,7 +632,7 @@ def create_service_configs(kube_control):
             should_restart = True
 
     if should_restart:
-        host.service_restart('snap.kube-apiserver.daemon')
+        service_restart('kube-apiserver')
         remove_state('authentication.setup')
 
 
@@ -683,21 +641,6 @@ def push_service_data(kube_api):
     ''' Send configuration to the load balancer, and close access to the
     public interface '''
     kube_api.configure(port=6443)
-
-
-def get_ingress_address(relation_name):
-    try:
-        network_info = hookenv.network_get(relation_name)
-    except NotImplementedError:
-        network_info = []
-
-    if network_info and 'ingress-addresses' in network_info:
-        # just grab the first one for now, maybe be more robust here?
-        return network_info['ingress-addresses'][0]
-    else:
-        # if they don't have ingress-addresses they are running a juju that
-        # doesn't support spaces, so just return the private address
-        return hookenv.unit_get('private-address')
 
 
 @when('certificates.available', 'kube-api-endpoint.available')
@@ -756,11 +699,12 @@ def kick_api_server(tls):
     if data_changed('cert', tls.get_server_cert()):
         # certificate changed, so restart the api server
         hookenv.log("Certificate information changed, restarting api server")
-        restart_apiserver()
+        service_restart('kube-apiserver')
     tls_client.reset_certificate_write_flag('server')
 
 
-@when_any('kubernetes-master.components.started', 'ceph-storage.configured')
+@when_any('kubernetes-master.components.started',
+          'ceph-storage.configured')
 @when('leadership.is_leader')
 def configure_cdk_addons():
     ''' Configure CDK addons '''
@@ -801,7 +745,7 @@ def configure_cdk_addons():
         'ceph-admin-key=' + (ceph.get('admin_key', '')),
         'ceph-kubernetes-key=' + (ceph.get('admin_key', '')),
         'ceph-mon-hosts="' + (ceph.get('mon_hosts', '')) + '"',
-        'default-storage=' + default_storage,
+        'default-storage=' + default_storage
     ]
     check_call(['snap', 'set', 'cdk-addons'] + args)
     if not addons_ready():
@@ -1094,31 +1038,6 @@ def shutdown():
     service_stop('snap.kube-scheduler.daemon')
 
 
-def restart_apiserver():
-    hookenv.status_set('maintenance', 'Restarting kube-apiserver')
-    host.service_restart('snap.kube-apiserver.daemon')
-
-
-def restart_controller_manager():
-    hookenv.status_set('maintenance', 'Restarting kube-controller-manager')
-    host.service_restart('snap.kube-controller-manager.daemon')
-
-
-def restart_scheduler():
-    hookenv.status_set('maintenance', 'Restarting kube-scheduler')
-    host.service_restart('snap.kube-scheduler.daemon')
-
-
-def arch():
-    '''Return the package architecture as a string. Raise an exception if the
-    architecture is not supported by kubernetes.'''
-    # Get the package architecture for this system.
-    architecture = check_output(['dpkg', '--print-architecture']).rstrip()
-    # Convert the binary result into a string.
-    architecture = architecture.decode('utf-8')
-    return architecture
-
-
 def build_kubeconfig(server):
     '''Gather the relevant data for Kubernetes configuration objects and create
     a config object with that information.'''
@@ -1140,55 +1059,14 @@ def build_kubeconfig(server):
         cmd = ['chown', 'ubuntu:ubuntu', kubeconfig_path]
         check_call(cmd)
 
-
-def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
-                      user='ubuntu', context='juju-context',
-                      cluster='juju-cluster', password=None, token=None):
-    '''Create a configuration for Kubernetes based on path using the supplied
-    arguments for values of the Kubernetes server, CA, key, certificate, user
-    context and cluster.'''
-    if not key and not certificate and not password and not token:
-        raise ValueError('Missing authentication mechanism.')
-
-    # token and password are mutually exclusive. Error early if both are
-    # present. The developer has requested an impossible situation.
-    # see: kubectl config set-credentials --help
-    if token and password:
-        raise ValueError('Token and Password are mutually exclusive.')
-    # Create the config file with the address of the master server.
-    cmd = 'kubectl config --kubeconfig={0} set-cluster {1} ' \
-          '--server={2} --certificate-authority={3} --embed-certs=true'
-    check_call(split(cmd.format(kubeconfig, cluster, server, ca)))
-    # Delete old users
-    cmd = 'kubectl config --kubeconfig={0} unset users'
-    check_call(split(cmd.format(kubeconfig)))
-    # Create the credentials using the client flags.
-    cmd = 'kubectl config --kubeconfig={0} ' \
-          'set-credentials {1} '.format(kubeconfig, user)
-
-    if key and certificate:
-        cmd = '{0} --client-key={1} --client-certificate={2} '\
-              '--embed-certs=true'.format(cmd, key, certificate)
-    if password:
-        cmd = "{0} --username={1} --password={2}".format(cmd, user, password)
-    # This is mutually exclusive from password. They will not work together.
-    if token:
-        cmd = "{0} --token={1}".format(cmd, token)
-    check_call(split(cmd))
-    # Create a default context with the cluster.
-    cmd = 'kubectl config --kubeconfig={0} set-context {1} ' \
-          '--cluster={2} --user={3}'
-    check_call(split(cmd.format(kubeconfig, context, cluster, user)))
-    # Make the config use this new context.
-    cmd = 'kubectl config --kubeconfig={0} use-context {1}'
-    check_call(split(cmd.format(kubeconfig, context)))
+        # make a copy in a location shared by kubernetes-worker
+        # and kubernete-master
+        create_kubeconfig(kubeclientconfig_path, server, ca,
+                          user='admin', password=client_pass)
 
 
 def get_dns_ip():
-    cmd = "kubectl get service --namespace kube-system kube-dns --output json"
-    output = check_output(cmd, shell=True).decode()
-    svc = json.loads(output)
-    return svc['spec']['clusterIP']
+    return get_service_ip('kube-dns', namespace='kube-system')
 
 
 def get_deprecated_dns_ip():
@@ -1222,50 +1100,7 @@ def handle_etcd_relation(reldata):
     reldata.save_client_credentials(key, cert, ca)
 
 
-def parse_extra_args(config_key):
-    elements = hookenv.config().get(config_key, '').split()
-    args = {}
-
-    for element in elements:
-        if '=' in element:
-            key, _, value = element.partition('=')
-            args[key] = value
-        else:
-            args[element] = 'true'
-
-    return args
-
-
-def configure_kubernetes_service(service, base_args, extra_args_key):
-    prev_args_key = 'kubernetes-master.prev_args.' + service
-    prev_args = db.get(prev_args_key) or {}
-
-    extra_args = parse_extra_args(extra_args_key)
-
-    args = {}
-    for arg in prev_args:
-        # remove previous args by setting to null
-        # note this is so we remove them from the snap's config
-        args[arg] = 'null'
-    for k, v in base_args.items():
-        args[k] = v
-    for k, v in extra_args.items():
-        args[k] = v
-
-    cmd = ['snap', 'set', service] + ['%s=%s' % item for item in args.items()]
-    check_call(cmd)
-
-    db.set(prev_args_key, args)
-
-
-def remove_if_exists(path):
-    try:
-        os.remove(path)
-    except FileNotFoundError:
-        pass
-
-
-def write_audit_config_file(path, contents):
+def write_config_file(path, contents):
     with open(path, 'w') as f:
         header = '# Autogenerated by kubernetes-master charm'
         f.write(header + '\n' + contents)
@@ -1406,7 +1241,7 @@ def configure_apiserver(etcd_connection_string):
     audit_policy_path = audit_root + '/audit-policy.yaml'
     audit_policy = hookenv.config('audit-policy')
     if audit_policy:
-        write_audit_config_file(audit_policy_path, audit_policy)
+        write_config_file(audit_policy_path, audit_policy)
         api_opts['audit-policy-file'] = audit_policy_path
     else:
         remove_if_exists(audit_policy_path)
@@ -1414,14 +1249,15 @@ def configure_apiserver(etcd_connection_string):
     audit_webhook_config_path = audit_root + '/audit-webhook-config.yaml'
     audit_webhook_config = hookenv.config('audit-webhook-config')
     if audit_webhook_config:
-        write_audit_config_file(audit_webhook_config_path,
-                                audit_webhook_config)
+        write_config_file(audit_webhook_config_path,
+                          audit_webhook_config)
         api_opts['audit-webhook-config-file'] = audit_webhook_config_path
     else:
         remove_if_exists(audit_webhook_config_path)
 
-    configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
-    restart_apiserver()
+    configure_kubernetes_service(configure_prefix, 'kube-apiserver',
+                                 api_opts, 'api-extra-args')
+    service_restart('kube-apiserver')
 
 
 def configure_controller_manager():
@@ -1461,9 +1297,10 @@ def configure_controller_manager():
         controller_opts['cloud-provider'] = 'azure'
         controller_opts['cloud-config'] = str(cloud_config_path)
 
-    configure_kubernetes_service('kube-controller-manager', controller_opts,
+    configure_kubernetes_service(configure_prefix, 'kube-controller-manager',
+                                 controller_opts,
                                  'controller-manager-extra-args')
-    restart_controller_manager()
+    service_restart('kube-controller-manager')
 
 
 def configure_scheduler():
@@ -1473,10 +1310,10 @@ def configure_scheduler():
     scheduler_opts['logtostderr'] = 'true'
     scheduler_opts['master'] = 'http://127.0.0.1:8080'
 
-    configure_kubernetes_service('kube-scheduler', scheduler_opts,
-                                 'scheduler-extra-args')
+    configure_kubernetes_service(configure_prefix, 'kube-scheduler',
+                                 scheduler_opts, 'scheduler-extra-args')
 
-    restart_scheduler()
+    service_restart('kube-scheduler')
 
 
 def setup_basic_auth(password=None, username='admin', uid='admin',
@@ -1647,13 +1484,6 @@ def apiserverVersion():
     cmd = 'kube-apiserver --version'.split()
     version_string = check_output(cmd).decode('utf-8')
     return tuple(int(q) for q in re.findall("[0-9]+", version_string)[:3])
-
-
-def touch(fname):
-    try:
-        os.utime(fname, None)
-    except OSError:
-        open(fname, 'a').close()
 
 
 def getStorageBackend():

@@ -9,6 +9,7 @@ includes:
   - 'layer:nagios'
   - 'layer:tls-client'
   - 'layer:cdk-service-kicker'
+  - 'layer:kubernetes-common'
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
