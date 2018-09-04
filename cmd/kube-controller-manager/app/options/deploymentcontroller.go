@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // DeploymentControllerOptions holds the DeploymentController options.
@@ -40,7 +40,7 @@ func (o *DeploymentControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up DeploymentController config with options.
-func (o *DeploymentControllerOptions) ApplyTo(cfg *componentconfig.DeploymentControllerConfiguration) error {
+func (o *DeploymentControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.DeploymentControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

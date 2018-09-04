@@ -786,17 +786,38 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	Describe("DynamicProvisioner External", func() {
 		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
-			// persistent-volume-provisioner role
-			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns,
-				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
+			// persistent-volume-provisioner clusterrole and a leader-locking role
+			serviceAccountName := "default"
+			subject := rbacv1beta1.Subject{
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Namespace: ns,
+				Name:      serviceAccountName,
+			}
 
-			err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
-				serviceaccount.MakeUsername(ns, "default"),
+			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns, subject)
+
+			roleName := "leader-locking-nfs-provisioner"
+			_, err := f.ClientSet.RbacV1beta1().Roles(ns).Create(&rbacv1beta1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbacv1beta1.PolicyRule{{
+					APIGroups: []string{""},
+					Resources: []string{"endpoints"},
+					Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+				}},
+			})
+			framework.ExpectNoError(err, "Failed to create leader-locking role")
+
+			framework.BindRoleInNamespace(c.RbacV1beta1(), roleName, ns, subject)
+
+			err = framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+				serviceaccount.MakeUsername(ns, serviceAccountName),
 				"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
-			framework.ExpectNoError(err, "Failed to update authorization: %v", err)
+			framework.ExpectNoError(err, "Failed to update authorization")
 
 			By("creating an external dynamic provisioner pod")
-			pod := startExternalProvisioner(c, ns)
+			pod := utils.StartExternalProvisioner(c, ns, externalPluginName)
 			defer framework.DeletePodOrFail(c, ns, pod.Name)
 
 			By("creating a StorageClass")
@@ -1372,79 +1393,6 @@ func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
 	By("locating the provisioner pod")
 	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-	return pod
-}
-
-func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
-	podClient := c.CoreV1().Pods(ns)
-
-	provisionerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "external-provisioner-",
-		},
-
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9",
-					SecurityContext: &v1.SecurityContext{
-						Capabilities: &v1.Capabilities{
-							Add: []v1.Capability{"DAC_READ_SEARCH"},
-						},
-					},
-					Args: []string{
-						"-provisioner=" + externalPluginName,
-						"-grace-period=0",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "nfs", ContainerPort: 2049},
-						{Name: "mountd", ContainerPort: 20048},
-						{Name: "rpcbind", ContainerPort: 111},
-						{Name: "rpcbind-udp", ContainerPort: 111, Protocol: v1.ProtocolUDP},
-					},
-					Env: []v1.EnvVar{
-						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
-						},
-					},
-					ImagePullPolicy: v1.PullIfNotPresent,
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "export-volume",
-							MountPath: "/export",
-						},
-					},
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "export-volume",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	provisionerPod, err := podClient.Create(provisionerPod)
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
-
-	By("locating the provisioner pod")
-	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-
 	return pod
 }
 

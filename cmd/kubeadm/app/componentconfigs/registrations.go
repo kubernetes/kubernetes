@@ -20,12 +20,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // AddToSchemeFunc is a function that adds known types and API GroupVersions to a scheme
@@ -47,6 +49,8 @@ type Registration struct {
 	GetFromInternalConfig func(*kubeadmapi.ClusterConfiguration) (runtime.Object, bool)
 	// SetToInternalConfig sets the pointer to a ComponentConfig API object embedded in the internal kubeadm config struct
 	SetToInternalConfig func(runtime.Object, *kubeadmapi.ClusterConfiguration) bool
+	// GetFromConfigMap returns the pointer to the ComponentConfig API object read from the config map stored in the cluster
+	GetFromConfigMap func(clientset.Interface, *version.Version) (runtime.Object, error)
 }
 
 // Marshal marshals obj to bytes for the current Registration
@@ -60,11 +64,18 @@ func (r Registration) Unmarshal(fileContent []byte) (runtime.Object, error) {
 	obj := r.EmptyValue.DeepCopyObject()
 
 	// Decode the file content into obj which is a pointer to an empty struct of the internal ComponentConfig
-	// object, using the componentconfig Codecs that knows about all APIs
-	if err := runtime.DecodeInto(Codecs.UniversalDecoder(), fileContent, obj); err != nil {
+	if err := unmarshalObject(obj, fileContent); err != nil {
 		return nil, err
 	}
 	return obj, nil
+}
+
+func unmarshalObject(obj runtime.Object, fileContent []byte) error {
+	// Decode the file content  using the componentconfig Codecs that knows about all APIs
+	if err := runtime.DecodeInto(Codecs.UniversalDecoder(), fileContent, obj); err != nil {
+		return err
+	}
+	return nil
 }
 
 const (
@@ -99,6 +110,7 @@ var Known Registrations = map[RegistrationKind]Registration{
 			}
 			return ok
 		},
+		GetFromConfigMap: GetFromKubeProxyConfigMap,
 	},
 	KubeletConfigurationKind: {
 		MarshalGroupVersion: kubeletconfigv1beta1.SchemeGroupVersion,
@@ -116,6 +128,7 @@ var Known Registrations = map[RegistrationKind]Registration{
 			}
 			return ok
 		},
+		GetFromConfigMap: GetFromKubeletConfigMap,
 	},
 }
 

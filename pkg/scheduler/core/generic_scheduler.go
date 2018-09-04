@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -373,15 +374,18 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
-		filtered = make([]*v1.Node, 2*numNodesToFind)
+		filtered = make([]*v1.Node, numNodesToFind)
 		errs := errors.MessageCountMap{}
-		var predicateResultLock sync.Mutex
-		var filteredLen int32
+		var (
+			predicateResultLock sync.Mutex
+			filteredLen         int32
+			equivClass          *equivalence.Class
+		)
+
+		ctx, cancel := context.WithCancel(context.Background())
 
 		// We can use the same metadata producer for all nodes.
 		meta := g.predicateMetaProducer(pod, g.cachedNodeInfoMap)
-
-		var equivClass *equivalence.Class
 
 		if g.equivalenceCache != nil {
 			// getEquivalenceClassInfo will return immediately if no equivalence pod found
@@ -412,25 +416,24 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				return
 			}
 			if fits {
-				filtered[atomic.AddInt32(&filteredLen, 1)-1] = g.cachedNodeInfoMap[nodeName].Node()
+				length := atomic.AddInt32(&filteredLen, 1)
+				if length > numNodesToFind {
+					cancel()
+					atomic.AddInt32(&filteredLen, -1)
+				} else {
+					filtered[length-1] = g.cachedNodeInfoMap[nodeName].Node()
+				}
 			} else {
 				predicateResultLock.Lock()
 				failedPredicateMap[nodeName] = failedPredicates
 				predicateResultLock.Unlock()
 			}
 		}
-		numNodesProcessed := int32(0)
-		for numNodesProcessed < allNodes {
-			numNodesToProcess := allNodes - numNodesProcessed
-			if numNodesToProcess > numNodesToFind {
-				numNodesToProcess = numNodesToFind
-			}
-			workqueue.Parallelize(16, int(numNodesToProcess), checkNode)
-			if filteredLen >= numNodesToFind {
-				break
-			}
-			numNodesProcessed += numNodesToProcess
-		}
+
+		// Stops searching for more nodes once the configured number of feasible nodes
+		// are found.
+		workqueue.ParallelizeUntil(ctx, 16, int(allNodes), checkNode)
+
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
 			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)

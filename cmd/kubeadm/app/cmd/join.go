@@ -48,6 +48,7 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
+	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -303,21 +304,22 @@ func (j *Join) Run(out io.Writer) error {
 	}
 
 	// If the node should host a new control plane instance
+	var initConfiguration *kubeadmapi.InitConfiguration
 	if j.cfg.ControlPlane == true {
 		// Retrives the kubeadm configuration used during kubeadm init
 		glog.V(1).Infoln("[join] retrieving KubeConfig objects")
-		clusterConfiguration, err := j.FetchInitClusterConfiguration(tlsBootstrapCfg)
+		initConfiguration, err = j.FetchInitConfiguration(tlsBootstrapCfg)
 		if err != nil {
 			return err
 		}
 
-		// injects into the kubeadm configuration used for init the information about the joining node
-		clusterConfiguration.NodeRegistration = j.cfg.NodeRegistration
-		clusterConfiguration.APIEndpoint.AdvertiseAddress = j.cfg.APIEndpoint.AdvertiseAddress
+		// injects into the kubeadm configuration the information about the joining node
+		initConfiguration.NodeRegistration = j.cfg.NodeRegistration
+		initConfiguration.APIEndpoint = j.cfg.APIEndpoint
 
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided
-		if err = j.CheckIfReadyForAdditionalControlPlane(clusterConfiguration); err != nil {
+		if err = j.CheckIfReadyForAdditionalControlPlane(initConfiguration); err != nil {
 			// outputs the not ready for hosting a new control plane instance message
 			ctx := map[string]string{
 				"Error": err.Error(),
@@ -330,11 +332,11 @@ func (j *Join) Run(out io.Writer) error {
 
 		// run kubeadm init preflight checks for checking all the prequisites
 		glog.Infoln("[join] running pre-flight checks before initializing the new control plane instance")
-		preflight.RunInitMasterChecks(utilsexec.New(), clusterConfiguration, j.ignorePreflightErrors)
+		preflight.RunInitMasterChecks(utilsexec.New(), initConfiguration, j.ignorePreflightErrors)
 
 		// Prepares the node for hosting a new control plane instance by writing necessary
 		// KubeConfig files, and static pod manifests
-		if err = j.PrepareForHostingControlPlane(clusterConfiguration); err != nil {
+		if err = j.PrepareForHostingControlPlane(initConfiguration); err != nil {
 			return err
 		}
 	}
@@ -351,8 +353,8 @@ func (j *Join) Run(out io.Writer) error {
 
 	// if the node is hosting a new control plane instance
 	if j.cfg.ControlPlane == true {
-		// Marks the node with master taint and label.
-		if err := j.MarkMaster(); err != nil {
+		// Completes the control plane setup
+		if err := j.PostInstallControlPlane(initConfiguration); err != nil {
 			return err
 		}
 
@@ -370,52 +372,48 @@ func (j *Join) Run(out io.Writer) error {
 	return nil
 }
 
-// FetchInitClusterConfiguration reads the cluster configuration from the kubeadm-admin configMap,
-func (j *Join) FetchInitClusterConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
+// FetchInitConfiguration reads the cluster configuration from the kubeadm-admin configMap,
+func (j *Join) FetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
 	// creates a client to access the cluster using the bootstrap token identity
 	tlsClient, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to access the cluster")
 	}
 
-	// Fetches the cluster configuration
-	kubeadmConfig, err := configutil.FetchConfigFromFileOrCluster(tlsClient, os.Stdout, "join", "")
+	// Fetches the init configuration
+	initConfiguration, err := configutil.FetchConfigFromFileOrCluster(tlsClient, os.Stdout, "join", "", true)
 	if err != nil {
 		return nil, errors.Wrap(err, "Unable to fetch the kubeadm-config ConfigMap")
 	}
 
-	// Converts public API struct to internal API
-	clusterConfiguration := &kubeadmapi.InitConfiguration{}
-	kubeadmscheme.Scheme.Convert(kubeadmConfig, clusterConfiguration, nil)
-
-	return clusterConfiguration, nil
+	return initConfiguration, nil
 }
 
 // CheckIfReadyForAdditionalControlPlane ensures that the cluster is in a state that supports
 // joining an additional control plane instance and if the node is ready to join
-func (j *Join) CheckIfReadyForAdditionalControlPlane(clusterConfiguration *kubeadmapi.InitConfiguration) error {
+func (j *Join) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 	// blocks if the cluster was created without a stable control plane endpoint
-	if clusterConfiguration.ControlPlaneEndpoint == "" {
+	if initConfiguration.ControlPlaneEndpoint == "" {
 		return fmt.Errorf("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
 	// blocks if the cluster was created without an external etcd cluster
-	if clusterConfiguration.Etcd.External == nil {
+	if initConfiguration.Etcd.External == nil {
 		return fmt.Errorf("unable to add a new control plane instance on a cluster that doesn't use an external etcd")
 	}
 
 	// blocks if control plane is self-hosted
-	if features.Enabled(clusterConfiguration.FeatureGates, features.SelfHosting) {
+	if features.Enabled(initConfiguration.FeatureGates, features.SelfHosting) {
 		return fmt.Errorf("self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
 	}
 
 	// blocks if the certificates for the control plane are stored in secrets (instead of the local pki folder)
-	if features.Enabled(clusterConfiguration.FeatureGates, features.StoreCertsInSecrets) {
+	if features.Enabled(initConfiguration.FeatureGates, features.StoreCertsInSecrets) {
 		return fmt.Errorf("certificates stored in secrets, as well as self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
 	}
 
 	// checks if the certificates that must be equal across contolplane instances are provided
-	if ret, err := certsphase.SharedCertificateExists(clusterConfiguration); !ret {
+	if ret, err := certsphase.SharedCertificateExists(initConfiguration); !ret {
 		return err
 	}
 
@@ -423,28 +421,28 @@ func (j *Join) CheckIfReadyForAdditionalControlPlane(clusterConfiguration *kubea
 }
 
 // PrepareForHostingControlPlane makes all preparation activities require for a node hosting a new control plane instance
-func (j *Join) PrepareForHostingControlPlane(clusterConfiguration *kubeadmapi.InitConfiguration) error {
+func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 
 	// Creates the admin kubeconfig file for the admin and for kubeadm itself.
-	if err := kubeconfigphase.CreateAdminKubeConfigFile(kubeadmconstants.KubernetesDir, clusterConfiguration); err != nil {
+	if err := kubeconfigphase.CreateAdminKubeConfigFile(kubeadmconstants.KubernetesDir, initConfiguration); err != nil {
 		return errors.Wrap(err, "error generating the admin kubeconfig file")
 	}
 
 	// Generate missing certificates (if any)
-	if err := certsphase.CreatePKIAssets(clusterConfiguration); err != nil {
+	if err := certsphase.CreatePKIAssets(initConfiguration); err != nil {
 		return err
 	}
 
 	// Generate kubeconfig files for controller manager, scheduler and for the admin/kubeadm itself
 	// NB. The kubeconfig file for kubelet will be generated by the TLS bootstrap process in
 	// following steps of the join --experimental-control plane workflow
-	if err := kubeconfigphase.CreateJoinControlPlaneKubeConfigFiles(kubeadmconstants.KubernetesDir, clusterConfiguration); err != nil {
+	if err := kubeconfigphase.CreateJoinControlPlaneKubeConfigFiles(kubeadmconstants.KubernetesDir, initConfiguration); err != nil {
 		return errors.Wrap(err, "error generating kubeconfig files")
 	}
 
 	// Creates static pod manifests file for the control plane components to be deployed on this node
 	// Static pods will be created and managed by the kubelet as soon as it starts
-	if err := controlplanephase.CreateInitStaticPodManifestFiles(kubeadmconstants.GetStaticPodDirectory(), clusterConfiguration); err != nil {
+	if err := controlplanephase.CreateInitStaticPodManifestFiles(kubeadmconstants.GetStaticPodDirectory(), initConfiguration); err != nil {
 		return errors.Wrap(err, "error creating static pod manifest files for the control plane components")
 	}
 
@@ -491,8 +489,10 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 		return err
 	}
 
-	// Write env file with flags for the kubelet to use. Also register taints
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, j.cfg.FeatureGates, true, kubeadmconstants.KubeletRunDirectory); err != nil {
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+	// as we handle that ourselves in the markmaster phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&j.cfg.NodeRegistration, j.cfg.FeatureGates, false, kubeadmconstants.KubeletRunDirectory); err != nil {
 		return err
 	}
 
@@ -530,8 +530,8 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 	return nil
 }
 
-// MarkMaster marks the new node as master
-func (j *Join) MarkMaster() error {
+// PostInstallControlPlane marks the new node as master and update the cluster status with information about current node
+func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 	kubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
 
 	client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
@@ -539,8 +539,13 @@ func (j *Join) MarkMaster() error {
 		return errors.Wrap(err, "couldn't create kubernetes client")
 	}
 
-	err = markmasterphase.MarkMaster(client, j.cfg.NodeRegistration.Name, j.cfg.NodeRegistration.Taints)
-	if err != nil {
+	glog.V(1).Info("[join] uploading currently used configuration to the cluster")
+	if err := uploadconfigphase.UploadConfiguration(initConfiguration, client); err != nil {
+		return fmt.Errorf("error uploading configuration: %v", err)
+	}
+
+	glog.V(1).Info("[join] marking the master with right label")
+	if err = markmasterphase.MarkMaster(client, initConfiguration.NodeRegistration.Name, initConfiguration.NodeRegistration.Taints); err != nil {
 		return errors.Wrap(err, "error applying master label and taints")
 	}
 

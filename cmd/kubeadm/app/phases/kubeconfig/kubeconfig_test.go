@@ -119,7 +119,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			},
 			{
 				kubeConfigFile: kubeadmconstants.KubeletKubeConfigFileName,
-				clientName:     fmt.Sprintf("system:node:%s", cfg.NodeRegistration.Name),
+				clientName:     fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
 				organizations:  []string{kubeadmconstants.NodesGroup},
 			},
 			{

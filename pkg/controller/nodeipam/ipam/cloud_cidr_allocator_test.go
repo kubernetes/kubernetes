@@ -59,6 +59,10 @@ func TestBoundedRetries(t *testing.T) {
 	}
 }
 
+func withinExpectedRange(got time.Duration, expected time.Duration) bool {
+	return got >= expected/2 && got <= 3*expected/2
+}
+
 func TestNodeUpdateRetryTimeout(t *testing.T) {
 	for _, tc := range []struct {
 		count int
@@ -71,7 +75,7 @@ func TestNodeUpdateRetryTimeout(t *testing.T) {
 		{count: 50, want: 5000 * time.Millisecond},
 	} {
 		t.Run(fmt.Sprintf("count %d", tc.count), func(t *testing.T) {
-			if got := nodeUpdateRetryTimeout(tc.count); got != tc.want {
+			if got := nodeUpdateRetryTimeout(tc.count); !withinExpectedRange(got, tc.want) {
 				t.Errorf("nodeUpdateRetryTimeout(tc.count) = %v; want %v", got, tc.want)
 			}
 		})

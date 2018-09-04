@@ -361,7 +361,12 @@ func processHTTPRetryResponse(resp *http.Response, err error) (bool, error) {
 	}
 
 	if shouldRetryHTTPRequest(resp, err) {
-		glog.Errorf("processHTTPRetryResponse: backoff failure, will retry, HTTP response=%d, err=%v", resp.StatusCode, err)
+		if err != nil {
+			glog.Errorf("processHTTPRetryResponse: backoff failure, will retry, err=%v", err)
+		} else {
+			glog.Errorf("processHTTPRetryResponse: backoff failure, will retry, HTTP response=%d", resp.StatusCode)
+		}
+
 		// suppress the error object so that backoff process continues
 		return false, nil
 	}

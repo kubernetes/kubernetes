@@ -31,7 +31,7 @@ import (
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -76,6 +76,7 @@ func TestAddFlags(t *testing.T) {
 		"--horizontal-pod-autoscaler-downscale-delay=2m",
 		"--horizontal-pod-autoscaler-sync-period=45s",
 		"--horizontal-pod-autoscaler-upscale-delay=1m",
+		"--horizontal-pod-autoscaler-downscale-stabilization=3m",
 		"--horizontal-pod-autoscaler-cpu-initialization-period=90s",
 		"--horizontal-pod-autoscaler-initial-readiness-delay=50s",
 		"--http2-max-streams-per-connection=47",
@@ -184,19 +185,20 @@ func TestAddFlags(t *testing.T) {
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			ConcurrentGCSyncs: 30,
-			GCIgnoredResources: []componentconfig.GroupResource{
+			GCIgnoredResources: []kubectrlmgrconfig.GroupResource{
 				{Group: "", Resource: "events"},
 			},
 			EnableGarbageCollector: false,
 		},
 		HPAController: &HPAControllerOptions{
-			HorizontalPodAutoscalerSyncPeriod:               metav1.Duration{Duration: 45 * time.Second},
-			HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 1 * time.Minute},
-			HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
-			HorizontalPodAutoscalerCPUInitializationPeriod:  metav1.Duration{Duration: 90 * time.Second},
-			HorizontalPodAutoscalerInitialReadinessDelay:    metav1.Duration{Duration: 50 * time.Second},
-			HorizontalPodAutoscalerTolerance:                0.1,
-			HorizontalPodAutoscalerUseRESTClients:           true,
+			HorizontalPodAutoscalerSyncPeriod:                   metav1.Duration{Duration: 45 * time.Second},
+			HorizontalPodAutoscalerUpscaleForbiddenWindow:       metav1.Duration{Duration: 1 * time.Minute},
+			HorizontalPodAutoscalerDownscaleForbiddenWindow:     metav1.Duration{Duration: 2 * time.Minute},
+			HorizontalPodAutoscalerDownscaleStabilizationWindow: metav1.Duration{Duration: 3 * time.Minute},
+			HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
+			HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
+			HorizontalPodAutoscalerTolerance:                    0.1,
+			HorizontalPodAutoscalerUseRESTClients:               true,
 		},
 		JobController: &JobControllerOptions{
 			ConcurrentJobSyncs: 5,
@@ -220,11 +222,11 @@ func TestAddFlags(t *testing.T) {
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
 			PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-			VolumeConfiguration: componentconfig.VolumeConfiguration{
+			VolumeConfiguration: kubectrlmgrconfig.VolumeConfiguration{
 				EnableDynamicProvisioning:  false,
 				EnableHostPathProvisioning: true,
 				FlexVolumePluginDir:        "/flex-volume-plugin",
-				PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+				PersistentVolumeRecyclerConfiguration: kubectrlmgrconfig.PersistentVolumeRecyclerConfiguration{
 					MaximumRetry:             3,
 					MinimumTimeoutNFS:        200,
 					IncrementTimeoutNFS:      45,
@@ -296,7 +298,7 @@ func TestAddFlags(t *testing.T) {
 	}
 }
 
-type sortedGCIgnoredResources []componentconfig.GroupResource
+type sortedGCIgnoredResources []kubectrlmgrconfig.GroupResource
 
 func (r sortedGCIgnoredResources) Len() int {
 	return len(r)

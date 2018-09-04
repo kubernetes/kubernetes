@@ -88,6 +88,10 @@ type Configurator interface {
 	// Exposed for testing
 	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error)
 
+	// Predicate related accessors to be exposed for use by k8s.io/autoscaler/cluster-autoscaler
+	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
+	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
+
 	// Needs to be exposed for things like integration tests where we want to make fake nodes.
 	GetNodeLister() corelisters.NodeLister
 	// Exposed for testing

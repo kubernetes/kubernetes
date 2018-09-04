@@ -32,6 +32,7 @@ filegroup(
         ":package-srcs",
         "//pkg/scheduler/apis/config/scheme:all-srcs",
         "//pkg/scheduler/apis/config/v1alpha1:all-srcs",
+        "//pkg/scheduler/apis/config/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

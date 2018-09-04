@@ -4074,6 +4074,7 @@ func Convert_core_LocalObjectReference_To_v1_LocalObjectReference(in *core.Local
 
 func autoConvert_v1_LocalVolumeSource_To_core_LocalVolumeSource(in *v1.LocalVolumeSource, out *core.LocalVolumeSource, s conversion.Scope) error {
 	out.Path = in.Path
+	out.FSType = (*string)(unsafe.Pointer(in.FSType))
 	return nil
 }
 
@@ -4084,6 +4085,7 @@ func Convert_v1_LocalVolumeSource_To_core_LocalVolumeSource(in *v1.LocalVolumeSo
 
 func autoConvert_core_LocalVolumeSource_To_v1_LocalVolumeSource(in *core.LocalVolumeSource, out *v1.LocalVolumeSource, s conversion.Scope) error {
 	out.Path = in.Path
+	out.FSType = (*string)(unsafe.Pointer(in.FSType))
 	return nil
 }
 

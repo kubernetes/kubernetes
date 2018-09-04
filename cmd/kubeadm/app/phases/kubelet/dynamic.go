@@ -32,7 +32,7 @@ import (
 // This func is ONLY run if the user enables the `DynamicKubeletConfig` feature gate, which is by default off
 func EnableDynamicConfigForNode(client clientset.Interface, nodeName string, kubeletVersion *version.Version) error {
 
-	configMapName := configMapName(kubeletVersion)
+	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
 	fmt.Printf("[kubelet] Enabling Dynamic Kubelet Config for Node %q; config sourced from ConfigMap %q in namespace %s\n",
 		nodeName, configMapName, metav1.NamespaceSystem)
 	fmt.Println("[kubelet] WARNING: The Dynamic Kubelet Config feature is beta, but off by default. It hasn't been well-tested yet at this stage, use with caution.")

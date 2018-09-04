@@ -60,31 +60,38 @@ type fakeVolumeHost struct {
 }
 
 func NewFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil)
+	return newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
 }
 
 func NewFakeVolumeHostWithCloudProvider(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
-	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud)
+	return newFakeVolumeHost(rootDir, kubeClient, plugins, cloud, nil)
 }
 
 func NewFakeVolumeHostWithNodeLabels(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, labels map[string]string) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil)
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
 	volHost.nodeLabels = labels
 	return volHost
 }
 
 func NewFakeVolumeHostWithNodeName(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, nodeName string) *fakeVolumeHost {
-	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil)
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, nil)
 	volHost.nodeName = nodeName
 	return volHost
 }
 
-func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface) *fakeVolumeHost {
+func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]mount.FileType) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
-	host.mounter = &mount.FakeMounter{}
+	host.mounter = &mount.FakeMounter{
+		Filesystem: pathToTypeMap,
+	}
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	return host
+}
+
+func NewFakeVolumeHostWithMounterFSType(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]mount.FileType) *fakeVolumeHost {
+	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, pathToTypeMap)
+	return volHost
 }
 
 func (f *fakeVolumeHost) GetPluginDir(podUID string) string {

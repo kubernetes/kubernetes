@@ -60,7 +60,9 @@ func GetMasterEndpoint(cfg *kubeadmapi.InitConfiguration) (string, error) {
 
 		// if a port is provided within the controlPlaneAddress warn the users we are using it, else use the bindport
 		if port != "" {
-			fmt.Println("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
+			if port != bindPortString {
+				fmt.Println("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
+			}
 		} else {
 			port = bindPortString
 		}
