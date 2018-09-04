@@ -30,7 +30,8 @@ var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha
 var (
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
 	localSchemeBuilder = &kubeproxyconfigv1alpha1.SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	// AddToScheme applies all the stored functions to the scheme.
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {

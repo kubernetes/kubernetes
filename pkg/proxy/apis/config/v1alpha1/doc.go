@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package v1alpha1 provides the v1alpha1 default configs for the proxy api
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/proxy/apis/config
 // +k8s:conversion-gen-external-types=k8s.io/kube-proxy/config/v1alpha1
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=../../../../../vendor/k8s.io/kube-proxy/config/v1alpha1
 // +groupName=kubeproxy.config.k8s.io
-package v1alpha1 // import "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
+package v1alpha1 //import "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
