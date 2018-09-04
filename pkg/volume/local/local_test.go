@@ -31,16 +31,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 const (
-	testPVName     = "pvA"
-	testMountPath  = "pods/poduid/volumes/kubernetes.io~local-volume/pvA"
-	testGlobalPath = "plugins/kubernetes.io~local-volume/volumeDevices/pvA"
-	testPodPath    = "pods/poduid/volumeDevices/kubernetes.io~local-volume"
-	testNodeName   = "fakeNodeName"
+	testPVName                        = "pvA"
+	testMountPath                     = "pods/poduid/volumes/kubernetes.io~local-volume/pvA"
+	testGlobalPath                    = "plugins/kubernetes.io~local-volume/volumeDevices/pvA"
+	testPodPath                       = "pods/poduid/volumeDevices/kubernetes.io~local-volume"
+	testNodeName                      = "fakeNodeName"
+	testBlockFormattingToFSGlobalPath = "plugins/kubernetes.io/local-volume/mounts/pvA"
 )
 
 func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
@@ -92,6 +94,33 @@ func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName(localVolumePluginName)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Can't find the plugin by name")
+	}
+	if plug.GetPluginName() != localVolumePluginName {
+		t.Errorf("Wrong name: %s", plug.GetPluginName())
+	}
+	return tmpDir, plug
+}
+
+func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (string, volume.DeviceMountableVolumePlugin) {
+	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	var pathToFSType map[string]mount.FileType
+	if isBlockDevice {
+		pathToFSType = map[string]mount.FileType{
+			tmpDir: mount.FileTypeBlockDev,
+		}
+	}
+
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHostWithMounterFSType(tmpDir, nil, nil, pathToFSType))
+
+	plug, err := plugMgr.FindDeviceMountablePluginByName(localVolumePluginName)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Can't find the plugin by name")
@@ -176,6 +205,87 @@ func TestInvalidLocalPath(t *testing.T) {
 	expectedMsg := "invalid path: /no/backsteps/allowed/.. must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
+	}
+}
+
+func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
+	// Block device global mount path testing
+	tmpBlockDir, plug := getDeviceMountablePluginWithBlockPath(t, true)
+	defer os.RemoveAll(tmpBlockDir)
+
+	dm, err := plug.NewDeviceMounter()
+	if err != nil {
+		t.Errorf("Failed to make a new device mounter: %v", err)
+	}
+
+	pvSpec := getTestVolume(false, tmpBlockDir, false)
+
+	expectedGlobalPath := filepath.Join(tmpBlockDir, testBlockFormattingToFSGlobalPath)
+	actualPath, err := dm.GetDeviceMountPath(pvSpec)
+	if err != nil {
+		t.Errorf("Failed to get device mount path: %v", err)
+	}
+	if expectedGlobalPath != actualPath {
+		t.Fatalf("Expected device mount global path:%s, got: %s", expectedGlobalPath, actualPath)
+	}
+
+	fmt.Println("expected global path is:", expectedGlobalPath)
+
+	err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(actualPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("DeviceMounter.MountDevice() failed, device mount path not created: %s", actualPath)
+		} else {
+			t.Errorf("DeviceMounter.MountDevice() failed: %v", err)
+		}
+	}
+
+	du, err := plug.NewDeviceUnmounter()
+	if err != nil {
+		t.Fatalf("Create device unmounter error: %v", err)
+	}
+
+	err = du.UnmountDevice(actualPath)
+	if err != nil {
+		t.Fatalf("Unmount device error: %v", err)
+	}
+}
+
+func TestFSGlobalPathAndMountDevice(t *testing.T) {
+	// FS global path testing
+	tmpFSDir, plug := getDeviceMountablePluginWithBlockPath(t, false)
+	defer os.RemoveAll(tmpFSDir)
+
+	dm, err := plug.NewDeviceMounter()
+	if err != nil {
+		t.Errorf("Failed to make a new device mounter: %v", err)
+	}
+
+	pvSpec := getTestVolume(false, tmpFSDir, false)
+
+	expectedGlobalPath := tmpFSDir
+	actualPath, err := dm.GetDeviceMountPath(pvSpec)
+	if err != nil {
+		t.Errorf("Failed to get device mount path: %v", err)
+	}
+	if expectedGlobalPath != actualPath {
+		t.Fatalf("Expected device mount global path:%s, got: %s", expectedGlobalPath, actualPath)
+	}
+
+	// Actually, we will do nothing if the local path is FS type
+	err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(expectedGlobalPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Errorf("DeviceMounter.MountDevice() failed, device mount path not created: %s", expectedGlobalPath)
+		} else {
+			t.Errorf("DeviceMounter.MountDevice() failed: %v", err)
+		}
 	}
 }
 
