@@ -58,6 +58,9 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	// if the feature gate is disabled, drop the feature.
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
 		crd.Spec.Validation = nil
+		for i := range crd.Spec.Versions {
+			crd.Spec.Versions[i].Schema = nil
+		}
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
 		crd.Spec.Subresources = nil
@@ -94,6 +97,12 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
 		newCRD.Spec.Validation = nil
 		oldCRD.Spec.Validation = nil
+		for i := range newCRD.Spec.Versions {
+			newCRD.Spec.Versions[i].Schema = nil
+		}
+		for i := range oldCRD.Spec.Versions {
+			oldCRD.Spec.Versions[i].Schema = nil
+		}
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
 		newCRD.Spec.Subresources = nil

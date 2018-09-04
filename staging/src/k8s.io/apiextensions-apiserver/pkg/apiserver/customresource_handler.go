@@ -443,7 +443,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
 
-		validator, _, err := apiservervalidation.NewSchemaValidator(crd.Spec.Validation)
+		validationSchema, err := getCRDSchemaForVersion(&crd.Spec, v.Name)
+		if err != nil {
+			return nil, err
+		}
+		validator, _, err := apiservervalidation.NewSchemaValidator(validationSchema)
 		if err != nil {
 			return nil, err
 		}
@@ -454,8 +458,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			statusSpec = crd.Spec.Subresources.Status
 
 			// for the status subresource, validate only against the status schema
-			if crd.Spec.Validation != nil && crd.Spec.Validation.OpenAPIV3Schema != nil && crd.Spec.Validation.OpenAPIV3Schema.Properties != nil {
-				if statusSchema, ok := crd.Spec.Validation.OpenAPIV3Schema.Properties["status"]; ok {
+			if validationSchema != nil && validationSchema.OpenAPIV3Schema != nil && validationSchema.OpenAPIV3Schema.Properties != nil {
+				if statusSchema, ok := validationSchema.OpenAPIV3Schema.Properties["status"]; ok {
 					openapiSchema := &spec.Schema{}
 					if err := apiservervalidation.ConvertJSONSchemaProps(&statusSchema, openapiSchema); err != nil {
 						return nil, err

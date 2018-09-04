@@ -49,7 +49,7 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 	}
 
 	allErrs := genericvalidation.ValidateObjectMeta(&obj.ObjectMeta, false, nameValidationFn, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpec(&obj.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionSpec(&obj.Spec, field.NewPath("spec"), false)...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStatus(&obj.Status, field.NewPath("status"))...)
 	allErrs = append(allErrs, ValidateCustomResourceDefinitionStoredVersions(obj.Status.StoredVersions, obj.Spec.Versions, field.NewPath("status").Child("storedVersions"))...)
 	return allErrs
@@ -98,8 +98,36 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 	return allErrs
 }
 
+// ValidateCustomResourceDefinitionVersion statically validates. If allowingPerVersionFieldOverride
+// is true, we are updating a CRD that already uses the per-version field override feature, we allow
+// the update operation to continue using the feature even if the CustomResourceWebhookConversion
+// feature gate is set off.
+func ValidateCustomResourceDefinitionVersion(version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, index int, allowingPerVersionFieldOverride bool) field.ErrorList {
+	allErrs := field.ErrorList{}
+	schemaInvalid := false
+	if version.Schema != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) && !allowingPerVersionFieldOverride {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("schema"), "disabled by feature-gate CustomResourceWebhookConversion"))
+			schemaInvalid = true
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("schema"), "disabled by feature-gate CustomResourceValidation"))
+			schemaInvalid = true
+		}
+	}
+	if !schemaInvalid {
+		statusEnabled := false
+		if version.Subresources != nil && version.Subresources.Status != nil {
+			statusEnabled = true
+		}
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionValidation(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: version.Schema}, statusEnabled, fldPath.Child("schema"))...)
+
+	}
+	return allErrs
+}
+
 // ValidateCustomResourceDefinitionSpec statically validates
-func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, fldPath *field.Path) field.ErrorList {
+func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, fldPath *field.Path, allowingPerVersionFieldOverride bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Group) == 0 {
@@ -133,6 +161,7 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		if errs := validationutil.IsDNS1035Label(version.Name); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i).Child("name"), spec.Versions[i].Name, strings.Join(errs, ",")))
 		}
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionVersion(&version, fldPath.Child("versions").Index(i), i, allowingPerVersionFieldOverride)...)
 	}
 	if !uniqueNames {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "must contain unique version names"))
@@ -192,7 +221,7 @@ func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 
 // ValidateCustomResourceDefinitionSpecUpdate statically validates
 func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.CustomResourceDefinitionSpec, established bool, fldPath *field.Path) field.ErrorList {
-	allErrs := ValidateCustomResourceDefinitionSpec(spec, fldPath)
+	allErrs := ValidateCustomResourceDefinitionSpec(spec, fldPath, hasPerVersionFieldOverride(oldSpec))
 
 	if established {
 		// these effect the storage and cannot be changed therefore
@@ -205,6 +234,16 @@ func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.Cus
 	allErrs = append(allErrs, genericvalidation.ValidateImmutableField(spec.Names.Plural, oldSpec.Names.Plural, fldPath.Child("names", "plural"))...)
 
 	return allErrs
+}
+
+// hasPerVersionFieldOverride returns true if a CRD spec uses the per-version field override feature.
+func hasPerVersionFieldOverride(spec *apiextensions.CustomResourceDefinitionSpec) bool {
+	for _, v := range spec.Versions {
+		if v.Schema != nil || v.Subresources != nil || v.AdditionalPrinterColumns != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidateCustomResourceDefinitionStatus statically validates

@@ -372,6 +372,42 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{},
 		},
+		{
+			name: "disallow per-version field override feature when CustomResourceWebhookConversion feature gate is off",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Schema:  validValidationSchema,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "versions[1]", "schema"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -781,6 +817,147 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				immutable("spec", "names", "plural"),
 			},
 		},
+		{
+			name: "disallow per-version field override feature when CustomResourceWebhookConversion feature gate is off",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Schema:  validValidationSchema,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "versions[1]", "schema"),
+			},
+		},
+		{
+			name: "allow per-version field override feature when CustomResourceWebhookConversion feature gate is off, if the old spec already uses the feature",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Schema:  &apiextensions.JSONSchemaProps{},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+						{
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Schema:  validValidationSchema,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{},
+		},
 	}
 
 	for _, tc := range tests {
@@ -868,36 +1045,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		{
 			name: "all allowed fields at the root of the schema with status",
 			input: apiextensions.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					Description:      "This is a description",
-					Type:             "object",
-					Format:           "date-time",
-					Title:            "This is a title",
-					Maximum:          float64Ptr(10),
-					ExclusiveMaximum: true,
-					Minimum:          float64Ptr(5),
-					ExclusiveMinimum: true,
-					MaxLength:        int64Ptr(10),
-					MinLength:        int64Ptr(5),
-					Pattern:          "^[a-z]$",
-					MaxItems:         int64Ptr(10),
-					MinItems:         int64Ptr(5),
-					MultipleOf:       float64Ptr(3),
-					Required:         []string{"spec", "status"},
-					Items: &apiextensions.JSONSchemaPropsOrArray{
-						Schema: &apiextensions.JSONSchemaProps{
-							Description: "This is a schema nested under Items",
-						},
-					},
-					Properties: map[string]apiextensions.JSONSchemaProps{
-						"spec":   {},
-						"status": {},
-					},
-					ExternalDocs: &apiextensions.ExternalDocumentation{
-						Description: "This is an external documentation description",
-					},
-					Example: &example,
-				},
+				OpenAPIV3Schema: validValidationSchema,
 			},
 			statusEnabled: true,
 			wantError:     false,
@@ -916,6 +1064,37 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 }
 
 var example = apiextensions.JSON(`"This is an example"`)
+
+var validValidationSchema = &apiextensions.JSONSchemaProps{
+	Description:      "This is a description",
+	Type:             "object",
+	Format:           "date-time",
+	Title:            "This is a title",
+	Maximum:          float64Ptr(10),
+	ExclusiveMaximum: true,
+	Minimum:          float64Ptr(5),
+	ExclusiveMinimum: true,
+	MaxLength:        int64Ptr(10),
+	MinLength:        int64Ptr(5),
+	Pattern:          "^[a-z]$",
+	MaxItems:         int64Ptr(10),
+	MinItems:         int64Ptr(5),
+	MultipleOf:       float64Ptr(3),
+	Required:         []string{"spec", "status"},
+	Items: &apiextensions.JSONSchemaPropsOrArray{
+		Schema: &apiextensions.JSONSchemaProps{
+			Description: "This is a schema nested under Items",
+		},
+	},
+	Properties: map[string]apiextensions.JSONSchemaProps{
+		"spec":   {},
+		"status": {},
+	},
+	ExternalDocs: &apiextensions.ExternalDocumentation{
+		Description: "This is an external documentation description",
+	},
+	Example: &example,
+}
 
 func float64Ptr(f float64) *float64 {
 	return &f
