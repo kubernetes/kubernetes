@@ -17,9 +17,8 @@ limitations under the License.
 package componentconfig
 
 import (
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -28,14 +27,14 @@ type CloudControllerManagerConfiguration struct {
 	metav1.TypeMeta
 
 	// Generic holds configuration for a generic controller-manager
-	Generic GenericControllerManagerConfiguration
+	Generic kubectrlmgrconfig.GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
-	KubeCloudShared KubeCloudSharedConfiguration
+	KubeCloudShared kubectrlmgrconfig.KubeCloudSharedConfiguration
 
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
-	ServiceController ServiceControllerConfiguration
+	ServiceController kubectrlmgrconfig.ServiceControllerConfiguration
 	// NodeStatusUpdateFrequency is the frequency at which the controller updates nodes' status
 	NodeStatusUpdateFrequency metav1.Duration
 }

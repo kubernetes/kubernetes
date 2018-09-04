@@ -19,11 +19,9 @@ package v1alpha1
 import (
 	"time"
 
-	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
-	utilpointer "k8s.io/utils/pointer"
+	kubectrlmgrconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
@@ -32,9 +30,6 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 
 func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManagerConfiguration) {
 	zero := metav1.Duration{}
-	if obj.ServiceController.ConcurrentServiceSyncs == 0 {
-		obj.ServiceController.ConcurrentServiceSyncs = 1
-	}
 	if obj.NodeStatusUpdateFrequency == zero {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 5 * time.Minute}
 	}
@@ -46,4 +41,7 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	if obj.Generic.ClientConnection.Burst == 0 {
 		obj.Generic.ClientConnection.Burst = 30
 	}
+
+	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
+	kubectrlmgrconfigv1alpha1.RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
 }
