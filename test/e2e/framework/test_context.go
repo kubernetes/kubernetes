@@ -238,7 +238,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
-	flag.Var(utilflag.NewMapStringString(&TestContext.DefaultPodAnnotations), "default-pod-annotation", "A set of key=value pairs that describe annotations which are used for annotation-based features, e.g. seccomp profile, sandbox container etc.")
+	flag.Var(utilflag.NewMapStringString(&TestContext.DefaultPodAnnotations), "default-pod-annotations", "A set of key=value pairs that describe annotations which are used for annotation-based features, e.g. seccomp profile, sandbox container etc.")
 }
 
 // Register flags specific to the cluster e2e test suite.
