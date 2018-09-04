@@ -215,9 +215,11 @@ func toRealServer(dst *libipvs.Destination) (*RealServer, error) {
 		return nil, errors.New("ipvs destination should not be empty")
 	}
 	return &RealServer{
-		Address: dst.Address,
-		Port:    dst.Port,
-		Weight:  dst.Weight,
+		Address:      dst.Address,
+		Port:         dst.Port,
+		Weight:       dst.Weight,
+		ActiveConn:   dst.ActiveConnections,
+		InactiveConn: dst.InactiveConnections,
 	}, nil
 }
 
