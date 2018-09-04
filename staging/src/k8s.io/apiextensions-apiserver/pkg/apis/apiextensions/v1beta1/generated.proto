@@ -145,10 +145,12 @@ message CustomResourceDefinitionSpec {
   optional string scope = 4;
 
   // Validation describes the validation methods for CustomResources
+  // Optional, and correspond to the first version in the versions list
   // +optional
   optional CustomResourceValidation validation = 5;
 
   // Subresources describes the subresources for CustomResources
+  // Optional, and correspond to the first version in the versions list
   // +optional
   optional CustomResourceSubresources subresources = 6;
 
@@ -167,6 +169,7 @@ message CustomResourceDefinitionSpec {
   repeated CustomResourceDefinitionVersion versions = 7;
 
   // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+  // Optional, and correspond to the first version in the versions list
   // +optional
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
 }
@@ -199,6 +202,21 @@ message CustomResourceDefinitionVersion {
   // Storage flags the version as storage version. There must be exactly one
   // flagged as storage version.
   optional bool storage = 3;
+
+  // Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
+  // Should not be set for first item in Versions list. The top level field is being used for first version.
+  // +optional
+  optional JSONSchemaProps schema = 4;
+
+  // Subresources describes the subresources for CustomResources
+  // Should not be set for first item in Versions list. The top level field is being used for first version.
+  // +optional
+  optional CustomResourceSubresources subresources = 5;
+
+  // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+  // Should not be set for first item in Versions list. The top level field is being used for first version.
+  // +optional
+  repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
 }
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
