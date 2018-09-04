@@ -23,6 +23,7 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/componentconfig
 // +k8s:conversion-gen=k8s.io/apimachinery/pkg/apis/config/v1alpha1
 // +k8s:conversion-gen=k8s.io/apiserver/pkg/apis/config/v1alpha1
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1
 // +k8s:openapi-gen=true
 // +k8s:defaulter-gen=TypeMeta
 
