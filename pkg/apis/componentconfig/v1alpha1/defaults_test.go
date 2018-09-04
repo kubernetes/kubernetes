@@ -34,10 +34,28 @@ func TestControllerDefaultsRoundTrip(t *testing.T) {
 
 	ks2 := &KubeControllerManagerConfiguration{}
 	if err = json.Unmarshal([]byte(cm.Data["KubeControllerManagerConfiguration"]), ks2); err != nil {
-		t.Errorf("unexpected error unserializing controller manager config %v", err)
+		t.Errorf("unexpected error unserializing kube-controller manager config %v", err)
 	}
 
 	if !reflect.DeepEqual(ks2, ks1) {
 		t.Errorf("Expected:\n%#v\n\nGot:\n%#v", ks1, ks2)
+	}
+}
+
+func TestCloudControllerManagerConfigurationDefaults(t *testing.T) {
+	cs1 := &CloudControllerManagerConfiguration{}
+	SetDefaults_CloudControllerManagerConfiguration(cs1)
+	cm, err := componentconfig.ConvertObjToConfigMap("CloudControllerManagerConfiguration", cs1)
+	if err != nil {
+		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
+	}
+
+	cs2 := &CloudControllerManagerConfiguration{}
+	if err = json.Unmarshal([]byte(cm.Data["CloudControllerManagerConfiguration"]), cs2); err != nil {
+		t.Errorf("unexpected error unserializing cloud-controller manager config %v", err)
+	}
+
+	if !reflect.DeepEqual(cs2, cs1) {
+		t.Errorf("Expected:\n%#v\n\nGot:\n%#v", cs1, cs2)
 	}
 }
