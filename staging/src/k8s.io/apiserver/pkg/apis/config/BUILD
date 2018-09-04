@@ -25,6 +25,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/config/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/apis/config/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
