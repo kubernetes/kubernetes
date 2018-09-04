@@ -572,6 +572,12 @@ token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
 EOF
   fi
+  if [[ -n "${CONTAINER_API_ENDPOINT:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+container-api-endpoint = ${CONTAINER_API_ENDPOINT}
+EOF
+  fi
   if [[ -n "${PROJECT_ID:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
