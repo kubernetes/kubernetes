@@ -138,12 +138,12 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 	}
 
 	failedJobs := []batchv1.Job{}
-	succesfulJobs := []batchv1.Job{}
+	successfulJobs := []batchv1.Job{}
 
 	for _, job := range js {
 		isFinished, finishedStatus := getFinishedStatus(&job)
 		if isFinished && finishedStatus == batchv1.JobComplete {
-			succesfulJobs = append(succesfulJobs, job)
+			successfulJobs = append(successfulJobs, job)
 		} else if isFinished && finishedStatus == batchv1.JobFailed {
 			failedJobs = append(failedJobs, job)
 		}
@@ -151,7 +151,7 @@ func cleanupFinishedJobs(sj *batchv1beta1.CronJob, js []batchv1.Job, jc jobContr
 
 	if sj.Spec.SuccessfulJobsHistoryLimit != nil {
 		removeOldestJobs(sj,
-			succesfulJobs,
+			successfulJobs,
 			jc,
 			pc,
 			*sj.Spec.SuccessfulJobsHistoryLimit,
