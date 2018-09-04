@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // GenericControllerManagerConfigurationOptions holds the options which are generic.
@@ -44,7 +44,7 @@ type GenericControllerManagerConfigurationOptions struct {
 // NewGenericControllerManagerConfigurationOptions returns generic configuration default values for both
 // the kube-controller-manager and the cloud-contoller-manager. Any common changes should
 // be made here. Any individual changes should be made in that controller.
-func NewGenericControllerManagerConfigurationOptions(cfg componentconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
+func NewGenericControllerManagerConfigurationOptions(cfg kubectrlmgrconfig.GenericControllerManagerConfiguration) *GenericControllerManagerConfigurationOptions {
 	o := &GenericControllerManagerConfigurationOptions{
 		Port:                    cfg.Port,
 		Address:                 cfg.Address,
@@ -82,7 +82,7 @@ func (o *GenericControllerManagerConfigurationOptions) AddFlags(fss *apiserverfl
 }
 
 // ApplyTo fills up generic config with options.
-func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *componentconfig.GenericControllerManagerConfiguration) error {
+func (o *GenericControllerManagerConfigurationOptions) ApplyTo(cfg *kubectrlmgrconfig.GenericControllerManagerConfiguration) error {
 	if o == nil {
 		return nil
 	}

@@ -31,7 +31,7 @@ import (
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -185,7 +185,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			ConcurrentGCSyncs: 30,
-			GCIgnoredResources: []componentconfig.GroupResource{
+			GCIgnoredResources: []kubectrlmgrconfig.GroupResource{
 				{Group: "", Resource: "events"},
 			},
 			EnableGarbageCollector: false,
@@ -222,11 +222,11 @@ func TestAddFlags(t *testing.T) {
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
 			PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
-			VolumeConfiguration: componentconfig.VolumeConfiguration{
+			VolumeConfiguration: kubectrlmgrconfig.VolumeConfiguration{
 				EnableDynamicProvisioning:  false,
 				EnableHostPathProvisioning: true,
 				FlexVolumePluginDir:        "/flex-volume-plugin",
-				PersistentVolumeRecyclerConfiguration: componentconfig.PersistentVolumeRecyclerConfiguration{
+				PersistentVolumeRecyclerConfiguration: kubectrlmgrconfig.PersistentVolumeRecyclerConfiguration{
 					MaximumRetry:             3,
 					MinimumTimeoutNFS:        200,
 					IncrementTimeoutNFS:      45,
@@ -298,7 +298,7 @@ func TestAddFlags(t *testing.T) {
 	}
 }
 
-type sortedGCIgnoredResources []componentconfig.GroupResource
+type sortedGCIgnoredResources []kubectrlmgrconfig.GroupResource
 
 func (r sortedGCIgnoredResources) Len() int {
 	return len(r)

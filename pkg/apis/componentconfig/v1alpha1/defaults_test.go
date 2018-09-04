@@ -24,17 +24,17 @@ import (
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
 )
 
-func TestControllerDefaultsRoundTrip(t *testing.T) {
-	ks1 := &KubeControllerManagerConfiguration{}
-	SetDefaults_KubeControllerManagerConfiguration(ks1)
-	cm, err := componentconfig.ConvertObjToConfigMap("KubeControllerManagerConfiguration", ks1)
+func TestCloudControllerDefaultsRoundTrip(t *testing.T) {
+	ks1 := &CloudControllerManagerConfiguration{}
+	SetDefaults_CloudControllerManagerConfiguration(ks1)
+	cm, err := componentconfig.ConvertObjToConfigMap("CloudControllerManagerConfiguration", ks1)
 	if err != nil {
 		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
 	}
 
-	ks2 := &KubeControllerManagerConfiguration{}
-	if err = json.Unmarshal([]byte(cm.Data["KubeControllerManagerConfiguration"]), ks2); err != nil {
-		t.Errorf("unexpected error unserializing controller manager config %v", err)
+	ks2 := &CloudControllerManagerConfiguration{}
+	if err = json.Unmarshal([]byte(cm.Data["CloudControllerManagerConfiguration"]), ks2); err != nil {
+		t.Errorf("unexpected error unserializing cloud controller manager config %v", err)
 	}
 
 	if !reflect.DeepEqual(ks2, ks1) {

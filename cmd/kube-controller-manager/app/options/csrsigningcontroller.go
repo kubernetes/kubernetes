@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 const (
@@ -52,7 +52,7 @@ func (o *CSRSigningControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up CSRSigningController config with options.
-func (o *CSRSigningControllerOptions) ApplyTo(cfg *componentconfig.CSRSigningControllerConfiguration) error {
+func (o *CSRSigningControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.CSRSigningControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}
