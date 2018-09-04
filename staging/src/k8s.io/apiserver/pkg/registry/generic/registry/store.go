@@ -551,6 +551,10 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		if err != nil {
 			return nil, nil, err
 		}
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		// If AllowUnconditionalUpdate() is true and the object specified by
 		// the user does not have a resource version, then we populate it with
@@ -558,7 +562,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		// the user matches the version of latest storage object.
 		resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, invalidResourceVersion(qualifiedResource, name, accessor.GetResourceVersion(), fmt.Sprintf("Failed to parse resource version: %v", err))
 		}
 		doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
@@ -603,12 +607,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			// Check if the object's resource version matches the latest
 			// resource version.
 			if resourceVersion == 0 {
-				// TODO: The Invalid error should have a field for Resource.
-				// After that field is added, we should fill the Resource and
-				// leave the Kind field empty. See the discussion in #18526.
-				qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
-				fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), resourceVersion, "must be specified for an update")}
-				return nil, nil, kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
+				return nil, nil, invalidResourceVersion(qualifiedResource, name, accessor.GetResourceVersion(), "must be specified for an update")
 			}
 			if resourceVersion != version {
 				return nil, nil, kubeerr.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
@@ -859,6 +858,15 @@ func markAsDeleting(obj runtime.Object) (err error) {
 	var zero int64 = 0
 	objectMeta.SetDeletionGracePeriodSeconds(&zero)
 	return nil
+}
+
+func invalidResourceVersion(qualifiedResource schema.GroupResource, name string, resourceVersion string, err string) error {
+	// TODO: The Invalid error should have a field for Resource.
+	// After that field is added, we should fill the Resource and
+	// leave the Kind field empty. See the discussion in #18526.
+	qualifiedKind := schema.GroupKind{Group: qualifiedResource.Group, Kind: qualifiedResource.Resource}
+	fieldErrList := field.ErrorList{field.Invalid(field.NewPath("metadata").Child("resourceVersion"), resourceVersion, err)}
+	return kubeerr.NewInvalid(qualifiedKind, name, fieldErrList)
 }
 
 // updateForGracefulDeletionAndFinalizers updates the given object for

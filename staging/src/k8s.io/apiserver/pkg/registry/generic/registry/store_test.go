@@ -623,6 +623,10 @@ func TestStoreUpdate(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "7"},
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
+	podAWithInvalidResourceVersion := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "invalid"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
@@ -660,6 +664,12 @@ func TestStoreUpdate(t *testing.T) {
 	// outofDate
 	_, _, err = registry.Update(testContext, podAWithResourceVersion.Name, rest.DefaultUpdatedObjectInfo(podAWithResourceVersion), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if !errors.IsConflict(err) {
+		t.Errorf("Unexpected error updating podAWithResourceVersion: %v", err)
+	}
+
+	// invalid resource version
+	_, _, err = registry.Update(testContext, podAWithInvalidResourceVersion.Name, rest.DefaultUpdatedObjectInfo(podAWithInvalidResourceVersion), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if !errors.IsInvalid(err) {
 		t.Errorf("Unexpected error updating podAWithResourceVersion: %v", err)
 	}
 
