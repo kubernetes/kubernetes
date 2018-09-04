@@ -1246,7 +1246,9 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 	return terms
 }
 
-func getMatchingTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) (*topologyPairsMaps, error) {
+// getMatchingAntiAffinityTopologyPairs is an initialization helper to calculate on each existing pod
+// of each node, whether (1) it has PodAntiAffinity and (2) ALL AffinityTerms matches incoming pod
+func getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) (*topologyPairsMaps, error) {
 	allNodeNames := make([]string, 0, len(nodeInfoMap))
 	for name := range nodeInfoMap {
 		allNodeNames = append(allNodeNames, name)
@@ -1277,75 +1279,68 @@ func getMatchingTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercach
 			catchError(fmt.Errorf("node not found"))
 			return
 		}
-		nodeTopologyMaps := newTopologyPairsMaps()
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
-			affinity := existingPod.Spec.Affinity
-			if affinity == nil {
-				continue
+			existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, node)
+			if err != nil {
+				catchError(err)
+				return
 			}
-			for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-				if err != nil {
-					catchError(err)
-					return
-				}
-				if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-					if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-						pair := topologyPair{key: term.TopologyKey, value: topologyValue}
-						nodeTopologyMaps.addTopologyPair(pair, existingPod)
-					}
-				}
-			}
-			if len(nodeTopologyMaps.podToTopologyPairs) > 0 {
-				appendTopologyPairsMaps(nodeTopologyMaps)
-			}
+
+			appendTopologyPairsMaps(existingPodTopologyMaps)
 		}
 	}
 	workqueue.Parallelize(16, len(allNodeNames), processNode)
 	return topologyMaps, firstError
 }
 
-func getMatchingTopologyPairsOfExistingPod(newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*topologyPairsMaps, error) {
-	topologyMaps := newTopologyPairsMaps()
+// getMatchingAntiAffinityTopologyPairsOfPod is a helper to calculate on each existing pod of
+// given node, whether (1) it has PodAntiAffinity and (2) ALL AffinityTerms matches incoming pod
+func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*topologyPairsMaps, error) {
 	affinity := existingPod.Spec.Affinity
-	if affinity != nil && affinity.PodAntiAffinity != nil {
-		for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-			if err != nil {
-				return nil, err
-			}
-			if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
-				if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
-					topologyMaps.addTopologyPair(pair, existingPod)
-				}
-			}
+	if affinity == nil || affinity.PodAntiAffinity == nil {
+		return nil, nil
+	}
+
+	terms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
+	for _, term := range terms {
+		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
+		// All terms must match for the anti-affinity rule to be considered a match.
+		if !priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
+			return nil, nil
+		}
+	}
+	// All terms have matched. Adding the topology pairs of this node...
+	topologyMaps := newTopologyPairsMaps()
+	for _, term := range terms {
+		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
+			pair := topologyPair{key: term.TopologyKey, value: topologyValue}
+			topologyMaps.addTopologyPair(pair, existingPod)
 		}
 	}
 	return topologyMaps, nil
 }
+
 func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, allPods []*v1.Pod) (*topologyPairsMaps, error) {
 	topologyMaps := newTopologyPairsMaps()
 
 	for _, existingPod := range allPods {
-		affinity := existingPod.Spec.Affinity
-		if affinity != nil && affinity.PodAntiAffinity != nil {
-			existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					glog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
-					continue
-				}
-				return nil, err
+		existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				glog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+				continue
 			}
-			existingPodsTopologyMaps, err := getMatchingTopologyPairsOfExistingPod(pod, existingPod, existingPodNode)
-			if err != nil {
-				return nil, err
-			}
-			topologyMaps.appendMaps(existingPodsTopologyMaps)
+			return nil, err
 		}
+		existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, existingPodNode)
+		if err != nil {
+			return nil, err
+		}
+		topologyMaps.appendMaps(existingPodTopologyMaps)
 	}
 	return topologyMaps, nil
 }
