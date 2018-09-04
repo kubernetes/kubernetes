@@ -305,6 +305,7 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              s.ComponentConfig.DisablePreemption,
 		PercentageOfNodesToScore:       s.ComponentConfig.PercentageOfNodesToScore,
+		BindTimeoutSeconds:             *s.ComponentConfig.BindTimeoutSeconds,
 	})
 
 	source := s.ComponentConfig.AlgorithmSource

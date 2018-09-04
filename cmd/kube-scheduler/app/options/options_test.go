@@ -144,6 +144,7 @@ users:
 	}
 
 	defaultSource := "DefaultProvider"
+	defaultBindTimeoutSeconds := int64(600)
 
 	testcases := []struct {
 		name             string
@@ -157,7 +158,10 @@ users:
 			options: &Options{
 				ConfigFile: configFile,
 				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
+					cfg, err := newDefaultComponentConfig()
+					if err != nil {
+						t.Fatal(err)
+					}
 					return *cfg
 				}(),
 			},
@@ -187,6 +191,7 @@ users:
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
 				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
 			},
 		},
 		{
@@ -229,6 +234,7 @@ users:
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
 				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
 			},
 		},
 		{

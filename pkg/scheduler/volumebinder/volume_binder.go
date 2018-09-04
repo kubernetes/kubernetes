@@ -36,11 +36,11 @@ func NewVolumeBinder(
 	client clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
-	storageClassInformer storageinformers.StorageClassInformer) *VolumeBinder {
+	storageClassInformer storageinformers.StorageClassInformer,
+	bindTimeout time.Duration) *VolumeBinder {
 
 	return &VolumeBinder{
-		// TODO: what is a good bind timeout value?
-		Binder: persistentvolume.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer, 10*time.Minute),
+		Binder: persistentvolume.NewVolumeBinder(client, pvcInformer, pvInformer, storageClassInformer, bindTimeout),
 	}
 }
 

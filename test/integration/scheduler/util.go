@@ -91,6 +91,7 @@ func createConfiguratorWithPodInformer(
 		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+		BindTimeoutSeconds:             600,
 	})
 }
 

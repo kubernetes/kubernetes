@@ -159,6 +159,7 @@ type ConfigFactoryArgs struct {
 	EnableEquivalenceClassCache    bool
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
+	BindTimeoutSeconds             int64
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -305,7 +306,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer)
+		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 		args.StorageClassInformer.Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{

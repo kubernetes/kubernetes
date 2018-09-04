@@ -41,6 +41,9 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	if cc.HardPodAffinitySymmetricWeight < 0 || cc.HardPodAffinitySymmetricWeight > 100 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("hardPodAffinitySymmetricWeight"), cc.HardPodAffinitySymmetricWeight, "not in valid range 0-100"))
 	}
+	if cc.BindTimeoutSeconds == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("bindTimeoutSeconds"), ""))
+	}
 	return allErrs
 }
 
