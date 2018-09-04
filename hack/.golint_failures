@@ -254,7 +254,6 @@ pkg/probe/exec
 pkg/probe/http
 pkg/probe/tcp
 pkg/proxy
-pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
 pkg/proxy/iptables
 pkg/proxy/userspace

@@ -142,6 +142,7 @@ type KubeProxyConfiguration struct {
 	NodePortAddresses []string
 }
 
+// ProxyMode is the type of proxy to use
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
 // (newer, faster), 'ipvs'(newest, better in performance and scalability).
 //
@@ -151,22 +152,26 @@ type KubeProxyConfiguration struct {
 // future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
 // insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
 // and the fall back path is firstly iptables and then userspace.
-
+//
 // In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.
 type ProxyMode string
 
 const (
-	ProxyModeUserspace   ProxyMode = "userspace"
-	ProxyModeIPTables    ProxyMode = "iptables"
-	ProxyModeIPVS        ProxyMode = "ipvs"
+	// ProxyModeUserspace is the ProxyMode for userspace
+	ProxyModeUserspace ProxyMode = "userspace"
+	// ProxyModeIPTables is the ProxyMode for iptables
+	ProxyModeIPTables ProxyMode = "iptables"
+	// ProxyModeIPVS is the ProxyMode for ipvs
+	ProxyModeIPVS ProxyMode = "ipvs"
+	// ProxyModeKernelspace is the ProxyMode for kernelspace
 	ProxyModeKernelspace ProxyMode = "kernelspace"
 )
 
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
 // UDP datagrams to real servers.  Scheduling algorithms are imple-
-//wanted as kernel modules. Ten are shipped with the Linux Virtual Server.
+// wanted as kernel modules. Ten are shipped with the Linux Virtual Server.
 type IPVSSchedulerMethod string
 
 const (
@@ -206,6 +211,7 @@ const (
 	NeverQueue IPVSSchedulerMethod = "nq"
 )
 
+// Set sets the ProxyMode from a given string
 func (m *ProxyMode) Set(s string) error {
 	*m = ProxyMode(s)
 	return nil
@@ -218,10 +224,12 @@ func (m *ProxyMode) String() string {
 	return ""
 }
 
+// Type returns
 func (m *ProxyMode) Type() string {
 	return "ProxyMode"
 }
 
+// ConfigurationMap is a map of configurations to their values
 type ConfigurationMap map[string]string
 
 func (m *ConfigurationMap) String() string {
@@ -233,6 +241,7 @@ func (m *ConfigurationMap) String() string {
 	return strings.Join(pairs, ",")
 }
 
+// Set sets the ConfigurationMap from a comma delimited string
 func (m *ConfigurationMap) Set(value string) error {
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
@@ -248,6 +257,7 @@ func (m *ConfigurationMap) Set(value string) error {
 	return nil
 }
 
+// Type returns the base type of the ConfigurationMap
 func (*ConfigurationMap) Type() string {
 	return "mapStringString"
 }
