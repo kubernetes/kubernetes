@@ -3,23 +3,19 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "cloudprovider.go",
-        "debugging.go",
-        "generic.go",
-        "kubecloudshared.go",
-        "servicecontroller.go",
+        "doc.go",
+        "register.go",
+        "types.go",
+        "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/cmd/controller-manager/app/options",
+    importpath = "k8s.io/kubernetes/pkg/controller/apis/config",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/client/leaderelectionconfig:go_default_library",
-        "//pkg/controller/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 
@@ -32,7 +28,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/apis/config/scheme:all-srcs",
+        "//pkg/controller/apis/config/v1alpha1:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

@@ -207,6 +207,7 @@ filegroup(
         "//staging/src/k8s.io/csi-api/pkg/client/informers/externalversions:all-srcs",
         "//staging/src/k8s.io/csi-api/pkg/client/listers/csi/v1alpha1:all-srcs",
         "//staging/src/k8s.io/kube-aggregator:all-srcs",
+        "//staging/src/k8s.io/kube-controller-manager/config/v1alpha1:all-srcs",
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:all-srcs",
         "//staging/src/k8s.io/kube-scheduler/config/v1alpha1:all-srcs",
         "//staging/src/k8s.io/kubelet/config/v1beta1:all-srcs",
