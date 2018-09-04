@@ -31,124 +31,38 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_KubeControllerManagerConfiguration(obj *KubeControllerManagerConfiguration) {
+func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeControllerManagerConfiguration) {
 	zero := metav1.Duration{}
-	if obj.EndpointController.ConcurrentEndpointSyncs == 0 {
-		obj.EndpointController.ConcurrentEndpointSyncs = 5
-	}
-	if obj.ServiceController.ConcurrentServiceSyncs == 0 {
-		obj.ServiceController.ConcurrentServiceSyncs = 1
-	}
-	if obj.ReplicationController.ConcurrentRCSyncs == 0 {
-		obj.ReplicationController.ConcurrentRCSyncs = 5
-	}
-	if obj.ReplicaSetController.ConcurrentRSSyncs == 0 {
-		obj.ReplicaSetController.ConcurrentRSSyncs = 5
-	}
-	if obj.DaemonSetController.ConcurrentDaemonSetSyncs == 0 {
-		obj.DaemonSetController.ConcurrentDaemonSetSyncs = 2
-	}
-	if obj.JobController.ConcurrentJobSyncs == 0 {
-		obj.JobController.ConcurrentJobSyncs = 5
-	}
-	if obj.ResourceQuotaController.ConcurrentResourceQuotaSyncs == 0 {
-		obj.ResourceQuotaController.ConcurrentResourceQuotaSyncs = 5
-	}
-	if obj.DeploymentController.ConcurrentDeploymentSyncs == 0 {
-		obj.DeploymentController.ConcurrentDeploymentSyncs = 5
-	}
-	if obj.NamespaceController.ConcurrentNamespaceSyncs == 0 {
-		obj.NamespaceController.ConcurrentNamespaceSyncs = 10
-	}
-	if obj.SAController.ConcurrentSATokenSyncs == 0 {
-		obj.SAController.ConcurrentSATokenSyncs = 5
-	}
-	if obj.ResourceQuotaController.ResourceQuotaSyncPeriod == zero {
-		obj.ResourceQuotaController.ResourceQuotaSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.NamespaceController.NamespaceSyncPeriod == zero {
-		obj.NamespaceController.NamespaceSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod == zero {
-		obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerSyncPeriod == zero {
-		obj.HPAController.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow == zero {
-		obj.HPAController.HorizontalPodAutoscalerUpscaleForbiddenWindow = metav1.Duration{Duration: 3 * time.Minute}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow == zero {
-		obj.HPAController.HorizontalPodAutoscalerDownscaleStabilizationWindow = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod == zero {
-		obj.HPAController.HorizontalPodAutoscalerCPUInitializationPeriod = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerInitialReadinessDelay == zero {
-		obj.HPAController.HorizontalPodAutoscalerInitialReadinessDelay = metav1.Duration{Duration: 30 * time.Second}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow == zero {
-		obj.HPAController.HorizontalPodAutoscalerDownscaleForbiddenWindow = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.HPAController.HorizontalPodAutoscalerTolerance == 0 {
-		obj.HPAController.HorizontalPodAutoscalerTolerance = 0.1
-	}
-	if obj.DeploymentController.DeploymentControllerSyncPeriod == zero {
-		obj.DeploymentController.DeploymentControllerSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	if obj.AttachDetachController.ReconcilerSyncLoopPeriod == zero {
+		obj.AttachDetachController.ReconcilerSyncLoopPeriod = metav1.Duration{Duration: 60 * time.Second}
 	}
 	if obj.DeprecatedController.RegisterRetryCount == 0 {
 		obj.DeprecatedController.RegisterRetryCount = 10
 	}
-	if obj.NodeLifecycleController.PodEvictionTimeout == zero {
-		obj.NodeLifecycleController.PodEvictionTimeout = metav1.Duration{Duration: 5 * time.Minute}
-	}
-	if obj.NodeLifecycleController.NodeMonitorGracePeriod == zero {
-		obj.NodeLifecycleController.NodeMonitorGracePeriod = metav1.Duration{Duration: 40 * time.Second}
-	}
-	if obj.NodeLifecycleController.NodeStartupGracePeriod == zero {
-		obj.NodeLifecycleController.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
-	}
 	if obj.NodeIPAMController.NodeCIDRMaskSize == 0 {
 		obj.NodeIPAMController.NodeCIDRMaskSize = 24
 	}
-	if obj.PodGCController.TerminatedPodGCThreshold == 0 {
-		obj.PodGCController.TerminatedPodGCThreshold = 12500
+	if obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod == zero {
+		obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}
-	if obj.GarbageCollectorController.EnableGarbageCollector == nil {
-		obj.GarbageCollectorController.EnableGarbageCollector = utilpointer.BoolPtr(true)
+	if obj.SAController.ConcurrentSATokenSyncs == 0 {
+		obj.SAController.ConcurrentSATokenSyncs = 5
 	}
-	if obj.GarbageCollectorController.ConcurrentGCSyncs == 0 {
-		obj.GarbageCollectorController.ConcurrentGCSyncs = 20
-	}
-	if obj.CSRSigningController.ClusterSigningCertFile == "" {
-		obj.CSRSigningController.ClusterSigningCertFile = "/etc/kubernetes/ca/ca.pem"
-	}
-	if obj.CSRSigningController.ClusterSigningKeyFile == "" {
-		obj.CSRSigningController.ClusterSigningKeyFile = "/etc/kubernetes/ca/ca.key"
-	}
-	if obj.CSRSigningController.ClusterSigningDuration == zero {
-		obj.CSRSigningController.ClusterSigningDuration = metav1.Duration{Duration: 365 * 24 * time.Hour}
-	}
-	if obj.AttachDetachController.ReconcilerSyncLoopPeriod == zero {
-		obj.AttachDetachController.ReconcilerSyncLoopPeriod = metav1.Duration{Duration: 60 * time.Second}
-	}
-	if obj.NodeLifecycleController.EnableTaintManager == nil {
-		obj.NodeLifecycleController.EnableTaintManager = utilpointer.BoolPtr(true)
-	}
-	if obj.HPAController.HorizontalPodAutoscalerUseRESTClients == nil {
-		obj.HPAController.HorizontalPodAutoscalerUseRESTClients = utilpointer.BoolPtr(true)
-	}
+
 	// These defaults override the recommended defaults from the apimachineryconfigv1alpha1 package that are applied automatically
 	// These client-connection defaults are specific to the kube-controller-manager
 	if obj.Generic.ClientConnection.QPS == 0.0 {
-		obj.Generic.ClientConnection.QPS = 50.0
+		obj.Generic.ClientConnection.QPS = 20.0
 	}
 	if obj.Generic.ClientConnection.Burst == 0 {
-		obj.Generic.ClientConnection.Burst = 100
+		obj.Generic.ClientConnection.Burst = 30
 	}
+
+	// Use the default RecommendedDefaultGenericControllerManagerConfiguration options
+	RecommendedDefaultGenericControllerManagerConfiguration(&obj.Generic)
 }
 
-func SetDefaults_GenericControllerManagerConfiguration(obj *GenericControllerManagerConfiguration) {
+func RecommendedDefaultGenericControllerManagerConfiguration(obj *kubectrlmgrconfigv1alpha1.GenericControllerManagerConfiguration) {
 	zero := metav1.Duration{}
 	if obj.Address == "" {
 		obj.Address = "0.0.0.0"
@@ -162,12 +76,13 @@ func SetDefaults_GenericControllerManagerConfiguration(obj *GenericControllerMan
 	if len(obj.Controllers) == 0 {
 		obj.Controllers = []string{"*"}
 	}
+
 	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
 	apimachineryconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
 	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 }
 
-func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration) {
+func SetDefaults_KubeCloudSharedConfiguration(obj *kubectrlmgrconfigv1alpha1.KubeCloudSharedConfiguration) {
 	zero := metav1.Duration{}
 	if obj.NodeMonitorPeriod == zero {
 		obj.NodeMonitorPeriod = metav1.Duration{Duration: 5 * time.Second}
@@ -183,7 +98,145 @@ func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration)
 	}
 }
 
-func SetDefaults_PersistentVolumeRecyclerConfiguration(obj *PersistentVolumeRecyclerConfiguration) {
+func SetDefaults_ServiceControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ServiceControllerConfiguration) {
+	if obj.ConcurrentServiceSyncs == 0 {
+		obj.ConcurrentServiceSyncs = 1
+	}
+}
+
+func SetDefaults_CSRSigningControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.CSRSigningControllerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.ClusterSigningCertFile == "" {
+		obj.ClusterSigningCertFile = "/etc/kubernetes/ca/ca.pem"
+	}
+	if obj.ClusterSigningKeyFile == "" {
+		obj.ClusterSigningKeyFile = "/etc/kubernetes/ca/ca.key"
+	}
+	if obj.ClusterSigningDuration == zero {
+		obj.ClusterSigningDuration = metav1.Duration{Duration: 365 * 24 * time.Hour}
+	}
+}
+
+func SetDefaults_DeploymentControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.DeploymentControllerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.ConcurrentDeploymentSyncs == 0 {
+		obj.ConcurrentDeploymentSyncs = 5
+	}
+	if obj.DeploymentControllerSyncPeriod == zero {
+		obj.DeploymentControllerSyncPeriod = metav1.Duration{Duration: 30 * time.Second}
+	}
+}
+
+func SetDefaults_DaemonSetControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.DaemonSetControllerConfiguration) {
+	if obj.ConcurrentDaemonSetSyncs == 0 {
+		obj.ConcurrentDaemonSetSyncs = 2
+	}
+}
+
+func SetDefaults_EndpointControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.EndpointControllerConfiguration) {
+	if obj.ConcurrentEndpointSyncs == 0 {
+		obj.ConcurrentEndpointSyncs = 5
+	}
+}
+
+func SetDefaults_GarbageCollectorControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.GarbageCollectorControllerConfiguration) {
+	if obj.EnableGarbageCollector == nil {
+		obj.EnableGarbageCollector = utilpointer.BoolPtr(true)
+	}
+	if obj.ConcurrentGCSyncs == 0 {
+		obj.ConcurrentGCSyncs = 20
+	}
+}
+
+func SetDefaults_HPAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.HPAControllerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.HorizontalPodAutoscalerUseRESTClients == nil {
+		obj.HorizontalPodAutoscalerUseRESTClients = utilpointer.BoolPtr(true)
+	}
+	if obj.HorizontalPodAutoscalerSyncPeriod == zero {
+		obj.HorizontalPodAutoscalerSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
+	}
+	if obj.HorizontalPodAutoscalerUpscaleForbiddenWindow == zero {
+		obj.HorizontalPodAutoscalerUpscaleForbiddenWindow = metav1.Duration{Duration: 3 * time.Minute}
+	}
+	if obj.HorizontalPodAutoscalerDownscaleStabilizationWindow == zero {
+		obj.HorizontalPodAutoscalerDownscaleStabilizationWindow = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.HorizontalPodAutoscalerCPUInitializationPeriod == zero {
+		obj.HorizontalPodAutoscalerCPUInitializationPeriod = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.HorizontalPodAutoscalerInitialReadinessDelay == zero {
+		obj.HorizontalPodAutoscalerInitialReadinessDelay = metav1.Duration{Duration: 30 * time.Second}
+	}
+	if obj.HorizontalPodAutoscalerDownscaleForbiddenWindow == zero {
+		obj.HorizontalPodAutoscalerDownscaleForbiddenWindow = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.HorizontalPodAutoscalerTolerance == 0 {
+		obj.HorizontalPodAutoscalerTolerance = 0.1
+	}
+}
+
+func SetDefaults_JobControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.JobControllerConfiguration) {
+	if obj.ConcurrentJobSyncs == 0 {
+		obj.ConcurrentJobSyncs = 5
+	}
+}
+
+func SetDefaults_NamespaceControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.NamespaceControllerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.ConcurrentNamespaceSyncs == 0 {
+		obj.ConcurrentNamespaceSyncs = 10
+	}
+	if obj.NamespaceSyncPeriod == zero {
+		obj.NamespaceSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
+	}
+}
+
+func SetDefaults_NodeLifecycleControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.NodeLifecycleControllerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.PodEvictionTimeout == zero {
+		obj.PodEvictionTimeout = metav1.Duration{Duration: 5 * time.Minute}
+	}
+	if obj.NodeMonitorGracePeriod == zero {
+		obj.NodeMonitorGracePeriod = metav1.Duration{Duration: 40 * time.Second}
+	}
+	if obj.NodeStartupGracePeriod == zero {
+		obj.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
+	}
+	if obj.EnableTaintManager == nil {
+		obj.EnableTaintManager = utilpointer.BoolPtr(true)
+	}
+}
+
+func SetDefaults_PodGCControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.PodGCControllerConfiguration) {
+	if obj.TerminatedPodGCThreshold == 0 {
+		obj.TerminatedPodGCThreshold = 12500
+	}
+}
+
+func SetDefaults_ReplicaSetControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ReplicaSetControllerConfiguration) {
+	if obj.ConcurrentRSSyncs == 0 {
+		obj.ConcurrentRSSyncs = 5
+	}
+}
+
+func SetDefaults_ReplicationControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ReplicationControllerConfiguration) {
+	if obj.ConcurrentRCSyncs == 0 {
+		obj.ConcurrentRCSyncs = 5
+	}
+}
+
+func SetDefaults_ResourceQuotaControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.ResourceQuotaControllerConfiguration) {
+	zero := metav1.Duration{}
+	if obj.ConcurrentResourceQuotaSyncs == 0 {
+		obj.ConcurrentResourceQuotaSyncs = 5
+	}
+	if obj.ResourceQuotaSyncPeriod == zero {
+		obj.ResourceQuotaSyncPeriod = metav1.Duration{Duration: 5 * time.Minute}
+	}
+}
+
+func SetDefaults_PersistentVolumeRecyclerConfiguration(obj *kubectrlmgrconfigv1alpha1.PersistentVolumeRecyclerConfiguration) {
 	if obj.MaximumRetry == 0 {
 		obj.MaximumRetry = 3
 	}
@@ -201,7 +254,7 @@ func SetDefaults_PersistentVolumeRecyclerConfiguration(obj *PersistentVolumeRecy
 	}
 }
 
-func SetDefaults_VolumeConfiguration(obj *VolumeConfiguration) {
+func SetDefaults_VolumeConfiguration(obj *kubectrlmgrconfigv1alpha1.VolumeConfiguration) {
 	if obj.EnableHostPathProvisioning == nil {
 		obj.EnableHostPathProvisioning = utilpointer.BoolPtr(false)
 	}

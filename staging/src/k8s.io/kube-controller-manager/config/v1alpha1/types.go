@@ -22,6 +22,7 @@ import (
 	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
 )
 
+// PersistentVolumeRecyclerConfiguration contains elements describing persistent volume plugins.
 type PersistentVolumeRecyclerConfiguration struct {
 	// maximumRetry is number of retries the PV recycler will execute on failure to recycle
 	// PV.
@@ -70,6 +71,7 @@ type VolumeConfiguration struct {
 	FlexVolumePluginDir string
 }
 
+// GroupResource describes an group resource.
 type GroupResource struct {
 	// group is the group portion of the GroupResource.
 	Group string
@@ -78,13 +80,17 @@ type GroupResource struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// KubeControllerManagerConfiguration contains elements describing kube-controller manager.
 type KubeControllerManagerConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
+
 	// Generic holds configuration for a generic controller-manager
 	Generic GenericControllerManagerConfiguration
 	// KubeCloudSharedConfiguration holds configuration for shared related features
 	// both in cloud controller manager and kube-controller manager.
 	KubeCloudShared KubeCloudSharedConfiguration
+
 	// AttachDetachControllerConfiguration holds configuration for
 	// AttachDetachController related features.
 	AttachDetachController AttachDetachControllerConfiguration
@@ -141,6 +147,7 @@ type KubeControllerManagerConfiguration struct {
 	ServiceController ServiceControllerConfiguration
 }
 
+// GenericControllerManagerConfiguration holds configuration for a generic controller-manager.
 type GenericControllerManagerConfiguration struct {
 	// port is the port that the controller-manager's http service runs on.
 	Port int32
@@ -166,6 +173,8 @@ type GenericControllerManagerConfiguration struct {
 	Debugging apiserverconfigv1alpha1.DebuggingConfiguration
 }
 
+// KubeCloudSharedConfiguration contains elements shared by both kube-controller manager
+// and cloud-controller manager, but not genericconfig.
 type KubeCloudSharedConfiguration struct {
 	// CloudProviderConfiguration holds configuration for CloudProvider related features.
 	CloudProvider CloudProviderConfiguration
@@ -199,6 +208,7 @@ type KubeCloudSharedConfiguration struct {
 	NodeSyncPeriod metav1.Duration
 }
 
+// AttachDetachControllerConfiguration contains elements describing AttachDetachController.
 type AttachDetachControllerConfiguration struct {
 	// Reconciler runs a periodic loop to reconcile the desired state of the with
 	// the actual state of the world by triggering attach detach operations.
@@ -209,6 +219,7 @@ type AttachDetachControllerConfiguration struct {
 	ReconcilerSyncLoopPeriod metav1.Duration
 }
 
+// CloudProviderConfiguration contains basically elements about cloud provider.
 type CloudProviderConfiguration struct {
 	// Name is the provider for cloud services.
 	Name string
@@ -216,6 +227,7 @@ type CloudProviderConfiguration struct {
 	CloudConfigFile string
 }
 
+// CSRSigningControllerConfiguration contains elements describing CSRSigningController.
 type CSRSigningControllerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// X509 CA certificate used to issue cluster-scoped certificates
@@ -228,6 +240,7 @@ type CSRSigningControllerConfiguration struct {
 	ClusterSigningDuration metav1.Duration
 }
 
+// DaemonSetControllerConfiguration contains elements describing DaemonSetController.
 type DaemonSetControllerConfiguration struct {
 	// concurrentDaemonSetSyncs is the number of daemonset objects that are
 	// allowed to sync concurrently. Larger number = more responsive daemonset,
@@ -235,6 +248,7 @@ type DaemonSetControllerConfiguration struct {
 	ConcurrentDaemonSetSyncs int32
 }
 
+// DeploymentControllerConfiguration contains elements describing DeploymentController.
 type DeploymentControllerConfiguration struct {
 	// concurrentDeploymentSyncs is the number of deployment objects that are
 	// allowed to sync concurrently. Larger number = more responsive deployments,
@@ -244,10 +258,11 @@ type DeploymentControllerConfiguration struct {
 	DeploymentControllerSyncPeriod metav1.Duration
 }
 
+// DeprecatedControllerConfiguration contains elements be deprecated.
 type DeprecatedControllerConfiguration struct {
 	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
 	// case of node failure.
-	DeletingPodsQps float32
+	DeletingPodsQPS float32
 	// DEPRECATED: deletingPodsBurst is the number of nodes on which pods are bursty deleted in
 	// case of node failure. For more details look into RateLimiter.
 	DeletingPodsBurst int32
@@ -256,6 +271,7 @@ type DeprecatedControllerConfiguration struct {
 	RegisterRetryCount int32
 }
 
+// EndpointControllerConfiguration contains elements describing EndpointController.
 type EndpointControllerConfiguration struct {
 	// concurrentEndpointSyncs is the number of endpoint syncing operations
 	// that will be done concurrently. Larger number = faster endpoint updating,
@@ -263,6 +279,7 @@ type EndpointControllerConfiguration struct {
 	ConcurrentEndpointSyncs int32
 }
 
+// GarbageCollectorControllerConfiguration contains elements describing GarbageCollectorController.
 type GarbageCollectorControllerConfiguration struct {
 	// enables the generic garbage collector. MUST be synced with the
 	// corresponding flag of the kube-apiserver. WARNING: the generic garbage
@@ -275,6 +292,7 @@ type GarbageCollectorControllerConfiguration struct {
 	GCIgnoredResources []GroupResource
 }
 
+// HPAControllerConfiguration contains elements describing HPAController.
 type HPAControllerConfiguration struct {
 	// HorizontalPodAutoscalerSyncPeriod is the period for syncing the number of
 	// pods in horizontal pod autoscaler.
@@ -303,6 +321,7 @@ type HPAControllerConfiguration struct {
 	HorizontalPodAutoscalerInitialReadinessDelay metav1.Duration
 }
 
+// JobControllerConfiguration contains elements describing JobController.
 type JobControllerConfiguration struct {
 	// concurrentJobSyncs is the number of job objects that are
 	// allowed to sync concurrently. Larger number = more responsive jobs,
@@ -310,6 +329,7 @@ type JobControllerConfiguration struct {
 	ConcurrentJobSyncs int32
 }
 
+// NamespaceControllerConfiguration contains elements describing NamespaceController.
 type NamespaceControllerConfiguration struct {
 	// namespaceSyncPeriod is the period for syncing namespace life-cycle
 	// updates.
@@ -319,6 +339,7 @@ type NamespaceControllerConfiguration struct {
 	ConcurrentNamespaceSyncs int32
 }
 
+// NodeIPAMControllerConfiguration contains elements describing NodeIpamController.
 type NodeIPAMControllerConfiguration struct {
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
@@ -326,6 +347,7 @@ type NodeIPAMControllerConfiguration struct {
 	NodeCIDRMaskSize int32
 }
 
+// NodeLifecycleControllerConfiguration contains elements describing NodeLifecycleController.
 type NodeLifecycleControllerConfiguration struct {
 	// If set to true enables NoExecute Taints and will evict all not-tolerating
 	// Pod running on Nodes tainted with this kind of Taints.
@@ -351,6 +373,8 @@ type NodeLifecycleControllerConfiguration struct {
 	UnhealthyZoneThreshold float32
 }
 
+// PersistentVolumeBinderControllerConfiguration contains elements describing
+// PersistentVolumeBinderController.
 type PersistentVolumeBinderControllerConfiguration struct {
 	// pvClaimBinderSyncPeriod is the period for syncing persistent volumes
 	// and persistent volume claims.
@@ -359,6 +383,7 @@ type PersistentVolumeBinderControllerConfiguration struct {
 	VolumeConfiguration VolumeConfiguration
 }
 
+// PodGCControllerConfiguration contains elements describing PodGCController.
 type PodGCControllerConfiguration struct {
 	// terminatedPodGCThreshold is the number of terminated pods that can exist
 	// before the terminated pod garbage collector starts deleting terminated pods.
@@ -366,6 +391,7 @@ type PodGCControllerConfiguration struct {
 	TerminatedPodGCThreshold int32
 }
 
+// ReplicaSetControllerConfiguration contains elements describing ReplicaSetController.
 type ReplicaSetControllerConfiguration struct {
 	// concurrentRSSyncs is the number of replica sets that are  allowed to sync
 	// concurrently. Larger number = more responsive replica  management, but more
@@ -373,6 +399,7 @@ type ReplicaSetControllerConfiguration struct {
 	ConcurrentRSSyncs int32
 }
 
+// ReplicationControllerConfiguration contains elements describing ReplicationController.
 type ReplicationControllerConfiguration struct {
 	// concurrentRCSyncs is the number of replication controllers that are
 	// allowed to sync concurrently. Larger number = more responsive replica
@@ -380,6 +407,7 @@ type ReplicationControllerConfiguration struct {
 	ConcurrentRCSyncs int32
 }
 
+// ResourceQuotaControllerConfiguration contains elements describing ResourceQuotaController.
 type ResourceQuotaControllerConfiguration struct {
 	// resourceQuotaSyncPeriod is the period for syncing quota usage status
 	// in the system.
@@ -390,6 +418,7 @@ type ResourceQuotaControllerConfiguration struct {
 	ConcurrentResourceQuotaSyncs int32
 }
 
+// SAControllerConfiguration contains elements describing ServiceAccountController.
 type SAControllerConfiguration struct {
 	// serviceAccountKeyFile is the filename containing a PEM-encoded private RSA key
 	// used to sign service account tokens.
@@ -402,6 +431,7 @@ type SAControllerConfiguration struct {
 	RootCAFile string
 }
 
+// ServiceControllerConfiguration contains elements describing ServiceController.
 type ServiceControllerConfiguration struct {
 	// concurrentServiceSyncs is the number of services that are
 	// allowed to sync concurrently. Larger number = more responsive service
