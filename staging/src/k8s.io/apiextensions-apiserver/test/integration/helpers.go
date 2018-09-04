@@ -20,14 +20,15 @@ import (
 	"fmt"
 	"testing"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 )
 
 func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
@@ -91,4 +92,18 @@ func updateCustomResourceDefinitionWithRetry(client clientset.Interface, name st
 		}
 	}
 	return nil, fmt.Errorf("too many retries after conflicts updating CustomResourceDefinition %q", name)
+}
+
+// getCRDColumnsForVersion returns the columns for given version in given CRD Spec.
+func getCRDColumnsForVersion(crdSpec *apiextensionsv1beta1.CustomResourceDefinitionSpec, version string) ([]apiextensionsv1beta1.CustomResourceColumnDefinition, error) {
+	for _, v := range crdSpec.Versions {
+		if version != v.Name {
+			continue
+		}
+		if v.AdditionalPrinterColumns != nil {
+			return v.AdditionalPrinterColumns, nil
+		}
+		return crdSpec.AdditionalPrinterColumns, nil
+	}
+	return nil, fmt.Errorf("version %s not found in CustomResourceDefinitionSpec", version)
 }

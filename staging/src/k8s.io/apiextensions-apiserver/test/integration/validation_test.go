@@ -146,6 +146,18 @@ func newNoxuValidationCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensio
 					},
 				},
 			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+				},
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: false,
+				},
+			},
 		},
 	}
 }
