@@ -14,6 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +k8s:defaulter-gen=TypeMeta
+// +groupName=kubeadm.k8s.io
+// +k8s:deepcopy-gen=package
+// +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
+
 // Package v1alpha3 is the API (config file) for driving the kubeadm binary.
 // Some of these options are also available as command line flags, but
 // the preferred way to configure kubeadm is to pass a YAML file in with the
@@ -90,9 +95,4 @@ limitations under the License.
 //
 // TODO: The BootstrapTokenString object should move out to either k8s.io/client-go or k8s.io/api in the future
 // (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.
-//
-// +k8s:defaulter-gen=TypeMeta
-// +groupName=kubeadm.k8s.io
-// +k8s:deepcopy-gen=package
-// +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 package v1alpha3 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
