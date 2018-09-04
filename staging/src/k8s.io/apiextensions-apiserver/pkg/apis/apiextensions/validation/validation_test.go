@@ -373,39 +373,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			errors: []validationMatch{},
 		},
 		{
-			name: "subresources and columns in first version",
-			resource: &apiextensions.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "group.com",
-					Version: "version",
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
-						{
-							Name:                     "version",
-							Served:                   true,
-							Storage:                  true,
-							Subresources:             &apiextensions.CustomResourceSubresources{},
-							AdditionalPrinterColumns: []apiextensions.CustomResourceColumnDefinition{},
-						},
-					},
-					Scope: apiextensions.NamespaceScoped,
-					Names: apiextensions.CustomResourceDefinitionNames{
-						Plural:   "plural",
-						Singular: "singular",
-						Kind:     "Plural",
-						ListKind: "PluralList",
-					},
-				},
-				Status: apiextensions.CustomResourceDefinitionStatus{
-					StoredVersions: []string{"version"},
-				},
-			},
-			errors: []validationMatch{
-				forbidden("spec", "versions[0]", "subresources"),
-				forbidden("spec", "versions[0]", "columns"),
-			},
-		},
-		{
 			name: "disallow per-version field override feature when CustomResourceWebhookConversion feature gate is off",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
@@ -850,69 +817,6 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 				immutable("spec", "scope"),
 				immutable("spec", "names", "kind"),
 				immutable("spec", "names", "plural"),
-			},
-		},
-		{
-			name: "subresources and columns in first version",
-			old: &apiextensions.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "plural.group.com",
-					ResourceVersion: "42",
-				},
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "group.com",
-					Version: "version",
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
-						{
-							Name:    "version",
-							Served:  true,
-							Storage: true,
-						},
-					},
-					Scope: apiextensions.NamespaceScoped,
-					Names: apiextensions.CustomResourceDefinitionNames{
-						Plural:   "plural",
-						Singular: "singular",
-						Kind:     "Plural",
-						ListKind: "PluralList",
-					},
-				},
-				Status: apiextensions.CustomResourceDefinitionStatus{
-					StoredVersions: []string{"version"},
-				},
-			},
-			resource: &apiextensions.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "plural.group.com",
-					ResourceVersion: "42",
-				},
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "group.com",
-					Version: "version",
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
-						{
-							Name:                     "version",
-							Served:                   true,
-							Storage:                  true,
-							Subresources:             &apiextensions.CustomResourceSubresources{},
-							AdditionalPrinterColumns: []apiextensions.CustomResourceColumnDefinition{},
-						},
-					},
-					Scope: apiextensions.NamespaceScoped,
-					Names: apiextensions.CustomResourceDefinitionNames{
-						Plural:   "plural",
-						Singular: "singular",
-						Kind:     "Plural",
-						ListKind: "PluralList",
-					},
-				},
-				Status: apiextensions.CustomResourceDefinitionStatus{
-					StoredVersions: []string{"version"},
-				},
-			},
-			errors: []validationMatch{
-				forbidden("spec", "versions[0]", "subresources"),
-				forbidden("spec", "versions[0]", "columns"),
 			},
 		},
 		{

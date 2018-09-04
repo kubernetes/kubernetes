@@ -105,10 +105,7 @@ func ValidateUpdateCustomResourceDefinitionStatus(obj, oldObj *apiextensions.Cus
 func ValidateCustomResourceDefinitionVersion(version *apiextensions.CustomResourceDefinitionVersion, fldPath *field.Path, index int, allowingPerVersionFieldOverride bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	subresourcesInvalid := false
-	if version.Subresources != nil && index == 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("subresources"), "subresources should not be set for first item in versions list"))
-		subresourcesInvalid = true
-	} else if version.Subresources != nil {
+	if version.Subresources != nil {
 		if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) && !allowingPerVersionFieldOverride {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("subresources"), "disabled by feature-gate CustomResourceWebhookConversion"))
 			subresourcesInvalid = true
@@ -121,17 +118,9 @@ func ValidateCustomResourceDefinitionVersion(version *apiextensions.CustomResour
 	if !subresourcesInvalid {
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionSubresources(version.Subresources, fldPath.Child("subresources"))...)
 	}
-	columnsInvalid := false
-	if version.AdditionalPrinterColumns != nil {
-		if index == 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("columns"), "columns should not be set for first item in versions list"))
-			columnsInvalid = true
-		} else if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) && !allowingPerVersionFieldOverride {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("columns"), "disabled by feature-gate CustomResourceWebhookConversion"))
-			columnsInvalid = true
-		}
-	}
-	if !columnsInvalid {
+	if version.AdditionalPrinterColumns != nil && !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) && !allowingPerVersionFieldOverride {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("columns"), "disabled by feature-gate CustomResourceWebhookConversion"))
+	} else {
 		for i := range version.AdditionalPrinterColumns {
 			allErrs = append(allErrs, ValidateCustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], fldPath.Child("columns").Index(i))...)
 		}
