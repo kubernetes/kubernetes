@@ -22,9 +22,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -35,17 +36,16 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
+	ccmconfigscheme "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/scheme"
+	ccmconfigv1alpha1 "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
-
-	"github.com/golang/glog"
 )
 
 const (
@@ -108,24 +108,13 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 }
 
 // NewDefaultComponentConfig returns cloud-controller manager configuration object.
-func NewDefaultComponentConfig(insecurePort int32) (*componentconfig.CloudControllerManagerConfiguration, error) {
-	// TODO: This code will be fixed up/improved when the ccm API types are moved to their own, real API group out of
-	// pkg/apis/componentconfig to cmd/cloud-controller-manager/app/apis/
-	scheme := runtime.NewScheme()
-	if err := componentconfigv1alpha1.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-	if err := componentconfig.AddToScheme(scheme); err != nil {
-		return nil, err
-	}
-	scheme.AddKnownTypes(componentconfigv1alpha1.SchemeGroupVersion, &componentconfigv1alpha1.CloudControllerManagerConfiguration{})
-	scheme.AddKnownTypes(componentconfig.SchemeGroupVersion, &componentconfig.CloudControllerManagerConfiguration{})
+func NewDefaultComponentConfig(insecurePort int32) (*ccmconfig.CloudControllerManagerConfiguration, error) {
+	versioned := &ccmconfigv1alpha1.CloudControllerManagerConfiguration{}
+	ccmconfigscheme.Scheme.Default(versioned)
 
-	versioned := &componentconfigv1alpha1.CloudControllerManagerConfiguration{}
-	internal := &componentconfig.CloudControllerManagerConfiguration{}
-	scheme.Default(versioned)
-	if err := scheme.Convert(versioned, internal, nil); err != nil {
-		return internal, err
+	internal := &ccmconfig.CloudControllerManagerConfiguration{}
+	if err := ccmconfigscheme.Scheme.Convert(versioned, internal, nil); err != nil {
+		return nil, err
 	}
 	internal.Generic.Port = insecurePort
 	return internal, nil
