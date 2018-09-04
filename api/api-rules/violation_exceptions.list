@@ -93,6 +93,7 @@ API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alp
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,GroupResource,Resource
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerSyncPeriod
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUpscaleForbiddenWindow
+API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleStabilizationWindow
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerDownscaleForbiddenWindow
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerTolerance
 API rule violation: names_match,k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1,HPAControllerConfiguration,HorizontalPodAutoscalerUseRESTClients
