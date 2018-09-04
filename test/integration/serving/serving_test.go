@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllermanager
+package serving
 
 import (
 	"crypto/tls"
@@ -36,12 +36,13 @@ import (
 	cloudctrlmgrtesting "k8s.io/kubernetes/cmd/cloud-controller-manager/app/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
+	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type controllerManagerTester interface {
+type componentTester interface {
 	StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error)
 }
 
@@ -59,6 +60,16 @@ type cloudControllerManagerTester struct{}
 
 func (cloudControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
 	gotResult, err := cloudctrlmgrtesting.StartTestServer(t, customFlags)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
+}
+
+type kubeSchedulerTester struct{}
+
+func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
+	gotResult, err := kubeschedulertesting.StartTestServer(t, customFlags)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -188,7 +199,7 @@ users:
 
 	tests := []struct {
 		name       string
-		tester     controllerManagerTester
+		tester     componentTester
 		extraFlags []string
 	}{
 		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
@@ -196,12 +207,12 @@ users:
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testControllerManager(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
+			testComponent(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
 		})
 	}
 }
 
-func testControllerManager(t *testing.T, tester controllerManagerTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
+func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
 	tests := []struct {
 		name                             string
 		flags                            []string
@@ -226,8 +237,7 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
 		}, "/healthz", true, false, intPtr(http.StatusOK), nil},
-		{"/metrics without auhn/z", []string{
-			"--kubeconfig", kubeconfig,
+		{"/metrics without authn/authz", []string{
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
 		}, "/metrics", true, false, intPtr(http.StatusForbidden), intPtr(http.StatusOK)},
@@ -293,7 +303,7 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
 				serverCert, err := ioutil.ReadFile(serverCertPath)
 				if err != nil {
-					t.Fatalf("Failed to read controller-manager server cert %q: %v", serverCertPath, err)
+					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
 				}
 				pool.AppendCertsFromPEM(serverCert)
 				tr := &http.Transport{
@@ -312,13 +322,13 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 				}
 				r, err := client.Do(req)
 				if err != nil {
-					t.Fatalf("failed to GET %s from controller-manager: %v", tt.path, err)
+					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 
 				body, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
-					t.Fatalf("expected http %d at %s of controller-manager, got: %d %q", expected, tt.path, got, string(body))
+					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
 				}
 			}
 
@@ -328,14 +338,146 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 				url := fmt.Sprintf("http://%s%s", insecureInfo.Listener.Addr().String(), tt.path)
 				r, err := http.Get(url)
 				if err != nil {
-					t.Fatalf("failed to GET %s from controller-manager: %v", tt.path, err)
+					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 				body, err := ioutil.ReadAll(r.Body)
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantInsecureCode; got != expected {
-					t.Fatalf("expected http %d at %s of controller-manager, got: %d %q", expected, tt.path, got, string(body))
+					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
 				}
 			}
+		})
+	}
+}
+
+func TestSchedulerServing(t *testing.T) {
+
+	// Insulate this test from picking up in-cluster config when run inside a pod
+	// We can't assume we have permissions to write to /var/run/secrets/... from a unit test to mock in-cluster config for testing
+	originalHost := os.Getenv("KUBERNETES_SERVICE_HOST")
+	if len(originalHost) > 0 {
+		os.Setenv("KUBERNETES_SERVICE_HOST", "")
+		defer os.Setenv("KUBERNETES_SERVICE_HOST", originalHost)
+	}
+
+	// authenticate to apiserver via bearer token
+	token := "flwqkenfjasasdfmwerasd"
+	tokenFile, err := ioutil.TempFile("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokenFile.WriteString(fmt.Sprintf(`
+%s,scheduler,scheduler,""
+`, token))
+	tokenFile.Close()
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--token-auth-file", tokenFile.Name(),
+		"--authorization-mode", "RBAC",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// allow scheduler to do SubjectAccessReview
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("unexpected error creating client config: %v", err)
+	}
+	_, err = client.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "scheduler:system:auth-delegator"},
+		Subjects: []rbacv1.Subject{{
+			Kind: "User",
+			Name: "scheduler",
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "system:auth-delegator",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create system:auth-delegator rbac cluster role binding: %v", err)
+	}
+
+	// allow scheduler to read kube-system/extension-apiserver-authentication
+	_, err = client.RbacV1().RoleBindings("kube-system").Create(&rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{Name: "scheduler:extension-apiserver-authentication-reader"},
+		Subjects: []rbacv1.Subject{{
+			Kind: "User",
+			Name: "scheduler",
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     "extension-apiserver-authentication-reader",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create scheduler:extension-apiserver-authentication-reader rbac role binding: %v", err)
+	}
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := ioutil.TempFile("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiserverConfig.WriteString(fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: scheduler
+  name: default-context
+current-context: default-context
+users:
+- name: scheduler
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, token))
+	apiserverConfig.Close()
+
+	// create BROKEN kubeconfig for the apiserver
+	brokenApiserverConfig, err := ioutil.TempFile("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	brokenApiserverConfig.WriteString(fmt.Sprintf(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: scheduler
+  name: default-context
+current-context: default-context
+users:
+- name: scheduler
+  user:
+    token: WRONGTOKEN
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile))
+	brokenApiserverConfig.Close()
+
+	tests := []struct {
+		name       string
+		tester     componentTester
+		extraFlags []string
+	}{
+		{"kube-scheduler", kubeSchedulerTester{}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testComponent(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
 		})
 	}
 }

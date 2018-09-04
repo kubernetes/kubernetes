@@ -63,11 +63,11 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.Se
 	secureLoopbackClientConfig, err := (*secureServingInfo).NewLoopbackClientConfig(uuid.NewRandom().String(), certPem)
 	switch {
 	// if we failed and there's no fallback loopback client config, we need to fail
-	case err != nil && secureLoopbackClientConfig == nil:
+	case err != nil && *loopbackClientConfig == nil:
 		return err
 
 	// if we failed, but we already have a fallback loopback client config (usually insecure), allow it
-	case err != nil && secureLoopbackClientConfig != nil:
+	case err != nil && *loopbackClientConfig != nil:
 
 	default:
 		*loopbackClientConfig = secureLoopbackClientConfig
