@@ -167,7 +167,7 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 
 	// TODO(juanvallejo): This is deprecated - remove
 	cmd.Flags().BoolP("show-all", "a", true, "When printing, show all resources (default show all pods including terminated one.)")
-	cmd.Flags().MarkDeprecated("show-all", "will be removed in an upcoming release")
+	cmd.Flags().MarkDeprecated("show-all", "will be removed in an upcoming release, Pods of all states are shown by default now")
 }
 
 // NewGetPrintFlags returns flags associated with humanreadable,
