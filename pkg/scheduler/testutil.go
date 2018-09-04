@@ -17,6 +17,8 @@ limitations under the License.
 package scheduler
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -30,6 +32,16 @@ import (
 // FakeConfigurator is an implementation for test.
 type FakeConfigurator struct {
 	Config *Config
+}
+
+// GetPredicateMetadataProducer is not implemented yet.
+func (fc *FakeConfigurator) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+// GetPredicates is not implemented yet.
+func (fc *FakeConfigurator) GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // GetHardPodAffinitySymmetricWeight is not implemented yet.
