@@ -179,7 +179,7 @@ func ExistsInCloudProvider(cloud cloudprovider.Interface, nodeName types.NodeNam
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
 	if _, err := instances.InstanceID(context.TODO(), nodeName); err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if err == cloudprovider.ErrInstanceNotFound {
 			return false, nil
 		}
 		return false, err
@@ -195,7 +195,7 @@ func ShutdownInCloudProvider(ctx context.Context, cloud cloudprovider.Interface,
 		return false, fmt.Errorf("%v", ErrCloudInstance)
 	}
 	shutdown, err := instances.InstanceShutdownByProviderID(ctx, node.Spec.ProviderID)
-	if err == cloudprovider.NotImplemented {
+	if err == cloudprovider.ErrNotImplemented {
 		return false, nil
 	}
 	return shutdown, err
