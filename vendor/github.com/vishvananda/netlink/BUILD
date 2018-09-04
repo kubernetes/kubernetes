@@ -6,7 +6,6 @@ go_library(
         "addr.go",
         "class.go",
         "filter.go",
-        "fou.go",
         "link.go",
         "neigh.go",
         "netlink.go",
@@ -22,7 +21,6 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -30,7 +28,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -38,7 +35,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:dragonfly": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -46,7 +42,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -59,7 +54,6 @@ go_library(
             "class_linux.go",
             "conntrack_linux.go",
             "filter_linux.go",
-            "fou_linux.go",
             "genetlink_linux.go",
             "gtp_linux.go",
             "handle_linux.go",
@@ -78,7 +72,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -86,7 +79,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:netbsd": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -94,7 +86,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:openbsd": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -102,7 +93,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:plan9": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -110,7 +100,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:solaris": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -118,7 +107,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "conntrack_unspecified.go",
-            "fou_unspecified.go",
             "genetlink_unspecified.go",
             "handle_unspecified.go",
             "netlink_unspecified.go",
@@ -131,7 +119,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
-        "//vendor/golang.org/x/sys/unix:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/vishvananda/netns:go_default_library",
