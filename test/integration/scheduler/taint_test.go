@@ -618,11 +618,11 @@ func TestTaintNodeByCondition(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "node-1",
+					Name: fmt.Sprintf("node-%d", i),
 				},
 				Spec: v1.NodeSpec{
 					Unschedulable: test.unschedulable,
@@ -643,9 +643,9 @@ func TestTaintNodeByCondition(t *testing.T) {
 			}
 
 			var pods []*v1.Pod
-			for i, p := range test.pods {
+			for j, p := range test.pods {
 				pod := p.pod.DeepCopy()
-				pod.Name = fmt.Sprintf("%s-%d", pod.Name, i)
+				pod.Name = fmt.Sprintf("%s-%d-%d", pod.Name, i, j)
 				pod.Spec.Tolerations = p.tolerations
 
 				createdPod, err := cs.CoreV1().Pods(pod.Namespace).Create(pod)
