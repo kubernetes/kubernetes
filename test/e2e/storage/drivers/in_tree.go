@@ -133,6 +133,13 @@ func (n *nfsDriver) CreateDriver() {
 	ns := f.Namespace
 	n.externalPluginName = fmt.Sprintf("example.com/nfs-%s", ns.Name)
 
+	n.driverInfo.Config, n.serverPod, n.serverIP = framework.NewNFSServer(cs, ns.Name, []string{})
+	// TODO(mkimuram): Below code is needed for making volumes test succeed by
+	// avoiding NFS server from deleted in VolumeTestCleanup before dynamic provisioner pod is deleted.
+	// VolumeTestCleanup should be fixed not to delete NFS server, after all volumes tests are changed
+	// to be called from this framework.
+	n.driverInfo.Config.ServerImage = ""
+
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
 	framework.BindClusterRole(cs.RbacV1beta1(), "cluster-admin", ns.Name,
@@ -144,10 +151,11 @@ func (n *nfsDriver) CreateDriver() {
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
 
 	By("creating an external dynamic provisioner pod")
-	n.externalProvisionerPod = startExternalProvisioner(cs, ns.Name, n.externalPluginName)
+	volSource := n.GetVolumeSource(false, "")
+	n.externalProvisionerPod = startExternalProvisioner(cs, ns.Name, n.externalPluginName, n.serverIP, *volSource)
 }
 
-func startExternalProvisioner(c clientset.Interface, ns string, externalPluginName string) *v1.Pod {
+func startExternalProvisioner(c clientset.Interface, ns string, externalPluginName string, serverIP string, volSource v1.VolumeSource) *v1.Pod {
 	podClient := c.CoreV1().Pods(ns)
 
 	provisionerPod := &v1.Pod{
@@ -163,47 +171,39 @@ func startExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 			Containers: []v1.Container{
 				{
 					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9",
+					Image: "quay.io/external_storage/nfs-client-provisioner:v3.1.0-k8s1.11",
 					SecurityContext: &v1.SecurityContext{
 						Capabilities: &v1.Capabilities{
 							Add: []v1.Capability{"DAC_READ_SEARCH"},
 						},
 					},
-					Args: []string{
-						"-provisioner=" + externalPluginName,
-						"-grace-period=0",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "nfs", ContainerPort: 2049},
-						{Name: "mountd", ContainerPort: 20048},
-						{Name: "rpcbind", ContainerPort: 111},
-						{Name: "rpcbind-udp", ContainerPort: 111, Protocol: v1.ProtocolUDP},
-					},
 					Env: []v1.EnvVar{
 						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
+							Name:  "PROVISIONER_NAME",
+							Value: externalPluginName,
+						},
+						{
+							Name:  "NFS_SERVER",
+							Value: serverIP,
+						},
+						{
+							Name:  "NFS_PATH",
+							Value: "/",
 						},
 					},
 					ImagePullPolicy: v1.PullIfNotPresent,
 					VolumeMounts: []v1.VolumeMount{
 						{
-							Name:      "export-volume",
-							MountPath: "/export",
+							Name:      "nfs-client-root",
+							MountPath: "/persistentvolumes",
 						},
 					},
 				},
 			},
 			Volumes: []v1.Volume{
 				{
-					Name: "export-volume",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
-					},
+					Name:         "nfs-client-root",
+					VolumeSource: volSource,
 				},
 			},
 		},
@@ -228,41 +228,16 @@ func (n *nfsDriver) CleanupDriver() {
 	framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
 	clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
 	cs.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
+
+	framework.CleanUpVolumeServer(f, n.serverPod)
 }
 
 func (n *nfsDriver) CreateVolume(volType testpatterns.TestVolType) {
-	f := n.driverInfo.Framework
-	cs := f.ClientSet
-	ns := f.Namespace
-
-	// NewNFSServer creates a pod for InlineVolume and PreprovisionedPV,
-	// and startExternalProvisioner creates a pods for DynamicPV.
-	// Therefore, we need a different CreateDriver logic for volType.
-	switch volType {
-	case testpatterns.InlineVolume:
-		fallthrough
-	case testpatterns.PreprovisionedPV:
-		n.driverInfo.Config, n.serverPod, n.serverIP = framework.NewNFSServer(cs, ns.Name, []string{})
-	case testpatterns.DynamicPV:
-		// Do nothing
-	default:
-		framework.Failf("Unsupported volType:%v is specified", volType)
-	}
+	// Do nothing. Volume will be created in CeateDriver
 }
 
 func (n *nfsDriver) DeleteVolume(volType testpatterns.TestVolType) {
-	f := n.driverInfo.Framework
-
-	switch volType {
-	case testpatterns.InlineVolume:
-		fallthrough
-	case testpatterns.PreprovisionedPV:
-		framework.CleanUpVolumeServer(f, n.serverPod)
-	case testpatterns.DynamicPV:
-		// Do nothing
-	default:
-		framework.Failf("Unsupported volType:%v is specified", volType)
-	}
+	// Do nothing. Volume will be deleted in CleanupDriver
 }
 
 // Gluster
@@ -659,7 +634,7 @@ var _ TestDriver = &hostPathDriver{}
 var _ PreprovisionedVolumeTestDriver = &hostPathDriver{}
 var _ InlineVolumeTestDriver = &hostPathDriver{}
 
-// InitHostpathDriver returns hostPathDriver that implements TestDriver interface
+// InitHostPathDriver returns hostPathDriver that implements TestDriver interface
 func InitHostPathDriver() TestDriver {
 	return &hostPathDriver{
 		driverInfo: DriverInfo{
@@ -1058,7 +1033,7 @@ var _ InlineVolumeTestDriver = &gcePdDriver{}
 var _ PreprovisionedPVTestDriver = &gcePdDriver{}
 var _ DynamicPVTestDriver = &gcePdDriver{}
 
-// InitGceDriver returns gcePdDriver that implements TestDriver interface
+// InitGcePdDriver returns gcePdDriver that implements TestDriver interface
 func InitGcePdDriver() TestDriver {
 	return &gcePdDriver{
 		driverInfo: DriverInfo{
