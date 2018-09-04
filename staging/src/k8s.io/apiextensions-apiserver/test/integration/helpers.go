@@ -92,3 +92,21 @@ func updateCustomResourceDefinitionWithRetry(client clientset.Interface, name st
 	}
 	return nil, fmt.Errorf("too many retries after conflicts updating CustomResourceDefinition %q", name)
 }
+
+// getCRDSchemaForVersion returns the validation schema for given version in given CRD Spec.
+func getCRDSchemaForVersion(crdSpec *apiextensionsv1beta1.CustomResourceDefinitionSpec, version string) (*apiextensionsv1beta1.CustomResourceValidation, error) {
+	for _, v := range crdSpec.Versions {
+		if version != v.Name {
+			continue
+		}
+		if v.Schema != nil {
+			// For backwards compatibility with existing code path, we wrap the OpenAPIV3Schema into
+			// a CustomResourceValidation struct
+			return &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: v.Schema,
+			}, nil
+		}
+		return crdSpec.Validation, nil
+	}
+	return nil, fmt.Errorf("version %s not found in CustomResourceDefinitionSpec", version)
+}

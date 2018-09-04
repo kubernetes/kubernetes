@@ -29,16 +29,27 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
 var labelSelectorPath = ".status.labelSelector"
 
 func NewNoxuSubresourcesCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensionsv1beta1.CustomResourceDefinition {
+	subresources := &apiextensionsv1beta1.CustomResourceSubresources{
+		Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+		Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
+			SpecReplicasPath:   ".spec.replicas",
+			StatusReplicasPath: ".status.replicas",
+			LabelSelectorPath:  &labelSelectorPath,
+		},
+	}
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: "noxus.mygroup.example.com"},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
@@ -51,13 +62,19 @@ func NewNoxuSubresourcesCRD(scope apiextensionsv1beta1.ResourceScope) *apiextens
 				ShortNames: []string{"foo", "bar", "abc", "def"},
 				ListKind:   "NoxuItemList",
 			},
-			Scope: scope,
-			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-				Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
-					SpecReplicasPath:   ".spec.replicas",
-					StatusReplicasPath: ".status.replicas",
-					LabelSelectorPath:  &labelSelectorPath,
+			Scope:        scope,
+			Subresources: subresources,
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+				},
+				{
+					Name:         "v1",
+					Served:       true,
+					Storage:      false,
+					Subresources: subresources,
 				},
 			},
 		},
@@ -322,6 +339,7 @@ func TestScaleSubresource(t *testing.T) {
 }
 
 func TestValidationSchemaWithStatus(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -348,7 +366,7 @@ func TestValidationSchemaWithStatus(t *testing.T) {
 	}
 
 	// make sure we are not restricting fields to properties even in subschemas
-	noxuDefinition.Spec.Validation.OpenAPIV3Schema = &apiextensionsv1beta1.JSONSchemaProps{
+	validationSchema := &apiextensionsv1beta1.JSONSchemaProps{
 		Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 			"spec": {
 				Description: "Validation for spec",
@@ -362,6 +380,8 @@ func TestValidationSchemaWithStatus(t *testing.T) {
 		Required:    []string{"spec"},
 		Description: "This is a description at the root of the schema",
 	}
+	noxuDefinition.Spec.Validation.OpenAPIV3Schema = validationSchema
+	noxuDefinition.Spec.Versions[1].Schema = validationSchema
 	_, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
 		t.Fatalf("unable to created crd %v: %v", noxuDefinition.Name, err)
@@ -369,6 +389,7 @@ func TestValidationSchemaWithStatus(t *testing.T) {
 }
 
 func TestValidateOnlyStatus(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -407,6 +428,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 	noxuDefinition.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
 		OpenAPIV3Schema: schema,
 	}
+	noxuDefinition.Spec.Versions[1].Schema = schema
 
 	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
 	if err != nil {
