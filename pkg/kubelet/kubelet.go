@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -87,6 +88,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/remote"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -245,6 +247,7 @@ type Dependencies struct {
 	OnHeartbeatFailure      func()
 	KubeClient              clientset.Interface
 	CSIClient               csiclientset.Interface
+	DynamicKubeClient       dynamic.Interface
 	Mounter                 mount.Interface
 	OOMAdjuster             *oom.OOMAdjuster
 	OSInterface             kubecontainer.OSInterface
@@ -653,6 +656,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		return nil, err
 	}
 	klet.runtimeService = runtimeService
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.DynamicKubeClient)
+	}
+
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
@@ -673,6 +681,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		imageService,
 		kubeDeps.ContainerManager.InternalContainerLifecycle(),
 		legacyLogProvider,
+		klet.runtimeClassManager,
 	)
 	if err != nil {
 		return nil, err
@@ -1192,6 +1201,9 @@ type Kubelet struct {
 
 	//  This flag indicates that kubelet should start plugin watcher utility server for discovering Kubelet plugins
 	enablePluginsWatcher bool
+
+	// Handles RuntimeClass objects for the Kubelet.
+	runtimeClassManager *runtimeclass.Manager
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1411,6 +1423,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// Start component sync loops.
 	kl.statusManager.Start()
 	kl.probeManager.Start()
+
+	// Start syncing RuntimeClasses if enabled.
+	if kl.runtimeClassManager != nil {
+		go kl.runtimeClassManager.Run(wait.NeverStop)
+	}
 
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
