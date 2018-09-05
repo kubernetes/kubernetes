@@ -318,7 +318,7 @@ func newTestKubeletWithImageList(
 		allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	}
 
-	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 	kubelet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(kubelet.kubeClient), allPlugins, prober)
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")

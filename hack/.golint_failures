@@ -177,7 +177,6 @@ pkg/kubectl/cmd/wait
 pkg/kubectl/metricsutil
 pkg/kubectl/util
 pkg/kubectl/util/slice
-pkg/kubelet
 pkg/kubelet/apis
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
