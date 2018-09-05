@@ -121,6 +121,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	out.DisablePreemption = in.DisablePreemption
 	out.PercentageOfNodesToScore = in.PercentageOfNodesToScore
 	out.FailureDomains = in.FailureDomains
+	out.BindTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindTimeoutSeconds))
 	return nil
 }
 
@@ -149,6 +150,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConf
 	out.DisablePreemption = in.DisablePreemption
 	out.PercentageOfNodesToScore = in.PercentageOfNodesToScore
 	out.FailureDomains = in.FailureDomains
+	out.BindTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindTimeoutSeconds))
 	return nil
 }
 

@@ -91,6 +91,7 @@ func createConfiguratorWithPodInformer(
 		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+		BindTimeoutSeconds:             600,
 	})
 }
 
@@ -143,7 +144,7 @@ func initTestScheduler(
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, controllerCh, setPodInformer, policy, false, time.Second)
+	return initTestSchedulerWithOptions(t, context, controllerCh, setPodInformer, policy, false, false, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -155,13 +156,15 @@ func initTestSchedulerWithOptions(
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 	disablePreemption bool,
+	disableEquivalenceCache bool,
 	resyncPeriod time.Duration,
 ) *TestContext {
-	// Enable EnableEquivalenceClassCache for all integration tests.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(
-		t,
-		utilfeature.DefaultFeatureGate,
-		features.EnableEquivalenceClassCache, true)()
+	if !disableEquivalenceCache {
+		defer utilfeaturetesting.SetFeatureGateDuringTest(
+			t,
+			utilfeature.DefaultFeatureGate,
+			features.EnableEquivalenceClassCache, true)()
+	}
 
 	// 1. Create scheduler
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, resyncPeriod)
@@ -256,7 +259,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), nil, true, nil, true, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), nil, true, nil, true, false, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called

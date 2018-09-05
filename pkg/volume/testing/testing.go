@@ -239,6 +239,7 @@ type FakeVolumePlugin struct {
 	VolumeLimits           map[string]int64
 	VolumeLimitsError      error
 	LimitKey               string
+	ProvisionDelaySeconds  int
 
 	Mounters             []*FakeVolume
 	Unmounters           []*FakeVolume
@@ -437,7 +438,7 @@ func (plugin *FakeVolumePlugin) NewProvisioner(options VolumeOptions) (Provision
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.LastProvisionerOptions = options
-	return &FakeProvisioner{options, plugin.Host}, nil
+	return &FakeProvisioner{options, plugin.Host, plugin.ProvisionDelaySeconds}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
@@ -779,8 +780,9 @@ func (fd *FakeDeleter) GetPath() string {
 }
 
 type FakeProvisioner struct {
-	Options VolumeOptions
-	Host    VolumeHost
+	Options               VolumeOptions
+	Host                  VolumeHost
+	ProvisionDelaySeconds int
 }
 
 func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
@@ -805,6 +807,10 @@ func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []
 				},
 			},
 		},
+	}
+
+	if fc.ProvisionDelaySeconds > 0 {
+		time.Sleep(time.Duration(fc.ProvisionDelaySeconds) * time.Second)
 	}
 
 	return pv, nil

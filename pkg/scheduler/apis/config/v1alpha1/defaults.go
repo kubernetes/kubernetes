@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	apiserverconfigv1alpha1 "k8s.io/apiserver/pkg/apis/config/v1alpha1"
 	kubescedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
+
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -102,4 +103,9 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.Kube
 
 	// Use the default LeaderElectionConfiguration options
 	apiserverconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection.LeaderElectionConfiguration)
+
+	if obj.BindTimeoutSeconds == nil {
+		defaultBindTimeoutSeconds := int64(600)
+		obj.BindTimeoutSeconds = &defaultBindTimeoutSeconds
+	}
 }

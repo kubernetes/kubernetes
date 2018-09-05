@@ -31,6 +31,8 @@ type PodBindingCache interface {
 	UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo)
 
 	// GetBindings will return the cached bindings for the given pod and node.
+	// A nil return value means that the entry was not found. An empty slice
+	// means that no binding operations are needed.
 	GetBindings(pod *v1.Pod, node string) []*bindingInfo
 
 	// UpdateProvisionedPVCs will update the cache with the given provisioning decisions
@@ -38,6 +40,8 @@ type PodBindingCache interface {
 	UpdateProvisionedPVCs(pod *v1.Pod, node string, provisionings []*v1.PersistentVolumeClaim)
 
 	// GetProvisionedPVCs will return the cached provisioning decisions for the given pod and node.
+	// A nil return value means that the entry was not found. An empty slice
+	// means that no provisioning operations are needed.
 	GetProvisionedPVCs(pod *v1.Pod, node string) []*v1.PersistentVolumeClaim
 
 	// DeleteBindings will remove all cached bindings and provisionings for the given pod.
@@ -46,7 +50,8 @@ type PodBindingCache interface {
 }
 
 type podBindingCache struct {
-	mutex sync.Mutex
+	// synchronizes bindingDecisions
+	rwMutex sync.RWMutex
 
 	// Key = pod name
 	// Value = nodeDecisions
@@ -68,16 +73,16 @@ func NewPodBindingCache() PodBindingCache {
 }
 
 func (c *podBindingCache) DeleteBindings(pod *v1.Pod) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	podName := getPodName(pod)
 	delete(c.bindingDecisions, podName)
 }
 
 func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*bindingInfo) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	podName := getPodName(pod)
 	decisions, ok := c.bindingDecisions[podName]
@@ -97,8 +102,8 @@ func (c *podBindingCache) UpdateBindings(pod *v1.Pod, node string, bindings []*b
 }
 
 func (c *podBindingCache) GetBindings(pod *v1.Pod, node string) []*bindingInfo {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	podName := getPodName(pod)
 	decisions, ok := c.bindingDecisions[podName]
@@ -113,8 +118,8 @@ func (c *podBindingCache) GetBindings(pod *v1.Pod, node string) []*bindingInfo {
 }
 
 func (c *podBindingCache) UpdateProvisionedPVCs(pod *v1.Pod, node string, pvcs []*v1.PersistentVolumeClaim) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	podName := getPodName(pod)
 	decisions, ok := c.bindingDecisions[podName]
@@ -134,8 +139,8 @@ func (c *podBindingCache) UpdateProvisionedPVCs(pod *v1.Pod, node string, pvcs [
 }
 
 func (c *podBindingCache) GetProvisionedPVCs(pod *v1.Pod, node string) []*v1.PersistentVolumeClaim {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	podName := getPodName(pod)
 	decisions, ok := c.bindingDecisions[podName]
