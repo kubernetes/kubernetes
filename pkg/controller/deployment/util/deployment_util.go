@@ -401,7 +401,7 @@ func SetReplicasAnnotations(rs *apps.ReplicaSet, desiredReplicas, maxReplicas in
 	return updated
 }
 
-// AnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
+// ReplicasAnnotationsNeedUpdate return true if ReplicasAnnotations need to be updated
 func ReplicasAnnotationsNeedUpdate(rs *apps.ReplicaSet, desiredReplicas, maxReplicas int32) bool {
 	if rs.Annotations == nil {
 		return true
