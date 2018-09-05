@@ -228,19 +228,19 @@ func getPhotonClient(pc *PCCloud) (*photon.Client, error) {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
 		if !scanner.Scan() {
-			glog.Errorf("Photon Cloud Provider: Empty username inside /etc/kubernetes/pc_login_info.")
+			glog.Error("Photon Cloud Provider: Empty username inside /etc/kubernetes/pc_login_info.")
 			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid username")
 		}
 		username := scanner.Text()
 		if !scanner.Scan() {
-			glog.Errorf("Photon Cloud Provider: Empty password set inside /etc/kubernetes/pc_login_info.")
+			glog.Error("Photon Cloud Provider: Empty password set inside /etc/kubernetes/pc_login_info.")
 			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid password")
 		}
 		password := scanner.Text()
 
 		token_options, err := pc.photonClient.Auth.GetTokensByPassword(username, password)
 		if err != nil {
-			glog.Errorf("Photon Cloud Provider: failed to get tokens by password")
+			glog.Error("Photon Cloud Provider: failed to get tokens by password")
 			return nil, err
 		}
 
