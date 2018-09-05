@@ -100,11 +100,13 @@ type serviceInfo struct {
 	hnsID                    string
 	nodePorthnsID            string
 	policyApplied            bool
+	remoteEndpoints          []*endpointsInfo
 }
 
 type hnsNetworkInfo struct {
-	name string
-	id   string
+	name        string
+	id          string
+	networkType string
 }
 
 func Log(v interface{}, message string, level glog.Level) {
@@ -164,8 +166,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, ser
 
 	// set default session sticky max age 180min=10800s
 	stickyMaxAgeSeconds := 10800
-	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
-		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
+	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP && service.Spec.SessionAffinityConfig != nil {
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 	info := &serviceInfo{
@@ -407,7 +408,10 @@ type Proxier struct {
 	// precomputing some number of those and cache for future reuse.
 	precomputedProbabilities []string
 
-	network hnsNetworkInfo
+	network     hnsNetworkInfo
+	sourceVip   string
+	serviceVips map[string]*endpointsInfo
+	hostMac     string
 }
 
 type localPort struct {
@@ -477,6 +481,9 @@ func NewProxier(
 
 	glog.V(1).Infof("Hns Network loaded with info = %v", hnsNetwork)
 
+	sourceVip := os.Getenv("SOURCE_VIP")
+	hostMac := os.Getenv("HOST_MAC")
+	
 	proxier := &Proxier{
 		portsMap:         make(map[localPort]closeable),
 		serviceMap:       make(proxyServiceMap),
@@ -492,6 +499,8 @@ func NewProxier(
 		healthChecker:    healthChecker,
 		healthzServer:    healthzServer,
 		network:          *hnsNetwork,
+		sourceVip:        sourceVip,
+		hostMac:          hostMac,
 	}
 
 	burstSyncs := 2
@@ -520,6 +529,10 @@ func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []*endpointsInfo) {
 		for _, ep := range endpoints {
 			ep.Cleanup()
 		}
+		for _, remoteEndpoint := range svcInfo.remoteEndpoints {
+			remoteEndpoint.Cleanup()
+			remoteEndpoint.hnsID = ""
+		}
 
 		svcInfo.policyApplied = false
 	}
@@ -541,7 +554,6 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 		deleteHnsLoadBalancerPolicy(lbIngressIp.hnsID)
 		lbIngressIp.hnsID = ""
 	}
-
 }
 
 func deleteAllHnsLoadBalancerPolicy() {
@@ -561,7 +573,7 @@ func deleteAllHnsLoadBalancerPolicy() {
 
 // getHnsLoadBalancer returns the LoadBalancer policy resource, if already found.
 // If not, it would create one and return
-func getHnsLoadBalancer(endpoints []hcsshim.HNSEndpoint, isILB bool, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*hcsshim.PolicyList, error) {
+func getHnsLoadBalancer(endpoints []hcsshim.HNSEndpoint, isILB bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*hcsshim.PolicyList, error) {
 	plists, err := hcsshim.HNSListPolicyListRequest()
 	if err != nil {
 		return nil, err
@@ -587,8 +599,7 @@ func getHnsLoadBalancer(endpoints []hcsshim.HNSEndpoint, isILB bool, vip string,
 
 		}
 	}
-	//TODO: sourceVip is not used. If required, expose this as a param
-	var sourceVip string
+
 	lb, err := hcsshim.AddLoadBalancer(
 		endpoints,
 		isILB,
@@ -648,8 +659,9 @@ func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
 	}
 
 	return &hnsNetworkInfo{
-		id:   hnsnetwork.Id,
-		name: hnsnetwork.Name,
+		id:          hnsnetwork.Id,
+		name:        hnsnetwork.Name,
+		networkType: hnsnetwork.Type,
 	}, nil
 }
 
@@ -956,6 +968,49 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
+		hnsNetworkName := proxier.network.name
+		hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
+
+		if err != nil {
+			glog.Errorf("%v", err)
+			continue
+		}
+
+		serviceVipEndpoint, err := getHnsEndpointByIpAddress(svcInfo.clusterIP, hnsNetworkName)
+
+		if  serviceVipEndpoint == nil  {
+			hnsEndpoint := &hcsshim.HNSEndpoint{
+			MacAddress: proxier.hostMac,
+			IPAddress:  svcInfo.clusterIP,
+			}
+
+			paPolicy := hcsshim.PaPolicy{
+				Type: hcsshim.PA,
+				PA:   proxier.nodeIP.String(),
+			}
+			paPolicyJson, err := json.Marshal(paPolicy)
+			if err != nil {
+				glog.Errorf("PA Policy creation failed for service VIP remote endpoint: %v", err)
+				continue
+			}
+			hnsEndpoint.Policies = append(hnsEndpoint.Policies, paPolicyJson)
+
+			newHnsEndpoint, err := hnsnetwork.CreateRemoteEndpoint(hnsEndpoint)
+			if err != nil {
+				glog.Errorf("Remote endpoint creation failed for service VIP: %v", err)
+				continue
+			}
+
+
+			epInfo := &endpointsInfo{
+				ip:         newHnsEndpoint.IPAddress.String(),
+				isLocal:    false,
+				macAddress: newHnsEndpoint.MacAddress,
+				refCount:   1,
+				hnsID:      newHnsEndpoint.Id,
+			}
+			svcInfo.remoteEndpoints = append(svcInfo.remoteEndpoints, epInfo)	
+		}
 		var hnsEndpoints []hcsshim.HNSEndpoint
 		glog.V(4).Infof("====Applying Policy for %s====", svcName)
 		// Create Remote endpoints for every endpoint, corresponding to the service
@@ -984,6 +1039,11 @@ func (proxier *Proxier) syncProxyRules() {
 				hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
 				if err != nil {
 					glog.Errorf("%v", err)
+					continue
+				}
+
+				if hnsnetwork.Type == "Overlay" {
+					glog.V(2).Info("Not creating remote endpoints for overlay network")
 					continue
 				}
 
@@ -1022,9 +1082,10 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.V(4).Infof("Trying to Apply Policies for service %s", spew.Sdump(svcInfo))
 		var hnsLoadBalancer *hcsshim.PolicyList
 
-		hnsLoadBalancer, err := getHnsLoadBalancer(
+		hnsLoadBalancer, err = getHnsLoadBalancer(
 			hnsEndpoints,
 			false,
+			proxier.sourceVip,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
 			uint16(svcInfo.targetPort),
@@ -1043,6 +1104,7 @@ func (proxier *Proxier) syncProxyRules() {
 			hnsLoadBalancer, err := getHnsLoadBalancer(
 				hnsEndpoints,
 				false,
+				proxier.sourceVip,
 				"", // VIP has to be empty to automatically select the nodeIP
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
@@ -1060,9 +1122,10 @@ func (proxier *Proxier) syncProxyRules() {
 		// Create a Load Balancer Policy for each external IP
 		for _, externalIp := range svcInfo.externalIPs {
 			// Try loading existing policies, if already available
-			hnsLoadBalancer, err := getHnsLoadBalancer(
+			hnsLoadBalancer, err = getHnsLoadBalancer(
 				hnsEndpoints,
 				false,
+				proxier.sourceVip,
 				externalIp.ip,
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
@@ -1081,6 +1144,7 @@ func (proxier *Proxier) syncProxyRules() {
 			hnsLoadBalancer, err := getHnsLoadBalancer(
 				hnsEndpoints,
 				false,
+				proxier.sourceVip,
 				lbIngressIp.ip,
 				Enum(svcInfo.protocol),
 				uint16(svcInfo.targetPort),
