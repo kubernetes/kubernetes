@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package gcepd
 
 import (
 	"fmt"
@@ -100,7 +100,7 @@ func (attacher *gcePersistentDiskAttacher) Attach(spec *volume.Spec, nodeName ty
 		}
 	}
 
-	return path.Join(diskByIdPath, diskGooglePrefix+pdName), nil
+	return path.Join(diskByIDPath, diskGooglePrefix+pdName), nil
 }
 
 func (attacher *gcePersistentDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
@@ -160,7 +160,7 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 	}
 	sdBeforeSet := sets.NewString(sdBefore...)
 
-	devicePaths := getDiskByIdPaths(pdName, partition)
+	devicePaths := getDiskByIDPaths(pdName, partition)
 	for {
 		select {
 		case <-ticker.C:
@@ -175,7 +175,7 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 				return path, nil
 			}
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached GCE PD %q. Timeout waiting for mount paths to be created.", pdName)
+			return "", fmt.Errorf("could not find attached GCE PD %q. Timeout waiting for mount paths to be created", pdName)
 		}
 	}
 }

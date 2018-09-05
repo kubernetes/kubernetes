@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package gcepd
 
 import (
 	"errors"
@@ -323,7 +323,7 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName, r
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
 		testcase.t.Errorf("Unexpected AttachDisk call!")
-		return errors.New("Unexpected AttachDisk call!")
+		return errors.New("unexpected AttachDisk call")
 	}
 
 	if expected.diskName != diskName {
@@ -358,7 +358,7 @@ func (testcase *testcase) DetachDisk(devicePath string, nodeName types.NodeName)
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
 		testcase.t.Errorf("Unexpected DetachDisk call!")
-		return errors.New("Unexpected DetachDisk call!")
+		return errors.New("unexpected DetachDisk call")
 	}
 
 	if expected.devicePath != devicePath {
@@ -383,7 +383,7 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 		// testcase.diskIsAttached looks uninitialized, test did not expect to
 		// call DiskIsAttached
 		testcase.t.Errorf("Unexpected DiskIsAttached call!")
-		return false, errors.New("Unexpected DiskIsAttached call!")
+		return false, errors.New("unexpected DiskIsAttached call")
 	}
 
 	if expected.diskName != diskName {

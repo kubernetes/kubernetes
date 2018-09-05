@@ -15,7 +15,7 @@ go_library(
         "gce_pd_block.go",
         "gce_util.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/gce_pd",
+    importpath = "k8s.io/kubernetes/pkg/volume/gcepd",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
