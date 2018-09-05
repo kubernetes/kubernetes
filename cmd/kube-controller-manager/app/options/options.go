@@ -77,6 +77,7 @@ type KubeControllerManagerOptions struct {
 	ReplicationController            *ReplicationControllerOptions
 	ResourceQuotaController          *ResourceQuotaControllerOptions
 	SAController                     *SAControllerOptions
+	TTLAfterFinishedController       *TTLAfterFinishedControllerOptions
 
 	SecureServing *apiserveroptions.SecureServingOptionsWithLoopback
 	// TODO: remove insecure serving mode
@@ -172,6 +173,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: componentConfig.ServiceController.ConcurrentServiceSyncs,
 		},
+		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
+			ConcurrentTTLSyncs: componentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs,
+		},
 		SecureServing: apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP(componentConfig.Generic.Address),
@@ -251,6 +255,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ReplicationController.AddFlags(fss.FlagSet("replicationcontroller"))
 	s.ResourceQuotaController.AddFlags(fss.FlagSet("resourcequota controller"))
 	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
+	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
 
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
@@ -328,6 +333,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config) e
 	if err := s.ServiceController.ApplyTo(&c.ComponentConfig.ServiceController); err != nil {
 		return err
 	}
+	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
+		return err
+	}
 	if err := s.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
@@ -376,6 +384,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.ResourceQuotaController.Validate()...)
 	errs = append(errs, s.SAController.Validate()...)
 	errs = append(errs, s.ServiceController.Validate()...)
+	errs = append(errs, s.TTLAfterFinishedController.Validate()...)
 	errs = append(errs, s.SecureServing.Validate()...)
 	errs = append(errs, s.InsecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)

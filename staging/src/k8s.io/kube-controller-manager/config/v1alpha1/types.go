@@ -145,6 +145,9 @@ type KubeControllerManagerConfiguration struct {
 	// ServiceControllerConfiguration holds configuration for ServiceController
 	// related features.
 	ServiceController ServiceControllerConfiguration
+	// TTLAfterFinishedControllerConfiguration holds configuration for
+	// TTLAfterFinishedController related features.
+	TTLAfterFinishedController TTLAfterFinishedControllerConfiguration
 }
 
 // GenericControllerManagerConfiguration holds configuration for a generic controller-manager.
@@ -437,4 +440,11 @@ type ServiceControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive service
 	// management, but more CPU (and network) load.
 	ConcurrentServiceSyncs int32
+}
+
+// TTLAfterFinishedControllerConfiguration contains elements describing TTLAfterFinishedController.
+type TTLAfterFinishedControllerConfiguration struct {
+	// concurrentTTLSyncs is the number of TTL-after-finished collector workers that are
+	// allowed to sync concurrently.
+	ConcurrentTTLSyncs int32
 }
