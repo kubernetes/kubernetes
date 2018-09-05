@@ -176,7 +176,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		masterAddr := framework.GetMasterAddress(cs)
 		flag, _ := framework.TestNotReachableHTTPTimeout(masterAddr, ports.InsecureKubeControllerManagerPort, gce.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
-		flag, _ = framework.TestNotReachableHTTPTimeout(masterAddr, ports.SchedulerPort, gce.FirewallTestTcpTimeout)
+		flag, _ = framework.TestNotReachableHTTPTimeout(masterAddr, ports.InsecureSchedulerPort, gce.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
 		flag, _ = framework.TestNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, gce.FirewallTestTcpTimeout)
 		Expect(flag).To(BeTrue())
