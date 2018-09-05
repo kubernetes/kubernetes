@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,13 +21,15 @@ import (
 	"reflect"
 	"testing"
 
-	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestCloudControllerDefaultsRoundTrip(t *testing.T) {
+func TestCloudControllerManagerDefaultsRoundTrip(t *testing.T) {
 	ks1 := &CloudControllerManagerConfiguration{}
 	SetDefaults_CloudControllerManagerConfiguration(ks1)
-	cm, err := componentconfig.ConvertObjToConfigMap("CloudControllerManagerConfiguration", ks1)
+	cm, err := convertObjToConfigMap("CloudControllerManagerConfiguration", ks1)
 	if err != nil {
 		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
 	}
@@ -40,4 +42,22 @@ func TestCloudControllerDefaultsRoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(ks2, ks1) {
 		t.Errorf("Expected:\n%#v\n\nGot:\n%#v", ks1, ks2)
 	}
+}
+
+// convertObjToConfigMap converts an object to a ConfigMap.
+// This is specifically meant for ComponentConfigs.
+func convertObjToConfigMap(name string, obj runtime.Object) (*v1.ConfigMap, error) {
+	eJSONBytes, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: map[string]string{
+			name: string(eJSONBytes[:]),
+		},
+	}
+	return cm, nil
 }

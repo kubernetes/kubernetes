@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,26 +22,32 @@ import (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "componentconfig"
+const GroupName = "cloudcontrollermanager.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1alpha1"}
 
 var (
-	SchemeBuilder      runtime.SchemeBuilder
+	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	// localSchemeBuilder ïs a pointer to SchemeBuilder instance. Using localSchemeBuilder
+	// defaulting and conversion init funcs are registered as well.
 	localSchemeBuilder = &SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	// AddToScheme is a global function that registers this API group & version to a schema
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(addKnownTypes, addDefaultingFuncs)
+	localSchemeBuilder.Register(addDefaultingFuncs)
 }
 
+// addKnownTypes registers known types to the given scheme
 func addKnownTypes(scheme *runtime.Scheme) error {
-	// TODO: All structs in this package are about to be moved out,
-	// so nothing should be registered here as this API group is going to be removed soon.
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&CloudControllerManagerConfiguration{},
+	)
 	return nil
 }

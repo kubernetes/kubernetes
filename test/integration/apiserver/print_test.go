@@ -113,10 +113,6 @@ var kindWhiteList = sets.NewString(
 	"Eviction",
 	// --
 
-	// k8s.io/kubernetes/pkg/apis/componentconfig
-	"KubeSchedulerConfiguration",
-	// --
-
 	// k8s.io/apimachinery/pkg/apis/meta
 	"WatchEvent",
 	"Status",

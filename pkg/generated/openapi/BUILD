@@ -11,9 +11,9 @@ openapi_library(
     srcs = ["doc.go"],
     go_prefix = openapi_go_prefix,
     openapi_targets = [
+        "cmd/cloud-controller-manager/app/apis/config/v1alpha1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",
-        "pkg/apis/componentconfig/v1alpha1",
         "pkg/version",
     ],
     tags = ["automanaged"],

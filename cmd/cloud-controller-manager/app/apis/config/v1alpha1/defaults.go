@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,11 +20,11 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1"
 )
 
-func addDefaultingFuncs(scheme *kruntime.Scheme) error {
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
@@ -33,6 +33,7 @@ func SetDefaults_CloudControllerManagerConfiguration(obj *CloudControllerManager
 	if obj.NodeStatusUpdateFrequency == zero {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 5 * time.Minute}
 	}
+
 	// These defaults override the recommended defaults from the apimachineryconfigv1alpha1 package that are applied automatically
 	// These client-connection defaults are specific to the cloud-controller-manager
 	if obj.Generic.ClientConnection.QPS == 0 {
