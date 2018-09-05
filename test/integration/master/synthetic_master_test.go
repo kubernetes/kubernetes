@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
@@ -46,6 +47,7 @@ import (
 	clientsetv1 "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -340,6 +342,56 @@ func TestObjectSizeResponses(t *testing.T) {
 				}
 			} else {
 				t.Errorf("no error; want: %s", r.expectedMessage)
+			}
+		})
+	}
+}
+
+func TestConstructBody(t *testing.T) {
+
+	// base sizes of deploymentObject for any size passed to constructBody > 0
+	const baseLabelSize = 383
+	const baseAnnotationsSize = 388
+	const baseFinalizersSize = 387
+
+	const labelString = ""
+	const finalizerString = "sample/sample"
+	// for given labelString and finalizerString, size of the object returned by constructBody is increased by factor*(size passed)
+	const factor = 16
+
+	requests := []struct {
+		val   string
+		size  int
+		field string
+	}{
+		{labelString, 1, "labels"},
+		{labelString, 1000000, "labels"},
+		{labelString, 1, "annotations"},
+		{labelString, 1000000, "annotations"},
+		{finalizerString, 1, "finalizers"},
+		{finalizerString, 1000000, "finalizers"},
+	}
+
+	for _, r := range requests {
+		t.Run(fmt.Sprintf("%s %d", r.field, r.size), func(t *testing.T) {
+			deploymentObject := constructBody(r.val, r.size, r.field, t)
+			data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion), deploymentObject)
+
+			if err != nil {
+				t.Errorf("could not encode deployment object: %s", err.Error())
+			} else {
+				var expectedSize int
+				switch r.field {
+				case "labels":
+					expectedSize = baseLabelSize + factor*r.size
+				case "annotations":
+					expectedSize = baseAnnotationsSize + factor*r.size
+				case "finalizers":
+					expectedSize = baseFinalizersSize + factor*r.size
+				}
+				if len(data) != expectedSize {
+					t.Errorf("expected size %d; got %d", expectedSize, len(data))
+				}
 			}
 		})
 	}
