@@ -397,7 +397,10 @@ func TestConstructBody(t *testing.T) {
 					expectedSize = baseAnnotationsSize + factor*r.size
 				case "finalizers":
 					expectedSize = baseFinalizersSize + factor*r.size
+				default:
+					t.Fatalf("Unexpected field: %s passed to test", r.field)
 				}
+
 				if len(data) != expectedSize {
 					t.Errorf("expected size %d; got %d", expectedSize, len(data))
 				}
