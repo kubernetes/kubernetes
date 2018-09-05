@@ -28,7 +28,7 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-var podSpec string = `
+podSpec := `
 {
     "metadata": {
         "creationTimestamp": null,
