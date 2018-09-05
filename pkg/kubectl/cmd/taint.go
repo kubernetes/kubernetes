@@ -197,7 +197,6 @@ func (o TaintOptions) validateFlags() error {
 			return nil
 		}
 	}
-	return nil
 }
 
 // Validate checks to the TaintOptions to see if there is sufficient information run the command.
