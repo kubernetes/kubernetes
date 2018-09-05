@@ -33,8 +33,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_KubeSchedulerConfiguration sets additional defaults
-func SetDefaults_KubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.KubeSchedulerConfiguration) {
+// SetDefaultsKubeSchedulerConfiguration sets additional defaults
+func SetDefaultsKubeSchedulerConfiguration(obj *kubescedulerconfigv1alpha1.KubeSchedulerConfiguration) {
 	if len(obj.SchedulerName) == 0 {
 		obj.SchedulerName = api.DefaultSchedulerName
 	}
