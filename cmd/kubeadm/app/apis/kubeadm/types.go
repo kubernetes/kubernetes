@@ -370,6 +370,8 @@ type AuditPolicyConfiguration struct {
 	LogDir string
 	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
 	LogMaxAge *int32
+	// LogMaxSize is the number of Size logs will be stored for.
+	LogMaxSize *int32
 	//TODO(chuckha) add other options for audit policy.
 }
 

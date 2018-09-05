@@ -202,6 +202,11 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 		} else {
 			defaultArguments["audit-log-maxage"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxAge)
 		}
+		if cfg.AuditPolicyConfiguration.LogMaxSize == nil {
+			defaultArguments["audit-log-maxsize"] = fmt.Sprintf("%d", kubeadmapiv1alpha3.DefaultAuditPolicyLogMaxSize)
+		} else {
+			defaultArguments["audit-log-maxsize"] = fmt.Sprintf("%d", *cfg.AuditPolicyConfiguration.LogMaxSize)
+		}
 	}
 	if cfg.APIServerExtraArgs == nil {
 		cfg.APIServerExtraArgs = map[string]string{}
