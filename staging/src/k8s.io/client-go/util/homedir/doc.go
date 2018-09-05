@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package homedir provides methods for interacting with a Users' home directory.
+// Package homedir provides methods for interacting with a User's home directory.
 package homedir // import "k8s.io/client-go/util/homedir"
