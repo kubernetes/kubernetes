@@ -364,9 +364,12 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 		clientConfig, err = loader.ClientConfig()
 	} else {
 		// without the remote kubeconfig file, try to use the in-cluster config.  Most addon API servers will
-		// use this path
+		// use this path. If it is optional, ignore errors.
 		clientConfig, err = rest.InClusterConfig()
-		if err == rest.ErrNotInCluster && s.RemoteKubeConfigFileOptional {
+		if err != nil && s.RemoteKubeConfigFileOptional {
+			if err != rest.ErrNotInCluster {
+				glog.Warningf("failed to read in-cluster kubeconfig for delegated authentication: %v", err)
+			}
 			return nil, nil
 		}
 	}
