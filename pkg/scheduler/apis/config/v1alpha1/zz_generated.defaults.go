@@ -36,5 +36,5 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *v1alpha1.KubeSchedulerConfiguration) {
-	SetDefaults_KubeSchedulerConfiguration(in)
+	SetDefaultsKubeSchedulerConfiguration(in)
 }
