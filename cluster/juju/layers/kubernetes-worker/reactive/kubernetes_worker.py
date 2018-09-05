@@ -860,9 +860,9 @@ def launch_default_ingress_controller():
 def restart_unit_services():
     '''Restart worker services.'''
     hookenv.log('Restarting kubelet and kube-proxy.')
-    services = ['kube-proxy', 'kubelet']
+    services = ['snap.kube-proxy.daemon', 'snap.kubelet.daemon']
     for service in services:
-        service_restart(services)
+        service_restart(service)
 
 
 def get_kube_api_servers(kube_api):

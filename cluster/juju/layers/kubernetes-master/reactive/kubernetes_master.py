@@ -632,7 +632,7 @@ def create_service_configs(kube_control):
             should_restart = True
 
     if should_restart:
-        service_restart('kube-apiserver')
+        service_restart('snap.kube-apiserver.daemon')
         remove_state('authentication.setup')
 
 
@@ -699,7 +699,7 @@ def kick_api_server(tls):
     if data_changed('cert', tls.get_server_cert()):
         # certificate changed, so restart the api server
         hookenv.log("Certificate information changed, restarting api server")
-        service_restart('kube-apiserver')
+        service_restart('snap.kube-apiserver.daemon')
     tls_client.reset_certificate_write_flag('server')
 
 
@@ -1257,7 +1257,7 @@ def configure_apiserver(etcd_connection_string):
 
     configure_kubernetes_service(configure_prefix, 'kube-apiserver',
                                  api_opts, 'api-extra-args')
-    service_restart('kube-apiserver')
+    service_restart('snap.kube-apiserver.daemon')
 
 
 def configure_controller_manager():
@@ -1300,7 +1300,7 @@ def configure_controller_manager():
     configure_kubernetes_service(configure_prefix, 'kube-controller-manager',
                                  controller_opts,
                                  'controller-manager-extra-args')
-    service_restart('kube-controller-manager')
+    service_restart('snap.kube-controller-manager.daemon')
 
 
 def configure_scheduler():
@@ -1313,7 +1313,7 @@ def configure_scheduler():
     configure_kubernetes_service(configure_prefix, 'kube-scheduler',
                                  scheduler_opts, 'scheduler-extra-args')
 
-    service_restart('kube-scheduler')
+    service_restart('snap.kube-scheduler.daemon')
 
 
 def setup_basic_auth(password=None, username='admin', uid='admin',
