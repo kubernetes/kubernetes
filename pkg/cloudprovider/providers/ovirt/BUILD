@@ -11,10 +11,9 @@ go_library(
     srcs = ["ovirt.go"],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
     deps = [
-        "//pkg/cloudprovider:go_default_library",
-        "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
     ],
 )
@@ -23,7 +22,7 @@ go_test(
     name = "go_default_test",
     srcs = ["ovirt_test.go"],
     embed = [":go_default_library"],
-    deps = ["//pkg/cloudprovider:go_default_library"],
+    deps = ["//staging/src/k8s.io/cloud-provider:go_default_library"],
 )
 
 filegroup(

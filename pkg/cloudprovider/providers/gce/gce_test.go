@@ -24,7 +24,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 func TestReadConfigFile(t *testing.T) {

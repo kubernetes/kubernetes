@@ -187,6 +187,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/util/retry:all-srcs",
         "//staging/src/k8s.io/client-go/util/testing:all-srcs",
         "//staging/src/k8s.io/client-go/util/workqueue:all-srcs",
+        "//staging/src/k8s.io/cloud-provider:all-srcs",
         "//staging/src/k8s.io/cluster-bootstrap/token/api:all-srcs",
         "//staging/src/k8s.io/cluster-bootstrap/token/util:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/client-gen:all-srcs",

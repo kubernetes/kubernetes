@@ -25,14 +25,25 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
-	"k8s.io/kubernetes/pkg/controller"
+	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 )
+
+// ControllerClientBuilder allows you to get clients and configs for controllers
+// Please note a copy also exists in pkg/controller/client_builder.go
+// TODO: Make this depend on the separate controller utilities repo (issues/68947)
+type ControllerClientBuilder interface {
+	Config(name string) (*restclient.Config, error)
+	ConfigOrDie(name string) *restclient.Config
+	Client(name string) (clientset.Interface, error)
+	ClientOrDie(name string) clientset.Interface
+}
 
 // Interface is an abstract, pluggable interface for cloud providers.
 type Interface interface {
 	// Initialize provides the cloud with a kubernetes client builder and may spawn goroutines
 	// to perform housekeeping activities within the cloud provider.
-	Initialize(clientBuilder controller.ControllerClientBuilder)
+	Initialize(clientBuilder ControllerClientBuilder)
 	// LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
 	LoadBalancer() (LoadBalancer, bool)
 	// Instances returns an instances interface. Also returns true if the interface is supported, false otherwise.

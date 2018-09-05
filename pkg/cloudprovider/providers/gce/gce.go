@@ -49,7 +49,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -601,7 +601,7 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 
 // Initialize takes in a clientBuilder and spawns a goroutine for watching the clusterid configmap.
 // This must be called before utilizing the funcs of gce.ClusterID
-func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
+func (gce *GCECloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {
 	gce.clientBuilder = clientBuilder
 	gce.client = clientBuilder.ClientOrDie("cloud-provider")
 

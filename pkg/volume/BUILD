@@ -17,7 +17,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume/util/fs:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
