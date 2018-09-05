@@ -2029,7 +2029,7 @@ function setup-addon-manifests {
       copy-manifests "${psp_dir}" "${dst_dir}"
     fi
   fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
       local -r nth_dir="${src_dir}/${3:-$2}/node-termination-handler"
       if [[ -d "${nth_dir}" ]]; then
           copy-manifests "${nth_dir}" "${dst_dir}"
@@ -2440,7 +2440,7 @@ EOF
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER}" == "true" ]]; then
+  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
       setup-addon-manifests "addons" "node-termination-handler"
       setup-node-termination-handler-manifest
   fi
