@@ -30,10 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	apiserver "k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -167,7 +166,7 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 		}
 	}
 	if c.SecureServing != nil {
-		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, false), c.Authentication.Authenticator, c.Authorization.Authorizer)
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, false), &c.Authentication, &c.Authorization)
 		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start healthz server: %v", err)
@@ -223,13 +222,19 @@ func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error 
 }
 
 // buildHandlerChain wraps the given handler with the standard filters.
-func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz authorizer.Authorizer) http.Handler {
+func buildHandlerChain(handler http.Handler, authenticationInfo *apiserver.AuthenticationInfo, authorizationInfo *apiserver.AuthorizationInfo) http.Handler {
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
 	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
 
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
-	handler = genericapifilters.WithAuthorization(handler, authz, legacyscheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler)
+
+	if authorizationInfo != nil {
+		handler = genericapifilters.WithAuthorization(handler, authorizationInfo.Authorizer, legacyscheme.Codecs)
+	}
+	if authenticationInfo != nil {
+		handler = genericapifilters.WithAuthentication(handler, authenticationInfo.Authenticator, failedHandler)
+	}
+
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
 

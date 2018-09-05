@@ -23,9 +23,10 @@ const (
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
-	// SchedulerPort is the default port for the scheduler status server.
+	// InsecureSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
-	SchedulerPort = 10251
+	// Deprecated: use the secure KubeSchedulerPort instead.
+	InsecureSchedulerPort = 10251
 	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	// Deprecated: use the secure KubeControllerManagerPort instead.
@@ -49,4 +50,8 @@ const (
 	// CloudControllerManagerPort is the default port for the cloud controller manager server.
 	// This value may be overridden by a flag at startup.
 	CloudControllerManagerPort = 10258
+
+	// KubeSchedulerPort is the default port for the scheduler status server.
+	// May be overridden by a flag at startup.
+	KubeSchedulerPort = 10259
 )
