@@ -9,6 +9,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "defaults.go",
+        "defaults_linux.go",
+        "defaults_others.go",
         "doc.go",
         "register.go",
         "zz_generated.conversion.go",
