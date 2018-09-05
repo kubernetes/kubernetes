@@ -191,7 +191,7 @@ func (udp *udpProxySocket) Addr() net.Addr {
 	return udp.LocalAddr()
 }
 
-// Holds all the known UDP clients that have not timed out.
+// ClientCache holds all the known UDP clients that have not timed out.
 type ClientCache struct {
 	Mu      sync.Mutex
 	Clients map[string]net.Conn // addr string -> connection
