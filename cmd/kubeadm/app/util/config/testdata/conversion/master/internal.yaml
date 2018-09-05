@@ -8,6 +8,7 @@ APIServerExtraVolumes: null
 AuditPolicyConfiguration:
   LogDir: /var/log/kubernetes/audit
   LogMaxAge: 2
+  LogMaxSize: 100
   Path: ""
 BootstrapTokens:
 - Description: ""

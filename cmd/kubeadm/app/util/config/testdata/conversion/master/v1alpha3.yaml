@@ -24,6 +24,7 @@ apiVersion: kubeadm.k8s.io/v1alpha3
 auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2
+  logMaxSize: 100
   path: ""
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
