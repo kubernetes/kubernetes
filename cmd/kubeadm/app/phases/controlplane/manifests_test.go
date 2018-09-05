@@ -411,12 +411,14 @@ func TestGetAPIServerCommand(t *testing.T) {
 		{
 			name: "auditing and HA are enabled with a custom log max size of 200",
 			cfg: &kubeadmapi.InitConfiguration{
-				API:             kubeadmapi.API{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-				FeatureGates:    map[string]bool{features.HighAvailability: true, features.Auditing: true},
-				CertificatesDir: testCertsDir,
-				AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
-					LogMaxSize: utilpointer.Int32Ptr(200),
+				APIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+					FeatureGates:    map[string]bool{features.HighAvailability: true, features.Auditing: true},
+					CertificatesDir: testCertsDir,
+					AuditPolicyConfiguration: kubeadmapi.AuditPolicyConfiguration{
+						LogMaxSize: utilpointer.Int32Ptr(200),
+					},
 				},
 			},
 			expected: []string{
