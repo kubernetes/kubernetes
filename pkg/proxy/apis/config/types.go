@@ -160,11 +160,11 @@ type ProxyMode string
 
 const (
 	//ProxyModeUserspace is the ProxyMode for userspace
-	ProxyModeUserspace ProxyMode = "userspace"
+	ProxyModeUserspace   ProxyMode = "userspace"
 	//ProxyModeIPTables is the ProxyMode for iptables
-	ProxyModeIPTables ProxyMode = "iptables"
+	ProxyModeIPTables    ProxyMode = "iptables"
 	//ProxyModeIPVS is the ProxyMode for ipvs
-	ProxyModeIPVS ProxyMode = "ipvs"
+	ProxyModeIPVS        ProxyMode = "ipvs"
 	//ProxyModeKernelspace is the ProxyMode for kernelspace
 	ProxyModeKernelspace ProxyMode = "kernelspace"
 )

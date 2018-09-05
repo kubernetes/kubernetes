@@ -31,7 +31,7 @@ var (
 	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
 	localSchemeBuilder = &kubeproxyconfigv1alpha1.SchemeBuilder
 	// AddToScheme applies all the stored functions to the scheme.
-	AddToScheme = localSchemeBuilder.AddToScheme
+	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
 func init() {

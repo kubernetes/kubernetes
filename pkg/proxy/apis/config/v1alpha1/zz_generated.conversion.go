@@ -23,6 +23,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	configv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -88,8 +89,7 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ClientConnection, &out.ClientConnection, 0); err != nil {
+	if err := configv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	if err := Convert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {
@@ -124,8 +124,7 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	out.EnableProfiling = in.EnableProfiling
 	out.ClusterCIDR = in.ClusterCIDR
 	out.HostnameOverride = in.HostnameOverride
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.ClientConnection, &out.ClientConnection, 0); err != nil {
+	if err := configv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	if err := Convert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTablesConfiguration(&in.IPTables, &out.IPTables, s); err != nil {

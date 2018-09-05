@@ -24,7 +24,7 @@ import (
 var (
 	schemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
 	//AddToScheme adds the component types to the scheme
-	AddToScheme = schemeBuilder.AddToScheme
+	AddToScheme   = schemeBuilder.AddToScheme
 )
 
 // GroupName is the group name use in this package
