@@ -20,6 +20,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// CustomResourceColumns masks the slice so protobuf can preserve empty slice
+type CustomResourceColumns []CustomResourceColumnDefinition
+
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
 type CustomResourceDefinitionSpec struct {
 	// Group is the group this resource belongs in
@@ -81,7 +84,7 @@ type CustomResourceDefinitionVersion struct {
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	// Setting this value overrides the global columns for this version.
 	// +optional
-	AdditionalPrinterColumns []CustomResourceColumnDefinition
+	AdditionalPrinterColumns CustomResourceColumns
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.

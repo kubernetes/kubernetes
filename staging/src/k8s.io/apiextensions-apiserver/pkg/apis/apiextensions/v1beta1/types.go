@@ -17,8 +17,19 @@ limitations under the License.
 package v1beta1
 
 import (
+	fmt "fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// CustomResourceColumns masks the slice so protobuf can preserve empty slice
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+type CustomResourceColumns []CustomResourceColumnDefinition
+
+func (t CustomResourceColumns) String() string {
+	return fmt.Sprintf("%v", []CustomResourceColumnDefinition(t))
+}
 
 // CustomResourceDefinitionSpec describes how a user wants their resource to appear
 type CustomResourceDefinitionSpec struct {
@@ -83,7 +94,7 @@ type CustomResourceDefinitionVersion struct {
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
 	// Setting this value overrides the global columns for this version.
 	// +optional
-	AdditionalPrinterColumns []CustomResourceColumnDefinition `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,6,rep,name=additionalPrinterColumns"`
+	AdditionalPrinterColumns CustomResourceColumns `json:"additionalPrinterColumns,omitempty" protobuf:"bytes,6,rep,name=additionalPrinterColumns"`
 }
 
 // CustomResourceColumnDefinition specifies a column for server side printing.

@@ -57,6 +57,15 @@ message CustomResourceColumnDefinition {
   optional string JSONPath = 6;
 }
 
+// CustomResourceColumns masks the slice so protobuf can preserve empty slice
+// +protobuf.nullable=true
+// +protobuf.options.(gogoproto.goproto_stringer)=false
+message CustomResourceColumns {
+  // items, if empty, will result in an empty slice
+
+  repeated CustomResourceColumnDefinition items = 1;
+}
+
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
 message CustomResourceDefinition {
@@ -219,7 +228,7 @@ message CustomResourceDefinitionVersion {
   // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
   // Setting this value overrides the global columns for this version.
   // +optional
-  repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
+  optional CustomResourceColumns additionalPrinterColumns = 6;
 }
 
 // CustomResourceSubresourceScale defines how to serve the scale subresource for CustomResources.
