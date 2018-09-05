@@ -72,8 +72,6 @@ const (
 
 var (
 	serviceAffinitySet            = sets.NewString(predicates.CheckServiceAffinityPred)
-	matchInterPodAffinitySet      = sets.NewString(predicates.MatchInterPodAffinityPred)
-	generalPredicatesSets         = sets.NewString(predicates.GeneralPred)
 	noDiskConflictSet             = sets.NewString(predicates.NoDiskConflictPred)
 	maxPDVolumeCountPredicateKeys = []string{predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred, predicates.MaxEBSVolumeCountPred}
 )
@@ -727,7 +725,8 @@ func (c *configFactory) updatePodInCache(oldObj, newObj interface{}) {
 		glog.Errorf("scheduler cache UpdatePod failed: %v", err)
 	}
 
-	c.invalidateCachedPredicatesOnUpdatePod(newPod, oldPod)
+	// TODO(harry): Invalidate MatchInterPodAffinity after it is moved out of skipped predicates.
+
 	c.podQueue.AssignedPodUpdated(newPod)
 }
 
@@ -772,27 +771,6 @@ func (c *configFactory) deletePodFromSchedulingQueue(obj interface{}) {
 	}
 }
 
-func (c *configFactory) invalidateCachedPredicatesOnUpdatePod(newPod *v1.Pod, oldPod *v1.Pod) {
-	if c.enableEquivalenceClassCache {
-		// if the pod does not have bound node, updating equivalence cache is meaningless;
-		// if pod's bound node has been changed, that case should be handled by pod add & delete.
-		if len(newPod.Spec.NodeName) != 0 && newPod.Spec.NodeName == oldPod.Spec.NodeName {
-			if !reflect.DeepEqual(oldPod.GetLabels(), newPod.GetLabels()) {
-				// MatchInterPodAffinity need to be reconsidered for this node,
-				// as well as all nodes in its same failure domain.
-				c.equivalencePodCache.InvalidatePredicates(
-					matchInterPodAffinitySet)
-			}
-			// if requested container resource changed, invalidate GeneralPredicates of this node
-			if !reflect.DeepEqual(predicates.GetResourceRequest(newPod),
-				predicates.GetResourceRequest(oldPod)) {
-				c.equivalencePodCache.InvalidatePredicatesOnNode(
-					newPod.Spec.NodeName, generalPredicatesSets)
-			}
-		}
-	}
-}
-
 func (c *configFactory) deletePodFromCache(obj interface{}) {
 	var pod *v1.Pod
 	switch t := obj.(type) {
@@ -824,11 +802,8 @@ func (c *configFactory) invalidateCachedPredicatesOnDeletePod(pod *v1.Pod) {
 	if c.enableEquivalenceClassCache {
 		// part of this case is the same as pod add.
 		c.equivalencePodCache.InvalidateCachedPredicateItemForPodAdd(pod, pod.Spec.NodeName)
-		// MatchInterPodAffinity need to be reconsidered for this node,
-		// as well as all nodes in its same failure domain.
-		// TODO(resouer) can we just do this for nodes in the same failure domain
-		c.equivalencePodCache.InvalidatePredicates(
-			matchInterPodAffinitySet)
+
+		// TODO(harry): Invalidate MatchInterPodAffinity after it is moved out of skipped predicates.
 
 		// if this pod have these PV, cached result of disk conflict will become invalid.
 		for _, volume := range pod.Spec.Volumes {
@@ -890,11 +865,8 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		// TODO(resouer): think about lazily initialize this set
 		invalidPredicates := sets.NewString()
 
-		if !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
-			invalidPredicates.Insert(predicates.GeneralPred) // "PodFitsResources"
-		}
 		if !reflect.DeepEqual(oldNode.GetLabels(), newNode.GetLabels()) {
-			invalidPredicates.Insert(predicates.GeneralPred, predicates.CheckServiceAffinityPred) // "PodSelectorMatches"
+			invalidPredicates.Insert(predicates.CheckServiceAffinityPred)
 			for k, v := range oldNode.GetLabels() {
 				// any label can be topology key of pod, we have to invalidate in all cases
 				if v != newNode.GetLabels()[k] {
@@ -922,33 +894,6 @@ func (c *configFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 			invalidPredicates.Insert(predicates.PodToleratesNodeTaintsPred)
 		}
 
-		if !reflect.DeepEqual(oldNode.Status.Conditions, newNode.Status.Conditions) {
-			oldConditions := make(map[v1.NodeConditionType]v1.ConditionStatus)
-			newConditions := make(map[v1.NodeConditionType]v1.ConditionStatus)
-			for _, cond := range oldNode.Status.Conditions {
-				oldConditions[cond.Type] = cond.Status
-			}
-			for _, cond := range newNode.Status.Conditions {
-				newConditions[cond.Type] = cond.Status
-			}
-			if oldConditions[v1.NodeMemoryPressure] != newConditions[v1.NodeMemoryPressure] {
-				invalidPredicates.Insert(predicates.CheckNodeMemoryPressurePred)
-			}
-			if oldConditions[v1.NodeDiskPressure] != newConditions[v1.NodeDiskPressure] {
-				invalidPredicates.Insert(predicates.CheckNodeDiskPressurePred)
-			}
-			if oldConditions[v1.NodePIDPressure] != newConditions[v1.NodePIDPressure] {
-				invalidPredicates.Insert(predicates.CheckNodePIDPressurePred)
-			}
-			if oldConditions[v1.NodeReady] != newConditions[v1.NodeReady] ||
-				oldConditions[v1.NodeOutOfDisk] != newConditions[v1.NodeOutOfDisk] ||
-				oldConditions[v1.NodeNetworkUnavailable] != newConditions[v1.NodeNetworkUnavailable] {
-				invalidPredicates.Insert(predicates.CheckNodeConditionPred)
-			}
-		}
-		if newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable {
-			invalidPredicates.Insert(predicates.CheckNodeConditionPred)
-		}
 		c.equivalencePodCache.InvalidatePredicatesOnNode(newNode.GetName(), invalidPredicates)
 	}
 }
