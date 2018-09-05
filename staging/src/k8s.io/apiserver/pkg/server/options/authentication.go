@@ -230,10 +230,10 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 	}
 	if client == nil {
 		if len(s.ClientCert.ClientCA) == 0 {
-			glog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			glog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 		if len(s.RequestHeader.ClientCAFile) == 0 {
-			glog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			glog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 		return nil
 	}
@@ -262,7 +262,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 			}
 		}
 		if len(s.ClientCert.ClientCA) == 0 {
-			glog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			glog.Warningf("Cluster doesn't provide client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 	}
 
@@ -277,7 +277,7 @@ func (s *DelegatingAuthenticationOptions) lookupMissingConfigInCluster(client ku
 			}
 		}
 		if len(s.RequestHeader.ClientCAFile) == 0 {
-			glog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication to extension api-server won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
+			glog.Warningf("Cluster doesn't provide requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		}
 	}
 
