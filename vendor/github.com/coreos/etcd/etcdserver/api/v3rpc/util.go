@@ -15,14 +15,18 @@
 package v3rpc
 
 import (
+	"strings"
+
 	"github.com/coreos/etcd/auth"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/coreos/etcd/etcdserver/membership"
 	"github.com/coreos/etcd/lease"
 	"github.com/coreos/etcd/mvcc"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func togRPCError(err error) error {
@@ -68,6 +72,8 @@ func togRPCError(err error) error {
 		return rpctypes.ErrGRPCLeaseNotFound
 	case lease.ErrLeaseExists:
 		return rpctypes.ErrGRPCLeaseExist
+	case lease.ErrLeaseTTLTooLarge:
+		return rpctypes.ErrGRPCLeaseTTLTooLarge
 
 	case auth.ErrRootUserNotExist:
 		return rpctypes.ErrGRPCRootUserNotExist
@@ -100,4 +106,36 @@ func togRPCError(err error) error {
 	default:
 		return grpc.Errorf(codes.Unknown, err.Error())
 	}
+}
+
+func isClientCtxErr(ctxErr error, err error) bool {
+	if ctxErr != nil {
+		return true
+	}
+
+	ev, ok := status.FromError(err)
+	if !ok {
+		return false
+	}
+
+	switch ev.Code() {
+	case codes.Canceled, codes.DeadlineExceeded:
+		// client-side context cancel or deadline exceeded
+		// "rpc error: code = Canceled desc = context canceled"
+		// "rpc error: code = DeadlineExceeded desc = context deadline exceeded"
+		return true
+	case codes.Unavailable:
+		msg := ev.Message()
+		// client-side context cancel or deadline exceeded with TLS ("http2.errClientDisconnected")
+		// "rpc error: code = Unavailable desc = client disconnected"
+		if msg == "client disconnected" {
+			return true
+		}
+		// "grpc/transport.ClientTransport.CloseStream" on canceled streams
+		// "rpc error: code = Unavailable desc = stream error: stream ID 21; CANCEL")
+		if strings.HasPrefix(msg, "stream error: ") && strings.HasSuffix(msg, "; CANCEL") {
+			return true
+		}
+	}
+	return false
 }

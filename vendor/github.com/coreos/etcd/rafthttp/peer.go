@@ -225,6 +225,7 @@ func (p *peer) send(m raftpb.Message) {
 			plog.MergeWarningf("dropped internal raft message to %s since %s's sending buffer is full (bad/overloaded network)", p.id, name)
 		}
 		plog.Debugf("dropped %s to %s since %s's sending buffer is full", m.Type, p.id, name)
+		sentFailures.WithLabelValues(types.ID(m.To).String()).Inc()
 	}
 }
 

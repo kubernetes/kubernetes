@@ -61,6 +61,7 @@ go_library(
         "//vendor/github.com/coreos/go-semver/semver:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
     ],
