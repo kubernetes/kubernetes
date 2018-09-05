@@ -27,10 +27,6 @@ import ipaddress
 from charms.leadership import leader_get, leader_set
 
 from shutil import move
-<<<<<<< HEAD
-
-=======
->>>>>>> Pulling out common library functions
 from pathlib import Path
 from subprocess import check_call
 from subprocess import check_output
