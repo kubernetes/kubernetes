@@ -15,8 +15,8 @@
 IMAGE=staging-k8s.gcr.io/kube-addon-manager
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-VERSION=v8.6
-KUBECTL_VERSION?=v1.9.3
+VERSION=v8.7
+KUBECTL_VERSION?=v1.10.7
 
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=bashell/alpine-bash
