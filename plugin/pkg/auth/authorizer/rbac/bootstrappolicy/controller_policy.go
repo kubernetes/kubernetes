@@ -73,6 +73,9 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
 			role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "create", "delete", "list", "watch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie())
+			if utilfeature.DefaultFeatureGate.Enabled(features.CSISkipAttach) {
+				role.Rules = append(role.Rules, rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie())
+			}
 		}
 
 		return role

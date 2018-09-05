@@ -18,7 +18,6 @@ package csi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -26,7 +25,6 @@ import (
 	"github.com/golang/glog"
 
 	api "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -113,9 +111,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	csi := c.csiClient
-	nodeName := string(c.plugin.host.GetNodeName())
-	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
-
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
@@ -134,20 +129,13 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 			return err
 		}
 	}
-
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	if c.volumeInfo == nil {
-		attachment, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		nodeName := string(c.plugin.host.GetNodeName())
+		c.volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, c.volumeID, c.driverName, nodeName)
 		if err != nil {
-			glog.Error(log("mounter.SetupAt failed while getting volume attachment [id=%v]: %v", attachID, err))
 			return err
 		}
-
-		if attachment == nil {
-			glog.Error(log("unable to find VolumeAttachment [id=%s]", attachID))
-			return errors.New("no existing VolumeAttachment found")
-		}
-		c.volumeInfo = attachment.Status.AttachmentMetadata
 	}
 
 	attribs := csiSource.VolumeAttributes
