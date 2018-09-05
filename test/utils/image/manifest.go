@@ -47,8 +47,15 @@ func (i *ImageConfig) SetVersion(version string) {
 }
 
 var (
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v2"}
-	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0"}
+	registry              = initReg()
+	dockerLibraryRegistry = registry.DockerLibraryRegistry
+	e2eRegistry           = registry.E2eRegistry
+	gcRegistry            = registry.GcRegistry
+	PrivateRegistry       = registry.PrivateRegistry
+	sampleRegistry        = registry.SampleRegistry
+
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.13v1"}
+	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.10"}
 	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0"}
 	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29"}
 	CheckMetadataConcealment = ImageConfig{e2eRegistry, "metadata-concealment", "1.1.1"}
