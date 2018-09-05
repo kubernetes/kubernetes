@@ -1,6 +1,24 @@
 {
 	"Rules": [
 	  {
+	    "SelectorRegexp": "k8s[.]io/(api/|apimachinery/)",
+	    "AllowedPrefixes": [
+	        ""
+	    ]
+	  },
+	  {
+        "SelectorRegexp": "k8s[.]io/client-go/",
+        "AllowedPrefixes": [
+            ""
+        ]
+      },
+      {
+        "SelectorRegexp": "k8s[.]io/utils/",
+        "AllowedPrefixes": [
+            ""
+        ]
+      },
+	  {
 		"SelectorRegexp": "k8s[.]io/kubernetes/cmd",
 		"AllowedPrefixes": [
 		    "k8s.io/kubernetes/cmd/kube-proxy/app",
@@ -8,6 +26,40 @@
 		],
 		"ForbiddenPrefixes": [
 		]
-	  }
+	  },
+	  {
+	    "SelectorRegexp": "k8s[.]io/kubernetes/pkg",
+	    "AllowedPrefixes": [
+	        "k8s.io/kubernetes/pkg/controller",
+	        "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log",
+	        "k8s.io/kubernetes/pkg/proxy/config",
+	        "k8s.io/kubernetes/pkg/proxy/iptables",
+	        "k8s.io/kubernetes/pkg/util/iptables",
+	        "k8s.io/kubernetes/pkg/util/node",
+	        "k8s.io/kubernetes/pkg/util/sysctl",
+	        "k8s.io/kubernetes/pkg/util/mount",
+	        "k8s.io/kubernetes/pkg/util/oom",
+	        "k8s.io/kubernetes/pkg/volume/empty_dir",
+	        "k8s.io/kubernetes/pkg/volume/secret"
+	    ],
+	    "ForbiddenPrefixes": [
+        ]
+	  },
+	  {
+        "SelectorRegexp": "k8s[.]io/kubernetes/test",
+        "AllowedPrefixes": [
+            "k8s.io/kubernetes/test/utils"
+        ],
+        "ForbiddenPrefixes": [
+        ]
+      },
+      {
+        "SelectorRegexp": "github[.]com",
+        "AllowedPrefixes": [
+            "github.com/golang/glog"
+        ],
+        "ForbiddenPrefixes": [
+        ]
+      }
 	]
 }
