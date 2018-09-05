@@ -37,7 +37,7 @@ import (
 	"vbom.ml/util/sortorder"
 )
 
-// Sorting printer sorts list types before delegating to another printer.
+// SortingPrinter sorts list types before delegating to another printer.
 // Non-list types are simply passed through
 type SortingPrinter struct {
 	SortField string

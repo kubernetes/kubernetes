@@ -367,7 +367,7 @@ func (r *RuntimeSorter) OriginalPosition(ix int) int {
 	return r.positioner.OriginalPosition(ix)
 }
 
-// allows custom decoder to be set for testing
+// WithDecoder allows custom decoder to be set for testing
 func (r *RuntimeSorter) WithDecoder(decoder runtime.Decoder) *RuntimeSorter {
 	r.decoder = decoder
 	return r

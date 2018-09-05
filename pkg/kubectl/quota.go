@@ -97,7 +97,7 @@ func (g *ResourceQuotaGeneratorV1) StructuredGenerate() (runtime.Object, error) 
 }
 
 // validate validates required fields are set to support structured generation
-func (r *ResourceQuotaGeneratorV1) validate() error {
+func (g *ResourceQuotaGeneratorV1) validate() error {
 	if len(r.Name) == 0 {
 		return fmt.Errorf("name must be specified")
 	}
