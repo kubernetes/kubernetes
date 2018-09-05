@@ -354,9 +354,9 @@ func TestConstructBody(t *testing.T) {
 	// so this is the base size of the object for any size passed to constructBody > 0. After the initial increase
 	// in size, each increase in size by 1 will increase the object size by factor.
 	// So expected size = base size for field + size*factor
-	const baseLabelSize = deploymentObjectSize+11
-	const baseAnnotationsSize = deploymentObjectSize+16
-	const baseFinalizersSize = deploymentObjectSize+15
+	const baseLabelSize = deploymentObjectSize + 11
+	const baseAnnotationsSize = deploymentObjectSize + 16
+	const baseFinalizersSize = deploymentObjectSize + 15
 
 	const labelString = ""
 	const finalizerString = "sample/sample"
