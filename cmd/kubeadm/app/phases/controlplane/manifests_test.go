@@ -406,6 +406,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--audit-policy-file=/etc/kubernetes/audit/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes/audit/audit.log",
 				"--audit-log-maxage=0",
+				"--audit-log-maxsize=100",
 			},
 		},
 		{
@@ -452,6 +453,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				fmt.Sprintf("--endpoint-reconciler-type=%s", kubeadmconstants.LeaseEndpointReconcilerType),
 				"--audit-policy-file=/etc/kubernetes/audit/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes/audit/audit.log",
+				"--audit-log-maxage=2",
 				"--audit-log-maxsize=200",
 			},
 		},
@@ -544,7 +546,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--audit-policy-file=/etc/config/audit.yaml",
 				"--audit-log-path=/var/log/kubernetes",
 				"--audit-log-maxage=2",
-				"--audit-log-maxsize=100",
+				"--audit-log-maxsize=200",
 			},
 		},
 		{
