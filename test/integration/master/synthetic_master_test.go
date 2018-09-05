@@ -363,17 +363,22 @@ func TestConstructBody(t *testing.T) {
 	// for given labelString and finalizerString, size of the object returned by constructBody is increased by factor*(size passed)
 	const factor = 16
 
+	Deployment1_5MegabyteSize := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
+	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
+
 	requests := []struct {
 		val   string
 		size  int
 		field string
 	}{
 		{labelString, 1, "labels"},
-		{labelString, 1000000, "labels"},
+		{labelString, Deployment1_5MegabyteSize, "labels"},
+		{labelString, DeploymentTwoMegabyteSize, "labels"},
 		{labelString, 1, "annotations"},
-		{labelString, 1000000, "annotations"},
+		{labelString, Deployment1_5MegabyteSize, "annotations"},
 		{finalizerString, 1, "finalizers"},
-		{finalizerString, 1000000, "finalizers"},
+		{finalizerString, Deployment1_5MegabyteSize, "finalizers"},
+		{finalizerString, DeploymentTwoMegabyteSize, "finalizers"},
 	}
 
 	for _, r := range requests {
