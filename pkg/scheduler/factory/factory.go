@@ -489,6 +489,10 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 		invalidPredicates.Insert(predicates.MaxAzureDiskVolumeCountPred)
 	}
 
+	if pv.Spec.CSI != nil && utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
+	}
+
 	// If PV contains zone related label, it may impact cached NoVolumeZoneConflict
 	for k := range pv.Labels {
 		if isZoneRegionLabel(k) {
@@ -565,6 +569,10 @@ func (c *configFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim
 	// The bound volume type may change
 	invalidPredicates := sets.NewString(maxPDVolumeCountPredicateKeys...)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
+	}
+
 	// The bound volume's label may change
 	invalidPredicates.Insert(predicates.NoVolumeZoneConflictPred)
 
@@ -585,6 +593,10 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 		}
 		// The bound volume type may change
 		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+			invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
+		}
 	}
 
 	c.equivalencePodCache.InvalidatePredicates(invalidPredicates)

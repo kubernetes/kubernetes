@@ -40,7 +40,7 @@ import (
 	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csi/labelmanager"
+	"k8s.io/kubernetes/pkg/volume/csi/nodeupdater"
 )
 
 const (
@@ -94,7 +94,7 @@ type csiDriversStore struct {
 // corresponding sockets
 var csiDrivers csiDriversStore
 
-var lm labelmanager.Interface
+var nodeUpdater nodeupdater.Interface
 
 // RegistrationCallback is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
@@ -118,13 +118,13 @@ func RegistrationCallback(pluginName string, endpoint string, versions []string,
 	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
-	driverNodeID, _, _, err := csi.NodeGetInfo(ctx)
+	driverNodeID, maxVolumePerNode, _, err := csi.NodeGetInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
 	}
 
 	// Calling nodeLabelManager to update annotations and labels for newly registered CSI driver
-	err = lm.AddLabels(pluginName, driverNodeID)
+	err = nodeUpdater.AddLabelsAndLimits(pluginName, driverNodeID, maxVolumePerNode)
 	if err != nil {
 		// Unregister the driver and return error
 		csiDrivers.Lock()
@@ -142,7 +142,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	// Initializing csiDrivers map and label management channels
 	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
-	lm = labelmanager.NewLabelManager(host.GetNodeName(), host.GetKubeClient())
+	nodeUpdater = nodeupdater.NewNodeUpdater(host.GetNodeName(), host.GetKubeClient())
 
 	csiClient := host.GetCSIClient()
 	if csiClient != nil {
