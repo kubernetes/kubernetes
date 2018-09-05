@@ -62,13 +62,17 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 	if err != nil {
 		return err
 	}
-	writeCertificateFilesIfNotExist(
+	err = writeCertificateFilesIfNotExist(
 		ic.CertificatesDir,
 		k.BaseName,
 		caCert,
 		cert,
 		key,
 	)
+
+	if err != nil {
+		return fmt.Errorf("failed to write certificate %q: %v", k.Name, err)
+	}
 
 	return nil
 }
@@ -108,25 +112,54 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 			return err
 		}
 
-		caCert, caKey, err := NewCACertAndKey(cfg)
-		if err != nil {
-			return err
+		var caKey *rsa.PrivateKey
+
+		caCert, err := pkiutil.TryLoadCertFromDisk(ic.CertificatesDir, ca.BaseName)
+		if err == nil {
+			// Cert exists already, make sure it's valid
+			if !caCert.IsCA {
+				return fmt.Errorf("certificate %q is not a CA", ca.Name)
+			}
+			// Try and load a CA Key
+			caKey, err = pkiutil.TryLoadKeyFromDisk(ic.CertificatesDir, ca.BaseName)
+			if err != nil {
+				// If there's no CA key, make sure every certificate exists.
+				for _, leaf := range leaves {
+					cl := certKeyLocation{
+						pkiDir:   ic.CertificatesDir,
+						baseName: leaf.BaseName,
+						uxName:   leaf.Name,
+					}
+					if err := validateSignedCertWithCA(cl, caCert); err != nil {
+						return fmt.Errorf("could not load expected certificate %q or validate the existence of key %q for it: %v", leaf.Name, ca.Name, err)
+					}
+				}
+				// CACert exists and all clients exist, continue to next CA.
+				continue
+			}
+			// CA key exists; just use that to create new certificates.
+		} else {
+			// CACert doesn't already exist, create a new cert and key.
+			caCert, caKey, err = NewCACertAndKey(cfg)
+			if err != nil {
+				return err
+			}
+
+			err = writeCertificateAuthorithyFilesIfNotExist(
+				ic.CertificatesDir,
+				ca.BaseName,
+				caCert,
+				caKey,
+			)
+			if err != nil {
+				return err
+			}
 		}
 
 		for _, leaf := range leaves {
 			if err := leaf.CreateFromCA(ic, caCert, caKey); err != nil {
 				return err
 			}
-		}
-
-		err = writeCertificateAuthorithyFilesIfNotExist(
-			ic.CertificatesDir,
-			ca.BaseName,
-			caCert,
-			caKey,
-		)
-		if err != nil {
-			return err
 		}
 	}
 	return nil

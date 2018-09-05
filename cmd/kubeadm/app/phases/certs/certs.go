@@ -396,6 +396,11 @@ func validateSignedCert(l certKeyLocation) error {
 		return fmt.Errorf("failure loading certificate authority for %s: %v", l.uxName, err)
 	}
 
+	return validateSignedCertWithCA(l, caCert)
+}
+
+// validateSignedCertWithCA tries to load a certificate and validate it with the given caCert
+func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error {
 	// Try to load key and signed certificate
 	signedCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(l.pkiDir, l.baseName)
 	if err != nil {
