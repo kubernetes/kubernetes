@@ -85,7 +85,6 @@ pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
 pkg/apis/scheduling
-pkg/apis/scheduling/v1alpha1
 pkg/apis/scheduling/v1beta1
 pkg/apis/settings
 pkg/apis/settings/v1alpha1
@@ -177,7 +176,6 @@ pkg/kubectl/cmd/wait
 pkg/kubectl/metricsutil
 pkg/kubectl/util
 pkg/kubectl/util/slice
-pkg/kubelet
 pkg/kubelet/apis
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1

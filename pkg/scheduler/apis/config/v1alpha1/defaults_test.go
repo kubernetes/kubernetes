@@ -29,7 +29,7 @@ import (
 
 func TestSchedulerDefaults(t *testing.T) {
 	ks1 := &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}
-	SetDefaults_KubeSchedulerConfiguration(ks1)
+	SetDefaultsKubeSchedulerConfiguration(ks1)
 	cm, err := convertObjToConfigMap("KubeSchedulerConfiguration", ks1)
 	if err != nil {
 		t.Errorf("unexpected ConvertObjToConfigMap error %v", err)
