@@ -89154,7 +89154,7 @@
     ],
     "properties": {
      "additionalPrinterColumns": {
-      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Optional, and correspond to the first version in the versions list",
+      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Optional, the global columns for all versions. Each version can override the columns by setting per version columns in the versions list.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
@@ -89173,11 +89173,11 @@
       "type": "string"
      },
      "subresources": {
-      "description": "Subresources describes the subresources for CustomResources Optional, and correspond to the first version in the versions list",
+      "description": "Subresources describes the subresources for CustomResources Optional, the global subresources for all versions. Each version can override the subresources by setting per version subresources in the versions list.",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
      },
      "validation": {
-      "description": "Validation describes the validation methods for CustomResources Optional, and correspond to the first version in the versions list",
+      "description": "Validation describes the validation methods for CustomResources Optional, the global validation schema for all versions. Each version can override the validation schema by setting per version schema in the versions list.",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
      },
      "version": {
@@ -89229,7 +89229,7 @@
     ],
     "properties": {
      "additionalPrinterColumns": {
-      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Should not be set for first item in Versions list. The top level field is being used for first version.",
+      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Setting this value overrides the global columns for this version.",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
@@ -89240,7 +89240,7 @@
       "type": "string"
      },
      "schema": {
-      "description": "Schema describes the schema for CustomResource used in validation, pruning, and defaulting. Should not be set for first item in Versions list. The top level field is being used for first version.",
+      "description": "Schema describes the schema for CustomResource used in validation, pruning, and defaulting. Setting this value overrides the global validation schema for this version.",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
      },
      "served": {
@@ -89252,7 +89252,7 @@
       "type": "boolean"
      },
      "subresources": {
-      "description": "Subresources describes the subresources for CustomResources Should not be set for first item in Versions list. The top level field is being used for first version.",
+      "description": "Subresources describes the subresources for CustomResources Setting this value overrides the global subresources for this version.",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
      }
     }

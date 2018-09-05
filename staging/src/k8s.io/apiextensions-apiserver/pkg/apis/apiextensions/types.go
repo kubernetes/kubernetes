@@ -34,11 +34,13 @@ type CustomResourceDefinitionSpec struct {
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope
 	// Validation describes the validation methods for CustomResources
-	// Optional, and correspond to the first version in the versions list
+	// Optional, the global validation schema for all versions. Each version can override the validation
+	// schema by setting per version schema in the versions list.
 	// +optional
 	Validation *CustomResourceValidation
 	// Subresources describes the subresources for CustomResources
-	// Optional, and correspond to the first version in the versions list
+	// Optional, the global subresources for all versions. Each version can override the subresources
+	// by setting per version subresources in the versions list.
 	// +optional
 	Subresources *CustomResourceSubresources
 	// Versions is the list of all supported versions for this resource.
@@ -54,7 +56,8 @@ type CustomResourceDefinitionSpec struct {
 	// v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
 	Versions []CustomResourceDefinitionVersion
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
-	// Optional, and correspond to the first version in the versions list
+	// Optional, the global columns for all versions. Each version can override the columns
+	// by setting per version columns in the versions list.
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
 }
@@ -68,15 +71,15 @@ type CustomResourceDefinitionVersion struct {
 	// as storage version.
 	Storage bool
 	// Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
-	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	// Setting this value overrides the global validation schema for this version.
 	// +optional
 	Schema *JSONSchemaProps
 	// Subresources describes the subresources for CustomResources
-	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	// Setting this value overrides the global subresources for this version.
 	// +optional
 	Subresources *CustomResourceSubresources
 	// AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
-	// Should not be set for first item in Versions list. The top level field is being used for first version.
+	// Setting this value overrides the global columns for this version.
 	// +optional
 	AdditionalPrinterColumns []CustomResourceColumnDefinition
 }

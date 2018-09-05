@@ -145,12 +145,14 @@ message CustomResourceDefinitionSpec {
   optional string scope = 4;
 
   // Validation describes the validation methods for CustomResources
-  // Optional, and correspond to the first version in the versions list
+  // Optional, the global validation schema for all versions. Each version can override the validation
+  // schema by setting per version schema in the versions list.
   // +optional
   optional CustomResourceValidation validation = 5;
 
   // Subresources describes the subresources for CustomResources
-  // Optional, and correspond to the first version in the versions list
+  // Optional, the global subresources for all versions. Each version can override the subresources
+  // by setting per version subresources in the versions list.
   // +optional
   optional CustomResourceSubresources subresources = 6;
 
@@ -169,7 +171,8 @@ message CustomResourceDefinitionSpec {
   repeated CustomResourceDefinitionVersion versions = 7;
 
   // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
-  // Optional, and correspond to the first version in the versions list
+  // Optional, the global columns for all versions. Each version can override the columns
+  // by setting per version columns in the versions list.
   // +optional
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
 }
@@ -204,17 +207,17 @@ message CustomResourceDefinitionVersion {
   optional bool storage = 3;
 
   // Schema describes the schema for CustomResource used in validation, pruning, and defaulting.
-  // Should not be set for first item in Versions list. The top level field is being used for first version.
+  // Setting this value overrides the global validation schema for this version.
   // +optional
   optional JSONSchemaProps schema = 4;
 
   // Subresources describes the subresources for CustomResources
-  // Should not be set for first item in Versions list. The top level field is being used for first version.
+  // Setting this value overrides the global subresources for this version.
   // +optional
   optional CustomResourceSubresources subresources = 5;
 
   // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
-  // Should not be set for first item in Versions list. The top level field is being used for first version.
+  // Setting this value overrides the global columns for this version.
   // +optional
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 6;
 }
