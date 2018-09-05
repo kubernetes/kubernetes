@@ -200,17 +200,12 @@ func (o *Options) Complete() error {
 	if len(o.ConfigFile) > 0 {
 		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
 			return err
-		} else {
-			o.config = c
 		}
+		o.config = c
 	}
 
 	err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Validate validates all the required options.
