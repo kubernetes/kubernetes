@@ -498,7 +498,7 @@ filename | sha256 hash
 * Backport Cloud CIDR allocator fixes to 1.9 ([#61797](https://github.com/kubernetes/kubernetes/pull/61797), [@satyasm](https://github.com/satyasm))
 * openstack cinder detach problem is fixed if nova is shutdowned ([#56846](https://github.com/kubernetes/kubernetes/pull/56846), [@zetaab](https://github.com/zetaab))
 * Fixed kube-proxy to work correctly with iptables 1.6.2 and later. ([#61734](https://github.com/kubernetes/kubernetes/pull/61734), [@danwinship](https://github.com/danwinship))
-* Ensure cloudprovider.ErrInstanceNotFound is reported when the VM is not found on Azure ([#61531](https://github.com/kubernetes/kubernetes/pull/61531), [@feiskyer](https://github.com/feiskyer))
+* Ensure cloudprovider.InstanceNotFound is reported when the VM is not found on Azure ([#61531](https://github.com/kubernetes/kubernetes/pull/61531), [@feiskyer](https://github.com/feiskyer))
 * On AWS kubelet returns an error when started under conditions that do not allow it to work (AWS has not yet tagged the instance). ([#60125](https://github.com/kubernetes/kubernetes/pull/60125), [@vainu-arto](https://github.com/vainu-arto))
 * Fix mounting of UNIX sockets(and other special files) in subpaths ([#61480](https://github.com/kubernetes/kubernetes/pull/61480), [@gnufied](https://github.com/gnufied))
 * Fixed missing error checking that could cause kubelet to crash in a race condition. ([#60962](https://github.com/kubernetes/kubernetes/pull/60962), [@technicianted](https://github.com/technicianted))
