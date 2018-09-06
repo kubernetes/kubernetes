@@ -48,6 +48,9 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	if obj.SAController.ConcurrentSATokenSyncs == 0 {
 		obj.SAController.ConcurrentSATokenSyncs = 5
 	}
+	if obj.TTLAfterFinishedController.ConcurrentTTLSyncs <= 0 {
+		obj.TTLAfterFinishedController.ConcurrentTTLSyncs = 5
+	}
 
 	// These defaults override the recommended defaults from the apimachineryconfigv1alpha1 package that are applied automatically
 	// These client-connection defaults are specific to the kube-controller-manager

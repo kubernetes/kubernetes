@@ -23,16 +23,16 @@ import (
 	"hash/fnv"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
-
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
-
-	"github.com/golang/glog"
 )
 
 // Cache is a thread safe map saves and reuses the output of predicate functions,
@@ -136,8 +136,16 @@ func (c *Cache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName str
 	// MaxPDVolumeCountPredicate: we check the volumes of pod to make decisioc.
 	for _, vol := range pod.Spec.Volumes {
 		if vol.PersistentVolumeClaim != nil {
-			invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred, predicates.MaxGCEPDVolumeCountPred, predicates.MaxAzureDiskVolumeCountPred)
+			invalidPredicates.Insert(
+				predicates.MaxEBSVolumeCountPred,
+				predicates.MaxGCEPDVolumeCountPred,
+				predicates.MaxAzureDiskVolumeCountPred)
+			if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+				invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
+			}
 		} else {
+			// We do not consider CSI volumes here because CSI
+			// volumes can not be used inline.
 			if vol.AWSElasticBlockStore != nil {
 				invalidPredicates.Insert(predicates.MaxEBSVolumeCountPred)
 			}

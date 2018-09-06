@@ -17,15 +17,17 @@ limitations under the License.
 package validation
 
 import (
+	"testing"
+	"time"
+
 	apimachinery "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserver "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"testing"
-	"time"
 )
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
+	testTimeout := int64(0)
 	validConfig := &config.KubeSchedulerConfiguration{
 		SchedulerName:                  "me",
 		HealthzBindAddress:             "0.0.0.0:10254",
@@ -56,6 +58,7 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 				RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
+		BindTimeoutSeconds: &testTimeout,
 	}
 
 	HardPodAffinitySymmetricWeightGt100 := validConfig.DeepCopy()
@@ -85,6 +88,9 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
 	enableContentProfilingSetWithoutEnableProfiling.EnableContentionProfiling = true
+
+	bindTimeoutUnset := validConfig.DeepCopy()
+	bindTimeoutUnset.BindTimeoutSeconds = nil
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -125,6 +131,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"bad-hard-pod-affinity-symmetric-weight-gt-100": {
 			expectedToFail: true,
 			config:         HardPodAffinitySymmetricWeightLt0,
+		},
+		"bind-timeout-unset": {
+			expectedToFail: true,
+			config:         bindTimeoutUnset,
 		},
 	}
 

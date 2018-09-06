@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
@@ -546,14 +547,16 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	// if in standalone mode, indicate as much by setting all clients to nil
 	if standaloneMode {
 		kubeDeps.KubeClient = nil
+		kubeDeps.DynamicKubeClient = nil
 		kubeDeps.EventClient = nil
 		kubeDeps.HeartbeatClient = nil
 		glog.Warningf("standalone mode, no API client")
-	} else if kubeDeps.KubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil {
+	} else if kubeDeps.KubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil || kubeDeps.DynamicKubeClient == nil {
 		// initialize clients if not standalone mode and any of the clients are not provided
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
 		var heartbeatClient clientset.Interface
+		var dynamicKubeClient dynamic.Interface
 
 		clientConfig, err := createAPIServerClientConfig(s)
 		if err != nil {
@@ -582,6 +585,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 			glog.V(2).Info("Starting client certificate rotation.")
 			clientCertificateManager.SetCertificateSigningRequestClient(kubeClient.CertificatesV1beta1().CertificateSigningRequests())
 			clientCertificateManager.Start()
+		}
+		dynamicKubeClient, err = dynamic.NewForConfig(clientConfig)
+		if err != nil {
+			glog.Warningf("Failed to initialize dynamic KubeClient: %v", err)
 		}
 
 		// make a separate client for events
@@ -617,6 +624,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 
 		kubeDeps.KubeClient = kubeClient
+		kubeDeps.DynamicKubeClient = dynamicKubeClient
 		if heartbeatClient != nil {
 			kubeDeps.HeartbeatClient = heartbeatClient
 			kubeDeps.OnHeartbeatFailure = closeAllConns

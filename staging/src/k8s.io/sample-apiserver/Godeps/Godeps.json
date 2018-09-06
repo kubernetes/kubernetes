@@ -36,51 +36,51 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/auth/authpb",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/clientv3",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdserverpb",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/mvcc/mvccpb",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/srv",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/tlsutil",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/transport",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/version",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-semver/semver",

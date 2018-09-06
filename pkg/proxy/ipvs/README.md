@@ -325,7 +325,7 @@ export KUBE_PROXY_MODE=ipvs
 
 Similar to local-up cluster, kube-proxy in [clusters running on GCE](https://kubernetes.io/docs/getting-started-guides/gce/) run in iptables mode by default. Users need to  export the env `KUBE_PROXY_MODE=ipvs` before [starting a cluster](https://kubernetes.io/docs/getting-started-guides/gce/#starting-a-cluster):
 ```shell
-#before running one of the commmands chosen to start a cluster:
+#before running one of the commands chosen to start a cluster:
 # curl -sS https://get.k8s.io | bash
 # wget -q -O - https://get.k8s.io | bash
 # cluster/kube-up.sh

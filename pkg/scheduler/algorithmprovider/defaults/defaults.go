@@ -133,6 +133,12 @@ func defaultPredicates() sets.String {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
+		factory.RegisterFitPredicateFactory(
+			predicates.MaxCSIVolumeCountPred,
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo)
+			},
+		),
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
 			predicates.MatchInterPodAffinityPred,

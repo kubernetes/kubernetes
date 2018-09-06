@@ -45,9 +45,8 @@ func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInf
 
 	filesystems := []*runtimeapi.FilesystemUsage{
 		{
-			Timestamp:  time.Now().UnixNano(),
-			UsedBytes:  &runtimeapi.UInt64Value{Value: fsinfo.Usage},
-			InodesUsed: &runtimeapi.UInt64Value{Value: 0},
+			Timestamp: time.Now().UnixNano(),
+			UsedBytes: &runtimeapi.UInt64Value{Value: fsinfo.Usage},
 			FsId: &runtimeapi.FilesystemIdentifier{
 				Mountpoint: info.DockerRootDir,
 			},

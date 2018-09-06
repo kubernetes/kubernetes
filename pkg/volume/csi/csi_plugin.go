@@ -29,15 +29,18 @@ import (
 
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
 	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
+	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/csi/labelmanager"
+	"k8s.io/kubernetes/pkg/volume/csi/nodeupdater"
 )
 
 const (
@@ -60,6 +63,7 @@ const (
 type csiPlugin struct {
 	host              volume.VolumeHost
 	blockEnabled      bool
+	csiDriverLister   csilister.CSIDriverLister
 	csiDriverInformer csiinformer.CSIDriverInformer
 }
 
@@ -90,7 +94,7 @@ type csiDriversStore struct {
 // corresponding sockets
 var csiDrivers csiDriversStore
 
-var lm labelmanager.Interface
+var nodeUpdater nodeupdater.Interface
 
 // RegistrationCallback is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
@@ -114,13 +118,13 @@ func RegistrationCallback(pluginName string, endpoint string, versions []string,
 	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
-	driverNodeID, _, _, err := csi.NodeGetInfo(ctx)
+	driverNodeID, maxVolumePerNode, _, err := csi.NodeGetInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
 	}
 
 	// Calling nodeLabelManager to update annotations and labels for newly registered CSI driver
-	err = lm.AddLabels(pluginName, driverNodeID)
+	err = nodeUpdater.AddLabelsAndLimits(pluginName, driverNodeID, maxVolumePerNode)
 	if err != nil {
 		// Unregister the driver and return error
 		csiDrivers.Lock()
@@ -138,13 +142,14 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	// Initializing csiDrivers map and label management channels
 	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
-	lm = labelmanager.NewLabelManager(host.GetNodeName(), host.GetKubeClient())
+	nodeUpdater = nodeupdater.NewNodeUpdater(host.GetNodeName(), host.GetKubeClient())
 
 	csiClient := host.GetCSIClient()
 	if csiClient != nil {
 		// Start informer for CSIDrivers.
 		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
 		p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
+		p.csiDriverLister = p.csiDriverInformer.Lister()
 		go factory.Start(wait.NeverStop)
 	}
 
@@ -486,4 +491,49 @@ func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 	}
 
 	return volume.NewSpecFromPersistentVolume(pv, false), nil
+}
+
+func (p *csiPlugin) skipAttach(driver string) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSISkipAttach) {
+		return false, nil
+	}
+	if p.csiDriverLister == nil {
+		return false, errors.New("CSIDriver lister does not exist")
+	}
+	csiDriver, err := p.csiDriverLister.Get(driver)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			// Don't skip attach if CSIDriver does not exist
+			return false, nil
+		}
+		return false, err
+	}
+	if csiDriver.Spec.AttachRequired != nil && *csiDriver.Spec.AttachRequired == false {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (p *csiPlugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+	skip, err := p.skipAttach(driver)
+	if err != nil {
+		return nil, err
+	}
+	if skip {
+		return nil, nil
+	}
+
+	attachID := getAttachmentName(handle, driver, nodeName)
+
+	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
+	attachment, err := client.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	if err != nil {
+		return nil, err // This err already has enough context ("VolumeAttachment xyz not found")
+	}
+
+	if attachment == nil {
+		err = errors.New("no existing VolumeAttachment found")
+		return nil, err
+	}
+	return attachment.Status.AttachmentMetadata, nil
 }

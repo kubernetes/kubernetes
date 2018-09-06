@@ -16,6 +16,11 @@ limitations under the License.
 
 package util
 
+import (
+	"crypto/sha1"
+	"encoding/hex"
+)
+
 // This file is a common place holder for volume limit utility constants
 // shared between volume package and scheduler
 
@@ -26,4 +31,25 @@ const (
 	AzureVolumeLimitKey = "attachable-volumes-azure-disk"
 	// GCEVolumeLimitKey stores resource name that will store volume limits for GCE node
 	GCEVolumeLimitKey = "attachable-volumes-gce-pd"
+
+	// CSIAttachLimitPrefix defines prefix used for CSI volumes
+	CSIAttachLimitPrefix = "attachable-volumes-csi-"
+
+	// ResourceNameLengthLimit stores maximum allowed Length for a ResourceName
+	ResourceNameLengthLimit = 63
 )
+
+// GetCSIAttachLimitKey returns limit key used for CSI volumes
+func GetCSIAttachLimitKey(driverName string) string {
+	csiPrefixLength := len(CSIAttachLimitPrefix)
+	totalkeyLength := csiPrefixLength + len(driverName)
+	if totalkeyLength >= ResourceNameLengthLimit {
+		charsFromDriverName := driverName[:23]
+		hash := sha1.New()
+		hash.Write([]byte(driverName))
+		hashed := hex.EncodeToString(hash.Sum(nil))
+		hashed = hashed[:16]
+		return CSIAttachLimitPrefix + charsFromDriverName + hashed
+	}
+	return CSIAttachLimitPrefix + driverName
+}

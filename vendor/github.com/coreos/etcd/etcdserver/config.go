@@ -48,8 +48,38 @@ type ServerConfig struct {
 	ForceNewCluster     bool
 	PeerTLSInfo         transport.TLSInfo
 
-	TickMs           uint
-	ElectionTicks    int
+	TickMs        uint
+	ElectionTicks int
+
+	// InitialElectionTickAdvance is true, then local member fast-forwards
+	// election ticks to speed up "initial" leader election trigger. This
+	// benefits the case of larger election ticks. For instance, cross
+	// datacenter deployment may require longer election timeout of 10-second.
+	// If true, local node does not need wait up to 10-second. Instead,
+	// forwards its election ticks to 8-second, and have only 2-second left
+	// before leader election.
+	//
+	// Major assumptions are that:
+	//  - cluster has no active leader thus advancing ticks enables faster
+	//    leader election, or
+	//  - cluster already has an established leader, and rejoining follower
+	//    is likely to receive heartbeats from the leader after tick advance
+	//    and before election timeout.
+	//
+	// However, when network from leader to rejoining follower is congested,
+	// and the follower does not receive leader heartbeat within left election
+	// ticks, disruptive election has to happen thus affecting cluster
+	// availabilities.
+	//
+	// Disabling this would slow down initial bootstrap process for cross
+	// datacenter deployments. Make your own tradeoffs by configuring
+	// --initial-election-tick-advance at the cost of slow initial bootstrap.
+	//
+	// If single-node, it advances ticks regardless.
+	//
+	// See https://github.com/coreos/etcd/issues/9333 for more detail.
+	InitialElectionTickAdvance bool
+
 	BootstrapTimeout time.Duration
 
 	AutoCompactionRetention int

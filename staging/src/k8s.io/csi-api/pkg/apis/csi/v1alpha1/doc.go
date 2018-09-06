@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1alpha1 provides alpha API for CSI API objects.
 // +k8s:deepcopy-gen=package,register
 // +groupName=csi.storage.k8s.io
 // +k8s:openapi-gen=true
+
+// Package v1alpha1 provides alpha API for CSI API objects.
 package v1alpha1 // import "k8s.io/csi-api/pkg/apis/csi/v1alpha1"

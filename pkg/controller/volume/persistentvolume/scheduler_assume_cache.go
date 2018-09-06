@@ -83,7 +83,8 @@ func (e *errObjectName) Error() string {
 // Restore() sets the latest object pointer back to the informer object.
 // Get/List() always returns the latest object pointer.
 type assumeCache struct {
-	mutex sync.Mutex
+	// Synchronizes updates to store
+	rwMutex sync.RWMutex
 
 	// describes the object stored
 	description string
@@ -155,8 +156,8 @@ func (c *assumeCache) add(obj interface{}) {
 		return
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
 		newVersion, err := c.getObjVersion(name, obj)
@@ -199,8 +200,8 @@ func (c *assumeCache) delete(obj interface{}) {
 		return
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
@@ -239,8 +240,8 @@ func (c *assumeCache) getObjInfo(name string) (*objInfo, error) {
 }
 
 func (c *assumeCache) Get(objName string) (interface{}, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
@@ -250,8 +251,8 @@ func (c *assumeCache) Get(objName string) (interface{}, error) {
 }
 
 func (c *assumeCache) List(indexObj interface{}) []interface{} {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.RLock()
+	defer c.rwMutex.RUnlock()
 
 	allObjs := []interface{}{}
 	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
@@ -277,8 +278,8 @@ func (c *assumeCache) Assume(obj interface{}) error {
 		return &errObjectName{err}
 	}
 
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo, err := c.getObjInfo(name)
 	if err != nil {
@@ -306,8 +307,8 @@ func (c *assumeCache) Assume(obj interface{}) error {
 }
 
 func (c *assumeCache) Restore(objName string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+	c.rwMutex.Lock()
+	defer c.rwMutex.Unlock()
 
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {

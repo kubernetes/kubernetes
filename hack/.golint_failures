@@ -186,6 +186,7 @@ pkg/kubelet/apis/cri/testing
 pkg/kubelet/apis/deviceplugin/v1alpha
 pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/apis/pluginregistration/v1alpha1
+pkg/kubelet/apis/pluginregistration/v1beta1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
 pkg/kubelet/checkpoint
@@ -407,7 +408,7 @@ pkg/volume/azure_file
 pkg/volume/cephfs
 pkg/volume/configmap
 pkg/volume/csi/fake
-pkg/volume/csi/labelmanager
+pkg/volume/csi/nodeupdater
 pkg/volume/empty_dir
 pkg/volume/fc
 pkg/volume/flexvolume
