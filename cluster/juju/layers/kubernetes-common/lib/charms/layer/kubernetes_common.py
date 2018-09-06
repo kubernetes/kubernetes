@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import re
-import os
 import subprocess
 import hashlib
 import json
@@ -27,7 +26,7 @@ from subprocess import CalledProcessError
 from charmhelpers.core import hookenv, unitdata
 from charmhelpers.core import host
 from charms.reactive import is_state
-from time import sleep, time
+from time import sleep
 
 db = unitdata.kv()
 kubeclientconfig_path = '/root/.kube/config'
@@ -135,11 +134,6 @@ def calculate_and_store_resource_checksums(checksum_prefix, snap_resources):
         key = get_resource_checksum_db_key(checksum_prefix, resource)
         checksum = calculate_resource_checksum(resource)
         db.set(key, checksum)
-
-
-def rename_file_idempotent(source, destination):
-    if os.path.isfile(source):
-        os.rename(source, destination)
 
 
 def get_ingress_address(relation_name):
@@ -256,42 +250,6 @@ def get_node_name():
         return gethostname().lower()
 
 
-class ApplyNodeLabelFailed(Exception):
-    pass
-
-
-def persistent_call(cmd, retry_message):
-    deadline = time() + 180
-    while time() < deadline:
-        code = subprocess.call(cmd)
-        if code == 0:
-            return True
-        hookenv.log(retry_message)
-        sleep(1)
-    else:
-        return False
-
-
-def set_label(label, value):
-    nodename = get_node_name()
-    cmd = 'kubectl --kubeconfig={0} label node {1} {2}={3} --overwrite'
-    cmd = cmd.format(kubeclientconfig_path, nodename, label, value)
-    cmd = cmd.split()
-    retry = 'Failed to apply label %s=%s. Will retry.' % (label, value)
-    if not persistent_call(cmd, retry):
-        raise ApplyNodeLabelFailed(retry)
-
-
-def remove_label(label):
-    nodename = get_node_name()
-    cmd = 'kubectl --kubeconfig={0} label node {1} {2}-'
-    cmd = cmd.format(kubeclientconfig_path, nodename, label)
-    cmd = cmd.split()
-    retry = 'Failed to remove label {0}. Will retry.'.format(label)
-    if not persistent_call(cmd, retry):
-        raise ApplyNodeLabelFailed(retry)
-
-
 def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
                       user='ubuntu', context='juju-context',
                       cluster='juju-cluster', password=None, token=None,
@@ -390,17 +348,3 @@ def configure_kubernetes_service(key, service, base_args, extra_args_key):
     check_call(cmd)
 
     db.set(prev_args_key, args)
-
-
-def remove_if_exists(path):
-    try:
-        os.remove(path)
-    except FileNotFoundError:
-        pass
-
-
-def touch(fname):
-    try:
-        os.utime(fname, None)
-    except OSError:
-        open(fname, 'a').close()
