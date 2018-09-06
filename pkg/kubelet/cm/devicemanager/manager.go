@@ -364,11 +364,15 @@ func (m *ManagerImpl) addEndpointProbeMode(resourceName string, socketPath strin
 
 	go func() {
 		select {
-		case <-chanForAckOfNotification:
+		case ackResult := <-chanForAckOfNotification:
 			close(chanForAckOfNotification)
-			m.runEndpoint(resourceName, new)
+			if ackResult {
+				m.runEndpoint(resourceName, new)
+			} else {
+				glog.Errorf("Error result in receiving notification ack from plugin: %s", resourceName)
+			}
 		case <-time.After(time.Second):
-			glog.Errorf("Timed out while waiting for notification ack from plugin")
+			glog.Errorf("Timed out while waiting for notification ack from plugin: %s", resourceName)
 		}
 	}()
 	return chanForAckOfNotification, nil
