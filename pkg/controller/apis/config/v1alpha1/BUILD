@@ -8,6 +8,7 @@ go_library(
         "doc.go",
         "register.go",
         "zz_generated.conversion.go",
+        "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/apis/config/v1alpha1",
