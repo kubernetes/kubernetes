@@ -1,7 +1,7 @@
-// +build linux
+// +build !linux
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,28 +18,5 @@ limitations under the License.
 
 package kubelet
 
-import (
-	"testing"
-
-	"github.com/stretchr/testify/assert"
-)
-
-func TestGetIPTablesMark(t *testing.T) {
-	tests := []struct {
-		bit    int
-		expect string
-	}{
-		{
-			14,
-			"0x00004000/0x00004000",
-		},
-		{
-			15,
-			"0x00008000/0x00008000",
-		},
-	}
-	for _, tc := range tests {
-		res := getIPTablesMark(tc.bit)
-		assert.Equal(t, tc.expect, res, "input %d", tc.bit)
-	}
-}
+// Do nothing.
+func (kl *Kubelet) syncNetworkUtil() {}
