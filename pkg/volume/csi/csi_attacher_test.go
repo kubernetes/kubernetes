@@ -747,12 +747,12 @@ func TestAttacherMountDevice(t *testing.T) {
 			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", numStaged, len(staged))
 		}
 		if tc.stageUnstageSet {
-			gotPath, ok := staged[tc.volName]
+			vol, ok := staged[tc.volName]
 			if !ok {
 				t.Errorf("could not find staged volume: %s", tc.volName)
 			}
-			if gotPath != tc.deviceMountPath {
-				t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, gotPath)
+			if vol.Path != tc.deviceMountPath {
+				t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, vol.Path)
 			}
 		}
 	}
@@ -836,7 +836,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 
 		// Add the volume to NodeStagedVolumes
 		cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
-		cdc.nodeClient.AddNodeStagedVolume(tc.volID, tc.deviceMountPath)
+		cdc.nodeClient.AddNodeStagedVolume(tc.volID, tc.deviceMountPath, nil)
 
 		// Make JSON for this object
 		if tc.deviceMountPath != "" {
