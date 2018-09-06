@@ -184,6 +184,13 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
 		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
 		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
+
+		// Apply user configurations for local etcd
+		if cfg.Etcd.Local != nil {
+			if value, ok := cfg.Etcd.Local.ExtraArgs["listen-client-urls"]; ok {
+				defaultArguments["etcd-servers"] = value
+			}
+		}
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
