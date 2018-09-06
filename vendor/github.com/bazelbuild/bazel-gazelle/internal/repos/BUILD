@@ -11,10 +11,9 @@ go_library(
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/repos",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
     deps = [
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/generator:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/label:go_default_library",
         "//vendor/github.com/bazelbuild/bazel-gazelle/internal/pathtools:go_default_library",
-        "//vendor/github.com/bazelbuild/buildtools/build:go_default_library",
+        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/rule:go_default_library",
         "//vendor/github.com/pelletier/go-toml:go_default_library",
         "//vendor/golang.org/x/tools/go/vcs:go_default_library",
     ],

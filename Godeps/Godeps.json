@@ -336,58 +336,78 @@
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/config",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
-			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/generator",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/flag",
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/label",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/language",
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/language/go",
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/language/proto",
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/merger",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
-		},
-		{
-			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/packages",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/pathtools",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/repos",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/resolve",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/rule",
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/version",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
+		},
+		{
+			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/walk",
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/bazel-gazelle/internal/wspace",
-			"Comment": "0.12.0",
-			"Rev": "7f30ba724af9495b221e2df0f5ac58511179485f"
+			"Comment": "0.14.0",
+			"Rev": "6a1b93cc9b1c7e55e7d05a6d324bcf9d87ea3ab1"
 		},
 		{
 			"ImportPath": "github.com/bazelbuild/buildtools/build",

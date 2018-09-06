@@ -12,6 +12,7 @@ go_library(
         "exec_windows.go",
         "memory_windows.go",
         "mksyscall.go",
+        "race.go",
         "race0.go",
         "security_windows.go",
         "service.go",
