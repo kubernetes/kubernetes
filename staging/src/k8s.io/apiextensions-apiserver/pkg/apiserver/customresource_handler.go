@@ -606,12 +606,12 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 }
 
 func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	return versioning.NewCodec(encoder, nil, s.converter, Scheme, Scheme, Scheme, gv, nil, "crdNegotiatedSerializer")
+	return versioning.NewCodec(encoder, nil, s.converter, Scheme, Scheme, Scheme, gv, nil, "crdNegotiatedSerializer", true)
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{}}
-	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
+	return versioning.NewCodec(nil, d, runtime.UnsafeObjectConvertor(Scheme), Scheme, Scheme, Scheme, nil, gv, "unstructured", true)
 }
 
 type UnstructuredObjectTyper struct {
@@ -722,6 +722,7 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 			t.encoderVersion,
 			t.decoderVersion,
 			"crdRESTOptions",
+			true,
 		)
 	}
 	return ret, err

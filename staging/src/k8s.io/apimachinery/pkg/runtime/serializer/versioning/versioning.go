@@ -33,7 +33,7 @@ func NewDefaultingCodecForScheme(
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
-	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, encodeVersion, decodeVersion, scheme.Name())
+	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, encodeVersion, decodeVersion, scheme.Name(), false)
 }
 
 // NewCodec takes objects in their internal versions and converts them to external versions before
@@ -49,6 +49,7 @@ func NewCodec(
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
 	originalSchemeName string,
+	forceConversion bool,
 ) runtime.Codec {
 	internal := &codec{
 		encoder:   encoder,
@@ -62,6 +63,7 @@ func NewCodec(
 		decodeVersion: decodeVersion,
 
 		originalSchemeName: originalSchemeName,
+		forceConversion:    forceConversion,
 	}
 	return internal
 }
@@ -79,6 +81,7 @@ type codec struct {
 
 	// originalSchemeName is optional, but when filled in it holds the name of the scheme from which this codec originates
 	originalSchemeName string
+	forceConversion    bool
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
@@ -103,7 +106,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 
 	// if we specify a target, use generic conversion.
 	if into != nil {
-		if into == obj {
+		if !c.forceConversion && into == obj {
 			if isVersioned {
 				return versioned, gvk, nil
 			}
