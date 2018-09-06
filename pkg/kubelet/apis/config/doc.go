@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
-// TODO: This file should also enable openapi-gen like the other packages
+// +groupName=kubelet.config.k8s.io
 
 package config // import "k8s.io/kubernetes/pkg/kubelet/apis/config"
