@@ -145,6 +145,8 @@ function run-checks {
       ret=1
       FAILED_TESTS+=(${t})
     fi
+    echo -e "Check for clean working directory after running ${check_name}"
+    kube::util::ensure_clean_working_dir
   done
 }
 
