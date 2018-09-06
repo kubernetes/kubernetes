@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1alpha2 holds the external kubeadm API types of version v1alpha2
-// Note: This file should be kept in sync with the similar one for the internal API
-// TODO: The BootstrapTokenString object should move out to either k8s.io/client-go or k8s.io/api in the future
-// (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.
 package v1alpha3
 
 import (
