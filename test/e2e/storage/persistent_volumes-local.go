@@ -940,7 +940,12 @@ func setupLocalVolumeGCELocalSSD(config *localTestConfig, node *v1.Node) *localT
 	Expect(err).NotTo(HaveOccurred())
 	dirName := strings.Fields(res)[0]
 	hostDir := "/mnt/disks/by-uuid/google-local-ssds-scsi-fs/" + dirName
-	return generateLocalTestVolume(hostDir, config, GCELocalSSDVolumeType, node)
+	// gce local ssd does not need to create a directory
+	return &localTestVolume{
+		node:            node,
+		hostDir:         hostDir,
+		localVolumeType: GCELocalSSDVolumeType,
+	}
 }
 
 func setupLocalVolumeDirectory(config *localTestConfig, node *v1.Node) *localTestVolume {
@@ -1108,7 +1113,8 @@ func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Po
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
 func cleanupLocalVolumeGCELocalSSD(config *localTestConfig, volume *localTestVolume) {
 	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm %s", volume.hostDir+"/"+testFile)
+	file := volume.hostDir + "/" + testFile
+	removeCmd := fmt.Sprintf("if [ -f %s ]; then rm %s; fi", file, file)
 	err := issueNodeCommand(config, removeCmd, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
