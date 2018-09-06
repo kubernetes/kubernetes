@@ -70,7 +70,7 @@ var (
 	MounttestUser            = ImageConfig{e2eRegistry, "mounttest-user", "1.0"}
 	Nautilus                 = ImageConfig{e2eRegistry, "nautilus", "1.0"}
 	Net                      = ImageConfig{e2eRegistry, "net", "1.0"}
-	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.0"}
+	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.1"}
 	Nettest                  = ImageConfig{e2eRegistry, "nettest", "1.0"}
 	Nginx                    = ImageConfig{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	NginxNew                 = ImageConfig{dockerLibraryRegistry, "nginx", "1.15-alpine"}
