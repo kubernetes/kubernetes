@@ -93,7 +93,7 @@ go_library(
         "//pkg/volume/flexvolume:go_default_library",
         "//pkg/volume/flocker:go_default_library",
         "//pkg/volume/gcepd:go_default_library",
-        "//pkg/volume/git_repo:go_default_library",
+        "//pkg/volume/gitrepo:go_default_library",
         "//pkg/volume/glusterfs:go_default_library",
         "//pkg/volume/host_path:go_default_library",
         "//pkg/volume/iscsi:go_default_library",

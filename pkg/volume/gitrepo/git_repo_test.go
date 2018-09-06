@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package git_repo
+package gitrepo
 
 import (
 	"fmt"
@@ -70,7 +70,7 @@ type expectedCommand struct {
 }
 
 func TestPlugin(t *testing.T) {
-	gitUrl := "https://github.com/kubernetes/kubernetes.git"
+	gitURL := "https://github.com/kubernetes/kubernetes.git"
 	revision := "2a30ce65c5ab586b98916d83385c5983edd353a1"
 
 	scenarios := []struct {
@@ -85,7 +85,7 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 						Revision:   revision,
 						Directory:  "target_dir",
 					},
@@ -93,7 +93,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", "--", gitUrl, "target_dir"},
+					cmd: []string{"git", "clone", "--", gitURL, "target_dir"},
 					dir: "",
 				},
 				{
@@ -113,14 +113,14 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 						Directory:  "target_dir",
 					},
 				},
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", "--", gitUrl, "target_dir"},
+					cmd: []string{"git", "clone", "--", gitURL, "target_dir"},
 					dir: "",
 				},
 			},
@@ -132,13 +132,13 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 					},
 				},
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", "--", gitUrl},
+					cmd: []string{"git", "clone", "--", gitURL},
 					dir: "",
 				},
 			},
@@ -150,7 +150,7 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 						Revision:   revision,
 						Directory:  "",
 					},
@@ -158,7 +158,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", "--", gitUrl},
+					cmd: []string{"git", "clone", "--", gitURL},
 					dir: "",
 				},
 				{
@@ -178,7 +178,7 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 						Revision:   revision,
 						Directory:  ".",
 					},
@@ -186,7 +186,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", "--", gitUrl, "."},
+					cmd: []string{"git", "clone", "--", gitURL, "."},
 					dir: "",
 				},
 				{
@@ -206,7 +206,7 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 						Revision:   revision,
 						Directory:  "./.",
 					},
@@ -214,7 +214,7 @@ func TestPlugin(t *testing.T) {
 			},
 			expecteds: []expectedCommand{
 				{
-					cmd: []string{"git", "clone", "--", gitUrl, "./."},
+					cmd: []string{"git", "clone", "--", gitURL, "./."},
 					dir: "",
 				},
 				{
@@ -246,7 +246,7 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 						Revision:   "--bar",
 					},
 				},
@@ -259,7 +259,7 @@ func TestPlugin(t *testing.T) {
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
 					GitRepo: &v1.GitRepoVolumeSource{
-						Repository: gitUrl,
+						Repository: gitURL,
 						Directory:  "-b",
 					},
 				},
@@ -330,11 +330,10 @@ func doTestPlugin(scenario struct {
 			allErrs = append(allErrs,
 				fmt.Errorf("SetUp() failed, volume path not created: %s", path))
 			return allErrs
-		} else {
-			allErrs = append(allErrs,
-				fmt.Errorf("SetUp() failed: %v", err))
-			return allErrs
 		}
+		allErrs = append(allErrs,
+			fmt.Errorf("SetUp() failed: %v", err))
+		return allErrs
 	}
 
 	// gitRepo volume should create its own empty wrapper path

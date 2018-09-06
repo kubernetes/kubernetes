@@ -140,7 +140,7 @@ EmptyDir volumes when FSGroup is specified new files should be created with FSGr
 EmptyDir volumes when FSGroup is specified volume on default medium should have the correct mode using FSGroup,eparis,1,node
 EmptyDir volumes when FSGroup is specified volume on tmpfs should have the correct mode using FSGroup,timothysc,1,node
 EmptyDir wrapper volumes should not cause race condition when used for configmaps,mtaufen,1,node
-EmptyDir wrapper volumes should not cause race condition when used for git_repo,brendandburns,1,node
+EmptyDir wrapper volumes should not cause race condition when used for gitrepo,brendandburns,1,node
 EmptyDir wrapper volumes should not conflict,deads2k,1,node
 Etcd failure should recover from SIGKILL,pmorie,1,api-machinery
 Etcd failure should recover from network partition with master,justinsb,1,api-machinery
