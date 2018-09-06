@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import json
 import os
 import random
 import re
 import shutil
 import subprocess
+import time
 import traceback
 import yaml
 
@@ -28,6 +30,7 @@ from charms.leadership import leader_get, leader_set
 from pathlib import Path
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
+from socket import gethostname
 
 from charms import layer
 from charms.layer import snap
@@ -53,11 +56,9 @@ from charms.layer.kubernetes_common import get_ingress_address
 from charms.layer.kubernetes_common import create_kubeconfig
 from charms.layer.kubernetes_common import kubectl_manifest, kubectl_success
 from charms.layer.kubernetes_common import kubectl
-from charms.layer.kubernetes_common import ApplyNodeLabelFailed
 from charms.layer.kubernetes_common import arch, get_node_name
-from charms.layer.kubernetes_common import gethostname
-from charms.layer.kubernetes_common import set_label, remove_label
 from charms.layer.kubernetes_common import configure_kubernetes_service
+from charms.layer.kubernetes_common import parse_extra_args
 
 # Override the default nagios shortname regex to allow periods, which we
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
@@ -777,8 +778,8 @@ def configure_kube_proxy(api_servers, cluster_cidr):
     if b'lxc' in check_output('virt-what', shell=True):
         kube_proxy_opts['conntrack-max-per-core'] = '0'
 
-    configure_kubernetes_service(configure_prefix, 'kube-proxy', kube_proxy_opts,
-                                 'proxy-extra-args')
+    configure_kubernetes_service(configure_prefix, 'kube-proxy',
+                                 kube_proxy_opts, 'proxy-extra-args')
 
 
 @when_any('config.changed.default-backend-image',
@@ -860,9 +861,9 @@ def launch_default_ingress_controller():
 def restart_unit_services():
     '''Restart worker services.'''
     hookenv.log('Restarting kubelet and kube-proxy.')
-    services = ['snap.kube-proxy.daemon', 'snap.kubelet.daemon']
+    services = ['kube-proxy', 'kubelet']
     for service in services:
-        service_restart(service)
+        service_restart('snap.%s.daemon' % service)
 
 
 def get_kube_api_servers(kube_api):
@@ -1088,6 +1089,42 @@ def _systemctl_is_active(application):
         return b'active' in raw
     except Exception:
         return False
+
+
+class ApplyNodeLabelFailed(Exception):
+    pass
+
+
+def persistent_call(cmd, retry_message):
+    deadline = time.time() + 180
+    while time.time() < deadline:
+        code = subprocess.call(cmd)
+        if code == 0:
+            return True
+        hookenv.log(retry_message)
+        time.sleep(1)
+    else:
+        return False
+
+
+def set_label(label, value):
+    nodename = get_node_name()
+    cmd = 'kubectl --kubeconfig={0} label node {1} {2}={3} --overwrite'
+    cmd = cmd.format(kubeconfig_path, nodename, label, value)
+    cmd = cmd.split()
+    retry = 'Failed to apply label %s=%s. Will retry.' % (label, value)
+    if not persistent_call(cmd, retry):
+        raise ApplyNodeLabelFailed(retry)
+
+
+def remove_label(label):
+    nodename = get_node_name()
+    cmd = 'kubectl --kubeconfig={0} label node {1} {2}-'
+    cmd = cmd.format(kubeconfig_path, nodename, label)
+    cmd = cmd.split()
+    retry = 'Failed to remove label {0}. Will retry.'.format(label)
+    if not persistent_call(cmd, retry):
+        raise ApplyNodeLabelFailed(retry)
 
 
 @when_any('endpoint.aws.joined',
