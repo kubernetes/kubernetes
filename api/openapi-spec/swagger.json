@@ -89163,7 +89163,7 @@
     ],
     "properties": {
      "additionalPrinterColumns": {
-      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.",
+      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Optional, and correspond to the first version in the versions list",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
@@ -89182,11 +89182,11 @@
       "type": "string"
      },
      "subresources": {
-      "description": "Subresources describes the subresources for CustomResources",
+      "description": "Subresources describes the subresources for CustomResources Optional, and correspond to the first version in the versions list",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
      },
      "validation": {
-      "description": "Validation describes the validation methods for CustomResources",
+      "description": "Validation describes the validation methods for CustomResources Optional, and correspond to the first version in the versions list",
       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceValidation"
      },
      "version": {
@@ -89237,9 +89237,20 @@
      "storage"
     ],
     "properties": {
+     "additionalPrinterColumns": {
+      "description": "AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column. Should not be set for first item in Versions list. The top level field is being used for first version.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceColumnDefinition"
+      }
+     },
      "name": {
       "description": "Name is the version name, e.g. “v1”, “v2beta1”, etc.",
       "type": "string"
+     },
+     "schema": {
+      "description": "Schema describes the schema for CustomResource used in validation, pruning, and defaulting. Should not be set for first item in Versions list. The top level field is being used for first version.",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.JSONSchemaProps"
      },
      "served": {
       "description": "Served is a flag enabling/disabling this version from being served via REST APIs",
@@ -89248,6 +89259,10 @@
      "storage": {
       "description": "Storage flags the version as storage version. There must be exactly one flagged as storage version.",
       "type": "boolean"
+     },
+     "subresources": {
+      "description": "Subresources describes the subresources for CustomResources Should not be set for first item in Versions list. The top level field is being used for first version.",
+      "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceSubresources"
      }
     }
    },
