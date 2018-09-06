@@ -813,9 +813,6 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	}
 
 	// The 'endpointname' is created in form of 'glusterfs-dynamic-<claimname>'.
-	// createEndpointService() checks for this 'endpoint' existence in PVC's namespace and
-	// If not found, it create an endpoint and service using the IPs we dynamically picked at time
-	// of volume creation.
 	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
 	epNamespace := p.options.PVC.Namespace
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
@@ -835,6 +832,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	}, sz, volID, nil
 }
 
+// createEndpointService() makes sure an endpoint and service
+// exist for the given namespace, PVC name, endpoint name, and
+// set of IPs. I.e. the endpoint or service is only created
+// if it does not exist yet.
 func (p *glusterfsVolumeProvisioner) createEndpointService(namespace string, epServiceName string, hostips []string, pvcname string) (endpoint *v1.Endpoints, service *v1.Service, err error) {
 
 	addrlist := make([]v1.EndpointAddress, len(hostips))
