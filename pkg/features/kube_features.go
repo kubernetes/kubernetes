@@ -260,7 +260,7 @@ const (
 	ReadOnlyAPIDataVolumes utilfeature.Feature = "ReadOnlyAPIDataVolumes"
 
 	// owner: @k82cn
-	// alpha: v1.10
+	// alpha: v1.11
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
 	ScheduleDaemonSetPods utilfeature.Feature = "ScheduleDaemonSetPods"
