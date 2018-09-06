@@ -168,13 +168,18 @@ function save-logs() {
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
 
-    if log-dump-ssh "${node_name}" "command -v docker" &> /dev/null; then
-      if [[ "${on_master}" == "true" ]]; then
-        log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-apiserver --format "{{.ID}}")" cat /tmp/k8s-kube-apiserver.cov' > "${dir}/kube-apiserver.cov" || true
-        log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-scheduler --format "{{.ID}}")" cat /tmp/k8s-kube-scheduler.cov' > "${dir}/kube-scheduler.cov" || true
-        log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-controller-manager --format "{{.ID}}")" cat /tmp/k8s-kube-controller-manager.cov' > "${dir}/kube-controller-manager.cov" || true
+    # Try dumping coverage profiles, if it looks like coverage is enabled in the first place.
+    if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then
+      if log-dump-ssh "${node_name}" "command -v docker" &> /dev/null; then
+        if [[ "${on_master}" == "true" ]]; then
+          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-apiserver --format "{{.ID}}")" cat /tmp/k8s-kube-apiserver.cov' > "${dir}/kube-apiserver.cov" || true
+          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-scheduler --format "{{.ID}}")" cat /tmp/k8s-kube-scheduler.cov' > "${dir}/kube-scheduler.cov" || true
+          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-controller-manager --format "{{.ID}}")" cat /tmp/k8s-kube-controller-manager.cov' > "${dir}/kube-controller-manager.cov" || true
+        else
+          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-proxy --format "{{.ID}}")" cat /tmp/k8s-kube-proxy.cov' > "${dir}/kube-proxy.cov" || true
+        fi
       else
-        log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-proxy --format "{{.ID}}")" cat /tmp/k8s-kube-proxy.cov' > "${dir}/kube-proxy.cov" || true
+        echo "Coverage profiles seem to exist, but cannot be retrieved from inside containers."
       fi
     fi
 
