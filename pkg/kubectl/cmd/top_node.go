@@ -79,9 +79,17 @@ func (o *HeapsterTopOptions) Bind(flags *pflag.FlagSet) {
 
 var (
 	topNodeLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage of nodes.
+		Display Resource (CPU/Memory) usage of nodes.
 
-		The top-node command allows you to see the resource consumption of nodes.`))
+		The 'top node' command allows you to see the resource consumption for nodes.
+
+		This command requires Metrics Server or Heapster running in the cluster.
+
+		Metric Servers should register itself for handling Metrics API in apiserver.
+		If Metrics API is available kubectl will send request to apiserver that will pass it down to Metrics Server.
+		In other case request will be sent to heapster service.
+
+		Both components are responsible for scraping metrics from kubelets summary API, with Heapster being deprecated.`))
 
 	topNodeExample = templates.Examples(i18n.T(`
 		  # Show metrics for all nodes

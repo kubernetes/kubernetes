@@ -32,11 +32,17 @@ var (
 		"v1beta1",
 	}
 	topLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage.
+		Display Resource (CPU/Memory) usage.
 
 		The top command allows you to see the resource consumption for nodes or pods.
 
-		This command requires Heapster to be correctly configured and working on the server. `))
+		This command requires Metrics Server or Heapster running in the cluster.
+
+		Metric Servers should register itself for handling Metrics API in apiserver.
+		If Metrics API is available kubectl will send request to apiserver that will pass it down to Metrics Server.
+		In other case request will be sent to heapster service.
+
+		Both components are responsible for scraping metrics from kubelets summary API, with Heapster being deprecated.`))
 )
 
 func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

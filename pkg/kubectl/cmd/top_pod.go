@@ -59,12 +59,20 @@ const metricsCreationDelay = 2 * time.Minute
 
 var (
 	topPodLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage of pods.
+		Display Resource (CPU/Memory) usage of pods.
 
 		The 'top pod' command allows you to see the resource consumption of pods.
 
 		Due to the metrics pipeline delay, they may be unavailable for a few minutes
-		since pod creation.`))
+		since pod creation.
+
+		This command requires Metrics Server or Heapster running in the cluster.
+
+		Metric Servers should register itself for handling Metrics API in apiserver.
+		If Metrics API is available kubectl will send request to apiserver that will pass it down to Metrics Server.
+		In other case request will be sent to heapster service.
+
+		Both components are responsible for scraping metrics from kubelets summary API, with Heapster being deprecated.`))
 
 	topPodExample = templates.Examples(i18n.T(`
 		# Show metrics for all pods in the default namespace
