@@ -771,6 +771,21 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	}
 	glog.V(2).Infof("create volume of size %dGiB", sz)
 
+	// Check whether we could create an endpoint before we
+	// create the gluster volume in order to prevent the churn
+	// of creating and deleting the volume if we already know
+	// the overall operation will fail anyways.
+	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
+	if len(epServiceName) > 63 {
+		glog.Errorf("The resulting endpoint name '%s' for this PVC "+
+			"create request is longer than the allowed maximum "+
+			"length of 63 characters.", epServiceName)
+		return nil, 0, "", fmt.Errorf("The resulting endpoint name "+
+			"'%s' for this PVC create request is longer than the "+
+			"allowed maximum length of 63 characters.",
+			epServiceName)
+	}
+
 	if p.url == "" {
 		glog.Errorf("REST server endpoint is empty")
 		return nil, 0, "", fmt.Errorf("failed to create glusterfs REST client, REST URL is empty")
@@ -812,7 +827,6 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, "", fmt.Errorf("failed to get cluster nodes for volume %s: %v", volume, err)
 	}
 
-	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
 	epNamespace := p.options.PVC.Namespace
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
