@@ -919,7 +919,7 @@ func setupLocalVolumeDirectoryLink(config *localTestConfig, node *v1.Node) *loca
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
 	hostDir := filepath.Join(hostBase, testDirName)
 	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
+	cmd := fmt.Sprintf("mkdir %s && sudo ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
 	_, err := framework.IssueSSHCommandWithResult(cmd, framework.TestContext.Provider, node)
 	Expect(err).NotTo(HaveOccurred())
 	// Populate volume with testFile containing testFileContent.
@@ -940,7 +940,7 @@ func setupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, node *v1.
 	testDirName := "local-volume-test-" + string(uuid.NewUUID())
 	hostDir := filepath.Join(hostBase, testDirName)
 	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s && ln -s %s %s",
+	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s && sudo ln -s %s %s",
 		hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
 	_, err := framework.IssueSSHCommandWithResult(cmd, framework.TestContext.Provider, node)
 	Expect(err).NotTo(HaveOccurred())
@@ -1027,7 +1027,7 @@ func cleanupLocalVolumeDirectoryLink(config *localTestConfig, volume *localTestV
 	By("Removing the test directory")
 	hostDir := volume.hostDir
 	hostDirBackend := hostDir + "-backend"
-	removeCmd := fmt.Sprintf("rm -r %s && rm -r %s", hostDir, hostDirBackend)
+	removeCmd := fmt.Sprintf("sudo rm -r %s && rm -r %s", hostDir, hostDirBackend)
 	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
@@ -1046,7 +1046,7 @@ func cleanupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, volume 
 	By("Removing the test directory")
 	hostDir := volume.hostDir
 	hostDirBackend := hostDir + "-backend"
-	removeCmd := fmt.Sprintf("rm %s && sudo umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
+	removeCmd := fmt.Sprintf("sudo rm %s && sudo umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
 	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
 	Expect(err).NotTo(HaveOccurred())
 }
