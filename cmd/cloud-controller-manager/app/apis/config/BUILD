@@ -1,36 +1,21 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "helpers.go",
         "register.go",
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/componentconfig",
+    importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/apis/config:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["helpers_test.go"],
-    embed = [":go_default_library"],
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
 )
 
 filegroup(
@@ -44,9 +29,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/componentconfig/fuzzer:all-srcs",
-        "//pkg/apis/componentconfig/install:all-srcs",
-        "//pkg/apis/componentconfig/v1alpha1:all-srcs",
+        "//cmd/cloud-controller-manager/app/apis/config/scheme:all-srcs",
+        "//cmd/cloud-controller-manager/app/apis/config/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

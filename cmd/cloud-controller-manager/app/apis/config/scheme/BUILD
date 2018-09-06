@@ -2,17 +2,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["config.go"],
-    importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config",
+    srcs = ["scheme.go"],
+    importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/scheme",
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/cloud-controller-manager/app/apis/config:go_default_library",
-        "//pkg/controller:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/client-go/informers:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//cmd/cloud-controller-manager/app/apis/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 

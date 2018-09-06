@@ -18,7 +18,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/master/ports:go_default_library",

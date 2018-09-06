@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,5 +15,6 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +groupName=cloudcontrollermanager.config.k8s.io
 
-package componentconfig // import "k8s.io/kubernetes/pkg/apis/componentconfig"
+package config // import "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
