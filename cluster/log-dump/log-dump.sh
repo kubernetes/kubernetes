@@ -172,11 +172,11 @@ function save-logs() {
     if log-dump-ssh "${node_name}" "stat /var/log/kubelet.cov" &> /dev/null; then
       if log-dump-ssh "${node_name}" "command -v docker" &> /dev/null; then
         if [[ "${on_master}" == "true" ]]; then
-          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-apiserver --format "{{.ID}}")" cat /tmp/k8s-kube-apiserver.cov' > "${dir}/kube-apiserver.cov" || true
-          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-scheduler --format "{{.ID}}")" cat /tmp/k8s-kube-scheduler.cov' > "${dir}/kube-scheduler.cov" || true
-          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-controller-manager --format "{{.ID}}")" cat /tmp/k8s-kube-controller-manager.cov' > "${dir}/kube-controller-manager.cov" || true
+          run-in-docker-container "${node_name}" "kube-apiserver" "cat /tmp/k8s-kube-apiserver.cov" > "${dir}/kube-apiserver.cov" || true
+          run-in-docker-container "${node_name}" "kube-scheduler" "cat /tmp/k8s-kube-scheduler.cov" > "${dir}/kube-scheduler.cov" || true
+          run-in-docker-container "${node_name}" "kube-controller-manager" "cat /tmp/k8s-kube-controller-manager.cov" > "${dir}/kube-controller-manager.cov" || true
         else
-          log-dump-ssh "${node_name}" 'docker exec "$(docker ps -f label=io.kubernetes.container.name=kube-proxy --format "{{.ID}}")" cat /tmp/k8s-kube-proxy.cov' > "${dir}/kube-proxy.cov" || true
+          run-in-docker-container "${node_name}" "kube-proxy" "cat /tmp/k8s-kube-proxy.cov" > "${dir}/kube-proxy.cov" || true
         fi
       else
         echo "Coverage profiles seem to exist, but cannot be retrieved from inside containers."
@@ -188,6 +188,15 @@ function save-logs() {
 
     echo "Copying '${files}' from ${node_name}"
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
+}
+
+# Execute a command in container $2 on node $1.
+# Uses docker because the container may not ordinarily permit direct execution.
+function run-in-docker-container() {
+  local node_name="$1"
+  local container="$2"
+  shift 2
+  log-dump-ssh "${node_name}" "docker exec \"\$(docker ps -f label=io.kubernetes.container.name=${container} --format \"{{.ID}}\")\" $@"
 }
 
 function dump_masters() {
