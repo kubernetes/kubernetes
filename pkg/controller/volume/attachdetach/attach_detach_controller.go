@@ -148,8 +148,11 @@ func NewAttachDetachController(
 	}
 
 	// Install required CSI CRDs on API server
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSICRDAutoInstall) {
-		adc.installCRDs()
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		adc.installCSIDriverCRD()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		adc.installCSINodeInfoCRD()
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -667,8 +670,7 @@ func (adc *attachDetachController) processVolumesInUse(
 	}
 }
 
-// installCRDs creates the specified CustomResourceDefinition for the CSIDrivers object.
-func (adc *attachDetachController) installCRDs() error {
+func (adc *attachDetachController) installCSIDriverCRD() error {
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: csiapiv1alpha1.CsiDriverResourcePlural + "." + csiapiv1alpha1.GroupName,
@@ -697,7 +699,12 @@ func (adc *attachDetachController) installCRDs() error {
 		return err
 	}
 
-	crd = &apiextensionsv1beta1.CustomResourceDefinition{
+	return nil
+}
+
+// installCRDs creates the specified CustomResourceDefinition for the CSIDrivers object.
+func (adc *attachDetachController) installCSINodeInfoCRD() error {
+	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: csiapiv1alpha1.CsiNodeInfoResourcePlural + "." + csiapiv1alpha1.GroupName,
 		},
@@ -711,7 +718,7 @@ func (adc *attachDetachController) installCRDs() error {
 			},
 		},
 	}
-	res, err = adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
 	if err == nil {
 		glog.Infof("CSINodeInfo CRD created successfully: %#v",

@@ -147,10 +147,10 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gate %s", features.NodeLease))
 
 	case csiNodeInfoResource:
-		if c.features.Enabled(features.KubeletPluginsWatcher) {
+		if c.features.Enabled(features.KubeletPluginsWatcher) && c.features.Enabled(features.CSINodeInfo) {
 			return c.admitCSINodeInfo(nodeName, a)
 		}
-		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gate %s", features.KubeletPluginsWatcher))
+		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo))
 
 	default:
 		return nil

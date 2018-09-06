@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,12 +42,12 @@ import (
 )
 
 var (
-	trEnabledFeature              = utilfeature.NewFeatureGate()
-	trDisabledFeature             = utilfeature.NewFeatureGate()
-	leaseEnabledFeature           = utilfeature.NewFeatureGate()
-	leaseDisabledFeature          = utilfeature.NewFeatureGate()
-	pluginsWatcherEnabledFeature  = utilfeature.NewFeatureGate()
-	pluginsWatcherDisabledFeature = utilfeature.NewFeatureGate()
+	trEnabledFeature           = utilfeature.NewFeatureGate()
+	trDisabledFeature          = utilfeature.NewFeatureGate()
+	leaseEnabledFeature        = utilfeature.NewFeatureGate()
+	leaseDisabledFeature       = utilfeature.NewFeatureGate()
+	csiNodeInfoEnabledFeature  = utilfeature.NewFeatureGate()
+	csiNodeInfoDisabledFeature = utilfeature.NewFeatureGate()
 )
 
 func init() {
@@ -62,10 +63,16 @@ func init() {
 	if err := leaseDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := pluginsWatcherEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := pluginsWatcherDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
+		panic(err)
+	}
+	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -996,43 +1003,43 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "disallowed create CSINodeInfo - feature disabled",
 			attributes: admission.NewAttributesRecord(nodeInfo, nil, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Create, false, mynode),
-			features:   pluginsWatcherDisabledFeature,
-			err:        "forbidden: disabled by feature gate KubeletPluginsWatcher",
+			features:   csiNodeInfoDisabledFeature,
+			err:        fmt.Sprintf("forbidden: disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo),
 		},
 		{
 			name:       "disallowed create another node's CSINodeInfo - feature enabled",
 			attributes: admission.NewAttributesRecord(nodeInfoWrongName, nil, csiNodeInfoKind, nodeInfoWrongName.Namespace, nodeInfoWrongName.Name, csiNodeInfoResource, "", admission.Create, false, mynode),
-			features:   pluginsWatcherEnabledFeature,
+			features:   csiNodeInfoEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "disallowed update another node's CSINodeInfo - feature enabled",
 			attributes: admission.NewAttributesRecord(nodeInfoWrongName, nodeInfoWrongName, csiNodeInfoKind, nodeInfoWrongName.Namespace, nodeInfoWrongName.Name, csiNodeInfoResource, "", admission.Update, false, mynode),
-			features:   pluginsWatcherEnabledFeature,
+			features:   csiNodeInfoEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "disallowed delete another node's CSINodeInfo - feature enabled",
 			attributes: admission.NewAttributesRecord(nil, nil, csiNodeInfoKind, nodeInfoWrongName.Namespace, nodeInfoWrongName.Name, csiNodeInfoResource, "", admission.Delete, false, mynode),
-			features:   pluginsWatcherEnabledFeature,
+			features:   csiNodeInfoEnabledFeature,
 			err:        "forbidden: ",
 		},
 		{
 			name:       "allowed create node CSINodeInfo - feature enabled",
 			attributes: admission.NewAttributesRecord(nodeInfo, nil, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Create, false, mynode),
-			features:   pluginsWatcherEnabledFeature,
+			features:   csiNodeInfoEnabledFeature,
 			err:        "",
 		},
 		{
 			name:       "allowed update node CSINodeInfo - feature enabled",
 			attributes: admission.NewAttributesRecord(nodeInfo, nodeInfo, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Update, false, mynode),
-			features:   pluginsWatcherEnabledFeature,
+			features:   csiNodeInfoEnabledFeature,
 			err:        "",
 		},
 		{
 			name:       "allowed delete node CSINodeInfo - feature enabled",
 			attributes: admission.NewAttributesRecord(nil, nil, csiNodeInfoKind, nodeInfo.Namespace, nodeInfo.Name, csiNodeInfoResource, "", admission.Delete, false, mynode),
-			features:   pluginsWatcherEnabledFeature,
+			features:   csiNodeInfoEnabledFeature,
 			err:        "",
 		},
 	}

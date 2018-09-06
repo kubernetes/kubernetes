@@ -123,10 +123,10 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 			}
 			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.NodeLease), nil
 		case csiNodeInfoResource:
-			if r.features.Enabled(features.KubeletPluginsWatcher) {
+			if r.features.Enabled(features.KubeletPluginsWatcher) && r.features.Enabled(features.CSINodeInfo) {
 				return r.authorizeCSINodeInfo(nodeName, attrs)
 			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.KubeletPluginsWatcher), nil
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo), nil
 		}
 
 	}

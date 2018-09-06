@@ -91,24 +91,23 @@ func (nim *nodeInfoManager) AddNodeInfo(driverName string, driverNodeID string, 
 		return fmt.Errorf("error adding CSI driver node info: driverNodeID must not be empty")
 	}
 
-	err := nim.updateNode(
+	nodeUpdateFuncs := []nodeUpdateFunc{
 		updateNodeIDInNode(driverName, driverNodeID),
 		updateMaxAttachLimit(driverName, maxAttachLimit),
-		updateTopologyLabels(topology),
-	)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		nodeUpdateFuncs = append(nodeUpdateFuncs, updateTopologyLabels(topology))
+	}
+	err := nim.updateNode(nodeUpdateFuncs...)
 	if err != nil {
 		return fmt.Errorf("error updating Node object with CSI driver node info: %v", err)
 	}
 
-	err = nim.updateCSINodeInfo(driverName, driverNodeID, topology)
-	if err != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSICRDAutoInstall) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		err = nim.updateCSINodeInfo(driverName, driverNodeID, topology)
+		if err != nil {
 			return fmt.Errorf("error updating CSINodeInfo object with CSI driver node info: %v", err)
 		}
-
-		// CSINodeInfo CRD doesn't exist. Log the error instead of triggering driver unregistration
-		// by returning the error.
-		glog.Errorf("Error updating CSINodeInfo object with CSI driver node info: %v", err)
 	}
 	return nil
 }

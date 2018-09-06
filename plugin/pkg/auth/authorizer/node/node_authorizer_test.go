@@ -39,14 +39,14 @@ import (
 )
 
 var (
-	csiEnabledFeature             = utilfeature.NewFeatureGate()
-	csiDisabledFeature            = utilfeature.NewFeatureGate()
-	trEnabledFeature              = utilfeature.NewFeatureGate()
-	trDisabledFeature             = utilfeature.NewFeatureGate()
-	leaseEnabledFeature           = utilfeature.NewFeatureGate()
-	leaseDisabledFeature          = utilfeature.NewFeatureGate()
-	pluginsWatcherEnabledFeature  = utilfeature.NewFeatureGate()
-	pluginsWatcherDisabledFeature = utilfeature.NewFeatureGate()
+	csiEnabledFeature          = utilfeature.NewFeatureGate()
+	csiDisabledFeature         = utilfeature.NewFeatureGate()
+	trEnabledFeature           = utilfeature.NewFeatureGate()
+	trDisabledFeature          = utilfeature.NewFeatureGate()
+	leaseEnabledFeature        = utilfeature.NewFeatureGate()
+	leaseDisabledFeature       = utilfeature.NewFeatureGate()
+	csiNodeInfoEnabledFeature  = utilfeature.NewFeatureGate()
+	csiNodeInfoDisabledFeature = utilfeature.NewFeatureGate()
 )
 
 func init() {
@@ -68,10 +68,16 @@ func init() {
 	if err := leaseDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.NodeLease: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := pluginsWatcherEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := pluginsWatcherDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
+	if err := csiNodeInfoEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
+		panic(err)
+	}
+	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.KubeletPluginsWatcher: {Default: false}}); err != nil {
+		panic(err)
+	}
+	if err := csiNodeInfoDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -350,79 +356,79 @@ func TestAuthorizer(t *testing.T) {
 		{
 			name:     "disallowed CSINodeInfo - feature disabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node0"},
-			features: pluginsWatcherDisabledFeature,
+			features: csiNodeInfoDisabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "disallowed CSINodeInfo with subresource - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodeinfos", Subresource: "csiDrivers", APIGroup: "csi.storage.k8s.io", Name: "node0"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "disallowed get another node's CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node1"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "disallowed update another node's CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node1"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "disallowed patch another node's CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node1"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "disallowed delete another node's CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node1"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "disallowed list CSINodeInfos - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "disallowed watch CSINodeInfos - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionNoOpinion,
 		},
 		{
 			name:     "allowed get CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node0"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionAllow,
 		},
 		{
 			name:     "allowed create CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node0"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionAllow,
 		},
 		{
 			name:     "allowed update CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node0"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionAllow,
 		},
 		{
 			name:     "allowed patch CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node0"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionAllow,
 		},
 		{
 			name:     "allowed delete CSINodeInfo - feature enabled",
 			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodeinfos", APIGroup: "csi.storage.k8s.io", Name: "node0"},
-			features: pluginsWatcherEnabledFeature,
+			features: csiNodeInfoEnabledFeature,
 			expect:   authorizer.DecisionAllow,
 		},
 	}

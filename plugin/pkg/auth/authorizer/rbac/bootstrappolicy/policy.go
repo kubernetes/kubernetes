@@ -164,7 +164,8 @@ func NodeRules() []rbacv1.PolicyRule {
 			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
 	}
@@ -507,7 +508,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
 		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{

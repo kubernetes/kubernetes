@@ -18,16 +18,19 @@ package nodeinfomanager
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csifake "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"testing"
 )
 
@@ -318,7 +321,52 @@ func TestAddNodeInfo(t *testing.T) {
 		},
 	}
 
-	test(t, true /* addNodeInfo */, testcases)
+	test(t, true /* addNodeInfo */, true /* csiNodeInfoEnabled */, testcases)
+}
+
+// TestAddNodeInfo_CSINodeInfoDisabled tests AddNodeInfo with various existing Node annotations
+// and CSINodeInfo feature gate disabled.
+func TestAddNodeInfo_CSINodeInfoDisabled(t *testing.T) {
+	testcases := []testcase{
+		{
+			name:         "empty node",
+			driverName:   "com.example.csi/driver1",
+			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */),
+			inputNodeID:  "com.example.csi/csi-node1",
+			expectedNodeIDMap: map[string]string{
+				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			},
+		},
+		{
+			name:       "pre-existing node info from the same driver",
+			driverName: "com.example.csi/driver1",
+			existingNode: generateNode(
+				nodeIDMap{
+					"com.example.csi/driver1": "com.example.csi/csi-node1",
+				},
+				nil /* labels */),
+			inputNodeID: "com.example.csi/csi-node1",
+			expectedNodeIDMap: map[string]string{
+				"com.example.csi/driver1": "com.example.csi/csi-node1",
+			},
+		},
+		{
+			name:       "pre-existing node info from different driver",
+			driverName: "com.example.csi/driver1",
+			existingNode: generateNode(
+				nodeIDMap{
+					"net.example.storage/other-driver": "net.example.storage/test-node",
+				},
+				nil /* labels */),
+			inputNodeID: "com.example.csi/csi-node1",
+			expectedNodeIDMap: map[string]string{
+				"com.example.csi/driver1":          "com.example.csi/csi-node1",
+				"net.example.storage/other-driver": "net.example.storage/test-node",
+			},
+		},
+	}
+
+	test(t, true /* addNodeInfo */, false /* csiNodeInfoEnabled */, testcases)
 }
 
 // TestRemoveNodeInfo tests RemoveNodeInfo with various existing Node and/or CSINodeInfo objects.
@@ -407,10 +455,51 @@ func TestRemoveNodeInfo(t *testing.T) {
 		},
 	}
 
-	test(t, false /* addNodeInfo */, testcases)
+	test(t, false /* addNodeInfo */, true /* csiNodeInfoEnabled */, testcases)
+}
+
+// TestRemoveNodeInfo tests RemoveNodeInfo with various existing Node objects and CSINodeInfo
+// feature disabled.
+func TestRemoveNodeInfo_CSINodeInfoDisabled(t *testing.T) {
+	testcases := []testcase{
+		{
+			name:              "empty node",
+			driverName:        "com.example.csi/driver1",
+			existingNode:      generateNode(nil /* nodeIDs */, nil /* labels */),
+			expectedNodeIDMap: nil,
+		},
+		{
+			name:       "pre-existing node info from the same driver",
+			driverName: "com.example.csi/driver1",
+			existingNode: generateNode(
+				nodeIDMap{
+					"com.example.csi/driver1": "com.example.csi/csi-node1",
+				},
+				nil /* labels */),
+			expectedNodeIDMap: nil,
+		},
+		{
+			name:       "pre-existing node info from different driver",
+			driverName: "com.example.csi/driver1",
+			existingNode: generateNode(
+				nodeIDMap{
+					"net.example.storage/other-driver": "net.example.storage/csi-node1",
+				},
+				nil /* labels */),
+			expectedNodeIDMap: map[string]string{
+				"net.example.storage/other-driver": "net.example.storage/csi-node1",
+			},
+		},
+	}
+
+	test(t, false /* addNodeInfo */, false /* csiNodeInfoEnabled */, testcases)
 }
 
 func TestAddNodeInfoExistingAnnotation(t *testing.T) {
+	csiNodeInfoEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.CSINodeInfo))
+	defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, csiNodeInfoEnabled))
+
 	driverName := "com.example.csi/driver1"
 	nodeID := "com.example.csi/some-node"
 
@@ -471,7 +560,11 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 	}
 }
 
-func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
+func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
+	wasEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, csiNodeInfoEnabled))
+	defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, wasEnabled))
+
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)
 
@@ -534,39 +627,39 @@ func test(t *testing.T, addNodeInfo bool, testcases []testcase) {
 			}
 		}
 
-		// Topology labels
-		if !helper.Semantic.DeepEqual(node.Labels, tc.expectedLabels) {
-			t.Errorf("expected topology labels to be %v; got: %v", tc.expectedLabels, node.Labels)
-		}
-		/* End Node Validation */
+		if csiNodeInfoEnabled {
+			// Topology labels
+			if !helper.Semantic.DeepEqual(node.Labels, tc.expectedLabels) {
+				t.Errorf("expected topology labels to be %v; got: %v", tc.expectedLabels, node.Labels)
+			}
 
-		/* CSINodeInfo validation */
-		nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
-		if tc.expectNoNodeInfo && errors.IsNotFound(err) {
-			continue
-		} else if err != nil {
-			t.Errorf("error getting CSINodeInfo: %v", err)
-			continue
-		}
+			/* CSINodeInfo validation */
+			nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
+			if tc.expectNoNodeInfo && errors.IsNotFound(err) {
+				continue
+			} else if err != nil {
+				t.Errorf("error getting CSINodeInfo: %v", err)
+				continue
+			}
 
-		// Extract node IDs and topology keys
-		actualNodeIDs := make(map[string]string)
-		actualTopologyKeys := make(map[string]sets.String)
-		for _, driver := range nodeInfo.CSIDrivers {
-			actualNodeIDs[driver.Driver] = driver.NodeID
-			actualTopologyKeys[driver.Driver] = sets.NewString(driver.TopologyKeys...)
-		}
+			// Extract node IDs and topology keys
+			actualNodeIDs := make(map[string]string)
+			actualTopologyKeys := make(map[string]sets.String)
+			for _, driver := range nodeInfo.CSIDrivers {
+				actualNodeIDs[driver.Driver] = driver.NodeID
+				actualTopologyKeys[driver.Driver] = sets.NewString(driver.TopologyKeys...)
+			}
 
-		// Node IDs
-		if !helper.Semantic.DeepEqual(actualNodeIDs, tc.expectedNodeIDMap) {
-			t.Errorf("expected node IDs %v from CSINodeInfo; got: %v", tc.expectedNodeIDMap, actualNodeIDs)
-		}
+			// Node IDs
+			if !helper.Semantic.DeepEqual(actualNodeIDs, tc.expectedNodeIDMap) {
+				t.Errorf("expected node IDs %v from CSINodeInfo; got: %v", tc.expectedNodeIDMap, actualNodeIDs)
+			}
 
-		// Topology keys
-		if !helper.Semantic.DeepEqual(actualTopologyKeys, tc.expectedTopologyMap) {
-			t.Errorf("expected topology keys %v from CSINodeInfo; got: %v", tc.expectedTopologyMap, actualTopologyKeys)
+			// Topology keys
+			if !helper.Semantic.DeepEqual(actualTopologyKeys, tc.expectedTopologyMap) {
+				t.Errorf("expected topology keys %v from CSINodeInfo; got: %v", tc.expectedTopologyMap, actualTopologyKeys)
+			}
 		}
-		/* End CSINodeInfo validation */
 	}
 }
 

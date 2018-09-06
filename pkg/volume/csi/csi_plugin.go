@@ -142,8 +142,6 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 		return fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
 	}
 
-	// Calling nodeLabelManager to update annotations and labels for newly registered CSI driver
-	// err = nodeUpdater.AddLabelsAndLimits(pluginName, driverNodeID, maxVolumePerNode) // TODO (verult) merge
 	err = nim.AddNodeInfo(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
 		unregisterDriver(pluginName)
