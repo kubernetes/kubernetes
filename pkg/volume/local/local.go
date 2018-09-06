@@ -110,7 +110,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.LocalVolumeSource, bool, error) {
 }
 
 func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	_, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
 			plugin:          plugin,
 			globalPath:      globalLocalPath,
-			MetricsProvider: volume.NewMetricsStatFS(volumeSource.Path),
+			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName), spec.Name())),
 		},
 		readOnly: readOnly,
 	}, nil
