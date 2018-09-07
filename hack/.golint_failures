@@ -13,14 +13,6 @@ cmd/kubeadm/app/util/system
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
-pkg/api/endpoints
-pkg/api/ref
-pkg/api/testapi
-pkg/api/testing
-pkg/api/testing/compat
-pkg/api/v1/endpoints
-pkg/api/v1/pod
-pkg/api/v1/resource
 pkg/apis/abac
 pkg/apis/abac/latest
 pkg/apis/abac/v0
