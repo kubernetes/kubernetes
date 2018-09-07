@@ -104,7 +104,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "94e38aa1586e8a6c8a75770bddf5ff84c48a106b"
+			"Rev": "f195058310bd062ea7c754a834f0ff43b4b63afb"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
