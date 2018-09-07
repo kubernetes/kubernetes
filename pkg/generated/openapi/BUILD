@@ -72,6 +72,8 @@ openapi_library(
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1",
         "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1",
         "k8s.io/kube-controller-manager/config/v1alpha1",
+        "k8s.io/kube-proxy/config/v1alpha1",
+        "k8s.io/kube-scheduler/config/v1alpha1",
         "k8s.io/kubelet/config/v1beta1",
         "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1",
         "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2",
