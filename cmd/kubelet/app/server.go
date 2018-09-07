@@ -62,7 +62,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/chaosclient"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -890,20 +889,7 @@ func createAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 	clientConfig.QPS = float32(s.KubeAPIQPS)
 	clientConfig.Burst = int(s.KubeAPIBurst)
 
-	addChaosToClientConfig(s, clientConfig)
 	return clientConfig, nil
-}
-
-// addChaosToClientConfig injects random errors into client connections if configured.
-func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config) {
-	if s.ChaosChance != 0.0 {
-		config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-			seed := chaosclient.NewSeed(1)
-			// TODO: introduce a standard chaos package with more tunables - this is just a proof of concept
-			// TODO: introduce random latency and stalls
-			return chaosclient.NewChaosRoundTripper(rt, chaosclient.LogChaos, seed.P(s.ChaosChance, chaosclient.ErrSimulatedConnectionResetByPeer))
-		}
-	}
 }
 
 // RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:
