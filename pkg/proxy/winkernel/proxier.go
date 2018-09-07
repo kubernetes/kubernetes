@@ -517,15 +517,14 @@ func CleanupLeftovers() (encounteredError bool) {
 
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []*endpointsInfo) {
 	Log(svcInfo, "Service Cleanup", 3)
-	if svcInfo.policyApplied {
-		svcInfo.deleteAllHnsLoadBalancerPolicy()
-		// Cleanup Endpoints references
-		for _, ep := range endpoints {
-			ep.Cleanup()
-		}
-
-		svcInfo.policyApplied = false
+	// Skip the svcInfo.policyApplied check to remove all the policies
+	svcInfo.deleteAllHnsLoadBalancerPolicy()
+	// Cleanup Endpoints references
+	for _, ep := range endpoints {
+		ep.Cleanup()
 	}
+
+	svcInfo.policyApplied = false
 }
 
 func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
