@@ -85,6 +85,7 @@ func selectString(s, spec string) bool {
 	pos := 0
 	match := true
 	parts := strings.Split(spec, "*")
+L:
 	for i, part := range parts {
 		if len(part) == 0 {
 			continue
@@ -100,7 +101,7 @@ func selectString(s, spec string) bool {
 		// last part does not exactly match remaining part of string
 		case i == (len(parts)-1) && len(s) != (len(part)+next):
 			match = false
-			break
+			break L
 		default:
 			pos = next
 		}

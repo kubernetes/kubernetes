@@ -307,19 +307,18 @@ func isBind(options []string) (bool, []string, []string) {
 	if checkForNetDev(options) {
 		bindOpts = append(bindOpts, "_netdev")
 	}
-
+L:
 	for _, option := range options {
 		switch option {
 		case "bind":
 			bind = true
-			break
+			break L
 		case "remount":
-			break
+			break L
 		default:
 			bindRemountOpts = append(bindRemountOpts, option)
 		}
 	}
-
 	return bind, bindOpts, bindRemountOpts
 }
 

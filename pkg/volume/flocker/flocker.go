@@ -395,7 +395,7 @@ func (b *flockerVolumeMounter) updateDatasetPrimary(datasetUUID string, primaryU
 				datasetUUID, primaryUUID, err,
 			)
 		case <-tickChan.C:
-			break
+			return nil
 		}
 	}
 
