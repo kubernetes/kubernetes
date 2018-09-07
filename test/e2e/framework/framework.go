@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -347,25 +346,6 @@ func (f *Framework) AfterEach() {
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		}
-
-		logFunc := Logf
-		if TestContext.ReportDir != "" {
-			filePath := path.Join(TestContext.ReportDir, "image-puller.txt")
-			file, err := os.Create(filePath)
-			if err != nil {
-				By(fmt.Sprintf("Failed to create a file with image-puller data %v: %v\nPrinting to stdout", filePath, err))
-			} else {
-				By(fmt.Sprintf("Dumping a list of prepulled images on each node to file %v", filePath))
-				defer file.Close()
-				if err = file.Chmod(0644); err != nil {
-					Logf("Failed to chmod to 644 of %v: %v", filePath, err)
-				}
-				logFunc = GetLogToFileFunc(file)
-			}
-		} else {
-			By("Dumping a list of prepulled images on each node...")
-		}
-		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", logFunc)
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
