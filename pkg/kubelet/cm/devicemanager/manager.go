@@ -56,7 +56,7 @@ type ManagerImpl struct {
 	socketname string
 	socketdir  string
 
-	endpoints map[string]endpoint // Key is ResourceName
+	endpoints map[string]endpointInfo // Key is ResourceName
 	mutex     sync.Mutex
 
 	server *grpc.Server
@@ -86,8 +86,12 @@ type ManagerImpl struct {
 
 	// podDevices contains pod to allocated device mapping.
 	podDevices        podDevices
-	pluginOpts        map[string]*pluginapi.DevicePluginOptions
 	checkpointManager checkpointmanager.CheckpointManager
+}
+
+type endpointInfo struct {
+	e    endpoint
+	opts *pluginapi.DevicePluginOptions
 }
 
 type sourcesReadyStub struct{}
@@ -109,13 +113,13 @@ func newManagerImpl(socketPath string) (*ManagerImpl, error) {
 
 	dir, file := filepath.Split(socketPath)
 	manager := &ManagerImpl{
-		endpoints:        make(map[string]endpoint),
+		endpoints: make(map[string]endpointInfo),
+
 		socketname:       file,
 		socketdir:        dir,
 		healthyDevices:   make(map[string]sets.String),
 		unhealthyDevices: make(map[string]sets.String),
 		allocatedDevices: make(map[string]sets.String),
-		pluginOpts:       make(map[string]*pluginapi.DevicePluginOptions),
 		podDevices:       make(podDevices),
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
@@ -228,8 +232,8 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	return nil
 }
 
-// GetWatcherCallback returns callback function to be registered with plugin watcher
-func (m *ManagerImpl) GetWatcherCallback() watcher.RegisterCallbackFn {
+// GetWatcherHandler returns the plugin handler
+func (m *ManagerImpl) GetWatcherHandler() watcher.PluginHandler {
 	if f, err := os.Create(m.socketdir + "DEPRECATION"); err != nil {
 		glog.Errorf("Failed to create deprecation file at %s", m.socketdir)
 	} else {
@@ -237,16 +241,57 @@ func (m *ManagerImpl) GetWatcherCallback() watcher.RegisterCallbackFn {
 		glog.V(4).Infof("created deprecation file %s", f.Name())
 	}
 
-	return func(name string, endpoint string, versions []string, sockPath string) (chan bool, error) {
-		if !m.isVersionCompatibleWithPlugin(versions) {
-			return nil, fmt.Errorf("manager version, %s, is not among plugin supported versions %v", pluginapi.Version, versions)
-		}
+	return watcher.PluginHandler(m)
+}
 
-		if !v1helper.IsExtendedResourceName(v1.ResourceName(name)) {
-			return nil, fmt.Errorf("invalid name of device plugin socket: %s", fmt.Sprintf(errInvalidResourceName, name))
-		}
+// ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
+func (m *ManagerImpl) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+	glog.V(2).Infof("Got Plugin %s at endpoint %s with versions %v", pluginName, endpoint, versions)
 
-		return m.addEndpointProbeMode(name, sockPath)
+	if !m.isVersionCompatibleWithPlugin(versions) {
+		return fmt.Errorf("manager version, %s, is not among plugin supported versions %v", pluginapi.Version, versions)
+	}
+
+	if !v1helper.IsExtendedResourceName(v1.ResourceName(pluginName)) {
+		return fmt.Errorf("invalid name of device plugin socket: %s", fmt.Sprintf(errInvalidResourceName, pluginName))
+	}
+
+	return nil
+}
+
+// RegisterPlugin starts the endpoint and registers it
+// TODO: Start the endpoint and wait for the First ListAndWatch call
+//       before registering the plugin
+func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string) error {
+	glog.V(2).Infof("Registering Plugin %s at endpoint %s", pluginName, endpoint)
+
+	e, err := newEndpointImpl(endpoint, pluginName, m.callback)
+	if err != nil {
+		return fmt.Errorf("Failed to dial device plugin with socketPath %s: %v", endpoint, err)
+	}
+
+	options, err := e.client.GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
+	if err != nil {
+		return fmt.Errorf("Failed to get device plugin options: %v", err)
+	}
+
+	m.registerEndpoint(pluginName, options, e)
+	go m.runEndpoint(pluginName, e)
+
+	return nil
+}
+
+// DeRegisterPlugin deregisters the plugin
+// TODO work on the behavior for deregistering plugins
+// e.g: Should we delete the resource
+func (m *ManagerImpl) DeRegisterPlugin(pluginName string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// Note: This will mark the resource unhealthy as per the behavior
+	// in runEndpoint
+	if eI, ok := m.endpoints[pluginName]; ok {
+		eI.e.stop()
 	}
 }
 
@@ -333,8 +378,8 @@ func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest
 func (m *ManagerImpl) Stop() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	for _, e := range m.endpoints {
-		e.stop()
+	for _, eI := range m.endpoints {
+		eI.e.stop()
 	}
 
 	if m.server == nil {
@@ -346,51 +391,26 @@ func (m *ManagerImpl) Stop() error {
 	return nil
 }
 
-func (m *ManagerImpl) addEndpointProbeMode(resourceName string, socketPath string) (chan bool, error) {
-	chanForAckOfNotification := make(chan bool)
-
-	new, err := newEndpointImpl(socketPath, resourceName, m.callback)
-	if err != nil {
-		glog.Errorf("Failed to dial device plugin with socketPath %s: %v", socketPath, err)
-		return nil, fmt.Errorf("Failed to dial device plugin with socketPath %s: %v", socketPath, err)
-	}
-
-	options, err := new.client.GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
-	if err != nil {
-		glog.Errorf("Failed to get device plugin options: %v", err)
-		return nil, fmt.Errorf("Failed to get device plugin options: %v", err)
-	}
-	m.registerEndpoint(resourceName, options, new)
-
-	go func() {
-		select {
-		case <-chanForAckOfNotification:
-			close(chanForAckOfNotification)
-			m.runEndpoint(resourceName, new)
-		case <-time.After(time.Second):
-			glog.Errorf("Timed out while waiting for notification ack from plugin")
-		}
-	}()
-	return chanForAckOfNotification, nil
-}
-
-func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e *endpointImpl) {
+func (m *ManagerImpl) registerEndpoint(resourceName string, options *pluginapi.DevicePluginOptions, e endpoint) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.pluginOpts[resourceName] = options
-	m.endpoints[resourceName] = e
+
+	m.endpoints[resourceName] = endpointInfo{e: e, opts: options}
 	glog.V(2).Infof("Registered endpoint %v", e)
 }
 
-func (m *ManagerImpl) runEndpoint(resourceName string, e *endpointImpl) {
+func (m *ManagerImpl) runEndpoint(resourceName string, e endpoint) {
 	e.run()
 	e.stop()
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if old, ok := m.endpoints[resourceName]; ok && old == e {
+
+	if old, ok := m.endpoints[resourceName]; ok && old.e == e {
 		m.markResourceUnhealthy(resourceName)
 	}
-	glog.V(2).Infof("Unregistered endpoint %v", e)
+
+	glog.V(2).Infof("Endpoint (%s, %v) became unhealthy", resourceName, e)
 }
 
 func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
@@ -437,8 +457,8 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	deletedResources := sets.NewString()
 	m.mutex.Lock()
 	for resourceName, devices := range m.healthyDevices {
-		e, ok := m.endpoints[resourceName]
-		if (ok && e.stopGracePeriodExpired()) || !ok {
+		eI, ok := m.endpoints[resourceName]
+		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
 			// The resources contained in endpoints and (un)healthyDevices
 			// should always be consistent. Otherwise, we run with the risk
 			// of failing to garbage collect non-existing resources or devices.
@@ -455,8 +475,8 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 		}
 	}
 	for resourceName, devices := range m.unhealthyDevices {
-		e, ok := m.endpoints[resourceName]
-		if (ok && e.stopGracePeriodExpired()) || !ok {
+		eI, ok := m.endpoints[resourceName]
+		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
 			if !ok {
 				glog.Errorf("unexpected: unhealthyDevices and endpoints are out of sync")
 			}
@@ -519,7 +539,7 @@ func (m *ManagerImpl) readCheckpoint() error {
 		// will stay zero till the corresponding device plugin re-registers.
 		m.healthyDevices[resource] = sets.NewString()
 		m.unhealthyDevices[resource] = sets.NewString()
-		m.endpoints[resource] = newStoppedEndpointImpl(resource)
+		m.endpoints[resource] = endpointInfo{e: newStoppedEndpointImpl(resource), opts: nil}
 	}
 	return nil
 }
@@ -652,7 +672,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// plugin Allocate grpc calls if it becomes common that a container may require
 		// resources from multiple device plugins.
 		m.mutex.Lock()
-		e, ok := m.endpoints[resource]
+		eI, ok := m.endpoints[resource]
 		m.mutex.Unlock()
 		if !ok {
 			m.mutex.Lock()
@@ -665,7 +685,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// TODO: refactor this part of code to just append a ContainerAllocationRequest
 		// in a passed in AllocateRequest pointer, and issues a single Allocate call per pod.
 		glog.V(3).Infof("Making allocation request for devices %v for device plugin %s", devs, resource)
-		resp, err := e.allocate(devs)
+		resp, err := eI.e.allocate(devs)
 		metrics.DevicePluginAllocationLatency.WithLabelValues(resource).Observe(metrics.SinceInMicroseconds(startRPCTime))
 		if err != nil {
 			// In case of allocation failure, we want to restore m.allocatedDevices
@@ -715,11 +735,13 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 // with PreStartRequired option set.
 func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource string) error {
 	m.mutex.Lock()
-	opts, ok := m.pluginOpts[resource]
+	eI, ok := m.endpoints[resource]
 	if !ok {
 		m.mutex.Unlock()
-		return fmt.Errorf("Plugin options not found in cache for resource: %s", resource)
-	} else if opts == nil || !opts.PreStartRequired {
+		return fmt.Errorf("endpoint not found in cache for a registered resource: %s", resource)
+	}
+
+	if eI.opts == nil || !eI.opts.PreStartRequired {
 		m.mutex.Unlock()
 		glog.V(4).Infof("Plugin options indicate to skip PreStartContainer for resource: %s", resource)
 		return nil
@@ -731,16 +753,10 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource s
 		return fmt.Errorf("no devices found allocated in local cache for pod %s, container %s, resource %s", podUID, contName, resource)
 	}
 
-	e, ok := m.endpoints[resource]
-	if !ok {
-		m.mutex.Unlock()
-		return fmt.Errorf("endpoint not found in cache for a registered resource: %s", resource)
-	}
-
 	m.mutex.Unlock()
 	devs := devices.UnsortedList()
 	glog.V(4).Infof("Issuing an PreStartContainer call for container, %s, of pod %s", contName, podUID)
-	_, err := e.preStartContainer(devs)
+	_, err := eI.e.preStartContainer(devs)
 	if err != nil {
 		return fmt.Errorf("device plugin PreStartContainer rpc failed with err: %v", err)
 	}

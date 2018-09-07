@@ -129,8 +129,12 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	}
 
 	vols := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodeStagedVolumes()
-	if vols[csiMapper.volumeID] != devicePath {
+	vol, ok := vols[csiMapper.volumeID]
+	if !ok {
 		t.Error("csi server may not have received NodePublishVolume call")
+	}
+	if vol.Path != devicePath {
+		t.Errorf("csi server expected device path %s, got %s", devicePath, vol.Path)
 	}
 }
 
@@ -198,8 +202,12 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	}
 
 	pubs := csiMapper.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
-	if pubs[csiMapper.volumeID] != podVolumeBlockFilePath {
+	vol, ok := pubs[csiMapper.volumeID]
+	if !ok {
 		t.Error("csi server may not have received NodePublishVolume call")
+	}
+	if vol.Path != podVolumeBlockFilePath {
+		t.Errorf("csi server expected path %s, got %s", podVolumeBlockFilePath, vol.Path)
 	}
 }
 

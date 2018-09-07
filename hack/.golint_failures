@@ -1,5 +1,6 @@
 
 cluster/images/etcd-version-monitor
+cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/hyperkube
 cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
@@ -55,8 +56,6 @@ pkg/apis/batch/validation
 pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
-pkg/apis/componentconfig
-pkg/apis/componentconfig/v1alpha1
 pkg/apis/coordination
 pkg/apis/coordination/v1beta1
 pkg/apis/core

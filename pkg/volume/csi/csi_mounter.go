@@ -18,6 +18,7 @@ package csi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -25,8 +26,11 @@ import (
 	"github.com/golang/glog"
 
 	api "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -47,6 +51,7 @@ var (
 		"nodeName",
 		"attachmentID",
 	}
+	currentPodInfoMountVersion = "v1"
 )
 
 type csiMountMgr struct {
@@ -162,6 +167,22 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
 	}
 
+	// Inject pod information into volume_attributes
+	podAttrs, err := c.podAttributes()
+	if err != nil {
+		glog.Error(log("mouter.SetUpAt failed to assemble volume attributes: %v", err))
+		return err
+	}
+	if podAttrs != nil {
+		if attribs == nil {
+			attribs = podAttrs
+		} else {
+			for k, v := range podAttrs {
+				attribs[k] = v
+			}
+		}
+	}
+
 	fsType := csiSource.FSType
 	err = csi.NodePublishVolume(
 		ctx,
@@ -214,6 +235,39 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	glog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
 	return nil
+}
+
+func (c *csiMountMgr) podAttributes() (map[string]string, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPodInfo) {
+		return nil, nil
+	}
+	if c.plugin.csiDriverLister == nil {
+		return nil, errors.New("CSIDriver lister does not exist")
+	}
+
+	csiDriver, err := c.plugin.csiDriverLister.Get(c.driverName)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			glog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// if PodInfoOnMountVersion is not set or not v1 we do not set pod attributes
+	if csiDriver.Spec.PodInfoOnMountVersion == nil || *csiDriver.Spec.PodInfoOnMountVersion != currentPodInfoMountVersion {
+		glog.V(4).Infof(log("CSIDriver %q does not require pod information", c.driverName))
+		return nil, nil
+	}
+
+	attrs := map[string]string{
+		"csi.storage.k8s.io/pod.name":            c.pod.Name,
+		"csi.storage.k8s.io/pod.namespace":       c.pod.Namespace,
+		"csi.storage.k8s.io/pod.uid":             string(c.pod.UID),
+		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
+	}
+	glog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
+	return attrs, nil
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
