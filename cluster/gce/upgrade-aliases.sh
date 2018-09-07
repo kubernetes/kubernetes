@@ -161,8 +161,8 @@ export KUBE_GCE_ENABLE_IP_ALIASES=true
 export SECONDARY_RANGE_NAME="pods-default"
 export STORAGE_BACKEND="etcd3"
 export STORAGE_MEDIA_TYPE="application/vnd.kubernetes.protobuf"
-export ETCD_IMAGE=3.2.18-0
-export ETCD_VERSION=3.2.18
+export ETCD_IMAGE=3.2.24-0
+export ETCD_VERSION=3.2.24
 
 # Upgrade master with updated kube envs
 ${KUBE_ROOT}/cluster/gce/upgrade.sh -M -l
