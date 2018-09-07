@@ -24,8 +24,6 @@ package nodelifecycle
 import (
 	"context"
 	"fmt"
-	"hash/fnv"
-	"io"
 	"sync"
 	"time"
 
@@ -38,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
@@ -48,7 +47,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/client-go/util/workqueue"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -222,8 +220,15 @@ type Controller struct {
 	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
 	taintNodeByCondition bool
 
-	nodeUpdateChannels []chan *v1.Node
-	nodeUpdateQueue    workqueue.Interface
+	// Channel that is used to pass updating Nodes to the background.
+	// This increases the throughput of taint updates by parallelization
+	// and not blocking on long operations (which shouldn't be done from
+	// event handlers anyway).
+	nodeUpdateChannel chan *v1.Node
+
+	// Keep a set of nodes that are currectly being processed to avoid races across workers.
+	lock              sync.Mutex
+	nodesInProcessing sets.String
 }
 
 // NewNodeLifecycleController returns a new taint controller.
@@ -282,7 +287,8 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
 		taintNodeByCondition:        taintNodeByCondition,
-		nodeUpdateQueue:             workqueue.New(),
+		nodesInProcessing:           sets.NewString(),
+		nodeUpdateChannel:           make(chan *v1.Node, scheduler.NodeUpdateChannelSize),
 	}
 	if useTaintBasedEvictions {
 		glog.Infof("Controller is using taint based evictions.")
@@ -349,13 +355,10 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	if nc.taintNodeByCondition {
 		glog.Infof("Controller will taint node by condition.")
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
-				nc.nodeUpdateQueue.Add(node)
-				return nil
-			}),
+			AddFunc: nodeutil.CreateAddNodeHandler(nc.putNodeToUpdateChannel),
 			UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
-				nc.nodeUpdateQueue.Add(newNode)
-				return nil
+				// TODO: Skip the node if an update is not needed for it.
+				return nc.putNodeToUpdateChannel(newNode)
 			}),
 		})
 	}
@@ -380,6 +383,38 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 	return nc, nil
 }
 
+func (nc *Controller) insertNodeToProcessing(nodeName string) bool {
+	nc.lock.Lock()
+	defer nc.lock.Unlock()
+	if nc.nodesInProcessing.Has(nodeName) {
+		return false
+	}
+	nc.nodesInProcessing.Insert(nodeName)
+	return true
+}
+
+func (nc *Controller) removeNodeFromProcessing(nodeName string) {
+	nc.lock.Lock()
+	defer nc.lock.Unlock()
+	nc.nodesInProcessing.Delete(nodeName)
+}
+
+// WARNING: If you're adding any return calls or defer any more work from this
+// function you have to make sure to update nodesInProcessing properly with the
+// disposition of the node when the work is done.
+func (nc *Controller) putNodeToUpdateChannel(node *v1.Node) error {
+	if node == nil {
+		return nil
+	}
+	if !nc.insertNodeToProcessing(node.Name) {
+		glog.V(2).Infof("Node %v is already in the node update channel.", node.Name)
+		return nil
+	}
+	glog.V(4).Infof("Putting node %s into the update channel", node.Name)
+	nc.nodeUpdateChannel <- node
+	return nil
+}
+
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
 func (nc *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
@@ -396,36 +431,9 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	}
 
 	if nc.taintNodeByCondition {
-		for i := 0; i < scheduler.UpdateWorkerSize; i++ {
-			nc.nodeUpdateChannels = append(nc.nodeUpdateChannels, make(chan *v1.Node, scheduler.NodeUpdateChannelSize))
-		}
-
-		// Dispatcher
-		go func(stopCh <-chan struct{}) {
-			for {
-				obj, shutdown := nc.nodeUpdateQueue.Get()
-				if shutdown {
-					break
-				}
-
-				node := obj.(*v1.Node)
-				hash := hash(node.Name, scheduler.UpdateWorkerSize)
-
-				select {
-				case <-stopCh:
-					nc.nodeUpdateQueue.Done(node)
-					return
-				case nc.nodeUpdateChannels[hash] <- node:
-				}
-				nc.nodeUpdateQueue.Done(node)
-			}
-		}(stopCh)
-		// Close node update queue to cleanup go routine.
-		defer nc.nodeUpdateQueue.ShutDown()
-
 		// Start workers to update NoSchedule taint for nodes.
 		for i := 0; i < scheduler.UpdateWorkerSize; i++ {
-			go nc.doNoScheduleTaintingPassWorker(i, stopCh)
+			go nc.doNoScheduleTaintingPassWorker(stopCh)
 		}
 	}
 
@@ -488,15 +496,20 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 	return nil
 }
 
-func (nc *Controller) doNoScheduleTaintingPassWorker(i int, stopCh <-chan struct{}) {
+func (nc *Controller) doNoScheduleTaintingPassWorker(stopCh <-chan struct{}) {
 	for {
 		select {
-		case <-stopCh:
-			return
-		case node := <-nc.nodeUpdateChannels[i]:
+		case node, ok := <-nc.nodeUpdateChannel:
+			if !ok {
+				glog.Warning("nodeUpdateChannel was unexpectedly closed")
+				return
+			}
 			if err := nc.doNoScheduleTaintingPass(node); err != nil {
 				glog.Errorf("Failed to taint NoSchedule on node <%s>: %v", node.Name, err)
 			}
+			nc.removeNodeFromProcessing(node.Name)
+		case <-stopCh:
+			return
 		}
 	}
 }
@@ -1252,10 +1265,4 @@ func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) 
 	default:
 		return notReadyNodes, stateNormal
 	}
-}
-
-func hash(val string, max int) int {
-	hasher := fnv.New32a()
-	io.WriteString(hasher, val)
-	return int(hasher.Sum32()) % max
 }
