@@ -3976,8 +3976,11 @@ type LocalObjectReference struct {
 
 // TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.
 type TypedLocalObjectReference struct {
-	// APIGroup is the group for the resource being referenced
-	APIGroup string
+	// APIGroup is the group for the resource being referenced.
+	// If APIGroup is not specified, the specified Kind must be in the core API group.
+	// For any other third-party types, APIGroup is required.
+	// +optional
+	APIGroup *string
 	// Kind is the type of resource being referenced
 	Kind string
 	// Name is the name of resource being referenced
