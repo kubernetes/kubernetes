@@ -134,11 +134,11 @@ func TestInstances(t *testing.T) {
 	}
 
 	nonExistingVM := types.NodeName(rand.String(15))
-	instanceId, err := i.InstanceID(context.TODO(), NodeName)
+	instanceID, err := i.InstanceID(context.TODO(), NodeName)
 	if err != nil {
 		t.Fatalf("Instances.InstanceID(%s) failed: %s", testVM, err)
 	}
-	t.Logf("Found InstanceID(%s) = %s\n", testVM, instanceId)
+	t.Logf("Found InstanceID(%s) = %s\n", testVM, instanceID)
 
 	_, err = i.InstanceID(context.TODO(), nonExistingVM)
 	if err == cloudprovider.InstanceNotFound {
