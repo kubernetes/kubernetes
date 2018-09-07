@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package cached provides a discovery client for memcached.
+// Package cached provides a discovery client with in-memory cache.
 package cached // import "k8s.io/client-go/discovery/cached"
