@@ -110,8 +110,9 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: KubeProxyDaemonSet19,
-			data: struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
+			data: struct{ Image, Arch, ProxyConfigMap, ProxyConfigMapKey string }{
 				Image:             "foo",
+				Arch:              "foo",
 				ProxyConfigMap:    "bar",
 				ProxyConfigMapKey: "baz",
 			},
