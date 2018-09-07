@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package v1alpha1 provides the v1alpha1 default configs for the proxy api
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/proxy/apis/config
 // +k8s:conversion-gen-external-types=k8s.io/kube-proxy/config/v1alpha1

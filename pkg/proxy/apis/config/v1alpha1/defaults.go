@@ -33,7 +33,9 @@ func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyConfiguration) {
+// SetDefaultsKubeProxyConfiguration assigns default values to the ProxyConfiguration
+func SetDefaultsKubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyConfiguration) {
+	
 	if len(obj.BindAddress) == 0 {
 		obj.BindAddress = "0.0.0.0"
 	}
