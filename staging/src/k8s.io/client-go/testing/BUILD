@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "actions.go",
+        "doc.go",
         "fake.go",
         "fixture.go",
     ],

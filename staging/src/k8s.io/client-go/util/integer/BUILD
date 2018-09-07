@@ -14,7 +14,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["integer.go"],
+    srcs = [
+        "doc.go",
+        "integer.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/integer",
     importpath = "k8s.io/client-go/util/integer",
 )

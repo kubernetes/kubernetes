@@ -51,6 +51,7 @@ go_library(
     srcs = [
         "client.go",
         "config.go",
+        "doc.go",
         "plugin.go",
         "request.go",
         "token_source.go",

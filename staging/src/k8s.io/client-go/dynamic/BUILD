@@ -26,6 +26,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "interface.go",
         "scheme.go",
         "simple.go",

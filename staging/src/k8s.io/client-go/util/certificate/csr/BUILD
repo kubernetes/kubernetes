@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["csr.go"],
+    srcs = [
+        "csr.go",
+        "doc.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/certificate/csr",
     importpath = "k8s.io/client-go/util/certificate/csr",
     deps = [

@@ -15,6 +15,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "fake_handler.go",
         "tmpdir.go",
     ],

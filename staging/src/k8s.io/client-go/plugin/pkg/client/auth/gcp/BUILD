@@ -15,7 +15,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["gcp.go"],
+    srcs = [
+        "doc.go",
+        "gcp.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/gcp",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/gcp",
     deps = [

@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["latest.go"],
+    srcs = [
+        "doc.go",
+        "latest.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/clientcmd/api/latest",
     importpath = "k8s.io/client-go/tools/clientcmd/api/latest",
     deps = [

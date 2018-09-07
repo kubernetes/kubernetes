@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "configmaplock.go",
+        "doc.go",
         "endpointslock.go",
         "interface.go",
     ],

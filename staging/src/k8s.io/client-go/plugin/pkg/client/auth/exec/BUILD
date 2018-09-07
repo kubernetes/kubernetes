@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["exec.go"],
+    srcs = [
+        "doc.go",
+        "exec.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/exec",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/exec",
     visibility = ["//visibility:public"],

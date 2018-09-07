@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["spdy.go"],
+    srcs = [
+        "doc.go",
+        "spdy.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/transport/spdy",
     importpath = "k8s.io/client-go/transport/spdy",
     deps = [

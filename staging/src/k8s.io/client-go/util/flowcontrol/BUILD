@@ -20,6 +20,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "backoff.go",
+        "doc.go",
         "throttle.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/flowcontrol",

@@ -21,6 +21,7 @@ go_library(
     srcs = [
         "cert.go",
         "csr.go",
+        "doc.go",
         "io.go",
         "pem.go",
     ],

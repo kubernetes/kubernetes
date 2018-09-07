@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["ref.go"],
+    srcs = [
+        "doc.go",
+        "ref.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/reference",
     importpath = "k8s.io/client-go/tools/reference",
     deps = [

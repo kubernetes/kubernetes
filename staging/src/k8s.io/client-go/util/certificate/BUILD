@@ -32,6 +32,7 @@ go_library(
     srcs = [
         "certificate_manager.go",
         "certificate_store.go",
+        "doc.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/certificate",
     importpath = "k8s.io/client-go/util/certificate",

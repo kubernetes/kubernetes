@@ -21,6 +21,7 @@ go_library(
     srcs = [
         "cache.go",
         "config.go",
+        "doc.go",
         "round_trippers.go",
         "transport.go",
     ],

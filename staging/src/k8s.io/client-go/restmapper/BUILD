@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "category_expansion.go",
         "discovery.go",
+        "doc.go",
         "shortcut.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/restmapper",

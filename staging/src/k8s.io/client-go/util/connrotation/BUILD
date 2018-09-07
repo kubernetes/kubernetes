@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["connrotation.go"],
+    srcs = [
+        "connrotation.go",
+        "doc.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/connrotation",
     importpath = "k8s.io/client-go/util/connrotation",
     visibility = ["//visibility:public"],

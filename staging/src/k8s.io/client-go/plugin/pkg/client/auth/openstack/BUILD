@@ -14,7 +14,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["openstack.go"],
+    srcs = [
+        "doc.go",
+        "openstack.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/openstack",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/openstack",
     deps = [

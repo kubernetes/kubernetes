@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["exec.go"],
+    srcs = [
+        "doc.go",
+        "exec.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/exec",
     importpath = "k8s.io/client-go/util/exec",
 )

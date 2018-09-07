@@ -14,7 +14,10 @@ go_test(
 
 go_library(
     name = "go_default_library",
-    srcs = ["oidc.go"],
+    srcs = [
+        "doc.go",
+        "oidc.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/plugin/pkg/client/auth/oidc",
     importpath = "k8s.io/client-go/plugin/pkg/client/auth/oidc",
     deps = [

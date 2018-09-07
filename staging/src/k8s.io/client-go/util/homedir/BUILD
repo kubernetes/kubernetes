@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["homedir.go"],
+    srcs = [
+        "doc.go",
+        "homedir.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/homedir",
     importpath = "k8s.io/client-go/util/homedir",
 )
