@@ -27,7 +27,9 @@ import (
 )
 
 const (
-	// https://docs.docker.com/engine/reference/api/docker_remote_api/
+	// Docker versions are documented here - https://docs.docker.com/engine/api/version-history/
+	// maximum docker version kubelet has been tested with.
+	MaximumDockerAPIVersion = "1.31"
 	// docker version should be at least 1.11.x
 	MinimumDockerAPIVersion = "1.23.0"
 
@@ -73,9 +75,9 @@ type Interface interface {
 func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
 		glog.Infof("Connecting to docker on %s", dockerEndpoint)
-		return dockerapi.NewClient(dockerEndpoint, "", nil, nil)
+		return dockerapi.NewClientWithOpts(dockerapi.WithHost(dockerEndpoint), dockerapi.WithVersion(""))
 	}
-	return dockerapi.NewEnvClient()
+	return dockerapi.NewClientWithOpts(dockerapi.FromEnv)
 }
 
 // ConnectToDockerOrDie creates docker client connecting to docker daemon.
@@ -84,7 +86,7 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 // is the timeout for docker requests. If timeout is exceeded, the request
 // will be cancelled and throw out an error. If requestTimeout is 0, a default
 // value will be applied.
-func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration,
+func ConnectToDockerOrDie(dockerEndpoint string, dockerAPIVersion string, requestTimeout, imagePullProgressDeadline time.Duration,
 	withTraceDisabled bool, enableSleep bool) Interface {
 	if dockerEndpoint == FakeDockerEndpoint {
 		fakeClient := NewFakeDockerClient()
@@ -102,5 +104,5 @@ func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgre
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
 	glog.Infof("Start docker client with request timeout=%v", requestTimeout)
-	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline)
+	return newKubeDockerClient(client, dockerAPIVersion, requestTimeout, imagePullProgressDeadline)
 }

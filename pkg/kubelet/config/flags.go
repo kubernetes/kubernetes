@@ -53,6 +53,8 @@ type ContainerRuntimeOptions struct {
 	PodSandboxImage string
 	// DockerEndpoint is the path to the docker endpoint to communicate with.
 	DockerEndpoint string
+	// The Maximum Docker API version that kubelet has been tested against
+	DockerAPIMaxVersion string
 	// If no pulling progress is made before the deadline imagePullProgressDeadline,
 	// the image pulling will be cancelled. Defaults to 1m0s.
 	// +optional
@@ -90,6 +92,7 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkHidden("experimental-dockershim-root-directory")
 	fs.StringVar(&s.PodSandboxImage, "pod-infra-container-image", s.PodSandboxImage, fmt.Sprintf("The image whose network/ipc namespaces containers in each pod will use. %s", dockerOnlyWarning))
 	fs.StringVar(&s.DockerEndpoint, "docker-endpoint", s.DockerEndpoint, fmt.Sprintf("Use this for the docker endpoint to communicate with. %s", dockerOnlyWarning))
+	fs.StringVar(&s.DockerAPIMaxVersion, "max-docker-api-version", s.DockerAPIMaxVersion, fmt.Sprintf("Use this for bumping the Docker API version to use. %s", dockerOnlyWarning))
 	fs.DurationVar(&s.ImagePullProgressDeadline.Duration, "image-pull-progress-deadline", s.ImagePullProgressDeadline.Duration, fmt.Sprintf("If no pulling progress is made before this deadline, the image pulling will be cancelled. %s", dockerOnlyWarning))
 
 	// Network plugin settings for Docker.

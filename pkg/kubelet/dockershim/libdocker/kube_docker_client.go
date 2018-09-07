@@ -33,6 +33,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimagetypes "github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/versions"
 	dockerapi "github.com/docker/docker/client"
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
@@ -75,7 +76,7 @@ const (
 
 // newKubeDockerClient creates an kubeDockerClient from an existing docker client. If requestTimeout is 0,
 // defaultTimeout will be applied.
-func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
+func newKubeDockerClient(dockerClient *dockerapi.Client, dockerAPIVersion string, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
 	if requestTimeout == 0 {
 		requestTimeout = defaultTimeout
 	}
@@ -91,8 +92,28 @@ func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePu
 		glog.Errorf("failed to retrieve docker version: %v", err)
 		glog.Warningf("Using empty version for docker client, this may sometimes cause compatibility issue.")
 	} else {
+		version := v.APIVersion
+		if dockerAPIVersion != "" {
+			if versions.GreaterThan(dockerAPIVersion, MaximumDockerAPIVersion) {
+				version = dockerAPIVersion
+				glog.Infof("using docker api version %s higher than the currently tested version %s", dockerAPIVersion, MaximumDockerAPIVersion)
+			} else if versions.LessThanOrEqualTo(dockerAPIVersion, MinimumDockerAPIVersion) {
+				glog.Fatalf("docker api version needs to be in the range (%s, %s)", dockerAPIVersion, MinimumDockerAPIVersion, MaximumDockerAPIVersion)
+			}
+		} else {
+			if versions.GreaterThan(version, MaximumDockerAPIVersion) {
+				glog.Warningf("using docker api version %s as docker daemon reports version %s which is higher than tested version", MaximumDockerAPIVersion, version)
+				version = MaximumDockerAPIVersion
+			} else if versions.LessThan(version, MinimumDockerAPIVersion) {
+				glog.Warningf("using docker api version %s which is lower than tested version, some features may not work", version)
+			} else {
+				glog.Warningf("docker api version %s is in range (%s, %s)", version, MinimumDockerAPIVersion, MaximumDockerAPIVersion)
+			}
+		}
+
 		// Update client version with real api version.
-		dockerClient.NegotiateAPIVersionPing(dockertypes.Ping{APIVersion: v.APIVersion})
+		dockerClient.NegotiateAPIVersionPing(dockertypes.Ping{APIVersion: version})
+		glog.Infof("docker api version after negotiation: %v", dockerClient.ClientVersion())
 	}
 	return k
 }

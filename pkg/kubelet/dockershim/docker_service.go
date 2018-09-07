@@ -160,6 +160,7 @@ var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPat
 // ClientConfig is parameters used to initialize docker client
 type ClientConfig struct {
 	DockerEndpoint            string
+	DockerAPIVersion          string
 	RuntimeRequestTimeout     time.Duration
 	ImagePullProgressDeadline time.Duration
 
@@ -175,6 +176,7 @@ func NewDockerClientFromConfig(config *ClientConfig) libdocker.Interface {
 		// Create docker client.
 		client := libdocker.ConnectToDockerOrDie(
 			config.DockerEndpoint,
+			config.DockerAPIVersion,
 			config.RuntimeRequestTimeout,
 			config.ImagePullProgressDeadline,
 			config.WithTraceDisabled,
