@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/tabwriter"
 
@@ -79,7 +80,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		client := c.CoreV1().PodTemplates(ns)
 
 		By("creating a large number of resources")
-		workqueue.Parallelize(5, 20, func(i int) {
+		workqueue.ParallelizeUntil(context.TODO(), 5, 20, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
 				_, err := client.Create(&v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{
