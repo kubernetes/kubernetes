@@ -129,7 +129,7 @@
                 "k8s.io/kubernetes/pkg/util/file",
                 "k8s.io/kubernetes/pkg/util/goroutinemap",
                 "k8s.io/kubernetes/pkg/util/hash",
-                "k8s.io/kubernetes/pkg/util/interrupt",
+                "k8s.io/apimachinery/pkg/util/interrupt",
                 "k8s.io/kubernetes/pkg/util/io",
                 "k8s.io/kubernetes/pkg/util/labels",
                 "k8s.io/kubernetes/pkg/util/metrics",
