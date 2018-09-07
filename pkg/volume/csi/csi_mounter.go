@@ -238,7 +238,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 }
 
 func (c *csiMountMgr) podAttributes() (map[string]string, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPodInfo) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return nil, nil
 	}
 	if c.plugin.csiDriverLister == nil {

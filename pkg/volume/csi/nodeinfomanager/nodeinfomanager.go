@@ -315,6 +315,10 @@ func (nim *nodeInfoManager) updateCSINodeInfo(
 	driverNodeID string,
 	topology *csipb.Topology) error {
 
+	if nim.csiKubeClient == nil {
+		return fmt.Errorf("CSI client cannot be nil")
+	}
+
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		nodeInfo, err := nim.csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
 		if nodeInfo == nil || errors.IsNotFound(err) {
