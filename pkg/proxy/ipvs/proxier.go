@@ -113,23 +113,22 @@ var iptablesChains = []struct {
 var ipsetInfo = []struct {
 	name    string
 	setType utilipset.Type
-	isIPv6  bool
 	comment string
 }{
-	{kubeLoopBackIPSet, utilipset.HashIPPortIP, true, kubeLoopBackIPSetComment},
-	{kubeClusterIPSet, utilipset.HashIPPort, true, kubeClusterIPSetComment},
-	{kubeExternalIPSet, utilipset.HashIPPort, true, kubeExternalIPSetComment},
-	{kubeLoadBalancerSet, utilipset.HashIPPort, true, kubeLoadBalancerSetComment},
-	{kubeLoadbalancerFWSet, utilipset.HashIPPort, true, kubeLoadbalancerFWSetComment},
-	{kubeLoadBalancerLocalSet, utilipset.HashIPPort, true, kubeLoadBalancerLocalSetComment},
-	{kubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, true, kubeLoadBalancerSourceIPSetComment},
-	{kubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, true, kubeLoadBalancerSourceCIDRSetComment},
-	{kubeNodePortSetTCP, utilipset.BitmapPort, false, kubeNodePortSetTCPComment},
-	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, false, kubeNodePortLocalSetTCPComment},
-	{kubeNodePortSetUDP, utilipset.BitmapPort, false, kubeNodePortSetUDPComment},
-	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, false, kubeNodePortLocalSetUDPComment},
-	{kubeNodePortSetSCTP, utilipset.BitmapPort, false, kubeNodePortSetSCTPComment},
-	{kubeNodePortLocalSetSCTP, utilipset.BitmapPort, false, kubeNodePortLocalSetSCTPComment},
+	{kubeLoopBackIPSet, utilipset.HashIPPortIP, kubeLoopBackIPSetComment},
+	{kubeClusterIPSet, utilipset.HashIPPort, kubeClusterIPSetComment},
+	{kubeExternalIPSet, utilipset.HashIPPort, kubeExternalIPSetComment},
+	{kubeLoadBalancerSet, utilipset.HashIPPort, kubeLoadBalancerSetComment},
+	{kubeLoadbalancerFWSet, utilipset.HashIPPort, kubeLoadbalancerFWSetComment},
+	{kubeLoadBalancerLocalSet, utilipset.HashIPPort, kubeLoadBalancerLocalSetComment},
+	{kubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, kubeLoadBalancerSourceIPSetComment},
+	{kubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, kubeLoadBalancerSourceCIDRSetComment},
+	{kubeNodePortSetTCP, utilipset.BitmapPort, kubeNodePortSetTCPComment},
+	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, kubeNodePortLocalSetTCPComment},
+	{kubeNodePortSetUDP, utilipset.BitmapPort, kubeNodePortSetUDPComment},
+	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, kubeNodePortLocalSetUDPComment},
+	{kubeNodePortSetSCTP, utilipset.BitmapPort, kubeNodePortSetSCTPComment},
+	{kubeNodePortLocalSetSCTP, utilipset.BitmapPort, kubeNodePortLocalSetSCTPComment},
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
@@ -383,10 +382,7 @@ func NewProxier(ipt utiliptables.Interface,
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
 	for _, is := range ipsetInfo {
-		if is.isIPv6 {
-			proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, isIPv6, is.comment)
-		}
-		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, false, is.comment)
+		proxier.ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, isIPv6, is.comment)
 	}
 	burstSyncs := 2
 	glog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
