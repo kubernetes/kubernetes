@@ -45,6 +45,9 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 
 	Context("when we need to admit a critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = make(map[string]bool)
+			}
 			initialConfig.FeatureGates[string(features.ExperimentalCriticalPodAnnotation)] = true
 		})
 
@@ -142,9 +145,9 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 		pod.ObjectMeta.Annotations = map[string]string{
 			kubelettypes.CriticalPodAnnotationKey: "",
 		}
-		Expect(kubelettypes.IsCriticalPod(pod)).To(BeTrue(), "pod should be a critical pod")
+		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeTrue(), "pod should be a critical pod")
 	} else {
-		Expect(kubelettypes.IsCriticalPod(pod)).To(BeFalse(), "pod should not be a critical pod")
+		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeFalse(), "pod should not be a critical pod")
 	}
 	return pod
 }
