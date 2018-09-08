@@ -21,7 +21,7 @@ spec:
     - exec /opt/kube-addons.sh 1>>/var/log/kube-addon-manager.log 2>&1
     resources:
       requests:
-        cpu: 3m
+        cpu: 5m
         memory: 50Mi
     volumeMounts:
     - mountPath: /etc/kubernetes/

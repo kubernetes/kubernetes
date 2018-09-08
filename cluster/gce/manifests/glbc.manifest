@@ -39,7 +39,7 @@ spec:
       # master components on a single core master.
       # TODO: Make resource requirements depend on the size of the cluster
       requests:
-        cpu: 5m
+        cpu: 10m
         memory: 50Mi
     command:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
