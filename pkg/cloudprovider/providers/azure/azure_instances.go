@@ -143,7 +143,17 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
+	if err != nil {
+		return false, err
+	}
+
+	provisioningState, err := az.vmSet.GetProvisioningStateByNodeName(string(nodeName))
+	if err != nil {
+		return false, err
+	}
+
+	return strings.ToLower(provisioningState) == "stopped" || strings.ToLower(provisioningState) == "deallocated", nil
 }
 
 // getComputeMetadata gets compute information from instance metadata.

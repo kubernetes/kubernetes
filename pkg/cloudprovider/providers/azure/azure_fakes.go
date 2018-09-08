@@ -893,3 +893,7 @@ func (f *fakeVMSet) DetachDiskByName(diskName, diskURI string, nodeName types.No
 func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
+
+func (f *fakeVMSet) GetProvisioningStateByNodeName(name string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
