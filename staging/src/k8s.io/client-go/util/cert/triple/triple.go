@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package triple generates key-certificate pairs for the
-// triple (CA, Server, Client).
 package triple
 
 import (
