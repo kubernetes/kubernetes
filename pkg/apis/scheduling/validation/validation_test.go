@@ -158,3 +158,117 @@ func TestValidatePriorityClassUpdate(t *testing.T) {
 		}
 	}
 }
+
+func TestValidatePodGroup(t *testing.T) {
+	successCases := map[string]scheduling.PodGroup{
+		"normal case": {
+			ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default"},
+			Spec: scheduling.PodGroupSpec{
+				NumMember: 1,
+			},
+		},
+	}
+
+	for k, v := range successCases {
+		if errs := ValidatePodGroup(&v); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+
+	errorCases := map[string]scheduling.PodGroup{
+		"invalid name": {
+			ObjectMeta: metav1.ObjectMeta{Name: "tier&1", Namespace: "default"},
+			Spec: scheduling.PodGroupSpec{
+				NumMember: 1,
+			},
+		},
+		"empty namespace": {
+			ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: ""},
+			Spec: scheduling.PodGroupSpec{
+				NumMember: 1,
+			},
+		},
+		"invalid numMember": {
+			ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default"},
+			Spec: scheduling.PodGroupSpec{
+				NumMember: -1,
+			},
+		},
+	}
+
+	for k, v := range errorCases {
+		if errs := ValidatePodGroup(&v); len(errs) == 0 {
+			t.Errorf("Expected error for %s, but it succeeded", k)
+		}
+	}
+}
+
+func TestValidatePodGroupUpdate(t *testing.T) {
+	old := scheduling.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", ResourceVersion: "1"},
+		Spec: scheduling.PodGroupSpec{
+			NumMember: 1,
+		},
+	}
+
+	successCases := map[string]scheduling.PodGroup{
+		"no change": {
+			ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", ResourceVersion: "1"},
+			Spec: scheduling.PodGroupSpec{
+				NumMember: 1,
+			},
+		},
+	}
+
+	for k, v := range successCases {
+		if errs := ValidatePodGroupUpdate(&v, &old); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+
+	errorCases := map[string]struct {
+		P scheduling.PodGroup
+		T field.ErrorType
+	}{
+		"change name": {
+			P: scheduling.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg2", Namespace: "default", ResourceVersion: "2"},
+				Spec: scheduling.PodGroupSpec{
+					NumMember: 1,
+				},
+			},
+			T: field.ErrorTypeInvalid,
+		},
+		"change namespace": {
+			P: scheduling.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "test", ResourceVersion: "2"},
+				Spec: scheduling.PodGroupSpec{
+					NumMember: 1,
+				},
+			},
+			T: field.ErrorTypeInvalid,
+		},
+		"change value": {
+			P: scheduling.PodGroup{
+				ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", ResourceVersion: "2"},
+				Spec: scheduling.PodGroupSpec{
+					NumMember: 2,
+				},
+			},
+			T: field.ErrorTypeForbidden,
+		},
+	}
+
+	for k, v := range errorCases {
+		errs := ValidatePodGroupUpdate(&v.P, &old)
+		if len(errs) == 0 {
+			t.Errorf("Expected error for %s, but it succeeded", k)
+			continue
+		}
+		for i := range errs {
+			if errs[i].Type != v.T {
+				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
+			}
+		}
+	}
+}

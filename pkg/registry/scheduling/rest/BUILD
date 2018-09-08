@@ -15,6 +15,7 @@ go_library(
         "//pkg/apis/scheduling/v1alpha1:go_default_library",
         "//pkg/apis/scheduling/v1beta1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion:go_default_library",
+        "//pkg/registry/scheduling/podgroup/storage:go_default_library",
         "//pkg/registry/scheduling/priorityclass/storage:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
