@@ -19,7 +19,6 @@ package internalversion
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -1806,24 +1805,6 @@ func printStatus(obj *metav1.Status, options printers.PrintOptions) ([]metav1bet
 	row.Cells = append(row.Cells, obj.Status, obj.Reason, obj.Message)
 
 	return []metav1beta1.TableRow{row}, nil
-}
-
-// Lay out all the containers on one line if use wide output.
-// DEPRECATED: convert to TableHandler and use layoutContainerCells
-func layoutContainers(containers []api.Container, w io.Writer) error {
-	var namesBuffer bytes.Buffer
-	var imagesBuffer bytes.Buffer
-
-	for i, container := range containers {
-		namesBuffer.WriteString(container.Name)
-		imagesBuffer.WriteString(container.Image)
-		if i != len(containers)-1 {
-			namesBuffer.WriteString(",")
-			imagesBuffer.WriteString(",")
-		}
-	}
-	_, err := fmt.Fprintf(w, "\t%s\t%s", namesBuffer.String(), imagesBuffer.String())
-	return err
 }
 
 // Lay out all the containers on one line if use wide output.
