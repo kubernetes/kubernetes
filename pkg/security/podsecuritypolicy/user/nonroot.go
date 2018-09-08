@@ -26,6 +26,7 @@ type nonRoot struct{}
 
 var _ RunAsUserStrategy = &nonRoot{}
 
+// NewRunAsNonRoot provides a strategy that ensures the container is run as a non root user
 func NewRunAsNonRoot(options *policy.RunAsUserStrategyOptions) (RunAsUserStrategy, error) {
 	return &nonRoot{}, nil
 }

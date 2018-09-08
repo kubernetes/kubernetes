@@ -24,15 +24,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
-// mayRunAs implements the GroupStrategy interface.
+// mayRunAs implements the group Strategy interface.
 type mayRunAs struct {
 	ranges []policy.IDRange
 }
 
-var _ GroupStrategy = &mayRunAs{}
+var _ Strategy = &mayRunAs{}
 
 // NewMayRunAs provides a new MayRunAs strategy.
-func NewMayRunAs(ranges []policy.IDRange) (GroupStrategy, error) {
+func NewMayRunAs(ranges []policy.IDRange) (Strategy, error) {
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("ranges must be supplied for MayRunAs")
 	}
@@ -55,5 +55,5 @@ func (s *mayRunAs) GenerateSingle(_ *api.Pod) (*int64, error) {
 // Groups are passed in here to allow this strategy to support multiple group fields (fsgroup and
 // supplemental groups).
 func (s *mayRunAs) Validate(fldPath *field.Path, _ *api.Pod, groups []int64) field.ErrorList {
-	return ValidateGroupsInRanges(fldPath, s.ranges, groups)
+	return validateGroupsInRanges(fldPath, s.ranges, groups)
 }

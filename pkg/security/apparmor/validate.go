@@ -36,12 +36,14 @@ import (
 // Set to true if the wrong build tags are set (see validate_disabled.go).
 var isDisabledBuild bool
 
-// Interface for validating that a pod with an AppArmor profile can be run by a Node.
+// Validator is an interface for validating that a pod with an AppArmor profile can be run by a Node.
 type Validator interface {
 	Validate(pod *v1.Pod) error
 	ValidateHost() error
 }
 
+// NewValidator creates a new validator with AppArmor FS for the provided runtime
+// or with a validateHostErr if unable to validate runtime or find AppArmor FS
 func NewValidator(runtime string) Validator {
 	if err := validateHost(runtime); err != nil {
 		return &validator{validateHostErr: err}
@@ -113,7 +115,7 @@ func validateHost(runtime string) error {
 
 	// Check runtime support. Currently only Docker is supported.
 	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q.", runtime)
+		return fmt.Errorf("only 'docker' and 'remote' runtimes are enabled for AppArmor. Found: %q", runtime)
 	}
 
 	return nil
@@ -135,6 +137,7 @@ func validateProfile(profile string, loadedProfiles map[string]bool) error {
 	return nil
 }
 
+// ValidateProfileFormat returns nil if the provided profile name is valid, otherwise error
 func ValidateProfileFormat(profile string) error {
 	if profile == "" || profile == ProfileRuntimeDefault || profile == ProfileNameUnconfined {
 		return nil
@@ -199,12 +202,10 @@ func getAppArmorFS() (string, error) {
 				msg := fmt.Sprintf("path %s does not exist", appArmorFS)
 				if err != nil {
 					return "", fmt.Errorf("%s: %v", msg, err)
-				} else {
-					return "", errors.New(msg)
 				}
-			} else {
-				return appArmorFS, nil
+				return "", errors.New(msg)
 			}
+			return appArmorFS, nil
 		}
 	}
 	if err := scanner.Err(); err != nil {

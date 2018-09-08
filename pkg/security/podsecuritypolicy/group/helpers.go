@@ -24,7 +24,7 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
-func ValidateGroupsInRanges(fldPath *field.Path, ranges []policy.IDRange, groups []int64) field.ErrorList {
+func validateGroupsInRanges(fldPath *field.Path, ranges []policy.IDRange, groups []int64) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for _, group := range groups {

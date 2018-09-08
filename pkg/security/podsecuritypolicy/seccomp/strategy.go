@@ -27,9 +27,9 @@ import (
 const (
 	// AllowAny is the wildcard used to allow any profile.
 	AllowAny = "*"
-	// The annotation key specifying the default seccomp profile.
+	// DefaultProfileAnnotationKey specifies the default seccomp profile.
 	DefaultProfileAnnotationKey = "seccomp.security.alpha.kubernetes.io/defaultProfileName"
-	// The annotation key specifying the allowed seccomp profiles.
+	// AllowedProfilesAnnotationKey specifies the allowed seccomp profiles.
 	AllowedProfilesAnnotationKey = "seccomp.security.alpha.kubernetes.io/allowedProfileNames"
 )
 

@@ -26,9 +26,12 @@ import (
 )
 
 const (
+	// ValidatedPSPAnnotation is the validated pod security policy annotation
 	ValidatedPSPAnnotation = "kubernetes.io/psp"
 )
 
+// GetAllFSTypesExcept returns a set of strings containing all FS types except those
+// provided as exceptions.
 func GetAllFSTypesExcept(exceptions ...string) sets.String {
 	fstypes := GetAllFSTypesAsSet()
 	for _, e := range exceptions {
@@ -37,6 +40,7 @@ func GetAllFSTypesExcept(exceptions ...string) sets.String {
 	return fstypes
 }
 
+// GetAllFSTypesAsSet returns a set of strings containing all FS types
 func GetAllFSTypesAsSet() sets.String {
 	fstypes := sets.NewString()
 	fstypes.Insert(
@@ -72,7 +76,7 @@ func GetAllFSTypesAsSet() sets.String {
 	return fstypes
 }
 
-// getVolumeFSType gets the FSType for a volume.
+// GetVolumeFSType gets the FSType for a volume.
 func GetVolumeFSType(v api.Volume) (policy.FSType, error) {
 	switch {
 	case v.HostPath != nil:

@@ -31,9 +31,11 @@ type mustRunAs struct {
 	opts *policy.SELinuxStrategyOptions
 }
 
-var _ SELinuxStrategy = &mustRunAs{}
+var _ Strategy = &mustRunAs{}
 
-func NewMustRunAs(options *policy.SELinuxStrategyOptions) (SELinuxStrategy, error) {
+// NewMustRunAs provides a strategy that will return the configured se linux context or
+// nil and an error if options or options.SELinuxOptions are nil
+func NewMustRunAs(options *policy.SELinuxStrategyOptions) (Strategy, error) {
 	if options == nil {
 		return nil, fmt.Errorf("MustRunAs requires SELinuxContextStrategyOptions")
 	}

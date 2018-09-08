@@ -21,14 +21,14 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// runAsAny implements the GroupStrategy interface.
+// runAsAny implements the group Strategy interface.
 type runAsAny struct {
 }
 
-var _ GroupStrategy = &runAsAny{}
+var _ Strategy = &runAsAny{}
 
-// NewRunAsAny provides a new RunAsAny strategy.
-func NewRunAsAny() (GroupStrategy, error) {
+// NewRunAsAny provides a new RunAsAny group strategy.
+func NewRunAsAny() (Strategy, error) {
 	return &runAsAny{}, nil
 }
 

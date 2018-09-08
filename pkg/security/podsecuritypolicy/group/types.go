@@ -21,8 +21,8 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// GroupStrategy defines the interface for all group constraint strategies.
-type GroupStrategy interface {
+// Strategy defines the interface for all group constraint strategies.
+type Strategy interface {
 	// Generate creates the group based on policy rules.  The underlying implementation can
 	// decide whether it will return a full range of values or a subset of values from the
 	// configured ranges.

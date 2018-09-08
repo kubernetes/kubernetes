@@ -38,6 +38,7 @@ type simpleStrategyFactory struct{}
 
 var _ StrategyFactory = &simpleStrategyFactory{}
 
+// NewSimpleStrategyFactory creates a new simpleStrategyFactory
 func NewSimpleStrategyFactory() StrategyFactory {
 	return &simpleStrategyFactory{}
 }
@@ -50,7 +51,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 		errs = append(errs, err)
 	}
 
-	var groupStrat group.GroupStrategy
+	var groupStrat group.Strategy
 	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
 		groupStrat, err = createRunAsGroupStrategy(psp.Spec.RunAsGroup)
 		if err != nil {
@@ -124,7 +125,7 @@ func createUserStrategy(opts *policy.RunAsUserStrategyOptions) (user.RunAsUserSt
 }
 
 // createRunAsGroupStrategy creates a new group strategy.
-func createRunAsGroupStrategy(opts *policy.RunAsGroupStrategyOptions) (group.GroupStrategy, error) {
+func createRunAsGroupStrategy(opts *policy.RunAsGroupStrategyOptions) (group.Strategy, error) {
 	if opts == nil {
 		return group.NewRunAsAny()
 	}
@@ -141,7 +142,7 @@ func createRunAsGroupStrategy(opts *policy.RunAsGroupStrategyOptions) (group.Gro
 }
 
 // createSELinuxStrategy creates a new selinux strategy.
-func createSELinuxStrategy(opts *policy.SELinuxStrategyOptions) (selinux.SELinuxStrategy, error) {
+func createSELinuxStrategy(opts *policy.SELinuxStrategyOptions) (selinux.Strategy, error) {
 	switch opts.Rule {
 	case policy.SELinuxStrategyMustRunAs:
 		return selinux.NewMustRunAs(opts)
@@ -163,7 +164,7 @@ func createSeccompStrategy(psp *policy.PodSecurityPolicy) (seccomp.Strategy, err
 }
 
 // createFSGroupStrategy creates a new fsgroup strategy
-func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.GroupStrategy, error) {
+func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.Strategy, error) {
 	switch opts.Rule {
 	case policy.FSGroupStrategyRunAsAny:
 		return group.NewRunAsAny()
@@ -177,7 +178,7 @@ func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.GroupStra
 }
 
 // createSupplementalGroupStrategy creates a new supplemental group strategy
-func createSupplementalGroupStrategy(opts *policy.SupplementalGroupsStrategyOptions) (group.GroupStrategy, error) {
+func createSupplementalGroupStrategy(opts *policy.SupplementalGroupsStrategyOptions) (group.Strategy, error) {
 	switch opts.Rule {
 	case policy.SupplementalGroupsStrategyRunAsAny:
 		return group.NewRunAsAny()

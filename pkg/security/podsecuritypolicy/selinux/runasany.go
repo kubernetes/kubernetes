@@ -22,13 +22,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
-// runAsAny implements the SELinuxStrategy interface.
+// runAsAny implements the selinux Strategy interface.
 type runAsAny struct{}
 
-var _ SELinuxStrategy = &runAsAny{}
+var _ Strategy = &runAsAny{}
 
 // NewRunAsAny provides a strategy that will return the configured se linux context or nil.
-func NewRunAsAny(options *policy.SELinuxStrategyOptions) (SELinuxStrategy, error) {
+func NewRunAsAny(options *policy.SELinuxStrategyOptions) (Strategy, error) {
 	return &runAsAny{}, nil
 }
 

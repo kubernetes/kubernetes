@@ -24,15 +24,15 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
-// mustRunAs implements the GroupStrategy interface
+// mustRunAs implements the group Strategy interface
 type mustRunAs struct {
 	ranges []policy.IDRange
 }
 
-var _ GroupStrategy = &mustRunAs{}
+var _ Strategy = &mustRunAs{}
 
 // NewMustRunAs provides a new MustRunAs strategy based on ranges.
-func NewMustRunAs(ranges []policy.IDRange) (GroupStrategy, error) {
+func NewMustRunAs(ranges []policy.IDRange) (Strategy, error) {
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("ranges must be supplied for MustRunAs")
 	}
@@ -65,7 +65,7 @@ func (s *mustRunAs) Validate(fldPath *field.Path, _ *api.Pod, groups []int64) fi
 		allErrs = append(allErrs, field.Invalid(fldPath, groups, "unable to validate empty groups against required ranges"))
 	}
 
-	allErrs = append(allErrs, ValidateGroupsInRanges(fldPath, s.ranges, groups)...)
+	allErrs = append(allErrs, validateGroupsInRanges(fldPath, s.ranges, groups)...)
 
 	return allErrs
 }
