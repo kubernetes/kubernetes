@@ -572,6 +572,8 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectForbidden(t, updateNode1Lease(node2Client))
 	expectForbidden(t, patchNode1Lease(node2Client))
 	expectForbidden(t, deleteNode1Lease(node2Client))
+
+	// TODO (verult) CSINodeInfo tests (issue #68254)
 }
 
 // expect executes a function a set number of times until it either returns the

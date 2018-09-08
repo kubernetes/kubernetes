@@ -22,12 +22,14 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
+	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
@@ -87,11 +89,12 @@ func (p *nodePlugin) ValidateInitialization() error {
 }
 
 var (
-	podResource     = api.Resource("pods")
-	nodeResource    = api.Resource("nodes")
-	pvcResource     = api.Resource("persistentvolumeclaims")
-	svcacctResource = api.Resource("serviceaccounts")
-	leaseResource   = coordapi.Resource("leases")
+	podResource         = api.Resource("pods")
+	nodeResource        = api.Resource("nodes")
+	pvcResource         = api.Resource("persistentvolumeclaims")
+	svcacctResource     = api.Resource("serviceaccounts")
+	leaseResource       = coordapi.Resource("leases")
+	csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos")
 )
 
 func (c *nodePlugin) Admit(a admission.Attributes) error {
@@ -142,6 +145,12 @@ func (c *nodePlugin) Admit(a admission.Attributes) error {
 			return c.admitLease(nodeName, a)
 		}
 		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gate %s", features.NodeLease))
+
+	case csiNodeInfoResource:
+		if c.features.Enabled(features.KubeletPluginsWatcher) && c.features.Enabled(features.CSINodeInfo) {
+			return c.admitCSINodeInfo(nodeName, a)
+		}
+		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo))
 
 	default:
 		return nil
@@ -417,6 +426,26 @@ func (r *nodePlugin) admitLease(nodeName string, a admission.Attributes) error {
 	} else {
 		if a.GetName() != nodeName {
 			return admission.NewForbidden(a, fmt.Errorf("can only access node lease with the same name as the requesting node"))
+		}
+	}
+
+	return nil
+}
+
+func (c *nodePlugin) admitCSINodeInfo(nodeName string, a admission.Attributes) error {
+	// the request must come from a node with the same name as the CSINodeInfo object
+	if a.GetOperation() == admission.Create {
+		// a.GetName() won't return the name on create, so we drill down to the proposed object
+		accessor, err := meta.Accessor(a.GetObject())
+		if err != nil {
+			return admission.NewForbidden(a, fmt.Errorf("unable to access the object name"))
+		}
+		if accessor.GetName() != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("can only access CSINodeInfo with the same name as the requesting node"))
+		}
+	} else {
+		if a.GetName() != nodeName {
+			return admission.NewForbidden(a, fmt.Errorf("can only access CSINodeInfo with the same name as the requesting node"))
 		}
 	}
 
