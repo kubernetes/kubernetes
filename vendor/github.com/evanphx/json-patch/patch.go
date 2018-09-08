@@ -204,7 +204,7 @@ func (n *lazyNode) equal(o *lazyNode) bool {
 }
 
 func (o operation) kind() string {
-	if obj, ok := o["op"]; ok {
+	if obj, ok := o["op"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -220,7 +220,7 @@ func (o operation) kind() string {
 }
 
 func (o operation) path() string {
-	if obj, ok := o["path"]; ok {
+	if obj, ok := o["path"]; ok && obj != nil {
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -236,7 +236,7 @@ func (o operation) path() string {
 }
 
 func (o operation) from() string {
-	if obj, ok := o["from"]; ok {
+	if obj, ok := o["from"]; ok && obj != nil{
 		var op string
 
 		err := json.Unmarshal(*obj, &op)
@@ -450,7 +450,7 @@ func (p Patch) add(doc *container, op operation) error {
 	con, key := findObject(doc, path)
 
 	if con == nil {
-		return fmt.Errorf("jsonpatch add operation does not apply: doc is missing path: %s", path)
+		return fmt.Errorf("jsonpatch add operation does not apply: doc is missing path: \"%s\"", path)
 	}
 
 	return con.add(key, op.value())
@@ -462,7 +462,7 @@ func (p Patch) remove(doc *container, op operation) error {
 	con, key := findObject(doc, path)
 
 	if con == nil {
-		return fmt.Errorf("jsonpatch remove operation does not apply: doc is missing path: %s", path)
+		return fmt.Errorf("jsonpatch remove operation does not apply: doc is missing path: \"%s\"", path)
 	}
 
 	return con.remove(key)
@@ -477,8 +477,8 @@ func (p Patch) replace(doc *container, op operation) error {
 		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing path: %s", path)
 	}
 
-	val, ok := con.get(key)
-	if val == nil || ok != nil {
+	_, ok := con.get(key)
+	if ok != nil {
 		return fmt.Errorf("jsonpatch replace operation does not apply: doc is missing key: %s", path)
 	}
 
