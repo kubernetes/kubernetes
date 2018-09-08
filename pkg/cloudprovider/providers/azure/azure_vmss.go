@@ -128,6 +128,15 @@ func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm co
 	return ssName, instanceID, *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
 }
 
+func (ss *scaleSet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+	_, _, vm, err := ss.getVmssVM(name)
+	if err != nil {
+		return provisioningState, err
+	}
+
+	return *vm.ProvisioningState, nil
+}
+
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
 // The node must belong to one of scale sets.
 func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID string) (vm compute.VirtualMachineScaleSetVM, err error) {

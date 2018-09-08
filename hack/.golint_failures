@@ -407,7 +407,6 @@ pkg/volume/azure_file
 pkg/volume/cephfs
 pkg/volume/configmap
 pkg/volume/csi/fake
-pkg/volume/csi/nodeupdater
 pkg/volume/empty_dir
 pkg/volume/fc
 pkg/volume/flexvolume

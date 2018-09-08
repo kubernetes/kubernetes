@@ -64,4 +64,7 @@ type VMSet interface {
 	DetachDiskByName(diskName, diskURI string, nodeName types.NodeName) error
 	// GetDataDisks gets a list of data disks attached to the node.
 	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
+
+	// GetProvisioningStateByNodeName gets the provisioning state by node name.
+	GetProvisioningStateByNodeName(name string) (string, error)
 }
