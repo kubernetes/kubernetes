@@ -341,7 +341,7 @@ func humanReadableBootstrapToken(token *kubeadmapi.BootstrapToken) string {
 		groupsString = "<none>"
 	}
 
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\n", token.Token.String(), ttl, expires, usagesString, description, groupsString)
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", token.Token.String(), ttl, expires, usagesString, description, groupsString)
 }
 
 func getClientset(file string, dryRun bool) (clientset.Interface, error) {

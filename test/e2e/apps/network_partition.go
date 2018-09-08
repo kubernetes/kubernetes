@@ -106,12 +106,11 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	f := framework.NewDefaultFramework("network-partition")
 	var c clientset.Interface
 	var ns string
-	ignoreLabels := framework.ImagePullerLabels
 
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		_, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
+		_, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 
 		// TODO(foxish): Re-enable testing on gce after kubernetes#56787 is fixed.

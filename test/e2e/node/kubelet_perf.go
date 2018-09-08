@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
@@ -199,12 +198,6 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var rm *framework.ResourceMonitor
 
 	BeforeEach(func() {
-		// Wait until image prepull pod has completed so that they wouldn't
-		// affect the runtime cpu usage. Fail the test if prepulling cannot
-		// finish in time.
-		if err := framework.WaitForPodsSuccess(f.ClientSet, metav1.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingLongTimeout); err != nil {
-			framework.Failf("Image puller didn't complete in %v, not running resource usage test since the metrics might be adultrated", imagePrePullingLongTimeout)
-		}
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {

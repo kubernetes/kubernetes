@@ -201,19 +201,10 @@ const (
 
 	// ssh port
 	sshPort = "22"
-
-	// ImagePrePullingTimeout is the time we wait for the e2e-image-puller
-	// static pods to pull the list of seeded images. If they don't pull
-	// images within this time we simply log their output and carry on
-	// with the tests.
-	ImagePrePullingTimeout = 5 * time.Minute
 )
 
 var (
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-	// Label allocated to the image puller static pod that runs on each node
-	// before e2es.
-	ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
 
 	// For parsing Kubectl version for version-skewed testing.
 	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
@@ -634,7 +625,7 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 //
 // If ignoreLabels is not empty, pods matching this selector are ignored.
 func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
-	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
+	ignoreSelector := labels.SelectorFromSet(map[string]string{})
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)

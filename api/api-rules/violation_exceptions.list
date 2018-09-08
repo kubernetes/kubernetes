@@ -162,6 +162,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,V
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,EnableDynamicProvisioning
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,PersistentVolumeRecyclerConfiguration
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,VolumeConfiguration,FlexVolumePluginDir
+API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfiguration,IPTables
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit

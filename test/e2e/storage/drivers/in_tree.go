@@ -278,17 +278,14 @@ func (g *glusterFSDriver) DeleteVolume(volType testpatterns.TestVolType) {
 	name := g.driverInfo.Config.Prefix + "-server"
 
 	framework.Logf("Deleting Gluster endpoints %q...", name)
-	epErr := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
+	err := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
+	if err != nil {
+		framework.Failf("Gluster delete endpoints failed: %v", err)
+	}
 	framework.Logf("Deleting Gluster server pod %q...", g.serverPod.Name)
-	err := framework.DeletePodWithWait(f, cs, g.serverPod)
-	if epErr != nil || err != nil {
-		if epErr != nil {
-			framework.Logf("Gluster delete endpoints failed: %v", err)
-		}
-		if err != nil {
-			framework.Logf("Gluster server pod delete failed: %v", err)
-		}
-		framework.Failf("Cleanup failed")
+	err = framework.DeletePodWithWait(f, cs, g.serverPod)
+	if err != nil {
+		framework.Failf("Gluster server pod delete failed: %v", err)
 	}
 }
 
