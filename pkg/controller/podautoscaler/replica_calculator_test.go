@@ -31,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
@@ -338,7 +340,17 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	testClient, testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
 	metricsClient := metricsclient.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
 
-	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
+	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
+	informer := informerFactory.Core().V1().Pods()
+
+	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingTolerance, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
+
+	stop := make(chan struct{})
+	defer close(stop)
+	informerFactory.Start(stop)
+	if !controller.WaitForCacheSync("HPA", stop, informer.Informer().HasSynced) {
+		return
+	}
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{"name": podNamePrefix},
@@ -1224,7 +1236,7 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 func TestGroupPods(t *testing.T) {
 	tests := []struct {
 		name                string
-		pods                []v1.Pod
+		pods                []*v1.Pod
 		metrics             metricsclient.PodMetricsInfo
 		resource            v1.ResourceName
 		expectReadyPodCount int
@@ -1233,7 +1245,7 @@ func TestGroupPods(t *testing.T) {
 	}{
 		{
 			"void",
-			[]v1.Pod{},
+			[]*v1.Pod{},
 			metricsclient.PodMetricsInfo{},
 			v1.ResourceCPU,
 			0,
@@ -1242,7 +1254,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"count in a ready pod - memory",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1262,7 +1274,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"ignore a pod without ready condition - CPU",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1285,7 +1297,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"count in a ready pod with fresh metrics during initialization period - CPU",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1315,7 +1327,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"ignore a ready pod without fresh metrics during initialization period - CPU",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1345,7 +1357,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"ignore an unready pod during initialization period - CPU",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1375,7 +1387,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"count in a ready pod without fresh metrics after initialization period - CPU",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bentham",
@@ -1406,7 +1418,7 @@ func TestGroupPods(t *testing.T) {
 
 		{
 			"count in an unready pod that was ready after initialization period - CPU",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1436,7 +1448,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"ignore pod that has never been ready after initialization period - CPU",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
@@ -1466,7 +1478,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"a missing pod",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "epicurus",
@@ -1487,7 +1499,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			"several pods",
-			[]v1.Pod{
+			[]*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "lucretius",
