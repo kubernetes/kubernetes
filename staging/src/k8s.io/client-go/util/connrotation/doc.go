@@ -16,4 +16,7 @@ limitations under the License.
 
 // Package connrotation implements a connection dialer that tracks and can close
 // all created connections.
+//
+// This is used for credential rotation of long-lived connections, when there's
+// no way to re-authenticate on a live connection.
 package connrotation // import "k8s.io/client-go/util/connrotation"
