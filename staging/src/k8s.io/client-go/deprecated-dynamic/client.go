@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package dynamic provides a client interface to arbitrary Kubernetes
-// APIs that exposes common high level operations and exposes common
-// metadata.
 package deprecated_dynamic
 
 import (
