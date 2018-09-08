@@ -14,4 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package watch // import "k8s.io/client-go/rest/watch"
+package versioned // import "k8s.io/client-go/rest/watch"
