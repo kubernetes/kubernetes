@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package metrics provides abstractions for registering which metrics
-// to record.
 package metrics
 
 import (
