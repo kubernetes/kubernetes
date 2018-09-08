@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package deprecateddynamic is a deprecated version of the package dynamic.
-package deprecateddynamic // import "k8s.io/client-go/deprecated-dynamic"
+// Package deprecated_dynamic is a deprecated version of the package dynamic.
+package deprecated_dynamic // import "k8s.io/client-go/deprecated-dynamic"
