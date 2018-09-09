@@ -1357,11 +1357,19 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	}
 
 	// Iterate over topology pairs to get any of the pods being affected by
-	// the scheduled pod anti-affinity rules
+	// the scheduled pod anti-affinity rules where all its anti-affnity rules
+	// are matched by the incoming pod
+	podToMatchingTermsCount := make(map[string]int)
 	for topologyKey, topologyValue := range node.Labels {
 		if topologyMaps.topologyPairToPods[topologyPair{key: topologyKey, value: topologyValue}] != nil {
-			glog.V(10).Infof("Cannot schedule pod %+v onto node %v", podName(pod), node.Name)
-			return ErrExistingPodsAntiAffinityRulesNotMatch, nil
+			for existingPod := range topologyMaps.topologyPairToPods[topologyPair{key: topologyKey, value: topologyValue}] {
+				affinity := existingPod.Spec.Affinity
+				podToMatchingTermsCount[schedutil.GetPodFullName(existingPod)] = podToMatchingTermsCount[schedutil.GetPodFullName(existingPod)] + 1
+				if podToMatchingTermsCount[schedutil.GetPodFullName(existingPod)] == len(GetPodAntiAffinityTerms(affinity.PodAntiAffinity)) {
+					glog.V(10).Infof("Cannot schedule pod %+v onto node %v", podName(pod), node.Name)
+					return ErrExistingPodsAntiAffinityRulesNotMatch, nil
+				}
+			}
 		}
 	}
 	if glog.V(10) {
