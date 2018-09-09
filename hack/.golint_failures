@@ -190,6 +190,9 @@ pkg/kubectl/cmd/util/openapi
 pkg/kubectl/cmd/util/sanity
 pkg/kubectl/cmd/version
 pkg/kubectl/cmd/wait
+pkg/kubectl/describe
+pkg/kubectl/generate
+pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
 pkg/kubectl/util
 pkg/kubectl/util/slice

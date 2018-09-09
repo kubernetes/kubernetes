@@ -393,6 +393,7 @@ package_group(
         "//pkg/kubectl",
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/generate",
+        "//pkg/kubectl/generate/versioned",
         "//pkg/kubectl/proxy",
     ],
 )

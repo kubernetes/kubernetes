@@ -25,7 +25,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/generate/versioned",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/credentialprovider:go_default_library",
         "//pkg/kubectl/generate:go_default_library",
         "//pkg/kubectl/util:go_default_library",
         "//pkg/kubectl/util/hash:go_default_library",
