@@ -186,10 +186,8 @@ filename | sha256 hash
 
 ### Other notable changes
 
-* GCE: decrease cpu requests on master node, to allow more components to fit on one core machine. ([#67504](https://github.com/kubernetes/kubernetes/pull/67504), [@loburm](https://github.com/loburm))
 * Orphan DaemonSet when deleting with --cascade option set ([#68007](https://github.com/kubernetes/kubernetes/pull/68007), [@soltysh](https://github.com/soltysh))
 * Bump event-exporter to 0.2.2 to pick up security fixes. ([#66157](https://github.com/kubernetes/kubernetes/pull/66157), [@loburm](https://github.com/loburm))
-* GCE: decrease cpu requests on master node, to allow more components to fit on one core machine. ([#67504](https://github.com/kubernetes/kubernetes/pull/67504), [@loburm](https://github.com/loburm))
 * PVC may not be synced to controller local cache in time if PV is bound by external PV binder (e.g. kube-scheduler), double check if PVC is not found to prevent reclaiming PV wrongly. ([#67062](https://github.com/kubernetes/kubernetes/pull/67062), [@cofyc](https://github.com/cofyc))
 * kube-apiserver: fixes error creating system priority classes when starting multiple apiservers simultaneously ([#67372](https://github.com/kubernetes/kubernetes/pull/67372), [@tanshanshan](https://github.com/tanshanshan))
 * Add NoSchedule/NoExecute tolerations to ip-masq-agent, ensuring it to be scheduled in all nodes except master. ([#66260](https://github.com/kubernetes/kubernetes/pull/66260), [@tanshanshan](https://github.com/tanshanshan))
