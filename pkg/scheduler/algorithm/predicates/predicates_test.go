@@ -3299,6 +3299,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": ""}},
+				// TODO(Huang-Wei): following case would fail
+				// ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "", "bar": ""}},
 			},
 			pods: []*v1.Pod{
 				{

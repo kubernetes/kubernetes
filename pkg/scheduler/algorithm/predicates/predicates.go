@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -1296,26 +1295,12 @@ func getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*s
 // getMatchingAntiAffinityTopologyPairsOfPod is a helper to calculate on each existing pod of
 // given node, whether (1) it has PodAntiAffinity and (2) ALL AffinityTerms matches incoming pod
 func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*topologyPairsMaps, error) {
-	affinity := existingPod.Spec.Affinity
-	if affinity == nil || affinity.PodAntiAffinity == nil {
+	if !targetPodMatchesAntiAffinityOfPod(existingPod, newPod) {
 		return nil, nil
-	}
-
-	terms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
-	for _, term := range terms {
-		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-		if err != nil {
-			return nil, err
-		}
-		// All terms must match for the anti-affinity rule to be considered a match.
-		if !priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
-			return nil, nil
-		}
 	}
 	// All terms have matched. Adding the topology pairs of this node...
 	topologyMaps := newTopologyPairsMaps()
-	for _, term := range terms {
+	for _, term := range GetPodAntiAffinityTerms(existingPod.Spec.Affinity.PodAntiAffinity) {
 		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 			pair := topologyPair{key: term.TopologyKey, value: topologyValue}
 			topologyMaps.addTopologyPair(pair, existingPod)
