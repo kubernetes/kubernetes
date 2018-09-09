@@ -29,6 +29,7 @@ type SELinuxRunner interface {
 	// Getfilecon returns the SELinux context for the given path or returns an
 	// error.
 	Getfilecon(path string) (string, error)
+	Setfilecon(path string, context string) error
 }
 
 // NewSELinuxRunner returns a new SELinuxRunner appropriate for the platform.

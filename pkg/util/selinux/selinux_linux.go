@@ -50,3 +50,11 @@ func (_ *realSELinuxRunner) Getfilecon(path string) (string, error) {
 	}
 	return selinux.FileLabel(path)
 }
+
+func (_ *realSELinuxRunner) Setfilecon(path string, label string) error {
+	err := selinux.SetFileLabel(path, label)
+	if err != nil {
+		return err
+	}
+	return nil
+}

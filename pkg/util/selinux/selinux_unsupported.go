@@ -31,3 +31,7 @@ var _ SELinuxRunner = &realSELinuxRunner{}
 func (_ *realSELinuxRunner) Getfilecon(path string) (string, error) {
 	return "", nil
 }
+
+func (_ *realSELinuxRunner) Setfilecon(path string, label string) error {
+	return nil
+}
