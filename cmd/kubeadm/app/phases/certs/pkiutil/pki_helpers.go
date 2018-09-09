@@ -30,6 +30,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmsystem "k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -92,6 +93,10 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	if err := certutil.WriteCert(certificatePath, certutil.EncodeCertPEM(cert)); err != nil {
 		return fmt.Errorf("unable to write certificate to file %q: [%v]", certificatePath, err)
 	}
+	selinuxContext := kubeadmsystem.NewSELinuxContext()
+	if err := kubeadmsystem.SetSELinuxFilecon(certificatePath, selinuxContext); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -105,6 +110,10 @@ func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	privateKeyPath := pathForKey(pkiPath, name)
 	if err := certutil.WriteKey(privateKeyPath, certutil.EncodePrivateKeyPEM(key)); err != nil {
 		return fmt.Errorf("unable to write private key to file %q: [%v]", privateKeyPath, err)
+	}
+	selinuxContext := kubeadmsystem.NewSELinuxContext()
+	if err := kubeadmsystem.SetSELinuxFilecon(privateKeyPath, selinuxContext); err != nil {
+		return err
 	}
 
 	return nil
@@ -123,6 +132,10 @@ func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	publicKeyPath := pathForPublicKey(pkiPath, name)
 	if err := certutil.WriteKey(publicKeyPath, publicKeyBytes); err != nil {
 		return fmt.Errorf("unable to write public key to file %q: [%v]", publicKeyPath, err)
+	}
+	selinuxContext := kubeadmsystem.NewSELinuxContext()
+	if err := kubeadmsystem.SetSELinuxFilecon(publicKeyPath, selinuxContext); err != nil {
+		return err
 	}
 
 	return nil
