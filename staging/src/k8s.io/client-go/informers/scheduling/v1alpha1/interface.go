@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// PodGroups returns a PodGroupInformer.
+	PodGroups() PodGroupInformer
 	// PriorityClasses returns a PriorityClassInformer.
 	PriorityClasses() PriorityClassInformer
 }
@@ -37,6 +39,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// PodGroups returns a PodGroupInformer.
+func (v *version) PodGroups() PodGroupInformer {
+	return &podGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // PriorityClasses returns a PriorityClassInformer.

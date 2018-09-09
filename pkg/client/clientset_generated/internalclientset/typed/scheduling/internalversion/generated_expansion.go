@@ -18,4 +18,6 @@ limitations under the License.
 
 package internalversion
 
+type PodGroupExpansion interface{}
+
 type PriorityClassExpansion interface{}

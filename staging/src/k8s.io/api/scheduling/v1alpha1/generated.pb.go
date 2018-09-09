@@ -25,6 +25,9 @@ limitations under the License.
 		k8s.io/kubernetes/vendor/k8s.io/api/scheduling/v1alpha1/generated.proto
 
 	It has these top-level messages:
+		PodGroup
+		PodGroupList
+		PodGroupSpec
 		PriorityClass
 		PriorityClassList
 */
@@ -33,6 +36,10 @@ package v1alpha1
 import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
+
+import k8s_io_apimachinery_pkg_api_resource "k8s.io/apimachinery/pkg/api/resource"
+
+import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -50,18 +57,157 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
+func (m *PodGroup) Reset()                    { *m = PodGroup{} }
+func (*PodGroup) ProtoMessage()               {}
+func (*PodGroup) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{0} }
+
+func (m *PodGroupList) Reset()                    { *m = PodGroupList{} }
+func (*PodGroupList) ProtoMessage()               {}
+func (*PodGroupList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
+
+func (m *PodGroupSpec) Reset()                    { *m = PodGroupSpec{} }
+func (*PodGroupSpec) ProtoMessage()               {}
+func (*PodGroupSpec) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{2} }
+
 func (m *PriorityClass) Reset()                    { *m = PriorityClass{} }
 func (*PriorityClass) ProtoMessage()               {}
-func (*PriorityClass) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{0} }
+func (*PriorityClass) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{3} }
 
 func (m *PriorityClassList) Reset()                    { *m = PriorityClassList{} }
 func (*PriorityClassList) ProtoMessage()               {}
-func (*PriorityClassList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{1} }
+func (*PriorityClassList) Descriptor() ([]byte, []int) { return fileDescriptorGenerated, []int{4} }
 
 func init() {
+	proto.RegisterType((*PodGroup)(nil), "k8s.io.api.scheduling.v1alpha1.PodGroup")
+	proto.RegisterType((*PodGroupList)(nil), "k8s.io.api.scheduling.v1alpha1.PodGroupList")
+	proto.RegisterType((*PodGroupSpec)(nil), "k8s.io.api.scheduling.v1alpha1.PodGroupSpec")
 	proto.RegisterType((*PriorityClass)(nil), "k8s.io.api.scheduling.v1alpha1.PriorityClass")
 	proto.RegisterType((*PriorityClassList)(nil), "k8s.io.api.scheduling.v1alpha1.PriorityClassList")
 }
+func (m *PodGroup) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodGroup) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
+	n1, err := m.ObjectMeta.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n1
+	dAtA[i] = 0x12
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.Spec.Size()))
+	n2, err := m.Spec.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n2
+	return i, nil
+}
+
+func (m *PodGroupList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodGroupList) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0xa
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
+	n3, err := m.ListMeta.MarshalTo(dAtA[i:])
+	if err != nil {
+		return 0, err
+	}
+	i += n3
+	if len(m.Items) > 0 {
+		for _, msg := range m.Items {
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintGenerated(dAtA, i, uint64(msg.Size()))
+			n, err := msg.MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n
+		}
+	}
+	return i, nil
+}
+
+func (m *PodGroupSpec) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalTo(dAtA)
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodGroupSpec) MarshalTo(dAtA []byte) (int, error) {
+	var i int
+	_ = i
+	var l int
+	_ = l
+	dAtA[i] = 0x8
+	i++
+	i = encodeVarintGenerated(dAtA, i, uint64(m.NumMember))
+	if len(m.Resources) > 0 {
+		keysForResources := make([]string, 0, len(m.Resources))
+		for k := range m.Resources {
+			keysForResources = append(keysForResources, string(k))
+		}
+		github_com_gogo_protobuf_sortkeys.Strings(keysForResources)
+		for _, k := range keysForResources {
+			dAtA[i] = 0x12
+			i++
+			v := m.Resources[string(k)]
+			msgSize := 0
+			if (&v) != nil {
+				msgSize = (&v).Size()
+				msgSize += 1 + sovGenerated(uint64(msgSize))
+			}
+			mapSize := 1 + len(k) + sovGenerated(uint64(len(k))) + msgSize
+			i = encodeVarintGenerated(dAtA, i, uint64(mapSize))
+			dAtA[i] = 0xa
+			i++
+			i = encodeVarintGenerated(dAtA, i, uint64(len(k)))
+			i += copy(dAtA[i:], k)
+			dAtA[i] = 0x12
+			i++
+			i = encodeVarintGenerated(dAtA, i, uint64((&v).Size()))
+			n4, err := (&v).MarshalTo(dAtA[i:])
+			if err != nil {
+				return 0, err
+			}
+			i += n4
+		}
+	}
+	return i, nil
+}
+
 func (m *PriorityClass) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -80,11 +226,11 @@ func (m *PriorityClass) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(m.ObjectMeta.Size()))
-	n1, err := m.ObjectMeta.MarshalTo(dAtA[i:])
+	n5, err := m.ObjectMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n1
+	i += n5
 	dAtA[i] = 0x10
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(m.Value))
@@ -121,11 +267,11 @@ func (m *PriorityClassList) MarshalTo(dAtA []byte) (int, error) {
 	dAtA[i] = 0xa
 	i++
 	i = encodeVarintGenerated(dAtA, i, uint64(m.ListMeta.Size()))
-	n2, err := m.ListMeta.MarshalTo(dAtA[i:])
+	n6, err := m.ListMeta.MarshalTo(dAtA[i:])
 	if err != nil {
 		return 0, err
 	}
-	i += n2
+	i += n6
 	if len(m.Items) > 0 {
 		for _, msg := range m.Items {
 			dAtA[i] = 0x12
@@ -168,6 +314,46 @@ func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return offset + 1
 }
+func (m *PodGroup) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *PodGroupList) Size() (n int) {
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *PodGroupSpec) Size() (n int) {
+	var l int
+	_ = l
+	n += 1 + sovGenerated(uint64(m.NumMember))
+	if len(m.Resources) > 0 {
+		for k, v := range m.Resources {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
 func (m *PriorityClass) Size() (n int) {
 	var l int
 	_ = l
@@ -207,6 +393,49 @@ func sovGenerated(x uint64) (n int) {
 func sozGenerated(x uint64) (n int) {
 	return sovGenerated(uint64((x << 1) ^ uint64((int64(x) >> 63))))
 }
+func (this *PodGroup) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodGroup{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(this.ObjectMeta.String(), "ObjectMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "PodGroupSpec", "PodGroupSpec", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodGroupList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodGroupList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_apimachinery_pkg_apis_meta_v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PodGroup", "PodGroup", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodGroupSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForResources := make([]string, 0, len(this.Resources))
+	for k := range this.Resources {
+		keysForResources = append(keysForResources, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForResources)
+	mapStringForResources := "map[string]k8s_io_apimachinery_pkg_api_resource.Quantity{"
+	for _, k := range keysForResources {
+		mapStringForResources += fmt.Sprintf("%v: %v,", k, this.Resources[k])
+	}
+	mapStringForResources += "}"
+	s := strings.Join([]string{`&PodGroupSpec{`,
+		`NumMember:` + fmt.Sprintf("%v", this.NumMember) + `,`,
+		`Resources:` + mapStringForResources + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *PriorityClass) String() string {
 	if this == nil {
 		return "nil"
@@ -238,6 +467,417 @@ func valueToStringGenerated(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *PodGroup) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodGroup: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodGroup: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PodGroupList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodGroupList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodGroupList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, PodGroup{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PodGroupSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= (uint64(b) & 0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodGroupSpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodGroupSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NumMember", wireType)
+			}
+			m.NumMember = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.NumMember |= (int32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= (int(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			var keykey uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				keykey |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			var stringLenmapkey uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLenmapkey |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLenmapkey := int(stringLenmapkey)
+			if intStringLenmapkey < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postStringIndexmapkey := iNdEx + intStringLenmapkey
+			if postStringIndexmapkey > l {
+				return io.ErrUnexpectedEOF
+			}
+			mapkey := string(dAtA[iNdEx:postStringIndexmapkey])
+			iNdEx = postStringIndexmapkey
+			if m.Resources == nil {
+				m.Resources = make(map[string]k8s_io_apimachinery_pkg_api_resource.Quantity)
+			}
+			if iNdEx < postIndex {
+				var valuekey uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					valuekey |= (uint64(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				var mapmsglen int
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					mapmsglen |= (int(b) & 0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				if mapmsglen < 0 {
+					return ErrInvalidLengthGenerated
+				}
+				postmsgIndex := iNdEx + mapmsglen
+				if mapmsglen < 0 {
+					return ErrInvalidLengthGenerated
+				}
+				if postmsgIndex > l {
+					return io.ErrUnexpectedEOF
+				}
+				mapvalue := &k8s_io_apimachinery_pkg_api_resource.Quantity{}
+				if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+					return err
+				}
+				iNdEx = postmsgIndex
+				m.Resources[mapkey] = *mapvalue
+			} else {
+				var mapvalue k8s_io_apimachinery_pkg_api_resource.Quantity
+				m.Resources[mapkey] = mapvalue
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *PriorityClass) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -608,33 +1248,44 @@ func init() {
 }
 
 var fileDescriptorGenerated = []byte{
-	// 447 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x92, 0x4f, 0x8b, 0xd3, 0x40,
-	0x18, 0xc6, 0x33, 0x5d, 0x0b, 0x75, 0x4a, 0x41, 0x23, 0x42, 0xe8, 0x61, 0x36, 0xac, 0x97, 0x5c,
-	0x76, 0xc6, 0x2e, 0x2a, 0x82, 0xb7, 0xb8, 0xb0, 0x08, 0x8a, 0x92, 0x83, 0x07, 0xf1, 0xe0, 0x24,
-	0x79, 0x37, 0x1d, 0x9b, 0x64, 0xc2, 0xcc, 0x24, 0xb0, 0x37, 0xcf, 0x9e, 0xfc, 0x52, 0x42, 0x8f,
-	0x7b, 0xdc, 0xd3, 0x62, 0xe3, 0x17, 0x91, 0xa4, 0x69, 0xd3, 0x5a, 0xfc, 0x73, 0xcb, 0x3c, 0xef,
-	0xef, 0x79, 0xe6, 0xcd, 0xc3, 0xe0, 0x8b, 0xc5, 0x73, 0x4d, 0x85, 0x64, 0x8b, 0x32, 0x04, 0x95,
-	0x83, 0x01, 0xcd, 0x2a, 0xc8, 0x63, 0xa9, 0x58, 0x37, 0xe0, 0x85, 0x60, 0x3a, 0x9a, 0x43, 0x5c,
-	0xa6, 0x22, 0x4f, 0x58, 0x35, 0xe3, 0x69, 0x31, 0xe7, 0x33, 0x96, 0x40, 0x0e, 0x8a, 0x1b, 0x88,
-	0x69, 0xa1, 0xa4, 0x91, 0x36, 0x59, 0xf3, 0x94, 0x17, 0x82, 0xf6, 0x3c, 0xdd, 0xf0, 0xd3, 0xd3,
-	0x44, 0x98, 0x79, 0x19, 0xd2, 0x48, 0x66, 0x2c, 0x91, 0x89, 0x64, 0xad, 0x2d, 0x2c, 0x2f, 0xdb,
-	0x53, 0x7b, 0x68, 0xbf, 0xd6, 0x71, 0xd3, 0x27, 0xfd, 0xf5, 0x19, 0x8f, 0xe6, 0x22, 0x07, 0x75,
-	0xc5, 0x8a, 0x45, 0xd2, 0x08, 0x9a, 0x65, 0x60, 0x38, 0xab, 0x0e, 0x96, 0x98, 0xb2, 0x3f, 0xb9,
-	0x54, 0x99, 0x1b, 0x91, 0xc1, 0x81, 0xe1, 0xd9, 0xbf, 0x0c, 0xcd, 0xaf, 0x64, 0xfc, 0x77, 0xdf,
-	0xc9, 0xd7, 0x01, 0x9e, 0xbc, 0x53, 0x42, 0x2a, 0x61, 0xae, 0x5e, 0xa6, 0x5c, 0x6b, 0xfb, 0x13,
-	0x1e, 0x35, 0x5b, 0xc5, 0xdc, 0x70, 0x07, 0xb9, 0xc8, 0x1b, 0x9f, 0x3d, 0xa6, 0x7d, 0x25, 0xdb,
-	0x70, 0x5a, 0x2c, 0x92, 0x46, 0xd0, 0xb4, 0xa1, 0x69, 0x35, 0xa3, 0x6f, 0xc3, 0xcf, 0x10, 0x99,
-	0x37, 0x60, 0xb8, 0x6f, 0x2f, 0x6f, 0x8f, 0xad, 0xfa, 0xf6, 0x18, 0xf7, 0x5a, 0xb0, 0x4d, 0xb5,
-	0x1f, 0xe1, 0x61, 0xc5, 0xd3, 0x12, 0x9c, 0x81, 0x8b, 0xbc, 0xa1, 0x3f, 0xe9, 0xe0, 0xe1, 0xfb,
-	0x46, 0x0c, 0xd6, 0x33, 0xfb, 0x05, 0x9e, 0x24, 0xa9, 0x0c, 0x79, 0x7a, 0x0e, 0x97, 0xbc, 0x4c,
-	0x8d, 0x73, 0xe4, 0x22, 0x6f, 0xe4, 0x3f, 0xec, 0xe0, 0xc9, 0xc5, 0xee, 0x30, 0xd8, 0x67, 0xed,
-	0xa7, 0x78, 0x1c, 0x83, 0x8e, 0x94, 0x28, 0x8c, 0x90, 0xb9, 0x73, 0xc7, 0x45, 0xde, 0x5d, 0xff,
-	0x41, 0x67, 0x1d, 0x9f, 0xf7, 0xa3, 0x60, 0x97, 0x3b, 0xf9, 0x8e, 0xf0, 0xfd, 0xbd, 0x32, 0x5e,
-	0x0b, 0x6d, 0xec, 0x8f, 0x07, 0x85, 0xd0, 0xff, 0x2b, 0xa4, 0x71, 0xb7, 0x75, 0xdc, 0xeb, 0x6e,
-	0x1e, 0x6d, 0x94, 0x9d, 0x32, 0x02, 0x3c, 0x14, 0x06, 0x32, 0xed, 0x0c, 0xdc, 0x23, 0x6f, 0x7c,
-	0x76, 0x4a, 0xff, 0xfe, 0xfc, 0xe8, 0xde, 0x7e, 0x7d, 0x77, 0xaf, 0x9a, 0x8c, 0x60, 0x1d, 0xe5,
-	0xd3, 0xe5, 0x8a, 0x58, 0xd7, 0x2b, 0x62, 0xdd, 0xac, 0x88, 0xf5, 0xa5, 0x26, 0x68, 0x59, 0x13,
-	0x74, 0x5d, 0x13, 0x74, 0x53, 0x13, 0xf4, 0xa3, 0x26, 0xe8, 0xdb, 0x4f, 0x62, 0x7d, 0x18, 0x6d,
-	0x32, 0x7f, 0x05, 0x00, 0x00, 0xff, 0xff, 0xab, 0x20, 0x12, 0x63, 0x3c, 0x03, 0x00, 0x00,
+	// 611 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xbc, 0x52, 0x3f, 0x6f, 0xd3, 0x4e,
+	0x18, 0xce, 0xa5, 0x8d, 0x94, 0x5c, 0x9a, 0x9f, 0x5a, 0xff, 0x84, 0x14, 0x65, 0x70, 0xab, 0xb0,
+	0x64, 0xa0, 0x77, 0xa4, 0x02, 0x54, 0xd1, 0xcd, 0x04, 0x45, 0x48, 0xa4, 0x14, 0x23, 0x31, 0x20,
+	0x06, 0xce, 0xf6, 0xd5, 0x39, 0x62, 0xfb, 0xac, 0xbb, 0x73, 0xa4, 0x6c, 0xcc, 0x4c, 0xec, 0x7c,
+	0x14, 0x58, 0x91, 0x32, 0x76, 0xec, 0x54, 0x11, 0xf3, 0x45, 0x90, 0x1d, 0x3b, 0x4e, 0x1a, 0x48,
+	0xcb, 0xd2, 0xed, 0xee, 0x7d, 0x9f, 0xe7, 0x79, 0x9f, 0xf7, 0x0f, 0xec, 0x8f, 0x8e, 0x25, 0x62,
+	0x1c, 0x8f, 0x22, 0x8b, 0x8a, 0x80, 0x2a, 0x2a, 0xf1, 0x98, 0x06, 0x0e, 0x17, 0x38, 0x4b, 0x90,
+	0x90, 0x61, 0x69, 0x0f, 0xa9, 0x13, 0x79, 0x2c, 0x70, 0xf1, 0xb8, 0x4b, 0xbc, 0x70, 0x48, 0xba,
+	0xd8, 0xa5, 0x01, 0x15, 0x44, 0x51, 0x07, 0x85, 0x82, 0x2b, 0xae, 0xe9, 0x73, 0x3c, 0x22, 0x21,
+	0x43, 0x05, 0x1e, 0xe5, 0xf8, 0xd6, 0xa1, 0xcb, 0xd4, 0x30, 0xb2, 0x90, 0xcd, 0x7d, 0xec, 0x72,
+	0x97, 0xe3, 0x94, 0x66, 0x45, 0xe7, 0xe9, 0x2f, 0xfd, 0xa4, 0xaf, 0xb9, 0x5c, 0xeb, 0x51, 0x51,
+	0xde, 0x27, 0xf6, 0x90, 0x05, 0x54, 0x4c, 0x70, 0x38, 0x72, 0x53, 0x3f, 0x82, 0x4a, 0x1e, 0x09,
+	0x9b, 0x5e, 0x37, 0xb1, 0x91, 0x25, 0xb1, 0x4f, 0x15, 0xc1, 0xe3, 0x35, 0xeb, 0x2d, 0xfc, 0x37,
+	0x96, 0x88, 0x02, 0xc5, 0xfc, 0xf5, 0x32, 0x4f, 0x6e, 0x22, 0x24, 0x03, 0xf0, 0xc9, 0x75, 0x5e,
+	0xfb, 0x3b, 0x80, 0xd5, 0x33, 0xee, 0xf4, 0x05, 0x8f, 0x42, 0xed, 0x03, 0xac, 0x26, 0x86, 0x1c,
+	0xa2, 0x48, 0x13, 0x1c, 0x80, 0x4e, 0xfd, 0xe8, 0x21, 0x2a, 0x66, 0xb8, 0xd0, 0x45, 0xe1, 0xc8,
+	0x4d, 0x02, 0x12, 0x25, 0x68, 0x34, 0xee, 0xa2, 0x57, 0xd6, 0x47, 0x6a, 0xab, 0x01, 0x55, 0xc4,
+	0xd0, 0xa6, 0x57, 0xfb, 0xa5, 0xf8, 0x6a, 0x1f, 0x16, 0x31, 0x73, 0xa1, 0xaa, 0x9d, 0xc2, 0x6d,
+	0x19, 0x52, 0xbb, 0x59, 0x4e, 0xd5, 0x1f, 0xa0, 0xcd, 0x1b, 0x42, 0xb9, 0xb3, 0x37, 0x21, 0xb5,
+	0x8d, 0x9d, 0x4c, 0x79, 0x3b, 0xf9, 0x99, 0xa9, 0x4e, 0xfb, 0x1b, 0x80, 0x3b, 0x39, 0xe8, 0x25,
+	0x93, 0x4a, 0x7b, 0xbf, 0xd6, 0x02, 0xba, 0x5d, 0x0b, 0x09, 0x3b, 0x6d, 0x60, 0x37, 0x2b, 0x53,
+	0xcd, 0x23, 0x4b, 0xf6, 0x07, 0xb0, 0xc2, 0x14, 0xf5, 0x65, 0xb3, 0x7c, 0xb0, 0xd5, 0xa9, 0x1f,
+	0x75, 0x6e, 0xeb, 0xdf, 0x68, 0x64, 0xa2, 0x95, 0x17, 0x09, 0xdd, 0x9c, 0xab, 0xb4, 0xbf, 0x96,
+	0x0b, 0xf7, 0x49, 0x53, 0x1a, 0x86, 0xb5, 0x20, 0xf2, 0x07, 0xd4, 0xb7, 0xa8, 0x48, 0xed, 0x57,
+	0x8c, 0xbd, 0x8c, 0x59, 0x3b, 0xcd, 0x13, 0x66, 0x81, 0xd1, 0x3c, 0x58, 0xcb, 0x2f, 0x2f, 0x37,
+	0x75, 0xf2, 0x2f, 0x43, 0x45, 0x66, 0xce, 0x7e, 0x1e, 0x28, 0x31, 0x29, 0xaa, 0x2d, 0xe2, 0x66,
+	0x51, 0xa0, 0xe5, 0xc1, 0xff, 0x56, 0xf1, 0xda, 0x2e, 0xdc, 0x1a, 0xd1, 0x49, 0x6a, 0xb5, 0x66,
+	0x26, 0x4f, 0xad, 0x07, 0x2b, 0x63, 0xe2, 0x45, 0x34, 0x5b, 0xf1, 0xc6, 0xe9, 0xa3, 0x5c, 0x1a,
+	0xbd, 0x8e, 0x48, 0xa0, 0x98, 0x9a, 0x98, 0x73, 0xf2, 0xd3, 0xf2, 0x31, 0x68, 0x7f, 0x2e, 0xc3,
+	0xc6, 0x99, 0x60, 0x5c, 0x30, 0x35, 0x79, 0xe6, 0x11, 0x29, 0xef, 0xe0, 0x3e, 0xef, 0x2f, 0xbb,
+	0xaf, 0x14, 0x6b, 0x7b, 0x9b, 0x04, 0x33, 0x73, 0xda, 0x09, 0x6c, 0xb8, 0x1e, 0xb7, 0x88, 0xd7,
+	0xa3, 0xe7, 0x24, 0xf2, 0x54, 0x73, 0xeb, 0x00, 0x74, 0xaa, 0xc6, 0xbd, 0x0c, 0xdc, 0xe8, 0x2f,
+	0x27, 0xcd, 0x55, 0xac, 0xf6, 0x18, 0xd6, 0x1d, 0x2a, 0x6d, 0xc1, 0x42, 0xc5, 0x78, 0xd0, 0xdc,
+	0x4e, 0x26, 0x67, 0xfc, 0x9f, 0x51, 0xeb, 0xbd, 0x22, 0x65, 0x2e, 0xe3, 0xda, 0x3f, 0x00, 0xdc,
+	0x5b, 0x19, 0xc6, 0x1d, 0x5c, 0xbb, 0xb9, 0x7a, 0xed, 0x87, 0x37, 0x1e, 0xd6, 0xb2, 0xbf, 0x3f,
+	0x9f, 0xbc, 0x81, 0xa6, 0x33, 0xbd, 0x74, 0x31, 0xd3, 0x4b, 0x97, 0x33, 0xbd, 0xf4, 0x29, 0xd6,
+	0xc1, 0x34, 0xd6, 0xc1, 0x45, 0xac, 0x83, 0xcb, 0x58, 0x07, 0x3f, 0x63, 0x1d, 0x7c, 0xf9, 0xa5,
+	0x97, 0xde, 0x55, 0x73, 0xcd, 0xdf, 0x01, 0x00, 0x00, 0xff, 0xff, 0x0c, 0xb0, 0x8c, 0x87, 0x0d,
+	0x06, 0x00, 0x00,
 }
