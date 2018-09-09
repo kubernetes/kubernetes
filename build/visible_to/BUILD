@@ -392,9 +392,7 @@ package_group(
     packages = [
         "//pkg/kubectl",
         "//pkg/kubectl/cmd",
-        "//pkg/kubectl/cmd/logs",
-        "//pkg/kubectl/cmd/portforward",
-        "//pkg/kubectl/cmd/rollingupdate",
+        "//pkg/kubectl/generate",
         "//pkg/kubectl/proxy",
     ],
 )
