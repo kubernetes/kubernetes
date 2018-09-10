@@ -61,6 +61,13 @@ func (c *nopConverter) Convert(in, out, context interface{}) error {
 	if err != nil {
 		return err
 	}
+	if context != nil {
+		if groupVersioner, ok := context.(runtime.GroupVersioner); ok {
+			if targetGVK, ok := groupVersioner.KindForGroupVersionKinds([]schema.GroupVersionKind{unstructOut.GroupVersionKind()}); ok {
+				unstructOut.SetGroupVersionKind(targetGVK)
+			}
+		}
+	}
 	return nil
 }
 

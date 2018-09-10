@@ -747,7 +747,7 @@ func (d schemaCoercingDecoder) Decode(data []byte, defaults *schema.GroupVersion
 		}
 	}
 
-	return obj, gvk, nil
+	return obj.DeepCopyObject(), gvk, nil
 }
 
 // schemaCoercingConverter calls the delegate converter and applies the Unstructured validator to
