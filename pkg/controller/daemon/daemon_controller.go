@@ -51,7 +51,6 @@ import (
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/features"
@@ -1012,7 +1011,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	if err != nil {
 		generation = nil
 	}
-	template := util.CreatePodTemplate(ds.Spec.Template, generation, hash)
+	template := util.CreatePodTemplate(ds.Namespace, ds.Spec.Template, generation, hash)
 	// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 	// and double with each successful iteration in a kind of "slow start".
 	// This handles attempts to start large numbers of pods that would
@@ -1039,7 +1038,6 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 					// should be no conflicting node affinity with the target node.
 					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
-					podTemplate.Spec.Tolerations = util.AppendNoScheduleTolerationIfNotExist(podTemplate.Spec.Tolerations)
 
 					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
 						ds, metav1.NewControllerRef(ds, controllerKind))
@@ -1289,49 +1287,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 }
 
 func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *apps.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
-	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
-	// Add infinite toleration for taint notReady:NoExecute here
-	// to survive taint-based eviction enforced by NodeController
-	// when node turns not ready.
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeNotReady,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoExecute,
-	})
-
-	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
-	// Add infinite toleration for taint unreachable:NoExecute here
-	// to survive taint-based eviction enforced by NodeController
-	// when node turns unreachable.
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeUnreachable,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoExecute,
-	})
-
-	// According to TaintNodesByCondition, all DaemonSet pods should tolerate
-	// MemoryPressure and DisPressure taints, and the critical pods should tolerate
-	// OutOfDisk taint additional.
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeDiskPressure,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoSchedule,
-	})
-
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeMemoryPressure,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoSchedule,
-	})
-
-	// TODO(#48843) OutOfDisk taints will be removed in 1.10
-	if kubelettypes.IsCriticalPod(newPod) {
-		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-			Key:      algorithm.TaintNodeOutOfDisk,
-			Operator: v1.TolerationOpExists,
-			Effect:   v1.TaintEffectNoSchedule,
-		})
-	}
+	util.AddOrUpdateDaemonPodTolerations(&newPod.Spec, kubelettypes.IsCriticalPod(newPod))
 
 	objects, err := dsc.podNodeIndex.ByIndex("nodeName", node.Name)
 	if err != nil {
