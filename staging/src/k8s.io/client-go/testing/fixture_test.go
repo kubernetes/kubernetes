@@ -43,7 +43,7 @@ func getArbitraryResource(s schema.GroupVersionResource, name, namespace string)
 				"namespace":       namespace,
 				"generateName":    "test_generateName",
 				"uid":             "test_uid",
-				"resourceVersion": "test_resourceVersion",
+				"resourceVersion": "0", // matches implementation in tracker.add()
 				"selfLink":        "test_selfLink",
 			},
 			"data": strconv.Itoa(rand.Int()),
@@ -113,6 +113,7 @@ func TestWatchCallAllNamespace(t *testing.T) {
 	outAll = <-wAll.ResultChan()
 	assert.Equal(t, watch.Modified, out.Type, "watch event mismatch")
 	assert.Equal(t, watch.Modified, outAll.Type, "watch event mismatch")
+	accessor.SetResourceVersion("1") // matches implementation in tracker.add()
 	assert.Equal(t, testObj, out.Object, "watched updated object mismatch")
 	assert.Equal(t, testObj, outAll.Object, "watched updated object mismatch")
 	go func() {
@@ -194,7 +195,8 @@ func TestWatchCallMultipleInvocation(t *testing.T) {
 			obj := getArbitraryResource(testResource, c.name, "test_namespace")
 			o.Create(testResource, obj, "test_namespace")
 		case watch.Modified:
-			obj := getArbitraryResource(testResource, c.name, "test_namespace")
+			obj, err := o.Get(testResource, "test_namespace", c.name)
+			assert.NoError(t, err)
 			o.Update(testResource, obj, "test_namespace")
 		case watch.Deleted:
 			o.Delete(testResource, "test_namespace", c.name)
