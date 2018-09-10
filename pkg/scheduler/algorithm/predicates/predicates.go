@@ -1245,8 +1245,9 @@ func GetPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 	return terms
 }
 
-// getMatchingAntiAffinityTopologyPairs is an initialization helper to calculate on each existing pod
-// of each node, whether (1) it has PodAntiAffinity and (2) ALL AffinityTerms matches incoming pod
+// getMatchingAntiAffinityTopologyPairs calculates the following for each existing pod on each node:
+// (1) Whether it has PodAntiAffinity
+// (2) Whether ALL AffinityTerms match the incoming pod
 func getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) (*topologyPairsMaps, error) {
 	allNodeNames := make([]string, 0, len(nodeInfoMap))
 	for name := range nodeInfoMap {
@@ -1279,12 +1280,7 @@ func getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*s
 			return
 		}
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
-			existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, node)
-			if err != nil {
-				catchError(err)
-				return
-			}
-
+			existingPodTopologyMaps := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, node)
 			appendTopologyPairsMaps(existingPodTopologyMaps)
 		}
 	}
@@ -1292,11 +1288,12 @@ func getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, nodeInfoMap map[string]*s
 	return topologyMaps, firstError
 }
 
-// getMatchingAntiAffinityTopologyPairsOfPod is a helper to calculate on each existing pod of
-// given node, whether (1) it has PodAntiAffinity and (2) ALL AffinityTerms matches incoming pod
-func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) (*topologyPairsMaps, error) {
+// getMatchingAntiAffinityTopologyPairs calculates the following for "existingPod" on given node:
+// (1) Whether it has PodAntiAffinity
+// (2) Whether ALL AffinityTerms match the incoming pod
+func getMatchingAntiAffinityTopologyPairsOfPod(newPod, existingPod *v1.Pod, node *v1.Node) *topologyPairsMaps {
 	if !targetPodMatchesAntiAffinityOfPod(existingPod, newPod) {
-		return nil, nil
+		return nil
 	}
 	// All terms have matched. Adding the topology pairs of this node...
 	topologyMaps := newTopologyPairsMaps()
@@ -1306,7 +1303,7 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 			topologyMaps.addTopologyPair(pair, existingPod)
 		}
 	}
-	return topologyMaps, nil
+	return topologyMaps
 }
 
 func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, allPods []*v1.Pod) (*topologyPairsMaps, error) {
@@ -1321,10 +1318,7 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairs(pod *v1.Pod, a
 			}
 			return nil, err
 		}
-		existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, existingPodNode)
-		if err != nil {
-			return nil, err
-		}
+		existingPodTopologyMaps := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, existingPodNode)
 		topologyMaps.appendMaps(existingPodTopologyMaps)
 	}
 	return topologyMaps, nil

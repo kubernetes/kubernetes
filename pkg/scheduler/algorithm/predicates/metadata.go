@@ -185,7 +185,7 @@ func (topologyPairsMaps *topologyPairsMaps) removePod(deletedPod *v1.Pod) {
 }
 
 func (topologyPairsMaps *topologyPairsMaps) appendMaps(toAppend *topologyPairsMaps) {
-	if toAppend == nil || len(toAppend.podToTopologyPairs) == 0 {
+	if toAppend == nil {
 		return
 	}
 	for pair := range toAppend.topologyPairToPods {
@@ -235,10 +235,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 		return fmt.Errorf("invalid node in nodeInfo")
 	}
 	// Add matching anti-affinity terms of the addedPod to the map.
-	topologyPairsMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(meta.pod, addedPod, nodeInfo.Node())
-	if err != nil {
-		return err
-	}
+	topologyPairsMaps := getMatchingAntiAffinityTopologyPairsOfPod(meta.pod, addedPod, nodeInfo.Node())
 	meta.topologyPairsAntiAffinityPodsMap.appendMaps(topologyPairsMaps)
 	// Add the pod to nodeNameToMatchingAffinityPods and nodeNameToMatchingAntiAffinityPods if needed.
 	affinity := meta.pod.Spec.Affinity
