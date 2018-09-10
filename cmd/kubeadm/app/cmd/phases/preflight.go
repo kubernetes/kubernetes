@@ -17,13 +17,19 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -46,32 +52,59 @@ var (
 		# Run node pre-flight checks.
 		kubeadm alpha phase preflight node
 	`)
+
+	errorMissingConfigFlag = errors.New("the --config flag is mandatory")
 )
 
 // NewCmdPreFlight calls cobra.Command for preflight checks
 func NewCmdPreFlight() *cobra.Command {
+	var cfgPath string
+	var ignorePreflightErrors []string
+
 	cmd := &cobra.Command{
 		Use:   "preflight",
 		Short: "Run pre-flight checks",
 		Long:  cmdutil.MacroCommandLongDescription,
 	}
 
-	cmd.AddCommand(NewCmdPreFlightMaster())
-	cmd.AddCommand(NewCmdPreFlightNode())
+	options.AddConfigFlag(cmd.PersistentFlags(), &cfgPath)
+	options.AddIgnorePreflightErrorsFlag(cmd.PersistentFlags(), &ignorePreflightErrors)
+
+	cmd.AddCommand(NewCmdPreFlightMaster(&cfgPath, &ignorePreflightErrors))
+	cmd.AddCommand(NewCmdPreFlightNode(&cfgPath, &ignorePreflightErrors))
+
 	return cmd
 }
 
 // NewCmdPreFlightMaster calls cobra.Command for master preflight checks
-func NewCmdPreFlightMaster() *cobra.Command {
+func NewCmdPreFlightMaster(cfgPath *string, ignorePreflightErrors *[]string) *cobra.Command {
+
 	cmd := &cobra.Command{
 		Use:     "master",
 		Short:   "Run master pre-flight checks",
 		Long:    masterPreflightLongDesc,
 		Example: masterPreflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := &kubeadmapi.InitConfiguration{}
-			err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, sets.NewString())
+			if len(*cfgPath) == 0 {
+				kubeadmutil.CheckErr(errorMissingConfigFlag)
+			}
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(*ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
+
+			cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+			kubeadmscheme.Scheme.Default(cfg)
+
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
+			kubeadmutil.CheckErr(err)
+			err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
+			kubeadmutil.CheckErr(err)
+
+			fmt.Println("[preflight] running pre-flight checks")
+
+			err = preflight.RunInitMasterChecks(utilsexec.New(), internalcfg, ignorePreflightErrorsSet)
+			kubeadmutil.CheckErr(err)
+
+			fmt.Println("[preflight] pre-flight checks passed")
 		},
 	}
 
@@ -79,16 +112,33 @@ func NewCmdPreFlightMaster() *cobra.Command {
 }
 
 // NewCmdPreFlightNode calls cobra.Command for node preflight checks
-func NewCmdPreFlightNode() *cobra.Command {
+func NewCmdPreFlightNode(cfgPath *string, ignorePreflightErrors *[]string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "node",
 		Short:   "Run node pre-flight checks",
 		Long:    nodePreflightLongDesc,
 		Example: nodePreflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cfg := &kubeadmapi.JoinConfiguration{}
-			err := preflight.RunJoinNodeChecks(utilsexec.New(), cfg, sets.NewString())
+			if len(*cfgPath) == 0 {
+				kubeadmutil.CheckErr(errorMissingConfigFlag)
+			}
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(*ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
+
+			cfg := &kubeadmapiv1alpha3.JoinConfiguration{}
+			kubeadmscheme.Scheme.Default(cfg)
+
+			internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
+			kubeadmutil.CheckErr(err)
+			err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
+			kubeadmutil.CheckErr(err)
+
+			fmt.Println("[preflight] running pre-flight checks")
+
+			err = preflight.RunJoinNodeChecks(utilsexec.New(), internalcfg, ignorePreflightErrorsSet)
+			kubeadmutil.CheckErr(err)
+
+			fmt.Println("[preflight] pre-flight checks passed")
 		},
 	}
 
