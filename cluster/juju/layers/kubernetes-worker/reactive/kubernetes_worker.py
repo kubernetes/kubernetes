@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
 import json
 import os
 import random
@@ -27,7 +26,6 @@ import yaml
 
 from charms.leadership import leader_get, leader_set
 
-from pathlib import Path
 from subprocess import check_call, check_output
 from subprocess import CalledProcessError
 from socket import gethostname
@@ -51,7 +49,7 @@ from charmhelpers.contrib.charmsupport import nrpe
 from charms.layer.kubernetes_common import kubeclientconfig_path
 from charms.layer.kubernetes_common import migrate_resource_checksums
 from charms.layer.kubernetes_common import check_resources_for_upgrade_needed
-from charms.layer.kubernetes_common import calculate_and_store_resource_checksums # noqa
+from charms.layer.kubernetes_common import calculate_and_store_resource_checksums  # noqa
 from charms.layer.kubernetes_common import get_ingress_address
 from charms.layer.kubernetes_common import create_kubeconfig
 from charms.layer.kubernetes_common import kubectl_manifest, kubectl_success
@@ -59,6 +57,10 @@ from charms.layer.kubernetes_common import kubectl
 from charms.layer.kubernetes_common import arch, get_node_name
 from charms.layer.kubernetes_common import configure_kubernetes_service
 from charms.layer.kubernetes_common import parse_extra_args
+from charms.layer.kubernetes_common import cloud_config_path
+from charms.layer.kubernetes_common import write_gcp_snap_config
+from charms.layer.kubernetes_common import write_openstack_snap_config
+from charms.layer.kubernetes_common import write_azure_snap_config
 
 # Override the default nagios shortname regex to allow periods, which we
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
@@ -67,7 +69,6 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 kubeconfig_path = '/root/cdk/kubeconfig'
 kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
-gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 snap_resources = ['kubectl', 'kubelet', 'kube-proxy']
 checksum_prefix = 'kubernetes-worker.resource-checksums.'
 configure_prefix = 'kubernetes-worker.prev_args.'
@@ -678,19 +679,17 @@ def configure_kubelet(dns, ingress_ip):
     kubelet_opts['node-ip'] = ingress_ip
     kubelet_opts['allow-privileged'] = set_privileged()
 
+    kubelet_cloud_config_path = cloud_config_path('kubelet')
     if is_state('endpoint.aws.ready'):
         kubelet_opts['cloud-provider'] = 'aws'
     elif is_state('endpoint.gcp.ready'):
-        cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'gce'
-        kubelet_opts['cloud-config'] = str(cloud_config_path)
+        kubelet_opts['cloud-config'] = str(kubelet_cloud_config_path)
     elif is_state('endpoint.openstack.ready'):
-        cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'openstack'
-        kubelet_opts['cloud-config'] = str(cloud_config_path)
+        kubelet_opts['cloud-config'] = str(kubelet_cloud_config_path)
     elif is_state('endpoint.vsphere.joined'):
         # vsphere just needs to be joined on the worker (vs 'ready')
-        cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'vsphere'
         # NB: vsphere maps node product-id to its uuid (no config file needed).
         uuid_file = '/sys/class/dmi/id/product_uuid'
@@ -699,9 +698,8 @@ def configure_kubelet(dns, ingress_ip):
         kubelet_opts['provider-id'] = 'vsphere://{}'.format(uuid)
     elif is_state('endpoint.azure.ready'):
         azure = endpoint_from_flag('endpoint.azure.ready')
-        cloud_config_path = _cloud_config_path('kubelet')
         kubelet_opts['cloud-provider'] = 'azure'
-        kubelet_opts['cloud-config'] = str(cloud_config_path)
+        kubelet_opts['cloud-config'] = str(kubelet_cloud_config_path)
         kubelet_opts['provider-id'] = azure.vm_id
 
     if get_version('kubelet') >= (1, 10):
@@ -1207,101 +1205,13 @@ def clear_cloud_flags():
 def cloud_ready():
     remove_state('kubernetes-worker.cloud.pending')
     if is_state('endpoint.gcp.ready'):
-        _write_gcp_snap_config('kubelet')
+        write_gcp_snap_config('kubelet')
     elif is_state('endpoint.openstack.ready'):
-        _write_openstack_snap_config('kubelet')
+        write_openstack_snap_config('kubelet')
     elif is_state('endpoint.azure.ready'):
-        _write_azure_snap_config('kubelet')
+        write_azure_snap_config('kubelet')
     set_state('kubernetes-worker.cloud.ready')
     set_state('kubernetes-worker.restart-needed')  # force restart
-
-
-def _snap_common_path(component):
-    return Path('/var/snap/{}/common'.format(component))
-
-
-def _cloud_config_path(component):
-    return _snap_common_path(component) / 'cloud-config.conf'
-
-
-def _cloud_endpoint_ca_path(component):
-    return _snap_common_path(component) / 'cloud-endpoint-ca.crt'
-
-
-def _gcp_creds_path(component):
-    return _snap_common_path(component) / 'gcp-creds.json'
-
-
-def _daemon_env_path(component):
-    return _snap_common_path(component) / 'environment'
-
-
-def _write_gcp_snap_config(component):
-    # gcp requires additional credentials setup
-    gcp = endpoint_from_flag('endpoint.gcp.ready')
-    creds_path = _gcp_creds_path(component)
-    with creds_path.open('w') as fp:
-        os.fchmod(fp.fileno(), 0o600)
-        fp.write(gcp.credentials)
-
-    # create a cloud-config file that sets token-url to nil to make the
-    # services use the creds env var instead of the metadata server, as
-    # well as making the cluster multizone
-    cloud_config_path = _cloud_config_path(component)
-    cloud_config_path.write_text('[Global]\n'
-                                 'token-url = nil\n'
-                                 'multizone = true\n')
-
-    daemon_env_path = _daemon_env_path(component)
-    if daemon_env_path.exists():
-        daemon_env = daemon_env_path.read_text()
-        if not daemon_env.endswith('\n'):
-            daemon_env += '\n'
-    else:
-        daemon_env = ''
-    if gcp_creds_env_key not in daemon_env:
-        daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
-        daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
-        daemon_env_path.write_text(daemon_env)
-
-
-def _write_openstack_snap_config(component):
-    # openstack requires additional credentials setup
-    openstack = endpoint_from_flag('endpoint.openstack.ready')
-
-    cloud_config_path = _cloud_config_path(component)
-    lines = [
-        '[Global]',
-        'auth-url = {}'.format(openstack.auth_url),
-        'username = {}'.format(openstack.username),
-        'password = {}'.format(openstack.password),
-        'tenant-name = {}'.format(openstack.project_name),
-        'domain-name = {}'.format(openstack.user_domain_name),
-    ]
-    if openstack.endpoint_tls_ca:
-        cloud_endpoint_ca_path = _cloud_endpoint_ca_path(component)
-        cloud_endpoint_ca_path.write_text(base64.b64decode(
-            openstack.endpoint_tls_ca
-        ).decode('utf-8'))
-        lines.append('ca-file = {}'.format(str(cloud_endpoint_ca_path)))
-
-    cloud_config_path.write_text('\n'.join(lines))
-
-
-def _write_azure_snap_config(component):
-    azure = endpoint_from_flag('endpoint.azure.ready')
-    cloud_config_path = _cloud_config_path(component)
-    cloud_config_path.write_text(json.dumps({
-        'useInstanceMetadata': True,
-        'useManagedIdentityExtension': True,
-        'subscriptionId': azure.subscription_id,
-        'resourceGroup': azure.resource_group,
-        'location': azure.resource_group_location,
-        'vnetName': azure.vnet_name,
-        'vnetResourceGroup': azure.vnet_resource_group,
-        'subnetName': azure.subnet_name,
-        'securityGroupName': azure.security_group_name,
-    }))
 
 
 def get_first_mount(mount_relation):

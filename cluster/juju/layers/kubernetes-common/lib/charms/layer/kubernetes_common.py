@@ -14,22 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import base64
 import re
+import os
 import subprocess
 import hashlib
 import json
 
+from pathlib import Path
 from subprocess import check_output, check_call
 from socket import gethostname, getfqdn
 from shlex import split
 from subprocess import CalledProcessError
 from charmhelpers.core import hookenv, unitdata
 from charmhelpers.core import host
-from charms.reactive import is_state
+from charms.reactive import is_state, endpoint_from_flag
 from time import sleep
 
 db = unitdata.kv()
 kubeclientconfig_path = '/root/.kube/config'
+gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 
 
 def get_version(bin_name):
@@ -348,3 +352,109 @@ def configure_kubernetes_service(key, service, base_args, extra_args_key):
     check_call(cmd)
 
     db.set(prev_args_key, args)
+
+
+def _snap_common_path(component):
+    return Path('/var/snap/{}/common'.format(component))
+
+
+def cloud_config_path(component):
+    return _snap_common_path(component) / 'cloud-config.conf'
+
+
+def _gcp_creds_path(component):
+    return _snap_common_path(component) / 'gcp-creds.json'
+
+
+def _daemon_env_path(component):
+    return _snap_common_path(component) / 'environment'
+
+
+def _cloud_endpoint_ca_path(component):
+    return _snap_common_path(component) / 'cloud-endpoint-ca.crt'
+
+
+def write_gcp_snap_config(component):
+    # gcp requires additional credentials setup
+    gcp = endpoint_from_flag('endpoint.gcp.ready')
+    creds_path = _gcp_creds_path(component)
+    with creds_path.open('w') as fp:
+        os.fchmod(fp.fileno(), 0o600)
+        fp.write(gcp.credentials)
+
+    # create a cloud-config file that sets token-url to nil to make the
+    # services use the creds env var instead of the metadata server, as
+    # well as making the cluster multizone
+    comp_cloud_config_path = cloud_config_path(component)
+    comp_cloud_config_path.write_text('[Global]\n'
+                                      'token-url = nil\n'
+                                      'multizone = true\n')
+
+    daemon_env_path = _daemon_env_path(component)
+    if daemon_env_path.exists():
+        daemon_env = daemon_env_path.read_text()
+        if not daemon_env.endswith('\n'):
+            daemon_env += '\n'
+    else:
+        daemon_env = ''
+    if gcp_creds_env_key not in daemon_env:
+        daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
+        daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
+        daemon_env_path.write_text(daemon_env)
+
+
+def write_openstack_snap_config(component):
+    # openstack requires additional credentials setup
+    openstack = endpoint_from_flag('endpoint.openstack.ready')
+
+    lines = [
+        '[Global]',
+        'auth-url = {}'.format(openstack.auth_url),
+        'region = {}'.format(openstack.region),
+        'username = {}'.format(openstack.username),
+        'password = {}'.format(openstack.password),
+        'tenant-name = {}'.format(openstack.project_name),
+        'domain-name = {}'.format(openstack.user_domain_name),
+    ]
+    if openstack.endpoint_tls_ca:
+        cloud_endpoint_ca_path = _cloud_endpoint_ca_path(component)
+        cloud_endpoint_ca_path.write_text(base64.b64decode(
+            openstack.endpoint_tls_ca
+        ).decode('utf-8'))
+        lines.append('ca-file = {}'.format(str(cloud_endpoint_ca_path)))
+    if any([openstack.subnet_id,
+            openstack.floating_network_id,
+            openstack.lb_method,
+            openstack.manage_security_groups]):
+        lines.append('')
+        lines.append('[LoadBalancer]')
+    if openstack.subnet_id:
+        lines.append('subnet-id = {}'.format(openstack.subnet_id))
+    if openstack.floating_network_id:
+        lines.append('floating-network-id = {}'.format(
+            openstack.floating_network_id))
+    if openstack.lb_method:
+        lines.append('lb-method = {}'.format(
+            openstack.lb_method))
+    if openstack.manage_security_groups:
+        lines.append('manage-security-groups = {}'.format(
+            openstack.manage_security_groups))
+
+    comp_cloud_config_path = cloud_config_path(component)
+    comp_cloud_config_path.write_text(''.join('{}\n'.format(l) for l in lines))
+
+
+def write_azure_snap_config(component):
+    azure = endpoint_from_flag('endpoint.azure.ready')
+    comp_cloud_config_path = cloud_config_path(component)
+    comp_cloud_config_path.write_text(json.dumps({
+        'useInstanceMetadata': True,
+        'useManagedIdentityExtension': True,
+        'subscriptionId': azure.subscription_id,
+        'resourceGroup': azure.resource_group,
+        'location': azure.resource_group_location,
+        'vnetName': azure.vnet_name,
+        'vnetResourceGroup': azure.vnet_resource_group,
+        'subnetName': azure.subnet_name,
+        'securityGroupName': azure.security_group_name,
+    }))
