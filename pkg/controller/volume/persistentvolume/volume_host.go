@@ -109,7 +109,7 @@ func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(_, _ s
 	}
 }
 
-func (adc *PersistentVolumeController) GetExec(pluginName string) mount.Exec {
+func (ctrl *PersistentVolumeController) GetExec(pluginName string) mount.Exec {
 	return mount.NewOsExec()
 }
 
