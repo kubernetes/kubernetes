@@ -79039,11 +79039,6 @@
    },
    "io.k8s.api.autoscaling.v2beta2.MetricValueStatus": {
     "description": "MetricValueStatus holds the current value for a metric",
-    "required": [
-     "value",
-     "averageValue",
-     "averageUtilization"
-    ],
     "properties": {
      "averageUtilization": {
       "description": "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",

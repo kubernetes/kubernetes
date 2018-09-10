@@ -259,31 +259,37 @@ message MetricTarget {
   optional string type = 1;
 
   // value is the target value of the metric (as a quantity).
+  // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 2;
 
   // averageValue is the target value of the average of the
   // metric across all relevant pods (as a quantity)
+  // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity averageValue = 3;
 
   // averageUtilization is the target value of the average of the
   // resource metric across all relevant pods, represented as a percentage of
   // the requested value of the resource for the pods.
   // Currently only valid for Resource metric source type
+  // +optional
   optional int32 averageUtilization = 4;
 }
 
 // MetricValueStatus holds the current value for a metric
 message MetricValueStatus {
   // value is the current value of the metric (as a quantity).
+  // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
 
   // averageValue is the current value of the average of the
   // metric across all relevant pods (as a quantity)
+  // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity averageValue = 2;
 
   // currentAverageUtilization is the current value of the average of the
   // resource metric across all relevant pods, represented as a percentage of
   // the requested value of the resource for the pods.
+  // +optional
   optional int32 averageUtilization = 3;
 }
 
