@@ -1362,15 +1362,13 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	podToMatchingTermsCount := make(map[string]int)
 	for topologyKey, topologyValue := range node.Labels {
 		podSet := topologyMaps.topologyPairToPods[topologyPair{key: topologyKey, value: topologyValue}]
-		if podSet != nil {
-			for existingPod := range podSet {
-				affinity := existingPod.Spec.Affinity
-				existingPodFullName := schedutil.GetPodFullName(existingPod)
-				podToMatchingTermsCount[existingPodFullName]++
-				if podToMatchingTermsCount[existingPodFullName] == len(GetPodAntiAffinityTerms(affinity.PodAntiAffinity)) {
-					glog.V(10).Infof("Cannot schedule pod %+v onto node %v, existing anti-affinity rules of pod %v are not satisfied.", podName(pod), node.Name, podName(existingPod))
-					return ErrExistingPodsAntiAffinityRulesNotMatch, nil
-				}
+		for existingPod := range podSet {
+			affinity := existingPod.Spec.Affinity
+			existingPodFullName := schedutil.GetPodFullName(existingPod)
+			podToMatchingTermsCount[existingPodFullName]++
+			if podToMatchingTermsCount[existingPodFullName] == len(GetPodAntiAffinityTerms(affinity.PodAntiAffinity)) {
+				glog.V(10).Infof("Cannot schedule pod %+v onto node %v, existing anti-affinity rules of pod %v are not satisfied.", podName(pod), node.Name, podName(existingPod))
+				return ErrExistingPodsAntiAffinityRulesNotMatch, nil
 			}
 		}
 	}
