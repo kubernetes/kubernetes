@@ -38,6 +38,7 @@ go_library(
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
         "//cmd/kubeadm/app/phases/markmaster:go_default_library",
+        "//cmd/kubeadm/app/phases/patchnode:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/phases/upgrade:go_default_library",
         "//cmd/kubeadm/app/phases/uploadconfig:go_default_library",

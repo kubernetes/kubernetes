@@ -27,6 +27,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -59,6 +60,14 @@ var (
 	kubeletConfigUploadExample = normalizer.Examples(`
 		# Uploads the kubelet configuration from the kubeadm Config file to a ConfigMap in the cluster.
 		kubeadm alpha phase kubelet config upload --config kubeadm.yaml
+		`)
+
+	kubeletConfigAnnotateCRILongDesc = normalizer.LongDesc(`
+		Adds an annotation to the current node with the CRI socket specified in the kubeadm InitConfiguration object.
+		` + cmdutil.AlphaDisclaimer)
+
+	kubeletConfigAnnotateCRIExample = normalizer.Examples(`
+		kubeadm alpha phase kubelet config annotate-cri --config kubeadm.yaml
 		`)
 
 	kubeletConfigDownloadLongDesc = normalizer.LongDesc(`
@@ -177,6 +186,7 @@ func NewCmdKubeletConfig() *cobra.Command {
 	}
 
 	cmd.AddCommand(NewCmdKubeletConfigUpload())
+	cmd.AddCommand(NewCmdKubeletAnnotateCRI())
 	cmd.AddCommand(NewCmdKubeletConfigDownload())
 	cmd.AddCommand(NewCmdKubeletConfigWriteToDisk())
 	cmd.AddCommand(NewCmdKubeletConfigEnableDynamic())
@@ -213,6 +223,45 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			err = kubeletphase.CreateConfigMap(internalcfg, client)
+			kubeadmutil.CheckErr(err)
+		},
+	}
+
+	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
+	options.AddConfigFlag(cmd.Flags(), &cfgPath)
+	return cmd
+}
+
+// NewCmdKubeletAnnotateCRI calls cobra.Command for annotating the node with the given crisocket
+func NewCmdKubeletAnnotateCRI() *cobra.Command {
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	var cfgPath string
+	kubeConfigFile := constants.GetAdminKubeConfigPath()
+
+	cmd := &cobra.Command{
+		Use:     "annotate-cri",
+		Short:   "annotates the node with the given crisocket",
+		Long:    kubeletConfigAnnotateCRILongDesc,
+		Example: kubeletConfigAnnotateCRIExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(cfgPath) == 0 {
+				kubeadmutil.CheckErr(fmt.Errorf("The --config argument is required"))
+			}
+
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err := SetKubernetesVersion(nil, cfg)
+			kubeadmutil.CheckErr(err)
+
+			// This call returns the ready-to-use configuration based on the configuration file
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+			kubeadmutil.CheckErr(err)
+
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+			kubeadmutil.CheckErr(err)
+
+			err = patchnodephase.AnnotateCRISocket(client, internalcfg.NodeRegistration.Name, internalcfg.NodeRegistration.CRISocket)
 			kubeadmutil.CheckErr(err)
 		},
 	}
