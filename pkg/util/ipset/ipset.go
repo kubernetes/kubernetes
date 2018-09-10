@@ -485,7 +485,7 @@ func validateProtocol(protocol string) bool {
 	if protocol == ProtocolTCP || protocol == ProtocolUDP || protocol == ProtocolSCTP {
 		return true
 	}
-	glog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s]", protocol, ProtocolTCP, ProtocolUDP, ProtocolSCTP)
+	glog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s, %s]", protocol, ProtocolTCP, ProtocolUDP, ProtocolSCTP)
 	return false
 }
 
