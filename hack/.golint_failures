@@ -425,7 +425,6 @@ pkg/volume/scaleio
 pkg/volume/secret
 pkg/volume/storageos
 pkg/volume/testing
-pkg/volume/util
 pkg/volume/util/fs
 pkg/volume/util/recyclerclient
 pkg/volume/util/volumepathhandler

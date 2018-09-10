@@ -261,6 +261,7 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 	return secret, nil
 }
 
+// GetClassForVolume locates storage class by persistent volume
 func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot get kube client")
@@ -379,11 +380,11 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 		}
 		// scheduler will guarantee if node != null above, zoneFromNode is member of allowedZones.
 		// so if zoneFromNode != "", we can safely assume it is part of allowedZones.
-		if zones, err := chooseZonesForVolumeIncludingZone(allowedZones, pvcName, zoneFromNode, numReplicas); err != nil {
+		zones, err := chooseZonesForVolumeIncludingZone(allowedZones, pvcName, zoneFromNode, numReplicas)
+		if err != nil {
 			return nil, fmt.Errorf("cannot process zones in allowedTopologies: %v", err)
-		} else {
-			return zones, nil
 		}
+		return zones, nil
 	}
 
 	// pick zone from parameters if present
@@ -405,11 +406,11 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 	// pick zone from zones with nodes
 	if zonesWithNodes.Len() > 0 {
 		// If node != null (and thus zoneFromNode != ""), zoneFromNode will be member of zonesWithNodes
-		if zones, err := chooseZonesForVolumeIncludingZone(zonesWithNodes, pvcName, zoneFromNode, numReplicas); err != nil {
+		zones, err := chooseZonesForVolumeIncludingZone(zonesWithNodes, pvcName, zoneFromNode, numReplicas)
+		if err != nil {
 			return nil, fmt.Errorf("cannot process zones where nodes exist in the cluster: %v", err)
-		} else {
-			return zones, nil
 		}
+		return zones, nil
 	}
 	return nil, fmt.Errorf("cannot determine zones to provision volume in")
 }
@@ -431,6 +432,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 	return zones, nil
 }
 
+// ZonesSetToLabelValue converts zones set to label value
 func ZonesSetToLabelValue(strSet sets.String) string {
 	return strings.Join(strSet.UnsortedList(), kubeletapis.LabelMultiZoneDelimiter)
 }
@@ -511,7 +513,7 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 func RoundUpSize(volumeSizeBytes int64, allocationUnitBytes int64) int64 {
 	roundedUp := volumeSizeBytes / allocationUnitBytes
 	if volumeSizeBytes%allocationUnitBytes > 0 {
-		roundedUp += 1
+		roundedUp++
 	}
 	return roundedUp
 }
