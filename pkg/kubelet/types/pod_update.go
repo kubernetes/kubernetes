@@ -159,13 +159,12 @@ func IsCriticalPod(pod *v1.Pod) bool {
 	return false
 }
 
-// Preemptable returns true if preemptor pod can preempt preemptee pod:
-//   - If preemptor's is greater than preemptee's priority, it's preemptable (return true)
-//   - If preemptor (or its priority) is nil and preemptee bears the critical pod annotation key,
-//     preemptee can not be preempted (return false)
-//   - If preemptor (or its priority) is nil and preemptee's priority is greater than or equal to
-//     SystemCriticalPriority, preemptee can not be preempted (return false)
+// Preemptable returns true if preemptor pod can preempt preemptee pod
+// if preemptee is not critical or if preemptor's priority is greater than preemptee's priority
 func Preemptable(preemptor, preemptee *v1.Pod) bool {
+	if IsCriticalPod(preemptor) && !IsCriticalPod(preemptee) {
+		return true
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		if (preemptor != nil && preemptor.Spec.Priority != nil) &&
 			(preemptee != nil && preemptee.Spec.Priority != nil) {
@@ -173,7 +172,7 @@ func Preemptable(preemptor, preemptee *v1.Pod) bool {
 		}
 	}
 
-	return !IsCriticalPod(preemptee)
+	return false
 }
 
 // IsCritical returns true if parameters bear the critical pod annotation
