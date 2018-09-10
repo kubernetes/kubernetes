@@ -60,12 +60,12 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", group.PackageName, version.NonEmpty())
+			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
 			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
 
 			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}])
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), groupClientPackage)))
-			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", groupAlias, version.NonEmpty(), fakeGroupClientPackage)))
+			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), groupClientPackage))
+			imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), fakeGroupClientPackage))
 		}
 	}
 	// the package that has the clientset Interface
