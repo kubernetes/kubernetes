@@ -49,7 +49,7 @@ type pluginServiceV1Beta1 struct {
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
-	glog.Infof("GetExampleInfo v1beta1field: %s", rqt.V1Beta1Field)
+	glog.Infof("GetExampleInfo v1beta1_field: %s", rqt.V1Beta1Field)
 	return &v1beta1.ExampleResponse{}, nil
 }
 
@@ -68,11 +68,6 @@ func (s *pluginServiceV1Beta2) GetExampleInfo(ctx context.Context, rqt *v1beta2.
 
 func (s *pluginServiceV1Beta2) RegisterService() {
 	v1beta2.RegisterExampleServer(s.server.grpcServer, s)
-}
-
-// NewExamplePlugin returns an initialized examplePlugin instance
-func NewExamplePlugin() *examplePlugin {
-	return &examplePlugin{}
 }
 
 // NewTestExamplePlugin returns an initialized examplePlugin instance for testing
@@ -97,7 +92,7 @@ func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoReques
 }
 
 func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
-	glog.Errorf("Registration is: %v\n", status)
+	glog.Infof("Registration is: %v", status)
 
 	if e.registrationStatus != nil {
 		e.registrationStatus <- *status
@@ -108,13 +103,13 @@ func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *re
 
 // Serve starts a pluginwatcher server and one or more of the plugin services
 func (e *examplePlugin) Serve(services ...string) error {
-	glog.Infof("starting example server at: %s\n", e.endpoint)
+	glog.Infof("starting example server at: %s", e.endpoint)
 	lis, err := net.Listen("unix", e.endpoint)
 	if err != nil {
 		return err
 	}
 
-	glog.Infof("example server started at: %s\n", e.endpoint)
+	glog.Infof("example server started at: %s", e.endpoint)
 	e.grpcServer = grpc.NewServer()
 
 	// Registers kubelet plugin watcher api.
@@ -149,7 +144,7 @@ func (e *examplePlugin) Serve(services ...string) error {
 }
 
 func (e *examplePlugin) Stop() error {
-	glog.Infof("Stopping example server at: %s\n", e.endpoint)
+	glog.Infof("Stopping example server at: %s", e.endpoint)
 
 	e.grpcServer.Stop()
 	c := make(chan struct{})
