@@ -58,20 +58,23 @@ from charmhelpers.contrib.charmsupport import nrpe
 from charms.layer.kubernetes_common import kubeclientconfig_path
 from charms.layer.kubernetes_common import migrate_resource_checksums
 from charms.layer.kubernetes_common import check_resources_for_upgrade_needed
-from charms.layer.kubernetes_common import calculate_and_store_resource_checksums # noqa
+from charms.layer.kubernetes_common import calculate_and_store_resource_checksums  # noqa
 from charms.layer.kubernetes_common import arch
 from charms.layer.kubernetes_common import service_restart
 from charms.layer.kubernetes_common import get_ingress_address
 from charms.layer.kubernetes_common import create_kubeconfig
 from charms.layer.kubernetes_common import get_service_ip
 from charms.layer.kubernetes_common import configure_kubernetes_service
+from charms.layer.kubernetes_common import cloud_config_path
+from charms.layer.kubernetes_common import write_gcp_snap_config
+from charms.layer.kubernetes_common import write_openstack_snap_config
+from charms.layer.kubernetes_common import write_azure_snap_config
 
 # Override the default nagios shortname regex to allow periods, which we
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
 # default regex in charmhelpers doesn't allow periods, but nagios itself does.
 nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
-gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 snap_resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
                   'kube-scheduler', 'cdk-addons']
 
@@ -1215,25 +1218,22 @@ def configure_apiserver(etcd_connection_string):
         api_opts['enable-aggregator-routing'] = 'true'
         api_opts['client-ca-file'] = ca_cert_path
 
+    api_cloud_config_path = cloud_config_path('kube-apiserver')
     if is_state('endpoint.aws.ready'):
         api_opts['cloud-provider'] = 'aws'
     elif is_state('endpoint.gcp.ready'):
-        cloud_config_path = _cloud_config_path('kube-apiserver')
         api_opts['cloud-provider'] = 'gce'
-        api_opts['cloud-config'] = str(cloud_config_path)
+        api_opts['cloud-config'] = str(api_cloud_config_path)
     elif is_state('endpoint.openstack.ready'):
-        cloud_config_path = _cloud_config_path('kube-apiserver')
         api_opts['cloud-provider'] = 'openstack'
-        api_opts['cloud-config'] = str(cloud_config_path)
+        api_opts['cloud-config'] = str(api_cloud_config_path)
     elif (is_state('endpoint.vsphere.ready') and
           get_version('kube-apiserver') >= (1, 12)):
-        cloud_config_path = _cloud_config_path('kube-apiserver')
         api_opts['cloud-provider'] = 'vsphere'
-        api_opts['cloud-config'] = str(cloud_config_path)
+        api_opts['cloud-config'] = str(api_cloud_config_path)
     elif is_state('endpoint.azure.ready'):
-        cloud_config_path = _cloud_config_path('kube-apiserver')
         api_opts['cloud-provider'] = 'azure'
-        api_opts['cloud-config'] = str(cloud_config_path)
+        api_opts['cloud-config'] = str(api_cloud_config_path)
 
     audit_root = '/root/cdk/audit'
     os.makedirs(audit_root, exist_ok=True)
@@ -1282,25 +1282,22 @@ def configure_controller_manager():
     controller_opts['service-account-private-key-file'] = \
         '/root/cdk/serviceaccount.key'
 
+    cm_cloud_config_path = cloud_config_path('kube-controller-manager')
     if is_state('endpoint.aws.ready'):
         controller_opts['cloud-provider'] = 'aws'
     elif is_state('endpoint.gcp.ready'):
-        cloud_config_path = _cloud_config_path('kube-controller-manager')
         controller_opts['cloud-provider'] = 'gce'
-        controller_opts['cloud-config'] = str(cloud_config_path)
+        controller_opts['cloud-config'] = str(cm_cloud_config_path)
     elif is_state('endpoint.openstack.ready'):
-        cloud_config_path = _cloud_config_path('kube-controller-manager')
         controller_opts['cloud-provider'] = 'openstack'
-        controller_opts['cloud-config'] = str(cloud_config_path)
+        controller_opts['cloud-config'] = str(cm_cloud_config_path)
     elif (is_state('endpoint.vsphere.ready') and
           get_version('kube-apiserver') >= (1, 12)):
-        cloud_config_path = _cloud_config_path('kube-controller-manager')
         controller_opts['cloud-provider'] = 'vsphere'
-        controller_opts['cloud-config'] = str(cloud_config_path)
+        controller_opts['cloud-config'] = str(cm_cloud_config_path)
     elif is_state('endpoint.azure.ready'):
-        cloud_config_path = _cloud_config_path('kube-controller-manager')
         controller_opts['cloud-provider'] = 'azure'
-        controller_opts['cloud-config'] = str(cloud_config_path)
+        controller_opts['cloud-config'] = str(cm_cloud_config_path)
 
     configure_kubernetes_service(configure_prefix, 'kube-controller-manager',
                                  controller_opts,
@@ -1612,96 +1609,24 @@ def clear_cloud_flags():
           'kubernetes-master.cloud.ready')
 def cloud_ready():
     if is_state('endpoint.gcp.ready'):
-        _write_gcp_snap_config('kube-apiserver')
-        _write_gcp_snap_config('kube-controller-manager')
+        write_gcp_snap_config('kube-apiserver')
+        write_gcp_snap_config('kube-controller-manager')
     elif is_state('endpoint.openstack.ready'):
-        _write_openstack_snap_config('kube-apiserver')
-        _write_openstack_snap_config('kube-controller-manager')
+        write_openstack_snap_config('kube-apiserver')
+        write_openstack_snap_config('kube-controller-manager')
     elif is_state('endpoint.vsphere.ready'):
         _write_vsphere_snap_config('kube-apiserver')
         _write_vsphere_snap_config('kube-controller-manager')
     elif is_state('endpoint.azure.ready'):
-        _write_azure_snap_config('kube-apiserver')
-        _write_azure_snap_config('kube-controller-manager')
+        write_azure_snap_config('kube-apiserver')
+        write_azure_snap_config('kube-controller-manager')
     remove_state('kubernetes-master.cloud.pending')
     set_state('kubernetes-master.cloud.ready')
     remove_state('kubernetes-master.components.started')  # force restart
 
 
-def _snap_common_path(component):
-    return Path('/var/snap/{}/common'.format(component))
-
-
-def _cloud_config_path(component):
-    return _snap_common_path(component) / 'cloud-config.conf'
-
-
-def _cloud_endpoint_ca_path(component):
-    return _snap_common_path(component) / 'cloud-endpoint-ca.crt'
-
-
-def _gcp_creds_path(component):
-    return _snap_common_path(component) / 'gcp-creds.json'
-
-
-def _daemon_env_path(component):
-    return _snap_common_path(component) / 'environment'
-
-
 def _cdk_addons_template_path():
     return Path('/snap/cdk-addons/current/templates')
-
-
-def _write_gcp_snap_config(component):
-    # gcp requires additional credentials setup
-    gcp = endpoint_from_flag('endpoint.gcp.ready')
-    creds_path = _gcp_creds_path(component)
-    with creds_path.open('w') as fp:
-        os.fchmod(fp.fileno(), 0o600)
-        fp.write(gcp.credentials)
-
-    # create a cloud-config file that sets token-url to nil to make the
-    # services use the creds env var instead of the metadata server, as
-    # well as making the cluster multizone
-    cloud_config_path = _cloud_config_path(component)
-    cloud_config_path.write_text('[Global]\n'
-                                 'token-url = nil\n'
-                                 'multizone = true\n')
-
-    daemon_env_path = _daemon_env_path(component)
-    if daemon_env_path.exists():
-        daemon_env = daemon_env_path.read_text()
-        if not daemon_env.endswith('\n'):
-            daemon_env += '\n'
-    else:
-        daemon_env = ''
-    if gcp_creds_env_key not in daemon_env:
-        daemon_env += '{}={}\n'.format(gcp_creds_env_key, creds_path)
-        daemon_env_path.parent.mkdir(parents=True, exist_ok=True)
-        daemon_env_path.write_text(daemon_env)
-
-
-def _write_openstack_snap_config(component):
-    # openstack requires additional credentials setup
-    openstack = endpoint_from_flag('endpoint.openstack.ready')
-
-    cloud_config_path = _cloud_config_path(component)
-    lines = [
-        '[Global]',
-        'auth-url = {}'.format(openstack.auth_url),
-        'username = {}'.format(openstack.username),
-        'password = {}'.format(openstack.password),
-        'tenant-name = {}'.format(openstack.project_name),
-        'domain-name = {}'.format(openstack.user_domain_name),
-    ]
-    if openstack.endpoint_tls_ca:
-        cloud_endpoint_ca_path = _cloud_endpoint_ca_path(component)
-        cloud_endpoint_ca_path.write_text(base64.b64decode(
-            openstack.endpoint_tls_ca
-        ).decode('utf-8'))
-        lines.append('ca-file = {}'.format(str(cloud_endpoint_ca_path)))
-
-    cloud_config_path.write_text('\n'.join(lines))
 
 
 def _write_vsphere_snap_config(component):
@@ -1720,8 +1645,8 @@ def _write_vsphere_snap_config(component):
         hookenv.log("Unable to read UUID from sysfs: {}".format(err))
         uuid = 'UNKNOWN'
 
-    cloud_config_path = _cloud_config_path(component)
-    cloud_config_path.write_text('\n'.join([
+    comp_cloud_config_path = cloud_config_path(component)
+    comp_cloud_config_path.write_text('\n'.join([
         '[Global]',
         'insecure-flag = true',
         'datacenters = "{}"'.format(vsphere.datacenter),
@@ -1738,19 +1663,3 @@ def _write_vsphere_snap_config(component):
         '[Disk]',
         'scsicontrollertype = "pvscsi"',
     ]))
-
-
-def _write_azure_snap_config(component):
-    azure = endpoint_from_flag('endpoint.azure.ready')
-    cloud_config_path = _cloud_config_path(component)
-    cloud_config_path.write_text(json.dumps({
-        'useInstanceMetadata': True,
-        'useManagedIdentityExtension': True,
-        'subscriptionId': azure.subscription_id,
-        'resourceGroup': azure.resource_group,
-        'location': azure.resource_group_location,
-        'vnetName': azure.vnet_name,
-        'vnetResourceGroup': azure.vnet_resource_group,
-        'subnetName': azure.subnet_name,
-        'securityGroupName': azure.security_group_name,
-    }))
