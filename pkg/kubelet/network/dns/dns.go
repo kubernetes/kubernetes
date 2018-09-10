@@ -233,7 +233,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, options, nil
 }
 
-func (c *Configurer) getHostDNSConfig(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+func (c *Configurer) getHostDNSConfig() (*runtimeapi.DNSConfig, error) {
 	var hostDNS, hostSearch, hostOptions []string
 	// Get host DNS settings
 	if c.ResolverConfig != "" {
@@ -323,7 +323,7 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 
 // GetPodDNS returns DNS settings for the pod.
 func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
-	dnsConfig, err := c.getHostDNSConfig(pod)
+	dnsConfig, err := c.getHostDNSConfig()
 	if err != nil {
 		return nil, err
 	}
