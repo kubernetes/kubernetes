@@ -86,8 +86,8 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				"zones":            strings.Join(cloudZones, ","),
 				"replication-type": "regional-pd",
 			},
-			claimSize:    "1.5G",
-			expectedSize: "2G",
+			claimSize:    "1.5Gi",
+			expectedSize: "2Gi",
 			pvCheck: func(volume *v1.PersistentVolume) error {
 				err := checkGCEPD(volume, "pd-standard")
 				if err != nil {
@@ -104,8 +104,8 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 				"type":             "pd-standard",
 				"replication-type": "regional-pd",
 			},
-			claimSize:    "1.5G",
-			expectedSize: "2G",
+			claimSize:    "1.5Gi",
+			expectedSize: "2Gi",
 			pvCheck: func(volume *v1.PersistentVolume) error {
 				err := checkGCEPD(volume, "pd-standard")
 				if err != nil {
