@@ -20,8 +20,11 @@ spec:
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
           env:
             - name: ADDRESS
+              value: /var/lib/kubelet/plugins/csi-rbdplugin/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
               value: /var/lib/kubelet/plugins/csi-rbdplugin/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -30,6 +33,8 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /var/lib/kubelet/plugins/csi-rbdplugin
+            - name: registration-dir
+              mountPath: /registration
         - name: rbd-driver
           securityContext:
             privileged: true
@@ -72,6 +77,10 @@ spec:
           hostPath:
             path: /var/lib/kubelet/plugins/csi-rbdplugin
             type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/
+            type: Directory
         - name: device-dir
           hostPath:
             path: /dev
