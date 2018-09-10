@@ -19,7 +19,6 @@ package cache
 import (
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"net/url"
@@ -242,14 +241,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		r.metrics.numberOfWatches.Inc()
 		w, err := r.listerWatcher.Watch(options)
 		if err != nil {
-			switch err {
-			case io.EOF:
-				// watch closed normally
-			case io.ErrUnexpectedEOF:
-				glog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
-			default:
-				utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err))
-			}
+			utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err))
 			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
 			// It doesn't make sense to re-list all objects because most likely we will be able to restart
 			// watch where we ended.

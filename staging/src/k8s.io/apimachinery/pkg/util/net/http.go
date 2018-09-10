@@ -71,6 +71,8 @@ func IsProbableEOF(err error) bool {
 	switch {
 	case err == io.EOF:
 		return true
+	case err == io.ErrUnexpectedEOF:
+		return true
 	case err.Error() == "http: can't write HTTP request on broken connection":
 		return true
 	case strings.Contains(err.Error(), "connection reset by peer"):
