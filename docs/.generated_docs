@@ -47,6 +47,7 @@ docs/admin/kubeadm_alpha_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_user.md
 docs/admin/kubeadm_alpha_phase_kubelet.md
 docs/admin/kubeadm_alpha_phase_kubelet_config.md
+docs/admin/kubeadm_alpha_phase_kubelet_config_annotate-cri.md
 docs/admin/kubeadm_alpha_phase_kubelet_config_download.md
 docs/admin/kubeadm_alpha_phase_kubelet_config_enable-dynamic.md
 docs/admin/kubeadm_alpha_phase_kubelet_config_upload.md
@@ -130,6 +131,7 @@ docs/man/man1/kubeadm-alpha-phase-kubeconfig-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-user.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-config-annotate-cri.1
 docs/man/man1/kubeadm-alpha-phase-kubelet-config-download.1
 docs/man/man1/kubeadm-alpha-phase-kubelet-config-enable-dynamic.1
 docs/man/man1/kubeadm-alpha-phase-kubelet-config-upload.1
