@@ -747,7 +747,12 @@ func (d schemaCoercingDecoder) Decode(data []byte, defaults *schema.GroupVersion
 		}
 	}
 
-	return obj, gvk, nil
+	// TODO(mehdy): This is a non-obvious workaround to makeup for the fact that our machinery does not support __internal
+	// version for Unstructured. It will force versioned converter to call our converter [here](https://bit.ly/2CCByRM).
+	// Because both obj and into are the same but the context parameter of the call is asking for a different version,
+	// our conversion stack should check for the context parameter and do the conversion to the proper version.
+	// This hack should be replaced with a proper support of __internal version.
+	return obj.DeepCopyObject(), gvk, nil
 }
 
 // schemaCoercingConverter calls the delegate converter and applies the Unstructured validator to
