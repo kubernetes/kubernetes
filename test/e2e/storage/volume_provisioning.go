@@ -1005,7 +1005,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
-	Describe("DynamicProvisioner delayed binding [Slow]", func() {
+	Describe("DynamicProvisioner delayed binding", func() {
 		It("should create a persistent volume in the same zone as node after a pod mounting the claim is started", func() {
 			tests := []storageClassTest{
 				{
@@ -1080,7 +1080,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 		})
 	})
-	Describe("DynamicProvisioner delayed binding with allowedTopologies [Slow]", func() {
+	Describe("DynamicProvisioner delayed binding with allowedTopologies", func() {
 		It("should create persistent volume in the same zone as specified in allowedTopologies after a pod mounting the claim is started", func() {
 			tests := []storageClassTest{
 				{
