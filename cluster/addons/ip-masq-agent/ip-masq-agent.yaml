@@ -28,7 +28,9 @@ spec:
       hostNetwork: true
       containers:
       - name: ip-masq-agent
-        image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.2
+        image: k8s.gcr.io/ip-masq-agent-amd64:v2.1.1
+        args:
+          - --masq-chain=IP-MASQ
         resources:
           requests:
             cpu: 10m
