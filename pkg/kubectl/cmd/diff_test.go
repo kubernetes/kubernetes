@@ -25,6 +25,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/utils/exec"
 )
@@ -41,12 +43,12 @@ func (f *FakeObject) Name() string {
 	return f.name
 }
 
-func (f *FakeObject) Merged() (map[string]interface{}, error) {
-	return f.merged, nil
+func (f *FakeObject) Merged() (runtime.Object, error) {
+	return &unstructured.Unstructured{Object: f.merged}, nil
 }
 
-func (f *FakeObject) Live() (map[string]interface{}, error) {
-	return f.live, nil
+func (f *FakeObject) Live() runtime.Object {
+	return &unstructured.Unstructured{Object: f.live}
 }
 
 func TestDiffProgram(t *testing.T) {
@@ -68,11 +70,11 @@ func TestDiffProgram(t *testing.T) {
 func TestPrinter(t *testing.T) {
 	printer := Printer{}
 
-	obj := map[string]interface{}{
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{
 		"string": "string",
 		"list":   []int{1, 2, 3},
 		"int":    12,
-	}
+	}}
 	buf := bytes.Buffer{}
 	printer.Print(obj, &buf)
 	want := `int: 12

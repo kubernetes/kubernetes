@@ -60,8 +60,6 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/kubectl:go_default_library",
-        "//pkg/kubectl/apply/parse:go_default_library",
-        "//pkg/kubectl/apply/strategy:go_default_library",
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
         "//pkg/kubectl/cmd/create:go_default_library",
