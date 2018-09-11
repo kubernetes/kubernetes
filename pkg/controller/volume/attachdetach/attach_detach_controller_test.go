@@ -324,7 +324,7 @@ func Test_CSIDriverCRDValidation(t *testing.T) {
 		t.Fatal("Expected to find validator for 'spec.attachRequired'")
 	}
 	if attachRequired.Type != "boolean" {
-		t.Fatalf("Expected 'spec.attachRequired' to have a type validator for boolean, got %s", attachRequired.Type)
+		t.Fatalf("Expected 'spec.attachRequired' to have a type validator for boolean, got: %s", attachRequired.Type)
 	}
 
 	podInfoOnMountVersion := spec.Properties["podInfoOnMountVersion"]
@@ -345,7 +345,7 @@ func Test_CSINodeInfoCRDValidation(t *testing.T) {
 		t.Fatal("Expected to find validator for 'csiDrivers'")
 	}
 	if drivers.Type != "array" {
-		t.Fatalf("Expected 'csiDrivers' to have a type validator for array, got %s", drivers.Type)
+		t.Fatalf("Expected 'csiDrivers' to have a type validator for array, got: %s", drivers.Type)
 	}
 	if drivers.Items == nil {
 		t.Fatal("Expected 'csiDrivers' to specify properties for array items")
@@ -358,17 +358,17 @@ func Test_CSINodeInfoCRDValidation(t *testing.T) {
 
 	driver := schema.Properties["driver"]
 	if driver.Type != "string" {
-		t.Fatalf("Expected 'csiDrivers[].driver' to have a type validator for string, got %s", driver.Type)
+		t.Fatalf("Expected 'csiDrivers[].driver' to have a type validator for string, got: %s", driver.Type)
 	}
 
 	nodeID := schema.Properties["nodeID"]
 	if nodeID.Type != "string" {
-		t.Fatalf("Expected 'csiDrivers[].nodeID' to have a type validator for string, got %s", nodeID.Type)
+		t.Fatalf("Expected 'csiDrivers[].nodeID' to have a type validator for string, got: %s", nodeID.Type)
 	}
 
 	topologyKeys := schema.Properties["topologyKeys"]
 	if topologyKeys.Type != "array" {
-		t.Fatalf("Expected 'csiDrivers[].topologyKeys' to have a type validator for array, got %s", topologyKeys.Type)
+		t.Fatalf("Expected 'csiDrivers[].topologyKeys' to have a type validator for array, got: %s", topologyKeys.Type)
 	}
 	if topologyKeys.Items == nil {
 		t.Fatal("Expected 'csiDrivers[].topologyKeys' to specify properties for array items")
@@ -378,6 +378,6 @@ func Test_CSINodeInfoCRDValidation(t *testing.T) {
 	}
 	topologyKeysSchema := topologyKeys.Items.Schema
 	if topologyKeysSchema.Type != "string" {
-		t.Fatalf("Expected 'csiDrivers[].topologyKeys[]' to have a type validator for string, got %s", topologyKeysSchema.Type)
+		t.Fatalf("Expected 'csiDrivers[].topologyKeys[]' to have a type validator for string, got: %s", topologyKeysSchema.Type)
 	}
 }
