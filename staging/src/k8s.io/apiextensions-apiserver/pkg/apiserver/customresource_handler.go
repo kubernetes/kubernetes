@@ -426,6 +426,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	statusScopes := map[string]handlers.RequestScope{}
 	scaleScopes := map[string]handlers.RequestScope{}
 
+	var allowedAPIVersions []string
+	for _, v := range crd.Spec.Versions {
+		allowedAPIVersions = append(allowedAPIVersions, crd.Spec.Group+"/"+v.Name)
+	}
 	for _, v := range crd.Spec.Versions {
 		safeConverter, unsafeConverter := conversion.NewCRDConverter(crd)
 		// In addition to Unstructured objects (Custom Resources), we also may sometimes need to
@@ -481,7 +485,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			customresource.NewStrategy(
 				typer,
 				crd.Spec.Scope == apiextensions.NamespaceScoped,
-				kind,
+				kind.GroupKind(),
+				allowedAPIVersions,
 				validator,
 				statusValidator,
 				statusSpec,

@@ -95,7 +95,8 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 		customresource.NewStrategy(
 			typer,
 			true,
-			kind,
+			kind.GroupKind(),
+			[]string{"mygroup.example.com/v1beta1"},
 			nil,
 			nil,
 			status,
