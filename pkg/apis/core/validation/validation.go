@@ -406,6 +406,12 @@ func devicePathAlreadyExists(devicePath string, mounts map[string]string) bool {
 	return false
 }
 
+var validStorageMedia = sets.NewString(
+	string(core.StorageMediumDefault),
+	string(core.StorageMediumMemory),
+	string(core.StorageMediumHugePages),
+)
+
 func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volName string) field.ErrorList {
 	numVolumes := 0
 	allErrs := field.ErrorList{}
@@ -419,6 +425,10 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 			if source.EmptyDir.SizeLimit != nil && source.EmptyDir.SizeLimit.Cmp(resource.Quantity{}) < 0 {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 			}
+		}
+		if !validStorageMedia.Has(string(source.EmptyDir.Medium)) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("emptyDir").Child("medium"), source.EmptyDir.Medium, "invalid storage medium for EmptyDir volumes"))
+
 		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) && source.EmptyDir.Medium == core.StorageMediumHugePages {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("medium"), "HugePages medium is disabled by feature-gate for EmptyDir volumes"))
