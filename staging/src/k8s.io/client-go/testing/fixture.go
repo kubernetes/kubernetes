@@ -114,6 +114,10 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			}
 			err = tracker.Update(gvr, action.GetObject(), ns)
 			if err != nil {
+				if errors.IsConflict(err) { // return the currently-stored version of the object
+					obj, _ := tracker.Get(gvr, ns, objMeta.GetName())
+					return true, obj, err
+				}
 				return true, nil, err
 			}
 			obj, err := tracker.Get(gvr, ns, objMeta.GetName())
@@ -171,6 +175,8 @@ type tracker struct {
 	// watchers' channel. Note that too many unhandled events (currently 100,
 	// see apimachinery/pkg/watch.DefaultChanSize) will cause a panic.
 	watchers map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
+	// incremented every time an object is added or updated, for optimistic locking
+	resourceVersionCounter int
 }
 
 var _ ObjectTracker = &tracker{}
@@ -350,6 +356,11 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		newMeta.SetNamespace(ns)
 	}
 
+	// Update version on new object
+	inputResourceVersion := newMeta.GetResourceVersion()
+	newMeta.SetResourceVersion(fmt.Sprintf("%d", t.resourceVersionCounter))
+	t.resourceVersionCounter++
+
 	if ns != newMeta.GetNamespace() {
 		msg := fmt.Sprintf("request namespace does not match object namespace, request: %q object: %q", ns, newMeta.GetNamespace())
 		return errors.NewBadRequest(msg)
@@ -362,6 +373,9 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 		}
 		if oldMeta.GetNamespace() == newMeta.GetNamespace() && oldMeta.GetName() == newMeta.GetName() {
 			if replaceExisting {
+				if oldMeta.GetResourceVersion() != inputResourceVersion {
+					return errors.NewConflict(gr, newMeta.GetName(), fmt.Errorf("Resource version mismatch"))
+				}
 				for _, w := range t.getWatches(gvr, ns) {
 					w.Modify(obj)
 				}
