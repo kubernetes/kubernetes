@@ -267,12 +267,7 @@ func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
 			return "", "", fmt.Errorf("failed to get publicIP name for node %q with pipID %q", nodeName, pipID)
 		}
 
-		resourceGroup, err := ss.GetNodeResourceGroup(nodeName)
-		if err != nil {
-			return "", "", err
-		}
-
-		pip, existsPip, err := ss.getPublicIPAddress(resourceGroup, pipName)
+		pip, existsPip, err := ss.getPublicIPAddress(ss.ResourceGroup, pipName)
 		if err != nil {
 			return "", "", err
 		}
