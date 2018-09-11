@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -146,10 +147,10 @@ func NewAttachDetachController(
 
 	// Install required CSI CRDs on API server
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		adc.installCSIDriverCRD()
+		adc.installCRD("CSIDriver", crd.CSIDriver())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		adc.installCSINodeInfoCRD()
+		adc.installCRD("CSINodeInfo", crd.CSINodeInfo())
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -667,32 +668,15 @@ func (adc *attachDetachController) processVolumesInUse(
 	}
 }
 
-func (adc *attachDetachController) installCSIDriverCRD() error {
-	crd := crd.CSIDriver()
+func (adc *attachDetachController) installCRD(name string, crd *apiextensionsv1beta1.CustomResourceDefinition) error {
 	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
 	if err == nil {
-		glog.Infof("CSIDrivers CRD created successfully: %v", res)
+		glog.Infof("%s CRD created successfully: %v", name, res)
 	} else if apierrors.IsAlreadyExists(err) {
-		glog.Warningf("CSIDrivers CRD already exists: %#v, err: %v", res, err)
+		glog.Warningf("%s CRD already exists: %#v, err: %v", name, res, err)
 	} else {
-		glog.Errorf("failed to create CSIDrivers CRD: %#v, err: %v", res, err)
-		return err
-	}
-
-	return nil
-}
-
-func (adc *attachDetachController) installCSINodeInfoCRD() error {
-	crd := crd.CSINodeInfo()
-	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-
-	if err == nil {
-		glog.Infof("CSINodeInfo CRD created successfully: %v", res)
-	} else if apierrors.IsAlreadyExists(err) {
-		glog.Warningf("CSINodeInfo CRD already exists: %#v, err: %v", res, err)
-	} else {
-		glog.Errorf("failed to create CSINodeInfo CRD: %#v, err: %v", res, err)
+		glog.Errorf("failed to create %s CRD: %#v, err: %v", name, res, err)
 		return err
 	}
 
