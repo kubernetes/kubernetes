@@ -75,7 +75,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartLogging(glog.Infof)
-	glog.V(0).Infof("Sending events to api server.")
+	glog.Info("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	set, err := cidrset.NewCIDRSet(clusterCIDR, subNetMaskSize)
@@ -96,7 +96,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 	if serviceCIDR != nil {
 		ra.filterOutServiceRange(serviceCIDR)
 	} else {
-		glog.V(0).Info("No Service CIDR provided. Skipping filtering out service addresses.")
+		glog.Info("No Service CIDR provided. Skipping filtering out service addresses.")
 	}
 
 	if nodeList != nil {

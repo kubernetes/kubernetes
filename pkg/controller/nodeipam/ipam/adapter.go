@@ -50,7 +50,7 @@ func newAdapter(k8s clientset.Interface, cloud *gce.Cloud) *adapter {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.Infof)
 	ret.recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloudCIDRAllocator"})
-	glog.V(0).Infof("Sending events to api server.")
+	glog.Info("Sending events to api server.")
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{
 		Interface: k8s.CoreV1().Events(""),
 	})

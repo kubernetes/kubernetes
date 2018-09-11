@@ -99,7 +99,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
-		glog.V(0).Info("Using Kernelspace Proxier.")
+		glog.Info("Using Kernelspace Proxier.")
 		proxierKernelspace, err := winkernel.NewProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
@@ -118,7 +118,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		endpointsEventHandler = proxierKernelspace
 		serviceEventHandler = proxierKernelspace
 	} else {
-		glog.V(0).Info("Using userspace Proxier.")
+		glog.Info("Using userspace Proxier.")
 		execer := exec.New()
 		var netshInterface utilnetsh.Interface
 		netshInterface = utilnetsh.New(execer)
@@ -143,7 +143,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		}
 		proxier = proxierUserspace
 		serviceEventHandler = proxierUserspace
-		glog.V(0).Info("Tearing down pure-winkernel proxy rules.")
+		glog.Info("Tearing down pure-winkernel proxy rules.")
 		winkernel.CleanupLeftovers()
 	}
 

@@ -75,7 +75,7 @@ func newProxyServer(
 
 	protocol := utiliptables.ProtocolIpv4
 	if net.ParseIP(config.BindAddress).To4() == nil {
-		glog.V(0).Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
+		glog.Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
 		protocol = utiliptables.ProtocolIpv6
 	}
 
@@ -145,7 +145,7 @@ func newProxyServer(
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
 	if proxyMode == proxyModeIPTables {
-		glog.V(0).Info("Using iptables Proxier.")
+		glog.Info("Using iptables Proxier.")
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
@@ -175,7 +175,7 @@ func newProxyServer(
 		serviceEventHandler = proxierIPTables
 		endpointsEventHandler = proxierIPTables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
-		glog.V(0).Info("Tearing down inactive rules.")
+		glog.Info("Tearing down inactive rules.")
 		// TODO this has side effects that should only happen when Run() is invoked.
 		userspace.CleanupLeftovers(iptInterface)
 		// IPVS Proxier will generate some iptables rules, need to clean them before switching to other proxy mode.
@@ -186,7 +186,7 @@ func newProxyServer(
 			ipvs.CleanupLeftovers(ipvsInterface, iptInterface, ipsetInterface, cleanupIPVS)
 		}
 	} else if proxyMode == proxyModeIPVS {
-		glog.V(0).Info("Using ipvs Proxier.")
+		glog.Info("Using ipvs Proxier.")
 		proxierIPVS, err := ipvs.NewProxier(
 			iptInterface,
 			ipvsInterface,
@@ -213,12 +213,12 @@ func newProxyServer(
 		proxier = proxierIPVS
 		serviceEventHandler = proxierIPVS
 		endpointsEventHandler = proxierIPVS
-		glog.V(0).Info("Tearing down inactive rules.")
+		glog.Info("Tearing down inactive rules.")
 		// TODO this has side effects that should only happen when Run() is invoked.
 		userspace.CleanupLeftovers(iptInterface)
 		iptables.CleanupLeftovers(iptInterface)
 	} else {
-		glog.V(0).Info("Using userspace Proxier.")
+		glog.Info("Using userspace Proxier.")
 		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 		// our config.EndpointsConfigHandler.
 		loadBalancer := userspace.NewLoadBalancerRR()
@@ -244,7 +244,7 @@ func newProxyServer(
 		proxier = proxierUserspace
 
 		// Remove artifacts from the iptables and ipvs Proxier, if not on Windows.
-		glog.V(0).Info("Tearing down inactive rules.")
+		glog.Info("Tearing down inactive rules.")
 		// TODO this has side effects that should only happen when Run() is invoked.
 		iptables.CleanupLeftovers(iptInterface)
 		// IPVS Proxier will generate some iptables rules, need to clean them before switching to other proxy mode.

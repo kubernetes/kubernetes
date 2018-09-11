@@ -86,10 +86,10 @@ func NewCloudNodeController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	if kubeClient != nil {
-		glog.V(0).Infof("Sending events to api server.")
+		glog.Info("Sending events to api server.")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	} else {
-		glog.V(0).Infof("No api server defined - no events will be sent to API server.")
+		glog.Info("No api server defined - no events will be sent to API server.")
 	}
 
 	cnc := &CloudNodeController{
