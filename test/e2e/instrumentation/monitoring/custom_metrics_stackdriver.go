@@ -29,11 +29,13 @@ import (
 
 	gcm "google.golang.org/api/monitoring/v3"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	cmv1beta1 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	customclient "k8s.io/metrics/pkg/client/custom_metrics"
 	externalclient "k8s.io/metrics/pkg/client/external_metrics"
 )
@@ -57,8 +59,10 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		if err != nil {
 			framework.Failf("Failed to load config: %s", err)
 		}
-		customMetricsClient := customclient.NewForConfigOrDie(config)
 		discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
+		restMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{cmv1beta1.SchemeGroupVersion})
+		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
 		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForOldResourceModel)
 	})
 
@@ -68,8 +72,10 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 		if err != nil {
 			framework.Failf("Failed to load config: %s", err)
 		}
-		customMetricsClient := customclient.NewForConfigOrDie(config)
 		discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(config)
+		apiVersionsGetter := customclient.NewAvailableAPIsGetter(discoveryClient)
+		restMapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{cmv1beta1.SchemeGroupVersion})
+		customMetricsClient := customclient.NewForConfig(config, restMapper, apiVersionsGetter)
 		testCustomMetrics(f, kubeClient, customMetricsClient, discoveryClient, AdapterForNewResourceModel)
 	})
 

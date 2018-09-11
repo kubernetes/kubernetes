@@ -1840,11 +1840,6 @@
    "v2beta2.MetricValueStatus": {
     "id": "v2beta2.MetricValueStatus",
     "description": "MetricValueStatus holds the current value for a metric",
-    "required": [
-     "value",
-     "averageValue",
-     "averageUtilization"
-    ],
     "properties": {
      "value": {
       "type": "string",
