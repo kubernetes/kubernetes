@@ -18,7 +18,6 @@ package nodeinfomanager
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csifake "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
@@ -496,9 +496,7 @@ func TestRemoveNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 }
 
 func TestAddNodeInfoExistingAnnotation(t *testing.T) {
-	csiNodeInfoEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo)
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.CSINodeInfo))
-	defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, csiNodeInfoEnabled))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
 
 	driverName := "com.example.csi/driver1"
 	nodeID := "com.example.csi/some-node"
@@ -561,9 +559,7 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 }
 
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
-	wasEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo)
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, csiNodeInfoEnabled))
-	defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, wasEnabled))
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
 
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)
