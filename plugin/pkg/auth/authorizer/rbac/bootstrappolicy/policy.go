@@ -52,6 +52,7 @@ const (
 	resMetricsGroup     = "metrics.k8s.io"
 	customMetricsGroup  = "custom.metrics.k8s.io"
 	networkingGroup     = "networking.k8s.io"
+	apiExtensionsGroup  = "apiextensions.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
