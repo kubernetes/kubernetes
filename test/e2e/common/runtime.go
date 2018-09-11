@@ -135,9 +135,9 @@ while true; do sleep 1; done
 				{
 					name: "if TerminationMessagePath is set [NodeConformance]",
 					container: v1.Container{
-						Image:   framework.BusyBoxImage,
-						Command: []string{"/bin/sh", "-c"},
-						Args:    []string{"/bin/echo -n DONE > /dev/termination-log"},
+						Image:                  framework.BusyBoxImage,
+						Command:                []string{"/bin/sh", "-c"},
+						Args:                   []string{"/bin/echo -n DONE > /dev/termination-log"},
 						TerminationMessagePath: "/dev/termination-log",
 						SecurityContext: &v1.SecurityContext{
 							RunAsUser: &rootUser,
@@ -150,9 +150,9 @@ while true; do sleep 1; done
 				{
 					name: "if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]",
 					container: v1.Container{
-						Image:   framework.BusyBoxImage,
-						Command: []string{"/bin/sh", "-c"},
-						Args:    []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
+						Image:                  framework.BusyBoxImage,
+						Command:                []string{"/bin/sh", "-c"},
+						Args:                   []string{"/bin/echo -n DONE > /dev/termination-custom-log"},
 						TerminationMessagePath: "/dev/termination-custom-log",
 						SecurityContext: &v1.SecurityContext{
 							RunAsUser: &nonRootUser,
@@ -165,9 +165,9 @@ while true; do sleep 1; done
 				{
 					name: "from log output if TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
 					container: v1.Container{
-						Image:   framework.BusyBoxImage,
-						Command: []string{"/bin/sh", "-c"},
-						Args:    []string{"/bin/echo -n DONE; /bin/false"},
+						Image:                    framework.BusyBoxImage,
+						Command:                  []string{"/bin/sh", "-c"},
+						Args:                     []string{"/bin/echo -n DONE; /bin/false"},
 						TerminationMessagePath:   "/dev/termination-log",
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},
@@ -178,9 +178,9 @@ while true; do sleep 1; done
 				{
 					name: "as empty when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
 					container: v1.Container{
-						Image:   framework.BusyBoxImage,
-						Command: []string{"/bin/sh", "-c"},
-						Args:    []string{"/bin/echo DONE; /bin/true"},
+						Image:                    framework.BusyBoxImage,
+						Command:                  []string{"/bin/sh", "-c"},
+						Args:                     []string{"/bin/echo DONE; /bin/true"},
 						TerminationMessagePath:   "/dev/termination-log",
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},
@@ -191,9 +191,9 @@ while true; do sleep 1; done
 				{
 					name: "from file when pod succeeds and TerminationMessagePolicy FallbackToLogOnError is set [NodeConformance]",
 					container: v1.Container{
-						Image:   framework.BusyBoxImage,
-						Command: []string{"/bin/sh", "-c"},
-						Args:    []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
+						Image:                    framework.BusyBoxImage,
+						Command:                  []string{"/bin/sh", "-c"},
+						Args:                     []string{"/bin/echo -n OK > /dev/termination-log; /bin/echo DONE; /bin/true"},
 						TerminationMessagePath:   "/dev/termination-log",
 						TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 					},

@@ -140,10 +140,10 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		return nil
 	}
 	predicateMetadata := &predicateMetadata{
-		pod:           pod,
-		podBestEffort: isPodBestEffort(pod),
-		podRequest:    GetResourceRequest(pod),
-		podPorts:      schedutil.GetContainerPorts(pod),
+		pod:                                    pod,
+		podBestEffort:                          isPodBestEffort(pod),
+		podRequest:                             GetResourceRequest(pod),
+		podPorts:                               schedutil.GetContainerPorts(pod),
 		topologyPairsPotentialAffinityPods:     topologyPairsAffinityPodsMaps,
 		topologyPairsPotentialAntiAffinityPods: topologyPairsAntiAffinityPodsMaps,
 		topologyPairsAntiAffinityPodsMap:       topologyPairsMaps,

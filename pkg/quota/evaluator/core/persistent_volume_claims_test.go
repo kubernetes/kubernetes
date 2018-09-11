@@ -84,8 +84,8 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 		"pvc-usage": {
 			pvc: validClaim,
 			usage: api.ResourceList{
-				api.ResourceRequestsStorage:                                                                       resource.MustParse("10Gi"),
-				api.ResourcePersistentVolumeClaims:                                                                resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
 		},

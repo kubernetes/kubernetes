@@ -72,11 +72,11 @@ var (
 
 func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		Use:                   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Run a proxy to the Kubernetes API server"),
-		Long:    proxyLong,
-		Example: proxyExample,
+		Short:                 i18n.T("Run a proxy to the Kubernetes API server"),
+		Long:                  proxyLong,
+		Example:               proxyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunProxy(f, streams.Out, cmd)
 			cmdutil.CheckErr(err)

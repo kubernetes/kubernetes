@@ -55,9 +55,9 @@ func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions,
 		nodeRegOpts:              nodeRegOpts,
 		featureGates:             featureGates,
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		execer:          utilsexec.New(),
-		pidOfFunc:       procfs.PidOf,
-		defaultHostname: hostName,
+		execer:                   utilsexec.New(),
+		pidOfFunc:                procfs.PidOf,
+		defaultHostname:          hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeRegOpts.KubeletExtraArgs)

@@ -104,8 +104,8 @@ func TestDefaultFlags(t *testing.T) {
 			RemoteKubeConfigFileOptional: true,
 			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or
 		},
-		Kubeconfig: "",
-		Master:     "",
+		Kubeconfig:                "",
+		Master:                    "",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {
@@ -222,8 +222,8 @@ func TestAddFlags(t *testing.T) {
 			RemoteKubeConfigFileOptional: true,
 			AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or
 		},
-		Kubeconfig: "/kubeconfig",
-		Master:     "192.168.4.20",
+		Kubeconfig:                "/kubeconfig",
+		Master:                    "192.168.4.20",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {

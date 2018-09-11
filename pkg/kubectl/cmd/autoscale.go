@@ -98,11 +98,11 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
 
 	cmd := &cobra.Command{
-		Use: "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU]",
+		Use:                   "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Auto-scale a Deployment, ReplicaSet, or ReplicationController"),
-		Long:    autoscaleLong,
-		Example: autoscaleExample,
+		Short:                 i18n.T("Auto-scale a Deployment, ReplicaSet, or ReplicationController"),
+		Long:                  autoscaleLong,
+		Example:               autoscaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
