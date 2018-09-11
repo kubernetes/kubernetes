@@ -36,16 +36,19 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	autoscalinginformers "k8s.io/client-go/informers/autoscaling/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	autoscalingclient "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
+	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
 
 var (
@@ -76,6 +79,11 @@ type HorizontalController struct {
 	hpaLister       autoscalinglisters.HorizontalPodAutoscalerLister
 	hpaListerSynced cache.InformerSynced
 
+	// podLister is able to list/get Pods from the shared cache from the informer passed in to
+	// NewHorizontalController.
+	podLister       corelisters.PodLister
+	podListerSynced cache.InformerSynced
+
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
 
@@ -89,10 +97,14 @@ func NewHorizontalController(
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
 	mapper apimeta.RESTMapper,
-	replicaCalc *ReplicaCalculator,
+	metricsClient metricsclient.MetricsClient,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
+	podInformer coreinformers.PodInformer,
 	resyncPeriod time.Duration,
 	downscaleStabilisationWindow time.Duration,
+	tolerance float64,
+	cpuInitializationPeriod,
+	delayOfInitialReadinessStatus time.Duration,
 
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster()
@@ -101,7 +113,6 @@ func NewHorizontalController(
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
-		replicaCalc:                  replicaCalc,
 		eventRecorder:                recorder,
 		scaleNamespacer:              scaleNamespacer,
 		hpaNamespacer:                hpaNamespacer,
@@ -122,6 +133,18 @@ func NewHorizontalController(
 	hpaController.hpaLister = hpaInformer.Lister()
 	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
 
+	hpaController.podLister = podInformer.Lister()
+	hpaController.podListerSynced = podInformer.Informer().HasSynced
+
+	replicaCalc := NewReplicaCalculator(
+		metricsClient,
+		hpaController.podLister,
+		tolerance,
+		cpuInitializationPeriod,
+		delayOfInitialReadinessStatus,
+	)
+	hpaController.replicaCalc = replicaCalc
+
 	return hpaController
 }
 
@@ -133,7 +156,7 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting HPA controller")
 	defer glog.Infof("Shutting down HPA controller")
 
-	if !controller.WaitForCacheSync("HPA", stopCh, a.hpaListerSynced) {
+	if !controller.WaitForCacheSync("HPA", stopCh, a.hpaListerSynced, a.podListerSynced) {
 		return
 	}
 

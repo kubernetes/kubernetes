@@ -2334,7 +2334,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		nodeController.doNoScheduleTaintingPass(test.Node)
+		nodeController.doNoScheduleTaintingPass(test.Node.Name)
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

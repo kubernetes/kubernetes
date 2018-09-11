@@ -28,6 +28,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"time"
+)
+
+const (
+	testInformerSyncPeriod  = 100 * time.Millisecond
+	testInformerSyncTimeout = 30 * time.Second
 )
 
 func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) (map[string]string, error) {

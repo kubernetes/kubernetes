@@ -30,6 +30,18 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// MetricListOptions is used to select metrics by their label selectors
+message MetricListOptions {
+  // A selector to restrict the list of returned objects by their labels.
+  // Defaults to everything.
+  // +optional
+  optional string labelSelector = 1;
+
+  // A selector to restrict the list of returned metrics by their labels
+  // +optional
+  optional string metricLabelSelector = 2;
+}
+
 // a metric value for some object
 message MetricValue {
   // a reference to the described object

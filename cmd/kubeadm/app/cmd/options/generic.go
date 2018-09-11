@@ -27,3 +27,11 @@ func AddKubeConfigFlag(fs *pflag.FlagSet, kubeConfigFile *string) {
 func AddConfigFlag(fs *pflag.FlagSet, cfgPath *string) {
 	fs.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
 }
+
+// AddIgnorePreflightErrorsFlag adds the --ignore-preflight-errors flag to the given flagset
+func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]string) {
+	fs.StringSliceVar(
+		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
+		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
+	)
+}

@@ -391,16 +391,6 @@ const (
 	//
 	// Allow TTL controller to clean up Pods and Jobs after they finish.
 	TTLAfterFinished utilfeature.Feature = "TTLAfterFinished"
-
-	// owner: @jsafrane
-	// Kubernetes skips attaching CSI volumes that don't require attachment.
-	//
-	CSISkipAttach utilfeature.Feature = "CSISkipAttach"
-
-	// owner: @jsafrane
-	//
-	// Kubelet sends pod information in NodePublish CSI call when a CSI driver wants so.
-	CSIPodInfo utilfeature.Feature = "CSIPodInfo"
 )
 
 func init() {
@@ -467,8 +457,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: utilfeature.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: utilfeature.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: utilfeature.Alpha},
-	CSISkipAttach:                               {Default: false, PreRelease: utilfeature.Alpha},
-	CSIPodInfo:                                  {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

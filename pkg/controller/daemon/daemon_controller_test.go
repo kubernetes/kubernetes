@@ -437,6 +437,12 @@ func markPodReady(pod *v1.Pod) {
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 }
 
+func setFeatureGate(t *testing.T, feature utilfeature.Feature, enabled bool) {
+	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", feature, enabled)); err != nil {
+		t.Fatalf("Failed to set FeatureGate %v to %t: %v", feature, enabled, err)
+	}
+}
+
 // DaemonSets without node selectors should launch pods on every node.
 func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	for _, strategy := range updateStrategies() {
@@ -460,12 +466,9 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
 	// Rollback feature gate.
 	defer func() {
-		if !enabled {
-			utilfeature.DefaultFeatureGate.Set("ScheduleDaemonSetPods=false")
-		}
+		setFeatureGate(t, features.ScheduleDaemonSetPods, enabled)
 	}()
-
-	utilfeature.DefaultFeatureGate.Set("ScheduleDaemonSetPods=true")
+	setFeatureGate(t, features.ScheduleDaemonSetPods, true)
 
 	nodeNum := 5
 
@@ -1576,6 +1579,11 @@ func setDaemonSetToleration(ds *apps.DaemonSet, tolerations []v1.Toleration) {
 // DaemonSet should launch a critical pod even when the node with OutOfDisk taints.
 // TODO(#48843) OutOfDisk taints will be removed in 1.10
 func TestTaintOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation)
+	defer func() {
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, enabled)
+	}()
+
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("critical")
 		ds.Spec.UpdateStrategy = *strategy
@@ -1593,25 +1601,24 @@ func TestTaintOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		// NOTE: Whether or not TaintNodesByCondition is enabled, it'll add toleration to DaemonSet pods.
 
 		// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
-		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, false)
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 
 		// With enabling critical pod annotation feature gate, we will create critical pod
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
-		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, true)
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-
-		// Rollback feature gate to false.
-		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
 	}
 }
 
 // DaemonSet should launch a pod even when the node with MemoryPressure/DiskPressure taints.
 func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition)
+	defer func() {
+		setFeatureGate(t, features.TaintNodesByCondition, enabled)
+	}()
+
 	for _, strategy := range updateStrategies() {
 		ds := newDaemonSet("critical")
 		ds.Spec.UpdateStrategy = *strategy
@@ -1633,17 +1640,19 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 		manager.nodeStore.Add(node)
 
 		// Enabling critical pod and taint nodes by condition feature gate should create critical pod
-		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=True")
+		setFeatureGate(t, features.TaintNodesByCondition, true)
 		manager.dsStore.Add(ds)
 		syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-
-		// Rollback feature gate to false.
-		utilfeature.DefaultFeatureGate.Set("TaintNodesByCondition=False")
 	}
 }
 
 // DaemonSet should launch a critical pod even when the node has insufficient free resource.
 func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation)
+	defer func() {
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, enabled)
+	}()
+
 	for _, strategy := range updateStrategies() {
 		podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 		ds := newDaemonSet("critical")
@@ -1663,7 +1672,7 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		})
 
 		// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=False")
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, false)
 		manager.dsStore.Add(ds)
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
@@ -1675,7 +1684,7 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		}
 
 		// Enabling critical pod annotation feature gate should create critical pod
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, true)
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 2)
@@ -1689,6 +1698,11 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 
 // DaemonSets should NOT launch a critical pod when there are port conflicts.
 func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation)
+	defer func() {
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, enabled)
+	}()
+
 	for _, strategy := range updateStrategies() {
 		podSpec := v1.PodSpec{
 			NodeName: "port-conflict",
@@ -1708,7 +1722,7 @@ func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
 			Spec: podSpec,
 		})
 
-		utilfeature.DefaultFeatureGate.Set("ExperimentalCriticalPodAnnotation=True")
+		setFeatureGate(t, features.ExperimentalCriticalPodAnnotation, true)
 		ds := newDaemonSet("critical")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec = podSpec

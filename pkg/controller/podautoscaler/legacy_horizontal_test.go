@@ -485,8 +485,6 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		return true, obj, nil
 	})
 
-	replicaCalc := NewReplicaCalculator(metricsClient, testClient.Core(), defaultTestingTolerance, defaultTestingCpuInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
-
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	defaultDownscaleStabilisationWindow := 5 * time.Minute
 
@@ -495,10 +493,14 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 		testScaleClient,
 		testClient.Autoscaling(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
-		replicaCalc,
+		metricsClient,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
+		informerFactory.Core().V1().Pods(),
 		controller.NoResyncPeriodFunc(),
 		defaultDownscaleStabilisationWindow,
+		defaultTestingTolerance,
+		defaultTestingCpuInitializationPeriod,
+		defaultTestingDelayOfInitialReadinessStatus,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 
