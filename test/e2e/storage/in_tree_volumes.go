@@ -24,11 +24,12 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	storagetypes "k8s.io/kubernetes/test/e2e/storage/types"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func() drivers.TestDriver{
+var testDrivers = []func() storagetypes.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -45,7 +46,7 @@ var testDrivers = []func() drivers.TestDriver{
 }
 
 // List of testSuites to be executed in below loop
-var testSuites = []func() testsuites.TestSuite{
+var testSuites = []func() storagetypes.TestSuite{
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeIOTestSuite,
 	testsuites.InitVolumeModeTestSuite,

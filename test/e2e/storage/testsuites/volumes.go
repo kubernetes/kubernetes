@@ -26,22 +26,22 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/types"
 )
 
 type volumesTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo types.TestSuiteInfo
 }
 
-var _ TestSuite = &volumesTestSuite{}
+var _ types.TestSuite = &volumesTestSuite{}
 
-// InitVolumesTestSuite returns volumesTestSuite that implements TestSuite interface
-func InitVolumesTestSuite() TestSuite {
+// InitVolumesTestSuite returns volumesTestSuite that implements types.TestSuite interface
+func InitVolumesTestSuite() types.TestSuite {
 	return &volumesTestSuite{
-		tsInfo: TestSuiteInfo{
-			name: "volumes",
-			testPatterns: []testpatterns.TestPattern{
+		tsInfo: types.TestSuiteInfo{
+			Name: "volumes",
+			TestPatterns: []testpatterns.TestPattern{
 				// Default fsType
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.DefaultFsPreprovisionedPV,
@@ -63,18 +63,18 @@ func InitVolumesTestSuite() TestSuite {
 	}
 }
 
-func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *volumesTestSuite) GetTestSuiteInfo() types.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (t *volumesTestSuite) SkipUnsupportedTest(pattern testpatterns.TestPattern, driver types.TestDriver) {
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.IsPersistent {
 		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
 	}
 }
 
-func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumesTestInput {
+func createVolumesTestInput(pattern testpatterns.TestPattern, resource GenericVolumeTestResource) volumesTestInput {
 	var fsGroup *int64
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
@@ -107,10 +107,10 @@ func createVolumesTestInput(pattern testpatterns.TestPattern, resource genericVo
 	}
 }
 
-func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumesTestSuite) ExecTest(driver types.TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
-			resource     genericVolumeTestResource
+			resource     GenericVolumeTestResource
 			input        volumesTestInput
 			needsCleanup bool
 		)
@@ -118,12 +118,12 @@ func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatte
 		BeforeEach(func() {
 			needsCleanup = false
 			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
+			SkipUnsupportedTest(t, driver, pattern)
 			needsCleanup = true
 
 			// Setup test resource for driver and testpattern
-			resource := genericVolumeTestResource{}
-			resource.setupResource(driver, pattern)
+			resource := GenericVolumeTestResource{}
+			resource.SetupResource(driver, pattern)
 
 			// Create test input
 			input = createVolumesTestInput(pattern, resource)
@@ -131,7 +131,7 @@ func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatte
 
 		AfterEach(func() {
 			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
+				resource.CleanupResource(driver, pattern)
 			}
 		})
 

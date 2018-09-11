@@ -19,6 +19,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/storage/testpatterns:go_default_library",
+        "//test/e2e/storage/types:go_default_library",
         "//test/e2e/storage/utils:go_default_library",
         "//test/e2e/storage/vsphere:go_default_library",
         "//test/utils/image:go_default_library",

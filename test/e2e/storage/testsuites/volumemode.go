@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/types"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -38,18 +39,18 @@ const (
 )
 
 type volumeModeTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo types.TestSuiteInfo
 }
 
-var _ TestSuite = &volumeModeTestSuite{}
+var _ types.TestSuite = &volumeModeTestSuite{}
 
-// InitVolumeModeTestSuite returns volumeModeTestSuite that implements TestSuite interface
-func InitVolumeModeTestSuite() TestSuite {
+// InitVolumeModeTestSuite returns volumeModeTestSuite that implements types.TestSuite interface
+func InitVolumeModeTestSuite() types.TestSuite {
 	return &volumeModeTestSuite{
-		tsInfo: TestSuiteInfo{
-			name:       "volumeMode",
-			featureTag: "[Feature:BlockVolume]",
-			testPatterns: []testpatterns.TestPattern{
+		tsInfo: types.TestSuiteInfo{
+			Name:       "volumeMode",
+			FeatureTag: "[Feature:BlockVolume]",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.FsVolModePreprovisionedPV,
 				testpatterns.FsVolModeDynamicPV,
 				testpatterns.BlockVolModePreprovisionedPV,
@@ -59,11 +60,11 @@ func InitVolumeModeTestSuite() TestSuite {
 	}
 }
 
-func (t *volumeModeTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *volumeModeTestSuite) GetTestSuiteInfo() types.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeModeTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (t *volumeModeTestSuite) SkipUnsupportedTest(pattern testpatterns.TestPattern, driver types.TestDriver) {
 }
 
 func createVolumeModeTestInput(pattern testpatterns.TestPattern, resource volumeModeTestResource) volumeModeTestInput {
@@ -83,7 +84,7 @@ func createVolumeModeTestInput(pattern testpatterns.TestPattern, resource volume
 	}
 }
 
-func getVolumeModeTestFunc(pattern testpatterns.TestPattern, driver drivers.TestDriver) func(*volumeModeTestInput) {
+func getVolumeModeTestFunc(pattern testpatterns.TestPattern, driver types.TestDriver) func(*volumeModeTestInput) {
 	dInfo := driver.GetDriverInfo()
 	isBlockSupported := dInfo.IsBlockSupported
 	volMode := pattern.VolMode
@@ -106,7 +107,7 @@ func getVolumeModeTestFunc(pattern testpatterns.TestPattern, driver drivers.Test
 	return nil
 }
 
-func (t *volumeModeTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeModeTestSuite) ExecTest(driver types.TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
 			resource     volumeModeTestResource
@@ -120,12 +121,12 @@ func (t *volumeModeTestSuite) execTest(driver drivers.TestDriver, pattern testpa
 		BeforeEach(func() {
 			needsCleanup = false
 			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
+			SkipUnsupportedTest(t, driver, pattern)
 			needsCleanup = true
 
 			// Setup test resource for driver and testpattern
 			resource := volumeModeTestResource{}
-			resource.setupResource(driver, pattern)
+			resource.SetupResource(driver, pattern)
 
 			// Create test input
 			input = createVolumeModeTestInput(pattern, resource)
@@ -133,7 +134,7 @@ func (t *volumeModeTestSuite) execTest(driver drivers.TestDriver, pattern testpa
 
 		AfterEach(func() {
 			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
+				resource.CleanupResource(driver, pattern)
 			}
 		})
 
@@ -142,16 +143,18 @@ func (t *volumeModeTestSuite) execTest(driver drivers.TestDriver, pattern testpa
 }
 
 type volumeModeTestResource struct {
-	driver drivers.TestDriver
+	driver types.TestDriver
 
 	sc  *storagev1.StorageClass
 	pvc *v1.PersistentVolumeClaim
 	pv  *v1.PersistentVolume
+
+	DriverTestResources types.DriverTestResources
 }
 
-var _ TestResource = &volumeModeTestResource{}
+var _ types.TestResource = &volumeModeTestResource{}
 
-func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (s *volumeModeTestResource) SetupResource(driver types.TestDriver, pattern testpatterns.TestPattern) {
 	s.driver = driver
 	dInfo := driver.GetDriverInfo()
 	f := dInfo.Framework
@@ -167,7 +170,7 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 	)
 
 	// Create volume for pre-provisioned volume tests
-	drivers.CreateVolume(driver, volType)
+	s.DriverTestResources = drivers.CreateVolume(driver, volType)
 
 	switch volType {
 	case testpatterns.PreprovisionedPV:
@@ -176,8 +179,8 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 		} else if volMode == v1.PersistentVolumeFilesystem {
 			scName = fmt.Sprintf("%s-%s-sc-for-file", ns.Name, dInfo.Name)
 		}
-		if pDriver, ok := driver.(drivers.PreprovisionedPVTestDriver); ok {
-			pvSource = pDriver.GetPersistentVolumeSource(false, fsType)
+		if pDriver, ok := driver.(types.PreprovisionedPVTestDriver); ok {
+			pvSource = pDriver.GetPersistentVolumeSource(false, fsType, s.DriverTestResources)
 			if pvSource == nil {
 				framework.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
 			}
@@ -188,7 +191,7 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 			s.pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns.Name)
 		}
 	case testpatterns.DynamicPV:
-		if dDriver, ok := driver.(drivers.DynamicPVTestDriver); ok {
+		if dDriver, ok := driver.(types.DynamicPVTestDriver); ok {
 			s.sc = dDriver.GetDynamicProvisionStorageClass(fsType)
 			if s.sc == nil {
 				framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
@@ -205,7 +208,7 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 	}
 }
 
-func (s *volumeModeTestResource) cleanupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (s *volumeModeTestResource) CleanupResource(driver types.TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	f := dInfo.Framework
 	cs := f.ClientSet
@@ -223,7 +226,7 @@ func (s *volumeModeTestResource) cleanupResource(driver drivers.TestDriver, patt
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
-	drivers.DeleteVolume(driver, volType)
+	drivers.DeleteVolume(driver, volType, s.DriverTestResources)
 }
 
 type volumeModeTestInput struct {

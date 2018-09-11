@@ -35,8 +35,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	"k8s.io/kubernetes/test/e2e/storage/types"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -50,17 +50,17 @@ var md5hashes = map[int64]string{
 }
 
 type volumeIOTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo types.TestSuiteInfo
 }
 
-var _ TestSuite = &volumeIOTestSuite{}
+var _ types.TestSuite = &volumeIOTestSuite{}
 
-// InitVolumeIOTestSuite returns volumeIOTestSuite that implements TestSuite interface
-func InitVolumeIOTestSuite() TestSuite {
+// InitVolumeIOTestSuite returns volumeIOTestSuite that implements types.TestSuite interface
+func InitVolumeIOTestSuite() types.TestSuite {
 	return &volumeIOTestSuite{
-		tsInfo: TestSuiteInfo{
-			name: "volumeIO",
-			testPatterns: []testpatterns.TestPattern{
+		tsInfo: types.TestSuiteInfo{
+			Name: "volumeIO",
+			TestPatterns: []testpatterns.TestPattern{
 				testpatterns.DefaultFsInlineVolume,
 				testpatterns.DefaultFsPreprovisionedPV,
 				testpatterns.DefaultFsDynamicPV,
@@ -69,14 +69,14 @@ func InitVolumeIOTestSuite() TestSuite {
 	}
 }
 
-func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
+func (t *volumeIOTestSuite) GetTestSuiteInfo() types.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumeIOTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver drivers.TestDriver) {
+func (t *volumeIOTestSuite) SkipUnsupportedTest(pattern testpatterns.TestPattern, driver types.TestDriver) {
 }
 
-func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericVolumeTestResource) volumeIOTestInput {
+func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource GenericVolumeTestResource) volumeIOTestInput {
 	var fsGroup *int64
 	driver := resource.driver
 	dInfo := driver.GetDriverInfo()
@@ -106,10 +106,10 @@ func createVolumeIOTestInput(pattern testpatterns.TestPattern, resource genericV
 	}
 }
 
-func (t *volumeIOTestSuite) execTest(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
+func (t *volumeIOTestSuite) ExecTest(driver types.TestDriver, pattern testpatterns.TestPattern) {
 	Context(getTestNameStr(t, pattern), func() {
 		var (
-			resource     genericVolumeTestResource
+			resource     GenericVolumeTestResource
 			input        volumeIOTestInput
 			needsCleanup bool
 		)
@@ -117,12 +117,12 @@ func (t *volumeIOTestSuite) execTest(driver drivers.TestDriver, pattern testpatt
 		BeforeEach(func() {
 			needsCleanup = false
 			// Skip unsupported tests to avoid unnecessary resource initialization
-			skipUnsupportedTest(t, driver, pattern)
+			SkipUnsupportedTest(t, driver, pattern)
 			needsCleanup = true
 
 			// Setup test resource for driver and testpattern
-			resource := genericVolumeTestResource{}
-			resource.setupResource(driver, pattern)
+			resource := GenericVolumeTestResource{}
+			resource.SetupResource(driver, pattern)
 
 			// Create test input
 			input = createVolumeIOTestInput(pattern, resource)
@@ -130,7 +130,7 @@ func (t *volumeIOTestSuite) execTest(driver drivers.TestDriver, pattern testpatt
 
 		AfterEach(func() {
 			if needsCleanup {
-				resource.cleanupResource(driver, pattern)
+				resource.CleanupResource(driver, pattern)
 			}
 		})
 
