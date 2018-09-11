@@ -65,6 +65,7 @@ type DrainOptions struct {
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
+	MaxRetries         int
 	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	Selector           string
@@ -201,6 +202,7 @@ func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 		IOStreams:          ioStreams,
 		backOff:            clockwork.NewRealClock(),
 		GracePeriodSeconds: -1,
+		MaxRetries: -1,
 	}
 }
 
@@ -223,6 +225,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&options.DeleteLocalData, "delete-local-data", options.DeleteLocalData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", options.GracePeriodSeconds, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", options.Timeout, "The length of time to wait before giving up, zero means infinite")
+	cmd.Flags().IntVar(&options.MaxRetries, "max-retries", options.MaxRetries, "Number of tries to evict a pod before deleting it.")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&options.PodSelector, "pod-selector", "", options.PodSelector, "Label selector to filter pods on the node")
 
@@ -577,6 +580,7 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
+			tried := 0
 			var err error
 			for {
 				err = o.evictPod(pod, policyGroupVersion)
@@ -586,8 +590,14 @@ func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, g
 					returnCh <- nil
 					return
 				} else if apierrors.IsTooManyRequests(err) {
-					fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
-					time.Sleep(5 * time.Second)
+					tried += 1
+					if o.MaxRetries != -1 && tried > o.MaxRetries {
+						fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will delete): %v\n", pod.Name, err)
+						o.deletePods([]corev1.Pod{pod}, getPodFn)
+					} else {
+						fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
+						time.Sleep(5 * time.Second)
+					}
 				} else {
 					returnCh <- fmt.Errorf("error when evicting pod %q: %v", pod.Name, err)
 					return
