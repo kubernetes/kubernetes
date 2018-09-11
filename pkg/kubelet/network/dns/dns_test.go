@@ -221,13 +221,13 @@ func TestMergeDNSOptions(t *testing.T) {
 		expectedOptions          []string
 	}{
 		{
-			desc: "Empty dnsConfigOptions",
+			desc:                     "Empty dnsConfigOptions",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions:         nil,
 			expectedOptions:          []string{"ndots:5", "debug"},
 		},
 		{
-			desc: "No duplicated entries",
+			desc:                     "No duplicated entries",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions: []v1.PodDNSConfigOption{
 				{Name: "single-request"},
@@ -236,7 +236,7 @@ func TestMergeDNSOptions(t *testing.T) {
 			expectedOptions: []string{"ndots:5", "debug", "single-request", "attempts:3"},
 		},
 		{
-			desc: "Overwrite duplicated entries",
+			desc:                     "Overwrite duplicated entries",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions: []v1.PodDNSConfigOption{
 				{Name: "ndots", Value: &testOptionValue},
@@ -335,7 +335,7 @@ func TestGetPodDNSType(t *testing.T) {
 			expectedDNSType: podDNSHost,
 		},
 		{
-			desc: "valid DNSNone with feature gate",
+			desc:                    "valid DNSNone with feature gate",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSNone,
 			expectedDNSType:         podDNSNone,
@@ -539,13 +539,13 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSNone without DNSConfig should have empty DNS settings",
+			desc:                    "feature gate is enabled, DNSNone without DNSConfig should have empty DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSNone,
 			expectedDNSConfig:       &runtimeapi.DNSConfig{},
 		},
 		{
-			desc: "feature gate is enabled, DNSNone with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSNone with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSNone,
 			dnsConfig: &v1.PodDNSConfig{
@@ -563,7 +563,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSClusterFirst with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSClusterFirst with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSClusterFirst,
 			dnsConfig: &v1.PodDNSConfig{
@@ -581,7 +581,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSClusterFirstWithHostNet with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSClusterFirstWithHostNet with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			hostnetwork:             true,
 			dnsPolicy:               v1.DNSClusterFirstWithHostNet,
@@ -600,7 +600,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			},
 		},
 		{
-			desc: "feature gate is enabled, DNSDefault with DNSConfig should have a merged DNS settings",
+			desc:                    "feature gate is enabled, DNSDefault with DNSConfig should have a merged DNS settings",
 			customPodDNSFeatureGate: true,
 			dnsPolicy:               v1.DNSDefault,
 			dnsConfig: &v1.PodDNSConfig{

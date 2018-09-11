@@ -67,11 +67,11 @@ func NewController(clock clock.Clock, client clientset.Interface, holderIdentity
 		leaseClient = client.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
 	}
 	return &controller{
-		client:               leaseClient,
-		holderIdentity:       holderIdentity,
-		leaseDurationSeconds: leaseDurationSeconds,
-		renewInterval:        renewInterval,
-		clock:                clock,
+		client:                     leaseClient,
+		holderIdentity:             holderIdentity,
+		leaseDurationSeconds:       leaseDurationSeconds,
+		renewInterval:              renewInterval,
+		clock:                      clock,
 		onRepeatedHeartbeatFailure: onRepeatedHeartbeatFailure,
 	}
 }

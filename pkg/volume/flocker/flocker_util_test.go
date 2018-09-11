@@ -34,7 +34,7 @@ func TestFlockerUtil_CreateVolume(t *testing.T) {
 	// test CreateVolume happy path
 	pvc := volumetest.CreateTestPVC("3Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce})
 	options := volume.VolumeOptions{
-		PVC: pvc,
+		PVC:                           pvc,
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 

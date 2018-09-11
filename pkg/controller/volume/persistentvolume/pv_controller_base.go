@@ -79,12 +79,12 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	}
 
 	controller := &PersistentVolumeController{
-		volumes:           newPersistentVolumeOrderedIndex(),
-		claims:            cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
-		kubeClient:        p.KubeClient,
-		eventRecorder:     eventRecorder,
-		runningOperations: goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
-		cloud:             p.Cloud,
+		volumes:                       newPersistentVolumeOrderedIndex(),
+		claims:                        cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
+		kubeClient:                    p.KubeClient,
+		eventRecorder:                 eventRecorder,
+		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
+		cloud:                         p.Cloud,
 		enableDynamicProvisioning:     p.EnableDynamicProvisioning,
 		clusterName:                   p.ClusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,

@@ -414,7 +414,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	informers := informers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
-		nil, /* csiClient */
+		nil,                     /* csiClient */
 		fakeApiExtensionsClient, /* crdClient */
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
