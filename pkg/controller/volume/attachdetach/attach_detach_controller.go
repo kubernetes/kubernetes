@@ -682,16 +682,16 @@ func getCSIDriverCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Validation: &apiextensionsv1beta1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						"spec": apiextensionsv1beta1.JSONSchemaProps{
+						"spec": {
 							Description: "Specification of the CSI Driver.",
 							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"attachRequired": apiextensionsv1beta1.JSONSchemaProps{
+								"attachRequired": {
 									Description: "Indicates this CSI volume driver requires an attach operation," +
 										" and that Kubernetes should call attach and wait for any attach operation to" +
-										" complete before proceeding to mounting.",
+										" complete before proceeding to mount.",
 									Type: "boolean",
 								},
-								"podInfoOnMountVersion": apiextensionsv1beta1.JSONSchemaProps{
+								"podInfoOnMountVersion": {
 									Description: "Indicates this CSI volume driver requires additional pod" +
 										" information (like podName, podUID, etc.) during mount operations.",
 									Type: "string",
@@ -737,21 +737,21 @@ func getCSINodeInfoCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 			Validation: &apiextensionsv1beta1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						"csiDrivers": apiextensionsv1beta1.JSONSchemaProps{
+						"csiDrivers": {
 							Description: "List of CSI drivers running on the node and their properties.",
 							Type:        "array",
 							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
 								Schema: &apiextensionsv1beta1.JSONSchemaProps{
 									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-										"driver": apiextensionsv1beta1.JSONSchemaProps{
+										"driver": {
 											Description: "The CSI driver that this object refers to.",
 											Type:        "string",
 										},
-										"nodeID": apiextensionsv1beta1.JSONSchemaProps{
+										"nodeID": {
 											Description: "The node from the driver point of view.",
 											Type:        "string",
 										},
-										"topologyKeys": apiextensionsv1beta1.JSONSchemaProps{
+										"topologyKeys": {
 											Description: "List of keys supported by the driver.",
 											Type:        "array",
 											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
