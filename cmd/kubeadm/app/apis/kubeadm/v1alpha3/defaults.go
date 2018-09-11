@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 )
 
 const (
@@ -111,6 +112,14 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 	if obj.Etcd.Local != nil {
 		if obj.Etcd.Local.DataDir == "" {
 			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
+		}
+		if obj.Etcd.Local.Image == "" {
+			etcdImageTag := constants.DefaultEtcdVersion
+			etcdImageVersion, err := constants.EtcdSupportedVersion(obj.KubernetesVersion)
+			if err == nil {
+				etcdImageTag = etcdImageVersion.String()
+			}
+			obj.Etcd.Local.Image = images.GetGenericImage(obj.ImageRepository, constants.Etcd, etcdImageTag)
 		}
 	}
 }

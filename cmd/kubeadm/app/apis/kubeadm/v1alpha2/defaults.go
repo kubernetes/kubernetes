@@ -25,6 +25,7 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 	utilpointer "k8s.io/utils/pointer"
@@ -119,6 +120,14 @@ func SetDefaults_Etcd(obj *InitConfiguration) {
 	if obj.Etcd.Local != nil {
 		if obj.Etcd.Local.DataDir == "" {
 			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
+		}
+		if obj.Etcd.Local.Image == "" {
+			etcdImageTag := constants.DefaultEtcdVersion
+			etcdImageVersion, err := constants.EtcdSupportedVersion(obj.KubernetesVersion)
+			if err == nil {
+				etcdImageTag = etcdImageVersion.String()
+			}
+			obj.Etcd.Local.Image = images.GetGenericImage(obj.ImageRepository, constants.Etcd, etcdImageTag)
 		}
 	}
 }
