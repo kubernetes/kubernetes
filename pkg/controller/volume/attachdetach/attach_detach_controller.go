@@ -21,16 +21,13 @@ package attachdetach
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"time"
 
 	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -44,11 +41,11 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	csiapiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/crd"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
@@ -670,47 +667,8 @@ func (adc *attachDetachController) processVolumesInUse(
 	}
 }
 
-func getCSIDriverCRD() *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: csiapiv1alpha1.CsiDriverResourcePlural + "." + csiapiv1alpha1.GroupName,
-		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   csiapiv1alpha1.GroupName,
-			Version: csiapiv1alpha1.SchemeGroupVersion.Version,
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Validation: &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						"spec": {
-							Description: "Specification of the CSI Driver.",
-							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-								"attachRequired": {
-									Description: "Indicates this CSI volume driver requires an attach operation," +
-										" and that Kubernetes should call attach and wait for any attach operation to" +
-										" complete before proceeding to mount.",
-									Type: "boolean",
-								},
-								"podInfoOnMountVersion": {
-									Description: "Indicates this CSI volume driver requires additional pod" +
-										" information (like podName, podUID, etc.) during mount operations.",
-									Type: "string",
-								},
-							},
-						},
-					},
-				},
-			},
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: csiapiv1alpha1.CsiDriverResourcePlural,
-				Kind:   reflect.TypeOf(csiapiv1alpha1.CSIDriver{}).Name(),
-			},
-		},
-	}
-}
-
 func (adc *attachDetachController) installCSIDriverCRD() error {
-	crd := getCSIDriverCRD()
+	crd := crd.CSIDriver()
 	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
 	if err == nil {
@@ -725,58 +683,8 @@ func (adc *attachDetachController) installCSIDriverCRD() error {
 	return nil
 }
 
-func getCSINodeInfoCRD() *apiextensionsv1beta1.CustomResourceDefinition {
-	return &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: csiapiv1alpha1.CsiNodeInfoResourcePlural + "." + csiapiv1alpha1.GroupName,
-		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   csiapiv1alpha1.GroupName,
-			Version: csiapiv1alpha1.SchemeGroupVersion.Version,
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Validation: &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						"csiDrivers": {
-							Description: "List of CSI drivers running on the node and their properties.",
-							Type:        "array",
-							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-								Schema: &apiextensionsv1beta1.JSONSchemaProps{
-									Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-										"driver": {
-											Description: "The CSI driver that this object refers to.",
-											Type:        "string",
-										},
-										"nodeID": {
-											Description: "The node from the driver point of view.",
-											Type:        "string",
-										},
-										"topologyKeys": {
-											Description: "List of keys supported by the driver.",
-											Type:        "array",
-											Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
-												Schema: &apiextensionsv1beta1.JSONSchemaProps{
-													Type: "string",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: csiapiv1alpha1.CsiNodeInfoResourcePlural,
-				Kind:   reflect.TypeOf(csiapiv1alpha1.CSINodeInfo{}).Name(),
-			},
-		},
-	}
-}
-
 func (adc *attachDetachController) installCSINodeInfoCRD() error {
-	crd := getCSINodeInfoCRD()
+	crd := crd.CSINodeInfo()
 	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
 	if err == nil {
