@@ -24,6 +24,8 @@ import (
 	csiapiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 )
 
+// CSIDriver generates a CRD captureing information about a Container Storage Interface (CSI)
+// volume driver deployed on the cluster.
 func CSIDriver() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
@@ -63,6 +65,7 @@ func CSIDriver() *apiextensionsv1beta1.CustomResourceDefinition {
 	}
 }
 
+// CSINodeInfo generates a CRD holding information about all CSI drivers installed on a node.
 func CSINodeInfo() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
