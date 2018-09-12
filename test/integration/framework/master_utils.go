@@ -242,7 +242,7 @@ func NewMasterConfig() *master.Config {
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
 	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
-	etcdOptions.StorageConfig.ServerList = []string{GetEtcdURL()}
+	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
 
 	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
@@ -341,7 +341,7 @@ func RunAMasterUsingServer(masterConfig *master.Config, s *httptest.Server, mast
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
 func SharedEtcd() *storagebackend.Config {
 	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New(), "registry"), nil)
-	cfg.ServerList = []string{GetEtcdURL()}
+	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg
 }
 

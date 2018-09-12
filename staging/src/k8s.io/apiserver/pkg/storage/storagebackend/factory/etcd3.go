@@ -54,7 +54,7 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	clientErrMsg.Store("etcd client connection not yet established")
 
 	go wait.PollUntil(time.Second, func() (bool, error) {
-		client, err := newETCD3Client(c)
+		client, err := newETCD3Client(c.Transport)
 		if err != nil {
 			clientErrMsg.Store(err.Error())
 			return false, nil
@@ -78,7 +78,7 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	}, nil
 }
 
-func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
+func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
@@ -109,7 +109,7 @@ func newETCD3Client(c storagebackend.Config) (*clientv3.Client, error) {
 }
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
-	client, err := newETCD3Client(c)
+	client, err := newETCD3Client(c.Transport)
 	if err != nil {
 		return nil, nil, err
 	}
