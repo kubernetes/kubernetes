@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,50 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crd
+// Package attachdetachcrd implements logic to generate CRDs required by the
+// attach/detach controller.
+package attachdetachcrd
 
 import (
 	"reflect"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csiapiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	"k8s.io/kubernetes/pkg/controller/crdinstaller/crdgenerator"
+	"k8s.io/kubernetes/pkg/features"
 )
 
-// CSIDriver generates a CRD captureing information about a Container Storage Interface (CSI)
-// volume driver deployed on the cluster.
-func CSIDriver() *apiextensionsv1beta1.CustomResourceDefinition {
+// NewAttachDetachControllerCRDGenerator returns a new instance of
+// ControllerCRDGenerator.
+func NewAttachDetachControllerCRDGenerator() crdgenerator.ControllerCRDGenerator {
+	return &attachDetachControllerCRDGenerator{}
+}
+
+var _ crdgenerator.ControllerCRDGenerator = (*attachDetachControllerCRDGenerator)(nil)
+
+type attachDetachControllerCRDGenerator struct {
+}
+
+// GetCRDs returns the CRDs required by the attach/detach controller.
+func (adcCRDGen *attachDetachControllerCRDGenerator) GetCRDs() []*apiextensionsv1beta1.CustomResourceDefinition {
+	var attachDetachCRDs []*apiextensionsv1beta1.CustomResourceDefinition
+
+	// Install required CSI CRDs on API server
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		attachDetachCRDs = append(attachDetachCRDs, adcCRDGen.createCSIDriverCRD())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		attachDetachCRDs = append(attachDetachCRDs, adcCRDGen.createCSINodeInfo())
+	}
+
+	return attachDetachCRDs
+}
+
+// createCSIDriverCRD generates a CRD for the Container Storage Interface (CSI) CSIDriver
+// object.
+func (adcCRDGen *attachDetachControllerCRDGenerator) createCSIDriverCRD() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: csiapiv1alpha1.CsiDriverResourcePlural + "." + csiapiv1alpha1.GroupName,
@@ -65,8 +96,8 @@ func CSIDriver() *apiextensionsv1beta1.CustomResourceDefinition {
 	}
 }
 
-// CSINodeInfo generates a CRD holding information about all CSI drivers installed on a node.
-func CSINodeInfo() *apiextensionsv1beta1.CustomResourceDefinition {
+// createCSINodeInfo generates a CRD holding information about all CSI drivers installed on a node.
+func (adcCRDGen *attachDetachControllerCRDGenerator) createCSINodeInfo() *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: csiapiv1alpha1.CsiNodeInfoResourcePlural + "." + csiapiv1alpha1.GroupName,

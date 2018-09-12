@@ -26,14 +26,11 @@ import (
 	"github.com/golang/glog"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -46,13 +43,11 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
-	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/crd"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -103,7 +98,6 @@ type AttachDetachController interface {
 func NewAttachDetachController(
 	kubeClient clientset.Interface,
 	csiClient csiclient.Interface,
-	crdClient apiextensionsclient.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
@@ -131,7 +125,6 @@ func NewAttachDetachController(
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
 		csiClient:   csiClient,
-		crdClient:   crdClient,
 		pvcLister:   pvcInformer.Lister(),
 		pvcsSynced:  pvcInformer.Informer().HasSynced,
 		pvLister:    pvInformer.Lister(),
@@ -143,14 +136,6 @@ func NewAttachDetachController(
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		cloud:       cloud,
 		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
-	}
-
-	// Install required CSI CRDs on API server
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		adc.installCRD("CSIDriver", crd.CSIDriver())
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		adc.installCRD("CSINodeInfo", crd.CSINodeInfo())
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -258,10 +243,6 @@ type attachDetachController struct {
 	// csiClient is the client used to read/write csi.storage.k8s.io API objects
 	// from the API server.
 	csiClient csiclient.Interface
-
-	// crdClient is the client used to read/write apiextensions.k8s.io objects
-	// from the API server.
-	crdClient apiextensionsclient.Interface
 
 	// pvcLister is the shared PVC lister used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
@@ -666,21 +647,6 @@ func (adc *attachDetachController) processVolumesInUse(
 				attachedVolume.VolumeName, nodeName, mounted, err)
 		}
 	}
-}
-
-func (adc *attachDetachController) installCRD(name string, crd *apiextensionsv1beta1.CustomResourceDefinition) error {
-	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-
-	if err == nil {
-		glog.Infof("%s CRD created successfully: %v", name, res)
-	} else if apierrors.IsAlreadyExists(err) {
-		glog.Warningf("%s CRD already exists: %#v, err: %v", name, res, err)
-	} else {
-		glog.Errorf("failed to create %s CRD: %#v, err: %v", name, res, err)
-		return err
-	}
-
-	return nil
 }
 
 // VolumeHost implementation

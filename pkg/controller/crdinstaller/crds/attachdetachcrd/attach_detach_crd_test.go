@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,17 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package crd_test
+package attachdetachcrd
 
 import (
 	"testing"
+)
 
-	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/crd"
+const (
+	expectedNumCRDs = 2
 )
 
 func Test_CRD_CSIDriver_Validation(t *testing.T) {
-	crd := crd.CSIDriver()
+	// Arrange
+	crdGenerator := NewAttachDetachControllerCRDGenerator()
 
+	// Act
+	crds := crdGenerator.GetCRDs()
+	if len(crds) != expectedNumCRDs {
+		t.Fatalf("Expected number of CRDs returned by GetCRDs() does not match. Expected: %v, Actual: %v", expectedNumCRDs, len(crds))
+	}
+	crd := crds[0] // Should be CSIDriver
+
+	// Assert
 	if crd.Spec.Validation == nil {
 		t.Fatal("Expected Driver CRD to have validations configured")
 	}
@@ -49,8 +60,17 @@ func Test_CRD_CSIDriver_Validation(t *testing.T) {
 }
 
 func Test_CRD_CSINodeInfo_Validation(t *testing.T) {
-	crd := crd.CSINodeInfo()
+	// Arrange
+	crdGenerator := NewAttachDetachControllerCRDGenerator()
 
+	// Act
+	crds := crdGenerator.GetCRDs()
+	if len(crds) != expectedNumCRDs {
+		t.Fatalf("Expected number of CRDs returned by GetCRDs() does not match. Expected: %v, Actual: %v", expectedNumCRDs, len(crds))
+	}
+	crd := crds[1] // Should be CSINodeInfo
+
+	// Assert
 	if crd.Spec.Validation == nil {
 		t.Fatal("Expected NodeInfo CRD to have validations configured")
 	}
