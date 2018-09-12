@@ -51,6 +51,7 @@ readonly kern_logfile="kern.log"
 readonly initd_logfiles="docker/log"
 readonly supervisord_logfiles="kubelet.log supervisor/supervisord.log supervisor/kubelet-stdout.log supervisor/kubelet-stderr.log supervisor/docker-stdout.log supervisor/docker-stderr.log"
 readonly systemd_services="kubelet kubelet-monitor kube-container-runtime-monitor ${LOG_DUMP_SYSTEMD_SERVICES:-docker}"
+readonly addons_logfiles="metrics-server"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
@@ -229,6 +230,36 @@ function dump_masters() {
 
     # We don't want to run more than ${max_dump_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
+    # take much longer than the others, but it should help.
+    proc=$((proc - 1))
+    if [[ proc -eq 0 ]]; then
+      proc=${max_dump_processes}
+      wait
+    fi
+  done
+  # Wait for any remaining processes.
+  if [[ proc -gt 0 && proc -lt ${max_dump_processes} ]]; then
+    wait
+  fi
+}
+
+function dump_addons() {
+  # Store logs from some on-cluster addon components for debugging purposes
+  KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
+  local proc=${max_dump_processes}
+  local addons_dir=${report_dir}/addons
+  mkdir -p ${addons_dir}
+  for addon in "${addons_logfiles[@]}"; do
+    local addon_dir=${addons_dir}/${addon}
+    mkdir -p ${addon_dir}
+    # use `-o jsonpath` instead of `-o name` to avoid the 'pod/' prefix
+    # use the first container
+    "${KUBECTL}" get pods -n kube-system -l "k8s-app=${addon}" -o go-template --template '{{range $pod := .items}}{{range $container := $pod.spec.containers}}{{$pod.metadata.name}}{{"\t"}}{{$container.name}}{{"\n"}}{{end}}{{end}}' | while read pod container; do
+      "${KUBECTL}" logs -n kube-system ${pod} -c ${container} > ${addon_dir}/${pod}-${container}.log &
+    done
+
+    # We don't want to run more than ${max_dump_processes} at a time, so
+    # wait once we hit that many pods. This isn't ideal, since one might
     # take much longer than the others, but it should help.
     proc=$((proc - 1))
     if [[ proc -eq 0 ]]; then
@@ -438,6 +469,10 @@ function main() {
     echo "Skipping dumping of node logs"
     return
   fi
+
+  # dump the addons via `kubectl logs`
+  echo "Dumping logs from cluster addons locally to '${report_dir}'"
+  dump_addons
 
   # Copy logs from nodes to GCS directly or to artifacts dir locally (through SSH).
   if [[ -n "${gcs_artifacts_dir}" ]]; then
