@@ -422,7 +422,7 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 				}
 			}
 			if err != nil {
-				glog.Errorf("Stat fs failed. Error: %v", err)
+				glog.V(4).Infof("Stat fs failed. Error: %v", err)
 			} else {
 				deviceSet[device] = struct{}{}
 				fs.DeviceInfo = DeviceInfo{
@@ -533,6 +533,21 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 	}
 
 	mount, found := self.mounts[dir]
+	// try the parent dir if not found until we reach the root dir
+	// this is an issue on btrfs systems where the directory is not
+	// the subvolume
+	for !found {
+		pathdir, _ := filepath.Split(dir)
+		// break when we reach root
+		if pathdir == "/" {
+			break
+		}
+		// trim "/" from the new parent path otherwise the next possible
+		// filepath.Split in the loop will not split the string any further
+		dir = strings.TrimSuffix(pathdir, "/")
+		mount, found = self.mounts[dir]
+	}
+
 	if found && mount.Fstype == "btrfs" && mount.Major == 0 && strings.HasPrefix(mount.Source, "/dev/") {
 		major, minor, err := getBtrfsMajorMinorIds(mount)
 		if err != nil {
