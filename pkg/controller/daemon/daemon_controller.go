@@ -1245,8 +1245,6 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 }
 
 func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *apps.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
-	util.AddOrUpdateDaemonPodTolerations(&newPod.Spec, kubelettypes.IsCriticalPod(newPod))
-
 	objects, err := dsc.podNodeIndex.ByIndex("nodeName", node.Name)
 	if err != nil {
 		return nil, nil, err
@@ -1376,6 +1374,15 @@ func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
 	newPod.Namespace = ds.Namespace
 	newPod.Spec.NodeName = nodeName
+
+	// NOTES (k82cn): Cherrypick (#68539), 'kubelettypes.IsCriticalPod' considered
+	// `features.ExperimentalCriticalPodAnnotation` in 1.12, but not in 1.11.
+	isCritical := kubelettypes.IsCriticalPod(newPod) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation)
+
+	// Added default tolerations for DaemonSet pods.
+	util.AddOrUpdateDaemonPodTolerations(&newPod.Spec, isCritical)
+
 	return newPod
 }
 
