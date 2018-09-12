@@ -12965,11 +12965,12 @@ func newNodeNameEndpoint(nodeName string) *core.Endpoints {
 func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	oldEndpoint := newNodeNameEndpoint("kubernetes-node-setup-by-backend")
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
-	// Check that NodeName cannot be changed during update (if already set)
+	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
+	// The same ip will now have a different nodeName.
 	errList := ValidateEndpoints(updatedEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
-	if len(errList) == 0 {
-		t.Error("Endpoint should not allow changing of Subset.Addresses.NodeName on update")
+	if len(errList) != 0 {
+		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
 	}
 }
 
