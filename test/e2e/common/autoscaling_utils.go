@@ -20,11 +20,14 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -359,11 +362,63 @@ func (rc *ResourceConsumer) GetReplicas() int {
 	return 0
 }
 
+func (rc *ResourceConsumer) logHPAStatus() {
+	hpa, err := rc.clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(rc.nsName).Get(rc.name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		// skip if we don't have an expected HPA
+		return
+	}
+	if err != nil {
+		framework.Logf("could not check HPA status: %v", err)
+		return
+	}
+	status := hpa.Status
+
+	currentMetricParts := make([]string, len(status.CurrentMetrics))
+	for i, currentMetric := range status.CurrentMetrics {
+		var valStatus autoscalingv2.MetricValueStatus
+		switch currentMetric.Type {
+		case autoscalingv2.ObjectMetricSourceType:
+			valStatus = currentMetric.Object.Current
+		case autoscalingv2.PodsMetricSourceType:
+			valStatus = currentMetric.Pods.Current
+		case autoscalingv2.ResourceMetricSourceType:
+			valStatus = currentMetric.Resource.Current
+		case autoscalingv2.ExternalMetricSourceType:
+			valStatus = currentMetric.External.Current
+		}
+
+		switch {
+		case valStatus.Value != nil:
+			currentMetricParts[i] = valStatus.Value.String()
+		case valStatus.AverageUtilization != nil:
+			currentMetricParts[i] = fmt.Sprintf("%d%% (%s)", *valStatus.AverageUtilization, valStatus.AverageValue)
+		case valStatus.AverageValue != nil:
+			currentMetricParts[i] = valStatus.AverageValue.String()
+		}
+	}
+
+	conditionParts := make([]string, len(status.Conditions))
+	for i, cond := range status.Conditions {
+		if cond.Status == v1.ConditionTrue || cond.Type == autoscalingv2.ScalingLimited {
+			// print short info for stable status conditions
+			conditionParts[i] = fmt.Sprintf("%s(%s)", cond.Reason, cond.Type)
+			continue
+		}
+
+		conditionParts[i] = fmt.Sprintf("%s(%s): %q", cond.Reason, cond.Type, cond.Message)
+	}
+
+	framework.Logf("while waiting for replicas, HPA last scaled at %s, desires %d replicas (current %d) from metrics %s", status.LastScaleTime, status.DesiredReplicas, status.CurrentReplicas, strings.Join(currentMetricParts, ","))
+	framework.Logf("while waiting for replicas, HPA had conditions %s", strings.Join(conditionParts, "; "))
+}
+
 func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.Duration) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
 		replicas := rc.GetReplicas()
 		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		rc.logHPAStatus()
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
 	})
 	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
