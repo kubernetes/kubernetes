@@ -707,7 +707,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		// This is the heuristics that from memory capacity is trying to infer
 		// the maximum number of nodes in the cluster and set cache sizes based
 		// on that value.
-		// From our documentation, we officially recommend 120GB machines for
+		// From our documentation, we officially recommend 120GB memories for
 		// 2000 nodes, and we scale from that point. Thus we assume ~60MB of
 		// capacity per node.
 		// TODO: We may consider deciding that some percentage of memory will
