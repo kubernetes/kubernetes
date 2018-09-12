@@ -356,7 +356,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		networkingrest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
-		schedulingrest.RESTStorageProvider{},
+		schedulingrest.SchedulingRESTStorageProvider{},
 		settingsrest.SettingRESTStorageProvider{},
 		storagerest.StorageRESTStorageProvider{},
 		// keep apps after extensions so legacy clients resolve the extensions versions of shared resource names.

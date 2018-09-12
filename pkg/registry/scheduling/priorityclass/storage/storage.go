@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 )
 
-// rest implements a RESTStorage for priority classes against etcd
+// REST implements a RESTStorage for priority classes against etcd
 type REST struct {
 	*genericregistry.Store
 }

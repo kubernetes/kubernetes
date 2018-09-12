@@ -38,13 +38,16 @@ import (
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
 )
 
+// PostStartHookName is the name of genericapiserver.PostStartHookFunc
 const PostStartHookName = "scheduling/bootstrap-system-priority-classes"
 
-type RESTStorageProvider struct{}
+// SchedulingRESTStorageProvider is a factory type for REST storage.
+type SchedulingRESTStorageProvider struct{}
 
-var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
+var _ genericapiserver.PostStartHookProvider = SchedulingRESTStorageProvider{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+// NewRESTStorage creates and returns an storage object
+func (p SchedulingRESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(scheduling.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1alpha1.SchemeGroupVersion) {
@@ -56,7 +59,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p SchedulingRESTStorageProvider) storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// priorityclasses
 	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
@@ -65,10 +68,12 @@ func (p RESTStorageProvider) storage(apiResourceConfigSource serverstorage.APIRe
 	return storage
 }
 
-func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+// PostStartHook returns PostStartHookName and a genericapiserver.PostStartHookFunc
+func (p SchedulingRESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	return PostStartHookName, AddSystemPriorityClasses(), nil
 }
 
+// AddSystemPriorityClasses returns a genericapiserver.PostStartHookFunc
 func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		// Adding system priority classes is important. If they fail to add, many critical system
@@ -87,9 +92,8 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 						_, err := schedClientSet.PriorityClasses().Create(pc)
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
-						} else {
-							glog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 						}
+						glog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
 						glog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)
@@ -108,6 +112,7 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 	}
 }
 
-func (p RESTStorageProvider) GroupName() string {
+// GroupName returns scheduling.GroupName
+func (p SchedulingRESTStorageProvider) GroupName() string {
 	return scheduling.GroupName
 }
