@@ -57,6 +57,8 @@ spec:
         # Remove these lines for non-GKE clusters, and when GKE supports token-based auth.
         - --kubelet-port=10255
         - --deprecated-kubelet-completely-insecure=true
+        - --logtostderr
+        - --v=2
         ports:
         - containerPort: 443
           name: https
