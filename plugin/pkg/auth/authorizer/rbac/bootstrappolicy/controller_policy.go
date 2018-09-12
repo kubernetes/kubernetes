@@ -78,6 +78,11 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			}
 		}
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) ||
+			utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("create").Groups(apiExtensionsGroup).Resources("customresourcedefinitions").RuleOrDie())
+		}
+
 		return role
 	}())
 
