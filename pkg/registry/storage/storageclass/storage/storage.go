@@ -28,11 +28,12 @@ import (
 	"k8s.io/kubernetes/pkg/registry/storage/storageclass"
 )
 
+// REST object that will work against storageclass.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against persistent volumes.
+// NewREST returns a RESTStorage object that will work against storageclass.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &storageapi.StorageClass{} },

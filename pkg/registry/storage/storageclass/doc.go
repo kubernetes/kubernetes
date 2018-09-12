@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package storageClass provides Registry interface and its REST
+// Package storageclass provides Registry interface and its REST
 // implementation for storing storageclass api objects.
 package storageclass
