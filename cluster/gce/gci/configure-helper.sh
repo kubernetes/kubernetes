@@ -2460,7 +2460,7 @@ EOF
     metrics_server_memory_per_node="4"
     metrics_server_min_cluster_size="16"
     if [[ "${ENABLE_SYSTEM_ADDON_RESOURCE_OPTIMIZATIONS:-}" == "true" ]]; then
-      base_metrics_server_cpu="5m"
+      base_metrics_server_cpu="40m"
       base_metrics_server_memory="35Mi"
       metrics_server_memory_per_node="4"
       metrics_server_min_cluster_size="5"
