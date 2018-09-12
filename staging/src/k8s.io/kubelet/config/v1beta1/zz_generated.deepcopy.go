@@ -144,6 +144,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
 	out.ImageMinimumGCAge = in.ImageMinimumGCAge
+	if in.ImageGCWhitelist != nil {
+		in, out := &in.ImageGCWhitelist, &out.ImageGCWhitelist
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ImageGCHighThresholdPercent != nil {
 		in, out := &in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
 		*out = new(int32)
