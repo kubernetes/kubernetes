@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -67,6 +68,7 @@ type Framework struct {
 
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
+	APIExtensionsClientSet           apiextensionsclient.Interface
 	CSIClientSet                     csi.Interface
 
 	InternalClientset *internalclientset.Clientset
@@ -175,6 +177,8 @@ func (f *Framework) BeforeEach() {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		f.APIExtensionsClientSet, err = apiextensionsclient.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.InternalClientset, err = internalclientset.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
