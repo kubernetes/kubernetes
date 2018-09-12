@@ -663,10 +663,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "custom certs dir",
+			name: "custom certs dir for v1.12.0-beta.2",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.12.0-beta.2",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -686,11 +686,11 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom cloudprovider",
+			name: "custom cloudprovider for v1.12.0-beta.2",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.12.0-beta.2",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -713,12 +713,12 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom extra-args",
+			name: "custom extra-args for v1.12.0-beta.2",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:                 kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
 				ControllerManagerExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
 				CertificatesDir:            testCertsDir,
-				KubernetesVersion:          "v1.7.0",
+				KubernetesVersion:          "v1.12.0-beta.2",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -741,11 +741,11 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
-			name: "custom IPv6 networking",
+			name: "custom IPv6 networking for v1.12.0-beta.2",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking:        kubeadmapi.Networking{PodSubnet: "2001:db8::/64"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.12.0-beta.2",
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -762,6 +762,95 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
+				"--allocate-node-cidrs=true",
+				"--cluster-cidr=2001:db8::/64",
+				"--node-cidr-mask-size=80",
+			},
+		},
+		{
+			name: "custom certs dir for v1.11.3",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.11.3",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+			},
+		},
+		{
+			name: "custom cloudprovider for v1.11.3",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:        kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.11.3",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--allocate-node-cidrs=true",
+				"--cluster-cidr=10.0.1.15/16",
+				"--node-cidr-mask-size=24",
+			},
+		},
+		{
+			name: "custom extra-args for v1.11.3",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:                 kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
+				ControllerManagerExtraArgs: map[string]string{"node-cidr-mask-size": "20"},
+				CertificatesDir:            testCertsDir,
+				KubernetesVersion:          "v1.11.3",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--allocate-node-cidrs=true",
+				"--cluster-cidr=10.0.1.15/16",
+				"--node-cidr-mask-size=20",
+			},
+		},
+		{
+			name: "custom IPv6 networking for v1.11.3",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:        kubeadmapi.Networking{PodSubnet: "2001:db8::/64"},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: "v1.11.3",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=2001:db8::/64",
 				"--node-cidr-mask-size=80",
@@ -868,11 +957,11 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 		expectedArgFunc func(dir string) []string
 	}{
 		{
-			name: "caKeyPresent-false",
+			name: "caKeyPresent-false for v1.12.0-beta.2",
 			cfg: &kubeadmapi.InitConfiguration{
 				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					KubernetesVersion: "v1.7.0",
+					KubernetesVersion: "v1.12.0-beta.2",
 					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 				},
 			},
@@ -897,11 +986,11 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 			},
 		},
 		{
-			name: "caKeyPresent true",
+			name: "caKeyPresent true for v1.12.0-beta.2",
 			cfg: &kubeadmapi.InitConfiguration{
 				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					KubernetesVersion: "v1.7.0",
+					KubernetesVersion: "v1.12.0-beta.2",
 					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 				},
 			},
@@ -922,6 +1011,56 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 					"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 					"--client-ca-file=" + tmpdir + "/ca.crt",
 					"--requestheader-client-ca-file=" + tmpdir + "/front-proxy-ca.crt",
+				}
+			},
+		},
+		{
+			name: "caKeyPresent-false for v1.11.3",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "v1.11.3",
+					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				},
+			},
+			caKeyPresent: false,
+			expectedArgFunc: func(tmpdir string) []string {
+				return []string{
+					"kube-controller-manager",
+					"--address=127.0.0.1",
+					"--leader-elect=true",
+					"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+					"--root-ca-file=" + tmpdir + "/ca.crt",
+					"--service-account-private-key-file=" + tmpdir + "/sa.key",
+					"--cluster-signing-cert-file=",
+					"--cluster-signing-key-file=",
+					"--use-service-account-credentials=true",
+					"--controllers=*,bootstrapsigner,tokencleaner",
+				}
+			},
+		},
+		{
+			name: "caKeyPresent true for v1.11.3",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "v1.11.3",
+					Networking:        kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				},
+			},
+			caKeyPresent: true,
+			expectedArgFunc: func(tmpdir string) []string {
+				return []string{
+					"kube-controller-manager",
+					"--address=127.0.0.1",
+					"--leader-elect=true",
+					"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+					"--root-ca-file=" + tmpdir + "/ca.crt",
+					"--service-account-private-key-file=" + tmpdir + "/sa.key",
+					"--cluster-signing-cert-file=" + tmpdir + "/ca.crt",
+					"--cluster-signing-key-file=" + tmpdir + "/ca.key",
+					"--use-service-account-credentials=true",
+					"--controllers=*,bootstrapsigner,tokencleaner",
 				}
 			},
 		},
