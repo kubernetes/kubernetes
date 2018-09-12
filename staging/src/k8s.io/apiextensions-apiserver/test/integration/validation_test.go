@@ -143,6 +143,25 @@ func newNoxuValidationCRD(scope apiextensionsv1beta1.ResourceScope) *apiextensio
 								},
 							},
 						},
+						"chi": {
+							Description: "Chi is just a thing that holds other things",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"psi": {
+									Description: "Chi.Psi is nested in Chi",
+									Type:        "string",
+								},
+							},
+						},
+						"omega": {
+							Description: "Omega is an array of zero or more elements, each element is a string starting with 'thing_'",
+							Type:        "array",
+							Items: &apiextensionsv1beta1.JSONSchemaPropsOrArray{
+								Schema: &apiextensionsv1beta1.JSONSchemaProps{
+									Type:    "string",
+									Pattern: "^thing_.+$",
+								},
+							},
+						},
 					},
 				},
 			},
@@ -163,6 +182,13 @@ func newNoxuValidationInstance(namespace, name string) *unstructured.Unstructure
 			"beta":  10,
 			"gamma": "bar",
 			"delta": "hello",
+			"chi": map[string]interface{}{
+				"psi": "the nested string",
+			},
+			"omega": []interface{}{
+				"thing_1",
+				"thing_2",
+			},
 		},
 	}
 }
@@ -287,6 +313,28 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 				return instance
 			},
 			expectedError: "must validate at least one schema (anyOf)\ndelta in body should be at most 5 chars long",
+		},
+		{
+			name: "bad chi.psi",
+			instanceFn: func() *unstructured.Unstructured {
+				instance := newNoxuValidationInstance(ns, "foo")
+				instance.Object["chi"] = map[string]interface{}{
+					"psi": map[string]interface{}{
+						"no object": "allowed here",
+					},
+				}
+				return instance
+			},
+			expectedError: "chi.psi in body must be of type string",
+		},
+		{
+			name: "bad omega",
+			instanceFn: func() *unstructured.Unstructured {
+				instance := newNoxuValidationInstance(ns, "foo")
+				instance.Object["omega"] = "nope"
+				return instance
+			},
+			expectedError: "omega in body must be of type array",
 		},
 		{
 			name: "absent alpha and beta",

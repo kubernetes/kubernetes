@@ -21,7 +21,6 @@ package attachdetach
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"time"
 
 	"github.com/golang/glog"
@@ -30,7 +29,6 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -44,11 +42,11 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	csiapiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/crd"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
@@ -149,10 +147,10 @@ func NewAttachDetachController(
 
 	// Install required CSI CRDs on API server
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		adc.installCSIDriverCRD()
+		adc.installCRD("CSIDriver", crd.CSIDriver())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		adc.installCSINodeInfoCRD()
+		adc.installCRD("CSINodeInfo", crd.CSINodeInfo())
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -670,65 +668,15 @@ func (adc *attachDetachController) processVolumesInUse(
 	}
 }
 
-func (adc *attachDetachController) installCSIDriverCRD() error {
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: csiapiv1alpha1.CsiDriverResourcePlural + "." + csiapiv1alpha1.GroupName,
-		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   csiapiv1alpha1.GroupName,
-			Version: csiapiv1alpha1.SchemeGroupVersion.Version,
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: csiapiv1alpha1.CsiDriverResourcePlural,
-				Kind:   reflect.TypeOf(csiapiv1alpha1.CSIDriver{}).Name(),
-			},
-		},
-	}
+func (adc *attachDetachController) installCRD(name string, crd *apiextensionsv1beta1.CustomResourceDefinition) error {
 	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 
 	if err == nil {
-		glog.Infof("CSIDrivers CRD created successfully: %#v",
-			res)
+		glog.Infof("%s CRD created successfully: %v", name, res)
 	} else if apierrors.IsAlreadyExists(err) {
-		glog.Warningf("CSIDrivers CRD already exists: %#v, err: %#v",
-			res, err)
+		glog.Warningf("%s CRD already exists: %#v, err: %v", name, res, err)
 	} else {
-		glog.Errorf("failed to create CSIDrivers CRD: %#v, err: %#v",
-			res, err)
-		return err
-	}
-
-	return nil
-}
-
-// installCRDs creates the specified CustomResourceDefinition for the CSIDrivers object.
-func (adc *attachDetachController) installCSINodeInfoCRD() error {
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: csiapiv1alpha1.CsiNodeInfoResourcePlural + "." + csiapiv1alpha1.GroupName,
-		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   csiapiv1alpha1.GroupName,
-			Version: csiapiv1alpha1.SchemeGroupVersion.Version,
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural: csiapiv1alpha1.CsiNodeInfoResourcePlural,
-				Kind:   reflect.TypeOf(csiapiv1alpha1.CSINodeInfo{}).Name(),
-			},
-		},
-	}
-	res, err := adc.crdClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-
-	if err == nil {
-		glog.Infof("CSINodeInfo CRD created successfully: %#v",
-			res)
-	} else if apierrors.IsAlreadyExists(err) {
-		glog.Warningf("CSINodeInfo CRD already exists: %#v, err: %#v",
-			res, err)
-	} else {
-		glog.Errorf("failed to create CSINodeInfo CRD: %#v, err: %#v",
-			res, err)
+		glog.Errorf("failed to create %s CRD: %#v, err: %v", name, res, err)
 		return err
 	}
 
