@@ -134,7 +134,7 @@ func (p *exampleHandler) AddPluginName(pluginName string) {
 	p.ExpectedNames[pluginName] = v
 }
 
-func (p *exampleHandler) DecreasePluginCount(pluginName string) (old int, ok bool) {
+func (p *exampleHandler) DecreasePluginCount(pluginName string) (int, bool) {
 	p.m.Lock()
 	defer p.m.Unlock()
 
