@@ -27,9 +27,11 @@ import (
 	podpresetstore "k8s.io/kubernetes/pkg/registry/settings/podpreset/storage"
 )
 
-type RESTStorageProvider struct{}
+// SettingRESTStorageProvider is a factory type for REST storage.
+type SettingRESTStorageProvider struct{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+// NewRESTStorage creates and returns an storage object
+func (p SettingRESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(settings.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
@@ -41,7 +43,7 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p SettingRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// podpresets
 	podPresetStorage := podpresetstore.NewREST(restOptionsGetter)
@@ -50,6 +52,7 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	return storage
 }
 
-func (p RESTStorageProvider) GroupName() string {
+// GroupName returns settings.GroupName
+func (p SettingRESTStorageProvider) GroupName() string {
 	return settings.GroupName
 }

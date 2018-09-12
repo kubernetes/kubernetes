@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/settings/podpreset"
 )
 
-// rest implements a RESTStorage for replication controllers against etcd
+// REST implements a RESTStorage for replication controllers against etcd
 type REST struct {
 	*genericregistry.Store
 }
