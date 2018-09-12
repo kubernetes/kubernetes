@@ -32,10 +32,11 @@ endif
 # It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /bin/bash
 
+
 # This rule collects all the generated file sets into a single rule.  Other
 # rules should depend on this to ensure generated files are rebuilt.
 .PHONY: generated_files
-generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi gen_bindata
+generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi gen_bindata gen_register
 
 #
 # Helper logic to calculate Go's dependency DAG ourselves.
@@ -495,4 +496,87 @@ gen_bindata: $(BINDATA_GEN) FORCE
 # and make is happy.
 $(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata/go-bindata)
 	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/jteeuwen/go-bindata/go-bindata
+	touch $@
+
+
+# Register generation
+#
+
+# The result file, in each pkg, of register-gen generation.
+REGISTERGEN_BASENAME := $(GENERATED_FILE_PREFIX)register
+REGISTERGEN_FILENAME := $(REGISTERGEN_BASENAME).go
+REGISTERGEN_OUTPUT_PKG := $(PRJ_SRC_PATH)/vendored
+
+# The tool used to generate register.go files.
+REGISTER_GEN := $(BIN_DIR)/register-gen
+
+# Find all the directories that request register generation.
+# files that need deepcopy also need to generate "register" files
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** finding all +k8s:deepcopy-gen tags)
+endif
+REGISTERGEN_DIRS := $(shell                                                 \
+    find ./staging/src/k8s.io/api -name types.go | xargs -n1 dirname | sort \
+)
+REGISTERGEN_FILES := $(addsuffix /$(REGISTERGEN_FILENAME), $(REGISTERGEN_DIRS))
+
+
+# Reset the list of packages that need generation.
+$(shell mkdir -p $$(dirname $(META_DIR)/$(REGISTER_GEN)))
+$(shell rm -f $(META_DIR)/$(REGISTER_GEN).todo)
+
+
+# This rule aggregates the set of files to generate and then generates them all
+# in a single run of the tool.
+.PHONY: gen_register
+gen_register: $(REGISTER_GEN) $(META_DIR)/$(REGISTER_GEN).todo
+	if [[ -s $(META_DIR)/$(REGISTER_GEN).todo ]]; then                                  \
+	    pkgs=$$(cat $(META_DIR)/$(REGISTER_GEN).todo | paste -sd, -);                   \
+	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then                                            \
+	        echo "DBG: running $(REGISTER_GEN) for $$pkgs";                             \
+	    fi;                                                                             \
+	    ./hack/run-in-gopath.sh $(REGISTER_GEN)                                         \
+	        --v $(KUBE_VERBOSE)                                                         \
+	        --logtostderr                                                               \
+	        -i "$$pkgs"                                                                 \
+	        -p $(REGISTERGEN_OUTPUT_PKG)                                                \
+	        -O $(REGISTERGEN_BASENAME)                                                  \
+	        "$$@";                                                                      \
+	fi                                                                                  \
+
+# For each dir in REGISTERGEN_DIRS, this establishes a dependency between the
+# output file and the input files that should trigger a rebuild.
+#
+# Note that this is a deps-only statement, not a full rule (see below).  This
+# has to be done in a distinct step because wildcards don't work in static
+# pattern rules.
+#
+# The '$(eval)' is needed because this has a different RHS for each LHS, and
+# would otherwise produce results that make can't parse.
+$(foreach dir, $(REGISTERGEN_DIRS), $(eval                     \
+    $(dir)/$(REGISTERGEN_FILENAME): $($(PRJ_SRC_PATH)/$(dir))  \
+))
+
+# How to regenerate register-gen code.  This is a little slow to run, so we batch
+# it up and trigger the batch from the 'generated_files' target.
+$(META_DIR)/$(REGISTER_GEN).todo: $(REGISTERGEN_FILES)
+
+$(REGISTERGEN_FILES): $(REGISTER_GEN)
+	if [[ "$(DBG_CODEGEN)" == 1 ]]; then            \
+	    echo "DBG: register-gen needed $(@D): $?";  \
+	    ls -lf --full-time $@ $? || true;           \
+	fi
+	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(REGISTER_GEN).todo
+
+# How to build the generator tool.  The deps for this are defined in
+# the $(REGISTER_GEN).mk, above.
+#
+# A word on the need to touch: This rule might trigger if, for example, a
+# non-Go file was added or deleted from a directory on which this depends.
+# This target needs to be reconsidered, but Go realizes it doesn't actually
+# have to be rebuilt.  In that case, make will forever see the dependency as
+# newer than the binary, and try to rebuild it over and over.  So we touch it,
+# and make is happy.
+$(REGISTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/register-gen)
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/register-gen
 	touch $@
