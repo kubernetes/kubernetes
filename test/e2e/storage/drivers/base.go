@@ -44,9 +44,9 @@ type TestDriver interface {
 type PreprovisionedVolumeTestDriver interface {
 	TestDriver
 	// CreateVolume creates a pre-provisioned volume.
-	CreateVolume(testpatterns.TestVolType)
+	CreateVolume(testpatterns.TestVolType) interface{}
 	// DeleteVolume deletes a volume that is created in CreateVolume
-	DeleteVolume(testpatterns.TestVolType)
+	DeleteVolume(testpatterns.TestVolType, interface{})
 }
 
 // InlineVolumeTestDriver represents an interface for a TestDriver that supports InlineVolume
@@ -55,7 +55,7 @@ type InlineVolumeTestDriver interface {
 	// GetVolumeSource returns a volumeSource for inline volume.
 	// It will set readOnly and fsType to the volumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
-	GetVolumeSource(readOnly bool, fsType string) *v1.VolumeSource
+	GetVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.VolumeSource
 }
 
 // PreprovisionedPVTestDriver represents an interface for a TestDriver that supports PreprovisionedPV
@@ -64,7 +64,7 @@ type PreprovisionedPVTestDriver interface {
 	// GetPersistentVolumeSource returns a PersistentVolumeSource for pre-provisioned Persistent Volume.
 	// It will set readOnly and fsType to the PersistentVolumeSource, if TestDriver supports both of them.
 	// It will return nil, if the TestDriver doesn't support either of the parameters.
-	GetPersistentVolumeSource(readOnly bool, fsType string) *v1.PersistentVolumeSource
+	GetPersistentVolumeSource(readOnly bool, fsType string, testResource interface{}) *v1.PersistentVolumeSource
 }
 
 // DynamicPVTestDriver represents an interface for a TestDriver that supports DynamicPV
@@ -104,30 +104,31 @@ func GetDriverNameWithFeatureTags(driver TestDriver) string {
 	return fmt.Sprintf("[Driver: %s]%s", dInfo.Name, dInfo.FeatureTag)
 }
 
-func CreateVolume(driver TestDriver, volType testpatterns.TestVolType) {
+func CreateVolume(driver TestDriver, volType testpatterns.TestVolType) interface{} {
 	// Create Volume for test unless dynamicPV test
 	switch volType {
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
 		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
-			pDriver.CreateVolume(volType)
+			return pDriver.CreateVolume(volType)
 		}
 	case testpatterns.DynamicPV:
 		// No need to create volume
 	default:
 		framework.Failf("Invalid volType specified: %v", volType)
 	}
+	return nil
 }
 
-func DeleteVolume(driver TestDriver, volType testpatterns.TestVolType) {
+func DeleteVolume(driver TestDriver, volType testpatterns.TestVolType, testResource interface{}) {
 	// Delete Volume for test unless dynamicPV test
 	switch volType {
 	case testpatterns.InlineVolume:
 		fallthrough
 	case testpatterns.PreprovisionedPV:
 		if pDriver, ok := driver.(PreprovisionedVolumeTestDriver); ok {
-			pDriver.DeleteVolume(volType)
+			pDriver.DeleteVolume(volType, testResource)
 		}
 	case testpatterns.DynamicPV:
 		// No need to delete volume

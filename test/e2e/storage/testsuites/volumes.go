@@ -122,7 +122,7 @@ func (t *volumesTestSuite) execTest(driver drivers.TestDriver, pattern testpatte
 			needsCleanup = true
 
 			// Setup test resource for driver and testpattern
-			resource := genericVolumeTestResource{}
+			resource = genericVolumeTestResource{}
 			resource.setupResource(driver, pattern)
 
 			// Create test input

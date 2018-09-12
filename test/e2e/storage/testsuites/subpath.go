@@ -110,7 +110,7 @@ func (s *subPathTestSuite) execTest(driver drivers.TestDriver, pattern testpatte
 			needsCleanup = true
 
 			// Setup test resource for driver and testpattern
-			resource := subPathTestResource{}
+			resource = subPathTestResource{}
 			resource.setupResource(driver, pattern)
 
 			// Create test input
@@ -151,7 +151,7 @@ func (s *subPathTestResource) setupResource(driver drivers.TestDriver, pattern t
 	switch volType {
 	case testpatterns.InlineVolume:
 		if iDriver, ok := driver.(drivers.InlineVolumeTestDriver); ok {
-			s.roVolSource = iDriver.GetVolumeSource(true, fsType)
+			s.roVolSource = iDriver.GetVolumeSource(true, fsType, s.genericVolumeTestResource.driverTestResource)
 		}
 	case testpatterns.PreprovisionedPV:
 		s.roVolSource = &v1.VolumeSource{

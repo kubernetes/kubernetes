@@ -124,7 +124,7 @@ func (t *volumeModeTestSuite) execTest(driver drivers.TestDriver, pattern testpa
 			needsCleanup = true
 
 			// Setup test resource for driver and testpattern
-			resource := volumeModeTestResource{}
+			resource = volumeModeTestResource{}
 			resource.setupResource(driver, pattern)
 
 			// Create test input
@@ -147,6 +147,8 @@ type volumeModeTestResource struct {
 	sc  *storagev1.StorageClass
 	pvc *v1.PersistentVolumeClaim
 	pv  *v1.PersistentVolume
+
+	driverTestResource interface{}
 }
 
 var _ TestResource = &volumeModeTestResource{}
@@ -167,7 +169,7 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 	)
 
 	// Create volume for pre-provisioned volume tests
-	drivers.CreateVolume(driver, volType)
+	s.driverTestResource = drivers.CreateVolume(driver, volType)
 
 	switch volType {
 	case testpatterns.PreprovisionedPV:
@@ -177,7 +179,7 @@ func (s *volumeModeTestResource) setupResource(driver drivers.TestDriver, patter
 			scName = fmt.Sprintf("%s-%s-sc-for-file", ns.Name, dInfo.Name)
 		}
 		if pDriver, ok := driver.(drivers.PreprovisionedPVTestDriver); ok {
-			pvSource = pDriver.GetPersistentVolumeSource(false, fsType)
+			pvSource = pDriver.GetPersistentVolumeSource(false, fsType, s.driverTestResource)
 			if pvSource == nil {
 				framework.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)
 			}
@@ -223,7 +225,7 @@ func (s *volumeModeTestResource) cleanupResource(driver drivers.TestDriver, patt
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
-	drivers.DeleteVolume(driver, volType)
+	drivers.DeleteVolume(driver, volType, s.driverTestResource)
 }
 
 type volumeModeTestInput struct {
