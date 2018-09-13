@@ -704,7 +704,23 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	})
 }
 
+func setFeatureGate(t *testing.T, feature utilfeature.Feature, enabled bool) {
+	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", feature, enabled)); err != nil {
+		t.Fatalf("Failed to set FeatureGate %v to %t: %v", feature, enabled, err)
+	}
+}
+
+// When ScheduleDaemonSetPods is disabled, DaemonSets should not launch onto nodes with insufficient capacity.
+// Look for TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled, we don't need this test anymore.
 func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
+	// Rollback feature gate.
+	defer func() {
+		if enabled {
+			setFeatureGate(t, features.ScheduleDaemonSetPods, true)
+		}
+	}()
+	setFeatureGate(t, features.ScheduleDaemonSetPods, false)
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
