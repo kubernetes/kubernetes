@@ -19,17 +19,44 @@ package polymorphichelpers
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Check whether the kind of resources could be exposed
 func canBeExposed(kind schema.GroupKind) error {
 	switch kind {
-	case api.Kind("ReplicationController"), api.Kind("Service"), api.Kind("Pod"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"), extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
+	case
+		schema.GroupKind{
+			Group: corev1.GroupName,
+			Kind:  "ReplicationController",
+		},
+		schema.GroupKind{
+			Group: corev1.GroupName,
+			Kind:  "Service",
+		},
+		schema.GroupKind{
+			Group: corev1.GroupName,
+			Kind:  "Pod",
+		},
+		schema.GroupKind{
+			Group: appsv1.GroupName,
+			Kind:  "Deployment",
+		},
+		schema.GroupKind{
+			Group: appsv1.GroupName,
+			Kind:  "ReplicaSet",
+		},
+		schema.GroupKind{
+			Group: extensionsv1.GroupName,
+			Kind:  "Deployment",
+		},
+		schema.GroupKind{
+			Group: extensionsv1.GroupName,
+			Kind:  "ReplicaSet",
+		}:
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot expose a %s", kind)

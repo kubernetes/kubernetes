@@ -19,16 +19,35 @@ package polymorphichelpers
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	appsv1 "k8s.io/kubernetes/pkg/apis/apps"
+	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func canBeAutoscaled(kind schema.GroupKind) error {
 	switch kind {
-	case api.Kind("ReplicationController"), extensions.Kind("ReplicaSet"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"), apps.Kind("ReplicaSet"):
+	case
+		schema.GroupKind{
+			Group: corev1.GroupName,
+			Kind:  "ReplicationController",
+		},
+		schema.GroupKind{
+			Group: appsv1.GroupName,
+			Kind:  "Deployment",
+		},
+		schema.GroupKind{
+			Group: appsv1.GroupName,
+			Kind:  "ReplicaSet",
+		},
+		schema.GroupKind{
+			Group: extensionsv1.GroupName,
+			Kind:  "Deployment",
+		},
+		schema.GroupKind{
+			Group: extensionsv1.GroupName,
+			Kind:  "ReplicaSet",
+		}:
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot autoscale a %v", kind)

@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"testing"
 
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestDefaultObjectResumer(t *testing.T) {

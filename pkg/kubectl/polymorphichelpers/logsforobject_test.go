@@ -21,16 +21,16 @@ import (
 	"testing"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
+	batch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 var (

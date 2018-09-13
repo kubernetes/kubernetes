@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestCanBeExposed(t *testing.T) {
@@ -29,11 +28,17 @@ func TestCanBeExposed(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			kind:      api.Kind("ReplicationController"),
+			kind: schema.GroupKind{
+				Group: "",
+				Kind:  "ReplicationController",
+			},
 			expectErr: false,
 		},
 		{
-			kind:      api.Kind("Node"),
+			kind: schema.GroupKind{
+				Group: "",
+				Kind:  "Node",
+			},
 			expectErr: true,
 		},
 	}

@@ -70,10 +70,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",

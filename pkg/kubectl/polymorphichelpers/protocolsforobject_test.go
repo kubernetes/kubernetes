@@ -21,9 +21,9 @@ import (
 
 	"reflect"
 
+	api "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestProtocolsForObject(t *testing.T) {
