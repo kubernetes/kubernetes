@@ -118,14 +118,14 @@ func (mounter *Mounter) Unmount(target string) error {
 	return nil
 }
 
-// GetMountRefs finds all other references to the device(drive) referenced
-// by mountPath; returns a list of paths.
+// GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
 func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
-	refs, err := getAllParentLinks(normalizeWindowsPath(mountPath))
-	if err != nil {
+	if _, err := os.Stat(normalizeWindowsPath(mountPath)); os.IsNotExist(err) {
+		return []string{}, nil
+	} else if err != nil {
 		return nil, err
 	}
-	return refs, nil
+	return []string{mountPath}, nil
 }
 
 // List returns a list of all mounted filesystems. todo
