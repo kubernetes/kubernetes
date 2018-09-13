@@ -49,7 +49,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
 		}
 
