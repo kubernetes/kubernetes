@@ -241,7 +241,6 @@ pkg/kubelet/util/cache
 pkg/kubelet/util/pluginwatcher
 pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1
 pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2
-pkg/kubelet/util/sliceutils
 pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
