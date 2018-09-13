@@ -51,7 +51,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -384,7 +383,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				},
 			}
 
-			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+			framework.InjectHtml(f, cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
 			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
@@ -537,7 +536,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				},
 			}
 
-			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+			framework.InjectHtml(f, cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
 			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
@@ -586,7 +585,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				},
 			}
 
-			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+			framework.InjectHtml(f, cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
 			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
@@ -599,11 +598,8 @@ func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs cli
 	volumeName, err := framework.CreatePDWithRetry()
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
-		// - Get NodeName from the pod spec to which the volume is mounted.
-		// - Force detach and delete.
-		pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
-		detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
+		err := framework.DeletePDWithRetry(volumeName)
+		Expect(err).NotTo(HaveOccurred(), "Failed deleting PD.", volumeName)
 	}()
 
 	defer func() {
@@ -627,7 +623,7 @@ func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs cli
 		},
 	}
 
-	framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+	framework.InjectHtml(f, cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
 	fsGroup := int64(1234)
 	framework.TestVolumeClient(cs, config, &fsGroup, tests)
