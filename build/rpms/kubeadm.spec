@@ -15,12 +15,12 @@ Command-line utility for deploying a Kubernetes cluster.
 
 %install
 install -m 755 -d %{buildroot}%{_bindir}
-install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/
-install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/
-install -m 755 -d %{buildroot}%{_sysconfdir}/sysconfig/
+install -m 644 -d %{buildroot}%{_sysconfdir}/systemd/system/
+install -m 644 -d %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/
+install -m 644 -d %{buildroot}%{_sysconfdir}/sysconfig/
 install -p -m 755 -t %{buildroot}%{_bindir} {kubeadm}
-install -p -m 755 -t %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/ {10-kubeadm.conf}
-install -p -m 755 -T {kubelet.env} %{buildroot}%{_sysconfdir}/sysconfig/kubelet
+install -p -m 644 -t %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/ {10-kubeadm.conf}
+install -p -m 644 -T {kubelet.env} %{buildroot}%{_sysconfdir}/sysconfig/kubelet
 
 %files
 %{_bindir}/kubeadm
