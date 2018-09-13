@@ -57,7 +57,7 @@ const (
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
 	// KubeproxyKubeConfigFileName defines the file name for the kube-proxy's KubeConfig file
-	KubeproxyKubeConfigFileName = "/var/lib/kube-proxy/kubeconfig.conf"
+	KubeproxyKubeConfigFileName = "/var/lib/kubelet/pods/"
 
 	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
 	DefaultDiscoveryTimeout = 5 * time.Minute
