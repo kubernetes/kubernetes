@@ -52,7 +52,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -389,24 +388,12 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 
 	cs := f.ClientSet
 
-	pod, err := cs.CoreV1().Pods(config.Namespace).Get(config.Prefix+"-client", metav1.GetOptions{})
-	ExpectNoError(err, "Failed to get client pod: %v", err)
-	err = DeletePodWithWait(f, cs, pod)
-	if err != nil {
-		// Log the error before failing test: if the test has already failed,
-		// framework.ExpectNoError() won't print anything to logs!
-		glog.Warningf("Failed to delete client pod: %v", err)
-		ExpectNoError(err, "Failed to delete client pod: %v", err)
-	}
+	err := DeletePodWithWaitByName(f, cs, config.Prefix+"-client", config.Namespace)
+	Expect(err).To(BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-client", config.Namespace)
 
 	if config.ServerImage != "" {
-		pod, err := cs.CoreV1().Pods(config.Namespace).Get(config.Prefix+"-server", metav1.GetOptions{})
-		ExpectNoError(err, "Failed to get server pod: %v", err)
-		err = DeletePodWithWait(f, cs, pod)
-		if err != nil {
-			glog.Warningf("Failed to delete server pod: %v", err)
-			ExpectNoError(err, "Failed to delete server pod: %v", err)
-		}
+		err := DeletePodWithWaitByName(f, cs, config.Prefix+"-server", config.Namespace)
+		Expect(err).To(BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 	}
 }
 
