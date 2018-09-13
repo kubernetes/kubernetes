@@ -726,7 +726,7 @@ func testVolumeSnapshotDataSourceInSpec(name string, kind string, apiGroup strin
 		},
 		StorageClassName: &scName,
 		DataSource: &core.TypedLocalObjectReference{
-			APIGroup: apiGroup,
+			APIGroup: &apiGroup,
 			Kind:     kind,
 			Name:     name,
 		},

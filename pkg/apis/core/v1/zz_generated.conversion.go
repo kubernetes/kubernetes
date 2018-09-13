@@ -7255,7 +7255,7 @@ func Convert_core_TopologySelectorTerm_To_v1_TopologySelectorTerm(in *core.Topol
 }
 
 func autoConvert_v1_TypedLocalObjectReference_To_core_TypedLocalObjectReference(in *v1.TypedLocalObjectReference, out *core.TypedLocalObjectReference, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
+	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
 	return nil
@@ -7267,7 +7267,7 @@ func Convert_v1_TypedLocalObjectReference_To_core_TypedLocalObjectReference(in *
 }
 
 func autoConvert_core_TypedLocalObjectReference_To_v1_TypedLocalObjectReference(in *core.TypedLocalObjectReference, out *v1.TypedLocalObjectReference, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
+	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
 	return nil
