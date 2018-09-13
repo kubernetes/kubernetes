@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
 	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
 	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
@@ -161,31 +160,22 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
 
-	kubeClient := host.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("error getting kube client")
-	}
-
-	var csiClient csiclientset.Interface
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) ||
-		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiClient = host.GetCSIClient()
-		if csiClient == nil {
-			return fmt.Errorf("error getting CSI client")
-		}
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		// Start informer for CSIDrivers.
-		factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
-		p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
-		p.csiDriverLister = p.csiDriverInformer.Lister()
-		go factory.Start(wait.NeverStop)
+		csiClient := host.GetCSIClient()
+		if csiClient == nil {
+			glog.Warning("The client for CSI Custom Resources is not available, skipping informer initialization")
+		} else {
+			// Start informer for CSIDrivers.
+			factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
+			p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
+			p.csiDriverLister = p.csiDriverInformer.Lister()
+			go factory.Start(wait.NeverStop)
+		}
 	}
 
 	// Initializing csiDrivers map and label management channels
 	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
-	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), kubeClient, csiClient)
+	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
 
 	return nil
 }
