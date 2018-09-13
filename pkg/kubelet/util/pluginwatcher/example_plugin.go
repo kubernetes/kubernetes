@@ -33,8 +33,8 @@ import (
 	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
 )
 
-// examplePlugin is a sample plugin to work with plugin watcher
-type examplePlugin struct {
+// ExamplePlugin is a sample plugin to work with plugin watcher
+type ExamplePlugin struct {
 	grpcServer         *grpc.Server
 	wg                 sync.WaitGroup
 	registrationStatus chan registerapi.RegistrationStatus // for testing
@@ -45,7 +45,7 @@ type examplePlugin struct {
 }
 
 type pluginServiceV1Beta1 struct {
-	server *examplePlugin
+	server *ExamplePlugin
 }
 
 func (s *pluginServiceV1Beta1) GetExampleInfo(ctx context.Context, rqt *v1beta1.ExampleRequest) (*v1beta1.ExampleResponse, error) {
@@ -58,7 +58,7 @@ func (s *pluginServiceV1Beta1) RegisterService() {
 }
 
 type pluginServiceV1Beta2 struct {
-	server *examplePlugin
+	server *ExamplePlugin
 }
 
 func (s *pluginServiceV1Beta2) GetExampleInfo(ctx context.Context, rqt *v1beta2.ExampleRequest) (*v1beta2.ExampleResponse, error) {
@@ -71,13 +71,13 @@ func (s *pluginServiceV1Beta2) RegisterService() {
 }
 
 // NewExamplePlugin returns an initialized examplePlugin instance
-func NewExamplePlugin() *examplePlugin {
-	return &examplePlugin{}
+func NewExamplePlugin() *ExamplePlugin {
+	return &ExamplePlugin{}
 }
 
 // NewTestExamplePlugin returns an initialized examplePlugin instance for testing
-func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string, advertisedVersions ...string) *examplePlugin {
-	return &examplePlugin{
+func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string, advertisedVersions ...string) *ExamplePlugin {
+	return &ExamplePlugin{
 		pluginName:         pluginName,
 		pluginType:         pluginType,
 		endpoint:           endpoint,
@@ -87,7 +87,7 @@ func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string,
 }
 
 // GetInfo is the RPC invoked by plugin watcher
-func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
+func (e *ExamplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
 	return &registerapi.PluginInfo{
 		Type:              e.pluginType,
 		Name:              e.pluginName,
@@ -96,7 +96,8 @@ func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoReques
 	}, nil
 }
 
-func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
+// NotifyRegistrationStatus receives status from plugin watcher and sends back response to plugin watcher
+func (e *ExamplePlugin) NotifyRegistrationStatus(ctx context.Context, status *registerapi.RegistrationStatus) (*registerapi.RegistrationStatusResponse, error) {
 	glog.Errorf("Registration is: %v\n", status)
 
 	if e.registrationStatus != nil {
@@ -107,7 +108,7 @@ func (e *examplePlugin) NotifyRegistrationStatus(ctx context.Context, status *re
 }
 
 // Serve starts a pluginwatcher server and one or more of the plugin services
-func (e *examplePlugin) Serve(services ...string) error {
+func (e *ExamplePlugin) Serve(services ...string) error {
 	glog.Infof("starting example server at: %s\n", e.endpoint)
 	lis, err := net.Listen("unix", e.endpoint)
 	if err != nil {
@@ -148,7 +149,8 @@ func (e *examplePlugin) Serve(services ...string) error {
 	return nil
 }
 
-func (e *examplePlugin) Stop() error {
+// Stop stops listening and removes the socket file
+func (e *ExamplePlugin) Stop() error {
 	glog.Infof("Stopping example server at: %s\n", e.endpoint)
 
 	e.grpcServer.Stop()

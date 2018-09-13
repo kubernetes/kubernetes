@@ -45,6 +45,7 @@ package pluginwatcher
 //
 // DeRegistration: When ReRegistration happens only the deletion of the new socket will trigger a DeRegister call
 
+// PluginHandler is the handler of plugin, it should handle the validate, register and deRegistration events of plugin
 type PluginHandler interface {
 	// Validate returns an error if the information provided by
 	// the potential plugin is erroneous (unsupported version, ...)

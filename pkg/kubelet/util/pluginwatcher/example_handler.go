@@ -30,7 +30,8 @@ import (
 	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
 )
 
-type exampleHandler struct {
+// ExampleHandler fakes an example of plugin handler for testing
+type ExampleHandler struct {
 	SupportedVersions []string
 	ExpectedNames     map[string]int
 
@@ -50,8 +51,8 @@ const (
 )
 
 // NewExampleHandler provide a example handler
-func NewExampleHandler(supportedVersions []string) *exampleHandler {
-	return &exampleHandler{
+func NewExampleHandler(supportedVersions []string) *ExampleHandler {
+	return &ExampleHandler{
 		SupportedVersions: supportedVersions,
 		ExpectedNames:     make(map[string]int),
 
@@ -59,7 +60,8 @@ func NewExampleHandler(supportedVersions []string) *exampleHandler {
 	}
 }
 
-func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+// ValidatePlugin implements the func ValidatePlugin of PluginHandler interface
+func (p *ExampleHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	p.SendEvent(pluginName, exampleEventValidate)
 
 	n, ok := p.DecreasePluginCount(pluginName)
@@ -79,7 +81,8 @@ func (p *exampleHandler) ValidatePlugin(pluginName string, endpoint string, vers
 	return nil
 }
 
-func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string) error {
+// RegisterPlugin implements the func RegisterPlugin of PluginHandler interface
+func (p *ExampleHandler) RegisterPlugin(pluginName, endpoint string) error {
 	p.SendEvent(pluginName, exampleEventRegister)
 
 	// Verifies the grpcServer is ready to serve services.
@@ -108,20 +111,24 @@ func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string) error {
 	return nil
 }
 
-func (p *exampleHandler) DeRegisterPlugin(pluginName string) {
+// DeRegisterPlugin implements the func DeRegisterPlugin of PluginHandler interface
+func (p *ExampleHandler) DeRegisterPlugin(pluginName string) {
 	p.SendEvent(pluginName, exampleEventDeRegister)
 }
 
-func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
+// EventChan returns the registered channel, key by pluginName
+func (p *ExampleHandler) EventChan(pluginName string) chan examplePluginEvent {
 	return p.eventChans[pluginName]
 }
 
-func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
+// SendEvent sends event to the registered channel, key by pluginName
+func (p *ExampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
 	glog.V(2).Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
 	p.eventChans[pluginName] <- event
 }
 
-func (p *exampleHandler) AddPluginName(pluginName string) {
+// AddPluginName adds a new plugin and records the number count of plugin
+func (p *ExampleHandler) AddPluginName(pluginName string) {
 	p.m.Lock()
 	defer p.m.Unlock()
 
@@ -134,7 +141,8 @@ func (p *exampleHandler) AddPluginName(pluginName string) {
 	p.ExpectedNames[pluginName] = v
 }
 
-func (p *exampleHandler) DecreasePluginCount(pluginName string) (old int, ok bool) {
+// DecreasePluginCount decreases plugin number count to -1 if not been registered
+func (p *ExampleHandler) DecreasePluginCount(pluginName string) (old int, ok bool) {
 	p.m.Lock()
 	defer p.m.Unlock()
 

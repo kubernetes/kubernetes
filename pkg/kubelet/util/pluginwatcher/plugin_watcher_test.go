@@ -91,7 +91,7 @@ func TestPluginReRegistration(t *testing.T) {
 	w := newWatcherWithHandler(t, hdlr)
 	defer func() { require.NoError(t, w.Stop()) }()
 
-	plugins := make([]*examplePlugin, 10)
+	plugins := make([]*ExamplePlugin, 10)
 
 	for i := 0; i < 10; i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
@@ -121,7 +121,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	defer cleanup(t)
 
 	hdlr := NewExampleHandler(supportedVersions)
-	plugins := make([]*examplePlugin, 10)
+	plugins := make([]*ExamplePlugin, 10)
 
 	for i := 0; i < len(plugins); i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
@@ -130,7 +130,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-		defer func(p *examplePlugin) { require.NoError(t, p.Stop()) }(p)
+		defer func(p *ExamplePlugin) { require.NoError(t, p.Stop()) }(p)
 
 		plugins[i] = p
 	}
@@ -141,7 +141,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < len(plugins); i++ {
 		wg.Add(1)
-		go func(p *examplePlugin) {
+		go func(p *ExamplePlugin) {
 			defer wg.Done()
 
 			require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))

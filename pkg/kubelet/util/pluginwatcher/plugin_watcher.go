@@ -65,6 +65,7 @@ func NewWatcher(sockDir string) *Watcher {
 	}
 }
 
+// AddHandler adds plugin handler to watcher, key by pluginType
 func (w *Watcher) AddHandler(pluginType string, handler PluginHandler) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
