@@ -18,6 +18,8 @@ package kubelet
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -89,6 +91,21 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 	return physicalMounter, nil
 }
 
+// check directory is empty or not;
+func (kl *Kubelet) IsDirEmpty(name string) (bool, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	_, err = f.Readdirnames(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err
+}
+
 // cleanupOrphanedPodDirs removes the volumes of pods that should not be
 // running and that have no containers running.  Note that we roll up logs here since it runs in the main loop.
 func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
@@ -125,8 +142,31 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 			continue
 		}
 		if len(volumePaths) > 0 {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but volume paths are still present on disk", uid))
-			continue
+			removePath := true
+			for _, volumePath := range volumePaths {
+				// if is not mountpoint, not remove；
+				// if is mountpoint, umount and remove empty directory;
+				if notMnt, err := kl.mounter.IsLikelyNotMountPoint(volumePath); err != nil {
+					removePath = false
+					break
+				} else if notMnt == false {
+					// umount path as volumePath is mountpoint;
+					// not remove if umount failed;
+					if err := kl.mounter.Unmount(volumePath); err != nil {
+						removePath = false
+						break
+					}
+					if empty, err := kl.IsDirEmpty(volumePath); err != nil || empty == false {
+						removePath = false
+						break
+					}
+				}
+			}
+			// check remove pod directory or not, if not remove, the Orphan pod will log warning always.
+			if !removePath {
+				orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("Orphaned pod %q found, but volume paths are still present on disk", uid))
+				continue
+			}
 		}
 		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
 		if err := removeall.RemoveAllOneFilesystem(kl.mounter, kl.getPodDir(uid)); err != nil {
