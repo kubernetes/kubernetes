@@ -351,7 +351,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			ep := &eventPatterns{
 				reason:  "FailedMount",
 				pattern: make([]string, 2)}
-			ep.pattern = append(ep.pattern, "MountVolume.SetUp failed")
+			ep.pattern = append(ep.pattern, "MountVolume", "failed")
 
 			testVol := &localTestVolume{
 				node:            config.node0,
