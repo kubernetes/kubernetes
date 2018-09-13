@@ -111,6 +111,17 @@ leaderElection:
 		t.Fatal(err)
 	}
 
+	invalidconfigFile := filepath.Join(tmpDir, "scheduler_invalid.yaml")
+	if err := ioutil.WriteFile(invalidconfigFile, []byte(fmt.Sprintf(`
+apiVersion: componentconfig/v1alpha2
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	// flag-specified kubeconfig
 	flagKubeconfig := filepath.Join(tmpDir, "flag.kubeconfig")
 	if err := ioutil.WriteFile(flagKubeconfig, []byte(fmt.Sprintf(`
@@ -195,9 +206,53 @@ users:
 			},
 		},
 		{
-			name:          "config file in componentconfig/v1alpha1",
-			options:       &Options{ConfigFile: oldconfigFile},
-			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\" in scheme",
+			name: "config file in componentconfig/v1alpha1",
+			options: &Options{
+				ConfigFile: oldconfigFile,
+				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+					cfg, err := newDefaultComponentConfig()
+					if err != nil {
+						t.Fatal(err)
+					}
+					return *cfg
+				}(),
+			},
+			// TODO: switch this to expect an error in 1.13 when the special-case coercion is removed from loadConfig
+			// expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\"",
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				SchedulerName:                  "default-scheduler",
+				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HardPodAffinitySymmetricWeight: 1,
+				HealthzBindAddress:             "0.0.0.0:10251",
+				MetricsBindAddress:             "0.0.0.0:10251",
+				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: apiserverconfig.LeaderElectionConfiguration{
+						LeaderElect:   true,
+						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline: metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:   metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:  "endpoints",
+					},
+					LockObjectNamespace: "kube-system",
+					LockObjectName:      "kube-scheduler",
+				},
+				ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+			},
+		},
+
+		{
+			name:          "invalid config file in componentconfig/v1alpha2",
+			options:       &Options{ConfigFile: invalidconfigFile},
+			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha2\"",
 		},
 		{
 			name: "kubeconfig flag",
