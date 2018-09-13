@@ -284,7 +284,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceNames("nodes", args...).
 		SingleResourceType().
