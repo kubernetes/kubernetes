@@ -31,7 +31,9 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",
+        "//vendor/github.com/golang/groupcache/lru:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/clock:go_default_library",
     ],
 )
 

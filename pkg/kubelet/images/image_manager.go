@@ -18,9 +18,13 @@ package images
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 
 	dockerref "github.com/docker/distribution/reference"
-	"k8s.io/api/core/v1"
+	"github.com/golang/groupcache/lru"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
@@ -29,6 +33,20 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/parsers"
+	"k8s.io/utils/clock"
+)
+
+const (
+	// max cache size of identicalEventSpamFilter
+	maxLruCacheEntries = 4096
+
+	// by default, allow imageManager to send 1 burst identical event about an object
+	// and control the refill rate to 1 new event every 5 minutes
+	// this helps avoid sending lots of identical events to kuberuntime manager's
+	// EventSourceObjectSpamFilter and consuming EventSourceObjectSpamFilter's token too fast
+	defaultSpamBurst = 1
+	// same as EventSourceObjectSpamFilter's qps
+	defaultSpamQPS = 1. / 300.
 )
 
 // imageManager provides the functionalities for image pulling.
@@ -38,6 +56,8 @@ type imageManager struct {
 	backOff      *flowcontrol.Backoff
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
 	puller imagePuller
+	// throttles the amount of identical events
+	identicalEventSpamFilter *IdenticalEventSpamFilter
 }
 
 var _ ImageManager = &imageManager{}
@@ -53,10 +73,11 @@ func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.I
 		puller = newParallelImagePuller(imageService)
 	}
 	return &imageManager{
-		recorder:     recorder,
-		imageService: imageService,
-		backOff:      imageBackOff,
-		puller:       puller,
+		recorder:                 recorder,
+		imageService:             imageService,
+		backOff:                  imageBackOff,
+		puller:                   puller,
+		identicalEventSpamFilter: defaultIdenticalEventSpamFilter(clock.RealClock{}),
 	}
 }
 
@@ -78,6 +99,11 @@ func shouldPullImage(container *v1.Container, imagePresent bool) bool {
 // records an event using ref, event msg.  log to glog using prefix, msg, logFn
 func (m *imageManager) logIt(ref *v1.ObjectReference, eventtype, event, prefix, msg string, logFn func(args ...interface{})) {
 	if ref != nil {
+		if m.identicalEventSpamFilter.Filter(ref, eventtype, event, msg) {
+			glog.V(4).Infof("Skipping to record identical event for %v %v(%v), event type:%v, reason:%v, message:%v",
+				ref.Kind, ref.Name, ref.UID, eventtype, event, msg)
+			return
+		}
 		m.recorder.Event(ref, eventtype, event, msg)
 	} else {
 		logFn(fmt.Sprint(prefix, " ", msg))
@@ -164,4 +190,77 @@ func applyDefaultImageTag(image string) (string, error) {
 		image = image + ":" + parsers.DefaultImageTag
 	}
 	return image, nil
+}
+
+// spamRecord holds data used to perform spam filtering decisions.
+type spamRecord struct {
+	// rateLimiter controls the rate of events about this object
+	rateLimiter flowcontrol.RateLimiter
+}
+
+// IdenticalEventSpamFilter is responsible for throttling
+// the amount of identical events.
+type IdenticalEventSpamFilter struct {
+	sync.RWMutex
+
+	// the cache that manages last synced state
+	cache *lru.Cache
+
+	// burst is the amount of identical events we allow per object
+	burst int
+
+	// qps is the refill rate of the token bucket in queries per second
+	qps float32
+
+	// clock is used to allow for testing over a time interval
+	clock clock.Clock
+}
+
+// defaultIdenticalEventSpamFilter allows defaultSpamBurst identical events about an object with defaultSpamQPS refill.
+func defaultIdenticalEventSpamFilter(clock clock.Clock) *IdenticalEventSpamFilter {
+	return &IdenticalEventSpamFilter{
+		cache: lru.New(maxLruCacheEntries),
+		burst: defaultSpamBurst,
+		qps:   defaultSpamQPS,
+		clock: clock,
+	}
+}
+
+// Filter controls that identical events are not exceeding the allowed rate.
+func (f *IdenticalEventSpamFilter) Filter(object *v1.ObjectReference, eventtype, reason, message string) bool {
+	var record spamRecord
+
+	// controls our cached information about this event
+	eventKey := getSpamKey(object, eventtype, reason, message)
+
+	f.Lock()
+	defer f.Unlock()
+	value, found := f.cache.Get(eventKey)
+	if found {
+		record = value.(spamRecord)
+	}
+
+	// verify we have a rate limiter for this record
+	if record.rateLimiter == nil {
+		record.rateLimiter = flowcontrol.NewTokenBucketRateLimiterWithClock(f.qps, f.burst, f.clock)
+	}
+
+	// ensure we have available rate
+	filter := !record.rateLimiter.TryAccept()
+
+	// update the cache
+	f.cache.Add(eventKey, record)
+
+	return filter
+}
+
+// getSpamKey builds unique event key based on involved object and message itself
+func getSpamKey(object *v1.ObjectReference, eventtype, reason, message string) string {
+	return strings.Join([]string{
+		string(object.UID),
+		eventtype,
+		reason,
+		message,
+	},
+		"-")
 }
