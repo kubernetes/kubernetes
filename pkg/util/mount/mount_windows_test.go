@@ -111,30 +111,25 @@ func setEquivalent(set1, set2 []string) bool {
 
 // this func must run in admin mode, otherwise it will fail
 func TestGetMountRefs(t *testing.T) {
-	fm := &FakeMounter{MountPoints: []MountPoint{}}
-	mountPath := `c:\secondmountpath`
-	expectedRefs := []string{`c:\`, `c:\firstmountpath`, mountPath}
-
-	// remove symbolic links first
-	for i := 1; i < len(expectedRefs); i++ {
-		removeLink(expectedRefs[i])
+	tests := []struct {
+		mountPath    string
+		expectedRefs []string
+	}{
+		{
+			mountPath:    `c:\windows`,
+			expectedRefs: []string{`c:\windows`},
+		},
+		{
+			mountPath:    `c:\doesnotexist`,
+			expectedRefs: []string{},
+		},
 	}
 
-	// create symbolic links
-	for i := 1; i < len(expectedRefs); i++ {
-		if err := makeLink(expectedRefs[i], expectedRefs[i-1]); err != nil {
-			t.Errorf("makeLink failed: %v", err)
-		}
-	}
+	mounter := Mounter{"fake/path"}
 
-	if refs, err := fm.GetMountRefs(mountPath); err != nil || !setEquivalent(expectedRefs, refs) {
-		t.Errorf("getMountRefs(%q) = %v, error: %v; expected %v", mountPath, refs, err, expectedRefs)
-	}
-
-	// remove symbolic links
-	for i := 1; i < len(expectedRefs); i++ {
-		if err := removeLink(expectedRefs[i]); err != nil {
-			t.Errorf("removeLink failed: %v", err)
+	for _, test := range tests {
+		if refs, err := mounter.GetMountRefs(test.mountPath); err != nil || !setEquivalent(test.expectedRefs, refs) {
+			t.Errorf("getMountRefs(%q) = %v, error: %v; expected %v", test.mountPath, refs, err, test.expectedRefs)
 		}
 	}
 }
