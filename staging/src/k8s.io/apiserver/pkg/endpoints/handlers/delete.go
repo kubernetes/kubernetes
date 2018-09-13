@@ -47,7 +47,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
 		}
 
@@ -183,7 +183,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
 		}
 
