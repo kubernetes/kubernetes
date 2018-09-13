@@ -2521,6 +2521,10 @@
      "group": {
       "type": "string",
       "description": "Group to map volume access to Default is no group"
+     },
+     "tenant": {
+      "type": "string",
+      "description": "Tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin"
      }
     }
    },

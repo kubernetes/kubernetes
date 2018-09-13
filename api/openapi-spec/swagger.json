@@ -83436,6 +83436,10 @@
       "description": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
       "type": "string"
      },
+     "tenant": {
+      "description": "Tenant owning the given Quobyte volume in the Backend Used with dynamically provisioned Quobyte volumes, value is set by the plugin",
+      "type": "string"
+     },
      "user": {
       "description": "User to map volume access to Defaults to serivceaccount user",
       "type": "string"
