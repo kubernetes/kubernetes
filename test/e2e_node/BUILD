@@ -117,6 +117,7 @@ go_test(
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
+        "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
