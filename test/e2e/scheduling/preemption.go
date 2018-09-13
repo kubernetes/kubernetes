@@ -175,6 +175,11 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 		})
 		// Make sure that the lowest priority pod is deleted.
 		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
+		defer func() {
+			// Clean-up the critical pod
+			err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
+			framework.ExpectNoError(err)
+		}()
 		podDeleted := (err != nil && errors.IsNotFound(err)) ||
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		Expect(podDeleted).To(BeTrue())
@@ -184,9 +189,6 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 			framework.ExpectNoError(err)
 			Expect(livePod.DeletionTimestamp).To(BeNil())
 		}
-		// Clean-up the critical pod
-		err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete("critical-pod", metav1.NewDeleteOptions(0))
-		framework.ExpectNoError(err)
 	})
 
 	// This test verifies that when a high priority pod is pending and its
@@ -341,11 +343,13 @@ var _ = SIGDescribe("PodPriorityResolution [Serial] [Feature:PodPreemption]", fu
 				Namespace:         metav1.NamespaceSystem,
 				PriorityClassName: spc,
 			})
+			defer func() {
+				// Clean-up the pod.
+				err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
+				framework.ExpectNoError(err)
+			}()
 			Expect(pod.Spec.Priority).NotTo(BeNil())
 			framework.Logf("Created pod: %v", pod.Name)
-			// Clean-up the pod.
-			err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, metav1.NewDeleteOptions(0))
-			framework.ExpectNoError(err)
 		}
 	})
 })
