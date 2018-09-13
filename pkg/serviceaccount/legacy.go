@@ -28,6 +28,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+// LegacyClaims creates a jwt.Claim and legacyPrivateClaims pair.
 func LegacyClaims(serviceAccount v1.ServiceAccount, secret v1.Secret) (*jwt.Claims, interface{}) {
 	return &jwt.Claims{
 			Subject: apiserverserviceaccount.MakeUsername(serviceAccount.Namespace, serviceAccount.Name),
@@ -39,7 +40,10 @@ func LegacyClaims(serviceAccount v1.ServiceAccount, secret v1.Secret) (*jwt.Clai
 		}
 }
 
-const LegacyIssuer = "kubernetes/serviceaccount"
+const (
+	// LegacyIssuer indicates legacy jwt token issuer
+	LegacyIssuer = "kubernetes/serviceaccount"
+)
 
 type legacyPrivateClaims struct {
 	ServiceAccountName string `json:"kubernetes.io/serviceaccount/service-account.name"`
@@ -48,7 +52,8 @@ type legacyPrivateClaims struct {
 	Namespace          string `json:"kubernetes.io/serviceaccount/namespace"`
 }
 
-func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter) Validator {
+// NewLegacyValidator returns a legacyValidator
+func NewLegacyValidator(lookup bool, getter TokenGetter) Validator {
 	return &legacyValidator{
 		lookup: lookup,
 		getter: getter,
@@ -57,16 +62,16 @@ func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter) Validator
 
 type legacyValidator struct {
 	lookup bool
-	getter ServiceAccountTokenGetter
+	getter TokenGetter
 }
 
 var _ = Validator(&legacyValidator{})
 
-func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
+func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, privateObj interface{}) (*serviceAccountInfo, error) {
 	private, ok := privateObj.(*legacyPrivateClaims)
 	if !ok {
 		glog.Errorf("jwt validator expected private claim of type *legacyPrivateClaims but got: %T", privateObj)
-		return nil, errors.New("Token could not be validated.")
+		return nil, errors.New("token could not be validated")
 	}
 
 	// Make sure the claims we need exist
@@ -100,15 +105,15 @@ func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private
 		secret, err := v.getter.GetSecret(namespace, secretName)
 		if err != nil {
 			glog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("token has been invalidated")
 		}
 		if secret.DeletionTimestamp != nil {
 			glog.V(4).Infof("Token is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("token has been invalidated")
 		}
 		if bytes.Compare(secret.Data[v1.ServiceAccountTokenKey], []byte(tokenData)) != 0 {
 			glog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
-			return nil, errors.New("Token does not match server's copy")
+			return nil, errors.New("token does not match server's copy")
 		}
 
 		// Make sure service account still exists (name and UID)
@@ -127,7 +132,7 @@ func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private
 		}
 	}
 
-	return &ServiceAccountInfo{
+	return &serviceAccountInfo{
 		Namespace: private.Namespace,
 		Name:      private.ServiceAccountName,
 		UID:       private.ServiceAccountUID,

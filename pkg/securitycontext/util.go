@@ -67,6 +67,9 @@ func ParseSELinuxOptions(context string) (*v1.SELinuxOptions, error) {
 	}, nil
 }
 
+// DetermineEffectiveSecurityContext returns a synthesized SecurityContext for reading effective configurations
+// from the given pod's and container's security context. If some fields are both set, the values
+// in container's take precedence.
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext

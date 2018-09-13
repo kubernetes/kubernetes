@@ -26,6 +26,7 @@ import (
 // Logs adds handlers for the /logs path serving log files from /var/log.
 type Logs struct{}
 
+// Install installs handlers for the /logs path serving log files from /var/log.
 func (l Logs) Install(c *restful.Container) {
 	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go

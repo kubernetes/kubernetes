@@ -33,19 +33,21 @@ const (
 
 // UserInfo returns a user.Info interface for the given namespace, service account name and UID
 func UserInfo(namespace, name, uid string) user.Info {
-	return (&ServiceAccountInfo{
+	return (&serviceAccountInfo{
 		Name:      name,
 		Namespace: namespace,
 		UID:       uid,
 	}).UserInfo()
 }
 
-type ServiceAccountInfo struct {
+// serviceAccountInfo contains key informations about a service account
+// including name, namespace, uid, pod name, pod uid.
+type serviceAccountInfo struct {
 	Name, Namespace, UID string
 	PodName, PodUID      string
 }
 
-func (sa *ServiceAccountInfo) UserInfo() user.Info {
+func (sa *serviceAccountInfo) UserInfo() user.Info {
 	info := &user.DefaultInfo{
 		Name:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
 		UID:    sa.UID,

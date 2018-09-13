@@ -23,16 +23,16 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
-// clientGetter implements ServiceAccountTokenGetter using a clientset.Interface
+// clientGetter implements serviceaccount.TokenGetter using a clientset.Interface
 type clientGetter struct {
 	client clientset.Interface
 }
 
-// NewGetterFromClient returns a ServiceAccountTokenGetter that
+// NewGetterFromClient returns a serviceaccount.TokenGetter that
 // uses the specified client to retrieve service accounts and secrets.
 // The client should NOT authenticate using a service account token
 // the returned getter will be used to retrieve, or recursion will result.
-func NewGetterFromClient(c clientset.Interface) serviceaccount.ServiceAccountTokenGetter {
+func NewGetterFromClient(c clientset.Interface) serviceaccount.TokenGetter {
 	return clientGetter{c}
 }
 

@@ -47,6 +47,7 @@ type ref struct {
 	UID  string `json:"uid,omitempty"`
 }
 
+// Claims creates a jwt.Claim and privateClaims pair.
 func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirationSeconds int64, audience []string) (*jwt.Claims, interface{}) {
 	now := now()
 	sc := &jwt.Claims{
@@ -80,7 +81,8 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 	return sc, pc
 }
 
-func NewValidator(audiences []string, getter ServiceAccountTokenGetter) Validator {
+// NewValidator creates a Validator.
+func NewValidator(audiences []string, getter TokenGetter) Validator {
 	return &validator{
 		auds:   audiences,
 		getter: getter,
@@ -89,16 +91,16 @@ func NewValidator(audiences []string, getter ServiceAccountTokenGetter) Validato
 
 type validator struct {
 	auds   []string
-	getter ServiceAccountTokenGetter
+	getter TokenGetter
 }
 
 var _ = Validator(&validator{})
 
-func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
+func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{}) (*serviceAccountInfo, error) {
 	private, ok := privateObj.(*privateClaims)
 	if !ok {
 		glog.Errorf("jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
-		return nil, errors.New("Token could not be validated.")
+		return nil, errors.New("token could not be validated")
 	}
 	err := public.Validate(jwt.Expected{
 		Time: now(),
@@ -106,10 +108,10 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 	switch {
 	case err == nil:
 	case err == jwt.ErrExpired:
-		return nil, errors.New("Token has expired.")
+		return nil, errors.New("token has expired")
 	default:
 		glog.Errorf("unexpected validation error: %T", err)
-		return nil, errors.New("Token could not be validated.")
+		return nil, errors.New("token could not be validated")
 	}
 
 	var audValid bool
@@ -122,7 +124,7 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 	}
 
 	if !audValid {
-		return nil, errors.New("Token is invalid for this audience.")
+		return nil, errors.New("token is invalid for this audience")
 	}
 
 	namespace := private.Kubernetes.Namespace
@@ -181,7 +183,7 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		podUID = podref.UID
 	}
 
-	return &ServiceAccountInfo{
+	return &serviceAccountInfo{
 		Namespace: private.Kubernetes.Namespace,
 		Name:      private.Kubernetes.Svcacct.Name,
 		UID:       private.Kubernetes.Svcacct.UID,

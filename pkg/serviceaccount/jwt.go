@@ -34,13 +34,14 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-// ServiceAccountTokenGetter defines functions to retrieve a named service account and secret
-type ServiceAccountTokenGetter interface {
+// TokenGetter defines functions to retrieve a named service account, pod and secret
+type TokenGetter interface {
 	GetServiceAccount(namespace, name string) (*v1.ServiceAccount, error)
 	GetPod(namespace, name string) (*v1.Pod, error)
 	GetSecret(namespace, name string) (*v1.Secret, error)
 }
 
+// TokenGenerator generates jwt tokens.
 type TokenGenerator interface {
 	// GenerateToken generates a token which will identify the given
 	// ServiceAccount. privateClaims is an interface that will be
@@ -110,7 +111,7 @@ func (j *jwtTokenGenerator) GenerateToken(claims *jwt.Claims, privateClaims inte
 
 // JWTTokenAuthenticator authenticates tokens as JWT tokens produced by JWTTokenGenerator
 // Token signatures are verified using each of the given public keys until one works (allowing key rotation)
-// If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided ServiceAccountTokenGetter
+// If lookup is true, the service account and secret referenced as claims inside the token are retrieved and verified with the provided TokenGetter
 func JWTTokenAuthenticator(iss string, keys []interface{}, validator Validator) authenticator.Token {
 	return &jwtTokenAuthenticator{
 		iss:       iss,
@@ -131,7 +132,7 @@ type Validator interface {
 	// Validate validates a token and returns user information or an error.
 	// Validator can assume that the issuer and signature of a token are already
 	// verified when this function is called.
-	Validate(tokenData string, public *jwt.Claims, private interface{}) (*ServiceAccountInfo, error)
+	Validate(tokenData string, public *jwt.Claims, private interface{}) (*serviceAccountInfo, error)
 	// NewPrivateClaims returns a struct that the authenticator should
 	// deserialize the JWT payload into. The authenticator may then pass this
 	// struct back to the Validator as the 'private' argument to a Validate()

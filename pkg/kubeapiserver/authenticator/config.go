@@ -73,7 +73,7 @@ type AuthenticatorConfig struct {
 	RequestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
-	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
+	ServiceAccountTokenGetter   serviceaccount.TokenGetter
 	BootstrapTokenAuthenticator authenticator.Token
 }
 
@@ -274,7 +274,7 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 }
 
 // newLegacyServiceAccountAuthenticator returns an authenticator.Token or an error
-func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.TokenGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := certutil.PublicKeysFromFile(keyfile)
@@ -289,7 +289,7 @@ func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, servic
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Token or an error
-func newServiceAccountAuthenticator(iss string, audiences []string, keyfiles []string, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+func newServiceAccountAuthenticator(iss string, audiences []string, keyfiles []string, serviceAccountGetter serviceaccount.TokenGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := certutil.PublicKeysFromFile(keyfile)
