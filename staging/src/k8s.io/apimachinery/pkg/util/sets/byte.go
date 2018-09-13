@@ -23,7 +23,7 @@ import (
 	"sort"
 )
 
-// sets.Byte is a set of bytes, implemented via map[byte]struct{} for minimal memory consumption.
+// Byte is a set of bytes, implemented via map[byte]struct{} for minimal memory consumption.
 type Byte map[byte]Empty
 
 // NewByte creates a Byte from a list of values.
@@ -107,9 +107,9 @@ func (s Byte) Difference(s2 Byte) Byte {
 // s2 = {a3, a4}
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
-func (s1 Byte) Union(s2 Byte) Byte {
+func (s Byte) Union(s2 Byte) Byte {
 	result := NewByte()
-	for key := range s1 {
+	for key := range s {
 		result.Insert(key)
 	}
 	for key := range s2 {
@@ -123,15 +123,15 @@ func (s1 Byte) Union(s2 Byte) Byte {
 // s1 = {a1, a2}
 // s2 = {a2, a3}
 // s1.Intersection(s2) = {a2}
-func (s1 Byte) Intersection(s2 Byte) Byte {
+func (s Byte) Intersection(s2 Byte) Byte {
 	var walk, other Byte
 	result := NewByte()
-	if s1.Len() < s2.Len() {
-		walk = s1
+	if s.Len() < s2.Len() {
+		walk = s
 		other = s2
 	} else {
 		walk = s2
-		other = s1
+		other = s
 	}
 	for key := range walk {
 		if other.Has(key) {
@@ -142,9 +142,9 @@ func (s1 Byte) Intersection(s2 Byte) Byte {
 }
 
 // IsSuperset returns true if and only if s1 is a superset of s2.
-func (s1 Byte) IsSuperset(s2 Byte) bool {
+func (s Byte) IsSuperset(s2 Byte) bool {
 	for item := range s2 {
-		if !s1.Has(item) {
+		if !s.Has(item) {
 			return false
 		}
 	}
@@ -154,8 +154,8 @@ func (s1 Byte) IsSuperset(s2 Byte) bool {
 // Equal returns true if and only if s1 is equal (as a set) to s2.
 // Two sets are equal if their membership is identical.
 // (In practice, this means same elements, order doesn't matter)
-func (s1 Byte) Equal(s2 Byte) bool {
-	return len(s1) == len(s2) && s1.IsSuperset(s2)
+func (s Byte) Equal(s2 Byte) bool {
+	return len(s) == len(s2) && s.IsSuperset(s2)
 }
 
 type sortableSliceOfByte []byte
@@ -183,7 +183,7 @@ func (s Byte) UnsortedList() []byte {
 	return res
 }
 
-// Returns a single element from the set.
+// PopAny returns a single element from the set.
 func (s Byte) PopAny() (byte, bool) {
 	for key := range s {
 		s.Delete(key)

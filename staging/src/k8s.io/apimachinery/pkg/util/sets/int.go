@@ -23,7 +23,7 @@ import (
 	"sort"
 )
 
-// sets.Int is a set of ints, implemented via map[int]struct{} for minimal memory consumption.
+// Int is a set of ints, implemented via map[int]struct{} for minimal memory consumption.
 type Int map[int]Empty
 
 // NewInt creates a Int from a list of values.
@@ -107,9 +107,9 @@ func (s Int) Difference(s2 Int) Int {
 // s2 = {a3, a4}
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
-func (s1 Int) Union(s2 Int) Int {
+func (s Int) Union(s2 Int) Int {
 	result := NewInt()
-	for key := range s1 {
+	for key := range s {
 		result.Insert(key)
 	}
 	for key := range s2 {
@@ -123,15 +123,15 @@ func (s1 Int) Union(s2 Int) Int {
 // s1 = {a1, a2}
 // s2 = {a2, a3}
 // s1.Intersection(s2) = {a2}
-func (s1 Int) Intersection(s2 Int) Int {
+func (s Int) Intersection(s2 Int) Int {
 	var walk, other Int
 	result := NewInt()
-	if s1.Len() < s2.Len() {
-		walk = s1
+	if s.Len() < s2.Len() {
+		walk = s
 		other = s2
 	} else {
 		walk = s2
-		other = s1
+		other = s
 	}
 	for key := range walk {
 		if other.Has(key) {
@@ -142,9 +142,9 @@ func (s1 Int) Intersection(s2 Int) Int {
 }
 
 // IsSuperset returns true if and only if s1 is a superset of s2.
-func (s1 Int) IsSuperset(s2 Int) bool {
+func (s Int) IsSuperset(s2 Int) bool {
 	for item := range s2 {
-		if !s1.Has(item) {
+		if !s.Has(item) {
 			return false
 		}
 	}
@@ -154,8 +154,8 @@ func (s1 Int) IsSuperset(s2 Int) bool {
 // Equal returns true if and only if s1 is equal (as a set) to s2.
 // Two sets are equal if their membership is identical.
 // (In practice, this means same elements, order doesn't matter)
-func (s1 Int) Equal(s2 Int) bool {
-	return len(s1) == len(s2) && s1.IsSuperset(s2)
+func (s Int) Equal(s2 Int) bool {
+	return len(s) == len(s2) && s.IsSuperset(s2)
 }
 
 type sortableSliceOfInt []int
@@ -183,7 +183,7 @@ func (s Int) UnsortedList() []int {
 	return res
 }
 
-// Returns a single element from the set.
+// PopAny returns a single element from the set.
 func (s Int) PopAny() (int, bool) {
 	for key := range s {
 		s.Delete(key)

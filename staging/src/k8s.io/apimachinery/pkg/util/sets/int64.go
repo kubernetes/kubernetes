@@ -23,7 +23,7 @@ import (
 	"sort"
 )
 
-// sets.Int64 is a set of int64s, implemented via map[int64]struct{} for minimal memory consumption.
+// Int64 is a set of int64s, implemented via map[int64]struct{} for minimal memory consumption.
 type Int64 map[int64]Empty
 
 // NewInt64 creates a Int64 from a list of values.
@@ -107,9 +107,9 @@ func (s Int64) Difference(s2 Int64) Int64 {
 // s2 = {a3, a4}
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
-func (s1 Int64) Union(s2 Int64) Int64 {
+func (s Int64) Union(s2 Int64) Int64 {
 	result := NewInt64()
-	for key := range s1 {
+	for key := range s {
 		result.Insert(key)
 	}
 	for key := range s2 {
@@ -123,15 +123,15 @@ func (s1 Int64) Union(s2 Int64) Int64 {
 // s1 = {a1, a2}
 // s2 = {a2, a3}
 // s1.Intersection(s2) = {a2}
-func (s1 Int64) Intersection(s2 Int64) Int64 {
+func (s Int64) Intersection(s2 Int64) Int64 {
 	var walk, other Int64
 	result := NewInt64()
-	if s1.Len() < s2.Len() {
-		walk = s1
+	if s.Len() < s2.Len() {
+		walk = s
 		other = s2
 	} else {
 		walk = s2
-		other = s1
+		other = s
 	}
 	for key := range walk {
 		if other.Has(key) {
@@ -142,9 +142,9 @@ func (s1 Int64) Intersection(s2 Int64) Int64 {
 }
 
 // IsSuperset returns true if and only if s1 is a superset of s2.
-func (s1 Int64) IsSuperset(s2 Int64) bool {
+func (s Int64) IsSuperset(s2 Int64) bool {
 	for item := range s2 {
-		if !s1.Has(item) {
+		if !s.Has(item) {
 			return false
 		}
 	}
@@ -154,8 +154,8 @@ func (s1 Int64) IsSuperset(s2 Int64) bool {
 // Equal returns true if and only if s1 is equal (as a set) to s2.
 // Two sets are equal if their membership is identical.
 // (In practice, this means same elements, order doesn't matter)
-func (s1 Int64) Equal(s2 Int64) bool {
-	return len(s1) == len(s2) && s1.IsSuperset(s2)
+func (s Int64) Equal(s2 Int64) bool {
+	return len(s) == len(s2) && s.IsSuperset(s2)
 }
 
 type sortableSliceOfInt64 []int64
@@ -183,7 +183,7 @@ func (s Int64) UnsortedList() []int64 {
 	return res
 }
 
-// Returns a single element from the set.
+// PopAny returns a single element from the set.
 func (s Int64) PopAny() (int64, bool) {
 	for key := range s {
 		s.Delete(key)
