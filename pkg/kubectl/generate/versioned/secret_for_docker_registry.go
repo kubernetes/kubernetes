@@ -116,13 +116,13 @@ func (s SecretForDockerRegistryGeneratorV1) StructuredGenerate() (runtime.Object
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
 func (s SecretForDockerRegistryGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"from-file", false},
-		{"docker-username", true},
-		{"docker-email", false},
-		{"docker-password", true},
-		{"docker-server", true},
-		{"append-hash", false},
+		{Name: "name", Required: true},
+		{Name: "from-file", Required: false},
+		{Name: "docker-username", Required: true},
+		{Name: "docker-email", Required: false},
+		{Name: "docker-password", Required: true},
+		{Name: "docker-server", Required: true},
+		{Name: "append-hash", Required: false},
 	}
 }
 

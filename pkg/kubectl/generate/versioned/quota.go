@@ -40,9 +40,9 @@ type ResourceQuotaGeneratorV1 struct {
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
 func (g ResourceQuotaGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"hard", true},
-		{"scopes", false},
+		{Name: "name", Required: true},
+		{Name: "hard", Required: true},
+		{Name: "scopes", Required: false},
 	}
 }
 

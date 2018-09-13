@@ -31,7 +31,7 @@ import (
 // DescriberFn gives a way to easily override the function for unit testing if needed
 var DescriberFn describe.DescriberFunc = Describer
 
-// Returns a Describer for displaying the specified RESTMapping type or an error.
+// Describer returns a Describer for displaying the specified RESTMapping type or an error.
 func Describer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {

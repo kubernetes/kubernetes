@@ -124,10 +124,10 @@ func readFile(file string) ([]byte, error) {
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
 func (s SecretForTLSGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"key", true},
-		{"cert", true},
-		{"append-hash", false},
+		{Name: "name", Required: true},
+		{Name: "key", Required: true},
+		{Name: "cert", Required: true},
+		{Name: "append-hash", Required: false},
 	}
 }
 

@@ -57,7 +57,7 @@ func (g NamespaceGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern
 func (g NamespaceGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
+		{Name: "name", Required: true},
 	}
 }
 

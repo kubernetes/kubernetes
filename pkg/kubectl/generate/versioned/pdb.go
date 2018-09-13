@@ -38,9 +38,9 @@ var _ generate.StructuredGenerator = &PodDisruptionBudgetV1Generator{}
 
 func (PodDisruptionBudgetV1Generator) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"min-available", false},
-		{"selector", true},
+		{Name: "name", Required: true},
+		{Name: "min-available", Required: false},
+		{Name: "selector", Required: true},
 	}
 }
 
@@ -120,10 +120,10 @@ var _ generate.StructuredGenerator = &PodDisruptionBudgetV2Generator{}
 
 func (PodDisruptionBudgetV2Generator) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"min-available", false},
-		{"max-unavailable", false},
-		{"selector", true},
+		{Name: "name", Required: true},
+		{Name: "min-available", Required: false},
+		{Name: "max-unavailable", Required: false},
+		{Name: "selector", Required: true},
 	}
 }
 

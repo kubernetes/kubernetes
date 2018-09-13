@@ -114,13 +114,13 @@ func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
 func (s ConfigMapGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"type", false},
-		{"from-file", false},
-		{"from-literal", false},
-		{"from-env-file", false},
-		{"force", false},
-		{"hash", false},
+		{Name: "name", Required: true},
+		{Name: "type", Required: false},
+		{Name: "from-file", Required: false},
+		{Name: "from-literal", Required: false},
+		{Name: "from-env-file", Required: false},
+		{Name: "force", Required: false},
+		{Name: "hash", Required: false},
 	}
 }
 

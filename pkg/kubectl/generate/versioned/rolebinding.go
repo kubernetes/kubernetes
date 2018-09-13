@@ -100,12 +100,12 @@ func (s RoleBindingGeneratorV1) Generate(genericParams map[string]interface{}) (
 // ParamNames returns the set of supported input parameters when using the parameter injection generator pattern.
 func (s RoleBindingGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"clusterrole", false},
-		{"role", false},
-		{"user", false},
-		{"group", false},
-		{"serviceaccount", false},
+		{Name: "name", Required: true},
+		{Name: "clusterrole", Required: false},
+		{Name: "role", Required: false},
+		{Name: "user", Required: false},
+		{Name: "group", Required: false},
+		{Name: "serviceaccount", Required: false},
 	}
 }
 

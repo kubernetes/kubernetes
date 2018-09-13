@@ -57,29 +57,29 @@ type ServiceExternalNameGeneratorV1 struct {
 
 func (ServiceClusterIPGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"tcp", true},
-		{"clusterip", false},
+		{Name: "name", Required: true},
+		{Name: "tcp", Required: true},
+		{Name: "clusterip", Required: false},
 	}
 }
 func (ServiceNodePortGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"tcp", true},
-		{"nodeport", true},
+		{Name: "name", Required: true},
+		{Name: "tcp", Required: true},
+		{Name: "nodeport", Required: true},
 	}
 }
 func (ServiceLoadBalancerGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"tcp", true},
+		{Name: "name", Required: true},
+		{Name: "tcp", Required: true},
 	}
 }
 
 func (ServiceExternalNameGeneratorV1) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"externalname", true},
+		{Name: "name", Required: true},
+		{Name: "externalname", Required: true},
 	}
 }
 

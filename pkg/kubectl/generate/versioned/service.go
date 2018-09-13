@@ -52,28 +52,28 @@ func (ServiceGeneratorV2) Generate(params map[string]interface{}) (runtime.Objec
 
 func paramNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"default-name", true},
-		{"name", false},
-		{"selector", true},
+		{Name: "default-name", Required: true},
+		{Name: "name", Required: false},
+		{Name: "selector", Required: true},
 		// port will be used if a user specifies --port OR the exposed object
 		// has one port
-		{"port", false},
+		{Name: "port", Required: false},
 		// ports will be used iff a user doesn't specify --port AND the
 		// exposed object has multiple ports
-		{"ports", false},
-		{"labels", false},
-		{"external-ip", false},
-		{"load-balancer-ip", false},
-		{"type", false},
-		{"protocol", false},
+		{Name: "ports", Required: false},
+		{Name: "labels", Required: false},
+		{Name: "external-ip", Required: false},
+		{Name: "load-balancer-ip", Required: false},
+		{Name: "type", Required: false},
+		{Name: "protocol", Required: false},
 		// protocols will be used to keep port-protocol mapping derived from
 		// exposed object
-		{"protocols", false},
-		{"container-port", false}, // alias of target-port
-		{"target-port", false},
-		{"port-name", false},
-		{"session-affinity", false},
-		{"cluster-ip", false},
+		{Name: "protocols", Required: false},
+		{Name: "container-port", Required: false}, // alias of target-port
+		{Name: "target-port", Required: false},
+		{Name: "port-name", Required: false},
+		{Name: "session-affinity", Required: false},
+		{Name: "cluster-ip", Required: false},
 	}
 }
 

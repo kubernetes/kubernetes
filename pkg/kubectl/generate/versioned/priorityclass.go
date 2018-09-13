@@ -38,10 +38,10 @@ var _ generate.StructuredGenerator = &PriorityClassV1Generator{}
 
 func (PriorityClassV1Generator) ParamNames() []generate.GeneratorParam {
 	return []generate.GeneratorParam{
-		{"name", true},
-		{"value", true},
-		{"global-default", false},
-		{"description", false},
+		{Name: "name", Required: true},
+		{Name: "value", Required: true},
+		{Name: "global-default", Required: false},
+		{Name: "description", Required: false},
 	}
 }
 
