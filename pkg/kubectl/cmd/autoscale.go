@@ -28,7 +28,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -195,7 +194,7 @@ func (o *AutoscaleOptions) Validate() error {
 
 func (o *AutoscaleOptions) Run() error {
 	r := o.builder.
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		ContinueOnError().
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, o.FilenameOptions).
@@ -246,7 +245,7 @@ func (o *AutoscaleOptions) Run() error {
 			return printer.PrintObj(hpa, o.Out)
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, hpa, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, hpa, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 
