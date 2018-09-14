@@ -95,11 +95,6 @@ pkg/cloudprovider/providers/vsphere
 pkg/cloudprovider/providers/vsphere/vclib
 pkg/controller
 pkg/controller/apis/config/v1alpha1
-pkg/controller/bootstrap
-pkg/controller/certificates
-pkg/controller/certificates/approver
-pkg/controller/certificates/signer
-pkg/controller/cloud
 pkg/controller/clusterroleaggregation
 pkg/controller/cronjob
 pkg/controller/daemon

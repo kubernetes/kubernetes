@@ -45,13 +45,14 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
-var UpdateNodeSpecBackoff = wait.Backoff{
+var updateNodeSpecBackoff = wait.Backoff{
 	Steps:    20,
 	Duration: 50 * time.Millisecond,
 	Jitter:   1.0,
 }
 
-type CloudNodeController struct {
+// NodeController is a cloud node controller object
+type NodeController struct {
 	nodeInformer coreinformers.NodeInformer
 	kubeClient   clientset.Interface
 	recorder     record.EventRecorder
@@ -74,13 +75,13 @@ const (
 	retrySleepTime = 20 * time.Millisecond
 )
 
-// NewCloudNodeController creates a CloudNodeController object
+// NewCloudNodeController creates a cloud NodeController object
 func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration,
-	nodeStatusUpdateFrequency time.Duration) *CloudNodeController {
+	nodeStatusUpdateFrequency time.Duration) *NodeController {
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
@@ -92,7 +93,7 @@ func NewCloudNodeController(
 		klog.V(0).Infof("No api server defined - no events will be sent to API server.")
 	}
 
-	cnc := &CloudNodeController{
+	cnc := &NodeController{
 		nodeInformer:              nodeInformer,
 		kubeClient:                kubeClient,
 		recorder:                  recorder,
@@ -105,15 +106,15 @@ func NewCloudNodeController(
 	// that exist before node controller starts will show up in the update method
 	cnc.nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    cnc.AddCloudNode,
-		UpdateFunc: cnc.UpdateCloudNode,
+		UpdateFunc: cnc.updateCloudNode,
 	})
 
 	return cnc
 }
 
-// This controller deletes a node if kubelet is not reporting
+// Run deletes a node if kubelet is not reporting
 // and the node is gone from the cloud provider.
-func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
+func (cnc *NodeController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
 	// The following loops run communicate with the APIServer with a worst case complexity
@@ -128,7 +129,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 }
 
 // UpdateNodeStatus updates the node status, such as node addresses
-func (cnc *CloudNodeController) UpdateNodeStatus() {
+func (cnc *NodeController) UpdateNodeStatus() {
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
@@ -147,7 +148,7 @@ func (cnc *CloudNodeController) UpdateNodeStatus() {
 }
 
 // UpdateNodeAddress updates the nodeAddress of a single node
-func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloudprovider.Instances) {
+func (cnc *NodeController) updateNodeAddress(node *v1.Node, instances cloudprovider.Instances) {
 	// Do not process nodes that are still tainted
 	cloudTaint := getCloudTaint(node.Spec.Taints)
 	if cloudTaint != nil {
@@ -210,9 +211,9 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	}
 }
 
-// Monitor node queries the cloudprovider for non-ready nodes and deletes them
+// MonitorNode monitors node queries the cloudprovider for non-ready nodes and deletes them
 // if they cannot be found in the cloud provider
-func (cnc *CloudNodeController) MonitorNode() {
+func (cnc *NodeController) MonitorNode() {
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("failed to get instances from cloud provider"))
@@ -244,8 +245,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 			time.Sleep(retrySleepTime)
 		}
 		if currentReadyCondition == nil {
-			klog.Errorf("Update status of Node %v from CloudNodeController exceeds retry count or the Node was deleted.", node.Name)
-			continue
+			klog.Errorf("Update status of Node %v from cloud NodeController exceeds retry count or the Node was deleted.", node.Name)			continue
 		}
 		// If the known node status says that Node is NotReady, then check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node immediately
@@ -312,7 +312,7 @@ func (cnc *CloudNodeController) MonitorNode() {
 	}
 }
 
-func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
+func (cnc *NodeController) updateCloudNode(_, newObj interface{}) {
 	if _, ok := newObj.(*v1.Node); !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 		return
@@ -320,8 +320,8 @@ func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
 	cnc.AddCloudNode(newObj)
 }
 
-// This processes nodes that were added into the cluster, and cloud initialize them if appropriate
-func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
+// AddCloudNode processes nodes that were added into the cluster, and cloud initialize them if appropriate
+func (cnc *NodeController) AddCloudNode(obj interface{}) {
 	node := obj.(*v1.Node)
 
 	cloudTaint := getCloudTaint(node.Spec.Taints)
@@ -336,7 +336,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		return
 	}
 
-	err := clientretry.RetryOnConflict(UpdateNodeSpecBackoff, func() error {
+	err := clientretry.RetryOnConflict(updateNodeSpecBackoff, func() error {
 		// TODO(wlan0): Move this logic to the route controller using the node taint instead of condition
 		// Since there are node taints, do we still need this?
 		// This condition marks the node as unusable until routes are initialized in the cloud provider

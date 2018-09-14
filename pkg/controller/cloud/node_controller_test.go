@@ -242,7 +242,7 @@ func TestNodeShutdown(t *testing.T) {
 			factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
 
 			eventBroadcaster := record.NewBroadcaster()
-			cloudNodeController := &CloudNodeController{
+			cloudNodeController := &NodeController{
 				kubeClient:                fnh,
 				nodeInformer:              factory.Core().V1().Nodes(),
 				cloud:                     fc,
@@ -338,7 +338,7 @@ func TestNodeDeleted(t *testing.T) {
 	factory := informers.NewSharedInformerFactory(fnh, controller.NoResyncPeriodFunc())
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:   fnh,
 		nodeInformer: factory.Core().V1().Nodes(),
 		cloud: &fakecloud.FakeCloud{
@@ -421,7 +421,7 @@ func TestNodeInitialized(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
@@ -487,7 +487,7 @@ func TestNodeIgnored(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:        fnh,
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
@@ -561,7 +561,7 @@ func TestGCECondition(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:        fnh,
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
@@ -651,7 +651,7 @@ func TestZoneInitialized(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:        fnh,
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
@@ -741,7 +741,7 @@ func TestNodeAddresses(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
@@ -856,7 +856,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
@@ -1069,7 +1069,7 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		Err:                nil,
 	}
 
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:   fnh,
 		nodeInformer: factory.Core().V1().Nodes(),
 		cloud:        fakeCloud,
@@ -1148,7 +1148,7 @@ func TestNodeProviderID(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
@@ -1232,7 +1232,7 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	cloudNodeController := &CloudNodeController{
+	cloudNodeController := &NodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,

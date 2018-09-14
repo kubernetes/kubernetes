@@ -39,7 +39,7 @@ func init() {
 
 const testTokenID = "abc123"
 
-func newBootstrapSigner() (*BootstrapSigner, *fake.Clientset, coreinformers.SecretInformer, coreinformers.ConfigMapInformer, error) {
+func newBootstrapSigner() (*Signer, *fake.Clientset, coreinformers.SecretInformer, coreinformers.ConfigMapInformer, error) {
 	options := DefaultBootstrapSignerOptions()
 	cl := fake.NewSimpleClientset()
 	informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
