@@ -179,17 +179,18 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		masterAddresses := framework.GetAllMasterAddresses(cs)
 		for _, masterAddress := range masterAddresses {
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, gce.FirewallTestTcpTimeout)
-			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, gce.FirewallTestTcpTimeout)
+			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureKubeControllerManagerPort, gce.FirewallTestTcpTimeout, false)
+			assertNotReachableHTTPTimeout(masterAddress, ports.InsecureSchedulerPort, gce.FirewallTestTcpTimeout, false)
+			assertNotReachableHTTPTimeout(masterAddress, ports.KubeSchedulerPort, gce.FirewallTestTcpTimeout, true)
 		}
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, gce.FirewallTestTcpTimeout)
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, gce.FirewallTestTcpTimeout)
-		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, gce.FirewallTestTcpTimeout)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletPort, gce.FirewallTestTcpTimeout, false)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.KubeletReadOnlyPort, gce.FirewallTestTcpTimeout, false)
+		assertNotReachableHTTPTimeout(nodeAddrs[0], ports.ProxyStatusPort, gce.FirewallTestTcpTimeout, false)
 	})
 })
 
-func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
-	unreachable, err := framework.TestNotReachableHTTPTimeout(ip, port, timeout)
+func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration, isSecure bool) {
+	unreachable, err := framework.TestNotReachableHTTPTimeout(ip, port, timeout, isSecure)
 	if err != nil {
 		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, err)
 	}
