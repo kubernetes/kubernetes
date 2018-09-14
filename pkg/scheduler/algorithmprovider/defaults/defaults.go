@@ -94,10 +94,6 @@ func init() {
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
 	factory.RegisterPriorityFunction2("EqualPriority", core.EqualPriorityMap, nil, 1)
-	// ImageLocalityPriority prioritizes nodes based on locality of images requested by a pod. Nodes with larger size
-	// of already-installed packages required by the pod will be preferred over nodes with no already-installed
-	// packages required by the pod or a small total size of already-installed packages required by the pod.
-	factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
 	factory.RegisterPriorityFunction2(
@@ -135,6 +131,12 @@ func defaultPredicates() sets.String {
 			predicates.MaxAzureDiskVolumeCountPred,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
+			},
+		),
+		factory.RegisterFitPredicateFactory(
+			predicates.MaxCSIVolumeCountPred,
+			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+				return predicates.NewCSIMaxVolumeLimitPredicate(args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by inter-pod affinity.
@@ -260,6 +262,9 @@ func defaultPriorities() sets.String {
 
 		// Prioritizes nodes that marked with taint which pod can tolerate.
 		factory.RegisterPriorityFunction2("TaintTolerationPriority", priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1),
+
+		// ImageLocalityPriority prioritizes nodes that have images requested by the pod present.
+		factory.RegisterPriorityFunction2("ImageLocalityPriority", priorities.ImageLocalityPriorityMap, nil, 1),
 	)
 }
 

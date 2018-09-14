@@ -307,6 +307,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			cgroupManager:     cm.cgroupManager,
 			podPidsLimit:      cm.ExperimentalPodPidsLimit,
 			enforceCPULimits:  cm.EnforceCPULimits,
+			cpuCFSQuotaPeriod: uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
 		}
 	}
 	return &podContainerManagerNoop{
@@ -604,8 +605,8 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	return nil
 }
 
-func (cm *containerManagerImpl) GetPluginRegistrationHandlerCallback() pluginwatcher.RegisterCallbackFn {
-	return cm.deviceManager.GetWatcherCallback()
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return cm.deviceManager.GetWatcherHandler()
 }
 
 // TODO: move the GetResources logic to PodContainerManager.

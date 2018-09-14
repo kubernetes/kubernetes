@@ -37,6 +37,14 @@ MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+
+# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
+# To avoid situation during cluster upgrade when there are two instances
+# of fluentd running on a node, kubelet need to mark node on which
+# fluentd is not running as a manifest pod with appropriate label.
+# TODO(piosz): remove this in 1.8
+NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
+
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
 # Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
 # configurations by separating them by a semi-colon ex. "2,scsi,fs;1,nvme,block"
@@ -47,10 +55,14 @@ NODE_LOCAL_SSDS_EXT=${NODE_LOCAL_SSDS_EXT:-}
 NODE_ACCELERATORS=${NODE_ACCELERATORS:-""}
 REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
+if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
+    NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
+fi
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-} # default value calculated below
 CREATE_CUSTOM_NETWORK=${CREATE_CUSTOM_NETWORK:-false}
+MIG_WAIT_UNTIL_STABLE_TIMEOUT=${MIG_WAIT_UNTIL_STABLE_TIMEOUT:-1800}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
@@ -162,13 +174,6 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
-# To avoid situation during cluster upgrade when there are two instances
-# of fluentd running on a node, kubelet need to mark node on which
-# fluentd is not running as a manifest pod with appropriate label.
-# TODO(piosz): remove this in 1.8
-NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
-
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
 
@@ -217,7 +222,7 @@ resources:
     - aesgcm:
         keys:
         - name: key1
-          secret: $(dd if=/dev/random bs=32 count=1 2>/dev/null | base64 | tr -d '\r\n')
+          secret: $(dd if=/dev/urandom iflag=fullblock bs=32 count=1 2>/dev/null | base64 | tr -d '\r\n')
 EOM
 )
 fi
@@ -286,9 +291,6 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   AUTOSCALER_ENABLE_SCALE_DOWN="${KUBE_AUTOSCALER_ENABLE_SCALE_DOWN:-true}"
   AUTOSCALER_EXPANDER_CONFIG="${KUBE_AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
 fi
-
-# Optional: Enable Rescheduler
-ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 
 # Optional: Enable allocation of pod IPs using IP aliases.
 #
@@ -392,10 +394,6 @@ METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
-if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
-  echo "Warning: Basic audit logging is deprecated and will be removed. Please use advanced auditing instead."
-fi
-
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
 fi
@@ -458,4 +456,12 @@ if [[ "${ENABLE_TOKENREQUEST:-}" == "true" ]]; then
   FEATURE_GATES="${FEATURE_GATES},TokenRequest=true"
   SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
   SERVICEACCOUNT_API_AUDIENCES="https://kubernetes.default.svc"
+fi
+
+# Optional: Enable Node termination Handler for Preemptible and GPU VMs.
+# https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
+ENABLE_NODE_TERMINATION_HANDLER="${ENABLE_NODE_TERMINATION_HANDLER:-false}"
+# Override default Node Termination Handler Image
+if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
 fi

@@ -523,6 +523,14 @@ items:
     - patch
     - update
     - watch
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -951,6 +959,12 @@ items:
     - patch
     - update
   - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
+  - apiGroups:
     - storage.k8s.io
     resources:
     - volumeattachments
@@ -1115,6 +1129,16 @@ items:
     verbs:
     - get
     - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - get
+    - list
+    - patch
+    - update
     - watch
 - aggregationRule:
     clusterRoleSelectors:

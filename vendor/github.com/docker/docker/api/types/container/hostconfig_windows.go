@@ -1,9 +1,5 @@
 package container
 
-import (
-	"strings"
-)
-
 // IsBridge indicates whether container uses the bridge network stack
 // in windows it is given the name NAT
 func (n NetworkMode) IsBridge() bool {
@@ -19,16 +15,6 @@ func (n NetworkMode) IsHost() bool {
 // IsUserDefined indicates user-created network
 func (n NetworkMode) IsUserDefined() bool {
 	return !n.IsDefault() && !n.IsNone() && !n.IsBridge() && !n.IsContainer()
-}
-
-// IsHyperV indicates the use of a Hyper-V partition for isolation
-func (i Isolation) IsHyperV() bool {
-	return strings.ToLower(string(i)) == "hyperv"
-}
-
-// IsProcess indicates the use of process isolation
-func (i Isolation) IsProcess() bool {
-	return strings.ToLower(string(i)) == "process"
 }
 
 // IsValid indicates if an isolation technology is valid

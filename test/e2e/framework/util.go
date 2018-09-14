@@ -87,6 +87,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -200,19 +201,10 @@ const (
 
 	// ssh port
 	sshPort = "22"
-
-	// ImagePrePullingTimeout is the time we wait for the e2e-image-puller
-	// static pods to pull the list of seeded images. If they don't pull
-	// images within this time we simply log their output and carry on
-	// with the tests.
-	ImagePrePullingTimeout = 5 * time.Minute
 )
 
 var (
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-	// Label allocated to the image puller static pod that runs on each node
-	// before e2es.
-	ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}
 
 	// For parsing Kubectl version for version-skewed testing.
 	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
@@ -633,7 +625,7 @@ func WaitForPodsSuccess(c clientset.Interface, ns string, successPodLabels map[s
 //
 // If ignoreLabels is not empty, pods matching this selector are ignored.
 func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedNotReadyPods int32, timeout time.Duration, ignoreLabels map[string]string) error {
-	ignoreSelector := labels.SelectorFromSet(ignoreLabels)
+	ignoreSelector := labels.SelectorFromSet(map[string]string{})
 	start := time.Now()
 	Logf("Waiting up to %v for all pods (need at least %d) in namespace '%s' to be running and ready",
 		timeout, minPods, ns)
@@ -2654,6 +2646,8 @@ func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeLi
 	return nodes
 }
 
+// WaitForAllNodesSchedulable waits up to timeout for all
+// (but TestContext.AllowedNotReadyNodes) to become scheduable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
 	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
@@ -2676,7 +2670,13 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if !isNodeSchedulable(node) {
+			if _, hasMasterRoleLabel := node.ObjectMeta.Labels[service.LabelNodeRoleMaster]; hasMasterRoleLabel {
+				// Kops clusters have masters with spec.unscheduable = false and
+				// node-role.kubernetes.io/master NoSchedule taint.
+				// Don't wait for them.
+				continue
+			}
+			if !isNodeSchedulable(node) || !isNodeUntainted(node) {
 				notSchedulable = append(notSchedulable, node)
 			}
 		}
@@ -2692,10 +2692,11 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 			if len(nodes.Items) >= largeClusterThreshold && attempt%10 == 0 {
 				Logf("Unschedulable nodes:")
 				for i := range notSchedulable {
-					Logf("-> %s Ready=%t Network=%t",
+					Logf("-> %s Ready=%t Network=%t Taints=%v",
 						notSchedulable[i].Name,
 						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
-						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false))
+						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
+						notSchedulable[i].Spec.Taints)
 				}
 				Logf("================================")
 			}
@@ -4831,7 +4832,8 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 func GetMasterAndWorkerNodesOrDie(c clientset.Interface) (sets.String, *v1.NodeList) {
 	nodes := &v1.NodeList{}
 	masters := sets.NewString()
-	all, _ := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	all, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	ExpectNoError(err)
 	for _, n := range all.Items {
 		if system.IsMasterNode(n.Name) {
 			masters.Insert(n.Name)
@@ -4875,8 +4877,8 @@ func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testut
 func (p *E2ETestNodePreparer) PrepareNodes() error {
 	nodes := GetReadySchedulableNodesOrDie(p.client)
 	numTemplates := 0
-	for k := range p.countToStrategy {
-		numTemplates += k
+	for _, v := range p.countToStrategy {
+		numTemplates += v.Count
 	}
 	if numTemplates > len(nodes.Items) {
 		return fmt.Errorf("Can't prepare Nodes. Got more templates than existing Nodes.")

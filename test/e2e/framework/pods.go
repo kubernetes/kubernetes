@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
@@ -258,4 +259,10 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 		return fmt.Errorf("failed to match regexp %q in output %q", expectedRegexp, output)
 	}
 	return nil
+}
+
+func (c *PodClient) PodIsReady(name string) bool {
+	pod, err := c.Get(name, metav1.GetOptions{})
+	ExpectNoError(err)
+	return podutil.IsPodReady(pod)
 }

@@ -15,7 +15,6 @@ filegroup(
     srcs = [
         "abac-authz-policy.jsonl",
         "cluster-autoscaler.manifest",
-        "e2e-image-puller.manifest",
         "etcd.manifest",
         "etcd-empty-dir-cleanup.yaml",
         "glbc.manifest",
@@ -25,7 +24,6 @@ filegroup(
         "kube-controller-manager.manifest",
         "kube-proxy.manifest",
         "kube-scheduler.manifest",
-        "rescheduler.manifest",
     ] + glob(["internal-*"]),
 )
 

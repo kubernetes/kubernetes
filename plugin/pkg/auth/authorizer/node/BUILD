@@ -15,7 +15,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/features:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
@@ -42,10 +41,10 @@ go_library(
     deps = [
         "//pkg/api/v1/persistentvolume:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
         "//pkg/features:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -57,6 +56,7 @@ go_library(
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/informers/storage/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
         "//third_party/forked/gonum/graph:go_default_library",
         "//third_party/forked/gonum/graph/simple:go_default_library",
         "//third_party/forked/gonum/graph/traverse:go_default_library",

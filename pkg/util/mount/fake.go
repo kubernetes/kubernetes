@@ -194,7 +194,7 @@ func (f *FakeMounter) GetFileType(pathname string) (FileType, error) {
 	if t, ok := f.Filesystem[pathname]; ok {
 		return t, nil
 	}
-	return FileType("fake"), nil
+	return FileType("Directory"), nil
 }
 
 func (f *FakeMounter) MakeDir(pathname string) error {

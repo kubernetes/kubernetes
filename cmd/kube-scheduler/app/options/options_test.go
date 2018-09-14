@@ -32,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 func TestSchedulerOptions(t *testing.T) {
@@ -70,7 +70,7 @@ func TestSchedulerOptions(t *testing.T) {
 	configFile := filepath.Join(tmpDir, "scheduler.yaml")
 	configKubeconfig := filepath.Join(tmpDir, "config.kubeconfig")
 	if err := ioutil.WriteFile(configFile, []byte(fmt.Sprintf(`
-apiVersion: componentconfig/v1alpha1
+apiVersion: kubescheduler.config.k8s.io/v1alpha1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
@@ -97,6 +97,17 @@ users:
   user:
     username: config
 `, server.URL)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	oldconfigFile := filepath.Join(tmpDir, "scheduler_old.yaml")
+	if err := ioutil.WriteFile(oldconfigFile, []byte(fmt.Sprintf(`
+apiVersion: componentconfig/v1alpha1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -133,32 +144,36 @@ users:
 	}
 
 	defaultSource := "DefaultProvider"
+	defaultBindTimeoutSeconds := int64(600)
 
 	testcases := []struct {
 		name             string
 		options          *Options
 		expectedUsername string
 		expectedError    string
-		expectedConfig   componentconfig.KubeSchedulerConfiguration
+		expectedConfig   kubeschedulerconfig.KubeSchedulerConfiguration
 	}{
 		{
 			name: "config file",
 			options: &Options{
 				ConfigFile: configFile,
-				ComponentConfig: func() componentconfig.KubeSchedulerConfiguration {
-					cfg, _ := newDefaultComponentConfig()
+				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+					cfg, err := newDefaultComponentConfig()
+					if err != nil {
+						t.Fatal(err)
+					}
 					return *cfg
 				}(),
 			},
 			expectedUsername: "config",
-			expectedConfig: componentconfig.KubeSchedulerConfiguration{
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                componentconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
 				HealthzBindAddress:             "0.0.0.0:10251",
 				MetricsBindAddress:             "0.0.0.0:10251",
 				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
-				LeaderElection: componentconfig.KubeSchedulerLeaderElectionConfiguration{
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: apiserverconfig.LeaderElectionConfiguration{
 						LeaderElect:   true,
 						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
@@ -176,26 +191,32 @@ users:
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
 				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
 			},
+		},
+		{
+			name:          "config file in componentconfig/v1alpha1",
+			options:       &Options{ConfigFile: oldconfigFile},
+			expectedError: "no kind \"KubeSchedulerConfiguration\" is registered for version \"componentconfig/v1alpha1\" in scheme",
 		},
 		{
 			name: "kubeconfig flag",
 			options: &Options{
-				ComponentConfig: func() componentconfig.KubeSchedulerConfiguration {
+				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
 					cfg, _ := newDefaultComponentConfig()
 					cfg.ClientConnection.Kubeconfig = flagKubeconfig
 					return *cfg
 				}(),
 			},
 			expectedUsername: "flag",
-			expectedConfig: componentconfig.KubeSchedulerConfiguration{
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 				SchedulerName:                  "default-scheduler",
-				AlgorithmSource:                componentconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
 				HealthzBindAddress:             "", // defaults empty when not running from config file
 				MetricsBindAddress:             "", // defaults empty when not running from config file
 				FailureDomains:                 "kubernetes.io/hostname,failure-domain.beta.kubernetes.io/zone,failure-domain.beta.kubernetes.io/region",
-				LeaderElection: componentconfig.KubeSchedulerLeaderElectionConfiguration{
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: apiserverconfig.LeaderElectionConfiguration{
 						LeaderElect:   true,
 						LeaseDuration: metav1.Duration{Duration: 15 * time.Second},
@@ -213,6 +234,7 @@ users:
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
 				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
 			},
 		},
 		{

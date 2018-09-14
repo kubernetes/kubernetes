@@ -11,6 +11,8 @@ go_library(
     srcs = [
         "arguments.go",
         "cgroupdriver.go",
+        "chroot_unix.go",
+        "chroot_windows.go",
         "copy.go",
         "endpoint.go",
         "error.go",
@@ -22,6 +24,8 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//pkg/util/version:go_default_library",
+        "//pkg/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
@@ -31,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
@@ -40,6 +45,7 @@ go_test(
     srcs = [
         "arguments_test.go",
         "cgroupdriver_test.go",
+        "chroot_test.go",
         "endpoint_test.go",
         "error_test.go",
         "marshal_test.go",

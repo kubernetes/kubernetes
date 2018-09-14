@@ -5,7 +5,6 @@
 	"metadata": {
 		"labels": {
 			"label2": "value2"
-		},
-		"namespace": ""
+		}
 	}
 }

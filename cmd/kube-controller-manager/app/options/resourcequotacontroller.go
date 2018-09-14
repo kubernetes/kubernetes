@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // ResourceQuotaControllerOptions holds the ResourceQuotaController options.
@@ -40,7 +40,7 @@ func (o *ResourceQuotaControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up ResourceQuotaController config with options.
-func (o *ResourceQuotaControllerOptions) ApplyTo(cfg *componentconfig.ResourceQuotaControllerConfiguration) error {
+func (o *ResourceQuotaControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.ResourceQuotaControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

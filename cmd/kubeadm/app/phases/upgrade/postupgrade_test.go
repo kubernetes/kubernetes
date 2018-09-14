@@ -27,7 +27,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -131,8 +130,10 @@ func TestRollbackFiles(t *testing.T) {
 
 func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 	cfg := &kubeadmapi.InitConfiguration{
-		API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-		Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+		APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+		},
 		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "test-node"},
 	}
 
@@ -148,21 +149,19 @@ func TestShouldBackupAPIServerCertAndKey(t *testing.T) {
 			expected:       true,
 		},
 	} {
-		caCert, caKey, err := certsphase.NewCACertAndKey()
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+		cfg.CertificatesDir = tmpdir
+
+		caCert, caKey, err := certsphase.KubeadmCertRootCA.CreateAsCA(cfg)
 		if err != nil {
 			t.Fatalf("failed creation of ca cert and key: %v", err)
 		}
 		caCert.NotBefore = caCert.NotBefore.Add(-test.adjustedExpiry).UTC()
-		apiCert, apiKey, err := certsphase.NewAPIServerCertAndKey(cfg, caCert, caKey)
+
+		err = certsphase.KubeadmCertAPIServer.CreateFromCA(cfg, caCert, caKey)
 		if err != nil {
 			t.Fatalf("Test %s: failed creation of cert and key: %v", desc, err)
-		}
-
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-
-		if err := pkiutil.WriteCertAndKey(tmpdir, constants.APIServerCertAndKeyBaseName, apiCert, apiKey); err != nil {
-			t.Fatalf("Test %s: failure while saving %s certificate and key: %v", desc, constants.APIServerCertAndKeyBaseName, err)
 		}
 
 		certAndKey := []string{filepath.Join(tmpdir, constants.APIServerCertName), filepath.Join(tmpdir, constants.APIServerKeyName)}

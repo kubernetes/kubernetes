@@ -474,10 +474,13 @@ func (lbaas *LbaasV2) GetLoadBalancer(ctx context.Context, clusterName string, s
 	portID := loadbalancer.VipPortID
 	if portID != "" {
 		floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
-		if err != nil {
+		if err != nil && err != ErrNotFound {
 			return nil, false, fmt.Errorf("error getting floating ip for port %s: %v", portID, err)
 		}
-		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+
+		if floatIP != nil {
+			status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+		}
 	} else {
 		status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 	}

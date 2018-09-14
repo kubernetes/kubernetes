@@ -1,11 +1,10 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"net/url"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"

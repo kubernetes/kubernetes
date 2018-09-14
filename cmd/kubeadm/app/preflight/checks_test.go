@@ -191,40 +191,46 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}{
 		{name: "Test valid advertised address",
 			cfg: &kubeadmapi.InitConfiguration{
-				API: kubeadmapi.API{AdvertiseAddress: "foo"},
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
 			},
 			expected: false,
 		},
 		{
 			name: "Test CA file exists if specfied",
 			cfg: &kubeadmapi.InitConfiguration{
-				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
+				},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Cert file exists if specfied",
 			cfg: &kubeadmapi.InitConfiguration{
-				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Key file exists if specfied",
 			cfg: &kubeadmapi.InitConfiguration{
-				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				},
 			},
 			expected: false,
 		},
 		{
 			cfg: &kubeadmapi.InitConfiguration{
-				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
 		},
 	}
-
 	for _, rt := range tests {
+		// TODO: Make RunInitMasterChecks accept a ClusterConfiguration object instead of InitConfiguration
 		actual := RunInitMasterChecks(exec.New(), rt.cfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(

@@ -26,6 +26,7 @@ go_library(
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/testutil:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/tlsutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/etcd/rafthttp:go_default_library",

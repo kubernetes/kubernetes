@@ -43,6 +43,40 @@ function setup-os-params {
   echo "core.%e.%p.%t" > /proc/sys/kernel/core_pattern
 }
 
+# secure_random generates a secure random string of bytes. This function accepts
+# a number of secure bytes desired and returns a base64 encoded string with at
+# least the requested entropy. Rather than directly reading from /dev/urandom,
+# we use uuidgen which calls getrandom(2). getrandom(2) verifies that the
+# entropy pool has been initialized sufficiently for the desired operation
+# before reading from /dev/urandom.
+#
+# ARGS:
+#   #1: number of secure bytes to generate. We round up to the nearest factor of 32.
+function secure_random {
+  local infobytes="${1}"
+  if ((infobytes <= 0)); then
+    echo "Invalid argument to secure_random: infobytes='${infobytes}'" 1>&2
+    return 1
+  fi
+
+  local out=""
+  for (( i = 0; i < "${infobytes}"; i += 32 )); do
+    # uuids have 122 random bits, sha256 sums have 256 bits, so concatenate
+    # three uuids and take their sum. The sum is encoded in ASCII hex, hence the
+    # 64 character cut.
+    out+="$(
+     (
+       uuidgen --random;
+       uuidgen --random;
+       uuidgen --random;
+     ) | sha256sum \
+       | head -c 64
+    )";
+  done
+  # Finally, convert the ASCII hex to base64 to increase the density.
+  echo -n "${out}" | xxd -r -p | base64 -w 0
+}
+
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
 
@@ -51,18 +85,20 @@ function config-ip-firewall {
   sysctl -w net.ipv4.conf.all.route_localnet=1
 
   # The GCI image has host firewall which drop most inbound/forwarded packets.
-  # We need to add rules to accept all TCP/UDP/ICMP packets.
+  # We need to add rules to accept all TCP/UDP/ICMP/SCTP packets.
   if iptables -w -L INPUT | grep "Chain INPUT (policy DROP)" > /dev/null; then
     echo "Add rules to accept all inbound TCP/UDP/ICMP packets"
     iptables -A INPUT -w -p TCP -j ACCEPT
     iptables -A INPUT -w -p UDP -j ACCEPT
     iptables -A INPUT -w -p ICMP -j ACCEPT
+    iptables -A INPUT -w -p SCTP -j ACCEPT
   fi
   if iptables -w -L FORWARD | grep "Chain FORWARD (policy DROP)" > /dev/null; then
-    echo "Add rules to accept all forwarded TCP/UDP/ICMP packets"
+    echo "Add rules to accept all forwarded TCP/UDP/ICMP/SCTP packets"
     iptables -A FORWARD -w -p TCP -j ACCEPT
     iptables -A FORWARD -w -p UDP -j ACCEPT
     iptables -A FORWARD -w -p ICMP -j ACCEPT
+    iptables -A FORWARD -w -p SCTP -j ACCEPT
   fi
 
   # Flush iptables nat table
@@ -568,6 +604,12 @@ EOF
     cat <<EOF >>/etc/gce.conf
 token-url = ${TOKEN_URL}
 token-body = ${TOKEN_BODY}
+EOF
+  fi
+  if [[ -n "${CONTAINER_API_ENDPOINT:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+container-api-endpoint = ${CONTAINER_API_ENDPOINT}
 EOF
   fi
   if [[ -n "${PROJECT_ID:-}" ]]; then
@@ -1459,8 +1501,12 @@ function start-kube-apiserver {
   params+=" --allow-privileged=true"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=${CA_CERT_BUNDLE_PATH}"
-  params+=" --etcd-servers=http://127.0.0.1:2379"
-  params+=" --etcd-servers-overrides=/events#http://127.0.0.1:4002"
+  params+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
+  if [[ -z "${ETCD_SERVERS:-}" ]]; then
+    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
+  elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
+    params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
+  fi
   params+=" --secure-port=443"
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
@@ -1526,26 +1572,7 @@ function start-kube-apiserver {
   local audit_policy_config_volume=""
   local audit_webhook_config_mount=""
   local audit_webhook_config_volume=""
-  if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
-    # We currently only support enabling with a fixed path and with built-in log
-    # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
-    # External log rotation should be set up the same as for kube-apiserver.log.
-    params+=" --audit-log-path=/var/log/kube-apiserver-audit.log"
-    params+=" --audit-log-maxage=0"
-    params+=" --audit-log-maxbackup=0"
-    # Lumberjack doesn't offer any way to disable size-based rotation. It also
-    # has an in-memory counter that doesn't notice if you truncate the file.
-    # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
-    # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
-    # never restarts. Please manually restart apiserver before this time.
-    params+=" --audit-log-maxsize=2000000000"
-    # Disable AdvancedAuditing enabled by default
-    if [[ -z "${FEATURE_GATES:-}" ]]; then
-      FEATURE_GATES="AdvancedAuditing=false"
-    else
-      FEATURE_GATES="${FEATURE_GATES},AdvancedAuditing=false"
-    fi
-  elif [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
+  if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
     local -r audit_policy_file="/etc/audit_policy.config"
     params+=" --audit-policy-file=${audit_policy_file}"
     # Create the audit policy file, and mount it into the apiserver pod.
@@ -1593,8 +1620,6 @@ function start-kube-apiserver {
       fi
     fi
     if [[ "${ADVANCED_AUDIT_BACKEND:-}" == *"webhook"* ]]; then
-      params+=" --audit-webhook-mode=batch"
-
       # Create the audit webhook config file, and mount it into the apiserver pod.
       local -r audit_webhook_config_file="/etc/audit_webhook.config"
       params+=" --audit-webhook-config-file=${audit_webhook_config_file}"
@@ -1605,6 +1630,8 @@ function start-kube-apiserver {
       # Batching parameters
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_MODE:-}" ]]; then
         params+=" --audit-webhook-mode=${ADVANCED_AUDIT_WEBHOOK_MODE}"
+      else
+        params+=" --audit-webhook-mode=batch"
       fi
       if [[ -n "${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE:-}" ]]; then
         params+=" --audit-webhook-batch-buffer-size=${ADVANCED_AUDIT_WEBHOOK_BUFFER_SIZE}"
@@ -2036,6 +2063,12 @@ function setup-addon-manifests {
       copy-manifests "${psp_dir}" "${dst_dir}"
     fi
   fi
+  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
+      local -r nth_dir="${src_dir}/${3:-$2}/node-termination-handler"
+      if [[ -d "${nth_dir}" ]]; then
+          copy-manifests "${nth_dir}" "${dst_dir}"
+      fi
+  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
@@ -2193,6 +2226,17 @@ function update-prometheus-to-sd-parameters {
    fi
 }
 
+# Updates parameters in yaml file for prometheus-to-sd configuration in daemon sets, or
+# removes component if it is disabled.
+function update-daemon-set-prometheus-to-sd-parameters {
+  if [[ "${DISABLE_PROMETHEUS_TO_SD_IN_DS:-}" == "true" ]]; then
+    # Removes all lines between two patterns (throws away prometheus-to-sd)
+    sed -i -e "/# BEGIN_PROMETHEUS_TO_SD/,/# END_PROMETHEUS_TO_SD/d" "$1"
+  else
+    update-prometheus-to-sd-parameters $1
+  fi
+}
+
 # Updates parameters in yaml file for event-exporter configuration
 function update-event-exporter {
     local -r stackdriver_resource_model="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
@@ -2243,7 +2287,7 @@ function setup-fluentd {
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
   fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.3-1.5.34-1-k8s-1}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
-  update-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
+  update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
   update-container-runtime ${fluentd_gcp_configmap_yaml}
   update-node-journal ${fluentd_gcp_configmap_yaml}
@@ -2329,7 +2373,7 @@ function start-kube-addons {
       cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
 $CUSTOM_KUBE_PROXY_YAML
 EOF
-      update-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
+      update-daemon-set-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     fi
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
@@ -2430,6 +2474,10 @@ EOF
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
+  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "node-termination-handler"
+      setup-node-termination-handler-manifest
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
       setup-addon-manifests "addons" "dns/coredns"
@@ -2491,7 +2539,7 @@ EOF
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metadata-proxy/gce"
     local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
-    update-prometheus-to-sd-parameters ${metadata_proxy_yaml}
+    update-daemon-set-prometheus-to-sd-parameters ${metadata_proxy_yaml}
   fi
   if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
     if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
@@ -2500,21 +2548,26 @@ EOF
       setup-addon-manifests "addons" "istio/noauth"
     fi
   fi
+  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
+    setup-addon-manifests "addons" "runtimeclass"
+  fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
     download-extra-addons
     setup-addon-manifests "addons" "gce-extras"
   fi
 
+
   # Place addon manager pod manifest.
-  cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
+  src_file="${src_dir}/kube-addon-manager.yaml"
+  sed -i -e "s@{{kubectl_extra_prune_whitelist}}@${ADDON_MANAGER_PRUNE_WHITELIST:-}@g" "${src_file}"
+  cp "${src_file}" /etc/kubernetes/manifests
 }
 
-# Starts an image-puller - used in test clusters.
-function start-image-puller {
-  echo "Start image-puller"
-  local -r e2e_image_puller_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/e2e-image-puller.manifest"
-  update-container-runtime "${e2e_image_puller_manifest}"
-  cp "${e2e_image_puller_manifest}" /etc/kubernetes/manifests/
+function setup-node-termination-handler-manifest {
+    local -r nth_manifest="/etc/kubernetes/$1/$2/daemonset.yaml"
+    if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
+        sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
+    fi 
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
@@ -2540,16 +2593,6 @@ function start-lb-controller {
     if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
       sed -i "s|image:.*|image: ${GCE_GLBC_IMAGE}|" "${dest_manifest}"
     fi
-  fi
-}
-
-# Starts rescheduler.
-function start-rescheduler {
-  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
-    echo "Start Rescheduler"
-    prepare-log-file /var/log/rescheduler.log
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
-       /etc/kubernetes/manifests/
   fi
 }
 
@@ -2687,9 +2730,9 @@ function main() {
   fi
 
   # generate the controller manager, scheduler and cluster autoscaler tokens here since they are only used on the master.
-  KUBE_CONTROLLER_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  KUBE_SCHEDULER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  KUBE_CLUSTER_AUTOSCALER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
+  KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
+  KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
 
   setup-os-params
   config-ip-firewall
@@ -2734,13 +2777,9 @@ function main() {
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
-    start-rescheduler
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
       start-kube-proxy
-    fi
-    if [[ "${PREPULL_E2E_IMAGES:-}" == "true" ]]; then
-      start-image-puller
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
       start-node-problem-detector

@@ -38,10 +38,10 @@ import (
 )
 
 var csiImageVersions = map[string]string{
-	"hostpathplugin":   "v0.2.0",
+	"hostpathplugin":   "canary", // TODO (verult) update tag once new hostpathplugin release is cut
 	"csi-attacher":     "v0.2.0",
 	"csi-provisioner":  "v0.2.1",
-	"driver-registrar": "v0.2.0",
+	"driver-registrar": "v0.3.0",
 }
 
 func csiContainerImage(image string) string {
@@ -239,6 +239,7 @@ func csiHostPathPod(
 					Args: []string{
 						"--v=5",
 						"--csi-address=/csi/csi.sock",
+						"--kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock",
 					},
 					Env: []v1.EnvVar{
 						{
@@ -254,6 +255,10 @@ func csiHostPathPod(
 						{
 							Name:      "socket-dir",
 							MountPath: "/csi",
+						},
+						{
+							Name:      "registration-dir",
+							MountPath: "/registration",
 						},
 					},
 				},
@@ -323,6 +328,15 @@ func csiHostPathPod(
 					VolumeSource: v1.VolumeSource{
 						HostPath: &v1.HostPathVolumeSource{
 							Path: "/var/lib/kubelet/plugins/csi-hostpath",
+							Type: &hostPathType,
+						},
+					},
+				},
+				{
+					Name: "registration-dir",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/var/lib/kubelet/plugins",
 							Type: &hostPathType,
 						},
 					},

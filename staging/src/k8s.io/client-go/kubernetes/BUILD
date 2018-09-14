@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,6 +9,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes",
     importpath = "k8s.io/client-go/kubernetes",
+    visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1:go_default_library",
@@ -27,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v2alpha1:go_default_library",
@@ -75,6 +72,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v1:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1:all-srcs",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v1:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v2alpha1:all-srcs",
@@ -96,4 +94,5 @@ filegroup(
         "//staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

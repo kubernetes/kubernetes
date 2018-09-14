@@ -55,21 +55,6 @@ function kube-down {
 	echo "Skeleton Provider: kube-down not implemented" 1>&2
 }
 
-# Prepare update a kubernetes component
-function prepare-push {
-	echo "Skeleton Provider: prepare-push not implemented" 1>&2
-}
-
-# Update a kubernetes master
-function push-master {
-	echo "Skeleton Provider: push-master not implemented" 1>&2
-}
-
-# Update a kubernetes node
-function push-node {
-	echo "Skeleton Provider: push-node not implemented" 1>&2
-}
-
 # Execute prior to running tests to build a release if required for env
 function test-build-release {
 	echo "Skeleton Provider: test-build-release not implemented" 1>&2

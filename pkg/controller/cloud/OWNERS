@@ -8,3 +8,5 @@ reviewers:
 - luxas
 - wlan0
 - andrewsykim
+labels:
+- sig/cloud-provider

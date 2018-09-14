@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // AttachDetachControllerOptions holds the AttachDetachController options.
@@ -40,7 +40,7 @@ func (o *AttachDetachControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up AttachDetachController config with options.
-func (o *AttachDetachControllerOptions) ApplyTo(cfg *componentconfig.AttachDetachControllerConfiguration) error {
+func (o *AttachDetachControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.AttachDetachControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

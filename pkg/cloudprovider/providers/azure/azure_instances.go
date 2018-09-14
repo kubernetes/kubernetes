@@ -30,6 +30,16 @@ import (
 
 // NodeAddresses returns the addresses of the specified instance.
 func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
+	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	unmanaged, err := az.IsNodeUnmanaged(string(name))
+	if err != nil {
+		return nil, err
+	}
+	if unmanaged {
+		glog.V(4).Infof("NodeAddresses: omitting unmanaged node %q", name)
+		return nil, nil
+	}
+
 	addressGetter := func(nodeName types.NodeName) ([]v1.NodeAddress, error) {
 		ip, publicIP, err := az.GetIPForMachineWithRetry(nodeName)
 		if err != nil {
@@ -51,7 +61,12 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 	}
 
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		computeMetadata, err := az.getComputeMetadata()
+		if err != nil {
+			return nil, err
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, computeMetadata.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -87,6 +102,12 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
+	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	if az.IsNodeUnmanagedByProviderID(providerID) {
+		glog.V(4).Infof("NodeAddressesByProviderID: omitting unmanaged node %q", providerID)
+		return nil, nil
+	}
+
 	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return nil, err
@@ -98,6 +119,12 @@ func (az *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID strin
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	// Returns true for unmanaged nodes because azure cloud provider always assumes them exists.
+	if az.IsNodeUnmanagedByProviderID(providerID) {
+		glog.V(4).Infof("InstanceExistsByProviderID: assuming unmanaged node %q exists", providerID)
+		return true, nil
+	}
+
 	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return false, err
@@ -116,35 +143,66 @@ func (az *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID stri
 
 // InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
 func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
-}
-
-func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
-	nodeName := mapNodeNameToVMName(name)
-	metadataName, err := az.metadata.Text("instance/compute/name")
+	nodeName, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return false, err
 	}
 
+	provisioningState, err := az.vmSet.GetProvisioningStateByNodeName(string(nodeName))
+	if err != nil {
+		return false, err
+	}
+
+	return strings.ToLower(provisioningState) == "stopped" || strings.ToLower(provisioningState) == "deallocated", nil
+}
+
+// getComputeMetadata gets compute information from instance metadata.
+func (az *Cloud) getComputeMetadata() (*ComputeMetadata, error) {
+	computeInfo := ComputeMetadata{}
+	err := az.metadata.Object(computeMetadataURI, &computeInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &computeInfo, nil
+}
+
+func (az *Cloud) isCurrentInstance(name types.NodeName, metadataVMName string) (bool, error) {
+	var err error
+	nodeName := mapNodeNameToVMName(name)
 	if az.VMType == vmTypeVMSS {
 		// VMSS vmName is not same with hostname, use hostname instead.
-		metadataName, err = os.Hostname()
+		metadataVMName, err = os.Hostname()
 		if err != nil {
 			return false, err
 		}
 	}
 
-	metadataName = strings.ToLower(metadataName)
-	return (metadataName == nodeName), err
+	metadataVMName = strings.ToLower(metadataVMName)
+	return (metadataVMName == nodeName), err
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
 // Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	nodeName := mapNodeNameToVMName(name)
+	unmanaged, err := az.IsNodeUnmanaged(nodeName)
+	if err != nil {
+		return "", err
+	}
+	if unmanaged {
+		// InstanceID is same with nodeName for unmanaged nodes.
+		glog.V(4).Infof("InstanceID: getting ID %q for unmanaged node %q", name, name)
+		return nodeName, nil
+	}
 
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		computeMetadata, err := az.getComputeMetadata()
+		if err != nil {
+			return "", err
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, computeMetadata.Name)
 		if err != nil {
 			return "", err
 		}
@@ -154,26 +212,28 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 			return az.vmSet.GetInstanceIDByNodeName(nodeName)
 		}
 
-		// Compose instanceID based on nodeName for standard instance.
-		if az.VMType == vmTypeStandard {
-			return az.getStandardMachineID(nodeName), nil
-		}
-
-		// Get scale set name and instanceID from vmName for vmss.
-		metadataName, err := az.metadata.Text("instance/compute/name")
+		// Get resource group name.
+		resourceGroup, err := az.metadata.Text("instance/compute/resourceGroupName")
 		if err != nil {
 			return "", err
 		}
-		ssName, instanceID, err := extractVmssVMName(metadataName)
+
+		// Compose instanceID based on nodeName for standard instance.
+		if az.VMType == vmTypeStandard {
+			return az.getStandardMachineID(resourceGroup, nodeName), nil
+		}
+
+		// Get scale set name and instanceID from vmName for vmss.
+		ssName, instanceID, err := extractVmssVMName(computeMetadata.Name)
 		if err != nil {
 			if err == ErrorNotVmssInstance {
 				// Compose machineID for standard Node.
-				return az.getStandardMachineID(nodeName), nil
+				return az.getStandardMachineID(resourceGroup, nodeName), nil
 			}
 			return "", err
 		}
 		// Compose instanceID based on ssName and instanceID for vmss instance.
-		return az.getVmssMachineID(ssName, instanceID), nil
+		return az.getVmssMachineID(resourceGroup, ssName, instanceID), nil
 	}
 
 	return az.vmSet.GetInstanceIDByNodeName(nodeName)
@@ -183,6 +243,12 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (az *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
+	// Returns "" for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	if az.IsNodeUnmanagedByProviderID(providerID) {
+		glog.V(4).Infof("InstanceTypeByProviderID: omitting unmanaged node %q", providerID)
+		return "", nil
+	}
+
 	name, err := az.vmSet.GetNodeNameByProviderID(providerID)
 	if err != nil {
 		return "", err
@@ -196,15 +262,29 @@ func (az *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string
 // (Implementer Note): This is used by kubelet. Kubelet will label the node. Real log from kubelet:
 //       Adding node label from cloud provider: beta.kubernetes.io/instance-type=[value]
 func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
+	// Returns "" for unmanaged nodes because azure cloud provider couldn't fetch information for them.
+	unmanaged, err := az.IsNodeUnmanaged(string(name))
+	if err != nil {
+		return "", err
+	}
+	if unmanaged {
+		glog.V(4).Infof("InstanceType: omitting unmanaged node %q", name)
+		return "", nil
+	}
+
 	if az.UseInstanceMetadata {
-		isLocalInstance, err := az.isCurrentInstance(name)
+		computeMetadata, err := az.getComputeMetadata()
+		if err != nil {
+			return "", err
+		}
+
+		isLocalInstance, err := az.isCurrentInstance(name, computeMetadata.Name)
 		if err != nil {
 			return "", err
 		}
 		if isLocalInstance {
-			machineType, err := az.metadata.Text("instance/compute/vmSize")
-			if err == nil {
-				return machineType, nil
+			if computeMetadata.VMSize != "" {
+				return computeMetadata.VMSize, nil
 			}
 		}
 	}

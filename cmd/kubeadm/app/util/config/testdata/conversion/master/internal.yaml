@@ -1,7 +1,6 @@
-API:
+APIEndpoint:
   AdvertiseAddress: 192.168.2.2
   BindPort: 6443
-  ControlPlaneEndpoint: ""
 APIServerCertSANs: null
 APIServerExtraArgs:
   authorization-mode: Node,RBAC,Webhook
@@ -30,7 +29,7 @@ ComponentConfigs:
       AcceptContentTypes: ""
       Burst: 10
       ContentType: application/vnd.kubernetes.protobuf
-      KubeConfigFile: /var/lib/kube-proxy/kubeconfig.conf
+      Kubeconfig: /var/lib/kube-proxy/kubeconfig.conf
       QPS: 5
     ClusterCIDR: ""
     ConfigSyncPeriod: 15m0s
@@ -79,6 +78,7 @@ ComponentConfigs:
         CacheAuthorizedTTL: 5m0s
         CacheUnauthorizedTTL: 30s
     CPUCFSQuota: true
+    CPUCFSQuotaPeriod: 0s
     CPUManagerPolicy: none
     CPUManagerReconcilePeriod: 10s
     CgroupDriver: cgroupfs
@@ -128,6 +128,7 @@ ComponentConfigs:
     MakeIPTablesUtilChains: true
     MaxOpenFiles: 1000000
     MaxPods: 110
+    NodeLeaseDurationSeconds: 40
     NodeStatusUpdateFrequency: 10s
     OOMScoreAdj: -999
     PodCIDR: ""
@@ -157,6 +158,7 @@ ComponentConfigs:
     TLSMinVersion: ""
     TLSPrivateKeyFile: ""
     VolumeStatsAggPeriod: 1m0s
+ControlPlaneEndpoint: ""
 ControllerManagerExtraArgs: null
 ControllerManagerExtraVolumes: null
 Etcd:

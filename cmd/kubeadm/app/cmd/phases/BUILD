@@ -38,6 +38,7 @@ go_library(
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
         "//cmd/kubeadm/app/phases/markmaster:go_default_library",
+        "//cmd/kubeadm/app/phases/patchnode:go_default_library",
         "//cmd/kubeadm/app/phases/selfhosting:go_default_library",
         "//cmd/kubeadm/app/phases/upgrade:go_default_library",
         "//cmd/kubeadm/app/phases/uploadconfig:go_default_library",
@@ -49,7 +50,6 @@ go_library(
         "//pkg/util/normalizer:go_default_library",
         "//pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/bootstrap/token/api:go_default_library",
@@ -93,7 +93,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/cmd/phases/certs:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

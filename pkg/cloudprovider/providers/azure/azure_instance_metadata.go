@@ -59,6 +59,13 @@ type InstanceMetadata struct {
 	baseURL string
 }
 
+// ComputeMetadata represents compute information
+type ComputeMetadata struct {
+	Name   string `json:"name,omitempty"`
+	Zone   string `json:"zone,omitempty"`
+	VMSize string `json:"vmSize,omitempty"`
+}
+
 // NewInstanceMetadata creates an instance of the InstanceMetadata accessor object.
 func NewInstanceMetadata() *InstanceMetadata {
 	return &InstanceMetadata{

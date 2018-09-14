@@ -147,6 +147,11 @@ func GroupVersionKindsHasKind(gvks []schema.GroupVersionKind, kind string) bool 
 	return false
 }
 
+// GroupVersionKindsHasClusterConfiguration returns whether the following gvk slice contains a ClusterConfiguration object
+func GroupVersionKindsHasClusterConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.ClusterConfigurationKind)
+}
+
 // GroupVersionKindsHasInitConfiguration returns whether the following gvk slice contains a InitConfiguration object
 func GroupVersionKindsHasInitConfiguration(gvks ...schema.GroupVersionKind) bool {
 	// Finding a MasterConfiguration kind is also okay, as it will decode and convert into an InitConfiguration struct eventually

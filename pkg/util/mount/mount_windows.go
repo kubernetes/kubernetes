@@ -309,7 +309,7 @@ func lockAndCheckSubPathWithoutSymlink(volumePath, subPath string) ([]uintptr, e
 			break
 		}
 
-		if !pathWithinBase(currentFullPath, volumePath) {
+		if !PathWithinBase(currentFullPath, volumePath) {
 			errorResult = fmt.Errorf("SubPath %q not within volume path %q", currentFullPath, volumePath)
 			break
 		}
@@ -499,7 +499,7 @@ func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	glog.V(4).Infof("Creating directory %q within base %q", pathname, base)
 
-	if !pathWithinBase(pathname, base) {
+	if !PathWithinBase(pathname, base) {
 		return fmt.Errorf("path %s is outside of allowed base %s", pathname, base)
 	}
 
@@ -534,7 +534,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	if err != nil {
 		return fmt.Errorf("cannot read link %s: %s", base, err)
 	}
-	if !pathWithinBase(fullExistingPath, fullBasePath) {
+	if !PathWithinBase(fullExistingPath, fullBasePath) {
 		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, err)
 	}
 

@@ -507,22 +507,25 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 // Deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
+	return DeletePodWithWaitByName(f, c, pod.GetName(), pod.GetNamespace())
+}
+
+// Deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
+// not existing.
+func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNamespace string) error {
 	const maxWait = 5 * time.Minute
-	if pod == nil {
-		return nil
-	}
-	Logf("Deleting pod %q in namespace %q", pod.Name, pod.Namespace)
-	err := c.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil)
+	Logf("Deleting pod %q in namespace %q", podName, podNamespace)
+	err := c.CoreV1().Pods(podNamespace).Delete(podName, nil)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			return nil // assume pod was already deleted
 		}
 		return fmt.Errorf("pod Delete API error: %v", err)
 	}
-	Logf("Wait up to %v for pod %q to be fully deleted", maxWait, pod.Name)
-	err = f.WaitForPodNotFound(pod.Name, maxWait)
+	Logf("Wait up to %v for pod %q to be fully deleted", maxWait, podName)
+	err = f.WaitForPodNotFound(podName, maxWait)
 	if err != nil {
-		return fmt.Errorf("pod %q was not deleted: %v", pod.Name, err)
+		return fmt.Errorf("pod %q was not deleted: %v", podName, err)
 	}
 	return nil
 }
@@ -722,7 +725,7 @@ func createPD(zone string) (string, error) {
 		}
 
 		tags := map[string]string{}
-		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeSSD, zone, 10 /* sizeGb */, tags)
+		err = gceCloud.CreateDisk(pdName, gcecloud.DiskTypeStandard, zone, 2 /* sizeGb */, tags)
 		if err != nil {
 			return "", err
 		}
@@ -1006,11 +1009,19 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 
 // create security pod with given claims
 func CreateSecPod(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, timeout time.Duration) (*v1.Pod, error) {
+	return CreateSecPodWithNodeName(client, namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup, "", timeout)
+}
+
+// create security pod with given claims
+func CreateSecPodWithNodeName(client clientset.Interface, namespace string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bool, command string, hostIPC bool, hostPID bool, seLinuxLabel *v1.SELinuxOptions, fsGroup *int64, nodeName string, timeout time.Duration) (*v1.Pod, error) {
 	pod := MakeSecPod(namespace, pvclaims, isPrivileged, command, hostIPC, hostPID, seLinuxLabel, fsGroup)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
+	// Setting nodeName
+	pod.Spec.NodeName = nodeName
+
 	// Waiting for pod to be running
 	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, namespace, timeout)
 	if err != nil {

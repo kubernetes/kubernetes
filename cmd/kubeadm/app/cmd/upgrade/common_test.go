@@ -25,7 +25,7 @@ import (
 
 func TestPrintConfiguration(t *testing.T) {
 	var tests = []struct {
-		cfg           *kubeadmapi.InitConfiguration
+		cfg           *kubeadmapi.ClusterConfiguration
 		buf           *bytes.Buffer
 		expectedBytes []byte
 	}{
@@ -34,7 +34,7 @@ func TestPrintConfiguration(t *testing.T) {
 			expectedBytes: []byte(""),
 		},
 		{
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
@@ -43,32 +43,28 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
-	api:
-	  advertiseAddress: ""
-	  bindPort: 0
-	  controlPlaneEndpoint: ""
 	apiVersion: kubeadm.k8s.io/v1alpha3
 	auditPolicy:
 	  logDir: ""
 	  path: ""
 	certificatesDir: ""
+	controlPlaneEndpoint: ""
 	etcd:
 	  local:
 	    dataDir: /some/path
 	    image: ""
 	imageRepository: ""
-	kind: InitConfiguration
+	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: ""
-	nodeRegistration: {}
 	unifiedControlPlaneImage: ""
 `),
 		},
 		{
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Networking: kubeadmapi.Networking{
 					ServiceSubnet: "10.96.0.1/12",
@@ -80,15 +76,12 @@ func TestPrintConfiguration(t *testing.T) {
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
-	api:
-	  advertiseAddress: ""
-	  bindPort: 0
-	  controlPlaneEndpoint: ""
 	apiVersion: kubeadm.k8s.io/v1alpha3
 	auditPolicy:
 	  logDir: ""
 	  path: ""
 	certificatesDir: ""
+	controlPlaneEndpoint: ""
 	etcd:
 	  external:
 	    caFile: ""
@@ -97,13 +90,12 @@ func TestPrintConfiguration(t *testing.T) {
 	    - https://one-etcd-instance:2379
 	    keyFile: ""
 	imageRepository: ""
-	kind: InitConfiguration
+	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
 	networking:
 	  dnsDomain: ""
 	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
-	nodeRegistration: {}
 	unifiedControlPlaneImage: ""
 `),
 		},

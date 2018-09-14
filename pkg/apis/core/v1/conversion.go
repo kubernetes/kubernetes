@@ -380,6 +380,11 @@ func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.AllowPrivilegeEscalation = in.AllowPrivilegeEscalation
+	if in.ProcMount != nil {
+		pm := string(*in.ProcMount)
+		pmt := v1.ProcMountType(pm)
+		out.ProcMount = &pmt
+	}
 	return nil
 }
 

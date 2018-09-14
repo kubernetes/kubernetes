@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
@@ -119,6 +120,10 @@ func (kvh *kubeletVolumeHost) GetPodPluginDir(podUID types.UID, pluginName strin
 
 func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 	return kvh.kubelet.kubeClient
+}
+
+func (kvh *kubeletVolumeHost) GetCSIClient() csiclientset.Interface {
+	return kvh.kubelet.csiClient
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(

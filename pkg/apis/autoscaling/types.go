@@ -154,13 +154,9 @@ type MetricSpec struct {
 // ObjectMetricSource indicates how to scale on a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricSource struct {
-	// Target is the described Kubernetes object.
-	Target CrossVersionObjectReference
-
-	// MetricName is the name of the metric in question.
-	MetricName string
-	// TargetValue is the target value of the metric (as a quantity).
-	TargetValue resource.Quantity
+	DescribedObject CrossVersionObjectReference
+	Target          MetricTarget
+	Metric          MetricIdentifier
 }
 
 // PodsMetricSource indicates how to scale on a metric describing each pod in
@@ -168,11 +164,10 @@ type ObjectMetricSource struct {
 // The values will be averaged together before being compared to the target
 // value.
 type PodsMetricSource struct {
-	// MetricName is the name of the metric in question
-	MetricName string
-	// TargetAverageValue is the target value of the average of the
-	// metric across all relevant pods (as a quantity)
-	TargetAverageValue resource.Quantity
+	// metric identifies the target metric by name and selector
+	Metric MetricIdentifier
+	// target specifies the target value for the given metric
+	Target MetricTarget
 }
 
 // ResourceMetricSource indicates how to scale on a resource metric known to
@@ -185,37 +180,56 @@ type PodsMetricSource struct {
 type ResourceMetricSource struct {
 	// Name is the name of the resource in question.
 	Name api.ResourceName
-	// TargetAverageUtilization is the target value of the average of the
-	// resource metric across all relevant pods, represented as a percentage of
-	// the requested value of the resource for the pods.
-	// +optional
-	TargetAverageUtilization *int32
-	// TargetAverageValue is the target value of the average of the
-	// resource metric across all relevant pods, as a raw value (instead of as
-	// a percentage of the request), similar to the "pods" metric source type.
-	// +optional
-	TargetAverageValue *resource.Quantity
+	// Target specifies the target value for the given metric
+	Target MetricTarget
 }
 
 // ExternalMetricSource indicates how to scale on a metric not associated with
 // any Kubernetes object (for example length of queue in cloud
 // messaging service, or QPS from loadbalancer running outside of cluster).
 type ExternalMetricSource struct {
-	// metricName is the name of the metric in question.
-	MetricName string
-	// MetricSelector is used to identify a specific time series
-	// within a given metric.
-	// +optional
-	MetricSelector *metav1.LabelSelector
-	// TargetValue is the target value of the metric (as a quantity).
-	// Mutually exclusive with TargetAverageValue.
-	// +optional
-	TargetValue *resource.Quantity
-	// TargetAverageValue is the target per-pod value of global metric (as a quantity).
-	// Mutually exclusive with TargetValue.
-	// +optional
-	TargetAverageValue *resource.Quantity
+	// Metric identifies the target metric by name and selector
+	Metric MetricIdentifier
+	// Target specifies the target value for the given metric
+	Target MetricTarget
 }
+
+// MetricIdentifier defines the name and optionally selector for a metric
+type MetricIdentifier struct {
+	// Name is the name of the given metric
+	Name string
+	// Selector is the selector for the given metric
+	// it is the string-encoded form of a standard kubernetes label selector
+	// +optional
+	Selector *metav1.LabelSelector
+}
+
+// MetricTarget defines the target value, average value, or average utilization of a specific metric
+type MetricTarget struct {
+	// Type represents whether the metric type is Utilization, Value, or AverageValue
+	Type MetricTargetType
+	// Value is the target value of the metric (as a quantity).
+	Value *resource.Quantity
+	// TargetAverageValue is the target value of the average of the
+	// metric across all relevant pods (as a quantity)
+	AverageValue *resource.Quantity
+
+	// AverageUtilization is the target value of the average of the
+	// resource metric across all relevant pods, represented as a percentage of
+	// the requested value of the resource for the pods.
+	// Currently only valid for Resource metric source type
+	AverageUtilization *int32
+}
+
+// MetricTargetType specifies the type of metric being targeted, and should be either
+// "Value", "AverageValue", or "Utilization"
+type MetricTargetType string
+
+var (
+	UtilizationMetricType  MetricTargetType = "Utilization"
+	ValueMetricType        MetricTargetType = "Value"
+	AverageValueMetricType MetricTargetType = "AverageValue"
+)
 
 // HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
 type HorizontalPodAutoscalerStatus struct {
@@ -237,6 +251,7 @@ type HorizontalPodAutoscalerStatus struct {
 	DesiredReplicas int32
 
 	// CurrentMetrics is the last read state of the metrics used by this autoscaler.
+	// +optional
 	CurrentMetrics []MetricStatus
 
 	// Conditions is the set of conditions required for this autoscaler to scale its target,
@@ -327,23 +342,17 @@ type MetricStatus struct {
 // ObjectMetricStatus indicates the current value of a metric describing a
 // kubernetes object (for example, hits-per-second on an Ingress object).
 type ObjectMetricStatus struct {
-	// Target is the described Kubernetes object.
-	Target CrossVersionObjectReference
+	Metric  MetricIdentifier
+	Current MetricValueStatus
 
-	// MetricName is the name of the metric in question.
-	MetricName string
-	// CurrentValue is the current value of the metric (as a quantity).
-	CurrentValue resource.Quantity
+	DescribedObject CrossVersionObjectReference
 }
 
 // PodsMetricStatus indicates the current value of a metric describing each pod in
 // the current scale target (for example, transactions-processed-per-second).
 type PodsMetricStatus struct {
-	// MetricName is the name of the metric in question
-	MetricName string
-	// CurrentAverageValue is the current value of the average of the
-	// metric across all relevant pods (as a quantity)
-	CurrentAverageValue resource.Quantity
+	Metric  MetricIdentifier
+	Current MetricValueStatus
 }
 
 // ResourceMetricStatus indicates the current value of a resource metric known to
@@ -353,36 +362,21 @@ type PodsMetricStatus struct {
 // normal per-pod metrics using the "pods" source.
 type ResourceMetricStatus struct {
 	// Name is the name of the resource in question.
-	Name api.ResourceName
-	// CurrentAverageUtilization is the current value of the average of the
-	// resource metric across all relevant pods, represented as a percentage of
-	// the requested value of the resource for the pods.  It will only be
-	// present if `targetAverageValue` was set in the corresponding metric
-	// specification.
-	// +optional
-	CurrentAverageUtilization *int32
-	// CurrentAverageValue is the current value of the average of the
-	// resource metric across all relevant pods, as a raw value (instead of as
-	// a percentage of the request), similar to the "pods" metric source type.
-	// It will always be set, regardless of the corresponding metric specification.
-	CurrentAverageValue resource.Quantity
+	Name    api.ResourceName
+	Current MetricValueStatus
 }
 
 // ExternalMetricStatus indicates the current value of a global metric
 // not associated with any Kubernetes object.
 type ExternalMetricStatus struct {
-	// MetricName is the name of a metric used for autoscaling in
-	// metric system.
-	MetricName string
-	// MetricSelector is used to identify a specific time series
-	// within a given metric.
-	// +optional
-	MetricSelector *metav1.LabelSelector
-	// CurrentValue is the current value of the metric (as a quantity)
-	CurrentValue resource.Quantity
-	// CurrentAverageValue is the current value of metric averaged over autoscaled pods.
-	// +optional
-	CurrentAverageValue *resource.Quantity
+	Metric  MetricIdentifier
+	Current MetricValueStatus
+}
+
+type MetricValueStatus struct {
+	Value              *resource.Quantity
+	AverageValue       *resource.Quantity
+	AverageUtilization *int32
 }
 
 // +genclient

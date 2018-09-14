@@ -63,6 +63,7 @@ type PodDisruptionBudgetStatus struct {
 	// the list automatically by PodDisruptionBudget controller after some time.
 	// If everything goes smooth this map should be empty for the most of the time.
 	// Large number of entries in the map may indicate problems with pod deletions.
+	// +optional
 	DisruptedPods map[string]metav1.Time
 
 	// Number of pod disruptions that are currently allowed.
@@ -227,6 +228,10 @@ type PodSecurityPolicySpec struct {
 	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
 	// +optional
 	ForbiddenSysctls []string
+	// AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+	// Empty or nil indicates that only the DefaultProcMountType may be used.
+	// +optional
+	AllowedProcMountTypes []api.ProcMountType
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy

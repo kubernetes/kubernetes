@@ -24,6 +24,8 @@ package nodelifecycle
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
+	"io"
 	"sync"
 	"time"
 
@@ -46,6 +48,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	v1node "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -77,40 +80,35 @@ var (
 		Effect: v1.TaintEffectNoExecute,
 	}
 
-	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]struct {
-		taintKey string
-		// noScheduleStatus is the condition under which the node should be tainted as not schedulable for this
-		// NodeConditionType
-		noScheduleStatus v1.ConditionStatus
-	}{
+	// map {NodeConditionType: {ConditionStatus: TaintKey}}
+	// represents which NodeConditionType under which ConditionStatus should be
+	// tainted with which TaintKey
+	// for certain NodeConditionType, there are multiple {ConditionStatus,TaintKey} pairs
+	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]map[v1.ConditionStatus]string{
 		v1.NodeReady: {
-			taintKey:         algorithm.TaintNodeNotReady,
-			noScheduleStatus: v1.ConditionFalse,
+			v1.ConditionFalse:   algorithm.TaintNodeNotReady,
+			v1.ConditionUnknown: algorithm.TaintNodeUnreachable,
 		},
 		v1.NodeMemoryPressure: {
-			taintKey:         algorithm.TaintNodeMemoryPressure,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeMemoryPressure,
 		},
 		v1.NodeOutOfDisk: {
-			taintKey:         algorithm.TaintNodeOutOfDisk,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeOutOfDisk,
 		},
 		v1.NodeDiskPressure: {
-			taintKey:         algorithm.TaintNodeDiskPressure,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeDiskPressure,
 		},
 		v1.NodeNetworkUnavailable: {
-			taintKey:         algorithm.TaintNodeNetworkUnavailable,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodeNetworkUnavailable,
 		},
 		v1.NodePIDPressure: {
-			taintKey:         algorithm.TaintNodePIDPressure,
-			noScheduleStatus: v1.ConditionTrue,
+			v1.ConditionTrue: algorithm.TaintNodePIDPressure,
 		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
 		algorithm.TaintNodeNotReady:           v1.NodeReady,
+		algorithm.TaintNodeUnreachable:        v1.NodeReady,
 		algorithm.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
 		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
@@ -223,6 +221,8 @@ type Controller struct {
 	// if set to true, NodeController will taint Nodes based on its condition for 'NetworkUnavailable',
 	// 'MemoryPressure', 'OutOfDisk' and 'DiskPressure'.
 	taintNodeByCondition bool
+
+	nodeUpdateQueue workqueue.Interface
 }
 
 // NewNodeLifecycleController returns a new taint controller.
@@ -281,6 +281,7 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
 		taintNodeByCondition:        taintNodeByCondition,
+		nodeUpdateQueue:             workqueue.New(),
 	}
 	if useTaintBasedEvictions {
 		glog.Infof("Controller is using taint based evictions.")
@@ -348,10 +349,12 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		glog.Infof("Controller will taint node by condition.")
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
-				return nc.doNoScheduleTaintingPass(node)
+				nc.nodeUpdateQueue.Add(node.Name)
+				return nil
 			}),
 			UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
-				return nc.doNoScheduleTaintingPass(newNode)
+				nc.nodeUpdateQueue.Add(newNode.Name)
+				return nil
 			}),
 		})
 	}
@@ -388,18 +391,32 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	}
 
 	if nc.runTaintManager {
-		go nc.taintManager.Run(wait.NeverStop)
+		go nc.taintManager.Run(stopCh)
+	}
+
+	if nc.taintNodeByCondition {
+		// Close node update queue to cleanup go routine.
+		defer nc.nodeUpdateQueue.ShutDown()
+
+		// Start workers to update NoSchedule taint for nodes.
+		for i := 0; i < scheduler.UpdateWorkerSize; i++ {
+			// Thanks to "workqueue", each worker just need to get item from queue, because
+			// the item is flagged when got from queue: if new event come, the new item will
+			// be re-queued until "Done", so no more than one worker handle the same item and
+			// no event missed.
+			go wait.Until(nc.doNoScheduleTaintingPassWorker, time.Second, stopCh)
+		}
 	}
 
 	if nc.useTaintBasedEvictions {
 		// Handling taint based evictions. Because we don't want a dedicated logic in TaintManager for NC-originated
 		// taints and we normally don't rate limit evictions caused by taints, we need to rate limit adding taints.
-		go wait.Until(nc.doNoExecuteTaintingPass, scheduler.NodeEvictionPeriod, wait.NeverStop)
+		go wait.Until(nc.doNoExecuteTaintingPass, scheduler.NodeEvictionPeriod, stopCh)
 	} else {
 		// Managing eviction of nodes:
 		// When we delete pods off a node, if the node was not empty at the time we then
 		// queue an eviction watcher. If we hit an error, retry deletion.
-		go wait.Until(nc.doEvictionPass, scheduler.NodeEvictionPeriod, wait.NeverStop)
+		go wait.Until(nc.doEvictionPass, scheduler.NodeEvictionPeriod, stopCh)
 	}
 
 	// Incorporate the results of node status pushed from kubelet to master.
@@ -407,7 +424,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 		if err := nc.monitorNodeStatus(); err != nil {
 			glog.Errorf("Error monitoring node status: %v", err)
 		}
-	}, nc.nodeMonitorPeriod, wait.NeverStop)
+	}, nc.nodeMonitorPeriod, stopCh)
 
 	<-stopCh
 }
@@ -450,14 +467,41 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 	return nil
 }
 
-func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
+func (nc *Controller) doNoScheduleTaintingPassWorker() {
+	for {
+		obj, shutdown := nc.nodeUpdateQueue.Get()
+		// "nodeUpdateQueue" will be shutdown when "stopCh" closed;
+		// we do not need to re-check "stopCh" again.
+		if shutdown {
+			return
+		}
+		nodeName := obj.(string)
+
+		if err := nc.doNoScheduleTaintingPass(nodeName); err != nil {
+			// TODO (k82cn): Add nodeName back to the queue.
+			glog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
+		}
+		nc.nodeUpdateQueue.Done(nodeName)
+	}
+}
+
+func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
+	node, err := nc.nodeLister.Get(nodeName)
+	if err != nil {
+		// If node not found, just ignore it.
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
 	// Map node's condition to Taints.
 	var taints []v1.Taint
 	for _, condition := range node.Status.Conditions {
-		if taint, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
-			if condition.Status == taint.noScheduleStatus {
+		if taintMap, found := nodeConditionToTaintKeyStatusMap[condition.Type]; found {
+			if taintKey, found := taintMap[condition.Status]; found {
 				taints = append(taints, v1.Taint{
-					Key:    taint.taintKey,
+					Key:    taintKey,
 					Effect: v1.TaintEffectNoSchedule,
 				})
 			}
@@ -473,6 +517,10 @@ func (nc *Controller) doNoScheduleTaintingPass(node *v1.Node) error {
 
 	// Get exist taints of node.
 	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
+		// only NoSchedule taints are candidates to be compared with "taints" later
+		if t.Effect != v1.TaintEffectNoSchedule {
+			return false
+		}
 		// Find unschedulable taint of node.
 		if t.Key == algorithm.TaintNodeUnschedulable {
 			return true
@@ -1197,4 +1245,10 @@ func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) 
 	default:
 		return notReadyNodes, stateNormal
 	}
+}
+
+func hash(val string, max int) int {
+	hasher := fnv.New32a()
+	io.WriteString(hasher, val)
+	return int(hasher.Sum32()) % max
 }

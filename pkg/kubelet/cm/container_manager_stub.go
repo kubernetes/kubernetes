@@ -77,10 +77,8 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 	return c
 }
 
-func (cm *containerManagerStub) GetPluginRegistrationHandlerCallback() pluginwatcher.RegisterCallbackFn {
-	return func(name string, endpoint string, versions []string, sockPath string) (chan bool, error) {
-		return nil, nil
-	}
+func (cm *containerManagerStub) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return nil
 }
 
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

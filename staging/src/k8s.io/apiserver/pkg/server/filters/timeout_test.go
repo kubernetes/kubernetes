@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
 type recorder struct {
@@ -50,22 +51,33 @@ func (r *recorder) Count() int {
 }
 
 func TestTimeout(t *testing.T) {
+	origReallyCrash := runtime.ReallyCrash
+	runtime.ReallyCrash = false
+	defer func() {
+		runtime.ReallyCrash = origReallyCrash
+	}()
+
 	sendResponse := make(chan struct{}, 1)
+	doPanic := make(chan struct{}, 1)
 	writeErrors := make(chan error, 1)
 	timeout := make(chan time.Time, 1)
 	resp := "test response"
 	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
 	record := &recorder{}
 
-	ts := httptest.NewServer(WithTimeout(http.HandlerFunc(
+	ts := httptest.NewServer(WithPanicRecovery(WithTimeout(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			<-sendResponse
-			_, err := w.Write([]byte(resp))
-			writeErrors <- err
+			select {
+			case <-sendResponse:
+				_, err := w.Write([]byte(resp))
+				writeErrors <- err
+			case <-doPanic:
+				panic("inner handler panics")
+			}
 		}),
 		func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
 			return req, timeout, record.Record, timeoutErr
-		}))
+		})))
 	defer ts.Close()
 
 	// No timeouts
@@ -113,5 +125,15 @@ func TestTimeout(t *testing.T) {
 	sendResponse <- struct{}{}
 	if err := <-writeErrors; err != http.ErrHandlerTimeout {
 		t.Errorf("got Write error of %v; expected %v", err, http.ErrHandlerTimeout)
+	}
+
+	// Panics
+	doPanic <- struct{}{}
+	res, err = http.Get(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != http.StatusInternalServerError {
+		t.Errorf("got res.StatusCode %d; expected %d due to panic", res.StatusCode, http.StatusInternalServerError)
 	}
 }

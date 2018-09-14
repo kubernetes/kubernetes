@@ -19,8 +19,6 @@ package stats
 import (
 	"fmt"
 
-	"github.com/golang/glog"
-
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
@@ -73,41 +71,16 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 	}
 
 	nodeStats := statsapi.NodeStats{
-		NodeName:  node.Name,
-		CPU:       rootStats.CPU,
-		Memory:    rootStats.Memory,
-		Network:   networkStats,
-		StartTime: rootStats.StartTime,
-		Fs:        rootFsStats,
-		Runtime:   &statsapi.RuntimeStats{ImageFs: imageFsStats},
-		Rlimit:    rlimit,
+		NodeName:         node.Name,
+		CPU:              rootStats.CPU,
+		Memory:           rootStats.Memory,
+		Network:          networkStats,
+		StartTime:        rootStats.StartTime,
+		Fs:               rootFsStats,
+		Runtime:          &statsapi.RuntimeStats{ImageFs: imageFsStats},
+		Rlimit:           rlimit,
+		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
 	}
-
-	systemContainers := map[string]struct {
-		name             string
-		forceStatsUpdate bool
-	}{
-		statsapi.SystemContainerKubelet: {nodeConfig.KubeletCgroupsName, false},
-		statsapi.SystemContainerRuntime: {nodeConfig.RuntimeCgroupsName, false},
-		statsapi.SystemContainerMisc:    {nodeConfig.SystemCgroupsName, false},
-		statsapi.SystemContainerPods:    {sp.provider.GetPodCgroupRoot(), updateStats},
-	}
-	for sys, cont := range systemContainers {
-		// skip if cgroup name is undefined (not all system containers are required)
-		if cont.name == "" {
-			continue
-		}
-		s, _, err := sp.provider.GetCgroupStats(cont.name, cont.forceStatsUpdate)
-		if err != nil {
-			glog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
-			continue
-		}
-		// System containers don't have a filesystem associated with them.
-		s.Logs, s.Rootfs = nil, nil
-		s.Name = sys
-		nodeStats.SystemContainers = append(nodeStats.SystemContainers, *s)
-	}
-
 	summary := statsapi.Summary{
 		Node: nodeStats,
 		Pods: podStats,

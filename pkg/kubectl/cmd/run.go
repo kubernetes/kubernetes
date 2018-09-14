@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -40,8 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -321,6 +321,13 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		} else {
 			generatorName = generatorNameTemp
 		}
+	}
+
+	// start deprecating all generators except for 'run-pod/v1' which will be
+	// the only supported on a route to simple kubectl run which should mimic
+	// docker run
+	if generatorName != cmdutil.RunPodV1GeneratorName {
+		fmt.Fprintf(o.ErrOut, "kubectl run --generator=%s is DEPRECATED and will be removed in a future version. Use kubectl create instead.\n", generatorName)
 	}
 
 	generators := cmdutil.GeneratorFn("run")
@@ -667,7 +674,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		if err != nil {
 			return nil, err
 		}
-		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj)
+		actualObj, err = resource.NewHelper(client, mapping).Create(namespace, false, obj, nil)
 		if err != nil {
 			return nil, err
 		}

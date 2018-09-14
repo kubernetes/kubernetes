@@ -321,20 +321,11 @@ var _ = SIGDescribe("Load capacity", func() {
 			// to make it possible to create/schedule & delete them in the meantime.
 			// Currently we assume that <throughput> pods/second average throughput.
 
-			// The expected number of created/deleted pods is totalPods/4 when scaling
-			// for the first time, with each RC changing its size from X to a uniform
-			// random value in the interval [X/2, 3X/2].
+			// The expected number of created/deleted pods is totalPods/4 when scaling,
+			// as each RC changes its size from X to a uniform random value in [X/2, 3X/2].
 			scalingTime := time.Duration(totalPods/(4*throughput)) * time.Second
 			framework.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
-			By("============================================================================")
-
-			// The expected number of created/deleted pods is totalPods/3 when scaling for
-			// the second time, with each RC changing its size from a uniform random value
-			// in the interval [X/2, 3X/2] to another uniform random value in same interval.
-			scalingTime = time.Duration(totalPods/(3*throughput)) * time.Second
-			framework.Logf("Starting to scale %v objects second time...", itArg.kind)
-			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(400, "scaling second time"))
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.

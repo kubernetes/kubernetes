@@ -34,7 +34,9 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"github.com/golang/glog"
+	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
+	"github.com/vmware/govmomi/vim25/mo"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -604,7 +606,13 @@ func (vs *VSphere) getVMFromNodeName(ctx context.Context, nodeName k8stypes.Node
 func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName) ([]v1.NodeAddress, error) {
 	// Get local IP addresses if node is local node
 	if vs.hostName == convertToString(nodeName) {
-		return getLocalIP()
+		addrs, err := getLocalIP()
+		if err != nil {
+			return nil, err
+		}
+		// add the hostname address
+		v1helper.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
+		return addrs, nil
 	}
 
 	if vs.cfg == nil {
@@ -754,9 +762,6 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 		}
 		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			if err == vclib.ErrNoVMFound {
-				return "", cloudprovider.InstanceNotFound
-			}
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
@@ -774,9 +779,8 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 
 	instanceID, err := instanceIDInternal()
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
 				glog.V(4).Infof("InstanceID: Found node %q", convertToString(nodeName))
 				instanceID, err = instanceIDInternal()
@@ -863,9 +867,8 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 	requestTime := time.Now()
 	diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
 				glog.V(4).Infof("AttachDisk: Found node %q", convertToString(nodeName))
 				diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
@@ -876,18 +879,6 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeN
 	glog.V(4).Infof("AttachDisk executed for node %s and volume %s with diskUUID %s. Err: %s", convertToString(nodeName), vmDiskPath, diskUUID, err)
 	vclib.RecordvSphereMetric(vclib.OperationAttachVolume, requestTime, err)
 	return diskUUID, err
-}
-
-func (vs *VSphere) retry(nodeName k8stypes.NodeName, err error) (bool, error) {
-	isManagedObjectNotFoundError := false
-	if err != nil {
-		if vclib.IsManagedObjectNotFoundError(err) {
-			isManagedObjectNotFoundError = true
-			glog.V(4).Infof("error %q ManagedObjectNotFound for node %q", err, convertToString(nodeName))
-			err = vs.nodeManager.RediscoverNode(nodeName)
-		}
-	}
-	return isManagedObjectNotFoundError, err
 }
 
 // DetachDisk detaches given virtual disk volume from the compute running kubelet.
@@ -934,9 +925,8 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 	requestTime := time.Now()
 	err := detachDiskInternal(volPath, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == nil {
 				err = detachDiskInternal(volPath, nodeName)
 			}
@@ -992,9 +982,8 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 	requestTime := time.Now()
 	isAttached, err := diskIsAttachedInternal(volPath, nodeName)
 	if err != nil {
-		var isManagedObjectNotFoundError bool
-		isManagedObjectNotFoundError, err = vs.retry(nodeName, err)
-		if isManagedObjectNotFoundError {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			err = vs.nodeManager.RediscoverNode(nodeName)
 			if err == vclib.ErrNoVMFound {
 				isAttached, err = false, nil
 			} else if err == nil {
@@ -1318,11 +1307,10 @@ func (vs *VSphere) NodeManager() (nodeManager *NodeManager) {
 	return vs.nodeManager
 }
 
-func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *tags.RestClient) error) error {
-	vsURL := connection.Client.URL()
-	vsURL.User = url.UserPassword(connection.Username, connection.Password)
-	c := tags.NewClient(vsURL, connection.Insecure, "")
-	if err := c.Login(ctx); err != nil {
+func withTagsClient(ctx context.Context, connection *vclib.VSphereConnection, f func(c *rest.Client) error) error {
+	c := rest.NewClient(connection.Client)
+	user := url.UserPassword(connection.Username, connection.Password)
+	if err := c.Login(ctx, user); err != nil {
 		return err
 	}
 	defer c.Logout(ctx)
@@ -1352,55 +1340,69 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 		glog.Errorf("Cannot find VM runtime host. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
 	}
-	client := vsi.conn
-	err = withTagsClient(ctx, client, func(client *tags.RestClient) error {
-		tags, err := client.ListAttachedTags(ctx, vmHost)
+
+	pc := vsi.conn.Client.ServiceContent.PropertyCollector
+	err = withTagsClient(ctx, vsi.conn, func(c *rest.Client) error {
+		client := tags.NewManager(c)
+		// example result: ["Folder", "Datacenter", "Cluster", "Host"]
+		objects, err := mo.Ancestors(ctx, vsi.conn.Client, pc, *vmHost)
 		if err != nil {
-			glog.Errorf("Cannot list attached tags. Get zone for node %s error", nodeName)
 			return err
 		}
-		for _, value := range tags {
-			tag, err := client.GetTag(ctx, value)
+
+		// search the hierarchy, example order: ["Host", "Cluster", "Datacenter", "Folder"]
+		for i := range objects {
+			obj := objects[len(objects)-1-i]
+			tags, err := client.ListAttachedTags(ctx, obj)
 			if err != nil {
-				glog.Errorf("Get tag %s error", value)
+				glog.Errorf("Cannot list attached tags. Get zone for node %s: %s", nodeName, err)
 				return err
 			}
-			category, err := client.GetCategory(ctx, tag.CategoryID)
-			if err != nil {
-				glog.Errorf("Get category %s error", value)
-				return err
-			}
-			switch {
+			for _, value := range tags {
+				tag, err := client.GetTag(ctx, value)
+				if err != nil {
+					glog.Errorf("Get tag %s: %s", value, err)
+					return err
+				}
+				category, err := client.GetCategory(ctx, tag.CategoryID)
+				if err != nil {
+					glog.Errorf("Get category %s error", value)
+					return err
+				}
 
-			case category.Name == vs.cfg.Labels.Zone:
-				zone.FailureDomain = tag.Name
+				found := func() {
+					glog.Errorf("Found %q tag (%s) for %s attached to %s", category.Name, tag.Name, vs.vmUUID, obj.Reference())
+				}
+				switch {
+				case category.Name == vs.cfg.Labels.Zone:
+					zone.FailureDomain = tag.Name
+					found()
+				case category.Name == vs.cfg.Labels.Region:
+					zone.Region = tag.Name
+					found()
+				}
 
-			case category.Name == vs.cfg.Labels.Region:
-				zone.Region = tag.Name
-
-			default:
-				zone.FailureDomain = ""
-				zone.Region = ""
+				if zone.FailureDomain != "" && zone.Region != "" {
+					return nil
+				}
 			}
 		}
-		switch {
-		case zone.Region == "":
-			if vs.cfg.Labels.Zone != "" {
-				return fmt.Errorf("The zone in vSphere configuration file not match for node %s ", nodeName)
-			}
-			glog.Infof("No zones support for node %s error", nodeName)
-			return nil
-		case zone.FailureDomain == "":
+
+		if zone.Region == "" {
 			if vs.cfg.Labels.Region != "" {
-				return fmt.Errorf("The zone in vSphere configuration file not match for node %s ", nodeName)
+				return fmt.Errorf("vSphere region category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Region, nodeName, vs.vmUUID)
 			}
-			glog.Infof("No zones support for node %s error", nodeName)
-			return nil
 		}
+		if zone.FailureDomain == "" {
+			if vs.cfg.Labels.Zone != "" {
+				return fmt.Errorf("vSphere zone category %q does not match any tags for node %s [%s]", vs.cfg.Labels.Zone, nodeName, vs.vmUUID)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
-		glog.Errorf("Get zone for node %s error", nodeName)
+		glog.Errorf("Get zone for node %s: %s", nodeName, err)
 		return cloudprovider.Zone{}, err
 	}
 	return zone, nil

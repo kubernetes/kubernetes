@@ -73,17 +73,17 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 	staticPodSpecs := map[string]v1.Pod{
 		kubeadmconstants.KubeAPIServer: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeAPIServer,
-			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, cfg),
+			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, &cfg.ClusterConfiguration),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getAPIServerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
-			LivenessProbe:   staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeAPIServer, int(cfg.API.BindPort), "/healthz", v1.URISchemeHTTPS),
+			LivenessProbe:   staticpodutil.ComponentProbe(cfg, kubeadmconstants.KubeAPIServer, int(cfg.APIEndpoint.BindPort), "/healthz", v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
 			Env:             getProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeControllerManager,
-			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, cfg),
+			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, &cfg.ClusterConfiguration),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getControllerManagerCommand(cfg, k8sVersion),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
@@ -93,7 +93,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.InitConfiguration, k8sVersion *version.Ve
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
-			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, cfg),
+			Image:           images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, &cfg.ClusterConfiguration),
 			ImagePullPolicy: v1.PullIfNotPresent,
 			Command:         getSchedulerCommand(cfg),
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
@@ -139,7 +139,7 @@ func createStaticPodFiles(manifestDir string, cfg *kubeadmapi.InitConfiguration,
 // getAPIServerCommand builds the right API server command from the given config object and version
 func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 	defaultArguments := map[string]string{
-		"advertise-address":               cfg.API.AdvertiseAddress,
+		"advertise-address":               cfg.APIEndpoint.AdvertiseAddress,
 		"insecure-port":                   "0",
 		"enable-admission-plugins":        "NodeRestriction",
 		"service-cluster-ip-range":        cfg.Networking.ServiceSubnet,
@@ -150,7 +150,7 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 		"kubelet-client-certificate":      filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
 		"kubelet-client-key":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
 		"enable-bootstrap-token-auth":     "true",
-		"secure-port":                     fmt.Sprintf("%d", cfg.API.BindPort),
+		"secure-port":                     fmt.Sprintf("%d", cfg.APIEndpoint.BindPort),
 		"allow-privileged":                "true",
 		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
 		// add options to configure the front proxy.  Without the generated client cert, this will never be useable
@@ -184,6 +184,13 @@ func getAPIServerCommand(cfg *kubeadmapi.InitConfiguration) []string {
 		defaultArguments["etcd-cafile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName)
 		defaultArguments["etcd-certfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientCertName)
 		defaultArguments["etcd-keyfile"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
+
+		// Apply user configurations for local etcd
+		if cfg.Etcd.Local != nil {
+			if value, ok := cfg.Etcd.Local.ExtraArgs["listen-client-urls"]; ok {
+				defaultArguments["etcd-servers"] = value
+			}
+		}
 	}
 
 	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
@@ -285,6 +292,14 @@ func getControllerManagerCommand(cfg *kubeadmapi.InitConfiguration, k8sVersion *
 		"cluster-signing-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
 		"use-service-account-credentials":  "true",
 		"controllers":                      "*,bootstrapsigner,tokencleaner",
+	}
+
+	//add the extra arguments for v1.12+
+	if k8sVersion.Major() >= 1 && k8sVersion.Minor() >= 12 {
+		defaultArguments["authentication-kubeconfig"] = filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+		defaultArguments["authorization-kubeconfig"] = filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+		defaultArguments["client-ca-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
+		defaultArguments["requestheader-client-ca-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName)
 	}
 
 	// If using external CA, pass empty string to controller manager instead of ca.key/ca.crt path,

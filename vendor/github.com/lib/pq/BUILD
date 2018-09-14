@@ -26,9 +26,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/lib/pq",
     importpath = "github.com/lib/pq",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/lib/pq/oid:go_default_library",
-    ],
+    deps = ["//vendor/github.com/lib/pq/oid:go_default_library"],
 )
 
 filegroup(

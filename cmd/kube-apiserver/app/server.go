@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	webhookconfig "k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -54,6 +53,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
@@ -360,7 +360,11 @@ func CreateKubeAPIServerConfig(
 			}
 		}
 
-		issuer = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		issuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to build token generator: %v", err)
+			return
+		}
 		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
 		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
@@ -526,7 +530,7 @@ func buildGenericConfig(
 		return
 	}
 
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers, versionedInformers)
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
@@ -535,8 +539,8 @@ func buildGenericConfig(
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	webhookAuthResolverWrapper := func(delegate webhookconfig.AuthenticationInfoResolver) webhookconfig.AuthenticationInfoResolver {
-		return &webhookconfig.AuthenticationInfoResolverDelegator{
+	webhookAuthResolverWrapper := func(delegate webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
+		return &webhook.AuthenticationInfoResolverDelegator{
 			ClientConfigForFunc: func(server string) (*rest.Config, error) {
 				if server == "kubernetes.default.svc" {
 					return genericConfig.LoopbackClientConfig, nil
@@ -589,7 +593,7 @@ func BuildAdmissionPluginInitializers(
 	client internalclientset.Interface,
 	sharedInformers informers.SharedInformerFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
-	webhookAuthWrapper webhookconfig.AuthenticationInfoResolverWrapper,
+	webhookAuthWrapper webhook.AuthenticationInfoResolverWrapper,
 ) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
 	var cloudConfig []byte
 
@@ -634,8 +638,8 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 }
 
 // BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.SharedInformerFactory, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers, versionedInformers)
+func BuildAuthorizer(s *options.ServerRunOptions, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	return authorizationConfig.New()
 }
 

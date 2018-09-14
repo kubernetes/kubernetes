@@ -173,8 +173,8 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 			cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
 		}
 		cmd.Flags().StringVar(&cfg.CertificatesDir, "cert-dir", cfg.CertificatesDir, "The path where certificates are stored")
-		cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address the API server is accessible on")
-		cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API server is accessible on")
+		cmd.Flags().StringVar(&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress, "The IP address the API server is accessible on")
+		cmd.Flags().Int32Var(&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort, "The port the API server is accessible on")
 		cmd.Flags().StringVar(&outDir, "kubeconfig-dir", outDir, "The path where to save the kubeconfig file")
 		if properties.use == "all" || properties.use == "kubelet" {
 			cmd.Flags().StringVar(&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name, `The node name that should be used for the kubelet client certificate`)

@@ -10,6 +10,7 @@ reviewers:
   - sttts
   - gmarek
   - vishh
+  - spiffxp
 approvers:
   - cblecker
   - deads2k
@@ -28,3 +29,4 @@ approvers:
   - liggitt
   - soltysh # for sig-cli related stuff
   - dims # for local-up-cluster related files
+  - spiffxp

@@ -96,6 +96,9 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	}
 
 	// Step 2: Create the sandbox container.
+	if r.GetRuntimeHandler() != "" {
+		return nil, fmt.Errorf("RuntimeHandler %q not supported", r.GetRuntimeHandler())
+	}
 	createConfig, err := ds.makeSandboxDockerConfig(config, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make sandbox docker config for pod %q: %v", config.Metadata.Name, err)
@@ -672,6 +675,8 @@ func toCheckpointProtocol(protocol runtimeapi.Protocol) Protocol {
 		return protocolTCP
 	case runtimeapi.Protocol_UDP:
 		return protocolUDP
+	case runtimeapi.Protocol_SCTP:
+		return protocolSCTP
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return protocolTCP

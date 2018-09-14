@@ -22,15 +22,18 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Config is the main context object for the cloud controller manager.
 type Config struct {
-	ComponentConfig componentconfig.CloudControllerManagerConfiguration
+	ComponentConfig ccmconfig.CloudControllerManagerConfiguration
 
 	SecureServing *apiserver.SecureServingInfo
+	// LoopbackClientConfig is a config for a privileged loopback connection
+	LoopbackClientConfig *restclient.Config
+
 	// TODO: remove deprecated insecure serving
 	InsecureServing *apiserver.DeprecatedInsecureServingInfo
 	Authentication  apiserver.AuthenticationInfo
@@ -71,5 +74,8 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
 func (c *Config) Complete() *CompletedConfig {
 	cc := completedConfig{c}
+
+	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)
+
 	return &CompletedConfig{&cc}
 }

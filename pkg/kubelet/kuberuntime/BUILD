@@ -45,6 +45,7 @@ go_library(
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/prober/results:go_default_library",
+        "//pkg/kubelet/runtimeclass:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/cache:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -83,6 +84,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "helpers_linux_test.go",
         "helpers_test.go",
         "instrumented_services_test.go",
         "kuberuntime_container_linux_test.go",
@@ -105,6 +107,8 @@ go_test(
         "//pkg/kubelet/container/testing:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
+        "//pkg/kubelet/runtimeclass:go_default_library",
+        "//pkg/kubelet/runtimeclass/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -118,6 +122,7 @@ go_test(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

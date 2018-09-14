@@ -26,6 +26,10 @@ run_kubectl_diff_tests() {
     create_and_use_new_namespace
     kube::log::status "Testing kubectl alpha diff"
 
+    # Test that it works when the live object doesn't exist
+    output_message=$(kubectl alpha diff LOCAL LIVE -f hack/testdata/pod.yaml)
+    kube::test::if_has_string "${output_message}" 'test-pod'
+
     kubectl apply -f hack/testdata/pod.yaml
 
     # Ensure that selfLink has been added, and shown in the diff

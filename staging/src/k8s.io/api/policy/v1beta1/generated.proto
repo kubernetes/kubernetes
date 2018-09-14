@@ -151,6 +151,7 @@ message PodDisruptionBudgetStatus {
   // the list automatically by PodDisruptionBudget controller after some time.
   // If everything goes smooth this map should be empty for the most of the time.
   // Large number of entries in the map may indicate problems with pod deletions.
+  // +optional
   map<string, k8s.io.apimachinery.pkg.apis.meta.v1.Time> disruptedPods = 2;
 
   // Number of pod disruptions that are currently allowed.
@@ -296,6 +297,12 @@ message PodSecurityPolicySpec {
   // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
   // +optional
   repeated string forbiddenSysctls = 20;
+
+  // AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+  // Empty or nil indicates that only the DefaultProcMountType may be used.
+  // This requires the ProcMountType feature flag to be enabled.
+  // +optional
+  repeated string allowedProcMountTypes = 21;
 }
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.

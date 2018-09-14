@@ -39,8 +39,13 @@ func BuildHandlerChain(apiHandler http.Handler, authorizationInfo *apiserver.Aut
 	requestInfoResolver := &apirequest.RequestInfoFactory{}
 	failedHandler := genericapifilters.Unauthorized(legacyscheme.Codecs, false)
 
-	handler := genericapifilters.WithAuthorization(apiHandler, authorizationInfo.Authorizer, legacyscheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, authenticationInfo.Authenticator, failedHandler)
+	handler := apiHandler
+	if authorizationInfo != nil {
+		handler = genericapifilters.WithAuthorization(apiHandler, authorizationInfo.Authorizer, legacyscheme.Codecs)
+	}
+	if authenticationInfo != nil {
+		handler = genericapifilters.WithAuthentication(handler, authenticationInfo.Authenticator, failedHandler)
+	}
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
 

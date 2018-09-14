@@ -116,7 +116,7 @@ func TestCreateFileShare(t *testing.T) {
 		fake.Keys = test.keys
 		fake.Err = test.err
 
-		account, key, err := cloud.CreateFileShare(test.name, test.acct, test.acctType, test.loc, test.gb)
+		account, key, err := cloud.CreateFileShare(test.name, test.acct, test.acctType, "rg", test.loc, test.gb)
 		if test.expectErr && err == nil {
 			t.Errorf("unexpected non-error")
 			continue

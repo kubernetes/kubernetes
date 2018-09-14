@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -98,6 +99,9 @@ type kubeGenericRuntimeManager struct {
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
 
+	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
+	cpuCFSQuotaPeriod metav1.Duration
+
 	// wrapped image puller.
 	imagePuller images.ImageManager
 
@@ -116,6 +120,9 @@ type kubeGenericRuntimeManager struct {
 
 	// A shim to legacy functions for backward compatibility.
 	legacyLogProvider LegacyLogProvider
+
+	// Manage RuntimeClass resources.
+	runtimeClassManager *runtimeclass.Manager
 }
 
 type KubeGenericRuntime interface {
@@ -146,14 +153,17 @@ func NewKubeGenericRuntimeManager(
 	imagePullQPS float32,
 	imagePullBurst int,
 	cpuCFSQuota bool,
+	cpuCFSQuotaPeriod metav1.Duration,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	internalLifecycle cm.InternalContainerLifecycle,
 	legacyLogProvider LegacyLogProvider,
+	runtimeClassManager *runtimeclass.Manager,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         cpuCFSQuota,
+		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
 		seccompProfileRoot:  seccompProfileRoot,
 		livenessManager:     livenessManager,
 		containerRefManager: containerRefManager,
@@ -165,6 +175,7 @@ func NewKubeGenericRuntimeManager(
 		keyring:             credentialprovider.NewDockerKeyring(),
 		internalLifecycle:   internalLifecycle,
 		legacyLogProvider:   legacyLogProvider,
+		runtimeClassManager: runtimeClassManager,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)

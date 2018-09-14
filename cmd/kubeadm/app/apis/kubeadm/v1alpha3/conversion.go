@@ -18,18 +18,18 @@ package v1alpha3
 
 import (
 	"k8s.io/apimachinery/pkg/conversion"
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
 )
 
-func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
-	if err := autoConvert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s); err != nil {
+func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s); err != nil {
 		return err
 	}
 
@@ -60,18 +60,18 @@ func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitCon
 	return nil
 }
 
-func defaultKubeProxyConfiguration(internalcfg *InitConfiguration, obj *kubeproxyconfig.KubeProxyConfiguration) {
+func defaultKubeProxyConfiguration(internalcfg *ClusterConfiguration, obj *kubeproxyconfig.KubeProxyConfiguration) {
 	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
 	if obj.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
 		obj.ClusterCIDR = internalcfg.Networking.PodSubnet
 	}
 
-	if obj.ClientConnection.KubeConfigFile == "" {
-		obj.ClientConnection.KubeConfigFile = "/var/lib/kube-proxy/kubeconfig.conf"
+	if obj.ClientConnection.Kubeconfig == "" {
+		obj.ClientConnection.Kubeconfig = "/var/lib/kube-proxy/kubeconfig.conf"
 	}
 }
 
-func defaultKubeletConfiguration(internalcfg *InitConfiguration, obj *kubeletconfig.KubeletConfiguration) {
+func defaultKubeletConfiguration(internalcfg *ClusterConfiguration, obj *kubeletconfig.KubeletConfiguration) {
 	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
 	if obj.StaticPodPath == "" {
 		obj.StaticPodPath = DefaultManifestsDir

@@ -84,6 +84,7 @@ standard where possible. The Godoc reference has a list of constants.
  RSASSA-PSS                 | PS256, PS384, PS512
  HMAC                       | HS256, HS384, HS512
  ECDSA                      | ES256, ES384, ES512
+ Ed25519                    | EdDSA
 
  Content encryption         | Algorithm identifier(s)
  :------------------------- | :------------------------------

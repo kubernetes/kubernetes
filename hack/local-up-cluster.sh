@@ -84,9 +84,6 @@ ENABLE_POD_PRIORITY_PREEMPTION=${ENABLE_POD_PRIORITY_PREEMPTION:-""}
 # enable kubernetes dashboard
 ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
 
-# enable audit log
-ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
-
 # RBAC Mode options
 AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
@@ -477,24 +474,6 @@ function start_apiserver {
     # The order defined here dose not matter.
     ENABLE_ADMISSION_PLUGINS=LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
 
-    audit_arg=""
-    APISERVER_BASIC_AUDIT_LOG=""
-    if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" = true ]]; then
-        # We currently only support enabling with a fixed path and with built-in log
-        # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
-        # External log rotation should be set up the same as for kube-apiserver.log.
-        APISERVER_BASIC_AUDIT_LOG=/tmp/kube-apiserver-audit.log
-        audit_arg=" --audit-log-path=${APISERVER_BASIC_AUDIT_LOG}"
-        audit_arg+=" --audit-log-maxage=0"
-        audit_arg+=" --audit-log-maxbackup=0"
-        # Lumberjack doesn't offer any way to disable size-based rotation. It also
-        # has an in-memory counter that doesn't notice if you truncate the file.
-        # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
-        # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
-        # never restarts. Please manually restart apiserver before this time.
-        audit_arg+=" --audit-log-maxsize=2000000000"
-    fi
-
     swagger_arg=""
     if [[ "${ENABLE_SWAGGER_UI}" = true ]]; then
       swagger_arg="--enable-swagger-ui=true "
@@ -572,7 +551,7 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${authorizer_arg} ${priv_arg} ${runtime_config} \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${authorizer_arg} ${priv_arg} ${runtime_config} \
       ${cloud_config_arg} \
       ${advertise_address} \
       ${node_port_range} \
@@ -967,10 +946,6 @@ Logs:
   ${PROXY_LOG:-}
   ${SCHEDULER_LOG:-}
 EOF
-fi
-
-if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" = true ]]; then
-  echo "  ${APISERVER_BASIC_AUDIT_LOG}"
 fi
 
 if [[ "${START_MODE}" == "all" ]]; then

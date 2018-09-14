@@ -26,9 +26,11 @@ import (
 	"github.com/golang/glog"
 
 	api "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -49,6 +51,7 @@ var (
 		"nodeName",
 		"attachmentID",
 	}
+	currentPodInfoMountVersion = "v1"
 )
 
 type csiMountMgr struct {
@@ -113,9 +116,6 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	csi := c.csiClient
-	nodeName := string(c.plugin.host.GetNodeName())
-	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
-
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
@@ -134,20 +134,13 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 			return err
 		}
 	}
-
 	// search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	if c.volumeInfo == nil {
-		attachment, err := c.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+		nodeName := string(c.plugin.host.GetNodeName())
+		c.volumeInfo, err = c.plugin.getPublishVolumeInfo(c.k8s, c.volumeID, c.driverName, nodeName)
 		if err != nil {
-			glog.Error(log("mounter.SetupAt failed while getting volume attachment [id=%v]: %v", attachID, err))
 			return err
 		}
-
-		if attachment == nil {
-			glog.Error(log("unable to find VolumeAttachment [id=%s]", attachID))
-			return errors.New("no existing VolumeAttachment found")
-		}
-		c.volumeInfo = attachment.Status.AttachmentMetadata
 	}
 
 	attribs := csiSource.VolumeAttributes
@@ -172,6 +165,22 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	accessMode := api.ReadWriteOnce
 	if c.spec.PersistentVolume.Spec.AccessModes != nil {
 		accessMode = c.spec.PersistentVolume.Spec.AccessModes[0]
+	}
+
+	// Inject pod information into volume_attributes
+	podAttrs, err := c.podAttributes()
+	if err != nil {
+		glog.Error(log("mouter.SetUpAt failed to assemble volume attributes: %v", err))
+		return err
+	}
+	if podAttrs != nil {
+		if attribs == nil {
+			attribs = podAttrs
+		} else {
+			for k, v := range podAttrs {
+				attribs[k] = v
+			}
+		}
 	}
 
 	fsType := csiSource.FSType
@@ -226,6 +235,39 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	glog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
 	return nil
+}
+
+func (c *csiMountMgr) podAttributes() (map[string]string, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		return nil, nil
+	}
+	if c.plugin.csiDriverLister == nil {
+		return nil, errors.New("CSIDriver lister does not exist")
+	}
+
+	csiDriver, err := c.plugin.csiDriverLister.Get(c.driverName)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			glog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// if PodInfoOnMountVersion is not set or not v1 we do not set pod attributes
+	if csiDriver.Spec.PodInfoOnMountVersion == nil || *csiDriver.Spec.PodInfoOnMountVersion != currentPodInfoMountVersion {
+		glog.V(4).Infof(log("CSIDriver %q does not require pod information", c.driverName))
+		return nil, nil
+	}
+
+	attrs := map[string]string{
+		"csi.storage.k8s.io/pod.name":            c.pod.Name,
+		"csi.storage.k8s.io/pod.namespace":       c.pod.Namespace,
+		"csi.storage.k8s.io/pod.uid":             string(c.pod.UID),
+		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
+	}
+	glog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
+	return attrs, nil
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {

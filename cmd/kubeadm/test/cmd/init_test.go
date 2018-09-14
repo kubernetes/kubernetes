@@ -23,9 +23,10 @@ import (
 )
 
 func runKubeadmInit(args ...string) (string, string, error) {
+	kubeadmPath := getKubeadmPath()
 	kubeadmArgs := []string{"init", "--dry-run", "--ignore-preflight-errors=all"}
 	kubeadmArgs = append(kubeadmArgs, args...)
-	return RunCmd(*kubeadmPath, kubeadmArgs...)
+	return RunCmd(kubeadmPath, kubeadmArgs...)
 }
 
 func TestCmdInitToken(t *testing.T) {
@@ -89,8 +90,8 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "invalid version string is detected",
-			args:     "--kubernetes-version=foobar",
+			name:     "invalid semantic version string is detected",
+			args:     "--kubernetes-version=v1.1",
 			expected: false,
 		},
 		{

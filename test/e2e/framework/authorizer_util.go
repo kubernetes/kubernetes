@@ -140,7 +140,7 @@ func IsRBACEnabled(f *Framework) bool {
 			Logf("Error listing ClusterRoles; assuming RBAC is disabled: %v", err)
 			isRBACEnabled = false
 		} else if crs == nil || len(crs.Items) == 0 {
-			Logf("No ClusteRoles found; assuming RBAC is disabled.")
+			Logf("No ClusterRoles found; assuming RBAC is disabled.")
 			isRBACEnabled = false
 		} else {
 			Logf("Found ClusterRoles; assuming RBAC is enabled.")

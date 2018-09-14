@@ -1,14 +1,7 @@
-api:
+apiEndpoint:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
-  controlPlaneEndpoint: ""
-apiServerExtraArgs:
-  authorization-mode: Node,RBAC,Webhook
 apiVersion: kubeadm.k8s.io/v1alpha3
-auditPolicy:
-  logDir: /var/log/kubernetes/audit
-  logMaxAge: 2
-  path: ""
 bootstrapTokens:
 - groups:
   - system:bootstrappers:kubeadm:default-node-token
@@ -17,25 +10,35 @@ bootstrapTokens:
   usages:
   - signing
   - authentication
-certificatesDir: /etc/kubernetes/pki
-clusterName: kubernetes
-etcd:
-  local:
-    dataDir: /var/lib/etcd
-    image: ""
-imageRepository: k8s.gcr.io
 kind: InitConfiguration
-kubernetesVersion: v1.10.2
-networking:
-  dnsDomain: cluster.local
-  podSubnet: ""
-  serviceSubnet: 10.96.0.0/12
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
   name: master-1
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
+---
+apiServerExtraArgs:
+  authorization-mode: Node,RBAC,Webhook
+apiVersion: kubeadm.k8s.io/v1alpha3
+auditPolicy:
+  logDir: /var/log/kubernetes/audit
+  logMaxAge: 2
+  path: ""
+certificatesDir: /etc/kubernetes/pki
+clusterName: kubernetes
+controlPlaneEndpoint: ""
+etcd:
+  local:
+    dataDir: /var/lib/etcd
+    image: ""
+imageRepository: k8s.gcr.io
+kind: ClusterConfiguration
+kubernetesVersion: v1.10.2
+networking:
+  dnsDomain: cluster.local
+  podSubnet: ""
+  serviceSubnet: 10.96.0.0/12
 unifiedControlPlaneImage: ""
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -104,6 +107,7 @@ containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
 contentType: application/vnd.kubernetes.protobuf
 cpuCFSQuota: true
+cpuCFSQuotaPeriod: 0s
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
 enableControllerAttachDetach: true
@@ -135,6 +139,7 @@ kubeAPIQPS: 5
 makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110
+nodeLeaseDurationSeconds: 40
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
 podPidsLimit: -1

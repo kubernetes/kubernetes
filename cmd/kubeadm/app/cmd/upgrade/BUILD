@@ -30,6 +30,7 @@ go_library(
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
         "//cmd/kubeadm/app/util/etcd:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//pkg/util/node:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//pkg/util/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

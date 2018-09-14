@@ -45,13 +45,13 @@ import (
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -122,6 +122,7 @@ through the API as necessary.`,
 	return cmd
 }
 
+// Run runs the Scheduler.
 func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
@@ -249,7 +250,7 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
 }
 
 // newMetricsHandler builds a metrics server from the config.
-func newMetricsHandler(config *componentconfig.KubeSchedulerConfiguration) http.Handler {
+func newMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration) http.Handler {
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
 	installMetricHandler(pathRecorderMux)
 	if config.EnableProfiling {
@@ -264,7 +265,7 @@ func newMetricsHandler(config *componentconfig.KubeSchedulerConfiguration) http.
 // newHealthzServer creates a healthz server from the config, and will also
 // embed the metrics handler if the healthz and metrics address configurations
 // are the same.
-func newHealthzHandler(config *componentconfig.KubeSchedulerConfiguration, separateMetrics bool) http.Handler {
+func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, separateMetrics bool) http.Handler {
 	pathRecorderMux := mux.NewPathRecorderMux("kube-scheduler")
 	healthz.InstallHandler(pathRecorderMux)
 	if !separateMetrics {
@@ -304,6 +305,7 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              s.ComponentConfig.DisablePreemption,
 		PercentageOfNodesToScore:       s.ComponentConfig.PercentageOfNodesToScore,
+		BindTimeoutSeconds:             *s.ComponentConfig.BindTimeoutSeconds,
 	})
 
 	source := s.ComponentConfig.AlgorithmSource
@@ -342,9 +344,9 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 			if err != nil {
 				return nil, fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
 			}
-			data, found := policyConfigMap.Data[componentconfig.SchedulerPolicyConfigMapKey]
+			data, found := policyConfigMap.Data[kubeschedulerconfig.SchedulerPolicyConfigMapKey]
 			if !found {
-				return nil, fmt.Errorf("missing policy config map value at key %q", componentconfig.SchedulerPolicyConfigMapKey)
+				return nil, fmt.Errorf("missing policy config map value at key %q", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
 			}
 			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
 			if err != nil {

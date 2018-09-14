@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
+	csi "k8s.io/csi-api/pkg/client/clientset/versioned"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -67,6 +67,7 @@ type Framework struct {
 
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
+	CSIClientSet                     csi.Interface
 
 	InternalClientset *internalclientset.Clientset
 	AggregatorClient  *aggregatorclient.Clientset
@@ -155,6 +156,15 @@ func (f *Framework) BeforeEach() {
 	if f.ClientSet == nil {
 		By("Creating a kubernetes client")
 		config, err := LoadConfig()
+		testDesc := CurrentGinkgoTestDescription()
+		if len(testDesc.ComponentTexts) > 0 {
+			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+			config.UserAgent = fmt.Sprintf(
+				"%v -- %v",
+				rest.DefaultKubernetesUserAgent(),
+				componentTexts)
+		}
+
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst
@@ -171,6 +181,11 @@ func (f *Framework) BeforeEach() {
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.DynamicClient, err = dynamic.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		// csi.storage.k8s.io is based on CRD, which is served only as JSON
+		jsonConfig := config
+		jsonConfig.ContentType = "application/json"
+		f.CSIClientSet, err = csi.NewForConfig(jsonConfig)
 		Expect(err).NotTo(HaveOccurred())
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
@@ -331,25 +346,6 @@ func (f *Framework) AfterEach() {
 		if !f.SkipNamespaceCreation {
 			DumpAllNamespaceInfo(f.ClientSet, f.Namespace.Name)
 		}
-
-		logFunc := Logf
-		if TestContext.ReportDir != "" {
-			filePath := path.Join(TestContext.ReportDir, "image-puller.txt")
-			file, err := os.Create(filePath)
-			if err != nil {
-				By(fmt.Sprintf("Failed to create a file with image-puller data %v: %v\nPrinting to stdout", filePath, err))
-			} else {
-				By(fmt.Sprintf("Dumping a list of prepulled images on each node to file %v", filePath))
-				defer file.Close()
-				if err = file.Chmod(0644); err != nil {
-					Logf("Failed to chmod to 644 of %v: %v", filePath, err)
-				}
-				logFunc = GetLogToFileFunc(file)
-			}
-		} else {
-			By("Dumping a list of prepulled images on each node...")
-		}
-		LogContainersInPodsWithLabels(f.ClientSet, metav1.NamespaceSystem, ImagePullerLabels, "image-puller", logFunc)
 	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
