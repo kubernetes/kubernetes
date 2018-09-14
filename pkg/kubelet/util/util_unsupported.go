@@ -24,10 +24,12 @@ import (
 	"time"
 )
 
+// CreateListener empty implementation
 func CreateListener(endpoint string) (net.Listener, error) {
 	return nil, fmt.Errorf("CreateListener is unsupported in this build")
 }
 
+// GetAddressAndDialer empty implementation
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
 }

@@ -28,6 +28,7 @@ const (
 	tcpProtocol = "tcp"
 )
 
+// CreateListener only supports tcp protocol and starts listening
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {
@@ -40,6 +41,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	return net.Listen(protocol, addr)
 }
 
+// GetAddressAndDialer returns address from endpoint and dial func
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {

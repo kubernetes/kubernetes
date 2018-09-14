@@ -33,6 +33,7 @@ const (
 	unixProtocol = "unix"
 )
 
+// CreateListener retrieves the protocol from endpoint and starts listening
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -51,6 +52,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	return net.Listen(protocol, addr)
 }
 
+// GetAddressAndDialer retrieves the address from endpoint
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
