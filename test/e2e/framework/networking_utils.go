@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -718,6 +719,9 @@ func httpGetNoConnectionPool(url string) (*http.Response, error) {
 func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
 	tr := utilnet.SetTransportDefaults(&http.Transport{
 		DisableKeepAlives: true,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
 	})
 	client := &http.Client{
 		Transport: tr,
@@ -789,12 +793,16 @@ func TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip string, port 
 }
 
 func TestNotReachableHTTP(ip string, port int) (bool, error) {
-	return TestNotReachableHTTPTimeout(ip, port, 5*time.Second)
+	return TestNotReachableHTTPTimeout(ip, port, 5*time.Second, false)
 }
 
-func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bool, error) {
+func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration, isSecure bool) (bool, error) {
 	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
-	url := fmt.Sprintf("http://%s", ipPort)
+	urlSchema := "http"
+	if isSecure {
+		urlSchema = "https"
+	}
+	url := fmt.Sprintf("%s://%s", urlSchema, ipPort)
 	if ip == "" {
 		Failf("Got empty IP for non-reachability check (%s)", url)
 		return false, nil
@@ -804,7 +812,7 @@ func TestNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) (bo
 		return false, nil
 	}
 
-	Logf("Testing HTTP non-reachability of %v", url)
+	Logf("Testing HTTP(S) non-reachability of %v", url)
 
 	resp, err := httpGetNoConnectionPoolTimeout(url, timeout)
 	if err != nil {
