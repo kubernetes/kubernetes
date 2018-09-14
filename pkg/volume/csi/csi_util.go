@@ -127,3 +127,16 @@ func getVolumeDeviceDataDir(specVolID string, host volume.VolumeHost) string {
 	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
 	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "data")
 }
+
+// hasReadWriteOnce returns true if modes contains v1.ReadWriteOnce
+func hasReadWriteOnce(modes []api.PersistentVolumeAccessMode) bool {
+	if modes == nil {
+		return false
+	}
+	for _, mode := range modes {
+		if mode == api.ReadWriteOnce {
+			return true
+		}
+	}
+	return false
+}
