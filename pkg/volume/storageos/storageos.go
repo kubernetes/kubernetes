@@ -281,6 +281,8 @@ type storageosManager interface {
 	CreateVolume(provisioner *storageosProvisioner) (*storageosVolume, error)
 	// Attaches the disk to the kubelet's host machine.
 	AttachVolume(mounter *storageosMounter) (string, error)
+	// Attaches the device to the host at a mount path.
+	AttachDevice(mounter *storageosMounter, deviceMountPath string) error
 	// Detaches the disk from the kubelet's host machine.
 	DetachVolume(unmounter *storageosUnmounter, dir string) error
 	// Mounts the disk on the Kubelet's host machine.
@@ -351,6 +353,14 @@ func (b *storageosMounter) SetUp(fsGroup *int64) error {
 		b.volNamespace = b.podNamespace
 	}
 
+	targetPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
+
+	// Attach the device to the host.
+	if err := b.manager.AttachDevice(b, targetPath); err != nil {
+		klog.Errorf("Failed to attach device at %s: %s", targetPath, err.Error())
+		return err
+	}
+
 	// Attach the StorageOS volume as a block device
 	devicePath, err := b.manager.AttachVolume(b)
 	if err != nil {
@@ -359,8 +369,7 @@ func (b *storageosMounter) SetUp(fsGroup *int64) error {
 	}
 
 	// Mount the loop device into the plugin's disk global mount dir.
-	globalPDPath := makeGlobalPDName(b.plugin.host, b.pvName, b.podNamespace, b.volName)
-	err = b.manager.MountVolume(b, devicePath, globalPDPath)
+	err = b.manager.MountVolume(b, devicePath, targetPath)
 	if err != nil {
 		return err
 	}
