@@ -522,6 +522,17 @@ function create-master-pki {
   APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
   write-pki-data "${APISERVER_CLIENT_KEY}" "${APISERVER_CLIENT_KEY_PATH}"
 
+  if [[ -z "${SCHEDULER_SERVER_CERT:-}" || -z "${SCHEDULER_SERVER_KEY:-}" ]]; then
+    SCHEDULER_SERVER_CERT="${MASTER_CERT}"
+    SCHEDULER_SERVER_KEY="${MASTER_KEY}"
+  fi
+
+  SCHEDULER_SERVER_CERT_PATH="${pki_dir}/scheduler.crt"
+  write-pki-data "${SCHEDULER_SERVER_CERT}" "${SCHEDULER_SERVER_CERT_PATH}"
+
+  SCHEDULER_SERVER_KEY_PATH="${pki_dir}/scheduler.key"
+  write-pki-data "${SCHEDULER_SERVER_KEY}" "${SCHEDULER_SERVER_KEY_PATH}"
+
   if [[ -z "${SERVICEACCOUNT_CERT:-}" || -z "${SERVICEACCOUNT_KEY:-}" ]]; then
     SERVICEACCOUNT_CERT="${MASTER_CERT}"
     SERVICEACCOUNT_KEY="${MASTER_KEY}"
@@ -1996,6 +2007,8 @@ function start-kube-scheduler {
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
   params+=" --kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig"
+  params+=" --tls-cert-file=${SCHEDULER_SERVER_CERT_PATH}"
+  params+=" --tls-private-key-file=${SCHEDULER_SERVER_KEY_PATH}"
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi

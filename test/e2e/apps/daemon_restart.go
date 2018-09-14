@@ -60,24 +60,26 @@ const (
 // restartDaemonConfig is a config to restart a running daemon on a node, and wait till
 // it comes back up. It uses ssh to send a SIGTERM to the daemon.
 type restartDaemonConfig struct {
-	nodeName     string
-	daemonName   string
-	healthzPort  int
-	pollInterval time.Duration
-	pollTimeout  time.Duration
+	nodeName            string
+	daemonName          string
+	insecureHealthzPort int
+	secureHealthzPort   int
+	pollInterval        time.Duration
+	pollTimeout         time.Duration
 }
 
 // NewRestartConfig creates a restartDaemonConfig for the given node and daemon.
-func NewRestartConfig(nodeName, daemonName string, healthzPort int, pollInterval, pollTimeout time.Duration) *restartDaemonConfig {
+func NewRestartConfig(nodeName, daemonName string, insecureHealthzPort int, secureHealthzPort int, pollInterval, pollTimeout time.Duration) *restartDaemonConfig {
 	if !framework.ProviderIs("gce") {
 		framework.Logf("WARNING: SSH through the restart config might not work on %s", framework.TestContext.Provider)
 	}
 	return &restartDaemonConfig{
-		nodeName:     nodeName,
-		daemonName:   daemonName,
-		healthzPort:  healthzPort,
-		pollInterval: pollInterval,
-		pollTimeout:  pollTimeout,
+		nodeName:            nodeName,
+		daemonName:          daemonName,
+		insecureHealthzPort: insecureHealthzPort,
+		secureHealthzPort:   secureHealthzPort,
+		pollInterval:        pollInterval,
+		pollTimeout:         pollTimeout,
 	}
 }
 
@@ -85,28 +87,41 @@ func (r *restartDaemonConfig) String() string {
 	return fmt.Sprintf("Daemon %v on node %v", r.daemonName, r.nodeName)
 }
 
-// waitUp polls healthz of the daemon till it returns "ok" or the polling hits the pollTimeout
+// waitUp polls healthz of the daemon through secure or insecure port till it returns "ok" or the polling
+// hits the pollTimeout
 func (r *restartDaemonConfig) waitUp() {
 	framework.Logf("Checking if %v is up by polling for a 200 on its /healthz endpoint", r)
-	healthzCheck := fmt.Sprintf(
-		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
+	var healthzChecks []string
+	if r.insecureHealthzPort != 0 {
+		healthzChecks = append(healthzChecks,
+			fmt.Sprintf("curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz",
+				r.insecureHealthzPort))
+	}
+	if r.secureHealthzPort != 0 {
+		healthzChecks = append(healthzChecks,
+			fmt.Sprintf("curl -s -k -o /dev/null -I -w \"%%{http_code}\" https://localhost:%v/healthz",
+				r.secureHealthzPort))
+	}
 
-	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
-		result, err := framework.NodeExec(r.nodeName, healthzCheck)
-		framework.ExpectNoError(err)
-		if result.Code == 0 {
-			httpCode, err := strconv.Atoi(result.Stdout)
-			if err != nil {
-				framework.Logf("Unable to parse healthz http return code: %v", err)
-			} else if httpCode == 200 {
-				return true, nil
+	for _, healthzCheck := range healthzChecks {
+		err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
+			result, err := framework.NodeExec(r.nodeName, healthzCheck)
+			framework.ExpectNoError(err)
+			if result.Code == 0 {
+				httpCode, err := strconv.Atoi(result.Stdout)
+				if err != nil {
+					framework.Logf("Unable to parse healthz http return code: %v", err)
+				} else if httpCode == 200 {
+					return true, nil
+				}
 			}
-		}
-		framework.Logf("node %v exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v",
-			r.nodeName, healthzCheck, result.Code, result.Stdout, result.Stderr)
-		return false, nil
-	})
-	framework.ExpectNoError(err, "%v did not respond with a 200 via %v within %v", r, healthzCheck, r.pollTimeout)
+			framework.Logf("node %v exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v",
+				r.nodeName, healthzCheck, result.Code, result.Stdout, result.Stderr)
+			return false, nil
+		})
+		framework.ExpectNoError(err, "%v did not respond with a 200 via %v within %v", r, healthzCheck, r.pollTimeout)
+		return
+	}
 }
 
 // kill sends a SIGTERM to the daemon
@@ -250,7 +265,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		framework.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-controller", ports.InsecureKubeControllerManagerPort, restartPollInterval, restartTimeout)
+			framework.GetMasterHost(), "kube-controller", ports.InsecureKubeControllerManagerPort, 0, restartPollInterval, restartTimeout)
 		restarter.restart()
 
 		// The intent is to ensure the replication controller manager has observed and reported status of
@@ -281,7 +296,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		// Requires master ssh access.
 		framework.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
-			framework.GetMasterHost(), "kube-scheduler", ports.InsecureSchedulerPort, restartPollInterval, restartTimeout)
+			framework.GetMasterHost(), "kube-scheduler", ports.InsecureSchedulerPort, ports.SchedulerPort, restartPollInterval, restartTimeout)
 
 		// Create pods while the scheduler is down and make sure the scheduler picks them up by
 		// scaling the rc to the same size.
@@ -304,7 +319,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		for _, ip := range nodeIPs {
 			restarter := NewRestartConfig(
-				ip, "kubelet", ports.KubeletReadOnlyPort, restartPollInterval, restartTimeout)
+				ip, "kubelet", ports.KubeletReadOnlyPort, 0, restartPollInterval, restartTimeout)
 			restarter.restart()
 		}
 		postRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
