@@ -136,11 +136,24 @@ func CreateTwoWayMergeMapPatch(original, modified JSONMap, dataStruct interface{
 	return CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified, schema, fns...)
 }
 
+// Make user be able to opt out.
+// A common option is disabling the $SetElementOrder directive and leave others as defaulted.
+// DiffOptions{
+//     SetElementOrder: false,
+// }
+func (o DiffOptions) CreateTwoWayMergeMapPatchWithOption(original, modified JSONMap, schema LookupPatchMeta, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
+	return o.createTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified, schema, fns...)
+}
+
 func CreateTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified JSONMap, schema LookupPatchMeta, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
 	diffOptions := DiffOptions{
 		SetElementOrder: true,
 	}
-	patchMap, err := diffMaps(original, modified, schema, diffOptions)
+	return diffOptions.createTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified, schema, fns...)
+}
+
+func (o DiffOptions) createTwoWayMergeMapPatchUsingLookupPatchMeta(original, modified JSONMap, schema LookupPatchMeta, fns ...mergepatch.PreconditionFunc) (JSONMap, error) {
+	patchMap, err := diffMaps(original, modified, schema, o)
 	if err != nil {
 		return nil, err
 	}
