@@ -455,17 +455,9 @@ func (r *Request) URL() *url.URL {
 
 // finalURLTemplate is similar to URL(), but will make all specific parameter values equal
 // - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
-// parameters will be reset. This creates a copy of the request so as not to change the
-// underlying object.  This means some useful request info (like the types of field
-// selectors in use) will be lost.
-// TODO: preserve field selector keys
+// parameters will be reset. This creates a copy of the url so as not to change the
+// underlying object.
 func (r Request) finalURLTemplate() url.URL {
-	if len(r.resourceName) != 0 {
-		r.resourceName = "{name}"
-	}
-	if r.namespaceSet && len(r.namespace) != 0 {
-		r.namespace = "{namespace}"
-	}
 	newParams := url.Values{}
 	v := []string{"{value}"}
 	for k := range r.params {
@@ -473,6 +465,59 @@ func (r Request) finalURLTemplate() url.URL {
 	}
 	r.params = newParams
 	url := r.URL()
+	segments := strings.Split(r.URL().Path, "/")
+	groupIndex := 0
+	index := 0
+	if r.URL() != nil && r.baseURL != nil && strings.Contains(r.URL().Path, r.baseURL.Path) {
+		groupIndex += len(strings.Split(r.baseURL.Path, "/"))
+	}
+	if groupIndex >= len(segments) {
+		return *url
+	}
+
+	const CoreGroupPrefix = "api"
+	const NamedGroupPrefix = "apis"
+	isCoreGroup := segments[groupIndex] == CoreGroupPrefix
+	isNamedGroup := segments[groupIndex] == NamedGroupPrefix
+	if isCoreGroup {
+		// checking the case of core group with /api/v1/... format
+		index = groupIndex + 2
+	} else if isNamedGroup {
+		// checking the case of named group with /apis/apps/v1/... format
+		index = groupIndex + 3
+	} else {
+		// this should not happen that the only two possibilities are /api... and /apis..., just want to put an
+		// outlet here in case more API groups are added in future if ever possible:
+		// https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups
+		// if a wrong API groups name is encountered, return the {prefix} for url.Path
+		url.Path = "/{prefix}"
+		url.RawQuery = ""
+		return *url
+	}
+	//switch segLength := len(segments) - index; segLength {
+	switch {
+	// case len(segments) - index == 1:
+	// resource (with no name) do nothing
+	case len(segments)-index == 2:
+		// /$RESOURCE/$NAME: replace $NAME with {name}
+		segments[index+1] = "{name}"
+	case len(segments)-index == 3:
+		if segments[index+2] == "finalize" || segments[index+2] == "status" {
+			// /$RESOURCE/$NAME/$SUBRESOURCE: replace $NAME with {name}
+			segments[index+1] = "{name}"
+		} else {
+			// /namespace/$NAMESPACE/$RESOURCE: replace $NAMESPACE with {namespace}
+			segments[index+1] = "{namespace}"
+		}
+	case len(segments)-index >= 4:
+		segments[index+1] = "{namespace}"
+		// /namespace/$NAMESPACE/$RESOURCE/$NAME: replace $NAMESPACE with {namespace},  $NAME with {name}
+		if segments[index+3] != "finalize" && segments[index+3] != "status" {
+			// /$RESOURCE/$NAME/$SUBRESOURCE: replace $NAME with {name}
+			segments[index+3] = "{name}"
+		}
+	}
+	url.Path = path.Join(segments...)
 	return *url
 }
 
