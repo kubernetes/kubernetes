@@ -486,7 +486,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
-				volumeToMount.VolumeName)
+				volumeToMount.VolumeName, devicePath)
 			if markDeviceMountedErr != nil {
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateErrorDetailed("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
@@ -796,7 +796,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
-				volumeToMount.VolumeName)
+				volumeToMount.VolumeName, devicePath)
 			if markDeviceMappedErr != nil {
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateErrorDetailed("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)

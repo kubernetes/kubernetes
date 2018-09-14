@@ -408,7 +408,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	}
 
 	// Act
-	err = asw.MarkDeviceAsMounted(generatedVolumeName)
+	err = asw.MarkDeviceAsMounted(generatedVolumeName, devicePath)
 
 	// Assert
 	if err != nil {
