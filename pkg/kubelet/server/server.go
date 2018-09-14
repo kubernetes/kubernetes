@@ -865,8 +865,10 @@ func containerPrometheusLabelsFunc(s stats.StatsProvider) metrics.ContainerLabel
 			metrics.LabelName:  name,
 			metrics.LabelImage: image,
 			"pod_name":         podName,
+			"pod":              podName,
 			"namespace":        namespace,
 			"container_name":   containerName,
+			"container":        containerName,
 		}
 		return set
 	}
