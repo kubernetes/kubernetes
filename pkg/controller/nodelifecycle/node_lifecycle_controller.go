@@ -1012,7 +1012,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 	if !allAreFullyDisrupted || !allWasFullyDisrupted {
 		// We're switching to full disruption mode
 		if allAreFullyDisrupted {
-			glog.V(0).Info("Controller detected that all Nodes are not-Ready. Entering master disruption mode.")
+			glog.V(0).Info("Controller detected that all Nodes are not-Ready. Entering full disruption mode.")
 			for i := range nodes {
 				if nc.useTaintBasedEvictions {
 					_, err := nc.markNodeAsReachable(nodes[i])
@@ -1039,7 +1039,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 		}
 		// We're exiting full disruption mode
 		if allWasFullyDisrupted {
-			glog.V(0).Info("Controller detected that some Nodes are Ready. Exiting master disruption mode.")
+			glog.V(0).Info("Controller detected that some Nodes are Ready. Exiting full disruption mode.")
 			// When exiting disruption mode update probe timestamps on all Nodes.
 			now := nc.now()
 			for i := range nodes {
