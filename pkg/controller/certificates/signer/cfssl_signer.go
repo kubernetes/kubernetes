@@ -37,7 +37,7 @@ import (
 )
 
 // NewCSRSigningController creates a new certificates.CertificateController that
-// handles signing certificate signing requests
+// handles signing certificate signing requests.
 func NewCSRSigningController(
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,

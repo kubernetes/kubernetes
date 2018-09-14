@@ -51,7 +51,7 @@ var updateNodeSpecBackoff = wait.Backoff{
 	Jitter:   1.0,
 }
 
-// NodeController is a cloud node controller object
+// NodeController is an object for controlling and monitoring cloud nodes.
 type NodeController struct {
 	nodeInformer coreinformers.NodeInformer
 	kubeClient   clientset.Interface
@@ -75,7 +75,7 @@ const (
 	retrySleepTime = 20 * time.Millisecond
 )
 
-// NewCloudNodeController creates a cloud NodeController object
+// NewCloudNodeController creates a cloud NodeController object.
 func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
@@ -128,7 +128,7 @@ func (cnc *NodeController) Run(stopCh <-chan struct{}) {
 	go wait.Until(cnc.MonitorNode, cnc.nodeMonitorPeriod, stopCh)
 }
 
-// UpdateNodeStatus updates the node status, such as node addresses
+// UpdateNodeStatus updates the node status, such as node addresses.
 func (cnc *NodeController) UpdateNodeStatus() {
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
@@ -147,7 +147,7 @@ func (cnc *NodeController) UpdateNodeStatus() {
 	}
 }
 
-// UpdateNodeAddress updates the nodeAddress of a single node
+// UpdateNodeAddress updates the nodeAddress of a single node.
 func (cnc *NodeController) updateNodeAddress(node *v1.Node, instances cloudprovider.Instances) {
 	// Do not process nodes that are still tainted
 	cloudTaint := getCloudTaint(node.Spec.Taints)
@@ -212,7 +212,7 @@ func (cnc *NodeController) updateNodeAddress(node *v1.Node, instances cloudprovi
 }
 
 // MonitorNode monitors node queries the cloudprovider for non-ready nodes and deletes them
-// if they cannot be found in the cloud provider
+// if they cannot be found in the cloud provider.
 func (cnc *NodeController) MonitorNode() {
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
@@ -245,7 +245,8 @@ func (cnc *NodeController) MonitorNode() {
 			time.Sleep(retrySleepTime)
 		}
 		if currentReadyCondition == nil {
-			klog.Errorf("Update status of Node %v from cloud NodeController exceeds retry count or the Node was deleted.", node.Name)			continue
+			klog.Errorf("Update status of Node %v from cloud NodeController exceeds retry count or the Node was deleted.", node.Name)
+			continue
 		}
 		// If the known node status says that Node is NotReady, then check if the node has been removed
 		// from the cloud provider. If node cannot be found in cloudprovider, then delete the node immediately
@@ -320,7 +321,7 @@ func (cnc *NodeController) updateCloudNode(_, newObj interface{}) {
 	cnc.AddCloudNode(newObj)
 }
 
-// AddCloudNode processes nodes that were added into the cluster, and cloud initialize them if appropriate
+// AddCloudNode processes nodes that were added into the cluster, and cloud initialize them if appropriate.
 func (cnc *NodeController) AddCloudNode(obj interface{}) {
 	node := obj.(*v1.Node)
 
@@ -444,7 +445,7 @@ func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
 }
 
 // ensureNodeExistsByProviderID checks if the instance exists by the provider id,
-// If provider id in spec is empty it calls instanceId with node name to get provider id
+// If provider id in spec is empty it calls instanceId with node name to get provider id.
 func ensureNodeExistsByProviderID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
 	providerID := node.Spec.ProviderID
 	if providerID == "" {
@@ -526,7 +527,7 @@ func getInstanceTypeByProviderIDOrName(instances cloudprovider.Instances, node *
 }
 
 // getZoneByProviderIDorName will attempt to get the zone of node using its providerID
-// then it's name. If both attempts fail, an error is returned
+// then it's name. If both attempts fail, an error is returned.
 func getZoneByProviderIDOrName(zones cloudprovider.Zones, node *v1.Node) (cloudprovider.Zone, error) {
 	zone, err := zones.GetZoneByProviderID(context.TODO(), node.Spec.ProviderID)
 	if err != nil {

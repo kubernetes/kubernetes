@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
-// SignerOptions contains options for the bootstrap Signer
+// SignerOptions contains options for the bootstrap Signer.
 type SignerOptions struct {
 	// ConfigMapNamespace is the namespace of the ConfigMap
 	ConfigMapNamespace string
@@ -60,7 +60,7 @@ type SignerOptions struct {
 }
 
 // DefaultBootstrapSignerOptions returns a set of default options for creating a
-// bootstrap Signer
+// bootstrap Signer.
 func DefaultBootstrapSignerOptions() SignerOptions {
 	return SignerOptions{
 		ConfigMapNamespace:   api.NamespacePublic,
@@ -152,7 +152,7 @@ func NewBootstrapSigner(cl clientset.Interface, secrets informers.SecretInformer
 	return e, nil
 }
 
-// Run runs controller loops and returns when they are done
+// Run runs controller loops and returns when they are done.
 func (e *Signer) Run(stopCh <-chan struct{}) {
 	// Shut down queues
 	defer utilruntime.HandleCrash()
@@ -248,7 +248,7 @@ func (e *Signer) updateConfigMap(cm *v1.ConfigMap) {
 	}
 }
 
-// getConfigMap gets the ConfigMap we are interested in
+// getConfigMap gets the ConfigMap we are interested in.
 func (e *Signer) getConfigMap() *v1.ConfigMap {
 	configMap, err := e.configMapLister.ConfigMaps(e.configMapNamespace).Get(e.configMapName)
 

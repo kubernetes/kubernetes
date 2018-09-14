@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-// CertificateController is a certificate controller object
+// CertificateController is a controller that manages certificate signing requests.
 type CertificateController struct {
 	kubeClient clientset.Interface
 
@@ -51,7 +51,7 @@ type CertificateController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewCertificateController creates a new CertificateController object
+// NewCertificateController creates a new CertificateController object.
 func NewCertificateController(
 	kubeClient clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
@@ -142,7 +142,7 @@ func (cc *CertificateController) processNextWorkItem() bool {
 
 	if err := cc.syncFunc(cKey.(string)); err != nil {
 		cc.queue.AddRateLimited(cKey)
-		if _, ignorable := err.(IgnorableError); !ignorable {
+		if _, ignorable := err.(ignorableError); !ignorable {
 			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
 		} else {
 			klog.V(4).Infof("Sync %v failed with : %v", cKey, err)
@@ -197,13 +197,13 @@ func (cc *CertificateController) syncFunc(key string) error {
 // it's spammy and usually user error. Instead we will log these errors at a
 // higher log level. We still need to throw these errors to signal that the
 // sync should be retried.
-func NewIgnorableError(s string, args ...interface{}) IgnorableError {
-	return IgnorableError(fmt.Sprintf(s, args...))
+func NewIgnorableError(s string, args ...interface{}) error {
+	return ignorableError(fmt.Sprintf(s, args...))
 }
 
-// IgnorableError is an error that can be ignored (e.g. user error)
-type IgnorableError string
+// ignorableError is an error that can be ignored (e.g. user error).
+type ignorableError string
 
-func (e IgnorableError) Error() string {
+func (e ignorableError) Error() string {
 	return string(e)
 }

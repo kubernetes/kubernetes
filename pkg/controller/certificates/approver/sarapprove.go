@@ -43,7 +43,7 @@ type sarApprover struct {
 }
 
 // NewCSRApprovingController creates a new certificate.CertificateController object
-// that handles approving certificate signing requests
+// that handles approving certificate signing requests.
 func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
