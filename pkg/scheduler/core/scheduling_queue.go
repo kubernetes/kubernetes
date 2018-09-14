@@ -43,6 +43,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
+var (
+	queueClosed = "scheduling queue is closed"
+)
+
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
 // makes it easy to use those data structures as a SchedulingQueue.
@@ -50,6 +54,8 @@ type SchedulingQueue interface {
 	Add(pod *v1.Pod) error
 	AddIfNotPresent(pod *v1.Pod) error
 	AddUnschedulableIfNotPresent(pod *v1.Pod) error
+	// Pop removes the head of the queue and returns it. It blocks if the
+	// queue is empty and waits until a new item is added to the queue.
 	Pop() (*v1.Pod, error)
 	Update(oldPod, newPod *v1.Pod) error
 	Delete(pod *v1.Pod) error
@@ -58,6 +64,9 @@ type SchedulingQueue interface {
 	AssignedPodUpdated(pod *v1.Pod)
 	WaitingPodsForNode(nodeName string) []*v1.Pod
 	WaitingPods() []*v1.Pod
+	// Close closes the SchedulingQueue so that the goroutine which is
+	// waiting to pop items can exit gracefully.
+	Close()
 }
 
 // NewSchedulingQueue initializes a new scheduling queue. If pod priority is
@@ -109,12 +118,11 @@ func (f *FIFO) Delete(pod *v1.Pod) error {
 // shouldn't be used in production code, but scheduler has always been using it.
 // This function does minimal error checking.
 func (f *FIFO) Pop() (*v1.Pod, error) {
-	var result interface{}
-	f.FIFO.Pop(func(obj interface{}) error {
-		result = obj
-		return nil
-	})
-	return result.(*v1.Pod), nil
+	result, err := f.FIFO.Pop(func(obj interface{}) error { return nil })
+	if err == cache.FIFOClosedError {
+		return nil, fmt.Errorf(queueClosed)
+	}
+	return result.(*v1.Pod), err
 }
 
 // WaitingPods returns all the waiting pods in the queue.
@@ -142,6 +150,11 @@ func (f *FIFO) MoveAllToActiveQueue() {}
 // but FIFO does not support it.
 func (f *FIFO) WaitingPodsForNode(nodeName string) []*v1.Pod {
 	return nil
+}
+
+// Close closes the FIFO queue.
+func (f *FIFO) Close() {
+	f.FIFO.Close()
 }
 
 // NewFIFO creates a FIFO object.
@@ -179,6 +192,10 @@ type PriorityQueue struct {
 	// pod was in flight (we were trying to schedule it). In such a case, we put
 	// the pod back into the activeQ if it is determined unschedulable.
 	receivedMoveRequest bool
+
+	// closed indicates that the queue is closed.
+	// It is mainly used to let Pop() exit its control loop while waiting for an item.
+	closed bool
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
@@ -312,6 +329,12 @@ func (p *PriorityQueue) Pop() (*v1.Pod, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	for len(p.activeQ.data.queue) == 0 {
+		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
+		// When Close() is called, the p.closed is set and the condition is broadcast,
+		// which causes this loop to continue and return from the Pop().
+		if p.closed {
+			return nil, fmt.Errorf(queueClosed)
+		}
 		p.cond.Wait()
 	}
 	obj, err := p.activeQ.Pop()
@@ -483,6 +506,14 @@ func (p *PriorityQueue) WaitingPods() []*v1.Pod {
 		result = append(result, pod)
 	}
 	return result
+}
+
+// Close closes the priority queue.
+func (p *PriorityQueue) Close() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.closed = true
+	p.cond.Broadcast()
 }
 
 // UnschedulablePodsMap holds pods that cannot be scheduled. This data structure
