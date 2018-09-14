@@ -3,11 +3,14 @@ package netutil
 import (
 	"errors"
 	"fmt"
-	"github.com/storageos/go-api/serror"
 	"strings"
+
+	"github.com/storageos/go-api/serror"
 )
 
-func errAllFailed(addrs []string) error {
+// ErrAllFailed produces a typed StorageOS error which should be used to indicate that
+// the API is not contactable for all of the supplied node addresses.
+func ErrAllFailed(addrs []string) error {
 	msg := fmt.Sprintf("failed to dial all known cluster members, (%s)", strings.Join(addrs, ","))
 	help := "ensure that the value of $STORAGEOS_HOST (or the -H flag) is correct, and that there are healthy StorageOS nodes in this cluster"
 
@@ -21,6 +24,8 @@ func newInvalidNodeError(err error) error {
 	return serror.NewTypedStorageOSError(serror.InvalidHostConfig, err, msg, help)
 }
 
-var errNoAddresses = errors.New("the MultiDialer instance has not been initialised with client addresses")
-var errUnsupportedScheme = errors.New("unsupported URL scheme")
-var errInvalidPortNumber = errors.New("invalid port number")
+var (
+	errUnsupportedScheme = errors.New("unsupported URL scheme")
+	errInvalidHostName   = errors.New("invalid hostname")
+	errInvalidPortNumber = errors.New("invalid port number")
+)

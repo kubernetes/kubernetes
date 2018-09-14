@@ -4,12 +4,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
-        "controller.go",
-        "event.go",
         "health.go",
         "logger.go",
         "login.go",
         "namespace.go",
+        "network_diagnostics.go",
+        "node.go",
         "policy.go",
         "pool.go",
         "rule.go",
@@ -24,7 +24,6 @@ go_library(
     importpath = "github.com/storageos/go-api",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/gorilla/websocket:go_default_library",
         "//vendor/github.com/storageos/go-api/netutil:go_default_library",
         "//vendor/github.com/storageos/go-api/serror:go_default_library",
         "//vendor/github.com/storageos/go-api/types:go_default_library",

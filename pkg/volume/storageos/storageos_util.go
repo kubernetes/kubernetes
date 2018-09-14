@@ -69,7 +69,7 @@ type apiImplementer interface {
 	VolumeMount(opts storageostypes.VolumeMountOptions) error
 	VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error
 	VolumeDelete(opt storageostypes.DeleteOptions) error
-	Controller(ref string) (*storageostypes.Controller, error)
+	Node(ref string) (*storageostypes.Node, error)
 }
 
 // storageosUtil is the utility structure to interact with the StorageOS API.
@@ -289,7 +289,7 @@ func (u *storageosUtil) DeleteVolume(d *storageosDeleter) error {
 // specified.
 func (u *storageosUtil) DeviceDir(b *storageosMounter) string {
 
-	ctrl, err := u.api.Controller(b.plugin.host.GetHostName())
+	ctrl, err := u.api.Node(b.plugin.host.GetHostName())
 	if err != nil {
 		klog.Warningf("node device path lookup failed: %v", err)
 		return defaultDeviceDir
