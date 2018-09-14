@@ -137,6 +137,8 @@ func newHollowNodeCommand() *cobra.Command {
 }
 
 func run(config *HollowNodeConfig) {
+	// To help debugging, immediately log version
+	glog.Infof("Version: %+v", version.Get())
 	if !knownMorphs.Has(config.Morph) {
 		glog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}

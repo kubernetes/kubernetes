@@ -29,6 +29,8 @@ import (
 
 // Run creates and executes new kubeadm command
 func Run() error {
+	// To help debugging, immediately log version
+	glog.Infof("Version: %+v", version.Get())
 	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
