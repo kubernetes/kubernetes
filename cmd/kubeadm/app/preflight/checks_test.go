@@ -502,6 +502,13 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 			}, // Expected to go via proxy, range is not in 2001:db8::/48
 			expectWarnings: true,
 		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "",
+			}, // Expected to warn, when the CIDR is missing
+			expectWarnings: true,
+		},
 	}
 
 	// Save current content of *_proxy and *_PROXY variables.

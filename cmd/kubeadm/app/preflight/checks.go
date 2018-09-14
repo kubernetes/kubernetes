@@ -465,8 +465,9 @@ func (HTTPProxyCIDRCheck) Name() string {
 // If it is not directly connected and goes via proxy it will produce warning.
 func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
 	glog.V(1).Infoln("validating http connectivity to first IP address in the CIDR")
+	// Check if the CIDR is missing
 	if len(subnet.CIDR) == 0 {
-		return nil, nil
+		return []error{fmt.Errorf("the CIDR is missing")}, nil
 	}
 
 	_, cidr, err := net.ParseCIDR(subnet.CIDR)
