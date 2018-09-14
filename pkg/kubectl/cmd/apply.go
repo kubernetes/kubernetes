@@ -723,7 +723,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
 	case err == nil:
 		// Compute a three way strategic merge patch to send to server.
-		patchType = types.StrategicMergePatchType
+		patchType = types.MergePatchType
 
 		// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
 		// Otherwise, fall back to baked-in types.
