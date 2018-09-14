@@ -892,7 +892,17 @@ func doCleanSubPaths(mounter Interface, podDir string, volumeName string) error 
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
 		subPaths, err := ioutil.ReadDir(fullContainerDirPath)
 		if err != nil {
-			return fmt.Errorf("error reading %s: %s", fullContainerDirPath, err)
+			glog.Errorf("error reading %s: %s", fullContainerDirPath, err)
+			if isCorruptedMnt(err) {
+				// the subdirs of fullContainerDirPath are from 0 to n
+				// e.g. var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/0
+				// we check if the path exists from 0 to n, until the path is not exists
+				for i := 0; pathExists(path.Join(fullContainerDirPath, fmt.Sprint(i))); i++ {
+					cleanCorruptedMnt(mounter, path.Join(fullContainerDirPath, fmt.Sprint(i)))
+				}
+			} else {
+				return fmt.Errorf("error reading %s: %s", fullContainerDirPath, err)
+			}
 		}
 		for _, subPath := range subPaths {
 			if err = doCleanSubPath(mounter, fullContainerDirPath, subPath.Name()); err != nil {
@@ -942,6 +952,57 @@ func doCleanSubPath(mounter Interface, fullContainerDirPath, subPathIndex string
 	}
 	glog.V(5).Infof("Removed %s", fullSubPath)
 	return nil
+}
+
+// cleanCorruptedMnt tears down the corrupted subpath bind mount
+func cleanCorruptedMnt(mounter Interface, fullSubPath string) error {
+	// process /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/<fullSubPath>
+	glog.V(4).Infof("Cleaning up subpath mounts for subpath %v", fullSubPath)
+	// Unmount it
+	if err := mounter.Unmount(fullSubPath); err != nil {
+		return fmt.Errorf("error unmounting %s: %s", fullSubPath, err)
+	}
+	glog.V(5).Infof("Unmounted %s", fullSubPath)
+	// Remove it *non*-recursively, just in case there were some hiccups.
+	if err := os.Remove(fullSubPath); err != nil {
+		return fmt.Errorf("error deleting %s: %s", fullSubPath, err)
+	}
+	glog.V(5).Infof("Removed %s", fullSubPath)
+	return nil
+}
+
+// pathExists returns true if the specified path exists.
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	} else if os.IsNotExist(err) {
+		return false
+	} else if isCorruptedMnt(err) {
+		return true
+	} else {
+		return false
+	}
+}
+
+// isCorruptedMnt return true if err is about corrupted mount point
+func isCorruptedMnt(err error) bool {
+	if err == nil {
+		return false
+	}
+	var underlyingError error
+	switch pe := err.(type) {
+	case nil:
+		return false
+	case *os.PathError:
+		underlyingError = pe.Err
+	case *os.LinkError:
+		underlyingError = pe.Err
+	case *os.SyscallError:
+		underlyingError = pe.Err
+	}
+
+	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO
 }
 
 // cleanSubPath will teardown the subpath bind mount and any remove any directories if empty
