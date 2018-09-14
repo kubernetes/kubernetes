@@ -34,12 +34,13 @@ import (
 
 // RemoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
 type RemoteRuntimeService struct {
-	timeout       time.Duration
-	runtimeClient runtimeapi.RuntimeServiceClient
+	timeout           time.Duration
+	podSandboxTimeout time.Duration
+	runtimeClient     runtimeapi.RuntimeServiceClient
 }
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
+func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, sandboxTimeout time.Duration) (internalapi.RuntimeService, error) {
 	glog.V(3).Infof("Connecting to runtime service %s", endpoint)
 	addr, dailer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
@@ -52,8 +53,9 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (
 	}
 
 	return &RemoteRuntimeService{
-		timeout:       connectionTimeout,
-		runtimeClient: runtimeapi.NewRuntimeServiceClient(conn),
+		timeout:           connectionTimeout,
+		podSandboxTimeout: sandboxTimeout,
+		runtimeClient:     runtimeapi.NewRuntimeServiceClient(conn),
 	}, nil
 }
 
@@ -80,9 +82,7 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (r *RemoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
-	// Use 2 times longer timeout for sandbox operation (4 mins by default)
-	// TODO: Make the pod sandbox timeout configurable.
-	ctx, cancel := getContextWithTimeout(r.timeout * 2)
+	ctx, cancel := getContextWithTimeout(r.podSandboxTimeout)
 	defer cancel()
 
 	resp, err := r.runtimeClient.RunPodSandbox(ctx, &runtimeapi.RunPodSandboxRequest{

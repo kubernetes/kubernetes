@@ -282,6 +282,8 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
+	// PodSandboxTimeout is the timeout for creating pod sandbox
+	PodSandboxTimeout metav1.Duration
 
 	/* the following fields are meant for Node Allocatable */
 

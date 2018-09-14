@@ -369,8 +369,9 @@ func runCommand(cmd ...string) (string, error) {
 func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
+	const podSandboxTimeout = 4 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, podSandboxTimeout)
 	if err != nil {
 		return nil, nil, err
 	}

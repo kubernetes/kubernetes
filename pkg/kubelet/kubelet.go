@@ -310,8 +310,8 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	return cfg, nil
 }
 
-func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoint string, runtimeRequestTimeout metav1.Duration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
-	rs, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout.Duration)
+func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoint string, runtimeRequestTimeout metav1.Duration, podSandboxTimeout metav1.Duration) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+	rs, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout.Duration, podSandboxTimeout.Duration)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -651,7 +651,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	default:
 		return nil, fmt.Errorf("unsupported CRI runtime: %q", containerRuntime)
 	}
-	runtimeService, imageService, err := getRuntimeAndImageServices(remoteRuntimeEndpoint, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout)
+	runtimeService, imageService, err := getRuntimeAndImageServices(remoteRuntimeEndpoint, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout, kubeCfg.PodSandboxTimeout)
 	if err != nil {
 		return nil, err
 	}

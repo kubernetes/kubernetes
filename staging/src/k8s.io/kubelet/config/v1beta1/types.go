@@ -654,6 +654,10 @@ type KubeletConfiguration struct {
 	// Default: "Watching"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// PodSandboxTimeout is the timeout for creating pod sandbox
+	// Default: 4 mins
+	// +optional
+	PodSandboxTimeout metav1.Duration `json:"podSandboxTimeout,omitempty"`
 
 	/* the following fields are meant for Node Allocatable */
 

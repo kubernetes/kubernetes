@@ -209,4 +209,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}
+	if obj.PodSandboxTimeout == zeroDuration {
+		obj.PodSandboxTimeout = metav1.Duration{Duration: 4 * time.Minute}
+	}
 }

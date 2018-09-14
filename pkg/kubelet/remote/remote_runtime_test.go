@@ -29,6 +29,7 @@ import (
 
 const (
 	defaultConnectionTimeout = 15 * time.Second
+	defaultPodSandboxTimeout = 30 * time.Second
 )
 
 // createAndStartFakeRemoteRuntime creates and starts fakeremote.RemoteRuntime.
@@ -45,7 +46,7 @@ func createAndStartFakeRemoteRuntime(t *testing.T) (*fakeremote.RemoteRuntime, s
 }
 
 func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.RuntimeService {
-	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout)
+	runtimeService, err := NewRemoteRuntimeService(endpoint, defaultConnectionTimeout, defaultPodSandboxTimeout)
 	require.NoError(t, err)
 
 	return runtimeService

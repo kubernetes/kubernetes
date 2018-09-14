@@ -260,6 +260,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(int32)
 		**out = **in
 	}
+	out.PodSandboxTimeout = in.PodSandboxTimeout
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved
 		*out = make(map[string]string, len(*in))
