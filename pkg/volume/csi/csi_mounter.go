@@ -206,7 +206,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// apply volume ownership
-	if !c.readOnly && fsGroup != nil {
+	if !c.readOnly && fsGroup != nil && accessMode == api.ReadWriteOnce {
 		err := volume.SetVolumeOwnership(c, fsGroup)
 		if err != nil {
 			// attempt to rollback mount.
