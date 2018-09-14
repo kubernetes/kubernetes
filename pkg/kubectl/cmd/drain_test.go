@@ -33,7 +33,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	batch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,9 +47,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -238,7 +237,7 @@ func TestDrain(t *testing.T) {
 	labels := make(map[string]string)
 	labels["my_key"] = "my_value"
 
-	rc := api.ReplicationController{
+	rc := corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "rc",
 			Namespace:         "default",
@@ -246,7 +245,7 @@ func TestDrain(t *testing.T) {
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("replicationcontrollers", "rc"),
 		},
-		Spec: api.ReplicationControllerSpec{
+		Spec: corev1.ReplicationControllerSpec{
 			Selector: labels,
 		},
 	}
@@ -535,7 +534,7 @@ func TestDrain(t *testing.T) {
 		node          *corev1.Node
 		expected      *corev1.Node
 		pods          []corev1.Pod
-		rcs           []api.ReplicationController
+		rcs           []corev1.ReplicationController
 		replicaSets   []extensions.ReplicaSet
 		args          []string
 		expectWarning string
@@ -547,7 +546,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{rc_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -557,7 +556,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{ds_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  true,
 			expectDelete: false,
@@ -567,7 +566,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{ds_terminated_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -577,7 +576,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{orphaned_ds_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node"},
 			expectFatal:  true,
 			expectDelete: false,
@@ -587,7 +586,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{orphaned_ds_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node", "--force"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -597,7 +596,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{ds_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node", "--ignore-daemonsets"},
 			expectFatal:  false,
 			expectDelete: false,
@@ -607,7 +606,7 @@ func TestDrain(t *testing.T) {
 			node:          node,
 			expected:      cordoned_node,
 			pods:          []corev1.Pod{ds_pod_with_emptyDir},
-			rcs:           []api.ReplicationController{rc},
+			rcs:           []corev1.ReplicationController{rc},
 			args:          []string{"node", "--ignore-daemonsets"},
 			expectWarning: "WARNING: Ignoring DaemonSet-managed pods: bar\n",
 			expectFatal:   false,
@@ -618,7 +617,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{job_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node", "--force", "--delete-local-data=true"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -628,7 +627,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{terminated_job_pod_with_local_storage},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -648,7 +647,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{naked_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node"},
 			expectFatal:  true,
 			expectDelete: false,
@@ -658,7 +657,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{naked_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node", "--force"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -677,7 +676,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{emptydir_terminated_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -696,7 +695,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: false,
@@ -785,7 +784,7 @@ func TestDrain(t *testing.T) {
 							}
 							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.PodList{Items: test.pods})}, nil
 						case m.isFor("GET", "/replicationcontrollers"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationControllerList{Items: test.rcs})}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
 						case m.isFor("PATCH", "/nodes/node"):
 							data, err := ioutil.ReadAll(req.Body)
 							if err != nil {
