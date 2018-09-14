@@ -40,6 +40,7 @@ go_library(
         "patch.go",
         "plugin.go",
         "portforward.go",
+        "profiling.go",
         "proxy.go",
         "replace.go",
         "rollingupdate.go",
