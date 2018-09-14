@@ -1146,6 +1146,10 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
 *   Remove the LbaasV1 of OpenStack cloud provider, currently only support LbaasV2. ([#52717](https://github.com/kubernetes/kubernetes/pull/52717),[ @FengyunPan](https://github.com/FengyunPan))
 
+### Autoscaling
+
+*   The HorizontalPodAutoscaler controller now uses aggregated APIs by default (the `hoizontal-pod-autoscaler-use-rest-clients` flag is on by default).  In order to use horizontal pod autoscaling, you'll need to either install [metrics-server](https://github.com/kubernetes-incubator/metrics-server), or turn this flag off explicitly to continue using Heapster.
+
 ## Known Issues
 
 This section contains a list of known issues reported in Kubernetes 1.9 release. The content is populated from the [v1.9.x known issues and FAQ accumulator] [#57159](https://github.com/kubernetes/kubernetes/issues/57159).
