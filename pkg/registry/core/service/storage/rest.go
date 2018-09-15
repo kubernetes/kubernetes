@@ -38,13 +38,11 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -483,11 +481,9 @@ func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http
 				// but in the expected case we'll only make one.
 				for try := 0; try < len(ss.Addresses); try++ {
 					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
-					if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceProxyAllowExternalIPs) {
-						if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
-							utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
-							continue
-						}
+					if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
+						utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
+						continue
 					}
 					ip := addr.IP
 					port := int(ss.Ports[i].Port)
