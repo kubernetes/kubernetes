@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	fakeapiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,13 +36,11 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	// Arrange
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	fakeApiExtensionsClient := fakeapiextensionsclient.NewSimpleClientset()
 
 	// Act
 	_, err := NewAttachDetachController(
 		fakeKubeClient,
 		nil, /* csiClient */
-		fakeApiExtensionsClient, /* crdClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
@@ -149,7 +146,6 @@ func Test_AttachDetachControllerRecovery(t *testing.T) {
 
 func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2 []*v1.Pod) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeApiExtensionsClient := fakeapiextensionsclient.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	//informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	plugins := controllervolumetesting.CreateTestPlugin()
@@ -220,7 +216,6 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 	adcObj, err := NewAttachDetachController(
 		fakeKubeClient,
 		nil, /* csiClient */
-		fakeApiExtensionsClient, /* crdClient */
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
