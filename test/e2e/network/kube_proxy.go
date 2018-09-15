@@ -48,6 +48,8 @@ var _ = SIGDescribe("Network", func() {
 	fr := framework.NewDefaultFramework("network")
 
 	It("should set TCP CLOSE_WAIT timeout", func() {
+		// This test requires that e2e test runner can ssh-login to
+		// schedulable nodes.
 		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
 		ips := framework.CollectAddresses(nodes, v1.NodeInternalIP)
 
@@ -170,11 +172,12 @@ var _ = SIGDescribe("Network", func() {
 		By("Checking /proc/net/nf_conntrack for the timeout")
 		// If test flakes occur here, then this check should be performed
 		// in a loop as there may be a race with the client connecting.
-		framework.IssueSSHCommandWithResult(
+		_, err = framework.IssueSSHCommandWithResult(
 			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTcpPort),
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
+		framework.ExpectNoError(err)
 
 		// Timeout in seconds is available as the fifth column from
 		// /proc/net/nf_conntrack.
