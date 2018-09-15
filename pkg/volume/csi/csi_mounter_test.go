@@ -262,6 +262,129 @@ func TestMounterSetUp(t *testing.T) {
 		MounterSetUpTests(t, false)
 	})
 }
+func TestMounterSetUpWithFSGroup(t *testing.T) {
+	fakeClient := fakeclient.NewSimpleClientset()
+	plug, tmpDir := newTestPlugin(t, fakeClient, nil)
+	defer os.RemoveAll(tmpDir)
+
+	testCases := []struct {
+		name        string
+		accessModes []api.PersistentVolumeAccessMode
+		readOnly    bool
+		fsType      string
+		setFsGroup  bool
+		fsGroup     int64
+	}{
+		{
+			name: "default fstype, with no fsgroup (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			readOnly: false,
+			fsType:   "",
+		},
+		{
+			name: "default fstype  with fsgroup (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			readOnly:   false,
+			fsType:     "",
+			setFsGroup: true,
+			fsGroup:    3000,
+		},
+		{
+			name: "fstype, fsgroup, RWM, ROM provided (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteMany,
+				api.ReadOnlyMany,
+			},
+			fsType:     "ext4",
+			setFsGroup: true,
+			fsGroup:    3000,
+		},
+		{
+			name: "fstype, fsgroup, RWO, but readOnly (should not apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			readOnly:   true,
+			fsType:     "ext4",
+			setFsGroup: true,
+			fsGroup:    3000,
+		},
+		{
+			name: "fstype, fsgroup, RWO provided (should apply fsgroup)",
+			accessModes: []api.PersistentVolumeAccessMode{
+				api.ReadWriteOnce,
+			},
+			fsType:     "ext4",
+			setFsGroup: true,
+			fsGroup:    3000,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Logf("Running test %s", tc.name)
+
+		volName := fmt.Sprintf("test-vol-%d", i)
+		pv := makeTestPV("test-pv", 10, testDriver, volName)
+		pv.Spec.AccessModes = tc.accessModes
+		pvName := pv.GetName()
+
+		spec := volume.NewSpecFromPersistentVolume(pv, tc.readOnly)
+
+		if tc.fsType != "" {
+			spec.PersistentVolume.Spec.CSI.FSType = tc.fsType
+		}
+
+		mounter, err := plug.NewMounter(
+			spec,
+			&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns}},
+			volume.VolumeOptions{},
+		)
+		if err != nil {
+			t.Fatalf("Failed to make a new Mounter: %v", err)
+		}
+
+		if mounter == nil {
+			t.Fatal("failed to create CSI mounter")
+		}
+
+		csiMounter := mounter.(*csiMountMgr)
+		csiMounter.csiClient = setupClient(t, true)
+
+		attachID := getAttachmentName(csiMounter.volumeID, csiMounter.driverName, string(plug.host.GetNodeName()))
+		attachment := makeTestAttachment(attachID, "test-node", pvName)
+
+		_, err = csiMounter.k8s.StorageV1beta1().VolumeAttachments().Create(attachment)
+		if err != nil {
+			t.Errorf("failed to setup VolumeAttachment: %v", err)
+			continue
+		}
+
+		// Mounter.SetUp()
+		var fsGroupPtr *int64
+		if tc.setFsGroup {
+			fsGroup := tc.fsGroup
+			fsGroupPtr = &fsGroup
+		}
+		if err := csiMounter.SetUp(fsGroupPtr); err != nil {
+			t.Fatalf("mounter.Setup failed: %v", err)
+		}
+
+		//Test the default value of file system type is not overridden
+		if len(csiMounter.spec.PersistentVolume.Spec.CSI.FSType) != len(tc.fsType) {
+			t.Errorf("file system type was overridden by type %s", csiMounter.spec.PersistentVolume.Spec.CSI.FSType)
+		}
+
+		// ensure call went all the way
+		pubs := csiMounter.csiClient.(*fakeCsiDriverClient).nodeClient.GetNodePublishedVolumes()
+		if pubs[csiMounter.volumeID].Path != csiMounter.GetPath() {
+			t.Error("csi server may not have received NodePublishVolume call")
+		}
+	}
+}
 
 func TestUnmounterTeardown(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil, nil)
