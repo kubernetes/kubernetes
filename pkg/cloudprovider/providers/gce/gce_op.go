@@ -168,6 +168,9 @@ func (gce *GCECloud) waitForZoneOpInProject(op gceObject, projectID, zone string
 }
 
 func convertToV1Operation(object gceObject) *computev1.Operation {
+	if object == nil {
+		return nil
+	}
 	enc, err := object.MarshalJSON()
 	if err != nil {
 		panic(fmt.Sprintf("Failed to encode to json: %v", err))
