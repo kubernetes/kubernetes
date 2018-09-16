@@ -450,7 +450,6 @@ plugin/pkg/auth/authorizer/node
 plugin/pkg/auth/authorizer/rbac
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 staging/src/k8s.io/api/admission/v1beta1
-staging/src/k8s.io/api/admissionregistration/v1alpha1
 staging/src/k8s.io/api/admissionregistration/v1beta1
 staging/src/k8s.io/api/apps/v1
 staging/src/k8s.io/api/apps/v1beta1
@@ -461,10 +460,7 @@ staging/src/k8s.io/api/authorization/v1
 staging/src/k8s.io/api/authorization/v1beta1
 staging/src/k8s.io/api/autoscaling/v1
 staging/src/k8s.io/api/autoscaling/v2beta1
-staging/src/k8s.io/api/autoscaling/v2beta2
 staging/src/k8s.io/api/batch/v1
-staging/src/k8s.io/api/batch/v1beta1
-staging/src/k8s.io/api/batch/v2alpha1
 staging/src/k8s.io/api/certificates/v1beta1
 staging/src/k8s.io/api/coordination/v1beta1
 staging/src/k8s.io/api/core/v1
