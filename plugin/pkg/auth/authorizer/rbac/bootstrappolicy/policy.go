@@ -161,7 +161,9 @@ func NodeRules() []rbacv1.PolicyRule {
 		nodePolicyRules = append(nodePolicyRules, volAttachRule)
 		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie()
+			crdRule := rbacv1helpers.NewRule("create", "list", "watch", "delete").Groups("apiextensions.k8s.io").Resources("customresourcedefinitions").RuleOrDie()
 			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
+			nodePolicyRules = append(nodePolicyRules, crdRule)
 		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
