@@ -41,6 +41,8 @@ If you want to build Kubernetes right away there are two options:
 
 ##### You have a working [Go environment].
 
+Make sure you have 5GB of RAM.
+
 ```
 $ go get -d k8s.io/kubernetes
 $ cd $GOPATH/src/k8s.io/kubernetes
