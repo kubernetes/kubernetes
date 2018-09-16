@@ -465,6 +465,7 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 		mergedClusterInfo.CertificateAuthority = ""
 		mergedClusterInfo.CertificateAuthorityData = nil
 	}
+	mergedClusterInfo.HttpProxy = os.Getenv("http_proxy")
 
 	return *mergedClusterInfo, nil
 }
