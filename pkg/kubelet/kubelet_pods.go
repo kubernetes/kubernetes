@@ -232,7 +232,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 		glog.V(5).Infof("Pod %q container %q mount %q has propagation %q", format.Pod(pod), container.Name, mount.Name, propagation)
 
-		mustMountRO := vol.Mounter.GetAttributes().ReadOnly && utilfeature.DefaultFeatureGate.Enabled(features.ReadOnlyAPIDataVolumes)
+		mustMountRO := vol.Mounter.GetAttributes().ReadOnly
 
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:           mount.Name,
