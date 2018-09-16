@@ -210,7 +210,7 @@ func (az *Cloud) getServiceLoadBalancer(service *v1.Service, clusterName string,
 	primaryVMSetName := az.vmSet.GetPrimaryVMSetName()
 	defaultLBName := az.getAzureLoadBalancerName(clusterName, primaryVMSetName, isInternal)
 
-	existingLBs, err := az.ListLBWithRetry()
+	existingLBs, err := az.ListLBWithRetry(service)
 	if err != nil {
 		return nil, nil, false, err
 	}
@@ -387,7 +387,7 @@ func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) 
 
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 
-	pips, err := az.ListPIPWithRetry(pipResourceGroup)
+	pips, err := az.ListPIPWithRetry(service, pipResourceGroup)
 	if err != nil {
 		return "", err
 	}
@@ -475,7 +475,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 
 	glog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%s, %q): start", pipResourceGroup, *pip.Name)
-	err = az.CreateOrUpdatePIPWithRetry(pipResourceGroup, pip)
+	err = az.CreateOrUpdatePIPWithRetry(service, pipResourceGroup, pip)
 	if err != nil {
 		glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - creating", serviceName, *pip.Name)
 		return nil, err
@@ -488,7 +488,6 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 	if err != nil {
 		return nil, err
 	}
-
 	return &pip, nil
 }
 
@@ -811,7 +810,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			// Remove backend pools from vmSets. This is required for virtual machine scale sets before removing the LB.
 			vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
 			glog.V(10).Infof("EnsureBackendPoolDeleted(%s, %s): start", lbBackendPoolID, vmSetName)
-			err := az.vmSet.EnsureBackendPoolDeleted(lbBackendPoolID, vmSetName, lb.BackendAddressPools)
+			err := az.vmSet.EnsureBackendPoolDeleted(service, lbBackendPoolID, vmSetName, lb.BackendAddressPools)
 			if err != nil {
 				glog.Errorf("EnsureBackendPoolDeleted(%s, %s) failed: %v", lbBackendPoolID, vmSetName, err)
 				return nil, err
@@ -820,7 +819,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			// Remove the LB.
 			glog.V(10).Infof("reconcileLoadBalancer: az.DeleteLBWithRetry(%q): start", lbName)
-			err = az.DeleteLBWithRetry(lbName)
+			err = az.DeleteLBWithRetry(service, lbName)
 			if err != nil {
 				glog.V(2).Infof("reconcileLoadBalancer for service(%s) abort backoff: lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
 				return nil, err
@@ -828,7 +827,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			glog.V(10).Infof("az.DeleteLBWithRetry(%q): end", lbName)
 		} else {
 			glog.V(2).Infof("reconcileLoadBalancer: reconcileLoadBalancer for service(%s): lb(%s) - updating", serviceName, lbName)
-			err := az.CreateOrUpdateLBWithRetry(*lb)
+			err := az.CreateOrUpdateLBWithRetry(service, *lb)
 			if err != nil {
 				glog.V(2).Infof("reconcileLoadBalancer for service(%s) abort backoff: lb(%s) - updating", serviceName, lbName)
 				return nil, err
@@ -852,7 +851,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	if wantLb && nodes != nil {
 		// Add the machines to the backend pool if they're not already
 		vmSetName := az.mapLoadBalancerNameToVMSet(lbName, clusterName)
-		err := az.vmSet.EnsureHostsInPool(serviceName, nodes, lbBackendPoolID, vmSetName, isInternal)
+		err := az.vmSet.EnsureHostsInPool(service, nodes, lbBackendPoolID, vmSetName, isInternal)
 		if err != nil {
 			return nil, err
 		}
@@ -1145,7 +1144,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		sg.SecurityRules = &updatedRules
 		glog.V(2).Infof("reconcileSecurityGroup for service(%s): sg(%s) - updating", serviceName, *sg.Name)
 		glog.V(10).Infof("CreateOrUpdateSGWithRetry(%q): start", *sg.Name)
-		err := az.CreateOrUpdateSGWithRetry(sg)
+		err := az.CreateOrUpdateSGWithRetry(service, sg)
 		if err != nil {
 			glog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
 			// TODO (Nov 2017): remove when augmented security rules are out of preview
@@ -1316,7 +1315,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
 
-	pips, err := az.ListPIPWithRetry(pipResourceGroup)
+	pips, err := az.ListPIPWithRetry(service, pipResourceGroup)
 	if err != nil {
 		return nil, err
 	}
@@ -1333,7 +1332,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, want
 			} else {
 				glog.V(2).Infof("reconcilePublicIP for service(%s): pip(%s) - deleting", serviceName, pipName)
 				glog.V(10).Infof("DeletePublicIPWithRetry(%s, %q): start", pipResourceGroup, pipName)
-				err = az.DeletePublicIPWithRetry(pipResourceGroup, pipName)
+				err = az.DeletePublicIPWithRetry(service, pipResourceGroup, pipName)
 				if err != nil {
 					glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - deleting", serviceName, pipName)
 					// We let err to pass through
