@@ -28,7 +28,13 @@ const (
 	StatefulSetRevisionLabel       = ControllerRevisionHashLabelKey
 	DeprecatedRollbackTo           = "deprecated.deployment.rollback.to"
 	DeprecatedTemplateGeneration   = "deprecated.daemonset.template.generation"
-	StatefulSetPodNameLabel        = "statefulset.kubernetes.io/pod-name"
+	// StatefulSetPodNameLabel corresponds to the unique name of each Pod.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#pod-name-label
+	StatefulSetPodNameLabel = "statefulset.kubernetes.io/pod-name"
+	// StatefulSetPodOrdinalLabel corresponds to the ordinal number of
+	// each Pod in a StatefulSet.
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#ordinal-index
+	StatefulSetPodOrdinalLabel = "statefulset.kubernetes.io/pod-ordinal"
 )
 
 // +genclient
@@ -36,12 +42,22 @@ const (
 // +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/api/autoscaling/v1.Scale,result=k8s.io/api/autoscaling/v1.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// StatefulSet represents a set of pods with consistent identities.
+// StatefulSet represents a set of Pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
 //  - Storage: As many VolumeClaims as requested.
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+//
+// For a StatefulSet with N replicas, each Pod in the StatefulSet will be
+// assigned an integer ordinal, from 0 up through N-1, that is unique
+// over the Set.
+//
+// Each Pod is assigned two labels based on its identity:
+//  - statefulset.kubernetes.io/pod-name: The unique name of the Pod.
+//  - statefulset.kubernetes.io/pod-ordinal: The ordinal number of the Pod in the StatefulSet.
+//
+// More info: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional

@@ -19,6 +19,7 @@ package statefulset
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -252,7 +253,7 @@ func GetStatefulSet(c clientset.Interface, namespace, name string) *appsv1.State
 	return ss
 }
 
-// CheckHostname verifies that all Pods in ss have the correct Hostname. If the returned error is not nil than verification failed.
+// CheckHostname verifies that all Pods in ss have the correct Hostname. If the returned error is not nil then verification failed.
 func CheckHostname(c clientset.Interface, ss *appsv1.StatefulSet) error {
 	cmd := "printf $(hostname)"
 	podList := GetPodList(c, ss)
@@ -264,6 +265,54 @@ func CheckHostname(c clientset.Interface, ss *appsv1.StatefulSet) error {
 		if hostname != statefulPod.Name {
 			return fmt.Errorf("unexpected hostname (%s) and stateful pod name (%s) not equal", hostname, statefulPod.Name)
 		}
+	}
+	return nil
+}
+
+// CheckIdentityLabels verifies that all Pods in ss have correct and non-overalapping
+// identity labels. If the returned error is not nil then verification failed.
+func CheckIdentityLabels(c clientset.Interface, ss *appsv1.StatefulSet) error {
+	podList := GetPodList(c, ss)
+	knownLabelValues := make(map[string]bool, len(podList.Items)*2)
+
+	for _, statefulPod := range podList.Items {
+		// Verify pod name label
+		podNameLabel, ok := statefulPod.Labels[appsv1.StatefulSetPodNameLabel]
+		if !ok {
+			return fmt.Errorf("missing %s label for pod %s", appsv1.StatefulSetPodNameLabel, statefulPod.Name)
+		}
+		if podNameLabel != statefulPod.Name {
+			return fmt.Errorf(
+				"expected %s label value (%s) and stateful pod name (%s) to be equal",
+				appsv1.StatefulSetPodNameLabel, podNameLabel, statefulPod.Name,
+			)
+		}
+		if knownLabelValues[podNameLabel] {
+			return fmt.Errorf(
+				"expected label %s to not have duplicate value (%s) for pod %s",
+				appsv1.StatefulSetPodNameLabel, podNameLabel, statefulPod.Name,
+			)
+		}
+		knownLabelValues[podNameLabel] = true
+		// Verify pod ordinal label
+		podOrdinalLabel, ok := statefulPod.Labels[appsv1.StatefulSetPodOrdinalLabel]
+		if !ok {
+			return fmt.Errorf("missing %s label for pod %s", appsv1.StatefulSetPodOrdinalLabel, statefulPod.Name)
+		}
+		expectedOrdinalLabel := strconv.Itoa(getStatefulPodOrdinal(&statefulPod))
+		if podOrdinalLabel != expectedOrdinalLabel {
+			return fmt.Errorf(
+				"expected %s label value (%s) and stateful pod ordinal (%s) to be equal",
+				appsv1.StatefulSetPodOrdinalLabel, podOrdinalLabel, expectedOrdinalLabel,
+			)
+		}
+		if knownLabelValues[podOrdinalLabel] {
+			return fmt.Errorf(
+				"expected label %s to not have duplicate value (%s) for pod %s",
+				appsv1.StatefulSetPodOrdinalLabel, podOrdinalLabel, statefulPod.Name,
+			)
+		}
+		knownLabelValues[podOrdinalLabel] = true
 	}
 	return nil
 }

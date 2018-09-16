@@ -84,6 +84,11 @@ func TestIdentityMatches(t *testing.T) {
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with the wrong statefulSetPodNameLabel")
 	}
+	pod = newStatefulSetPod(set, 1)
+	delete(pod.Labels, apps.StatefulSetPodOrdinalLabel)
+	if identityMatches(set, pod) {
+		t.Error("identity matches for a Pod with the wrong StatefulSetPodOrdinalLabel")
+	}
 }
 
 func TestStorageMatches(t *testing.T) {
@@ -137,6 +142,11 @@ func TestUpdateIdentity(t *testing.T) {
 	updateIdentity(set, pod)
 	if !identityMatches(set, pod) {
 		t.Error("updateIdentity failed to restore the statefulSetPodName label")
+	}
+	delete(pod.Labels, apps.StatefulSetPodOrdinalLabel)
+	updateIdentity(set, pod)
+	if !identityMatches(set, pod) {
+		t.Error("updateIdentity failed to restore the statefulSetPodOrdinal label")
 	}
 }
 

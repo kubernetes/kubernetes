@@ -25,7 +25,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -112,6 +112,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Verifying statefulset provides a stable hostname for each pod")
 			framework.ExpectNoError(e2esset.CheckHostname(c, ss))
+
+			ginkgo.By("Verifying statefulset provides identity labels for each pod")
+			framework.ExpectNoError(e2esset.CheckIdentityLabels(c, ss))
 
 			ginkgo.By("Verifying statefulset set proper service name")
 			framework.ExpectNoError(e2esset.CheckServiceName(ss, headlessSvcName))
