@@ -99,6 +99,8 @@ spec:
         k8s-app: kube-dns
       annotations:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9153"
     spec:
       serviceAccountName: coredns
       tolerations:
@@ -162,9 +164,6 @@ kind: Service
 metadata:
   name: kube-dns
   namespace: kube-system
-  annotations:
-    prometheus.io/port: "9153"
-    prometheus.io/scrape: "true"
   labels:
     k8s-app: kube-dns
     kubernetes.io/cluster-service: "true"
