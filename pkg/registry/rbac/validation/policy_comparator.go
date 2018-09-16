@@ -50,7 +50,11 @@ func Covers(ownerRules, servantRules []rbacv1.PolicyRule) (bool, []rbacv1.Policy
 		}
 	}
 
-	return (len(uncoveredRules) == 0), uncoveredRules
+	compactedRules, err := CompactRules(uncoveredRules)
+	if err != nil {
+		return (len(uncoveredRules) == 0), uncoveredRules
+	}
+	return (len(uncoveredRules) == 0), compactedRules
 }
 
 // BreadownRule takes a rule and builds an equivalent list of rules that each have at most one verb, one
