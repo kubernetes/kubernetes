@@ -39,6 +39,7 @@ import (
 
 func TestMerge(t *testing.T) {
 	grace := int64(30)
+	enableServiceLinks := api.DefaultEnableServiceLinks
 	tests := []struct {
 		obj       runtime.Object
 		fragment  string
@@ -125,6 +126,7 @@ func TestMerge(t *testing.T) {
 					TerminationGracePeriodSeconds: &grace,
 					SecurityContext:               &api.PodSecurityContext{},
 					SchedulerName:                 api.DefaultSchedulerName,
+					EnableServiceLinks:            &enableServiceLinks,
 				},
 			},
 		},

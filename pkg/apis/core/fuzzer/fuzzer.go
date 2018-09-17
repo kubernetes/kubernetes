@@ -84,6 +84,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			if s.SchedulerName == "" {
 				s.SchedulerName = core.DefaultSchedulerName
 			}
+			if s.EnableServiceLinks == nil {
+				enableServiceLinks := core.DefaultEnableServiceLinks
+				s.EnableServiceLinks = &enableServiceLinks
+			}
 		},
 		func(j *core.PodPhase, c fuzz.Continue) {
 			statuses := []core.PodPhase{core.PodPending, core.PodRunning, core.PodFailed, core.PodUnknown}

@@ -488,7 +488,7 @@ var masterServices = sets.NewString("kubernetes")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a
 // pod in namespace ns should see.
-func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
+func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks *bool) (map[string]string, error) {
 	var (
 		serviceMap = make(map[string]*v1.Service)
 		m          = make(map[string]string)
@@ -520,6 +520,11 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 		//
 		// ordering of the case clauses below enforces this
 		case ns:
+			// If service links are not enabled, we shouldn't add services from
+			// the same namespace.
+			if !*enableServiceLinks {
+				continue
+			}
 			serviceMap[serviceName] = service
 		case kl.masterServiceNamespace:
 			if masterServices.Has(serviceName) {
@@ -553,7 +558,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace)
+	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, pod.Spec.EnableServiceLinks)
 	if err != nil {
 		return result, err
 	}
