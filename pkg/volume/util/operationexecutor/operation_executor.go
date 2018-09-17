@@ -169,7 +169,7 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume as having been globally mounted.
-	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName) error
+	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath string) error
 
 	// Marks the specified volume as having its global mount unmounted.
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
