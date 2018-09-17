@@ -30,33 +30,33 @@ type Config struct {
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	// +optional
-	Kind string `json:"kind,omitempty"`
+	Kind string
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	// +optional
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion string
 	// Preferences holds general information to be use for cli interactions
-	Preferences Preferences `json:"preferences"`
+	Preferences Preferences
 	// Clusters is a map of referencable names to cluster configs
-	Clusters map[string]*Cluster `json:"clusters"`
+	Clusters map[string]*Cluster
 	// AuthInfos is a map of referencable names to user configs
-	AuthInfos map[string]*AuthInfo `json:"users"`
+	AuthInfos map[string]*AuthInfo
 	// Contexts is a map of referencable names to context configs
-	Contexts map[string]*Context `json:"contexts"`
+	Contexts map[string]*Context
 	// CurrentContext is the name of the context that you would like to use by default
-	CurrentContext string `json:"current-context"`
+	CurrentContext string
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
-	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+	Extensions map[string]runtime.Object
 }
 
 // IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
 type Preferences struct {
 	// +optional
-	Colors bool `json:"colors,omitempty"`
+	Colors bool
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
-	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+	Extensions map[string]runtime.Object
 }
 
 // Cluster contains information about how to communicate with a kubernetes cluster
@@ -64,19 +64,19 @@ type Cluster struct {
 	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
 	LocationOfOrigin string
 	// Server is the address of the kubernetes cluster (https://hostname:port).
-	Server string `json:"server"`
+	Server string
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	// +optional
-	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
+	InsecureSkipTLSVerify bool
 	// CertificateAuthority is the path to a cert file for the certificate authority.
 	// +optional
-	CertificateAuthority string `json:"certificate-authority,omitempty"`
+	CertificateAuthority string
 	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
 	// +optional
-	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
+	CertificateAuthorityData []byte
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
-	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+	Extensions map[string]runtime.Object
 }
 
 // AuthInfo contains information that describes identity information.  This is use to tell the kubernetes cluster who you are.
@@ -85,46 +85,46 @@ type AuthInfo struct {
 	LocationOfOrigin string
 	// ClientCertificate is the path to a client cert file for TLS.
 	// +optional
-	ClientCertificate string `json:"client-certificate,omitempty"`
+	ClientCertificate string
 	// ClientCertificateData contains PEM-encoded data from a client cert file for TLS. Overrides ClientCertificate
 	// +optional
-	ClientCertificateData []byte `json:"client-certificate-data,omitempty"`
+	ClientCertificateData []byte
 	// ClientKey is the path to a client key file for TLS.
 	// +optional
-	ClientKey string `json:"client-key,omitempty"`
+	ClientKey string
 	// ClientKeyData contains PEM-encoded data from a client key file for TLS. Overrides ClientKey
 	// +optional
-	ClientKeyData []byte `json:"client-key-data,omitempty"`
+	ClientKeyData []byte
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	// +optional
-	Token string `json:"token,omitempty"`
+	Token string
 	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
 	// +optional
-	TokenFile string `json:"tokenFile,omitempty"`
+	TokenFile string
 	// Impersonate is the username to act-as.
 	// +optional
-	Impersonate string `json:"act-as,omitempty"`
+	Impersonate string
 	// ImpersonateGroups is the groups to imperonate.
 	// +optional
-	ImpersonateGroups []string `json:"act-as-groups,omitempty"`
+	ImpersonateGroups []string
 	// ImpersonateUserExtra contains additional information for impersonated user.
 	// +optional
-	ImpersonateUserExtra map[string][]string `json:"act-as-user-extra,omitempty"`
+	ImpersonateUserExtra map[string][]string
 	// Username is the username for basic authentication to the kubernetes cluster.
 	// +optional
-	Username string `json:"username,omitempty"`
+	Username string
 	// Password is the password for basic authentication to the kubernetes cluster.
 	// +optional
-	Password string `json:"password,omitempty"`
+	Password string
 	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
 	// +optional
-	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
+	AuthProvider *AuthProviderConfig
 	// Exec specifies a custom exec-based authentication plugin for the kubernetes cluster.
 	// +optional
-	Exec *ExecConfig `json:"exec,omitempty"`
+	Exec *ExecConfig
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
-	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+	Extensions map[string]runtime.Object
 }
 
 // Context is a tuple of references to a cluster (how do I communicate with a kubernetes cluster), a user (how do I identify myself), and a namespace (what subset of resources do I want to work with)
@@ -132,22 +132,22 @@ type Context struct {
 	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
 	LocationOfOrigin string
 	// Cluster is the name of the cluster for this context
-	Cluster string `json:"cluster"`
+	Cluster string
 	// AuthInfo is the name of the authInfo for this context
-	AuthInfo string `json:"user"`
+	AuthInfo string
 	// Namespace is the default namespace to use on unspecified requests
 	// +optional
-	Namespace string `json:"namespace,omitempty"`
+	Namespace string
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
-	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+	Extensions map[string]runtime.Object
 }
 
 // AuthProviderConfig holds the configuration for a specified auth provider.
 type AuthProviderConfig struct {
-	Name string `json:"name"`
+	Name string
 	// +optional
-	Config map[string]string `json:"config,omitempty"`
+	Config map[string]string
 }
 
 // ExecConfig specifies a command to provide client credentials. The command is exec'd
@@ -157,26 +157,26 @@ type AuthProviderConfig struct {
 // and output format
 type ExecConfig struct {
 	// Command to execute.
-	Command string `json:"command"`
+	Command string
 	// Arguments to pass to the command when executing it.
 	// +optional
-	Args []string `json:"args"`
+	Args []string
 	// Env defines additional environment variables to expose to the process. These
 	// are unioned with the host's environment, as well as variables client-go uses
 	// to pass argument to the plugin.
 	// +optional
-	Env []ExecEnvVar `json:"env"`
+	Env []ExecEnvVar
 
 	// Preferred input version of the ExecInfo. The returned ExecCredentials MUST use
 	// the same encoding version as the input.
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion string
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based
 // credential plugin.
 type ExecEnvVar struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name  string
+	Value string
 }
 
 // NewConfig is a convenience function that returns a new Config object with non-nil maps
