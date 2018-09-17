@@ -133,6 +133,7 @@ ComponentConfigs:
     OOMScoreAdj: -999
     PodCIDR: ""
     PodPidsLimit: -1
+    PodSandboxTimeout: 4m0s
     PodsPerCore: 0
     Port: 10250
     ProtectKernelDefaults: false

@@ -143,6 +143,7 @@ nodeLeaseDurationSeconds: 40
 nodeStatusUpdateFrequency: 10s
 oomScoreAdj: -999
 podPidsLimit: -1
+podSandboxTimeout: 4m0s
 port: 10250
 registryBurst: 10
 registryPullQPS: 5
