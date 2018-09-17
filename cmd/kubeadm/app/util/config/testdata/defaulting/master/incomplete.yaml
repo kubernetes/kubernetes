@@ -8,7 +8,7 @@ bootstrapTokens:
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
 imageRepository: my-company.com
-kubernetesVersion: v1.10.2
+kubernetesVersion: v1.11.2
 networking:
   dnsDomain: cluster.global
   serviceSubnet: 10.196.0.0/12

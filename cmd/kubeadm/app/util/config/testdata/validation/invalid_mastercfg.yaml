@@ -7,7 +7,7 @@ bootstrapTokens:
 certificatesDir: relativepath
 clusterName: kubernetes
 imageRepository: my-company.com
-kubernetesVersion: v1.10.2
+kubernetesVersion: v1.11.2
 networking:
   dnsDomain: cluster.GLOBAL
   serviceSubnet: 10.196.1000.0/100

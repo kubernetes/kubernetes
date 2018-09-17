@@ -639,13 +639,13 @@ func TestKubeletVersionCheck(t *testing.T) {
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v1.11.2", "", false, false},               // check minimally supported version when there is no information about control plane
-		{"v1.8.3", "v1.8.8", true, false},           // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v1.10.0", "v1.10.5", false, false},        // kubelet within same major.minor as control plane
-		{"v1.10.5", "v1.10.1", false, false},        // kubelet is newer, but still within same major.minor as control plane
-		{"v1.10.0", "v1.11.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
-		{"v1.11.0-alpha.1", "v1.10.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v1.11.0", "v1.10.5", true, false},         // kubelet is newer (release) than control plane, should fail.
+		{"v1.12.2", "", false, false},               // check minimally supported version when there is no information about control plane
+		{"v1.9.3", "v1.9.8", true, false},           // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
+		{"v1.11.0", "v1.11.5", false, false},        // kubelet within same major.minor as control plane
+		{"v1.11.5", "v1.11.1", false, false},        // kubelet is newer, but still within same major.minor as control plane
+		{"v1.11.0", "v1.12.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
+		{"v1.12.0-alpha.1", "v1.11.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v1.12.0", "v1.11.5", true, false},         // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {
