@@ -41,25 +41,25 @@ const (
 // Configuration provides configuration for the EventRateLimit admission
 // controller.
 type Configuration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta
 
 	// limits are the limits to place on event queries received.
 	// Limits can be placed on events received server-wide, per namespace,
 	// per user, and per source+object.
 	// At least one limit is required.
-	Limits []Limit `json:"limits"`
+	Limits []Limit
 }
 
 // Limit is the configuration for a particular limit type
 type Limit struct {
 	// type is the type of limit to which this configuration applies
-	Type LimitType `json:"type"`
+	Type LimitType
 
 	// qps is the number of event queries per second that are allowed for this
 	// type of limit. The qps and burst fields are used together to determine if
 	// a particular event query is accepted. The qps determines how many queries
 	// are accepted once the burst amount of queries has been exhausted.
-	QPS int32 `json:"qps"`
+	QPS int32
 
 	// burst is the burst number of event queries that are allowed for this type
 	// of limit. The qps and burst fields are used together to determine if a
@@ -69,7 +69,7 @@ type Limit struct {
 	// before blocking any queries. Every second, 3 more queries will be allowed.
 	// If some of that allowance is not used, then it will roll over to the next
 	// second, until the maximum allowance of 10 is reached.
-	Burst int32 `json:"burst"`
+	Burst int32
 
 	// cacheSize is the size of the LRU cache for this type of limit. If a bucket
 	// is evicted from the cache, then the allowance for that bucket is reset. If
@@ -81,5 +81,5 @@ type Limit struct {
 	//
 	// If limitType is 'server', then cacheSize is ignored.
 	// +optional
-	CacheSize int32 `json:"cacheSize,omitempty"`
+	CacheSize int32
 }

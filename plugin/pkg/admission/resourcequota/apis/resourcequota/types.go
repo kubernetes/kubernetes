@@ -39,13 +39,13 @@ type LimitedResource struct {
 
 	// APIGroup is the name of the APIGroup that contains the limited resource.
 	// +optional
-	APIGroup string `json:"apiGroup,omitempty"`
+	APIGroup string
 
 	// Resource is the name of the resource this rule applies to.
 	// For example, if the administrator wants to limit consumption
 	// of a storage resource associated with persistent volume claims,
 	// the value would be "persistentvolumeclaims".
-	Resource string `json:"resource"`
+	Resource string
 
 	// For each intercepted request, the quota system will evaluate
 	// its resource usage.  It will iterate through each resource consumed
@@ -67,6 +67,5 @@ type LimitedResource struct {
 	// the list would include
 	// "PriorityClassNameIn=cluster-services"
 	// +optional
-	//	MatchScopes []string `json:"matchScopes,omitempty"`
 	MatchScopes []corev1.ScopedResourceSelectorRequirement `json:"matchScopes,omitempty"`
 }
