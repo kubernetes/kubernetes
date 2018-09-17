@@ -35,7 +35,7 @@ func TestCreateConfigMap(t *testing.T) {
 	cfg := &kubeadmapi.InitConfiguration{
 		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodeName},
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "v1.11.0",
+			KubernetesVersion: "v1.12.0",
 			ComponentConfigs: kubeadmapi.ComponentConfigs{
 				Kubelet: &kubeletconfig.KubeletConfiguration{},
 			},

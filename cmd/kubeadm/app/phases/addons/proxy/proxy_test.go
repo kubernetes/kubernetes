@@ -183,7 +183,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 					PodSubnet: "5.6.7.8/24",
 				},
 				ImageRepository:   "someRepo",
-				KubernetesVersion: "v1.10.0",
+				KubernetesVersion: "v1.11.0",
 			},
 		}
 
