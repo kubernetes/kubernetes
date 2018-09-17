@@ -1005,6 +1005,9 @@ func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode
 }
 
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	if _, err := os.Stat(pathname); os.IsNotExist(err) {
+		return []string{}, nil
+	}
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
 		return nil, err

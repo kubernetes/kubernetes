@@ -281,7 +281,7 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 	// Ignore deletion errors.  Failing on them will interrupt test cleanup.
 	framework.DeletePodWithWait(f, c, client)
 	framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-	if forceDeletePV {
+	if forceDeletePV && pv != nil {
 		framework.DeletePersistentVolume(c, pv.Name)
 		return
 	}
