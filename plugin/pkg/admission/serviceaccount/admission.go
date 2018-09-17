@@ -147,7 +147,10 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	pod := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
 
 	// Don't modify the spec of mirror pods.
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)

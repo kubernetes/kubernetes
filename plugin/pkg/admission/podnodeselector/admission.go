@@ -113,7 +113,11 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	}
 
 	resource := a.GetResource().GroupResource()
-	pod := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
+
 	namespaceNodeSelector, err := p.getNamespaceNodeSelectorMap(a.GetNamespace())
 	if err != nil {
 		return err
@@ -140,7 +144,10 @@ func (p *podNodeSelector) Validate(a admission.Attributes) error {
 	}
 
 	resource := a.GetResource().GroupResource()
-	pod := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
 
 	namespaceNodeSelector, err := p.getNamespaceNodeSelectorMap(a.GetNamespace())
 	if err != nil {
