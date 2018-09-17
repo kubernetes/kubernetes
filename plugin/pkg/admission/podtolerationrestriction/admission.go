@@ -89,7 +89,11 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
-	pod := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
+
 	var finalTolerations []api.Toleration
 	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
 	if err != nil {
@@ -149,7 +153,10 @@ func (p *podTolerationsPlugin) Validate(a admission.Attributes) error {
 	}
 
 	// whitelist verification.
-	pod := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
 	if len(pod.Spec.Tolerations) > 0 {
 		whitelist, err := p.getNamespaceTolerationsWhitelist(a.GetNamespace())
 		if err != nil {

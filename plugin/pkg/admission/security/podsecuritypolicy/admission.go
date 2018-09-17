@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
@@ -122,7 +123,10 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
-	pod := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
 
 	// compute the context. Mutation is allowed. ValidatedPSPAnnotation is not taken into account.
 	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, true, "")
@@ -156,7 +160,10 @@ func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
 		return nil
 	}
 
-	pod := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*api.Pod)
+	if !ok {
+		return errors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
 
 	// compute the context. Mutation is not allowed. ValidatedPSPAnnotation is used as a hint to gain same speed-up.
 	allowedPod, pspName, validationErrs, err := c.computeSecurityContext(a, pod, false, pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation])
