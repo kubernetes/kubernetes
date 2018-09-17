@@ -45,7 +45,7 @@ limitations under the License.
 //	  podSubnet: "10.100.0.1/24"
 //	  dnsDomain: "cluster.local"
 //	kubernetesVersion: "v1.12.0"
-//	ControlPlaneEndpoint: "10.100.0.1:6443"
+//	controlPlaneEndpoint: "10.100.0.1:6443"
 //	apiServerExtraArgs:
 //	  authorization-mode: "Node,RBAC"
 //	controlManagerExtraArgs:
