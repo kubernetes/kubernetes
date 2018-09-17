@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -59,6 +60,9 @@ const (
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second
+
+	// the restart count limit for a pod
+	podRestartCountLimitAnn = "io.kubernetes.pod.restartCountLimit"
 )
 
 var (
@@ -730,6 +734,28 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			startContainerResult.Fail(err, msg)
 			glog.V(4).Infof("Backing Off restarting container %+v in pod %v", container, format.Pod(pod))
 			continue
+		}
+
+		// limit pod restart count if set
+		restartCountLimitStr, ok := pod.Annotations[podRestartCountLimitAnn]
+		if ok {
+			if len(restartCountLimitStr) > 0 {
+				restartCountLimit, err := strconv.Atoi(restartCountLimitStr)
+				if err != nil {
+					glog.V(5).Infof("Failed to parse restart count limit in pod %v: %+v", format.Pod(pod), err)
+				} else {
+					currentRestartCount := 0
+					for _, containerStatus := range podStatus.ContainerStatuses {
+						currentRestartCount += containerStatus.RestartCount
+					}
+					if currentRestartCount > restartCountLimit {
+						msg := fmt.Sprintf("Stop restarting container %+v in pod %v due to exceeding pod restart count limit", container, format.Pod(pod))
+						startContainerResult.Fail(errors.New("ExceededRestartCountLimit"), msg)
+						glog.V(4).Infof(msg)
+						continue
+					}
+				}
+			}
 		}
 
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
