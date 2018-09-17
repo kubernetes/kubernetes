@@ -157,7 +157,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	fmt.Fprintf(out, "Starting to serve on %s\n", l.Addr().String())
+	fmt.Fprintf(out, "Starting to serve on http://%s\n", l.Addr().String())
 	glog.Fatal(server.ServeOnListener(l))
 	return nil
 }
