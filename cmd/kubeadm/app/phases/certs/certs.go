@@ -189,10 +189,14 @@ func writeCertificateAuthorithyFilesIfNotExist(pkiDir string, baseName string, c
 	if pkiutil.CertOrKeyExist(pkiDir, baseName) {
 
 		// Try to load .crt and .key from the PKI directory
-		caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
+		existingCert, existingKey, err := pkiutil.TryLoadCertAndKeyFromDisk(pkiDir, baseName)
 		if err != nil {
 			return fmt.Errorf("failure loading %s certificate: %v", baseName, err)
 		}
+
+		// Update the value of the caCert and caKey pointers rather than the pointers themselves
+		*caCert = *existingCert
+		*caKey = *existingKey
 
 		// Check if the existing cert is a CA
 		if !caCert.IsCA {
