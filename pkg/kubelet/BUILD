@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "active_deadline.go",
         "doc.go",
+        "errors.go",
         "kubelet.go",
         "kubelet_getters.go",
         "kubelet_network.go",
