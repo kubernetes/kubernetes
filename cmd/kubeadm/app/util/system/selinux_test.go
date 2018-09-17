@@ -1,7 +1,5 @@
-// +build !linux
-
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,22 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package selinux
+package system
 
-// SELinuxEnabled always returns false on non-linux platforms.
-func SELinuxEnabled() bool {
-	return false
-}
+import (
+	"testing"
+)
 
-// realSELinuxRunner is the NOP implementation of the SELinuxRunner interface.
-type realSELinuxRunner struct{}
+func TestNewSELinuxContext(t *testing.T) {
+	v := NewSELinuxContext()
+	expected := "unconfined_u:object_r:container_file_t:s0"
+	got := v.ToString()
 
-var _ SELinuxRunner = &realSELinuxRunner{}
+	if got != expected {
+		t.Errorf("ToString() = %q, want %q", got, expected)
+	}
 
-func (_ *realSELinuxRunner) Getfilecon(path string) (string, error) {
-	return "", nil
-}
-
-func (_ *realSELinuxRunner) Setfilecon(path string, label string) error {
-	return nil
 }

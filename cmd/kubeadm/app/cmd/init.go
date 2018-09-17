@@ -61,6 +61,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeadmsystem "k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -354,6 +355,19 @@ func (i *Init) Run(out io.Writer) error {
 	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
+
+	etcdDataDir := i.cfg.Etcd.Local.DataDir
+
+	if err := os.MkdirAll(etcdDataDir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %q: %v", etcdDataDir, err)
+	}
+
+	// Set SELinux context for etcd data directory
+	selinuxContext := kubeadmsystem.NewSELinuxContext()
+	if err := kubeadmsystem.SetSELinuxFilecon(etcdDataDir, selinuxContext); err != nil {
+		return fmt.Errorf("error setting SELinux context for etcd data directory: %v", err)
+	}
+
 	// Add etcd static pod spec only if external etcd is not configured
 	if i.cfg.Etcd.External == nil {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
