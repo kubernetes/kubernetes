@@ -6,15 +6,22 @@ top-level k8s.io repositories.
 
 Repositories currently staged here:
 
-- [`k8s.io/apiextensions-apiserver`](https://github.com/kubernetes/apiextensions-apiserver)
 - [`k8s.io/api`](https://github.com/kubernetes/api)
+- [`k8s.io/apiextensions-apiserver`](https://github.com/kubernetes/apiextensions-apiserver)
 - [`k8s.io/apimachinery`](https://github.com/kubernetes/apimachinery)
 - [`k8s.io/apiserver`](https://github.com/kubernetes/apiserver)
+- [`k8s.io/cli-runtime`](https://github.com/kubernetes/cli-runtime)
 - [`k8s.io/client-go`](https://github.com/kubernetes/client-go)
-- [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
+- [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
+- [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
+- [`k8s.io/kube-controller-manager`](https://github.com/kubernetes/kube-controller-manager)
+- [`k8s.io/kube-proxy`](https://github.com/kubernetes/kube-proxy)
+- [`k8s.io/kube-scheduler`](https://github.com/kubernetes/kube-scheduler)
+- [`k8s.io/kubelet`](https://github.com/kubernetes/kubelet)
 - [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
 - [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
+- [`k8s.io/sample-cli-plugin`](https://github.com/kubernetes/sample-cli-plugin)
 - [`k8s.io/sample-controller`](https://github.com/kubernetes/sample-controller)
 
 The code in the staging/ directory is authoritative, i.e. the only copy of the
