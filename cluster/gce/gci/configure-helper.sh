@@ -120,7 +120,7 @@ function get-local-disk-num() {
 function safe-block-symlink(){
   local device="${1}"
   local symdir="${2}"
-  
+
   mkdir -p "${symdir}"
 
   get-or-generate-uuid "${device}"
@@ -195,11 +195,11 @@ function unique-uuid-bind-mount(){
   # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
   udevadm control --reload-rules
   udevadm trigger
-  udevadm settle 
+  udevadm settle
 
   # grep the exact match of actual device, prevents substring matching
   local myuuid=$(ls -l /dev/disk/by-uuid/ | grep "/${actual_device}$" | tr -s ' ' | cut -d ' ' -f 9)
-  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/ 
+  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/
   if [[ -z "${myuuid}" ]]; then
     echo "Failed to get a uuid for device ${actual_device} when mounting." >&2
     exit 2
@@ -231,7 +231,7 @@ function mount-ext(){
   local devicenum="${2}"
   local interface="${3}"
   local format="${4}"
-  
+
 
   if [[ -z "${devicenum}" ]]; then
     echo "Failed to get the local disk number for device ${ssd}" >&2
@@ -2352,8 +2352,11 @@ function start-kube-registry-proxy {
   cp "${KUBE_HOME}/kube-manifests/kubernetes/kube-registry-proxy.yaml" /etc/kubernetes/manifests
 }
 
-# Starts a l7 loadbalancing controller for ingress.
+# Setups manifests for ingress controller and gce-specific policies for service controller.
 function start-lb-controller {
+  setup-addon-manifests "addons" "loadbalancing"
+
+  # Starts a l7 loadbalancing controller for ingress.
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
