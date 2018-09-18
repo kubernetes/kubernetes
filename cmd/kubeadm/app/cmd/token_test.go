@@ -182,7 +182,7 @@ func TestRunCreateToken(t *testing.T) {
 			ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
 				// KubernetesVersion is not used, but we set this explicitly to avoid
 				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-				KubernetesVersion: "v1.10.0",
+				KubernetesVersion: "v1.11.0",
 			},
 			BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
 				{

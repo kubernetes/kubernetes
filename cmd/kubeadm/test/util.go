@@ -66,7 +66,7 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 		apiVersion: kubeadm.k8s.io/v1alpha3
 		kind: ClusterConfiguration
 		certificatesDir: {{.CertificatesDir}}
-		kubernetesVersion: v1.10.0
+		kubernetesVersion: v1.11.0
 		`)))
 
 	f, err := os.Create(cfgPath)

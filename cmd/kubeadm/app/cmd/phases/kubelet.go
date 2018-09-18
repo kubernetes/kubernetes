@@ -81,7 +81,7 @@ var (
 		kubeadm alpha phase kubelet config download
 
 		# Downloads the kubelet configuration from the ConfigMap in the cluster. Uses a specific desired kubelet version.
-		kubeadm alpha phase kubelet config download --kubelet-version v1.11.0
+		kubeadm alpha phase kubelet config download --kubelet-version v1.12.0
 		`)
 
 	kubeletConfigWriteToDiskLongDesc = normalizer.LongDesc(`
@@ -104,7 +104,7 @@ var (
 
 	kubeletConfigEnableDynamicExample = normalizer.Examples(`
 		# Enables dynamic kubelet configuration for a Node.
-		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version v1.11.0
+		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version v1.12.0
 
 		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.
