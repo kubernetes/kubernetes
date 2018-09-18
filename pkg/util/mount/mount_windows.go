@@ -459,6 +459,11 @@ func getAllParentLinks(path string) ([]string, error) {
 }
 
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	if _, err := os.Stat(normalizeWindowsPath(pathname)); os.IsNotExist(err) {
+		return []string{}, nil
+	} else if err != nil {
+		return nil, err
+	}
 	refs, err := getAllParentLinks(normalizeWindowsPath(pathname))
 	if err != nil {
 		return nil, err
