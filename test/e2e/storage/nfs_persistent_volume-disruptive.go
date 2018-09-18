@@ -208,7 +208,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 		AfterEach(func() {
 			framework.Logf("Tearing down test spec")
-			tearDownTestCase(c, f, ns, clientPod, pvc, pv)
+			tearDownTestCase(c, f, ns, clientPod, pvc, pv, true /* force PV delete */)
 			pv, pvc, clientPod = nil, nil, nil
 		})
 
@@ -277,11 +277,14 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 }
 
 // tearDownTestCase destroy resources created by initTestCase.
-func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, client *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
+func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, client *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, forceDeletePV bool) {
 	// Ignore deletion errors.  Failing on them will interrupt test cleanup.
 	framework.DeletePodWithWait(f, c, client)
 	framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
-	if pv != nil {
+	if forceDeletePV && pv != nil {
 		framework.DeletePersistentVolume(c, pv.Name)
+		return
 	}
+	err := framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, 5*time.Minute)
+	framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", pv.Name)
 }
