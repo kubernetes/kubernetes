@@ -38,6 +38,7 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     jq \
     kmod \
     openssh-client \
+    netbase \
     nfs-common \
     socat \
     udev \
