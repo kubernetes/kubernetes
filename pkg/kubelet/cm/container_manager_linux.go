@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
@@ -70,7 +71,6 @@ const (
 	// The minimum memory limit allocated to docker container: 150Mi
 	MinDockerMemoryLimit = 150 * 1024 * 1024
 
-	dockerProcessName     = "docker"
 	dockerPidFile         = "/var/run/docker.pid"
 	containerdProcessName = "docker-containerd"
 	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
@@ -425,7 +425,7 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 		// TODO(#27097): Fix this after NodeSpec is clearly defined.
 		cm.periodicTasks = append(cm.periodicTasks, func() {
 			glog.V(4).Infof("[ContainerManager]: Adding periodic tasks for docker CRI integration")
-			cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
+			cont, err := getContainerNameForProcess(kubetypes.DockerContainerRuntime, dockerPidFile)
 			if err != nil {
 				glog.Error(err)
 				return
@@ -709,7 +709,7 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 // dockershim as the default.
 func EnsureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager *fs.Manager) error {
 	type process struct{ name, file string }
-	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
+	dockerProcs := []process{{kubetypes.DockerContainerRuntime, dockerPidFile}}
 	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
 		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
 	}

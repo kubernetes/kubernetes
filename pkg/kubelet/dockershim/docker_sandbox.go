@@ -43,9 +43,6 @@ const (
 
 	// Various default sandbox resources requests/limits.
 	defaultSandboxCPUshares int64 = 2
-
-	// Name of the underlying container runtime
-	runtimeName = "docker"
 )
 
 var (
@@ -164,7 +161,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	// sandbox networking, but it might insert iptables rules or open ports
 	// on the host as well, to satisfy parts of the pod spec that aren't
 	// recognized by the CNI standard yet.
-	cID := kubecontainer.BuildContainerID(runtimeName, createResp.ID)
+	cID := kubecontainer.BuildContainerID(types.DockerContainerRuntime, createResp.ID)
 	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations)
 	if err != nil {
 		errList := []error{fmt.Errorf("failed to set up sandbox container %q network for pod %q: %v", createResp.ID, config.Metadata.Name, err)}
@@ -244,7 +241,7 @@ func (ds *dockerService) StopPodSandbox(ctx context.Context, r *runtimeapi.StopP
 	ready, ok := ds.getNetworkReady(podSandboxID)
 	if !hostNetwork && (ready || !ok) {
 		// Only tear down the pod network if we haven't done so already
-		cID := kubecontainer.BuildContainerID(runtimeName, podSandboxID)
+		cID := kubecontainer.BuildContainerID(types.DockerContainerRuntime, podSandboxID)
 		err := ds.network.TearDownPod(namespace, name, cID)
 		if err == nil {
 			ds.setNetworkReady(podSandboxID, false)
@@ -322,7 +319,7 @@ func (ds *dockerService) getIPFromPlugin(sandbox *dockertypes.ContainerJSON) (st
 		return "", err
 	}
 	msg := fmt.Sprintf("Couldn't find network status for %s/%s through plugin", metadata.Namespace, metadata.Name)
-	cID := kubecontainer.BuildContainerID(runtimeName, sandbox.ID)
+	cID := kubecontainer.BuildContainerID(types.DockerContainerRuntime, sandbox.ID)
 	networkStatus, err := ds.network.GetPodNetworkStatus(metadata.Namespace, metadata.Name, cID)
 	if err != nil {
 		return "", err

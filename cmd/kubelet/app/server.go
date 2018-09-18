@@ -179,7 +179,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				glog.Fatal(err)
 			}
 
-			if kubeletFlags.ContainerRuntime == "remote" && cleanFlagSet.Changed("pod-infra-container-image") {
+			if kubeletFlags.ContainerRuntime == kubetypes.RemoteContainerRuntime && cleanFlagSet.Changed("pod-infra-container-image") {
 				glog.Warning("Warning: For remote container runtime, --pod-infra-container-image is ignored in kubelet, which should be set in that remote runtime instead")
 			}
 

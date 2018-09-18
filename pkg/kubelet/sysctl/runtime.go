@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -28,8 +29,6 @@ const (
 	// CRI uses semver-compatible API version, while docker does not
 	// (e.g., 1.24). Append the version with a ".0".
 	dockerMinimumAPIVersion = "1.24.0"
-
-	dockerTypeName = "docker"
 )
 
 // TODO: The admission logic in this file is runtime-dependent. It should be
@@ -45,7 +44,7 @@ var _ lifecycle.PodAdmitHandler = &runtimeAdmitHandler{}
 // the given runtime support sysctls.
 func NewRuntimeAdmitHandler(runtime container.Runtime) (*runtimeAdmitHandler, error) {
 	switch runtime.Type() {
-	case dockerTypeName:
+	case kubetypes.DockerContainerRuntime:
 		v, err := runtime.APIVersion()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get runtime version: %v", err)

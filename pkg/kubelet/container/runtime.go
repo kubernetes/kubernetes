@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -239,7 +240,7 @@ type DockerID string
 
 func (id DockerID) ContainerID() ContainerID {
 	return ContainerID{
-		Type: "docker",
+		Type: kubetypes.DockerContainerRuntime,
 		ID:   string(id),
 	}
 }

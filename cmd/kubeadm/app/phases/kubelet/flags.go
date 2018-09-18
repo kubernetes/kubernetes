@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsexec "k8s.io/utils/exec"
@@ -81,7 +82,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 			kubeletFlags["cgroup-driver"] = driver
 		}
 	} else {
-		kubeletFlags["container-runtime"] = "remote"
+		kubeletFlags["container-runtime"] = kubetypes.RemoteContainerRuntime
 		kubeletFlags["container-runtime-endpoint"] = opts.nodeRegOpts.CRISocket
 	}
 

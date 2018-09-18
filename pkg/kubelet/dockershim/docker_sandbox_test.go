@@ -215,7 +215,7 @@ func TestNetworkPluginInvocation(t *testing.T) {
 		map[string]string{"label": name},
 		map[string]string{"annotation": ns},
 	)
-	cID := kubecontainer.ContainerID{Type: runtimeName, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
+	cID := kubecontainer.ContainerID{Type: types.DockerContainerRuntime, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
 
 	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
 	setup := mockPlugin.EXPECT().SetUpPod(ns, name, cID)
@@ -249,7 +249,7 @@ func TestHostNetworkPluginInvocation(t *testing.T) {
 			},
 		},
 	}
-	cID := kubecontainer.ContainerID{Type: runtimeName, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
+	cID := kubecontainer.ContainerID{Type: types.DockerContainerRuntime, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
 
 	// No calls to network plugin are expected
 	_, err := ds.RunPodSandbox(getTestCTX(), &runtimeapi.RunPodSandboxRequest{Config: c})
@@ -274,7 +274,7 @@ func TestSetUpPodFailure(t *testing.T) {
 		map[string]string{"label": name},
 		map[string]string{"annotation": ns},
 	)
-	cID := kubecontainer.ContainerID{Type: runtimeName, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
+	cID := kubecontainer.ContainerID{Type: types.DockerContainerRuntime, ID: libdocker.GetFakeContainerID(fmt.Sprintf("/%v", makeSandboxName(c)))}
 	mockPlugin.EXPECT().Name().Return("mockNetworkPlugin").AnyTimes()
 	mockPlugin.EXPECT().SetUpPod(ns, name, cID).Return(errors.New("setup pod error")).AnyTimes()
 	// If SetUpPod() fails, we expect TearDownPod() to immediately follow

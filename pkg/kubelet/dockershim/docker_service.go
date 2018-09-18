@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
@@ -48,7 +49,6 @@ import (
 )
 
 const (
-	dockerRuntimeName = "docker"
 	kubeAPIVersion    = "0.1.0"
 
 	// String used to detect docker host mode for various namespaces (e.g.
@@ -317,7 +317,7 @@ func (ds *dockerService) Version(_ context.Context, r *runtimeapi.VersionRequest
 	}
 	return &runtimeapi.VersionResponse{
 		Version:           kubeAPIVersion,
-		RuntimeName:       dockerRuntimeName,
+		RuntimeName:       kubetypes.DockerContainerRuntime,
 		RuntimeVersion:    v.Version,
 		RuntimeApiVersion: v.APIVersion,
 	}, nil
