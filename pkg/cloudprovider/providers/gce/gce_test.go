@@ -547,6 +547,13 @@ func TestConvertToV1Operation(t *testing.T) {
 	} else {
 		t.Errorf("Expect output to be type v1 operation, but got %v", op)
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panicked with nil input")
+		}
+	}()
+	op = convertToV1Operation(nil)
 }
 
 func getTestOperation() *computev1.Operation {
