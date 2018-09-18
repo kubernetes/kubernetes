@@ -30,6 +30,9 @@ spec:
     - mountPath: /var/log
       name: varlog
       readOnly: false
+    env:
+    - name: KUBECTL_EXTRA_PRUNE_WHITELIST
+      value: {{kubectl_extra_prune_whitelist}}
   volumes:
   - hostPath:
       path: /etc/kubernetes/
