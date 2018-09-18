@@ -16,7 +16,7 @@
 
 REGISTRY?="gcr.io/google-containers"
 IMAGE=debian-iptables
-TAG=v10.1
+TAG=v10.2
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 
