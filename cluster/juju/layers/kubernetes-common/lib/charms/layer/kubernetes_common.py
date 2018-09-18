@@ -20,6 +20,7 @@ import os
 import subprocess
 import hashlib
 import json
+import random
 
 from pathlib import Path
 from subprocess import check_output, check_call
@@ -34,6 +35,7 @@ from time import sleep
 db = unitdata.kv()
 kubeclientconfig_path = '/root/.kube/config'
 gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
+kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
 
 
 def get_version(bin_name):
@@ -458,3 +460,20 @@ def write_azure_snap_config(component):
         'subnetName': azure.subnet_name,
         'securityGroupName': azure.security_group_name,
     }))
+
+
+def configure_kube_proxy(configure_prefix, api_servers, cluster_cidr):
+    kube_proxy_opts = {}
+    kube_proxy_opts['cluster-cidr'] = cluster_cidr
+    kube_proxy_opts['kubeconfig'] = kubeproxyconfig_path
+    kube_proxy_opts['logtostderr'] = 'true'
+    kube_proxy_opts['v'] = '0'
+    kube_proxy_opts['master'] = random.choice(api_servers)
+    kube_proxy_opts['hostname-override'] = get_node_name()
+
+    if host.is_container():
+        kube_proxy_opts['conntrack-max-per-core'] = '0'
+
+    configure_kubernetes_service(configure_prefix, 'kube-proxy',
+                                 kube_proxy_opts, 'proxy-extra-args')
+
