@@ -18,6 +18,14 @@ limitations under the License.
 
 package internalversion
 
+// PodGroupListerExpansion allows custom methods to be added to
+// PodGroupLister.
+type PodGroupListerExpansion interface{}
+
+// PodGroupNamespaceListerExpansion allows custom methods to be added to
+// PodGroupNamespaceLister.
+type PodGroupNamespaceListerExpansion interface{}
+
 // PriorityClassListerExpansion allows custom methods to be added to
 // PriorityClassLister.
 type PriorityClassListerExpansion interface{}

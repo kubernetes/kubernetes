@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "interface.go",
+        "podgroup.go",
         "priorityclass.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/scheduling/internalversion",

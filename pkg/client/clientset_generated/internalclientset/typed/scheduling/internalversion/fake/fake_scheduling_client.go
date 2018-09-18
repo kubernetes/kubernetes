@@ -28,6 +28,10 @@ type FakeScheduling struct {
 	*testing.Fake
 }
 
+func (c *FakeScheduling) PodGroups(namespace string) internalversion.PodGroupInterface {
+	return &FakePodGroups{c, namespace}
+}
+
 func (c *FakeScheduling) PriorityClasses() internalversion.PriorityClassInterface {
 	return &FakePriorityClasses{c}
 }

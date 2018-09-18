@@ -16,7 +16,10 @@ limitations under the License.
 
 package scheduling
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 const (
 	// DefaultPriorityWhenNoDefaultClassExists is used to set priority of pods
@@ -78,4 +81,43 @@ type PriorityClassList struct {
 
 	// Items is the list of PriorityClasses.
 	Items []PriorityClass
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodGroup is a collection of Pod; used for batch workload.
+type PodGroup struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec defines the behavior of a pod group.
+	// +optional
+	Spec PodGroupSpec
+}
+
+// PodGroupSpec is a description of a pod group.
+type PodGroupSpec struct {
+	// NumMember defines the number of members/tasks to run the pod group;
+	// if there's not enough resources to start all tasks, the scheduler
+	// will not start anyone.
+	NumMember int32
+	// Resources defines the total resource the PodGroup requests to run
+	// Pods.
+	Resources map[string]resource.Quantity
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PodGroupList is a collection of pod group.
+type PodGroupList struct {
+	metav1.TypeMeta
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of PodGroup.
+	Items []PodGroup
 }

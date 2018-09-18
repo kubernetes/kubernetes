@@ -54,3 +54,28 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	}
 	return allErrs
 }
+
+// ValidatePodGroup tests whether required fields in the PodGroup are
+// set correctly.
+func ValidatePodGroup(pg *scheduling.PodGroup) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(
+		&pg.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+
+	if pg.Spec.NumMember < 1 {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("Spec", "NumMember"), "can not be less than 1."))
+	}
+
+	return allErrs
+}
+
+// ValidatePodGroupUpdate tests if required fields in the PodGroup are set and are valid.
+// PodGroup does not allow updating metadata.name, metadata.namespace and .spec.numMember.
+func ValidatePodGroupUpdate(pc, oldPc *scheduling.PodGroup) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&pc.ObjectMeta, &oldPc.ObjectMeta, field.NewPath("metadata"))
+	// Name is immutable and is checked by the ObjectMeta validator.
+	if pc.Spec.NumMember != oldPc.Spec.NumMember {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("Spec", "NumMember"), "may not be changed in an update."))
+	}
+	return allErrs
+}

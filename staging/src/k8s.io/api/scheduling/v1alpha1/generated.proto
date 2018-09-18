@@ -21,12 +21,49 @@ syntax = 'proto2';
 
 package k8s.io.api.scheduling.v1alpha1;
 
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
+
+// PodGroup is a collection of Pod; used for batch workload.
+message PodGroup {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Specification of the desired behavior of the pod group.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional PodGroupSpec spec = 2;
+}
+
+// PodGroupList is a collection of pod groups.
+message PodGroupList {
+  // Standard list metadata
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of PodGroup
+  repeated PodGroup items = 2;
+}
+
+// PodGroupSpec represents the template of a pod group.
+message PodGroupSpec {
+  // NumMember defines the number of members/tasks to run the pod group;
+  // if there's not enough resources to start all tasks, the scheduler
+  // will not start anyone.
+  optional int32 numMember = 1;
+
+  // Resources defines the total resource the PodGroup requests to run
+  // Pods.
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> resources = 2;
+}
 
 // PriorityClass defines mapping from a priority class name to the priority
 // integer value. The value can be any valid integer.

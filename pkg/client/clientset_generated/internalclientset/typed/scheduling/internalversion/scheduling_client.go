@@ -25,12 +25,17 @@ import (
 
 type SchedulingInterface interface {
 	RESTClient() rest.Interface
+	PodGroupsGetter
 	PriorityClassesGetter
 }
 
 // SchedulingClient is used to interact with features provided by the scheduling.k8s.io group.
 type SchedulingClient struct {
 	restClient rest.Interface
+}
+
+func (c *SchedulingClient) PodGroups(namespace string) PodGroupInterface {
+	return newPodGroups(c, namespace)
 }
 
 func (c *SchedulingClient) PriorityClasses() PriorityClassInterface {
