@@ -507,6 +507,9 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 // Deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
+	if pod == nil {
+		return nil
+	}
 	return DeletePodWithWaitByName(f, c, pod.GetName(), pod.GetNamespace())
 }
 

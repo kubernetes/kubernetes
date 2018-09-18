@@ -110,6 +110,10 @@ func TestGetMountRefs(t *testing.T) {
 				"/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2",
 			},
 		},
+		{
+			"/var/fake/directory/that/doesnt/exist",
+			[]string{},
+		},
 	}
 
 	for i, test := range tests {

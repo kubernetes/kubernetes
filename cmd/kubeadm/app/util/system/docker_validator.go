@@ -38,7 +38,7 @@ func (d *DockerValidator) Name() string {
 
 const (
 	dockerConfigPrefix        = "DOCKER_"
-	maxDockerValidatedVersion = "17.03"
+	maxDockerValidatedVersion = "18.06"
 )
 
 // TODO(random-liu): Add more validating items.
