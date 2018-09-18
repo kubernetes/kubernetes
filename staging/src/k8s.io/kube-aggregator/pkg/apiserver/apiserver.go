@@ -36,6 +36,7 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
+	"k8s.io/kube-aggregator/pkg/metrics"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
 )
 
@@ -186,6 +187,8 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		c.ExtraConfig.ProxyTransport,
 		s.serviceResolver,
 	)
+	// register a collector to report metrics on state of apiservice
+	metrics.RegisterAPIServiceCollector(informerFactory.Apiregistration().InternalVersion().APIServices().Lister())
 
 	s.GenericAPIServer.AddPostStartHook("start-kube-aggregator-informers", func(context genericapiserver.PostStartHookContext) error {
 		informerFactory.Start(context.StopCh)
