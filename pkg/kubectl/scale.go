@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	"k8s.io/client-go/discovery/cached"
 	scaleclient "k8s.io/client-go/scale"
 )
 
@@ -160,7 +161,11 @@ func scaleHasDesiredReplicas(sClient scaleclient.ScalesGetter, gr schema.GroupRe
 	return func() (bool, error) {
 		actualScale, err := sClient.Scales(namespace).Get(gr, resourceName)
 		if err != nil {
-			return false, err
+			if err == cached.ErrCacheEmpty {
+				return false, nil
+			} else {
+				return false, err
+			}
 		}
 		// this means the desired scale target has been reset by something else
 		if actualScale.Spec.Replicas != desiredReplicas {
