@@ -16,7 +16,7 @@ FROM ubuntu:xenial
 
 RUN apt-get update
 RUN apt-get install -y software-properties-common
-RUN add-apt-repository -y ppa:gluster/glusterfs-4.0
+RUN add-apt-repository -y ppa:gluster/glusterfs-4.1
 RUN apt-get update
 Run apt-get install -y netbase nfs-common glusterfs-client
 
