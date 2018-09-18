@@ -163,13 +163,13 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -208,6 +208,86 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	close(stopCh)
 }
 
+// Via integration test we can verify that if pod delete
+// event is triggered, but the pod is in the broken node - it still
+// gets cleaned up by Desired State of World populator.
+func TestPodDeletionOnUnavailableNodeByDswp(t *testing.T) {
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	defer closeFn()
+	namespaceName := "test-pod-deletion"
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "node-sandbox",
+			Annotations: map[string]string{
+				util.ControllerManagedAttachAnnotation: "true",
+			},
+		},
+	}
+
+	ns := framework.CreateTestingNamespace(namespaceName, server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
+	pod := fakePodWithVol(namespaceName)
+	tgp := int64(1)
+	pod.Spec.TerminationGracePeriodSeconds = &tgp
+	pod.Status = v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				State: v1.ContainerState{
+					Running: &v1.ContainerStateRunning{},
+				},
+			},
+		},
+		Phase: v1.PodPhase("Running"),
+	}
+
+	podStopCh := make(chan struct{})
+
+	_, err := testClient.CoreV1().Nodes().Create(node)
+	if err != nil {
+		t.Fatalf("Failed to created node : %v", err)
+	}
+
+	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+		t.Errorf("Failed to create pod : %v", err)
+	}
+
+	podInformer := informers.Core().V1().Pods().Informer()
+	go podInformer.Run(podStopCh)
+
+	// start controller loop
+	stopCh := make(chan struct{})
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
+	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go ctrl.Run(stopCh)
+
+	waitToObservePods(t, podInformer, 1)
+
+	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
+
+	// pods in the broken node will be evicted in 5 minutes,
+	// here we do not need to wait for 5 minutes, set deletion timestamp and grace period directly
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	dgp := int64(1)
+	pod.DeletionGracePeriodSeconds = &dgp
+	pod.Status.Phase = v1.PodPhase("Unknown")
+	err = podInformer.GetStore().Update(pod)
+	if err != nil {
+		t.Fatalf("Error updating pod : %v", err)
+	}
+
+	waitToObservePods(t, podInformer, 1)
+	time.Sleep(2 * time.Second)
+	// the populator loop turns every 1 minute
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
+
+	close(podStopCh)
+	close(stopCh)
+}
+
 func TestPodUpdateWithWithADC(t *testing.T) {
 	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
@@ -230,13 +310,13 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -265,7 +345,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -298,13 +378,13 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -333,7 +413,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.Core().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -478,13 +558,13 @@ func TestPodAddedByDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.Core().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -553,7 +633,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 			},
 		},
 	}
-	if _, err := testClient.Core().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
@@ -561,10 +641,10 @@ func TestPVCBoundWithADC(t *testing.T) {
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := 0; i < 3; i++ {
 		pod, pvc := fakePodWithPVC(fmt.Sprintf("fakepod-pvcnotbound-%d", i), fmt.Sprintf("fakepvc-%d", i), namespaceName)
-		if _, err := testClient.Core().Pods(pod.Namespace).Create(pod); err != nil {
+		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(pod); err != nil {
 			t.Errorf("Failed to create pod : %v", err)
 		}
-		if _, err := testClient.Core().PersistentVolumeClaims(pvc.Namespace).Create(pvc); err != nil {
+		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc); err != nil {
 			t.Errorf("Failed to create pvc : %v", err)
 		}
 		pvcs = append(pvcs, pvc)
@@ -572,7 +652,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	// pod with no pvc
 	podNew := fakePodWithVol(namespaceName)
 	podNew.SetName("fakepod")
-	if _, err := testClient.Core().Pods(podNew.Namespace).Create(podNew); err != nil {
+	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(podNew); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -612,7 +692,7 @@ func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.Persi
 			StorageClassName: *pvc.Spec.StorageClassName,
 		},
 	}
-	if _, err := testClient.Core().PersistentVolumes().Create(pv); err != nil {
+	if _, err := testClient.CoreV1().PersistentVolumes().Create(pv); err != nil {
 		t.Errorf("Failed to create pv : %v", err)
 	}
 }

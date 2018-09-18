@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -155,7 +156,28 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 		// should be detached or not
 		return keepTerminatedPodVolume
 	}
+	if isPodNeededToBeRemoved(pod) {
+		// if kubelet is down, we let kubelet policy dictate if volume
+		// should be detached or not
+		return keepTerminatedPodVolume
+	}
+
 	return defaultAction
+}
+
+// deleted pod that should be gone and volumes in it should be removed from dswp if they are not deleted after DeletionGracePeriod seconds
+// this can happen if a node is lost, and the kubelet is never able to confirm deletion.
+func isPodNeededToBeRemoved(pod *v1.Pod) bool {
+	if pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil {
+		now := time.Now()
+		deletionTime := pod.DeletionTimestamp.Time
+		gracePeriod := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
+		if now.After(deletionTime.Add(gracePeriod)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ProcessPodVolumes processes the volumes in the given pod and adds them to the

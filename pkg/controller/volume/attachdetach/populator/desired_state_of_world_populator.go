@@ -127,6 +127,13 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			glog.Errorf("podLister Get failed for pod %q (UID %q) with %v", dswPodKey, dswPodUID, err)
 			continue
 		default:
+			// we can detect the terminated pods(volumes) as well as pods(volumes) which are not terminated but in unavailable node here.
+			// if pod.DeletionTimestamp is set, and after pod.DeletionGracePeriodSeconds, the pod is still not deleted, we assume that
+			// the pod is in broken node, and we should trigger detach for pod volumes.
+			// BTW: if the node is unavailable, we will trigger pod deletion operation after podEvictionTimeout(defaulting to 5 minutes),
+			// and DeletionGracePeriodSeconds will be set as well.
+			// dswp will loop every 1 minute, and the volume will be forcefully detached in 6 minutes by A/D controller.
+			// so the volumes in broken node will be detached in at most 5 + 6  + ( DeletionGracePeriodSeconds/60 + 1 ) minutes.
 			volumeActionFlag := util.DetermineVolumeAction(
 				informerPod,
 				dswp.desiredStateOfWorld,

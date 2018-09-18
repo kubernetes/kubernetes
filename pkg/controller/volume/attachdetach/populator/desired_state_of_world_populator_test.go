@@ -135,3 +135,117 @@ func TestFindAndAddActivePods_FindAndRemoveDeletedPods(t *testing.T) {
 	}
 
 }
+
+func TestFindAndRemoveDeletedPodsInFailedNodes(t *testing.T) {
+	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	fakeClient := &fake.Clientset{}
+
+	fakeInformerFactory := informers.NewSharedInformerFactory(fakeClient, controller.NoResyncPeriodFunc())
+	fakePodInformer := fakeInformerFactory.Core().V1().Pods()
+
+	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "dswp-test-pod",
+			UID:       "dswp-test-pod-uid",
+			Namespace: "dswp-test",
+		},
+		Spec: v1.PodSpec{
+			NodeName: "dswp-test-host",
+			Volumes: []v1.Volume{
+				{
+					Name: "dswp-test-volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "dswp-test-fake-device",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					State: v1.ContainerState{
+						Running: &v1.ContainerStateRunning{},
+					},
+				},
+			},
+			Phase: v1.PodPhase("Running"),
+		},
+	}
+
+	fakePodInformer.Informer().GetStore().Add(pod)
+
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].GCEPersistentDisk.PDName
+
+	pvcLister := fakeInformerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	pvLister := fakeInformerFactory.Core().V1().PersistentVolumes().Lister()
+
+	dswp := &desiredStateOfWorldPopulator{
+		loopSleepDuration:     100 * time.Millisecond,
+		listPodsRetryDuration: 3 * time.Second,
+		desiredStateOfWorld:   fakesDSW,
+		volumePluginMgr:       fakeVolumePluginMgr,
+		podLister:             fakePodInformer.Lister(),
+		pvcLister:             pvcLister,
+		pvLister:              pvLister,
+	}
+
+	//add the given node to the list of nodes managed by dsw
+	dswp.desiredStateOfWorld.AddNode(k8stypes.NodeName(pod.Spec.NodeName), false /*keepTerminatedPodVolumes*/)
+
+	dswp.findAndAddActivePods()
+
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	//check if the given volume referenced by the pod is added to dsw
+	volumeExists := dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	// update pod, adding DeletionTimestamp and DeletionGracePeriodSeconds for it.
+	podClone := pod.DeepCopy()
+	now := time.Now()
+	dgps := int64(5)
+	podClone.DeletionTimestamp = &metav1.Time{Time: now}
+	podClone.DeletionGracePeriodSeconds = &dgps
+	podClone.Status.Phase = v1.PodPhase("Unknown")
+	err := fakePodInformer.Informer().GetStore().Update(podClone)
+	if err != nil {
+		t.Fatalf(
+			"Update pod failed, error: %v", err)
+	}
+
+	// sleep 3 seconds to check if the pod is removed from dswp (it should not be)
+	time.Sleep(3 * time.Second)
+	dswp.findAndRemoveDeletedPods()
+	//check if the given volume referenced by the pod is added to dsw
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	// sleep another 3 seconds to simulate the situation that the pod should have been delete, but it doesn't,
+	// checking if dswp will remove it
+	time.Sleep(3 * time.Second)
+
+	dswp.findAndRemoveDeletedPods()
+
+	//check if the given volume referenced by the pod still exists in dsw
+	volumeExists = dswp.desiredStateOfWorld.VolumeExists(expectedVolumeName, k8stypes.NodeName(pod.Spec.NodeName))
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+}
