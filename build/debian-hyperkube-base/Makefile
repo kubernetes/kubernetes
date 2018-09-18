@@ -19,7 +19,7 @@
 
 REGISTRY?=staging-k8s.gcr.io
 IMAGE?=debian-hyperkube-base
-TAG=0.10.1
+TAG=0.10.2
 ARCH?=amd64
 CACHEBUST?=1
 
