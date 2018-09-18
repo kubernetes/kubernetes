@@ -11,5 +11,5 @@ options:
       created for the load balancers.
   proxy_read_timeout:
     type: int
-    default: 90
+    default: 600
     description: Timeout in seconds for reading a response from proxy server.
