@@ -41,7 +41,7 @@ var (
 	moreForeverTestTimeout = 2 * 60 * time.Second
 )
 
-var _ = SIGDescribe("DNS configMap federations", func() {
+var _ = SIGDescribe("DNS configMap federations [Feature:Federation]", func() {
 
 	t := &dnsFederationsConfigMapTest{dnsTestCommon: newDnsTestCommon()}
 
