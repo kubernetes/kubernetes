@@ -63,6 +63,7 @@ func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool
 		resourceclient.NewForConfigOrDie(clientConfig),
 		custom_metrics.NewForConfig(clientConfig, ctx.RESTMapper, apiVersionsGetter),
 		external_metrics.NewForConfigOrDie(clientConfig),
+		ctx.RESTMapper,
 	)
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }

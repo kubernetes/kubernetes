@@ -226,7 +226,8 @@ func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo
 func (tc *restClientTestCase) runTest(t *testing.T) {
 	var err error
 	testMetricsClient, testCMClient, testEMClient := tc.prepareTestClient(t)
-	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient)
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
+	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient, testEMClient, mapper)
 	isResource := len(tc.resourceName) > 0
 	isExternal := tc.metricSelector != nil
 	if isResource {

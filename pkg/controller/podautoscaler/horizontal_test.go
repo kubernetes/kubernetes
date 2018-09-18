@@ -617,6 +617,7 @@ func (tc *testCase) verifyResults(t *testing.T) {
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
 	testClient, testMetricsClient, testCMClient, testEMClient, testScaleClient := tc.prepareTestClient(t)
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
 	if tc.testClient != nil {
 		testClient = tc.testClient
 	}
@@ -636,6 +637,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		testMetricsClient.MetricsV1beta1(),
 		testCMClient,
 		testEMClient,
+		mapper,
 	)
 
 	eventClient := &fake.Clientset{}
