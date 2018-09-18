@@ -488,7 +488,7 @@ var masterServices = sets.NewString("kubernetes")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a
 // pod in namespace ns should see.
-func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
+func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks *bool) (map[string]string, error) {
 	var (
 		serviceMap = make(map[string]*v1.Service)
 		m          = make(map[string]string)
@@ -536,6 +536,11 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	}
 
 	for _, e := range envvars.FromServices(mappedServices) {
+		// If service links are not enabled, we shouldn't add service variables
+		// except those which start from "KUBERNETES_".
+		if !*enableServiceLinks && !strings.HasPrefix(e.Name, "KUBERNETES_") {
+			continue
+		}
 		m[e.Name] = e.Value
 	}
 	return m, nil
@@ -544,6 +549,8 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 // Make the environment variables for a pod in the given namespace.
 func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container, podIP string) ([]kubecontainer.EnvVar, error) {
 	var result []kubecontainer.EnvVar
+	var serviceEnv map[string]string
+	var err error
 	// Note:  These are added to the docker Config, but are not included in the checksum computed
 	// by kubecontainer.HashContainer(...).  That way, we can still determine whether an
 	// v1.Container is already running by its hash. (We don't want to restart a container just
@@ -553,7 +560,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace)
+	serviceEnv, err = kl.getServiceEnvVarMap(pod.Namespace, pod.Spec.EnableServiceLinks)
 	if err != nil {
 		return result, err
 	}
