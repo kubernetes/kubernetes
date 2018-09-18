@@ -7,6 +7,7 @@ maintainers:
     - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
     - Charles Butler <Chuck@dasroot.net>
     - Matthew Bruzek <mbruzek@ubuntu.com>
+    - Mike Wilson <mike.wilson@canonical.com>
 description: |
   Kubernetes is an open-source platform for deploying, scaling, and operations
   of application containers across a cluster of hosts. Kubernetes is portable
@@ -72,3 +73,7 @@ resources:
     type: file
     filename: cdk-addons.snap
     description: CDK addons snap
+  kube-proxy:
+    type: file
+    filename: kube-proxy.snap
+    description: kube-proxy snap

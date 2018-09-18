@@ -61,6 +61,8 @@ from charms.layer.kubernetes_common import cloud_config_path
 from charms.layer.kubernetes_common import write_gcp_snap_config
 from charms.layer.kubernetes_common import write_openstack_snap_config
 from charms.layer.kubernetes_common import write_azure_snap_config
+from charms.layer.kubernetes_common import kubeproxyconfig_path
+from charms.layer.kubernetes_common import configure_kube_proxy
 
 # Override the default nagios shortname regex to allow periods, which we
 # need because our bin names contain them (e.g. 'snap.foo.daemon'). The
@@ -69,6 +71,7 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 kubeconfig_path = '/root/cdk/kubeconfig'
 kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
+gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 snap_resources = ['kubectl', 'kubelet', 'kube-proxy']
 checksum_prefix = 'kubernetes-worker.resource-checksums.'
 configure_prefix = 'kubernetes-worker.prev_args.'
@@ -472,7 +475,8 @@ def start_worker(kube_api, kube_control, auth_control, cni):
 
     create_config(random.choice(servers), creds)
     configure_kubelet(dns, ingress_ip)
-    configure_kube_proxy(servers, cluster_cidr)
+    configure_kube_proxy(configure_prefix, servers,
+                         cluster_cidr)
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
     update_kubelet_status()
@@ -762,22 +766,6 @@ def configure_kubelet(dns, ingress_ip):
 
     configure_kubernetes_service(configure_prefix, 'kubelet', kubelet_opts,
                                  'kubelet-extra-args')
-
-
-def configure_kube_proxy(api_servers, cluster_cidr):
-    kube_proxy_opts = {}
-    kube_proxy_opts['cluster-cidr'] = cluster_cidr
-    kube_proxy_opts['kubeconfig'] = kubeproxyconfig_path
-    kube_proxy_opts['logtostderr'] = 'true'
-    kube_proxy_opts['v'] = '0'
-    kube_proxy_opts['master'] = random.choice(api_servers)
-    kube_proxy_opts['hostname-override'] = get_node_name()
-
-    if b'lxc' in check_output('virt-what', shell=True):
-        kube_proxy_opts['conntrack-max-per-core'] = '0'
-
-    configure_kubernetes_service(configure_prefix, 'kube-proxy',
-                                 kube_proxy_opts, 'proxy-extra-args')
 
 
 @when_any('config.changed.default-backend-image',
