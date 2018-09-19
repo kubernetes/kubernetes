@@ -202,8 +202,6 @@ func csiHostPathPod(
 	f *framework.Framework,
 	sa *v1.ServiceAccount,
 ) *v1.Pod {
-	podClient := client.CoreV1().Pods(config.Namespace)
-
 	priv := true
 	mountPropagation := v1.MountPropagationBidirectional
 	hostPathType := v1.HostPathDirectoryOrCreate
@@ -366,10 +364,15 @@ func csiHostPathPod(
 		return nil
 	}
 
-	ret, err := podClient.Create(pod)
-	if err != nil {
-		framework.ExpectNoError(err, "Failed to create %q pod: %v", pod.GetName(), err)
-	}
+	// Creating the pod can fail initially while the service
+	// account's secret isn't provisioned yet ('No API token found
+	// for service account "csi-service-account", retry after the
+	// token is automatically created and added to the service
+	// account', see https://github.com/kubernetes/kubernetes/issues/68776).
+	// We could use a DaemonSet, but then the name of the csi-pod changes
+	// during each test run. It's simpler to just try for a while here.
+	podClient := f.PodClient()
+	ret := podClient.CreateEventually(pod)
 
 	// Wait for pod to come up
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, ret))
