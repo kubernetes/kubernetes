@@ -265,7 +265,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	// Apply the patch.
 	patchedObjJS, err := p.applyJSPatch(currentObjJS)
 	if err != nil {
-		return nil, interpretPatchError(err)
+		return nil, interpretStrategicPatchError(err)
 	}
 
 	// Construct the resulting typed, unversioned object.
@@ -286,7 +286,9 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 		if err != nil {
 			return nil, err
 		}
-		return patchObj.Apply(versionedJS)
+
+		patchedJS, err := patchObj.Apply(versionedJS)
+		return patchedJS, interpretJSONPatchError(err)
 	case types.MergePatchType:
 		return jsonpatch.MergePatch(versionedJS, p.patchJS)
 	default:
@@ -415,7 +417,7 @@ func applyPatchToObject(
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
-		return interpretPatchError(err)
+		return interpretStrategicPatchError(err)
 	}
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
@@ -428,12 +430,24 @@ func applyPatchToObject(
 	return nil
 }
 
-// interpretPatchError interprets the error type and returns an error with appropriate HTTP code.
-func interpretPatchError(err error) error {
+// interpretStrategicPatchError interprets the error type and returns an error with appropriate HTTP code.
+func interpretStrategicPatchError(err error) error {
 	switch err {
 	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
 		return errors.NewBadRequest(err.Error())
 	case mergepatch.ErrNoListOfLists, mergepatch.ErrPatchContentNotMatchRetainKeys:
+		return errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
+	default:
+		return err
+	}
+}
+
+// interpretJSONPatchError interprets the error and returns an error with appropriate HTTP code.
+func interpretJSONPatchError(err error) error {
+	switch {
+	case strings.Contains(err.Error(), "doc is missing"):
+		return errors.NewBadRequest(err.Error())
+	case strings.Contains(err.Error(), "Testing value") && strings.Contains(err.Error(), "failed"):
 		return errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
 	default:
 		return err
