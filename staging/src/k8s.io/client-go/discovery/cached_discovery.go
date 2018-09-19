@@ -229,13 +229,14 @@ func (d *CachedDiscoveryClient) Fresh() bool {
 	return d.fresh
 }
 
-func (d *CachedDiscoveryClient) Invalidate() {
+func (d *CachedDiscoveryClient) Invalidate() error {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
 
 	d.ourFiles = map[string]struct{}{}
 	d.fresh = true
 	d.invalidated = true
+	return nil
 }
 
 // NewCachedDiscoveryClientForConfig creates a new DiscoveryClient for the given config, and wraps

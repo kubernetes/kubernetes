@@ -152,6 +152,11 @@ func GetAPIGroupResources(cl discovery.DiscoveryInterface) ([]*APIGroupResources
 		}
 		// TODO track the errors and update callers to handle partial errors.
 	}
+
+	if apiGroups == nil {
+		return nil, nil
+	}
+
 	var result []*APIGroupResources
 	for _, group := range apiGroups.Groups {
 		groupResources := &APIGroupResources{
@@ -202,6 +207,10 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 
 	groupResources, err := GetAPIGroupResources(d.cl)
 	if err != nil {
+		// Refresh the cache so that next call might succeed
+		if !d.cl.Fresh() {
+			d.resetLocked()
+		}
 		return nil, err
 	}
 
@@ -209,16 +218,26 @@ func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
 	return d.delegate, err
 }
 
-// Reset resets the internally cached Discovery information and will
-// cause the next mapping request to re-discover.
-func (d *DeferredDiscoveryRESTMapper) Reset() {
-	glog.V(5).Info("Invalidating discovery information")
+// Reset resets the internally cached Discovery information, and redo the
+// discovery. If the rediscovery succeeds, the internally cached restmapper is
+// reset as well.
+func (d *DeferredDiscoveryRESTMapper) Reset() error {
+	glog.V(5).Info("Refreshing discovery information")
 
 	d.initMu.Lock()
 	defer d.initMu.Unlock()
 
-	d.cl.Invalidate()
+	return d.resetLocked()
+}
+
+// resetLocked is the same as Reset but assumes the d.initMu lock is already
+// acquired.
+func (d *DeferredDiscoveryRESTMapper) resetLocked() error {
+	if err := d.cl.Invalidate(); err != nil {
+		return err
+	}
 	d.delegate = nil
+	return nil
 }
 
 // KindFor takes a partial resource and returns back the single match.

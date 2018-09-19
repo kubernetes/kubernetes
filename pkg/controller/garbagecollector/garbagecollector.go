@@ -154,7 +154,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 // from discovery.
 type resettableRESTMapper interface {
 	meta.RESTMapper
-	Reset()
+	Reset() error
 }
 
 // Sync periodically resyncs the garbage collector when new resources are
