@@ -385,7 +385,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	// Failed mount scenario.
 	// Since glusterfs does not return error text
 	// it all goes in a log file, we will read the log file
-	logErr := readGlusterLog(log, b.pod.Name)
+	logErr := readGlusterLog(log, b.pod.Name, !hasLogFile)
 	if logErr != nil {
 		return fmt.Errorf("mount failed: %v the following error information was pulled from the glusterfs log to help diagnose this issue: %v", errs, logErr)
 	}

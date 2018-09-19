@@ -28,7 +28,7 @@ import (
 // on failure of gluster SetUp and return those so kubelet can
 // properly expose them
 // return error on any failure
-func readGlusterLog(path string, podName string) error {
+func readGlusterLog(path string, podName string, needToClear bool) error {
 
 	var line1 string
 	var line2 string
@@ -42,7 +42,7 @@ func readGlusterLog(path string, podName string) error {
 	}
 
 	// open the log file
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	if err != nil {
 		return fmt.Errorf("could not open log file for pod %s", podName)
 	}
@@ -65,6 +65,12 @@ func readGlusterLog(path string, podName string) error {
 	}
 
 	if linecount > 0 {
+		// Empty the log file after read gluster logs if logfile is driver specific
+		// which prevent the log file from growing too large when repeat mount due to failed mount.
+		if needToClear {
+			file.Truncate(0)
+			file.Seek(0, 0)
+		}
 		return fmt.Errorf("%v", line1+line2+"\n")
 	}
 	return nil
