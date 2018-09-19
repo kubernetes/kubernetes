@@ -107,6 +107,7 @@ type genericScheduler struct {
 	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
+	pdbLister                algorithm.PDBLister
 	disablePreemption        bool
 	percentageOfNodesToScore int32
 }
@@ -266,7 +267,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		return nil, nil, []*v1.Pod{pod}, nil
 	}
-	pdbs, err := g.cache.ListPDBs(labels.Everything())
+	pdbs, err := g.pdbLister.List(labels.Everything())
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -1146,6 +1147,7 @@ func NewGenericScheduler(
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
+	pdbLister algorithm.PDBLister,
 	alwaysCheckAllPredicates bool,
 	disablePreemption bool,
 	percentageOfNodesToScore int32,
@@ -1162,6 +1164,7 @@ func NewGenericScheduler(
 		cachedNodeInfoMap:        make(map[string]*schedulercache.NodeInfo),
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
+		pdbLister:                pdbLister,
 		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
 		disablePreemption:        disablePreemption,
 		percentageOfNodesToScore: percentageOfNodesToScore,
