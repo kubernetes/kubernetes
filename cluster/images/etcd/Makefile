@@ -40,13 +40,19 @@ REVISION?=0
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
 
 ARCH?=amd64
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 # Image should be pulled from k8s.gcr.io, which will auto-detect
 # region (us, eu, asia, ...) and pull from the closest.
 REGISTRY?=k8s.gcr.io
 # Images should be pushed to staging-k8s.gcr.io.
 PUSH_REGISTRY?=staging-k8s.gcr.io
+
+MANIFEST_IMAGE := $(PUSH_REGISTRY)/etcd
+
+# This option is for running docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version from https://github.com/coreos/etcd/releases for the current ETCD_VERSION.
-GOLANG_VERSION?=1.8.7
+GOLANG_VERSION?=1.11
 GOARM=7
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -118,14 +124,25 @@ endif
 	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(TEMP_DIR)
 
 push: build
-	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(PUSH_REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG)
-	docker push $(PUSH_REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG)
+	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)
+	docker push $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)
 
-ifeq ($(ARCH),amd64)
-	# Backward compatibility. TODO: deprecate this image tag
-	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(PUSH_REGISTRY)/etcd:$(IMAGE_TAG)
-	docker push $(PUSH_REGISTRY)/etcd:$(IMAGE_TAG)
-endif
+sub-build-%:
+	$(MAKE) ARCH=$* build
+
+all-build: $(addprefix sub-build-,$(ALL_ARCH))
+
+sub-push-image-%:
+	$(MAKE) ARCH=$* push
+
+all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
+
+all-push: all-push-images push-manifest
+
+push-manifest:
+	docker manifest create --amend $(MANIFEST_IMAGE):$(IMAGE_TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(MANIFEST_IMAGE)\-&:$(IMAGE_TAG)~g")
+	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${MANIFEST_IMAGE}:${IMAGE_TAG} ${MANIFEST_IMAGE}-$${arch}:${IMAGE_TAG}; done
+	docker manifest push ${MANIFEST_IMAGE}:${IMAGE_TAG}
 
 unit-test:
 	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
@@ -146,5 +163,5 @@ integration-test:
 
 integration-build-test: build-integration-test-image integration-test
 test: unit-test integration-build-test
-all: build test
-.PHONY:	build push unit-test build-integration-test-image integration-test integration-build-test test
+all: all-build test
+.PHONY:	build push push-manifest all-push all-push-images all-build unit-test build-integration-test-image integration-test integration-build-test test
