@@ -26,7 +26,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,10 +39,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+
 	// kubectl should not be taking dependencies on logic in the controllers
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -115,10 +115,10 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	if d.Spec.Paused {
 		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", d.Name)
 	}
-	deploymentRollback := &extensionsv1beta1.DeploymentRollback{
+	deploymentRollback := &extensions.DeploymentRollback{
 		Name:               d.Name,
 		UpdatedAnnotations: updatedAnnotations,
-		RollbackTo: extensionsv1beta1.RollbackConfig{
+		RollbackTo: extensions.RollbackConfig{
 			Revision: toRevision,
 		},
 	}
@@ -130,7 +130,7 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 		return result, err
 	}
 	// Do the rollback
-	if err := r.c.ExtensionsV1beta1().Deployments(d.Namespace).Rollback(deploymentRollback); err != nil {
+	if err := r.c.Extensions().Deployments(d.Namespace).Rollback(deploymentRollback); err != nil {
 		return result, err
 	}
 	// Watch for the changes of events
@@ -288,7 +288,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	// Restore revision
-	if _, err = r.c.ExtensionsV1beta1().DaemonSets(accessor.GetNamespace()).Patch(accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
+	if _, err = r.c.Extensions().DaemonSets(accessor.GetNamespace()).Patch(accessor.GetName(), types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
 		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
 	}
 
