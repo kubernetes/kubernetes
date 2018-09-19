@@ -128,7 +128,7 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 
 	o.BuilderArgs = args
 	o.StatusViewer = func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-		return polymorphichelpers.StatusViewerFn(f, mapping)
+		return polymorphichelpers.StatusViewerFn(mapping)
 	}
 
 	clientConfig, err := f.ToRESTConfig()
