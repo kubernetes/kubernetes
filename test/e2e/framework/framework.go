@@ -251,18 +251,9 @@ func (f *Framework) BeforeEach() {
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
 		var err error
-		var nodeMode NodesSet
-		switch TestContext.GatherKubeSystemResourceUsageData {
-		case "master":
-			nodeMode = MasterAndDNSNodes
-		case "masteranddns":
-			nodeMode = MasterAndDNSNodes
-		default:
-			nodeMode = AllNodes
-		}
 		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
-			InKubemark: ProviderIs("kubemark"),
-			Nodes:      nodeMode,
+			InKubemark:                  ProviderIs("kubemark"),
+			MasterOnly:                  TestContext.GatherKubeSystemResourceUsageData == "master",
 			ResourceDataGatheringPeriod: 60 * time.Second,
 			ProbeDuration:               15 * time.Second,
 			PrintVerboseLogs:            false,
