@@ -30,7 +30,6 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -314,7 +313,7 @@ func (p *ExecOptions) Run() error {
 			Namespace(pod.Namespace).
 			SubResource("exec").
 			Param("container", containerName)
-		req.VersionedParams(&api.PodExecOptions{
+		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
 			Stdin:     p.Stdin,
