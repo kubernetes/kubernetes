@@ -123,7 +123,7 @@ func TestRunHandlerExec(t *testing.T) {
 
 type fakeHTTP struct {
 	url     string
-	headers *http.Header
+	headers http.Header
 	err     error
 	resp    *http.Response
 }
@@ -164,6 +164,46 @@ func TestRunHandlerHttp(t *testing.T) {
 	}
 	if fakeHttp.url != "http://foo:8080/bar" {
 		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+}
+
+func TestRunHandlerHttpWithHeaders(t *testing.T) {
+	fakeHttp := fakeHTTP{}
+	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
+	containerName := "containerFoo"
+
+	container := v1.Container{
+		Name: containerName,
+		Lifecycle: &v1.Lifecycle{
+			PostStart: &v1.Handler{
+				HTTPGet: &v1.HTTPGetAction{
+					Host: "boo",
+					Port: intstr.FromInt(8080),
+					Path: "far",
+					HTTPHeaders: []v1.HTTPHeader{
+						{Name: "X-Muffins-Or-Cupcakes", Value: "cupcakes"},
+						{Name: "User-Agent", Value: "foo/1.0"},
+					},
+				},
+			},
+		},
+	}
+	pod := v1.Pod{}
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
+	pod.Spec.Containers = []v1.Container{container}
+	_, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if fakeHttp.url != "http://boo:8080/far" {
+		t.Errorf("unexpected url: %s", fakeHttp.url)
+	}
+	if fakeHttp.headers.Get("X-Muffins-Or-Cupcakes") != "cupcakes" {
+		t.Errorf("missing http header: %s", fakeHttp.headers)
 	}
 }
 
