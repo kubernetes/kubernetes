@@ -68,7 +68,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 // SetDefaults_InitConfiguration assigns default values for the InitConfiguration
 func SetDefaults_InitConfiguration(obj *InitConfiguration) {
 	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
-	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 }
@@ -138,15 +137,8 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 		obj.CACertPath = DefaultCACertPath
 	}
 
-	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_JoinControlPlane(obj.ControlPlane)
 	SetDefaults_Discovery(&obj.Discovery)
-}
-
-func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
-	if obj.CRISocket == "" {
-		obj.CRISocket = DefaultCRISocket
-	}
 }
 
 func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {

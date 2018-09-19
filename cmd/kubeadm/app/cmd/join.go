@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -233,16 +234,13 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfig
 		`Specify the node name.`,
 	)
 	flagSet.StringVar(
-		&cfg.NodeRegistration.CRISocket, options.NodeCRISocket, cfg.NodeRegistration.CRISocket,
-		`Specify the CRI socket to connect to.`,
-	)
-	flagSet.StringVar(
 		&cfg.Discovery.TLSBootstrapToken, options.TLSBootstrapToken, cfg.Discovery.TLSBootstrapToken,
 		`Specify the token used to temporarily authenticate with the Kubernetes Master while joining the node.`,
 	)
 	AddControlPlaneFlags(flagSet, cfg.ControlPlane)
 	AddJoinBootstrapTokenDiscoveryFlags(flagSet, cfg.Discovery.BootstrapToken)
 	AddJoinFileDiscoveryFlags(flagSet, cfg.Discovery.File)
+	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 }
 
 // AddJoinBootstrapTokenDiscoveryFlags adds bootstrap token specific discovery flags to the specified flagset
@@ -388,7 +386,7 @@ func newJoinData(cmd *cobra.Command, options *joinOptions, out io.Writer) (joinD
 	if options.externalcfg.NodeRegistration.Name != "" {
 		cfg.NodeRegistration.Name = options.externalcfg.NodeRegistration.Name
 	}
-	if options.externalcfg.NodeRegistration.CRISocket != kubeadmapiv1beta1.DefaultCRISocket {
+	if options.externalcfg.NodeRegistration.CRISocket != "" {
 		cfg.NodeRegistration.CRISocket = options.externalcfg.NodeRegistration.CRISocket
 	}
 

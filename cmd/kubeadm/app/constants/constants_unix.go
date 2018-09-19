@@ -1,7 +1,7 @@
 // +build !windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,11 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package constants
 
 const (
-	// DefaultCACertPath defines default location of CA certificate on Linux
-	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
-	// DefaultUrlScheme defines default socket url prefix
-	DefaultUrlScheme = "unix"
+	// DefaultDockerCRISocket defines the default Docker CRI socket
+	DefaultDockerCRISocket = "/var/run/dockershim.sock"
 )

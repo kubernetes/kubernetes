@@ -230,10 +230,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
-	flagSet.StringVar(
-		&cfg.NodeRegistration.CRISocket, options.NodeCRISocket, cfg.NodeRegistration.CRISocket,
-		`Specify the CRI socket to connect to.`,
-	)
+	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 	flagSet.StringVar(featureGatesString, options.FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
 }
@@ -316,7 +313,7 @@ func newInitData(cmd *cobra.Command, options *initOptions, out io.Writer) (initD
 	if options.externalcfg.NodeRegistration.Name != "" {
 		cfg.NodeRegistration.Name = options.externalcfg.NodeRegistration.Name
 	}
-	if options.externalcfg.NodeRegistration.CRISocket != kubeadmapiv1beta1.DefaultCRISocket {
+	if options.externalcfg.NodeRegistration.CRISocket != "" {
 		cfg.NodeRegistration.CRISocket = options.externalcfg.NodeRegistration.CRISocket
 	}
 
