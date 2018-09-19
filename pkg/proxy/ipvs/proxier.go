@@ -697,6 +697,8 @@ func (proxier *Proxier) syncProxyRules() {
 	// This is to avoid memory reallocations and thus improve performance.
 	proxier.natChains.Reset()
 	proxier.natRules.Reset()
+	proxier.filterChains.Reset()
+	proxier.filterRules.Reset()
 
 	// Write table headers.
 	writeLine(proxier.filterChains, "*filter")
@@ -1131,6 +1133,8 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Reset()
 	proxier.iptablesData.Write(proxier.natChains.Bytes())
 	proxier.iptablesData.Write(proxier.natRules.Bytes())
+	proxier.iptablesData.Write(proxier.filterChains.Bytes())
+	proxier.iptablesData.Write(proxier.filterRules.Bytes())
 
 	glog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)

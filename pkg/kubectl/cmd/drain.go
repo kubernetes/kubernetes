@@ -403,8 +403,7 @@ func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fata
 
 func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) {
 	// Note that we return false in cases where the pod is DaemonSet managed,
-	// regardless of flags.  We never delete them, the only question is whether
-	// their presence constitutes an error.
+	// regardless of flags.
 	//
 	// The exception is for pods that are orphaned (the referencing
 	// management resource - including DaemonSet - is not found).
@@ -413,12 +412,17 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
 		return true, nil, nil
 	}
+	// Any finished pod can be removed.
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		return true, nil, nil
+	}
 
 	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
 		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && o.Force {
 			return true, &warning{err.Error()}, nil
 		}
+
 		return false, nil, &fatal{err.Error()}
 	}
 
@@ -450,9 +454,14 @@ func (o *DrainOptions) localStorageFilter(pod corev1.Pod) (bool, *warning, *fata
 	if !hasLocalStorage(pod) {
 		return true, nil, nil
 	}
+	// Any finished pod can be removed.
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		return true, nil, nil
+	}
 	if !o.DeleteLocalData {
 		return false, nil, &fatal{kLocalStorageFatal}
 	}
+
 	return true, &warning{kLocalStorageWarning}, nil
 }
 

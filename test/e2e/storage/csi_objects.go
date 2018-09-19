@@ -35,6 +35,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/manifest"
 
 	. "github.com/onsi/ginkgo"
+
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	csicrd "k8s.io/csi-api/pkg/crd"
 )
 
 var csiImageVersions = map[string]string{
@@ -426,4 +430,27 @@ func deployGCEPDCSIDriver(
 	_, err = client.AppsV1().DaemonSets(config.Namespace).Create(nodeds)
 	framework.ExpectNoError(err, "Failed to create DaemonSet: %v", nodeds.Name)
 
+}
+
+func createCSICRDs(c apiextensionsclient.Interface) {
+	By("Creating CSI CRDs")
+	crds := []*apiextensionsv1beta1.CustomResourceDefinition{
+		csicrd.CSIDriverCRD(),
+		csicrd.CSINodeInfoCRD(),
+	}
+
+	for _, crd := range crds {
+		_, err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+		framework.ExpectNoError(err, "Failed to create CSI CRD %q: %v", crd.Name, err)
+	}
+}
+
+func deleteCSICRDs(c apiextensionsclient.Interface) {
+	By("Deleting CSI CRDs")
+	csiDriverCRDName := csicrd.CSIDriverCRD().Name
+	csiNodeInfoCRDName := csicrd.CSINodeInfoCRD().Name
+	err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(csiDriverCRDName, &metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Failed to delete CSI CRD %q: %v", csiDriverCRDName, err)
+	err = c.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(csiNodeInfoCRDName, &metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Failed to delete CSI CRD %q: %v", csiNodeInfoCRDName, err)
 }

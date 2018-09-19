@@ -353,7 +353,7 @@ func (nim *nodeInfoManager) createNodeInfoObject(
 		return fmt.Errorf("error getting CSI client")
 	}
 
-	var topologyKeys []string
+	topologyKeys := []string{} // must be an empty slice instead of nil to satisfy CRD OpenAPI Schema validation
 	if topology != nil {
 		for k := range topology.Segments {
 			topologyKeys = append(topologyKeys, k)
