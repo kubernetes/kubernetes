@@ -170,6 +170,8 @@ type StorageTestContextType struct {
 	CSIImageVersion string
 	// CSIImageRegistry defines the image registry hosting the CSI container images.
 	CSIImageRegistry string
+	// GCEPDCSIImage overrides the image location of the GCE PD CSI Driver
+	GCEPDCSIImage string
 }
 
 type CloudConfig struct {
@@ -309,6 +311,7 @@ func RegisterNodeFlags() {
 func RegisterStorageFlags() {
 	flag.StringVar(&TestContext.CSIImageVersion, "csiImageVersion", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
 	flag.StringVar(&TestContext.CSIImageRegistry, "csiImageRegistry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
+	flag.StringVar(&TestContext.GCEPDCSIImage, "gcePDCSIImage", "", "overrides the default image used for GCE PD CSI images")
 }
 
 // ViperizeFlags sets up all flag and config processing. Future configuration info should be added to viper, not to flags.
