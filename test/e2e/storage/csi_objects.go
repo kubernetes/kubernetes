@@ -392,6 +392,20 @@ func deployGCEPDCSIDriver(
 	controllerservice, err := manifest.SvcFromManifest("test/e2e/testing-manifests/storage-csi/gce-pd/controller_service.yaml")
 	framework.ExpectNoError(err, "Failed to create Service from manifest")
 
+	if len(framework.TestContext.GCEPDCSIImage) != 0 {
+		// Override Controller and Node GCE PD CSI Image with provided flag
+		for i, c := range nodeds.Spec.Template.Spec.Containers {
+			if c.Name == "gce-driver" {
+				nodeds.Spec.Template.Spec.Containers[i].Image = framework.TestContext.GCEPDCSIImage
+			}
+		}
+		for i, c := range controllerss.Spec.Template.Spec.Containers {
+			if c.Name == "gce-driver" {
+				controllerss.Spec.Template.Spec.Containers[i].Image = framework.TestContext.GCEPDCSIImage
+			}
+		}
+	}
+
 	// Got all objects from manifests now try to delete objects
 	err = client.CoreV1().Services(config.Namespace).Delete(controllerservice.GetName(), nil)
 	if err != nil {
