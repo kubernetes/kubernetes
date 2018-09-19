@@ -25,6 +25,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/golang/glog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -51,6 +52,7 @@ type cniNetworkPlugin struct {
 	confDir     string
 	binDirs     []string
 	podCidr     string
+	podIPs      map[kubecontainer.ContainerID]string
 }
 
 type cniNetwork struct {
@@ -109,6 +111,7 @@ func ProbeNetworkPlugins(confDir string, binDirs []string) []network.NetworkPlug
 		execer:         utilexec.New(),
 		confDir:        confDir,
 		binDirs:        binDirs,
+		podIPs:         make(map[kubecontainer.ContainerID]string),
 	}
 
 	// sync NetworkConfig in best effort during probing.
@@ -311,10 +314,21 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 		return nil, err
 	}
 
+	if res == nil {
+		glog.Warningf("CNI plugin gives empty network result")
+		return nil, nil
+	}
+
+	curRes, err := cnicurrent.NewResultFromResult(res)
+	if curRes != nil && len(curRes.IPs) != 0 {
+		glog.V(4).Infof("IP address for CNI network was set from plugin's output", netConf.Name, netConf.Plugins[0].Network.Type)
+		plugin.SetPodIPs(podSandboxID, curRes.IPs[0].Address.IP.To4().String())
+	}
 	return res, nil
 }
 
 func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
+	plugin.SetPodIPs(podSandboxID, "")
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations)
 	if err != nil {
 		glog.Errorf("Error deleting network when building cni runtime conf: %v", err)
@@ -331,6 +345,22 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 		return err
 	}
 	return nil
+}
+
+func (plugin *cniNetworkPlugin) SetPodIPs(podSandboxID kubecontainer.ContainerID, ipAddress string) {
+	plugin.Lock()
+	defer plugin.Unlock()
+	if ipAddress != "" {
+		plugin.podIPs[podSandboxID] = ipAddress
+	} else {
+		delete(plugin.podIPs, podSandboxID)
+	}
+}
+
+func (plugin *cniNetworkPlugin) GetPodIPs(podSandboxID kubecontainer.ContainerID) string {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	return plugin.podIPs[podSandboxID]
 }
 
 func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) (*libcni.RuntimeConf, error) {
