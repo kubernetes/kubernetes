@@ -407,7 +407,12 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		}
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
 		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
-		restMapper.Reset()
+
+		reset := func() (bool, error) {
+			err := restMapper.Reset()
+			return err == nil, nil
+		}
+		err = retryWithExponentialBackOff(1*time.Second, reset)
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 	}
