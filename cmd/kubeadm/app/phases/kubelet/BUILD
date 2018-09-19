@@ -20,6 +20,7 @@ go_library(
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/procfs:go_default_library",

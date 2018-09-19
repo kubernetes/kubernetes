@@ -49,7 +49,7 @@ import (
 )
 
 const (
-	kubeAPIVersion    = "0.1.0"
+	kubeAPIVersion = "0.1.0"
 
 	// String used to detect docker host mode for various namespaces (e.g.
 	// networking). Must match the value returned by docker inspect -f

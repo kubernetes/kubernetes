@@ -19,6 +19,7 @@ go_library(
         "//pkg/apis/policy/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
     ],
 )
 
