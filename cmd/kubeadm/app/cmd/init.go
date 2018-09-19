@@ -476,6 +476,13 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error creating clusterinfo RBAC rules: %v", err)
 	}
 
+	glog.V(1).Infof("[init] creating Nodes RBAC rules")
+	for _, token := range tokens {
+		if err := clusterinfophase.CreateNodesRBACRules(client, token); err != nil {
+			return fmt.Errorf("error creating Nodes RBAC rules: %v", err)
+		}
+	}
+
 	glog.V(1).Infof("[init] ensuring DNS addon")
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
 		return fmt.Errorf("error ensuring dns addon: %v", err)

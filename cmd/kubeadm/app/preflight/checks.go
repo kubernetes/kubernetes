@@ -52,6 +52,9 @@ import (
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	utilsexec "k8s.io/utils/exec"
+	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -410,6 +413,43 @@ func (hc HostnameCheck) Check() (warnings, errors []error) {
 	}
 	if err != nil {
 		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, err))
+	}
+	return warnings, errors
+}
+
+// HostnameUniqueCheck ensures that the node hostname is unique in the cluster.
+type HostnameUniqueCheck struct {
+	cfg *kubeadmapi.JoinConfiguration
+}
+
+// Name will return HostnameUnique as name for HostnameUniqueCheck.
+func (HostnameUniqueCheck) Name() string {
+	return "HostnameUnique"
+}
+
+// Check validates if node hostname is unique.
+func (huc HostnameUniqueCheck) Check() (warnings, errors []error) {
+	glog.V(1).Infof("checking whether the given hostname is unique in the cluster")
+	errors = []error{}
+	warnings = []error{}
+	hostname := huc.cfg.NodeRegistration.Name
+	tlsBootstrapCfg, err := discovery.For(huc.cfg)
+	if err != nil {
+		warnings = append(warnings, fmt.Errorf("hostname unique check failed: %s", err))
+	}
+	client, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
+	if err != nil {
+		warnings = append(warnings, fmt.Errorf("hostname unique check failed: %s", err))
+	}
+	nodes, err := client.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		warnings = append(warnings, fmt.Errorf("hostname unique check failed: %s", err))
+	}
+	for _, node := range nodes.Items {
+		if hostname == node.Name {
+			errors = append(errors, fmt.Errorf("hostname \"%s\" already exists in the cluster, please change the node hostname or pass another one by --node-name", hostname))
+			break
+		}
 	}
 	return warnings, errors
 }
@@ -921,6 +961,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 		ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
+		HostnameUniqueCheck{cfg: cfg},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
 	if !cfg.ControlPlane {

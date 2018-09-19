@@ -18,6 +18,7 @@ package clusterinfo
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -35,6 +36,10 @@ import (
 const (
 	// BootstrapSignerClusterRoleName sets the name for the ClusterRole that allows access to ConfigMaps in the kube-public ns
 	BootstrapSignerClusterRoleName = "kubeadm:bootstrap-signer-clusterinfo"
+	// BootstrapSignerNodesRoleName sets the name for the ClusterRole that allows access to nodes
+	BootstrapSignerNodesRoleName = "kubeadm:bootstrap-signer-nodes"
+	// BootstrapSignerNodesRoleBindingPrefix sets the name prefix for the ClusterRoleBinding that allows access to nodes
+	BootstrapSignerNodesRoleBindingPrefix = "kubeadm:bootstrap-signer-nodes-crb-"
 )
 
 // CreateBootstrapConfigMapIfNotExists creates the kube-public ConfigMap if it doesn't exist already
@@ -104,6 +109,62 @@ func CreateClusterInfoRBACRules(client clientset.Interface) error {
 			{
 				Kind: rbac.UserKind,
 				Name: user.Anonymous,
+			},
+		},
+	})
+}
+
+var (
+	// tokenRegexpString defines id.secret regular expression pattern
+	tokenRegexpString = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"
+	// tokenRegexp is a compiled regular expression of TokenRegexpString
+	tokenRegexp = regexp.MustCompile(tokenRegexpString)
+)
+
+// parseToken tries and parse a valid token from a string.
+// A token ID and token secret are returned in case of success, an error otherwise.
+func parseToken(s string) (string, string, error) {
+	split := tokenRegexp.FindStringSubmatch(s)
+	if len(split) != 3 {
+		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, tokenRegexpString)
+	}
+	return split[1], split[2], nil
+}
+
+// CreateNodesRBACRules creates the RBAC rules for exposing the nodes in the cluster to bootstrap user
+func CreateNodesRBACRules(client clientset.Interface, token string) error {
+	glog.V(1).Infoln("creating the RBAC rules for exposing the nodes in the cluster to bootstrap user")
+	tokenID, _, err := parseToken(token)
+	if err != nil {
+		return err
+	}
+	err = apiclient.CreateOrUpdateClusterRole(client, &rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      BootstrapSignerNodesRoleName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Rules: []rbac.PolicyRule{
+			rbachelper.NewRule("list").Groups("").Resources("nodes").RuleOrDie(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      BootstrapSignerNodesRoleBindingPrefix + tokenID,
+			Namespace: metav1.NamespaceSystem,
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole",
+			Name:     BootstrapSignerNodesRoleName,
+		},
+		Subjects: []rbac.Subject{
+			{
+				Kind: rbac.UserKind,
+				Name: bootstrapapi.BootstrapUserPrefix + tokenID,
 			},
 		},
 	})
