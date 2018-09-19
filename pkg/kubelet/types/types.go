@@ -26,8 +26,8 @@ import (
 
 // TODO: Reconcile custom types in kubelet/types and this subpackage
 
-type HttpGetter interface {
-	Get(url string) (*http.Response, error)
+type HttpDoer interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 // Timestamp wraps around time.Time and offers utilities to format and parse

@@ -122,13 +122,15 @@ func TestRunHandlerExec(t *testing.T) {
 }
 
 type fakeHTTP struct {
-	url  string
-	err  error
-	resp *http.Response
+	url     string
+	headers *http.Header
+	err     error
+	resp    *http.Response
 }
 
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
+func (f *fakeHTTP) Do(req *http.Request) (*http.Response, error) {
+	f.url = req.URL.String()
+	f.headers = req.Header
 	return f.resp, f.err
 }
 

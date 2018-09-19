@@ -34,7 +34,7 @@ import (
 )
 
 type HandlerRunner struct {
-	httpGetter       kubetypes.HttpGetter
+	httpDoer         kubetypes.HttpDoer
 	commandRunner    kubecontainer.ContainerCommandRunner
 	containerManager podStatusProvider
 }
@@ -43,9 +43,9 @@ type podStatusProvider interface {
 	GetPodStatus(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
-func NewHandlerRunner(httpGetter kubetypes.HttpGetter, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
+func NewHandlerRunner(httpDoer kubetypes.HttpDoer, commandRunner kubecontainer.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
 	return &HandlerRunner{
-		httpGetter:       httpGetter,
+		httpDoer:         httpDoer,
 		commandRunner:    commandRunner,
 		containerManager: containerManager,
 	}
@@ -124,8 +124,24 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		}
 	}
 	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
-	resp, err := hr.httpGetter.Get(url)
+	req, err := makeHttpRequest(handler.HTTPGet, url)
+	if err != nil {
+		return "", err
+	}
+	resp, err := hr.httpDoer.Do(req)
 	return getHttpRespBody(resp), err
+}
+
+func makeHttpRequest(httpGet *v1.HTTPGetAction, url string) (*http.Request, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, header := range httpGet.HTTPHeaders {
+		req.Header.Set(header.Name, header.Value)
+	}
+	return req, nil
+
 }
 
 func getHttpRespBody(resp *http.Response) string {
