@@ -60,6 +60,7 @@ var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
 
 var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
 
+// PluginFactory create flex volume plugin
 type PluginFactory interface {
 	NewFlexVolumePlugin(pluginDir, driverName string, runner exec.Interface) (volume.VolumePlugin, error)
 }
@@ -89,9 +90,8 @@ func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Int
 	if flexPlugin.capabilities.Attach {
 		// Plugin supports attach/detach, so return flexVolumeAttachablePlugin
 		return &flexVolumeAttachablePlugin{flexVolumePlugin: flexPlugin}, nil
-	} else {
-		return flexPlugin, nil
 	}
+	return flexPlugin, nil
 }
 
 // Init is part of the volume.VolumePlugin interface.
