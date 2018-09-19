@@ -59,11 +59,11 @@ func csiContainerImage(image string) string {
 	return fullName
 }
 
-// Create the driver registrar cluster role if it doesn't exist, no teardown so that tests
-// are parallelizable. This role will be shared with many of the CSI tests.
-func csiDriverRegistrarClusterRole(
+// Create the CSI roles if they doesn't exist yet, no teardown so that tests
+// are parallelizable. These roles will be shared with many of the CSI tests.
+func createCSIRoles(
 	config framework.VolumeTestConfig,
-) *rbacv1.ClusterRole {
+) {
 	// TODO(Issue: #62237) Remove impersonation workaround and cluster role when issue resolved
 	By("Creating an impersonating superuser kubernetes clientset to define cluster role")
 	rc, err := framework.LoadConfig()
@@ -76,7 +76,12 @@ func csiDriverRegistrarClusterRole(
 	framework.ExpectNoError(err, "Failed to create superuser clientset: %v", err)
 	By("Creating the CSI driver registrar cluster role")
 	clusterRoleClient := superuserClientset.RbacV1().ClusterRoles()
-	role := &rbacv1.ClusterRole{
+	createClusterRole := func(role *rbacv1.ClusterRole) {
+		if _, err := clusterRoleClient.Create(role); err != nil && !apierrs.IsAlreadyExists(err) {
+			framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
+		}
+	}
+	createClusterRole(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: csiDriverRegistrarClusterRoleName,
 		},
@@ -93,17 +98,75 @@ func csiDriverRegistrarClusterRole(
 				Verbs:     []string{"get", "update", "patch"},
 			},
 		},
-	}
+	})
+	createClusterRole(&rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csiExternalAttacherClusterRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
 
-	ret, err := clusterRoleClient.Create(role)
-	if err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			return ret
-		}
-		framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
-	}
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumes"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"volumeattachments"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			},
+		},
+	})
+	createClusterRole(&rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csiExternalProvisionerClusterRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
 
-	return ret
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumes"},
+				Verbs:     []string{"create", "delete", "get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumeclaims"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"storageclasses"},
+				Verbs:     []string{"list", "watch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				// This is only needed when the "CSINodeInfo" feature gate is enabled,
+				// but here we can't know whether it is, so we add it always.
+				APIGroups: []string{"csi.storage.k8s.io"},
+				Resources: []string{"csinodeinfos"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+		},
+	})
 }
 
 func csiServiceAccount(
@@ -155,7 +218,7 @@ func csiClusterRoleBindings(
 	if teardown {
 		bindingString = "Unbinding"
 	}
-	By(fmt.Sprintf("%v cluster roles %v to the CSI service account %v", bindingString, clusterRolesNames, sa.GetName()))
+	By(fmt.Sprintf("%v cluster roles %v to the CSI service account %v in namespace %s", bindingString, clusterRolesNames, sa.GetName(), config.Namespace))
 	clusterRoleBindingClient := client.RbacV1().ClusterRoleBindings()
 	for _, clusterRoleName := range clusterRolesNames {
 

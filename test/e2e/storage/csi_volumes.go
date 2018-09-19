@@ -41,9 +41,14 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// All of these roles are getting created by createCSIRoles. They
+// mimick the permissions that real-world deployments of CSI drivers
+// must create themselves.
+//
+// The builtin system:csi* roles are deprecated.
 const (
-	csiExternalProvisionerClusterRoleName string = "system:csi-external-provisioner"
-	csiExternalAttacherClusterRoleName    string = "system:csi-external-attacher"
+	csiExternalProvisionerClusterRoleName string = "csi-external-provisioner"
+	csiExternalAttacherClusterRoleName    string = "csi-external-attacher"
 	csiDriverRegistrarClusterRoleName     string = "csi-driver-registrar"
 )
 
@@ -85,7 +90,7 @@ var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
 			ServerNodeName:    node.Name,
 			WaitForCompletion: true,
 		}
-		csiDriverRegistrarClusterRole(config)
+		createCSIRoles(config)
 		createCSICRDs(crdclient)
 	})
 
