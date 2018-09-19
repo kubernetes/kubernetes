@@ -337,7 +337,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}()
 
 	if c.csiClient == nil {
-		c.csiClient = newCsiDriverClient(csiSource.Driver)
+		c.csiClient = newCsiDriverClient(c.plugin.host, csiSource.Driver)
 	}
 	csi := c.csiClient
 
@@ -517,7 +517,7 @@ func (c *csiAttacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	if c.csiClient == nil {
-		c.csiClient = newCsiDriverClient(driverName)
+		c.csiClient = newCsiDriverClient(c.plugin.host, driverName)
 	}
 	csi := c.csiClient
 

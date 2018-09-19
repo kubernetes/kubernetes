@@ -29,6 +29,7 @@ import (
 	api "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 type csiClient interface {
@@ -69,14 +70,15 @@ type csiClient interface {
 
 // csiClient encapsulates all csi-plugin methods
 type csiDriverClient struct {
+	host       volume.VolumeHost
 	driverName string
 	nodeClient csipb.NodeClient
 }
 
 var _ csiClient = &csiDriverClient{}
 
-func newCsiDriverClient(driverName string) *csiDriverClient {
-	c := &csiDriverClient{driverName: driverName}
+func newCsiDriverClient(host volume.VolumeHost, driverName string) *csiDriverClient {
+	c := &csiDriverClient{host: host, driverName: driverName}
 	return c
 }
 
@@ -87,7 +89,7 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	err error) {
 	glog.V(4).Info(log("calling NodeGetInfo rpc"))
 
-	conn, err := newGrpcConn(c.driverName)
+	conn, err := newGrpcConn(c.host, c.driverName)
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -118,7 +120,7 @@ func (c *csiDriverClient) NodePublishVolume(
 		return errors.New("missing target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	conn, err := newGrpcConn(c.host, c.driverName)
 	if err != nil {
 		return err
 	}
@@ -167,7 +169,7 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string,
 		return errors.New("missing target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	conn, err := newGrpcConn(c.host, c.driverName)
 	if err != nil {
 		return err
 	}
@@ -200,7 +202,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 		return errors.New("missing staging target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	conn, err := newGrpcConn(c.host, c.driverName)
 	if err != nil {
 		return err
 	}
@@ -245,7 +247,7 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 		return errors.New("missing staging target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	conn, err := newGrpcConn(c.host, c.driverName)
 	if err != nil {
 		return err
 	}
@@ -263,7 +265,7 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
 	glog.V(4).Info(log("calling NodeGetCapabilities rpc"))
 
-	conn, err := newGrpcConn(c.driverName)
+	conn, err := newGrpcConn(c.host, c.driverName)
 	if err != nil {
 		return nil, err
 	}
@@ -290,11 +292,11 @@ func asCSIAccessMode(am api.PersistentVolumeAccessMode) csipb.VolumeCapability_A
 	return csipb.VolumeCapability_AccessMode_UNKNOWN
 }
 
-func newGrpcConn(driverName string) (*grpc.ClientConn, error) {
+func newGrpcConn(host volume.VolumeHost, driverName string) (*grpc.ClientConn, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
 	}
-	addr := fmt.Sprintf(csiAddrTemplate, driverName)
+	addr := fmt.Sprintf(csiAddrTemplate, host.GetPluginDir(driverName))
 	// TODO once KubeletPluginsWatcher graduates to beta, remove FeatureGate check
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
 		driver, ok := csiDrivers.driversMap[driverName]
