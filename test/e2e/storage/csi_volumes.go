@@ -24,10 +24,11 @@ import (
 	"k8s.io/api/core/v1"
 
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	csi "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -58,19 +59,21 @@ var csiTestDrivers = map[string]func(f *framework.Framework, config framework.Vo
 	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
 }
 
-var _ = utils.SIGDescribe("CSI Volumes", func() {
+var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (
-		cs     clientset.Interface
-		csics  csiclient.Interface
-		ns     *v1.Namespace
-		node   v1.Node
-		config framework.VolumeTestConfig
+		cs        clientset.Interface
+		crdclient apiextensionsclient.Interface
+		csics     csiclient.Interface
+		ns        *v1.Namespace
+		node      v1.Node
+		config    framework.VolumeTestConfig
 	)
 
 	BeforeEach(func() {
 		cs = f.ClientSet
+		crdclient = f.APIExtensionsClientSet
 		csics = f.CSIClientSet
 		ns = f.Namespace
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
@@ -83,13 +86,18 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			WaitForCompletion: true,
 		}
 		csiDriverRegistrarClusterRole(config)
+		createCSICRDs(crdclient)
+	})
+
+	AfterEach(func() {
+		deleteCSICRDs(crdclient)
 	})
 
 	for driverName, initCSIDriver := range csiTestDrivers {
 		curDriverName := driverName
 		curInitCSIDriver := initCSIDriver
 
-		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s", curDriverName), func() {
+		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s [Serial]", curDriverName), func() {
 			var (
 				driver csiTestDriver
 			)
@@ -205,13 +213,13 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	})
 })
 
-func createCSIDriver(csics csiclient.Interface, attachable bool) *csi.CSIDriver {
+func createCSIDriver(csics csiclient.Interface, attachable bool) *csiv1alpha1.CSIDriver {
 	By("Creating CSIDriver instance")
-	driver := &csi.CSIDriver{
+	driver := &csiv1alpha1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "csi-hostpath",
 		},
-		Spec: csi.CSIDriverSpec{
+		Spec: csiv1alpha1.CSIDriverSpec{
 			AttachRequired: &attachable,
 		},
 	}
