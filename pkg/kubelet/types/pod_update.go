@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -28,44 +27,48 @@ import (
 )
 
 const (
-	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
-	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
+	// ConfigSourceAnnotationKey is the key for config source annotation
+	ConfigSourceAnnotationKey = "kubernetes.io/config.source"
+	// ConfigMirrorAnnotationKey is the key for config mirror annotation
+	ConfigMirrorAnnotationKey = v1.MirrorPodAnnotationKey
+	// ConfigFirstSeenAnnotationKey is the key for config first seen annotation
 	ConfigFirstSeenAnnotationKey = "kubernetes.io/config.seen"
-	ConfigHashAnnotationKey      = "kubernetes.io/config.hash"
-	CriticalPodAnnotationKey     = "scheduler.alpha.kubernetes.io/critical-pod"
+	// ConfigHashAnnotationKey is the key for config hash annotation
+	ConfigHashAnnotationKey = "kubernetes.io/config.hash"
+	// CriticalPodAnnotationKey is the key for critical pod annotation
+	CriticalPodAnnotationKey = "scheduler.alpha.kubernetes.io/critical-pod"
 )
 
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
 
 const (
-	// This is the current pod configuration
+	// SET is the current pod configuration
 	SET PodOperation = iota
-	// Pods with the given ids are new to this source
+	// ADD means pods with the given ids are new to this source
 	ADD
-	// Pods with the given ids are gracefully deleted from this source
+	// DELETE means pods with the given ids are gracefully deleted from this source
 	DELETE
-	// Pods with the given ids have been removed from this source
+	// REMOVE means pods with the given ids have been removed from this source
 	REMOVE
-	// Pods with the given ids have been updated in this source
+	// UPDATE means pods with the given ids have been updated in this source
 	UPDATE
-	// Pods with the given ids have unexpected status in this source,
+	// RECONCILE means pods with the given ids have unexpected status in this source,
 	// kubelet should reconcile status with this source
 	RECONCILE
-	// Pods with the given ids have been restored from a checkpoint.
+	// RESTORE means pods with the given ids have been restored from a checkpoint.
 	RESTORE
 
-	// These constants identify the sources of pods
-	// Updates from a file
-	FileSource = "file"
-	// Updates from querying a web page
-	HTTPSource = "http"
-	// Updates from Kubernetes API Server
-	ApiserverSource = "api"
-	// Updates from all sources
-	AllSource = "*"
+	// Following is constants for identifying the sources of pods
 
-	NamespaceDefault = metav1.NamespaceDefault
+	// FileSource means updating from a file
+	FileSource = "file"
+	// HTTPSource means updating from querying a web page
+	HTTPSource = "http"
+	// ApiserverSource means updating from Kubernetes API Server
+	ApiserverSource = "api"
+	// AllSource means updating from all sources
+	AllSource = "*"
 )
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
@@ -83,7 +86,7 @@ type PodUpdate struct {
 	Source string
 }
 
-// Gets all validated sources from the specified sources.
+// GetValidatedSources gets all validated sources from the specified sources.
 func GetValidatedSources(sources []string) ([]string, error) {
 	validated := make([]string, 0, len(sources))
 	for _, source := range sources {
