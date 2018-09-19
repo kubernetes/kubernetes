@@ -132,6 +132,21 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	return result
 }
 
+// cadvisorInfoToContainerCPUAndMemoryStats returns the statsapi.ContainerStats converted
+// from the container and filesystem info.
+func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.ContainerInfo) *statsapi.ContainerStats {
+	result := &statsapi.ContainerStats{
+		StartTime: metav1.NewTime(info.Spec.CreationTime),
+		Name:      name,
+	}
+
+	cpu, memory := cadvisorInfoToCPUandMemoryStats(info)
+	result.CPU = cpu
+	result.Memory = memory
+
+	return result
+}
+
 // cadvisorInfoToNetworkStats returns the statsapi.NetworkStats converted from
 // the container info from cadvisor.
 func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) *statsapi.NetworkStats {

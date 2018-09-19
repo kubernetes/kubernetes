@@ -51,6 +51,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+
 	// Do some initialization to decode the query parameters correctly.
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -255,12 +256,16 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 	return map[string]volume.Volume{}, true
 }
 
-func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)     { return nil, nil }
-func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)  { return nil, nil }
-func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)    { return nil, nil }
-func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error) { return nil, nil }
+func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                { return nil, nil }
+func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { return nil, nil }
+func (_ *fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
+func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
 func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
+}
+func (_ *fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
+	return nil, nil
 }
 
 type fakeAuth struct {
