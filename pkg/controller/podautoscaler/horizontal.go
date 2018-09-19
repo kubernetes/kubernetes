@@ -464,6 +464,12 @@ func (a *HorizontalController) computeStatusForExternalMetric(currentReplicas in
 	return 0, time.Time{}, "", fmt.Errorf(errMsg)
 }
 
+func (a *HorizontalController) recordInitialRecommendation(currentReplicas int32, key string) {
+	if a.recommendations[key] == nil {
+		a.recommendations[key] = []timestampedRecommendation{{currentReplicas, time.Now()}}
+	}
+}
+
 func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler, key string) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpav1 := hpav1Shared.DeepCopy()
@@ -508,6 +514,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	}
 	setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededGetScale", "the HPA controller was able to get the target's current scale")
 	currentReplicas := scale.Status.Replicas
+	a.recordInitialRecommendation(currentReplicas, key)
 
 	var metricStatuses []autoscalingv2.MetricStatus
 	metricDesiredReplicas := int32(0)
