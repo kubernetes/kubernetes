@@ -71,9 +71,9 @@ type RolloutStatusOptions struct {
 	Revision int64
 	Timeout  time.Duration
 
-	StatusViewer  func(*meta.RESTMapping) (kubectl.StatusViewer, error)
-	Builder       func() *resource.Builder
-	DynamicClient dynamic.Interface
+	StatusViewerFn func(*meta.RESTMapping) (kubectl.StatusViewer, error)
+	Builder        func() *resource.Builder
+	DynamicClient  dynamic.Interface
 
 	FilenameOptions *resource.FilenameOptions
 	genericclioptions.IOStreams
@@ -127,9 +127,7 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	}
 
 	o.BuilderArgs = args
-	o.StatusViewer = func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-		return polymorphichelpers.StatusViewerFn(mapping)
-	}
+	o.StatusViewerFn = polymorphichelpers.StatusViewerFn
 
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
@@ -180,7 +178,7 @@ func (o *RolloutStatusOptions) Run() error {
 	info := infos[0]
 	mapping := info.ResourceMapping()
 
-	statusViewer, err := o.StatusViewer(mapping)
+	statusViewer, err := o.StatusViewerFn(mapping)
 	if err != nil {
 		return err
 	}
