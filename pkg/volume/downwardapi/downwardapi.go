@@ -18,7 +18,6 @@ package downwardapi
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 
 	"k8s.io/api/core/v1"
@@ -297,10 +296,6 @@ func (c *downwardAPIVolumeUnmounter) TearDown() error {
 
 func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
 	return volumeutil.UnmountViaEmptyDir(dir, c.plugin.host, c.volName, wrappedVolumeSpec(), c.podUID)
-}
-
-func (b *downwardAPIVolumeMounter) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.DownwardAPIVolumeSource, bool) {
