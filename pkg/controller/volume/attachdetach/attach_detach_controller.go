@@ -361,9 +361,9 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 				glog.Errorf("Failed to mark the volume as attached: %v", err)
 				continue
 			}
-			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
-			adc.addNodeToDswp(node, types.NodeName(node.Name))
 		}
+		adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+		adc.addNodeToDswp(node, types.NodeName(node.Name))
 	}
 	return nil
 }
