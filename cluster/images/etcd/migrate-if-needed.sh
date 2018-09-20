@@ -18,7 +18,7 @@
 # This script performs etcd upgrade based on the following environmental
 # variables:
 # TARGET_STORAGE - API of etcd to be used (supported: 'etcd2', 'etcd3')
-# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.17', '3.1.12', '3.2.18', '3.2.24')
+# TARGET_VERSION - etcd release to be used (supported: '2.2.1', '2.3.7', '3.0.17', '3.1.12', '3.2.24')
 # DATA_DIRECTORY - directory with etcd data
 #
 # The current etcd version and storage format is detected based on the
@@ -29,8 +29,7 @@
 # - 2.2.1/etcd2 -> 2.3.7/etcd2
 # - 2.3.7/etcd2 -> 3.0.17/etcd2
 # - 3.0.17/etcd3 -> 3.1.12/etcd3
-# - 3.1.12/etcd3 -> 3.2.18/etcd3
-# - 3.2.18/etcd3 -> 3.2.24/etcd3
+# - 3.1.12/etcd3 -> 3.2.24/etcd3
 #
 # NOTE: The releases supported in this script has to match release binaries
 # present in the etcd image (to make this script work correctly).
@@ -43,7 +42,7 @@ set -o nounset
 
 # NOTE: BUNDLED_VERSION has to match release binaries present in the
 # etcd image (to make this script work correctly).
-BUNDLED_VERSIONS="2.2.1, 2.3.7, 3.0.17, 3.1.12, 3.2.18 3.2.24"
+BUNDLED_VERSIONS="2.2.1, 2.3.7, 3.0.17, 3.1.12, 3.2.24"
 
 ETCD_NAME="${ETCD_NAME:-etcd-$(hostname)}"
 if [ -z "${DATA_DIRECTORY:-}" ]; then
