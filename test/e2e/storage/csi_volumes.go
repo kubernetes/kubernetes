@@ -50,6 +50,8 @@ const (
 	csiExternalProvisionerClusterRoleName string = "csi-external-provisioner"
 	csiExternalAttacherClusterRoleName    string = "csi-external-attacher"
 	csiDriverRegistrarClusterRoleName     string = "csi-driver-registrar"
+	csiExternalAttacherRoleName           string = "csi-external-attacher-role"
+	csiExternalProvisionerRoleName        string = "csi-external-provisioner-role"
 )
 
 type csiTestDriver interface {
@@ -304,6 +306,7 @@ func startPausePod(cs clientset.Interface, t storageClassTest, ns string) (*stor
 
 type hostpathCSIDriver struct {
 	combinedClusterRoleNames []string
+	combinedRoleNames        []string
 	serviceAccount           *v1.ServiceAccount
 
 	f      *framework.Framework
@@ -316,6 +319,10 @@ func initCSIHostpath(f *framework.Framework, config framework.VolumeTestConfig) 
 			csiExternalAttacherClusterRoleName,
 			csiExternalProvisionerClusterRoleName,
 			csiDriverRegistrarClusterRoleName,
+		},
+		combinedRoleNames: []string{
+			csiExternalAttacherRoleName,
+			csiExternalProvisionerRoleName,
 		},
 		f:      f,
 		config: config,
@@ -340,6 +347,7 @@ func (h *hostpathCSIDriver) createCSIDriver() {
 	config := h.config
 	h.serviceAccount = csiServiceAccount(cs, config, "hostpath", false)
 	csiClusterRoleBindings(cs, config, false, h.serviceAccount, h.combinedClusterRoleNames)
+	csiRoleBindings(cs, config, false, h.serviceAccount, h.combinedRoleNames)
 	csiHostPathPod(cs, config, false, f, h.serviceAccount)
 }
 
@@ -350,6 +358,7 @@ func (h *hostpathCSIDriver) cleanupCSIDriver() {
 	config := h.config
 	csiHostPathPod(cs, config, true, f, h.serviceAccount)
 	csiClusterRoleBindings(cs, config, true, h.serviceAccount, h.combinedClusterRoleNames)
+	csiRoleBindings(cs, config, true, h.serviceAccount, h.combinedRoleNames)
 	csiServiceAccount(cs, config, "hostpath", true)
 }
 
