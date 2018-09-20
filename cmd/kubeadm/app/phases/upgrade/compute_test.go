@@ -715,7 +715,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						KubeVersion:    "v1.12.0",
 						KubeadmVersion: "v1.12.0",
 						DNSType:        "kube-dns",
-						DNSVersion:     "1.14.12",
+						DNSVersion:     "1.14.13",
 						EtcdVersion:    "3.2.24",
 					},
 				},
