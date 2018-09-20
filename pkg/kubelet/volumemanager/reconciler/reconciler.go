@@ -276,8 +276,10 @@ func (rc *reconciler) reconcile() {
 	// Ensure devices that should be detached/unmounted are detached/unmounted.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetUnmountedVolumes() {
 		// Check IsOperationPending to avoid marking a volume as detached if it's in the process of mounting.
-		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
-			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName) {
+		// Check DevicePath to avoid device unmounted slow, and with desiredStateOfWorld Volume is exists,
+		if (!rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
+			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName)) ||
+			attachedVolume.DevicePath == ""	{
 			if attachedVolume.GloballyMounted {
 				// Volume is globally mounted to device, unmount it
 				glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
