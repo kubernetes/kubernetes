@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-// Test the cases of proccessEnvFileLine that can be run without touching the
+// Test the cases of processEnvFileLine that can be run without touching the
 // environment.
 func Test_processEnvFileLine(t *testing.T) {
 	testCases := []struct {
@@ -50,7 +50,7 @@ func Test_processEnvFileLine(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			key, value, err := proccessEnvFileLine(tt.line, `filename`, tt.currentLine)
+			key, value, err := processEnvFileLine(tt.line, `filename`, tt.currentLine)
 			t.Logf("Testing that %s.", tt.name)
 			if tt.expectedKey != key {
 				t.Errorf("\texpected key %q, received %q", tt.expectedKey, key)
@@ -71,7 +71,7 @@ func Test_processEnvFileLine(t *testing.T) {
 	}
 }
 
-// proccessEnvFileLine needs to fetch the value from the environment if no
+// processEnvFileLine needs to fetch the value from the environment if no
 // equals sign is provided.
 // For example:
 //
@@ -92,7 +92,7 @@ func Test_processEnvFileLine_readEnvironment(t *testing.T) {
 
 	os.Setenv(realKey, `my_value`)
 
-	key, value, err := proccessEnvFileLine([]byte(realKey), `filename`, 3)
+	key, value, err := processEnvFileLine([]byte(realKey), `filename`, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
