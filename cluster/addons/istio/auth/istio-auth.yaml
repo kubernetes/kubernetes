@@ -1,30 +1,11 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: kube-public
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-injection: disabled
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: kube-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-injection: disabled
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     istio-injection: disabled
----
 ---
 # Source: istio/charts/galley/templates/configmap.yaml
 apiVersion: v1
@@ -851,7 +832,6 @@ kind: ServiceAccount
 metadata:
   name: prometheus
   namespace: istio-system
-
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
@@ -4088,9 +4068,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-egressgateway
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4109,9 +4089,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-ingressgateway
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4134,9 +4114,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-policy
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4155,9 +4135,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-telemetry
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4179,9 +4159,9 @@ apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
     name: istio-pilot
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4225,11 +4205,8 @@ webhooks:
         resources: ["pods"]
     failurePolicy: Fail
     namespaceSelector:
-      matchExpressions:
-      - key: istio-injection
-        operator: NotIn
-        values:
-        - disabled
+      matchLabels:
+        istio-injection: enabled
 
 
 ---

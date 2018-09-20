@@ -1,30 +1,11 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: kube-public
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-injection: disabled
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: kube-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    istio-injection: disabled
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: istio-system
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     istio-injection: disabled
----
 ---
 # Source: istio/charts/galley/templates/configmap.yaml
 apiVersion: v1
@@ -430,58 +411,7 @@ metadata:
     heritage: Tiller
     istio: security
 data:
-  custom-resources.yaml: |-    
-    # These policy and destination rules effectively enable mTLS for all services in the mesh. For now,
-    # they are added to Istio installation yaml for backward compatible. In future, they should be in
-    # a separated yaml file so that customer can enable mTLS independent from installation.
-    
-    # Authentication policy to enable mutual TLS for all services (that have sidecar) in the mesh.
-    apiVersion: "authentication.istio.io/v1alpha1"
-    kind: "MeshPolicy"
-    metadata:
-      name: "default"
-      labels:
-        app: istio-security
-        chart: security-1.0.2
-        release: istio
-        heritage: Tiller
-    spec:
-      peers:
-      - mtls: {}
-    ---
-    # Corresponding destination rule to configure client side to use mutual TLS when talking to
-    # any service (host) in the mesh.
-    apiVersion: networking.istio.io/v1alpha3
-    kind: DestinationRule
-    metadata:
-      name: "default"
-      labels:
-        app: istio-security
-        chart: security-1.0.2
-        release: istio
-        heritage: Tiller
-    spec:
-      host: "*.local"
-      trafficPolicy:
-        tls:
-          mode: ISTIO_MUTUAL
-    ---
-    # Destination rule to dislabe (m)TLS when talking to API server, as API server doesn't have sidecar.
-    # Customer should add similar destination rules for other services that dont' have sidecar.
-    apiVersion: networking.istio.io/v1alpha3
-    kind: DestinationRule
-    metadata:
-      name: "api-server"
-      labels:
-        app: istio-security
-        chart: security-1.0.2
-        release: istio
-        heritage: Tiller
-    spec:
-      host: "kubernetes.default.svc.cluster.local"
-      trafficPolicy:
-        tls:
-          mode: DISABLE
+  custom-resources.yaml: |-
   run.sh: |-    
     #!/bin/sh
     
@@ -543,8 +473,8 @@ data:
     accessLogFile: "/dev/stdout"
     #
     # Deprecated: mixer is using EDS
-    mixerCheckServer: istio-policy.istio-system.svc.cluster.local:15004
-    mixerReportServer: istio-telemetry.istio-system.svc.cluster.local:15004
+    mixerCheckServer: istio-policy.istio-system.svc.cluster.local:9091
+    mixerReportServer: istio-telemetry.istio-system.svc.cluster.local:9091
 
     # Unix Domain Socket through which envoy communicates with NodeAgent SDS to get
     # key/cert for mTLS. Use secret-mount files instead of SDS if set to empty. 
@@ -602,10 +532,10 @@ data:
       statsdUdpAddress: istio-statsd-prom-bridge.istio-system:9125
       #
       # Mutual TLS authentication between sidecars and istio control plane.
-      controlPlaneAuthPolicy: MUTUAL_TLS
+      controlPlaneAuthPolicy: NONE
       #
       # Address where istio Pilot service is running
-      discoveryAddress: istio-pilot.istio-system:15005
+      discoveryAddress: istio-pilot.istio-system:15007
 
 ---
 # Source: istio/templates/sidecar-injector-configmap.yaml
@@ -851,7 +781,6 @@ kind: ServiceAccount
 metadata:
   name: prometheus
   namespace: istio-system
-
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
@@ -964,105 +893,6 @@ spec:
                 name=$(echo $entry | awk '{print $2}');
                 kubectl delete secret $name -n $ns;
               done
-      restartPolicy: OnFailure
-
----
-# Source: istio/charts/security/templates/create-custom-resources-job.yaml
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: istio-security-post-install-account
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    app: istio-security
-    chart: security-1.0.2
-    heritage: Tiller
-    release: istio
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRole
-metadata:
-  name: istio-security-post-install-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    app: istio-security
-    chart: security-1.0.2
-    heritage: Tiller
-    release: istio
-rules:
-- apiGroups: ["authentication.istio.io"] # needed to create default authn policy
-  resources: ["*"]
-  verbs: ["*"]
-- apiGroups: ["networking.istio.io"] # needed to create security destination rules
-  resources: ["*"]
-  verbs: ["*"]
-- apiGroups: ["admissionregistration.k8s.io"]
-  resources: ["validatingwebhookconfigurations"]
-  verbs: ["get"]
-- apiGroups: ["extensions"]
-  resources: ["deployments", "replicasets"]
-  verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: istio-security-post-install-role-binding-istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    app: istio-security
-    chart: security-1.0.2
-    heritage: Tiller
-    release: istio
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: istio-security-post-install-istio-system
-subjects:
-  - kind: ServiceAccount
-    name: istio-security-post-install-account
-    namespace: istio-system
----
-
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: istio-security-post-install
-  namespace: istio-system
-  annotations:
-    "helm.sh/hook": post-install
-    "helm.sh/hook-delete-policy": hook-succeeded
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    app: istio-security
-    chart: security-1.0.2
-    release: istio
-    heritage: Tiller
-spec:
-  template:
-    metadata:
-      name: istio-security-post-install
-      labels:
-        app: istio-security
-        release: istio
-    spec:
-      serviceAccountName: istio-security-post-install-account
-      containers:
-        - name: hyperkube
-          image: "gcr.io/gke-release/istio/coreos/hyperkube:v1.7.6_coreos.0"
-          command: [ "/bin/bash", "/tmp/security/run.sh", "/tmp/security/custom-resources.yaml" ]
-          volumeMounts:
-            - mountPath: "/tmp/security"
-              name: tmp-configmap-security
-      volumes:
-        - name: tmp-configmap-security
-          configMap:
-            name: istio-security-custom-resources
       restartPolicy: OnFailure
 
 ---
@@ -3150,9 +2980,9 @@ spec:
           - --proxyAdminPort
           - "15000"
           - --controlPlaneAuthPolicy
-          - MUTUAL_TLS
+          - NONE
           - --discoveryAddress
-          - istio-pilot:15005
+          - istio-pilot:8080
           resources:
             requests:
               cpu: 10m
@@ -3294,9 +3124,9 @@ spec:
           - --proxyAdminPort
           - "15000"
           - --controlPlaneAuthPolicy
-          - MUTUAL_TLS
+          - NONE
           - --discoveryAddress
-          - istio-pilot:15005
+          - istio-pilot:8080
           resources:
             requests:
               cpu: 10m
@@ -3485,7 +3315,7 @@ spec:
         - --templateFile
         - /etc/istio/proxy/envoy_policy.yaml.tmpl
         - --controlPlaneAuthPolicy
-        - MUTUAL_TLS
+        - NONE
         env:
         - name: POD_NAME
           valueFrom:
@@ -3584,7 +3414,7 @@ spec:
         - --templateFile
         - /etc/istio/proxy/envoy_telemetry.yaml.tmpl
         - --controlPlaneAuthPolicy
-        - MUTUAL_TLS
+        - NONE
         env:
         - name: POD_NAME
           valueFrom:
@@ -3705,7 +3535,7 @@ spec:
           - --templateFile
           - /etc/istio/proxy/envoy_pilot.yaml.tmpl
           - --controlPlaneAuthPolicy
-          - MUTUAL_TLS
+          - NONE
           env:
           - name: POD_NAME
             valueFrom:
@@ -4088,9 +3918,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-egressgateway
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4109,9 +3939,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-ingressgateway
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4134,9 +3964,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-policy
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4155,9 +3985,9 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-telemetry
     namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4179,9 +4009,9 @@ apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
     name: istio-pilot
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
+    labels:
+      k8s-app: istio
+      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4225,11 +4055,8 @@ webhooks:
         resources: ["pods"]
     failurePolicy: Fail
     namespaceSelector:
-      matchExpressions:
-      - key: istio-injection
-        operator: NotIn
-        values:
-        - disabled
+      matchLabels:
+        istio-injection: enabled
 
 
 ---
@@ -4238,6 +4065,10 @@ webhooks:
 
 ---
 # Source: istio/charts/pilot/templates/meshexpansion.yaml
+
+
+---
+# Source: istio/charts/security/templates/create-custom-resources-job.yaml
 
 
 ---
@@ -5031,11 +4862,6 @@ metadata:
 spec:
   host: istio-policy.istio-system.svc.cluster.local
   trafficPolicy:
-    portLevelSettings:
-    - port:
-        number: 15004
-      tls:
-        mode: ISTIO_MUTUAL
     connectionPool:
       http:
         http2MaxRequests: 10000
@@ -5052,11 +4878,6 @@ metadata:
 spec:
   host: istio-telemetry.istio-system.svc.cluster.local
   trafficPolicy:
-    portLevelSettings:
-    - port:
-        number: 15004
-      tls:
-        mode: ISTIO_MUTUAL
     connectionPool:
       http:
         http2MaxRequests: 10000
