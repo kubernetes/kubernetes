@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"math"
@@ -110,7 +109,6 @@ import (
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/mount"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -354,7 +352,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
-	nodeStatusMaxImages int32) (*Kubelet, error) {
+	nodeStatusMaxImages int32,
+	hostname string,
+	nodeName types.NodeName) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -372,27 +372,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		if kubeCfg.IPTablesDropBit == kubeCfg.IPTablesMasqueradeBit {
 			return nil, fmt.Errorf("iptables-masquerade-bit and iptables-drop-bit must be different")
 		}
-	}
-
-	hostname, err := nodeutil.GetHostname(hostnameOverride)
-	if err != nil {
-		return nil, err
-	}
-	// Query the cloud provider for our node name, default to hostname
-	nodeName := types.NodeName(hostname)
-	if kubeDeps.Cloud != nil {
-		var err error
-		instances, ok := kubeDeps.Cloud.Instances()
-		if !ok {
-			return nil, fmt.Errorf("failed to get instances from cloud provider")
-		}
-
-		nodeName, err = instances.CurrentNodeName(context.TODO(), hostname)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-		}
-
-		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 	}
 
 	if kubeDeps.PodConfig == nil {
