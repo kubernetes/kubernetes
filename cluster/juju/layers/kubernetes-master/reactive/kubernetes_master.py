@@ -573,7 +573,7 @@ def start_master():
     # kube-proxy
     cni = endpoint_from_flag('cni.available')
     cluster_cidr = cni.get_config()['cidr']
-    configure_kube_proxy(configure_prefix, 
+    configure_kube_proxy(configure_prefix,
                          ['127.0.0.1:8080'], cluster_cidr)
     service_restart('snap.kube-proxy.daemon')
 
@@ -646,16 +646,18 @@ def create_service_configs(kube_control):
     for request in requests:
         username = request[1]['user']
         group = request[1]['group']
+        if not username or not group:
+            continue
         kubelet_token = get_token(username)
-        if not kubelet_token and username and group:
+        if not kubelet_token:
             # Usernames have to be in the form of system:node:<nodeName>
             userid = "kubelet-{}".format(request[0].split('/')[1])
             setup_tokens(None, username, userid, group)
             kubelet_token = get_token(username)
-            kube_control.sign_auth_request(request[0], username,
-                                           kubelet_token, proxy_token,
-                                           client_token)
             should_restart = True
+        kube_control.sign_auth_request(request[0], username,
+                                       kubelet_token, proxy_token,
+                                       client_token)
 
     if should_restart:
         service_restart('snap.kube-apiserver.daemon')
