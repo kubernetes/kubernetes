@@ -233,7 +233,7 @@ CLUSTER_SIGNING_CERT_FILE=${CLUSTER_SIGNING_CERT_FILE:-"${ROOT_CA_FILE}"}
 CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${ROOT_CA_KEY}"}
 # Reuse certs will skip generate new ca/cert files under CERT_DIR
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
-REUSE_CERTS=${REUSE_CERTS:-"false"}
+REUSE_CERTS=${REUSE_CERTS:-false}
 
 # name of the cgroup driver, i.e. cgroupfs or systemd
 if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
@@ -550,7 +550,7 @@ function start_apiserver {
         node_port_range="--service-node-port-range=${NODE_PORT_RANGE}"
     fi
 
-    if [[ "${REUSE_CERTS}" == "false" ]]; then
+    if [[ "${REUSE_CERTS}" != true ]]; then
       # Create Certs
       generate_certs
     fi
