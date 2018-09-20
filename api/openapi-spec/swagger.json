@@ -29807,19 +29807,19 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "202": {
        "description": "Accepted",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "401": {
@@ -50615,19 +50615,19 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "202": {
        "description": "Accepted",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "401": {
