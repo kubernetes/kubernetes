@@ -612,6 +612,7 @@ func BuildAdmissionPluginInitializers(
 
 	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
 		discoveryRESTMapper.Reset()
+		// TOOD: remove the anonymous function wrapper after #68865 is solved.
 		go utilwait.Until(func() { discoveryRESTMapper.Reset() }, 30*time.Second, context.StopCh)
 		return nil
 	}

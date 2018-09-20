@@ -71,6 +71,7 @@ type CachedDiscoveryInterface interface {
 	// Invalidate enforces that no cached data is used in the future that is older
 	// than the current time. If an error is returned, caller should retry the
 	// Invalidate.
+	// TODO: do not return error when #68865 is solved.
 	Invalidate() error
 }
 

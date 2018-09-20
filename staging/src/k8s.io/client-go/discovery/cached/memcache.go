@@ -122,7 +122,10 @@ func (d *memCacheClient) Invalidate() error {
 	// APIResourceList to have the same GroupVersion, the lists would need merged.
 	gl, err := d.delegate.ServerGroups()
 	if err != nil || len(gl.Groups) == 0 {
-		return fmt.Errorf("couldn't get current server API group list; will keep using cached value. (%v)", err)
+		// TODO: remove the redundant error logging #68865 is solved.
+		err2 := fmt.Errorf("couldn't get current server API group list; will keep using cached value. (%v)", err)
+		utilruntime.HandleError(err2)
+		return err2
 	}
 
 	rl := map[string]*metav1.APIResourceList{}
