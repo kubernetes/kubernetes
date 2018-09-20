@@ -281,3 +281,7 @@ func typeOfNetwork(network *compute.Network) netType {
 
 	return netTypeCustom
 }
+
+func getLocationName(project, zoneOrRegion string) string {
+	return fmt.Sprintf("projects/%s/locations/%s", project, zoneOrRegion)
+}
