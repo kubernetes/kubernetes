@@ -30,7 +30,7 @@ const (
 	DockerOperationsLatencyKey = "docker_operations_latency_microseconds"
 	// DockerOperationsErrorsKey is the key for the operation error metrics.
 	DockerOperationsErrorsKey = "docker_operations_errors"
-	// DockerOperationsTimeoutKey is the key for the operation timoeut metrics.
+	// DockerOperationsTimeoutKey is the key for the operation timeout metrics.
 	DockerOperationsTimeoutKey = "docker_operations_timeout"
 
 	// Keep the "kubelet" subsystem for backward compatibility.
