@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 type testStrategy struct {
@@ -177,14 +178,28 @@ func TestGenerate(t *testing.T) {
 		},
 	}
 	for k, v := range tests {
+		pod := &api.Pod{
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: v.podSeccompProfile,
+				},
+			},
+		}
 		s := NewSeccompStrategy(v.pspStrategy.defaultProfile, v.pspStrategy.allowedProfiles)
-		actual, err := s.Generate(nil, nil)
+		actual, err := s.Generate(pod, nil)
 		if err != nil {
 			t.Errorf("%s received error during generation %#v", k, err)
 			continue
 		}
-		if actual != v.expectedProfile {
-			t.Errorf("%s expected profile %s but received %s", k, *v.expectedProfile, *actual)
+		if v.expectedProfile != nil {
+			if actual == nil {
+				t.Errorf("%s expected profile to be %s but found <nil>", k, *v.expectedProfile)
+			} else if *actual != *v.expectedProfile {
+				t.Errorf("%s expected defaultProfile to be %s but found %s", k, *v.expectedProfile, *actual)
+			}
+		}
+		if v.expectedProfile == nil && actual != nil {
+			t.Errorf("%s expected defaultProfile to be <nil> but found %s", k, *actual)
 		}
 	}
 }

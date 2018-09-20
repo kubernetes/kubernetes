@@ -351,17 +351,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidDuplicatedSysctls.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.ip_local_port_range"}
 
 	invalidSeccompDefault := validPSP()
-	invalidSeccompDefault.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey: "not-good",
-	}
+	invalidSeccompDefaultString := "not-good"
+	invalidSeccompDefault.Spec.DefaultSeccompProfile = &invalidSeccompDefaultString
+
 	invalidSeccompAllowAnyDefault := validPSP()
-	invalidSeccompAllowAnyDefault.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey: "*",
-	}
+	invalidSeccompAllowAnyDefaultString := seccomp.SeccompAllowAny
+	invalidSeccompAllowAnyDefault.Spec.DefaultSeccompProfile = &invalidSeccompAllowAnyDefaultString
+
 	invalidSeccompAllowed := validPSP()
-	invalidSeccompAllowed.Annotations = map[string]string{
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",not-good",
-	}
+	invalidSeccompAllowed.Spec.AllowedSeccompProfiles = []string{api.SeccompProfileRuntimeDefault, "not-good"}
 
 	invalidAllowedHostPathMissingPath := validPSP()
 	invalidAllowedHostPathMissingPath.Spec.AllowedHostPaths = []policy.AllowedHostPath{
@@ -622,9 +620,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	withAllowedUnsafeSysctl.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.tcp_max_syn_backlog"}
 
 	validSeccomp := validPSP()
-	validSeccomp.Annotations = map[string]string{
-		seccomp.DefaultProfileAnnotationKey:  api.SeccompProfileRuntimeDefault,
-		seccomp.AllowedProfilesAnnotationKey: api.SeccompProfileRuntimeDefault + ",unconfined,localhost/foo,*",
+	validSeccompDefaultString := api.SeccompProfileRuntimeDefault
+	validSeccomp.Spec.DefaultSeccompProfile = &validSeccompDefaultString
+	validSeccomp.Spec.AllowedSeccompProfiles = []string{
+		api.SeccompProfileRuntimeDefault,
+		"unconfined",
+		"localhost/foo",
+		seccomp.SeccompAllowAny,
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()

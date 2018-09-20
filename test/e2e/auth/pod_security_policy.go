@@ -177,7 +177,8 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 
 	By("Running an unconfined Seccomp pod", func() {
 		unconfined := restrictedPod("seccomp")
-		unconfined.Annotations[v1.SeccompPodAnnotationKey] = "unconfined"
+		seccompProfileUnconfined := "unconfined"
+		unconfined.Spec.SecurityContext.SeccompProfile = &seccompProfileUnconfined
 		tester(unconfined)
 	})
 
@@ -233,11 +234,11 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policy.PodSecurityPol
 }
 
 func restrictedPod(name string) *v1.Pod {
+	seccompProfileRuntimeDefault := v1.SeccompProfileRuntimeDefault
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
 				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
 			},
 		},
@@ -248,6 +249,7 @@ func restrictedPod(name string) *v1.Pod {
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
 					RunAsUser:                utilpointer.Int64Ptr(65534),
+					SeccompProfile:           &seccompProfileRuntimeDefault,
 				},
 			}},
 		},

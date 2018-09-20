@@ -5448,6 +5448,7 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
+		{Name: "seccomp-cont", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: securityContextSeccomp("localhost/foo")},
 	}
 	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
@@ -5685,6 +5686,24 @@ func TestValidateContainers(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		"Invalid seccomp profile": {
+			{
+				Name:                     "123",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				SecurityContext:          securityContextSeccomp("foo"),
+			},
+		},
+		"Empty seccomp profile name": {
+			{
+				Name:                     "123",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				SecurityContext:          securityContextSeccomp(""),
 			},
 		},
 	}
@@ -6493,7 +6512,31 @@ func extendPodSpecwithTolerations(in core.PodSpec, tolerations []core.Toleration
 	return out
 }
 
+func extendPodSpecWithSeccomp(in core.PodSpec, seccompProfile string) core.PodSpec {
+	var out core.PodSpec
+	out.Containers = in.Containers
+	out.RestartPolicy = in.RestartPolicy
+	out.DNSPolicy = in.DNSPolicy
+	out.SecurityContext = &core.PodSecurityContext{
+		SeccompProfile: &seccompProfile,
+	}
+	return out
+}
+
+func extendContainerInPodSpecWithSeccomp(in core.PodSpec, seccompProfile string) core.PodSpec {
+	var out core.PodSpec
+	out.Containers = in.Containers
+	out.Containers[0].SecurityContext = &core.SecurityContext{
+		SeccompProfile: &seccompProfile,
+	}
+	out.RestartPolicy = in.RestartPolicy
+	out.DNSPolicy = in.DNSPolicy
+
+	return out
+}
+
 func TestValidatePod(t *testing.T) {
+	// TODO: add the tests for container seccomp?
 	validPodSpec := func(affinity *core.Affinity) core.PodSpec {
 		spec := core.PodSpec{
 			Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
@@ -6802,51 +6845,29 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: core.SeccompProfileRuntimeDefault,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecWithSeccomp(validPodSpec(nil), core.SeccompProfileRuntimeDefault),
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: core.DeprecatedSeccompProfileDockerDefault,
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecWithSeccomp(validPodSpec(nil), core.DeprecatedSeccompProfileDockerDefault),
 		},
 		{ // unconfined seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: "unconfined",
-				},
 			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecWithSeccomp(validPodSpec(nil), "unconfined"),
 		},
 		{ // localhost seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompPodAnnotationKey: "localhost/foo",
-				},
 			},
-			Spec: validPodSpec(nil),
-		},
-		{ // localhost seccomp profile for a container
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					core.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
-				},
-			},
-			Spec: validPodSpec(nil),
+			Spec: extendPodSpecWithSeccomp(validPodSpec(nil), "localhost/foo"),
 		},
 		{ // default AppArmor profile for a container
 			ObjectMeta: metav1.ObjectMeta{
@@ -7471,50 +7492,8 @@ func TestValidatePod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "123",
 					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompPodAnnotationKey: "foo",
-					},
 				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"must be a valid container seccomp profile": {
-			expectedError: "must be a valid seccomp profile",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"must be a non-empty container name in seccomp annotation": {
-			expectedError: "name part must be non-empty",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompContainerAnnotationKeyPrefix: "foo",
-					},
-				},
-				Spec: validPodSpec(nil),
-			},
-		},
-		"must be a non-empty container profile in seccomp annotation": {
-			expectedError: "must be a valid seccomp profile",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompContainerAnnotationKeyPrefix + "foo": "",
-					},
-				},
-				Spec: validPodSpec(nil),
+				Spec: extendPodSpecWithSeccomp(validPodSpec(nil), "foo"),
 			},
 		},
 		"must be a relative path in a node-local seccomp profile annotation": {
@@ -7523,11 +7502,8 @@ func TestValidatePod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "123",
 					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompPodAnnotationKey: "localhost//foo",
-					},
 				},
-				Spec: validPodSpec(nil),
+				Spec: extendPodSpecWithSeccomp(validPodSpec(nil), "localhost//foo"),
 			},
 		},
 		"must not start with '../'": {
@@ -7536,11 +7512,8 @@ func TestValidatePod(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "123",
 					Namespace: "ns",
-					Annotations: map[string]string{
-						core.SeccompPodAnnotationKey: "localhost/../foo",
-					},
 				},
-				Spec: validPodSpec(nil),
+				Spec: extendPodSpecWithSeccomp(validPodSpec(nil), "localhost/../foo"),
 			},
 		},
 		"AppArmor profile must apply to a container": {
@@ -12681,6 +12654,12 @@ func TestValidateSecurityContext(t *testing.T) {
 func fakeValidSecurityContext(priv bool) *core.SecurityContext {
 	return &core.SecurityContext{
 		Privileged: &priv,
+	}
+}
+
+func securityContextSeccomp(seccomp string) *core.SecurityContext {
+	return &core.SecurityContext{
+		SeccompProfile: &seccomp,
 	}
 }
 

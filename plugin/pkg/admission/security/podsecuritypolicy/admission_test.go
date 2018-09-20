@@ -102,117 +102,91 @@ func useInitContainers(pod *kapi.Pod) *kapi.Pod {
 
 func TestAdmitSeccomp(t *testing.T) {
 	containerName := "container"
+	seccompFooProfile := "foo"
+	seccompBarProfile := "bar"
+
 	tests := map[string]struct {
-		pspAnnotations     map[string]string
-		podAnnotations     map[string]string
-		shouldPassAdmit    bool
-		shouldPassValidate bool
+		pspDefaultSeccompProfile *string
+		pspAllowedSeccompProfile []string
+		podSeccompProfile        *string
+		containerSeccompProfile  *string
+		shouldPassAdmit          bool
+		shouldPassValidate       bool
 	}{
-		"no seccomp, no pod annotations": {
-			pspAnnotations:     nil,
-			podAnnotations:     nil,
+		"no seccomp": {
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 		},
-		"no seccomp, pod annotations": {
-			pspAnnotations: nil,
-			podAnnotations: map[string]string{
-				kapi.SeccompPodAnnotationKey: "foo",
-			},
+		"no psp seccomp, pod seccomp": {
+			podSeccompProfile:  &seccompFooProfile,
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
-		"no seccomp, container annotations": {
-			pspAnnotations: nil,
-			podAnnotations: map[string]string{
-				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "foo",
-			},
-			shouldPassAdmit:    false,
-			shouldPassValidate: false,
+		"no psp seccomp, container seccomp": {
+			containerSeccompProfile: &seccompFooProfile,
+			shouldPassAdmit:         false,
+			shouldPassValidate:      false,
 		},
-		"seccomp, allow any no pod annotation": {
-			pspAnnotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny,
-			},
-			podAnnotations:     nil,
-			shouldPassAdmit:    true,
-			shouldPassValidate: true,
+		"psp seccomp allow any, no pod seccomp": {
+			pspAllowedSeccompProfile: []string{seccomp.SeccompAllowAny},
+			shouldPassAdmit:          true,
+			shouldPassValidate:       true,
 		},
-		"seccomp, allow any pod annotation": {
-			pspAnnotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny,
-			},
-			podAnnotations: map[string]string{
-				kapi.SeccompPodAnnotationKey: "foo",
-			},
-			shouldPassAdmit:    true,
-			shouldPassValidate: true,
+		"seccomp allow any, pod field": {
+			pspAllowedSeccompProfile: []string{seccomp.SeccompAllowAny},
+			podSeccompProfile:        &seccompFooProfile,
+			shouldPassAdmit:          true,
+			shouldPassValidate:       true,
 		},
-		"seccomp, allow any container annotation": {
-			pspAnnotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny,
-			},
-			podAnnotations: map[string]string{
-				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "foo",
-			},
-			shouldPassAdmit:    true,
-			shouldPassValidate: true,
+		"seccomp allow any, container field": {
+			pspAllowedSeccompProfile: []string{seccomp.SeccompAllowAny},
+			containerSeccompProfile:  &seccompFooProfile,
+			shouldPassAdmit:          true,
+			shouldPassValidate:       true,
 		},
-		"seccomp, allow specific pod annotation failure": {
-			pspAnnotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey: "foo",
-			},
-			podAnnotations: map[string]string{
-				kapi.SeccompPodAnnotationKey: "bar",
-			},
-			shouldPassAdmit:    false,
-			shouldPassValidate: false,
+		"seccomp allow specific, pod field failure": {
+			pspAllowedSeccompProfile: []string{seccompFooProfile},
+			podSeccompProfile:        &seccompBarProfile,
+			shouldPassAdmit:          false,
+			shouldPassValidate:       false,
 		},
-		"seccomp, allow specific container annotation failure": {
-			pspAnnotations: map[string]string{
-				// provide a default so we don't have to give the pod annotation
-				seccomp.DefaultProfileAnnotationKey:  "foo",
-				seccomp.AllowedProfilesAnnotationKey: "foo",
-			},
-			podAnnotations: map[string]string{
-				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "bar",
-			},
-			shouldPassAdmit:    false,
-			shouldPassValidate: false,
+		"seccomp allow specific, container field failure": {
+			pspDefaultSeccompProfile: &seccompFooProfile,
+			pspAllowedSeccompProfile: []string{seccompFooProfile},
+			containerSeccompProfile:  &seccompBarProfile,
+			shouldPassAdmit:          false,
+			shouldPassValidate:       false,
 		},
-		"seccomp, allow specific pod annotation pass": {
-			pspAnnotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey: "foo",
-			},
-			podAnnotations: map[string]string{
-				kapi.SeccompPodAnnotationKey: "foo",
-			},
-			shouldPassAdmit:    true,
-			shouldPassValidate: true,
+		"seccomp allow specific, pod field pass": {
+			pspAllowedSeccompProfile: []string{seccompFooProfile},
+			podSeccompProfile:        &seccompFooProfile,
+			shouldPassAdmit:          true,
+			shouldPassValidate:       true,
 		},
-		"seccomp, allow specific container annotation pass": {
-			pspAnnotations: map[string]string{
-				// provide a default so we don't have to give the pod annotation
-				seccomp.DefaultProfileAnnotationKey:  "foo",
-				seccomp.AllowedProfilesAnnotationKey: "foo,bar",
-			},
-			podAnnotations: map[string]string{
-				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "bar",
-			},
-			shouldPassAdmit:    true,
-			shouldPassValidate: true,
+		"seccomp allow specific, container field pass": {
+			pspDefaultSeccompProfile: &seccompFooProfile,
+			pspAllowedSeccompProfile: []string{seccompFooProfile, seccompBarProfile},
+			containerSeccompProfile:  &seccompBarProfile,
+			shouldPassAdmit:          true,
+			shouldPassValidate:       true,
 		},
 	}
 	for k, v := range tests {
 		psp := restrictivePSP()
-		psp.Annotations = v.pspAnnotations
+		psp.Spec.DefaultSeccompProfile = v.pspDefaultSeccompProfile
+		psp.Spec.AllowedSeccompProfiles = v.pspAllowedSeccompProfile
 		pod := &kapi.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: v.podAnnotations,
-			},
 			Spec: kapi.PodSpec{
+				SecurityContext: &kapi.PodSecurityContext{
+					SeccompProfile: v.podSeccompProfile,
+				},
 				Containers: []kapi.Container{
-					{Name: containerName},
+					{
+						Name: containerName,
+						SecurityContext: &kapi.SecurityContext{
+							SeccompProfile: v.containerSeccompProfile,
+						},
+					},
 				},
 			},
 		}

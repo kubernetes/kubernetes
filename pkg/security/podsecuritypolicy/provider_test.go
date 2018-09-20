@@ -789,12 +789,15 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		},
 	}
 
+	seccompFooProfile := "foo"
 	seccompPSP := defaultPSP()
-	seccompPSP.Spec.AllowedSeccompProfiles = []string{"foo"}
+	seccompPSP.Spec.AllowedSeccompProfiles = []string{seccompFooProfile}
 
 	seccompPod := defaultPod()
-	seccompPodSeccompString := "foo"
-	seccompPod.Spec.SecurityContext.SeccompProfile = &seccompPodSeccompString
+	seccompPod.Spec.SecurityContext.SeccompProfile = &seccompFooProfile
+
+	seccompPodContainer := defaultPod()
+	seccompPodContainer.Spec.Containers[0].SecurityContext.SeccompProfile = &seccompFooProfile
 
 	flexVolumePod := defaultPod()
 	flexVolumePod.Spec.Volumes = []api.Volume{
@@ -868,8 +871,12 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 			pod: hostPathDirPod,
 			psp: hostPathDirAsterisksPSP,
 		},
-		"pass seccomp validating PSP": {
+		"pass seccomp validating PSP - pod seccomp profile": {
 			pod: seccompPod,
+			psp: seccompPSP,
+		},
+		"pass seccomp validating PSP - container seccomp profile": {
+			pod: seccompPodContainer,
 			psp: seccompPSP,
 		},
 		"flex volume driver in a whitelist (all volumes are allowed)": {
@@ -1044,7 +1051,6 @@ func TestValidateContainerSuccess(t *testing.T) {
 			pod: seccompPod,
 			psp: seccompPSP,
 		},
-		// FIXME: this guy needs some serious fixing
 		"pass seccomp inherit pod annotation": {
 			pod: seccompPodInherit,
 			psp: seccompPSP,
