@@ -428,6 +428,9 @@ func csiHostPathPod(
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
+						"--leader-election",
+						"--leader-election-namespace=" + config.Namespace,
+						"--leader-election-identity=external-attacher",
 						"--csi-address=$(ADDRESS)",
 					},
 					Env: []v1.EnvVar{
