@@ -1508,7 +1508,7 @@ type LinuxContainerSecurityContext struct {
 	// * localhost/<full-path-to-profile>: the profile installed on the node.
 	//   <full-path-to-profile> is the full path of the profile.
 	// Default: "", which is identical with unconfined.
-	SeccompProfilePath string `protobuf:"bytes,10,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"`
+	SeccompProfile string `protobuf:"bytes,10,opt,name=seccomp_profile,json=seccompProfile,proto3" json:"seccomp_profile,omitempty"`
 	// no_new_privs defines if the flag for no_new_privs should be set on the
 	// container.
 	NoNewPrivs bool `protobuf:"varint,11,opt,name=no_new_privs,json=noNewPrivs,proto3" json:"no_new_privs,omitempty"`

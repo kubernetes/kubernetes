@@ -155,7 +155,7 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 	}
 	hc.Resources.Devices = devices
 
-	securityOpts, err := ds.getSecurityOpts(config.GetLinux().GetSecurityContext().GetSeccompProfilePath(), securityOptSeparator)
+	securityOpts, err := ds.getSecurityOpts(config.GetLinux().GetSecurityContext().GetSeccompProfile(), securityOptSeparator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate security options for container %q: %v", config.Metadata.Name, err)
 	}

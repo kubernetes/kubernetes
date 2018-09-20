@@ -258,7 +258,7 @@ message LinuxSandboxSecurityContext {
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
     // Default: "", which is identical with unconfined.
-    string seccomp_profile_path = 7;
+    string seccomp_profile = 7;
 }
 
 // LinuxPodSandboxConfig holds platform-specific configurations for Linux
@@ -589,7 +589,7 @@ message LinuxContainerSecurityContext {
     // * localhost/<full-path-to-profile>: the profile installed on the node.
     //   <full-path-to-profile> is the full path of the profile.
     // Default: "", which is identical with unconfined.
-    string seccomp_profile_path = 10;
+    string seccomp_profile = 10;
     // no_new_privs defines if the flag for no_new_privs should be set on the
     // container.
     bool no_new_privs = 11;
