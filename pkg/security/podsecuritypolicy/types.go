@@ -67,5 +67,5 @@ type ProviderStrategies struct {
 	SupplementalGroupStrategy group.GroupStrategy
 	CapabilitiesStrategy      capabilities.Strategy
 	SysctlsStrategy           sysctl.SysctlsStrategy
-	SeccompStrategy           seccomp.Strategy
+	SeccompStrategy           seccomp.SeccompStrategy
 }

@@ -46,8 +46,7 @@ func PrivilegedPSP(name string) *policy.PodSecurityPolicy {
 	allowPrivilegeEscalation := true
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Annotations: map[string]string{seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny},
+			Name: name,
 		},
 		Spec: policy.PodSecurityPolicySpec{
 			Privileged:               true,
@@ -72,6 +71,7 @@ func PrivilegedPSP(name string) *policy.PodSecurityPolicy {
 			},
 			ReadOnlyRootFilesystem: false,
 			AllowedUnsafeSysctls:   []string{"*"},
+			AllowedSeccompProfiles: []string{seccomp.SeccompAllowAny},
 		},
 	}
 }

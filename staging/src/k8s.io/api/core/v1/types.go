@@ -2991,6 +2991,8 @@ type PodSecurityContext struct {
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
 	Sysctls []Sysctl `json:"sysctls,omitempty" protobuf:"bytes,7,rep,name=sysctls"`
+	// +optional
+	SeccompProfile *string `json:"seccompProfile,omitempty"`
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -5251,6 +5253,8 @@ type SecurityContext struct {
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	ProcMount *ProcMountType `json:"procMount,omitempty" protobuf:"bytes,9,opt,name=procMount"`
+	// +optional
+	SeccompProfile *string `json:"seccompProfile,omitEmpty"`
 }
 
 type ProcMountType string

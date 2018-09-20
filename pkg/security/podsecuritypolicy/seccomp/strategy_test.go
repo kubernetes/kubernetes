@@ -21,70 +21,99 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+type testStrategy struct {
+	defaultProfile  *string
+	allowedProfiles []string
+}
+
 var (
-	withoutSeccomp    = map[string]string{"foo": "bar"}
-	allowAnyNoDefault = map[string]string{
-		AllowedProfilesAnnotationKey: "*",
+	seccompFooProfile = "foo"
+	withoutSeccomp    = testStrategy{}
+	allowAnyNoDefault = testStrategy{allowedProfiles: []string{SeccompAllowAny}}
+	allowAnyDefault   = testStrategy{
+		allowedProfiles: []string{SeccompAllowAny},
+		defaultProfile:  &seccompFooProfile,
 	}
-	allowAnyDefault = map[string]string{
-		AllowedProfilesAnnotationKey: "*",
-		DefaultProfileAnnotationKey:  "foo",
+	allowAnyAndSpecificDefault = testStrategy{
+		allowedProfiles: []string{"bar", SeccompAllowAny},
+		defaultProfile:  &seccompFooProfile,
 	}
-	allowAnyAndSpecificDefault = map[string]string{
-		AllowedProfilesAnnotationKey: "*,bar",
-		DefaultProfileAnnotationKey:  "foo",
+	allowSpecificNoDefault = testStrategy{allowedProfiles: []string{"foo"}}
+	allowMultipleNoDefault = testStrategy{
+		allowedProfiles: []string{"foo", "bar"},
 	}
-	allowSpecific = map[string]string{
-		AllowedProfilesAnnotationKey: "foo",
+	allowMultipleDefault = testStrategy{
+		allowedProfiles: []string{"foo", "bar"},
+		defaultProfile:  &seccompFooProfile,
 	}
 )
 
 func TestNewStrategy(t *testing.T) {
+	seccompFooProfile := "foo"
+
 	tests := map[string]struct {
-		annotations                   map[string]string
+		strategy                      testStrategy
 		expectedAllowedProfilesString string
 		expectedAllowAny              bool
 		expectedAllowedProfiles       map[string]bool
-		expectedDefaultProfile        string
+		expectedDefaultProfile        *string
 	}{
 		"no seccomp": {
-			annotations:                   withoutSeccomp,
+			strategy:                      withoutSeccomp,
 			expectedAllowAny:              false,
 			expectedAllowedProfilesString: "",
-			expectedAllowedProfiles:       nil,
-			expectedDefaultProfile:        "",
+			expectedAllowedProfiles:       map[string]bool{},
+			expectedDefaultProfile:        nil,
 		},
 		"allow any, no default": {
-			annotations:                   allowAnyNoDefault,
+			strategy:                      allowAnyNoDefault,
 			expectedAllowAny:              true,
-			expectedAllowedProfilesString: "*",
+			expectedAllowedProfilesString: SeccompAllowAny,
 			expectedAllowedProfiles:       map[string]bool{},
-			expectedDefaultProfile:        "",
+			expectedDefaultProfile:        nil,
 		},
 		"allow any, default": {
-			annotations:                   allowAnyDefault,
+			strategy:                      allowAnyDefault,
 			expectedAllowAny:              true,
-			expectedAllowedProfilesString: "*",
+			expectedAllowedProfilesString: SeccompAllowAny,
 			expectedAllowedProfiles:       map[string]bool{},
-			expectedDefaultProfile:        "foo",
+			expectedDefaultProfile:        &seccompFooProfile,
 		},
 		"allow any and specific, default": {
-			annotations:                   allowAnyAndSpecificDefault,
+			strategy:                      allowAnyAndSpecificDefault,
 			expectedAllowAny:              true,
-			expectedAllowedProfilesString: "*,bar",
+			expectedAllowedProfilesString: "bar, " + SeccompAllowAny,
 			expectedAllowedProfiles: map[string]bool{
 				"bar": true,
 			},
-			expectedDefaultProfile: "foo",
+			expectedDefaultProfile: &seccompFooProfile,
+		},
+		"allow multiple specific, no default": {
+			strategy:                      allowMultipleNoDefault,
+			expectedAllowAny:              false,
+			expectedAllowedProfilesString: "foo, bar",
+			expectedAllowedProfiles: map[string]bool{
+				"foo": true,
+				"bar": true,
+			},
+		},
+		"allow multiple specific, default": {
+			strategy:                      allowMultipleDefault,
+			expectedAllowAny:              false,
+			expectedAllowedProfilesString: "foo, bar",
+			expectedAllowedProfiles: map[string]bool{
+				"foo": true,
+				"bar": true,
+			},
+			expectedDefaultProfile: &seccompFooProfile,
 		},
 	}
 	for k, v := range tests {
-		s := NewStrategy(v.annotations)
-		internalStrat, _ := s.(*strategy)
+		s := NewSeccompStrategy(v.strategy.defaultProfile, v.strategy.allowedProfiles)
+		internalStrat, _ := s.(*seccompStrategy)
 
 		if internalStrat.allowAnyProfile != v.expectedAllowAny {
 			t.Errorf("%s expected allowAnyProfile to be %t but found %t", k, v.expectedAllowAny, internalStrat.allowAnyProfile)
@@ -92,8 +121,15 @@ func TestNewStrategy(t *testing.T) {
 		if internalStrat.allowedProfilesString != v.expectedAllowedProfilesString {
 			t.Errorf("%s expected allowedProfilesString to be %s but found %s", k, v.expectedAllowedProfilesString, internalStrat.allowedProfilesString)
 		}
-		if internalStrat.defaultProfile != v.expectedDefaultProfile {
-			t.Errorf("%s expected defaultProfile to be %s but found %s", k, v.expectedDefaultProfile, internalStrat.defaultProfile)
+		if v.expectedDefaultProfile != nil {
+			if internalStrat.defaultProfile == nil {
+				t.Errorf("%s expected defaultProfile to be %s but found <nil>", k, *v.expectedDefaultProfile)
+			} else if *internalStrat.defaultProfile != *v.expectedDefaultProfile {
+				t.Errorf("%s expected defaultProfile to be %s but found %s", k, *v.expectedDefaultProfile, *internalStrat.defaultProfile)
+			}
+		}
+		if v.expectedDefaultProfile == nil && internalStrat.defaultProfile != nil {
+			t.Errorf("%s expected defaultProfile to be <nil> but found %s", k, *internalStrat.defaultProfile)
 		}
 		if !reflect.DeepEqual(v.expectedAllowedProfiles, internalStrat.allowedProfiles) {
 			t.Errorf("%s expected expectedAllowedProfiles to be %#v but found %#v", k, v.expectedAllowedProfiles, internalStrat.allowedProfiles)
@@ -102,210 +138,105 @@ func TestNewStrategy(t *testing.T) {
 }
 
 func TestGenerate(t *testing.T) {
+	seccompBarProfile := "bar"
+
 	tests := map[string]struct {
-		pspAnnotations  map[string]string
-		podAnnotations  map[string]string
-		expectedProfile string
+		pspStrategy       testStrategy
+		podSeccompProfile *string
+		expectedProfile   *string
 	}{
 		"no seccomp, no pod annotations": {
-			pspAnnotations:  withoutSeccomp,
-			podAnnotations:  nil,
-			expectedProfile: "",
+			pspStrategy:       withoutSeccomp,
+			podSeccompProfile: nil,
+			expectedProfile:   nil,
 		},
 		"no seccomp, pod annotations": {
-			pspAnnotations: withoutSeccomp,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "foo",
-			},
-			expectedProfile: "foo",
+			pspStrategy:       withoutSeccomp,
+			podSeccompProfile: &seccompFooProfile,
+			expectedProfile:   &seccompFooProfile,
 		},
 		"seccomp with no default, no pod annotations": {
-			pspAnnotations:  allowAnyNoDefault,
-			podAnnotations:  nil,
-			expectedProfile: "",
+			pspStrategy:       allowAnyNoDefault,
+			podSeccompProfile: nil,
+			expectedProfile:   nil,
 		},
 		"seccomp with no default, pod annotations": {
-			pspAnnotations: allowAnyNoDefault,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "foo",
-			},
-			expectedProfile: "foo",
+			pspStrategy:       allowAnyNoDefault,
+			podSeccompProfile: &seccompFooProfile,
+			expectedProfile:   &seccompFooProfile,
 		},
 		"seccomp with default, no pod annotations": {
-			pspAnnotations:  allowAnyDefault,
-			podAnnotations:  nil,
-			expectedProfile: "foo",
+			pspStrategy:       allowAnyDefault,
+			podSeccompProfile: nil,
+			expectedProfile:   &seccompFooProfile,
 		},
 		"seccomp with default, pod annotations": {
-			pspAnnotations: allowAnyDefault,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "bar",
-			},
-			expectedProfile: "bar",
+			pspStrategy:       allowAnyDefault,
+			podSeccompProfile: &seccompBarProfile,
+			expectedProfile:   &seccompBarProfile,
 		},
 	}
 	for k, v := range tests {
-		s := NewStrategy(v.pspAnnotations)
-		actual, err := s.Generate(v.podAnnotations, nil)
+		s := NewSeccompStrategy(v.pspStrategy.defaultProfile, v.pspStrategy.allowedProfiles)
+		actual, err := s.Generate(nil, nil)
 		if err != nil {
 			t.Errorf("%s received error during generation %#v", k, err)
 			continue
 		}
 		if actual != v.expectedProfile {
-			t.Errorf("%s expected profile %s but received %s", k, v.expectedProfile, actual)
+			t.Errorf("%s expected profile %s but received %s", k, *v.expectedProfile, *actual)
 		}
 	}
 }
 
-func TestValidatePod(t *testing.T) {
+func TestValidate(t *testing.T) {
+	seccompFooProfile := "foo"
+	seccompBarProfile := "bar"
+
 	tests := map[string]struct {
-		pspAnnotations map[string]string
-		podAnnotations map[string]string
+		pspSpec        testStrategy
+		seccompProfile *string
 		expectedError  string
 	}{
 		"no pod annotations, required profiles": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: nil,
-			expectedError:  "Forbidden:  is not an allowed seccomp profile. Valid values are foo",
+			pspSpec:        allowSpecificNoDefault,
+			seccompProfile: nil,
+			expectedError:  "Forbidden: <nil> is not an allowed seccomp profile. Valid values are foo",
 		},
 		"no pod annotations, no required profiles": {
-			pspAnnotations: withoutSeccomp,
-			podAnnotations: nil,
+			pspSpec:        withoutSeccomp,
+			seccompProfile: nil,
 			expectedError:  "",
 		},
 		"valid pod annotations, required profiles": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "foo",
-			},
-			expectedError: "",
+			pspSpec:        allowSpecificNoDefault,
+			seccompProfile: &seccompFooProfile,
+			expectedError:  "",
 		},
 		"invalid pod annotations, required profiles": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "bar",
-			},
-			expectedError: "Forbidden: bar is not an allowed seccomp profile. Valid values are foo",
+			pspSpec:        allowSpecificNoDefault,
+			seccompProfile: &seccompBarProfile,
+			expectedError:  "Forbidden: bar is not an allowed seccomp profile. Valid values are foo",
 		},
 		"pod annotations, no required profiles": {
-			pspAnnotations: withoutSeccomp,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "foo",
-			},
-			expectedError: "Forbidden: seccomp may not be set",
+			pspSpec:        withoutSeccomp,
+			seccompProfile: &seccompFooProfile,
+			expectedError:  "Forbidden: seccomp must not be set",
 		},
 		"pod annotations, allow any": {
-			pspAnnotations: allowAnyNoDefault,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "foo",
-			},
-			expectedError: "",
+			pspSpec:        allowAnyNoDefault,
+			seccompProfile: &seccompFooProfile,
+			expectedError:  "",
 		},
 		"no pod annotations, allow any": {
-			pspAnnotations: allowAnyNoDefault,
-			podAnnotations: nil,
+			pspSpec:        allowAnyNoDefault,
+			seccompProfile: nil,
 			expectedError:  "",
 		},
 	}
 	for k, v := range tests {
-		pod := &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: v.podAnnotations,
-			},
-		}
-		s := NewStrategy(v.pspAnnotations)
-		errs := s.ValidatePod(pod)
-		if v.expectedError == "" && len(errs) != 0 {
-			t.Errorf("%s expected no errors but received %#v", k, errs.ToAggregate().Error())
-		}
-		if v.expectedError != "" && len(errs) == 0 {
-			t.Errorf("%s expected error %s but received none", k, v.expectedError)
-		}
-		if v.expectedError != "" && len(errs) > 1 {
-			t.Errorf("%s received multiple errors: %s", k, errs.ToAggregate().Error())
-		}
-		if v.expectedError != "" && len(errs) == 1 && !strings.Contains(errs.ToAggregate().Error(), v.expectedError) {
-			t.Errorf("%s expected error %s but received %s", k, v.expectedError, errs.ToAggregate().Error())
-		}
-	}
-}
-
-func TestValidateContainer(t *testing.T) {
-	tests := map[string]struct {
-		pspAnnotations map[string]string
-		podAnnotations map[string]string
-		expectedError  string
-	}{
-		"no pod annotations, required profiles": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: nil,
-			expectedError:  "Forbidden:  is not an allowed seccomp profile. Valid values are foo",
-		},
-		"no pod annotations, no required profiles": {
-			pspAnnotations: withoutSeccomp,
-			podAnnotations: nil,
-			expectedError:  "",
-		},
-		"valid pod annotations, required profiles": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: map[string]string{
-				api.SeccompContainerAnnotationKeyPrefix + "container": "foo",
-			},
-			expectedError: "",
-		},
-		"invalid pod annotations, required profiles": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: map[string]string{
-				api.SeccompContainerAnnotationKeyPrefix + "container": "bar",
-			},
-			expectedError: "Forbidden: bar is not an allowed seccomp profile. Valid values are foo",
-		},
-		"pod annotations, no required profiles": {
-			pspAnnotations: withoutSeccomp,
-			podAnnotations: map[string]string{
-				api.SeccompContainerAnnotationKeyPrefix + "container": "foo",
-			},
-			expectedError: "Forbidden: seccomp may not be set",
-		},
-		"pod annotations, allow any": {
-			pspAnnotations: allowAnyNoDefault,
-			podAnnotations: map[string]string{
-				api.SeccompContainerAnnotationKeyPrefix + "container": "foo",
-			},
-			expectedError: "",
-		},
-		"no pod annotations, allow any": {
-			pspAnnotations: allowAnyNoDefault,
-			podAnnotations: nil,
-			expectedError:  "",
-		},
-		"container inherits valid pod annotation": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "foo",
-			},
-			expectedError: "",
-		},
-		"container inherits invalid pod annotation": {
-			pspAnnotations: allowSpecific,
-			podAnnotations: map[string]string{
-				api.SeccompPodAnnotationKey: "bar",
-			},
-			expectedError: "Forbidden: bar is not an allowed seccomp profile. Valid values are foo",
-		},
-	}
-	for k, v := range tests {
-		pod := &api.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Annotations: v.podAnnotations,
-			},
-		}
-		container := &api.Container{
-			Name: "container",
-		}
-
-		s := NewStrategy(v.pspAnnotations)
-		errs := s.ValidateContainer(pod, container)
+		s := NewSeccompStrategy(v.pspSpec.defaultProfile, v.pspSpec.allowedProfiles)
+		errs := s.Validate(field.NewPath(""), v.seccompProfile)
 		if v.expectedError == "" && len(errs) != 0 {
 			t.Errorf("%s expected no errors but received %#v", k, errs.ToAggregate().Error())
 		}

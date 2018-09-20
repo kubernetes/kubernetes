@@ -127,7 +127,6 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *core.Po
 		allErrs = append(allErrs, ValidateTolerationsInPodAnnotations(annotations, fldPath)...)
 	}
 
-	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
 	return allErrs
@@ -3345,6 +3344,7 @@ func validatePodAffinity(podAffinity *core.PodAffinity, fldPath *field.Path) fie
 	return allErrs
 }
 
+// ValidateSeccompProfile tests that the given string is a valid seccomp profile
 func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 	if p == core.SeccompProfileRuntimeDefault || p == core.DeprecatedSeccompProfileDockerDefault {
 		return nil
@@ -3356,20 +3356,6 @@ func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 		return validateLocalDescendingPath(strings.TrimPrefix(p, "localhost/"), fldPath)
 	}
 	return field.ErrorList{field.Invalid(fldPath, p, "must be a valid seccomp profile")}
-}
-
-func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if p, exists := annotations[core.SeccompPodAnnotationKey]; exists {
-		allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(core.SeccompPodAnnotationKey))...)
-	}
-	for k, p := range annotations {
-		if strings.HasPrefix(k, core.SeccompContainerAnnotationKeyPrefix) {
-			allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(k))...)
-		}
-	}
-
-	return allErrs
 }
 
 func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
@@ -3489,6 +3475,10 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 			} else {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("sysctls"), "Sysctls are disabled by Sysctls feature-gate"))
 			}
+		}
+
+		if securityContext.SeccompProfile != nil {
+			allErrs = append(allErrs, ValidateSeccompProfile(*securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
 		}
 	}
 
@@ -5285,6 +5275,10 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 				}
 			}
 		}
+	}
+
+	if sc.SeccompProfile != nil {
+		allErrs = append(allErrs, ValidateSeccompProfile(*sc.SeccompProfile, fldPath)...)
 	}
 
 	return allErrs

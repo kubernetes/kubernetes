@@ -385,6 +385,7 @@ func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext
 		pmt := v1.ProcMountType(pm)
 		out.ProcMount = &pmt
 	}
+	out.SeccompProfile = in.SeccompProfile
 	return nil
 }
 
@@ -410,6 +411,7 @@ func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecuri
 			}
 		}
 	}
+	out.SeccompProfile = in.SeccompProfile
 	return nil
 }
 
@@ -435,7 +437,7 @@ func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurity
 			}
 		}
 	}
-
+	out.SeccompProfile = in.SeccompProfile
 	return nil
 }
 

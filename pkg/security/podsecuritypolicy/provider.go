@@ -89,17 +89,12 @@ func (s *simpleProvider) DefaultPodSecurityContext(pod *api.Pod) error {
 		sc.SetSELinuxOptions(seLinux)
 	}
 
-	// This is only generated on the pod level.  Containers inherit the pod's profile.  If the
-	// container has a specific profile set then it will be caught in the validation step.
-	seccompProfile, err := s.strategies.SeccompStrategy.Generate(pod.Annotations, pod)
-	if err != nil {
-		return err
-	}
-	if seccompProfile != "" {
-		if pod.Annotations == nil {
-			pod.Annotations = map[string]string{}
+	if sc.SeccompProfile() == nil {
+		seccompProfile, err := s.strategies.SeccompStrategy.Generate(pod, nil)
+		if err != nil {
+			return err
 		}
-		pod.Annotations[api.SeccompPodAnnotationKey] = seccompProfile
+		sc.SetSeccompProfile(seccompProfile)
 	}
 
 	pod.Spec.SecurityContext = sc.PodSecurityContext()
@@ -141,6 +136,14 @@ func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container
 			return err
 		}
 		sc.SetSELinuxOptions(seLinux)
+	}
+
+	if sc.SeccompProfile() == nil {
+		seccompProfile, err := s.strategies.SeccompStrategy.Generate(pod, container)
+		if err != nil {
+			return err
+		}
+		sc.SetSeccompProfile(seccompProfile)
 	}
 
 	annotations, err := s.strategies.AppArmorStrategy.Generate(pod.Annotations, container)
@@ -199,7 +202,10 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 	}
 	allErrs = append(allErrs, s.strategies.FSGroupStrategy.Validate(scPath.Child("fsGroup"), pod, fsGroups)...)
 	allErrs = append(allErrs, s.strategies.SupplementalGroupStrategy.Validate(scPath.Child("supplementalGroups"), pod, sc.SupplementalGroups())...)
-	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidatePod(pod)...)
+
+	if sc.SeccompProfile() != nil {
+		allErrs = append(allErrs, s.strategies.SeccompStrategy.Validate(scPath.Child("seccompProfile"), sc.SeccompProfile())...)
+	}
 
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(scPath.Child("seLinuxOptions"), pod, nil, sc.SELinuxOptions())...)
 
@@ -304,7 +310,6 @@ func (s *simpleProvider) ValidateContainer(pod *api.Pod, container *api.Containe
 	}
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(scPath.Child("seLinuxOptions"), pod, container, sc.SELinuxOptions())...)
 	allErrs = append(allErrs, s.strategies.AppArmorStrategy.Validate(pod, container)...)
-	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidateContainer(pod, container)...)
 
 	privileged := sc.Privileged()
 	if !s.psp.Spec.Privileged && privileged != nil && *privileged {
@@ -330,6 +335,8 @@ func (s *simpleProvider) ValidateContainer(pod *api.Pod, container *api.Containe
 	allErrs = append(allErrs, s.strategies.CapabilitiesStrategy.Validate(scPath.Child("capabilities"), pod, container, sc.Capabilities())...)
 
 	allErrs = append(allErrs, s.hasInvalidHostPort(container, containerPath)...)
+
+	allErrs = append(allErrs, s.strategies.SeccompStrategy.Validate(scPath.Child("seccompProfile"), sc.SeccompProfile())...)
 
 	if s.psp.Spec.ReadOnlyRootFilesystem {
 		readOnly := sc.ReadOnlyRootFilesystem()

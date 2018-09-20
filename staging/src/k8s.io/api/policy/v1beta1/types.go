@@ -240,6 +240,10 @@ type PodSecurityPolicySpec struct {
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
+	// +optional
+	DefaultSeccompProfile *string `json:"defaultSeccompProfile,omitempty" protobuf:"bytes,23,opt,name=defaultSeccompProfile"`
+	// +optional
+	AllowedSeccompProfiles []string `json:"allowedSeccompProfiles,omitempty" protobuf:"bytes,24,rep,name=allowedSeccompProfiles"`
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy

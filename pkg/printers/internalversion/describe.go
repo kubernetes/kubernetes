@@ -3761,8 +3761,19 @@ func describePodSecurityPolicy(psp *policy.PodSecurityPolicy) (string, error) {
 		w.Write(LEVEL_1, "Supplemental Groups Strategy: %s\t\n", string(psp.Spec.SupplementalGroups.Rule))
 		w.Write(LEVEL_2, "Ranges:\t%s\n", idRangeToString(psp.Spec.SupplementalGroups.Ranges))
 
+		w.Write(LEVEL_1, "Default Seccomp profile:\t%s\n", stringPtrToStringOrNone(psp.Spec.DefaultSeccompProfile))
+		w.Write(LEVEL_1, "Allowed Seccomp Profiles:\t%s\n", allowedSeccompProfilesToString(psp.Spec.AllowedSeccompProfiles))
+
 		return nil
 	})
+}
+
+func stringPtrToStringOrNone(s *string) string {
+	if s != nil {
+		return stringOrNone(*s)
+	}
+
+	return "<none>"
 }
 
 func stringOrNone(s string) string {
@@ -3774,6 +3785,15 @@ func stringOrDefaultValue(s, defaultValue string) string {
 		return s
 	}
 	return defaultValue
+}
+
+func allowedSeccompProfilesToString(profiles []string) string {
+	for _, p := range profiles {
+		if p == "*" {
+			return "<all>"
+		}
+	}
+	return stringOrNone(strings.Join(profiles, ","))
 }
 
 func fsTypeToString(volumes []policy.FSType) string {

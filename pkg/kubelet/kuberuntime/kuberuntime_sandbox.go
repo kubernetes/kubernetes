@@ -140,8 +140,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	lc := &runtimeapi.LinuxPodSandboxConfig{
 		CgroupParent: cgroupParent,
 		SecurityContext: &runtimeapi.LinuxSandboxSecurityContext{
-			Privileged:         kubecontainer.HasPrivilegedContainer(pod),
-			SeccompProfilePath: m.getSeccompProfileFromAnnotations(pod.Annotations, ""),
+			Privileged: kubecontainer.HasPrivilegedContainer(pod),
 		},
 	}
 
@@ -184,6 +183,9 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 				Type:  sc.SELinuxOptions.Type,
 				Level: sc.SELinuxOptions.Level,
 			}
+		}
+		if sc.SeccompProfile != nil {
+			lc.SecurityContext.SeccompProfilePath = *sc.SeccompProfile
 		}
 	}
 

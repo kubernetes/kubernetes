@@ -172,14 +172,13 @@ func TestGetImageUser(t *testing.T) {
 	}
 }
 
-func TestGetSeccompProfileFromAnnotations(t *testing.T) {
+func TestConvertSeccompLocalPath(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	tests := []struct {
 		description     string
-		annotation      map[string]string
-		containerName   string
+		seccompProfile  string
 		expectedProfile string
 	}{
 		{
@@ -187,99 +186,29 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 			expectedProfile: "",
 		},
 		{
-			description:     "no seccomp with containerName should return exmpty string",
-			containerName:   "container1",
-			expectedProfile: "",
-		},
-		{
-			description: "pod runtime/default seccomp profile should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
+			description:     "pod runtime/default seccomp profile should return runtime/default",
+			seccompProfile:  v1.SeccompProfileRuntimeDefault,
 			expectedProfile: v1.SeccompProfileRuntimeDefault,
 		},
 		{
-			description: "pod docker/default seccomp profile should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
+			description:     "pod docker/default seccomp profile should return docker/default",
+			seccompProfile:  v1.DeprecatedSeccompProfileDockerDefault,
 			expectedProfile: v1.DeprecatedSeccompProfileDockerDefault,
 		},
 		{
-			description: "pod runtime/default seccomp profile with containerName should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: v1.SeccompProfileRuntimeDefault,
-		},
-		{
-			description: "pod docker/default seccomp profile with containerName should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: v1.DeprecatedSeccompProfileDockerDefault,
-		},
-		{
-			description: "pod unconfined seccomp profile should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "unconfined",
-			},
+			description:     "pod unconfined seccomp profile should return unconfined",
+			seccompProfile:  "unconfined",
 			expectedProfile: "unconfined",
 		},
 		{
-			description: "pod unconfined seccomp profile with containerName should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "unconfined",
-			},
-			containerName:   "container1",
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "pod localhost seccomp profile should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
+			description:     "pod localhost seccomp profile should return local profile path",
+			seccompProfile:  "localhost/chmod.json",
 			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "pod localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "container localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "container localhost seccomp profile should override pod profile",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            "unconfined",
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
-		},
-		{
-			description: "container localhost seccomp profile with unmatched containerName should return empty string",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container2",
-			expectedProfile: "",
 		},
 	}
 
 	for i, test := range tests {
-		seccompProfile := m.getSeccompProfileFromAnnotations(test.annotation, test.containerName)
+		seccompProfile := m.convertSeccompLocalPath(&test.seccompProfile)
 		assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]", i)
 	}
 }

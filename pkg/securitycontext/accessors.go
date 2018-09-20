@@ -33,6 +33,7 @@ type PodSecurityContextAccessor interface {
 	RunAsNonRoot() *bool
 	SupplementalGroups() []int64
 	FSGroup() *int64
+	SeccompProfile() *string
 }
 
 // PodSecurityContextMutator allows reading and writing the values of a PodSecurityContext object
@@ -48,6 +49,7 @@ type PodSecurityContextMutator interface {
 	SetRunAsNonRoot(*bool)
 	SetSupplementalGroups([]int64)
 	SetFSGroup(*int64)
+	SetSeccompProfile(*string)
 
 	// PodSecurityContext returns the current PodSecurityContext object
 	PodSecurityContext() *api.PodSecurityContext
@@ -200,6 +202,19 @@ func (w *podSecurityContextWrapper) SetFSGroup(v *int64) {
 	w.ensurePodSC()
 	w.podSC.FSGroup = v
 }
+func (w *podSecurityContextWrapper) SeccompProfile() *string {
+	if w.podSC == nil {
+		return nil
+	}
+	return w.podSC.SeccompProfile
+}
+func (w *podSecurityContextWrapper) SetSeccompProfile(p *string) {
+	if w.podSC == nil && p == nil {
+		return
+	}
+	w.ensurePodSC()
+	w.podSC.SeccompProfile = p
+}
 
 type ContainerSecurityContextAccessor interface {
 	Capabilities() *api.Capabilities
@@ -211,6 +226,7 @@ type ContainerSecurityContextAccessor interface {
 	RunAsNonRoot() *bool
 	ReadOnlyRootFilesystem() *bool
 	AllowPrivilegeEscalation() *bool
+	SeccompProfile() *string
 }
 
 type ContainerSecurityContextMutator interface {
@@ -226,6 +242,7 @@ type ContainerSecurityContextMutator interface {
 	SetRunAsNonRoot(*bool)
 	SetReadOnlyRootFilesystem(*bool)
 	SetAllowPrivilegeEscalation(*bool)
+	SetSeccompProfile(*string)
 }
 
 func NewContainerSecurityContextAccessor(containerSC *api.SecurityContext) ContainerSecurityContextAccessor {
@@ -365,6 +382,21 @@ func (w *containerSecurityContextWrapper) SetAllowPrivilegeEscalation(v *bool) {
 	w.containerSC.AllowPrivilegeEscalation = v
 }
 
+func (w *containerSecurityContextWrapper) SeccompProfile() *string {
+	if w.containerSC == nil {
+		return nil
+	}
+	return w.containerSC.SeccompProfile
+}
+
+func (w *containerSecurityContextWrapper) SetSeccompProfile(p *string) {
+	if w.containerSC == nil && p == nil {
+		return
+	}
+	w.ensureContainerSC()
+	w.containerSC.SeccompProfile = p
+}
+
 func NewEffectiveContainerSecurityContextAccessor(podSC PodSecurityContextAccessor, containerSC ContainerSecurityContextMutator) ContainerSecurityContextAccessor {
 	return &effectiveContainerSecurityContextWrapper{podSC: podSC, containerSC: containerSC}
 }
@@ -460,5 +492,18 @@ func (w *effectiveContainerSecurityContextWrapper) AllowPrivilegeEscalation() *b
 func (w *effectiveContainerSecurityContextWrapper) SetAllowPrivilegeEscalation(v *bool) {
 	if !reflect.DeepEqual(w.AllowPrivilegeEscalation(), v) {
 		w.containerSC.SetAllowPrivilegeEscalation(v)
+	}
+}
+
+func (w *effectiveContainerSecurityContextWrapper) SeccompProfile() *string {
+	if p := w.containerSC.SeccompProfile(); p != nil {
+		return p
+	}
+	return w.podSC.SeccompProfile()
+}
+
+func (w *effectiveContainerSecurityContextWrapper) SetSeccompProfile(p *string) {
+	if !reflect.DeepEqual(w.SeccompProfile(), p) {
+		w.containerSC.SetSeccompProfile(p)
 	}
 }

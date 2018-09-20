@@ -40,6 +40,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// create a var from constant so that we can reference it in PSP constructors
+var seccompProfileRuntimeDefault = v1.SeccompProfileRuntimeDefault
+
 var _ = SIGDescribe("PodSecurityPolicy", func() {
 	f := framework.NewDefaultFramework("podsecuritypolicy")
 	f.SkipPrivilegedPSPBinding = true
@@ -255,8 +258,7 @@ func restrictedPod(name string) *v1.Pod {
 func privilegedPSP(name string) *policy.PodSecurityPolicy {
 	return &policy.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Annotations: map[string]string{seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny},
+			Name: name,
 		},
 		Spec: policy.PodSecurityPolicySpec{
 			Privileged:               true,
@@ -280,6 +282,7 @@ func privilegedPSP(name string) *policy.PodSecurityPolicy {
 				Rule: policy.FSGroupStrategyRunAsAny,
 			},
 			ReadOnlyRootFilesystem: false,
+			AllowedSeccompProfiles: []string{seccomp.SeccompAllowAny},
 		},
 	}
 }
@@ -290,8 +293,6 @@ func restrictedPSP(name string) *policy.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
-				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
 				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
 				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
 			},
@@ -335,6 +336,8 @@ func restrictedPSP(name string) *policy.PodSecurityPolicy {
 				Rule: policy.FSGroupStrategyRunAsAny,
 			},
 			ReadOnlyRootFilesystem: false,
+			DefaultSeccompProfile:  &seccompProfileRuntimeDefault,
+			AllowedSeccompProfiles: []string{v1.SeccompProfileRuntimeDefault},
 		},
 	}
 }

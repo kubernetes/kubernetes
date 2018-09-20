@@ -126,6 +126,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.ProcMount = *containerSc.ProcMount
 	}
 
+	if containerSc.SeccompProfile != nil {
+		effectiveSc.SeccompProfile = new(string)
+		*effectiveSc.SeccompProfile = *containerSc.SeccompProfile
+	}
+
 	return effectiveSc
 }
 
@@ -153,6 +158,11 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 	if pod.Spec.SecurityContext.RunAsNonRoot != nil {
 		synthesized.RunAsNonRoot = new(bool)
 		*synthesized.RunAsNonRoot = *pod.Spec.SecurityContext.RunAsNonRoot
+	}
+
+	if pod.Spec.SecurityContext.SeccompProfile != nil {
+		synthesized.SeccompProfile = new(string)
+		*synthesized.SeccompProfile = *pod.Spec.SecurityContext.SeccompProfile
 	}
 
 	return synthesized

@@ -127,6 +127,18 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
 
+	if p := spec.DefaultSeccompProfile; p != nil {
+		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(*p, fldPath)...)
+	}
+	if allowed := spec.AllowedSeccompProfiles; len(allowed) > 0 {
+		for _, p := range allowed {
+			if p == seccomp.SeccompAllowAny {
+				continue
+			}
+			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath)...)
+		}
+	}
+
 	return allErrs
 }
 
@@ -143,18 +155,6 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 			if err := apparmor.ValidateProfileFormat(p); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.AllowedProfilesAnnotationKey), allowed, err.Error()))
 			}
-		}
-	}
-
-	if p := annotations[seccomp.DefaultProfileAnnotationKey]; p != "" {
-		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.DefaultProfileAnnotationKey))...)
-	}
-	if allowed := annotations[seccomp.AllowedProfilesAnnotationKey]; allowed != "" {
-		for _, p := range strings.Split(allowed, ",") {
-			if p == seccomp.AllowAny {
-				continue
-			}
-			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.AllowedProfilesAnnotationKey))...)
 		}
 	}
 	return allErrs
