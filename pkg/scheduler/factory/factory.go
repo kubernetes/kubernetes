@@ -176,6 +176,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 		client:                         args.Client,
 		podLister:                      schedulerCache,
 		podQueue:                       core.NewSchedulingQueue(),
+		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
 		serviceLister:                  args.ServiceInformer.Lister(),
@@ -255,7 +256,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.deleteNodeFromCache,
 		},
 	)
-	c.nodeLister = args.NodeInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
@@ -267,7 +267,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.onPvDelete,
 		},
 	)
-	c.pVLister = args.PvInformer.Lister()
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
 	args.PvcInformer.Informer().AddEventHandler(
@@ -277,7 +276,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.onPvcDelete,
 		},
 	)
-	c.pVCLister = args.PvcInformer.Lister()
 
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
@@ -289,7 +287,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.onServiceDelete,
 		},
 	)
-	c.serviceLister = args.ServiceInformer.Lister()
 
 	// Existing equivalence cache should not be affected by add/delete RC/Deployment etc,
 	// it only make sense when pod is scheduled or deleted
