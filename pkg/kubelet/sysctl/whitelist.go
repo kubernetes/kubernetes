@@ -26,23 +26,23 @@ import (
 )
 
 const (
-	AnnotationInvalidReason = "InvalidSysctlAnnotation"
-	ForbiddenReason         = "SysctlForbidden"
+	// ForbiddenReason represents reason to forbidden sysctl
+	ForbiddenReason = "SysctlForbidden"
 )
 
-// patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
+// PatternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
 // checks validity via a sysctl and prefix map, rejecting those which are not known
 // to be namespaced.
-type patternWhitelist struct {
+type PatternWhitelist struct {
 	sysctls  map[string]Namespace
 	prefixes map[string]Namespace
 }
 
-var _ lifecycle.PodAdmitHandler = &patternWhitelist{}
+var _ lifecycle.PodAdmitHandler = &PatternWhitelist{}
 
 // NewWhitelist creates a new Whitelist from a list of sysctls and sysctl pattern (ending in *).
-func NewWhitelist(patterns []string) (*patternWhitelist, error) {
-	w := &patternWhitelist{
+func NewWhitelist(patterns []string) (*PatternWhitelist, error) {
+	w := &PatternWhitelist{
 		sysctls:  map[string]Namespace{},
 		prefixes: map[string]Namespace{},
 	}
@@ -80,7 +80,7 @@ func NewWhitelist(patterns []string) (*patternWhitelist, error) {
 // The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
 // respective namespaces with the host. This check is only possible for sysctls on
 // the static default whitelist, not those on the custom whitelist provided by the admin.
-func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
+func (w *PatternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
 	nsErrorFmt := "%q not allowed with host %s enabled"
 	if ns, found := w.sysctls[sysctl]; found {
 		if ns == IpcNamespace && hostIPC {
@@ -107,7 +107,7 @@ func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 
 // Admit checks that all sysctls given in pod's security context
 // are valid according to the whitelist.
-func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (w *PatternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
 	if pod.Spec.SecurityContext == nil || len(pod.Spec.SecurityContext.Sysctls) == 0 {
 		return lifecycle.PodAdmitResult{

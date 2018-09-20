@@ -234,7 +234,6 @@ pkg/kubelet/server/streaming
 pkg/kubelet/stats
 pkg/kubelet/status
 pkg/kubelet/status/testing
-pkg/kubelet/sysctl
 pkg/kubelet/util/pluginwatcher
 pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1
 pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2
