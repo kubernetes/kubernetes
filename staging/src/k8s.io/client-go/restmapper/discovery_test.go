@@ -17,6 +17,7 @@ limitations under the License.
 package restmapper
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -252,10 +253,9 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 		Version:  "v1",
 		Resource: "foo",
 	})
-	assert.NoError(err)
+	assert.Error(err)
 	assert.True(cdc.fresh, "should be fresh after a cache-miss")
 	assert.Equal(cdc.invalidateCalls, 1, "should have called Invalidate() once")
-	assert.Equal(gvk.Kind, "Foo")
 
 	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
@@ -264,6 +264,7 @@ func TestDeferredDiscoveryRESTMapper_CacheMiss(t *testing.T) {
 	})
 	assert.NoError(err)
 	assert.Equal(cdc.invalidateCalls, 1, "should NOT have called Invalidate() again")
+	assert.Equal(gvk.Kind, "Foo")
 
 	gvk, err = m.KindFor(schema.GroupVersionResource{
 		Group:    "a",
@@ -295,10 +296,11 @@ func (c *fakeCachedDiscoveryInterface) Fresh() bool {
 	return c.fresh
 }
 
-func (c *fakeCachedDiscoveryInterface) Invalidate() {
+func (c *fakeCachedDiscoveryInterface) Invalidate() error {
 	c.invalidateCalls = c.invalidateCalls + 1
 	c.fresh = true
 	c.enabledA = true
+	return nil
 }
 
 func (c *fakeCachedDiscoveryInterface) RESTClient() restclient.Interface {
@@ -325,7 +327,8 @@ func (c *fakeCachedDiscoveryInterface) ServerGroups() (*metav1.APIGroupList, err
 			},
 		}, nil
 	}
-	return &metav1.APIGroupList{}, nil
+	// Like the real mem-cached discovery client, an error is returned if there is no group.
+	return nil, fmt.Errorf("the cache has not been filled yet")
 }
 
 func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {

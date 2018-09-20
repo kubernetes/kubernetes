@@ -68,8 +68,11 @@ type CachedDiscoveryInterface interface {
 	// TODO: this needs to be revisited, this interface can't be locked properly
 	// and doesn't make a lot of sense.
 	Fresh() bool
-	// Invalidate enforces that no cached data is used in the future that is older than the current time.
-	Invalidate()
+	// Invalidate enforces that no cached data is used in the future that is older
+	// than the current time. If an error is returned, caller should retry the
+	// Invalidate.
+	// TODO: do not return error when #68865 is solved.
+	Invalidate() error
 }
 
 // ServerGroupsInterface has methods for obtaining supported groups on the API server

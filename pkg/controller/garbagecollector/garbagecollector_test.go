@@ -53,7 +53,7 @@ type testRESTMapper struct {
 	meta.RESTMapper
 }
 
-func (_ *testRESTMapper) Reset() {}
+func (_ *testRESTMapper) Reset() error { return nil }
 
 func TestGarbageCollectorConstruction(t *testing.T) {
 	config := &restclient.Config{}

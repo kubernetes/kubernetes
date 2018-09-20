@@ -73,7 +73,7 @@ func (d *memCacheClient) ServerResources() ([]*metav1.APIResourceList, error) {
 func (d *memCacheClient) ServerGroups() (*metav1.APIGroupList, error) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
-	if d.groupList == nil {
+	if !d.cacheValid {
 		return nil, ErrCacheEmpty
 	}
 	return d.groupList, nil
@@ -103,7 +103,7 @@ func (d *memCacheClient) Fresh() bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 	// Fresh is supposed to tell the caller whether or not to retry if the cache
-	// fails to find something. The idea here is that Invalidate will be called
+	// fails to find something. The idea here is that Invalidate() will be called
 	// periodically and therefore we'll always be returning the latest data. (And
 	// in the future we can watch and stay even more up-to-date.) So we only
 	// return false if the cache has never been filled.
@@ -113,7 +113,7 @@ func (d *memCacheClient) Fresh() bool {
 // Invalidate refreshes the cache, blocking calls until the cache has been
 // refreshed. It would be trivial to make a version that does this in the
 // background while continuing to respond to requests if needed.
-func (d *memCacheClient) Invalidate() {
+func (d *memCacheClient) Invalidate() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -122,8 +122,10 @@ func (d *memCacheClient) Invalidate() {
 	// APIResourceList to have the same GroupVersion, the lists would need merged.
 	gl, err := d.delegate.ServerGroups()
 	if err != nil || len(gl.Groups) == 0 {
-		utilruntime.HandleError(fmt.Errorf("couldn't get current server API group list; will keep using cached value. (%v)", err))
-		return
+		// TODO: remove the redundant error logging #68865 is solved.
+		err2 := fmt.Errorf("couldn't get current server API group list; will keep using cached value. (%v)", err)
+		utilruntime.HandleError(err2)
+		return err2
 	}
 
 	rl := map[string]*metav1.APIResourceList{}
@@ -145,6 +147,7 @@ func (d *memCacheClient) Invalidate() {
 
 	d.groupToServerResources, d.groupList = rl, gl
 	d.cacheValid = true
+	return nil
 }
 
 // NewMemCacheClient creates a new CachedDiscoveryInterface which caches
