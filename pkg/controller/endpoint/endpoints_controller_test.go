@@ -155,7 +155,7 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 }
 
 type endpointController struct {
-	*EndpointController
+	*Controller
 	podStore       cache.Store
 	serviceStore   cache.Store
 	endpointsStore cache.Store
@@ -164,7 +164,7 @@ type endpointController struct {
 func newController(url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
-	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
+	endpoints := NewController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
 	endpoints.podsSynced = alwaysReady
 	endpoints.servicesSynced = alwaysReady

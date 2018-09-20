@@ -180,10 +180,10 @@ func newFixture(t testing.TB) *fixture {
 	return f
 }
 
-func (f *fixture) newController() (*DeploymentController, informers.SharedInformerFactory, error) {
+func (f *fixture) newController() (*Controller, informers.SharedInformerFactory, error) {
 	f.client = fake.NewSimpleClientset(f.objects...)
 	informers := informers.NewSharedInformerFactory(f.client, controller.NoResyncPeriodFunc())
-	c, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
+	c, err := NewController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), f.client)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -204,14 +204,14 @@ func (f *fixture) newController() (*DeploymentController, informers.SharedInform
 }
 
 func (f *fixture) runExpectError(deploymentName string, startInformers bool) {
-	f.run_(deploymentName, startInformers, true)
+	f.runDeployment(deploymentName, startInformers, true)
 }
 
 func (f *fixture) run(deploymentName string) {
-	f.run_(deploymentName, true, false)
+	f.runDeployment(deploymentName, true, false)
 }
 
-func (f *fixture) run_(deploymentName string, startInformers bool, expectError bool) {
+func (f *fixture) runDeployment(deploymentName string, startInformers bool, expectError bool) {
 	c, informers, err := f.newController()
 	if err != nil {
 		f.t.Fatalf("error creating Deployment controller: %v", err)

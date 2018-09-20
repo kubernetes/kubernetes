@@ -217,7 +217,7 @@ func initTestSchedulerWithOptions(
 
 // initDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
-func initDisruptionController(t *testing.T, context *testContext) *disruption.DisruptionController {
+func initDisruptionController(t *testing.T, context *testContext) *disruption.Controller {
 	informers := informers.NewSharedInformerFactory(context.clientSet, 12*time.Hour)
 
 	discoveryClient := cacheddiscovery.NewMemCacheClient(context.clientSet.Discovery())
@@ -230,7 +230,7 @@ func initDisruptionController(t *testing.T, context *testContext) *disruption.Di
 		t.Fatalf("Error in create scaleClient: %v", err)
 	}
 
-	dc := disruption.NewDisruptionController(
+	dc := disruption.NewController(
 		informers.Core().V1().Pods(),
 		informers.Policy().V1beta1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),

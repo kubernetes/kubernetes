@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.DisruptionController, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
+func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Controller, informers.SharedInformerFactory, clientset.Interface, *apiextensionsclientset.Clientset, dynamic.Interface) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
 
 	clientSet, err := clientset.NewForConfig(server.ClientConfig)
@@ -75,7 +75,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 		t.Fatalf("Error creating dynamicClient: %v", err)
 	}
 
-	pdbc := disruption.NewDisruptionController(
+	pdbc := disruption.NewController(
 		informers.Core().V1().Pods(),
 		informers.Policy().V1beta1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),

@@ -37,7 +37,7 @@ func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error)
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
 		return nil, false, nil
 	}
-	dsc, err := daemon.NewDaemonSetsController(
+	dsc, err := daemon.NewController(
 		ctx.InformerFactory.Apps().V1().DaemonSets(),
 		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
 		ctx.InformerFactory.Core().V1().Pods(),
@@ -83,7 +83,7 @@ func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
 		return nil, false, nil
 	}
-	dc, err := deployment.NewDeploymentController(
+	dc, err := deployment.NewController(
 		ctx.InformerFactory.Apps().V1().Deployments(),
 		ctx.InformerFactory.Apps().V1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),

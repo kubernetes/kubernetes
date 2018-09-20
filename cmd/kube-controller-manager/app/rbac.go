@@ -27,7 +27,7 @@ func startClusterRoleAggregrationController(ctx ControllerContext) (http.Handler
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}] {
 		return nil, false, nil
 	}
-	go clusterroleaggregation.NewClusterRoleAggregation(
+	go clusterroleaggregation.NewController(
 		ctx.InformerFactory.Rbac().V1().ClusterRoles(),
 		ctx.ClientBuilder.ClientOrDie("clusterrole-aggregation-controller").RbacV1(),
 	).Run(5, ctx.Stop)

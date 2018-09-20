@@ -146,7 +146,7 @@ func TestSyncClusterRole(t *testing.T) {
 				indexer.Add(obj)
 			}
 			fakeClient := fakeclient.NewSimpleClientset(objs...)
-			c := ClusterRoleAggregationController{
+			c := Controller{
 				clusterRoleClient: fakeClient.RbacV1(),
 				clusterRoleLister: rbaclisters.NewClusterRoleLister(indexer),
 			}

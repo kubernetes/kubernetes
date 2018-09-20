@@ -38,8 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-// ClusterRoleAggregationController is a controller to combine cluster roles
-type ClusterRoleAggregationController struct {
+// Controller to combine cluster roles
+type Controller struct {
 	clusterRoleClient  rbacclient.ClusterRolesGetter
 	clusterRoleLister  rbaclisters.ClusterRoleLister
 	clusterRolesSynced cache.InformerSynced
@@ -48,9 +48,9 @@ type ClusterRoleAggregationController struct {
 	queue       workqueue.RateLimitingInterface
 }
 
-// NewClusterRoleAggregation creates a new controller
-func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *ClusterRoleAggregationController {
-	c := &ClusterRoleAggregationController{
+// NewController creates a new controller to combine cluster roles
+func NewController(clusterRoleInformer rbacinformers.ClusterRoleInformer, clusterRoleClient rbacclient.ClusterRolesGetter) *Controller {
+	c := &Controller{
 		clusterRoleClient:  clusterRoleClient,
 		clusterRoleLister:  clusterRoleInformer.Lister(),
 		clusterRolesSynced: clusterRoleInformer.Informer().HasSynced,
@@ -73,7 +73,7 @@ func NewClusterRoleAggregation(clusterRoleInformer rbacinformers.ClusterRoleInfo
 	return c
 }
 
-func (c *ClusterRoleAggregationController) syncClusterRole(key string) error {
+func (c *Controller) syncClusterRole(key string) error {
 	_, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
@@ -141,7 +141,7 @@ func ruleExists(haystack []rbacv1.PolicyRule, needle rbacv1.PolicyRule) bool {
 }
 
 // Run starts the controller and blocks until stopCh is closed.
-func (c *ClusterRoleAggregationController) Run(workers int, stopCh <-chan struct{}) {
+func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -159,12 +159,12 @@ func (c *ClusterRoleAggregationController) Run(workers int, stopCh <-chan struct
 	<-stopCh
 }
 
-func (c *ClusterRoleAggregationController) runWorker() {
+func (c *Controller) runWorker() {
 	for c.processNextWorkItem() {
 	}
 }
 
-func (c *ClusterRoleAggregationController) processNextWorkItem() bool {
+func (c *Controller) processNextWorkItem() bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false
@@ -183,7 +183,7 @@ func (c *ClusterRoleAggregationController) processNextWorkItem() bool {
 	return true
 }
 
-func (c *ClusterRoleAggregationController) enqueue() {
+func (c *Controller) enqueue() {
 	// this is unusual, but since the set of all clusterroles is small and we don't know the dependency
 	// graph, just queue up every thing each time.  This allows errors to be selectively retried if there
 	// is a problem updating a single role

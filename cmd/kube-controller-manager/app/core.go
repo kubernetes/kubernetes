@@ -378,7 +378,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 }
 
 func startEndpointController(ctx ControllerContext) (http.Handler, bool, error) {
-	go endpointcontroller.NewEndpointController(
+	go endpointcontroller.NewController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Endpoints(),

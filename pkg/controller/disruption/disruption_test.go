@@ -96,7 +96,7 @@ func (ps *pdbStates) VerifyDisruptionAllowed(t *testing.T, key string, disruptio
 }
 
 type disruptionController struct {
-	*DisruptionController
+	*Controller
 
 	podStore cache.Store
 	pdbStore cache.Store
@@ -125,7 +125,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	scheme.AddKnownTypeWithName(customGVK, &v1.Service{})
 	fakeScaleClient := &scalefake.FakeScaleClient{}
 
-	dc := NewDisruptionController(
+	dc := NewController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -948,46 +948,46 @@ func TestDeploymentFinderFunction(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		rsApiVersion  string
+		rsAPIVersion  string
 		rsKind        string
-		depApiVersion string
+		depAPIVersion string
 		depKind       string
 		findsScale    bool
 		expectedScale int32
 	}{
 		"happy path": {
-			rsApiVersion:  "apps/v1",
+			rsAPIVersion:  "apps/v1",
 			rsKind:        controllerKindRS.Kind,
-			depApiVersion: "extensions/v1",
+			depAPIVersion: "extensions/v1",
 			depKind:       controllerKindDep.Kind,
 			findsScale:    true,
 			expectedScale: 10,
 		},
 		"invalid rs apiVersion": {
-			rsApiVersion:  "invalid/v1",
+			rsAPIVersion:  "invalid/v1",
 			rsKind:        controllerKindRS.Kind,
-			depApiVersion: "apps/v1",
+			depAPIVersion: "apps/v1",
 			depKind:       controllerKindDep.Kind,
 			findsScale:    false,
 		},
 		"invalid rs kind": {
-			rsApiVersion:  "apps/v1",
+			rsAPIVersion:  "apps/v1",
 			rsKind:        "InvalidKind",
-			depApiVersion: "apps/v1",
+			depAPIVersion: "apps/v1",
 			depKind:       controllerKindDep.Kind,
 			findsScale:    false,
 		},
 		"invalid deployment apiVersion": {
-			rsApiVersion:  "extensions/v1",
+			rsAPIVersion:  "extensions/v1",
 			rsKind:        controllerKindRS.Kind,
-			depApiVersion: "deployment/v1",
+			depAPIVersion: "deployment/v1",
 			depKind:       controllerKindDep.Kind,
 			findsScale:    false,
 		},
 		"invalid deployment kind": {
-			rsApiVersion:  "apps/v1",
+			rsAPIVersion:  "apps/v1",
 			rsKind:        controllerKindRS.Kind,
-			depApiVersion: "extensions/v1",
+			depAPIVersion: "extensions/v1",
 			depKind:       "InvalidKind",
 			findsScale:    false,
 		},
@@ -1005,7 +1005,7 @@ func TestDeploymentFinderFunction(t *testing.T) {
 			rs.Labels = labels
 			trueVal := true
 			rs.OwnerReferences = append(rs.OwnerReferences, metav1.OwnerReference{
-				APIVersion: tc.depApiVersion,
+				APIVersion: tc.depAPIVersion,
 				Kind:       tc.depKind,
 				Name:       dep.Name,
 				UID:        dep.UID,
@@ -1014,7 +1014,7 @@ func TestDeploymentFinderFunction(t *testing.T) {
 			add(t, dc.rsStore, rs)
 
 			controllerRef := &metav1.OwnerReference{
-				APIVersion: tc.rsApiVersion,
+				APIVersion: tc.rsAPIVersion,
 				Kind:       tc.rsKind,
 				Name:       rs.Name,
 				UID:        rs.UID,

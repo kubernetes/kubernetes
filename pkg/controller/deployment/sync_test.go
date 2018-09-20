@@ -272,7 +272,7 @@ func TestScale(t *testing.T) {
 			_ = olderTimestamp
 			t.Log(test.name)
 			fake := fake.Clientset{}
-			dc := &DeploymentController{
+			dc := &Controller{
 				client:        &fake,
 				eventRecorder: &record.FakeRecorder{},
 			}
@@ -412,7 +412,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 
 		fake := &fake.Clientset{}
 		informers := informers.NewSharedInformerFactory(fake, controller.NoResyncPeriodFunc())
-		controller, err := NewDeploymentController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
+		controller, err := NewController(informers.Apps().V1().Deployments(), informers.Apps().V1().ReplicaSets(), informers.Core().V1().Pods(), fake)
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}

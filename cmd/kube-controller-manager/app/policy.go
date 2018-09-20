@@ -57,7 +57,7 @@ func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error
 		return nil, false, err
 	}
 
-	go disruption.NewDisruptionController(
+	go disruption.NewController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		ctx.InformerFactory.Core().V1().ReplicationControllers(),

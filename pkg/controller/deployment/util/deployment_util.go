@@ -64,7 +64,6 @@ const (
 	RollbackDone = "DeploymentRollback"
 
 	// Reasons for deployment conditions
-	//
 	// Progressing:
 
 	// ReplicaSetUpdatedReason is added in a deployment when one of its replica sets is updated as part
@@ -89,7 +88,7 @@ const (
 	// ResumedDeployReason is added in a deployment when it is resumed. Useful for not failing accidentally
 	// deployments that paused amidst a rollout and are bounded by a deadline.
 	ResumedDeployReason = "DeploymentResumed"
-	//
+
 	// Available:
 
 	// MinimumReplicasAvailable is added in a deployment when it has its minimum replicas required available.
@@ -557,9 +556,8 @@ func RsListFromClient(c appsclient.AppsV1Interface) RsListFunc {
 	}
 }
 
-// TODO: switch RsListFunc and podListFunc to full namespacers
-
 // RsListFunc returns the ReplicaSet from the ReplicaSet namespace and the List metav1.ListOptions.
+// TODO: switch RsListFunc and podListFunc to full namespacers
 type RsListFunc func(string, metav1.ListOptions) ([]*apps.ReplicaSet, error)
 
 // podListFunc returns the PodList from the Pod namespace and the List metav1.ListOptions.

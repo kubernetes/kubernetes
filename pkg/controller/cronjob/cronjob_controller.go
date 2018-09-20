@@ -59,7 +59,7 @@ import (
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batchv1beta1.SchemeGroupVersion.WithKind("CronJob")
 
-// Controller is a controller for CronJobs.
+// Controller to manage cronjobs
 type Controller struct {
 	kubeClient clientset.Interface
 	jobControl jobControlInterface
@@ -68,7 +68,7 @@ type Controller struct {
 	recorder   record.EventRecorder
 }
 
-// NewController creates and initializes a new Controller.
+// NewController creates new cronjob controller
 func NewController(kubeClient clientset.Interface) (*Controller, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -91,7 +91,7 @@ func NewController(kubeClient clientset.Interface) (*Controller, error) {
 	return jm, nil
 }
 
-// Run starts the main goroutine responsible for watching and syncing jobs.
+// Run the main goroutine responsible for watching and syncing jobs.
 func (jm *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	klog.Infof("Starting CronJob Manager")

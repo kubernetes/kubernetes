@@ -321,7 +321,7 @@ func (f *fakePodControl) DeletePod(namespace string, podID string, object runtim
 }
 
 type daemonSetsController struct {
-	*DaemonSetsController
+	*Controller
 
 	dsStore      cache.Store
 	historyStore cache.Store
@@ -334,7 +334,7 @@ func newTestController(initialObjects ...runtime.Object) (*daemonSetsController,
 	clientset := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
 
-	dsc, err := NewDaemonSetsController(
+	dsc, err := NewController(
 		informerFactory.Apps().V1().DaemonSets(),
 		informerFactory.Apps().V1().ControllerRevisions(),
 		informerFactory.Core().V1().Pods(),
