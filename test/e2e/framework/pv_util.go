@@ -837,7 +837,7 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 					Name:    "write-pod",
 					Image:   BusyBoxImage,
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
+					Args:    []string{"-c", fmt.Sprintf("trap exit TERM; %s", command)},
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &isPrivileged,
 					},
@@ -935,7 +935,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, isPrivileged bo
 					Name:    "write-pod",
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
+					Args:    []string{"-c", fmt.Sprintf("trap exit TERM; %s", command)},
 					SecurityContext: &v1.SecurityContext{
 						Privileged: &isPrivileged,
 					},

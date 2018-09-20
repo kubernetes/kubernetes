@@ -498,7 +498,7 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-					Command: []string{"/bin/sh", "-ec", "echo nothing"},
+					Command: []string{"/bin/sh", "-ec", "trap exit TERM; echo nothing"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -525,7 +525,7 @@ func clearSubpathPodCommands(pod *v1.Pod) {
 }
 
 func setInitCommand(pod *v1.Pod, command string) {
-	pod.Spec.InitContainers[0].Command = []string{"/bin/sh", "-ec", command}
+	pod.Spec.InitContainers[0].Command = []string{"/bin/sh", "-ec", fmt.Sprintf("trap exit TERM; %s", command)}
 }
 
 func setWriteCommand(file string, container *v1.Container) {
@@ -608,9 +608,9 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
 	pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.BusyBox)
-	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
+	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "trap exit TERM; sleep 100000"}
 	pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
-	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
+	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "trap exit TERM; sleep 100000"}
 
 	// Add liveness probe to subpath container
 	pod.Spec.Containers[0].LivenessProbe = &v1.Probe{
@@ -703,9 +703,9 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 
 	// Change to busybox
 	pod.Spec.Containers[0].Image = imageutils.GetE2EImage(imageutils.BusyBox)
-	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
+	pod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", "trap exit TERM; sleep 100000"}
 	pod.Spec.Containers[1].Image = imageutils.GetE2EImage(imageutils.BusyBox)
-	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "sleep 100000"}
+	pod.Spec.Containers[1].Command = []string{"/bin/sh", "-ec", "trap exit TERM; sleep 100000"}
 
 	// If grace period is too short, then there is not enough time for the volume
 	// manager to cleanup the volumes

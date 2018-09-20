@@ -290,7 +290,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 					Name:    "volume-tester",
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
+					Args:    []string{"-c", fmt.Sprintf("trap exit TERM; %s", command)},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
@@ -338,7 +338,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 		commands = []string{
 			"/bin/sh",
 			"-c",
-			"while true; do sleep 2; done",
+			"trap exit TERM; while true; do sleep 2; done",
 		}
 	}
 	pod := &v1.Pod{

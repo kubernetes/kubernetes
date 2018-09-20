@@ -283,7 +283,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 					Name:    "volume-tester",
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
+					Args:    []string{"-c", fmt.Sprintf("trap exit TERM; %s", command)},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "my-volume",
