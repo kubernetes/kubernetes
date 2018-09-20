@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.18 3.2.24] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,7 +26,7 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=2.2.1 2.3.7 3.0.17 3.1.12 3.2.18 3.2.24
+BUNDLED_ETCD_VERSIONS?=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
 LATEST_ETCD_VERSION?=3.2.24
