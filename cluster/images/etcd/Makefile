@@ -52,7 +52,7 @@ MANIFEST_IMAGE := $(PUSH_REGISTRY)/etcd
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version from https://github.com/coreos/etcd/releases for the current ETCD_VERSION.
-GOLANG_VERSION?=1.11
+GOLANG_VERSION?=1.8.7
 GOARM=7
 TEMP_DIR:=$(shell mktemp -d)
 
