@@ -120,7 +120,7 @@ filename | sha256 hash
     *       - kind: ServiceAccount
     *         name: azure-cloud-provider
     *         namespace: kube-system
-    * If the clusterrole with same has already been provisioned (e.g. for accessing azurefile secrets), then the above yaml should be merged togather, e.g.
+    * If the clusterrole with same has already been provisioned (e.g. for accessing azurefile secrets), then the above yaml should be merged together, e.g.
     *     kind: List
     *     apiVersion: v1
     *     items:
