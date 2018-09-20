@@ -70,7 +70,6 @@ from charms.layer.kubernetes_common import configure_kube_proxy
 nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 kubeconfig_path = '/root/cdk/kubeconfig'
-kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
 gcp_creds_env_key = 'GOOGLE_APPLICATION_CREDENTIALS'
 snap_resources = ['kubectl', 'kubelet', 'kube-proxy']
 checksum_prefix = 'kubernetes-worker.resource-checksums.'
