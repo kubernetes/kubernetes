@@ -43,8 +43,8 @@ import (
 
 var csiImageVersions = map[string]string{
 	"hostpathplugin":   "canary", // TODO (verult) update tag once new hostpathplugin release is cut
-	"csi-attacher":     "v0.2.0",
-	"csi-provisioner":  "v0.2.1",
+	"csi-attacher":     "v0.3.0",
+	"csi-provisioner":  "v0.3.1",
 	"driver-registrar": "v0.3.0",
 }
 
