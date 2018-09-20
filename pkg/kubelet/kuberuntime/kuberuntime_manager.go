@@ -115,6 +115,9 @@ type kubeGenericRuntimeManager struct {
 	// The directory path for seccomp profiles.
 	seccompProfileRoot string
 
+	// The default profile name
+	seccompDefaultProfile string
+
 	// Internal lifecycle event handlers for container resource management.
 	internalLifecycle cm.InternalContainerLifecycle
 
@@ -143,6 +146,7 @@ func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
 	seccompProfileRoot string,
+	seccompDefaultProfile string,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
 	podStateProvider podStateProvider,
@@ -162,21 +166,22 @@ func NewKubeGenericRuntimeManager(
 	runtimeClassManager *runtimeclass.Manager,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         cpuCFSQuota,
-		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
-		seccompProfileRoot:  seccompProfileRoot,
-		livenessManager:     livenessManager,
-		containerRefManager: containerRefManager,
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      newInstrumentedRuntimeService(runtimeService),
-		imageService:        newInstrumentedImageManagerService(imageService),
-		keyring:             credentialprovider.NewDockerKeyring(),
-		internalLifecycle:   internalLifecycle,
-		legacyLogProvider:   legacyLogProvider,
-		runtimeClassManager: runtimeClassManager,
+		recorder:              recorder,
+		cpuCFSQuota:           cpuCFSQuota,
+		cpuCFSQuotaPeriod:     cpuCFSQuotaPeriod,
+		seccompProfileRoot:    seccompProfileRoot,
+		seccompDefaultProfile: seccompDefaultProfile,
+		livenessManager:       livenessManager,
+		containerRefManager:   containerRefManager,
+		machineInfo:           machineInfo,
+		osInterface:           osInterface,
+		runtimeHelper:         runtimeHelper,
+		runtimeService:        newInstrumentedRuntimeService(runtimeService),
+		imageService:          newInstrumentedImageManagerService(imageService),
+		keyring:               credentialprovider.NewDockerKeyring(),
+		internalLifecycle:     internalLifecycle,
+		legacyLogProvider:     legacyLogProvider,
+		runtimeClassManager:   runtimeClassManager,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)

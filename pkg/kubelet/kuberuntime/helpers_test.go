@@ -176,20 +176,22 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
-	tests := []struct {
+	type seccompTest struct {
 		description     string
 		annotation      map[string]string
 		containerName   string
 		expectedProfile string
-	}{
+	}
+
+	tests := []seccompTest{
 		{
-			description:     "no seccomp should return empty string",
-			expectedProfile: "",
+			description:     "no seccomp should return default profile of the runtime manager",
+			expectedProfile: fakeDefaultSeccompProfile,
 		},
 		{
-			description:     "no seccomp with containerName should return exmpty string",
+			description:     "no seccomp with containerName should return default profile of the runtime manager",
 			containerName:   "container1",
-			expectedProfile: "",
+			expectedProfile: fakeDefaultSeccompProfile,
 		},
 		{
 			description: "pod runtime/default seccomp profile should return runtime/default",
@@ -269,12 +271,21 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "chmod.json"),
 		},
 		{
-			description: "container localhost seccomp profile with unmatched containerName should return empty string",
+			description: "container seccomp profile with unmatched containerName should return pod seccomp profile if set",
+			annotation: map[string]string{
+				v1.SeccompPodAnnotationKey:                            "localhost/podchmod.json",
+				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
+			},
+			containerName:   "container2",
+			expectedProfile: "localhost/" + filepath.Join(fakeSeccompProfileRoot, "podchmod.json"),
+		},
+		{
+			description: "container seccomp profile with unmatched containerName should return default profile of the runtime manager if pod seccomp unset",
 			annotation: map[string]string{
 				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
 			},
 			containerName:   "container2",
-			expectedProfile: "",
+			expectedProfile: fakeDefaultSeccompProfile,
 		},
 	}
 
@@ -282,6 +293,14 @@ func TestGetSeccompProfileFromAnnotations(t *testing.T) {
 		seccompProfile := m.getSeccompProfileFromAnnotations(test.annotation, test.containerName)
 		assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]", i)
 	}
+
+	m.seccompDefaultProfile = "localhost/profile.json"
+	test := seccompTest{
+		description:     "default seccomp profile set to localhost/path changes to localhost/absolute_path",
+		expectedProfile: "localhost//fakeSeccompProfileRoot/profile.json",
+	}
+	seccompProfile := m.getSeccompProfileFromAnnotations(nil, "")
+	assert.Equal(t, test.expectedProfile, seccompProfile, "Test default profile with localhost path")
 }
 
 func TestNamespacesForPod(t *testing.T) {

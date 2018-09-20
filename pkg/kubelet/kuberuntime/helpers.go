@@ -207,7 +207,7 @@ func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations
 	}
 
 	if !profileOK {
-		return ""
+		profile = m.seccompDefaultProfile
 	}
 
 	if strings.HasPrefix(profile, "localhost/") {

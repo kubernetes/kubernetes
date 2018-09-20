@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -35,7 +36,8 @@ import (
 )
 
 const (
-	fakeSeccompProfileRoot = "/fakeSeccompProfileRoot"
+	fakeSeccompProfileRoot    = "/fakeSeccompProfileRoot"
+	fakeDefaultSeccompProfile = core.SeccompProfileRuntimeDefault
 )
 
 type fakeHTTP struct {
@@ -73,19 +75,20 @@ func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
 func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         false,
-		cpuCFSQuotaPeriod:   metav1.Duration{Duration: time.Microsecond * 100},
-		livenessManager:     proberesults.NewManager(),
-		containerRefManager: kubecontainer.NewRefManager(),
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      runtimeService,
-		imageService:        imageService,
-		keyring:             keyring,
-		seccompProfileRoot:  fakeSeccompProfileRoot,
-		internalLifecycle:   cm.NewFakeInternalContainerLifecycle(),
+		recorder:              recorder,
+		cpuCFSQuota:           false,
+		cpuCFSQuotaPeriod:     metav1.Duration{Duration: time.Microsecond * 100},
+		livenessManager:       proberesults.NewManager(),
+		containerRefManager:   kubecontainer.NewRefManager(),
+		machineInfo:           machineInfo,
+		osInterface:           osInterface,
+		runtimeHelper:         runtimeHelper,
+		runtimeService:        runtimeService,
+		imageService:          imageService,
+		keyring:               keyring,
+		seccompProfileRoot:    fakeSeccompProfileRoot,
+		seccompDefaultProfile: fakeDefaultSeccompProfile,
+		internalLifecycle:     cm.NewFakeInternalContainerLifecycle(),
 	}
 
 	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)

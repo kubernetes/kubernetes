@@ -973,6 +973,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.KeepTerminatedPodVolumes,
 		kubeServer.NodeLabels,
 		kubeServer.SeccompProfileRoot,
+		kubeServer.DefaultSeccompProfile,
 		kubeServer.BootstrapCheckpointPath,
 		kubeServer.NodeStatusMaxImages)
 	if err != nil {
@@ -1046,6 +1047,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
+	seccompDefaultProfile string,
 	bootstrapCheckpointPath string,
 	nodeStatusMaxImages int32) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
@@ -1080,6 +1082,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		keepTerminatedPodVolumes,
 		nodeLabels,
 		seccompProfileRoot,
+		seccompDefaultProfile,
 		bootstrapCheckpointPath,
 		nodeStatusMaxImages)
 	if err != nil {

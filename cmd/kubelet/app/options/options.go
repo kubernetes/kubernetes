@@ -162,6 +162,13 @@ type KubeletFlags struct {
 	ExitOnLockContention bool
 	// seccompProfileRoot is the directory path for seccomp profiles.
 	SeccompProfileRoot string
+	// DefaultSeccompProfile is the default profile to be used
+	// It can take either of the following values:
+	//      unconfined        - run without seccomp filters
+	//      runtime/default   - default seccomp profile for container runtimes
+	//      docker/default    - ditto, DEPRECATED
+	//      localhost/{path}  - the profile will be read from SeccompProfileRoot/{path}
+	DefaultSeccompProfile string
 	// bootstrapCheckpointPath is the path to the directory containing pod checkpoints to
 	// run on restore
 	BootstrapCheckpointPath string
@@ -232,6 +239,7 @@ func NewKubeletFlags() *KubeletFlags {
 		VolumePluginDir:                     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
 		RegisterNode:                        true,
 		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
+		DefaultSeccompProfile:               core.SeccompProfileRuntimeDefault,
 		HostNetworkSources:                  []string{kubetypes.AllSource},
 		HostPIDSources:                      []string{kubetypes.AllSource},
 		HostIPCSources:                      []string{kubetypes.AllSource},
@@ -386,6 +394,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.StringVar(&f.LockFilePath, "lock-file", f.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.BoolVar(&f.ExitOnLockContention, "exit-on-lock-contention", f.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
 	fs.StringVar(&f.SeccompProfileRoot, "seccomp-profile-root", f.SeccompProfileRoot, "<Warning: Alpha feature> Directory path for seccomp profiles.")
+	fs.StringVar(&f.DefaultSeccompProfile, "default-seccomp-profile", f.DefaultSeccompProfile, "<Warning: Alpha feature> The default seccomp profile. Can be set to either unconfined, runtime/default or localhost/PATH where PATH is the path to a file defining a seccomp profile in the directory specified in --seccomp-profile-root")
 	fs.StringVar(&f.BootstrapCheckpointPath, "bootstrap-checkpoint-path", f.BootstrapCheckpointPath, "<Warning: Alpha feature> Path to the directory where the checkpoints are stored")
 	fs.Int32Var(&f.NodeStatusMaxImages, "node-status-max-images", f.NodeStatusMaxImages, "<Warning: Alpha feature> The maximum number of images to report in Node.Status.Images. If -1 is specified, no cap will be applied. Default: 50")
 
