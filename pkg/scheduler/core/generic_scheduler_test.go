@@ -41,6 +41,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -447,7 +448,7 @@ func TestGenericScheduler(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				nil,
-				NewSchedulingQueue(),
+				internalqueue.NewSchedulingQueue(),
 				test.predicates,
 				algorithm.EmptyPredicateMetadataProducer,
 				test.prioritizers,
@@ -483,7 +484,7 @@ func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Nod
 	s := NewGenericScheduler(
 		cache,
 		nil,
-		NewSchedulingQueue(),
+		internalqueue.NewSchedulingQueue(),
 		predicates,
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
@@ -1404,7 +1405,7 @@ func TestPreempt(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				nil,
-				NewSchedulingQueue(),
+				internalqueue.NewSchedulingQueue(),
 				map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 				algorithm.EmptyPredicateMetadataProducer,
 				[]algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}},
@@ -1531,7 +1532,7 @@ func TestCacheInvalidationRace(t *testing.T) {
 	scheduler := NewGenericScheduler(
 		mockCache,
 		eCache,
-		NewSchedulingQueue(),
+		internalqueue.NewSchedulingQueue(),
 		ps,
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
@@ -1614,7 +1615,7 @@ func TestCacheInvalidationRace2(t *testing.T) {
 	scheduler := NewGenericScheduler(
 		cache,
 		eCache,
-		NewSchedulingQueue(),
+		internalqueue.NewSchedulingQueue(),
 		ps,
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
