@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestEnableDynamicConfigForNode(t *testing.T) {

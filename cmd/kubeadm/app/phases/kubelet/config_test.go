@@ -26,7 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestCreateConfigMap(t *testing.T) {

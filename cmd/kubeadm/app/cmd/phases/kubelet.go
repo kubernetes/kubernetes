@@ -33,7 +33,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/normalizer"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
 )
 

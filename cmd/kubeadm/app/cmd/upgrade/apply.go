@@ -38,7 +38,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 const (

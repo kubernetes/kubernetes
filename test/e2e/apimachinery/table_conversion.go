@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"k8s.io/kubernetes/pkg/printers"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )

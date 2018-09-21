@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	utilpointer "k8s.io/utils/pointer"

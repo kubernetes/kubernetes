@@ -97,7 +97,7 @@ import (
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"

@@ -47,7 +47,7 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilexec "k8s.io/utils/exec"
 )
 

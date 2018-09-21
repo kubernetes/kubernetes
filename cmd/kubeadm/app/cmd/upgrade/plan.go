@@ -34,7 +34,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 type planFlags struct {

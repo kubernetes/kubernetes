@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilexec "k8s.io/utils/exec"
 )
 

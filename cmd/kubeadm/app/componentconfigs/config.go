@@ -25,7 +25,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // GetFromKubeletConfigMap returns the pointer to the ComponentConfig API object read from the kubelet-config-version

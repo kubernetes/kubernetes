@@ -25,7 +25,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 var cfgFiles = map[string][]byte{

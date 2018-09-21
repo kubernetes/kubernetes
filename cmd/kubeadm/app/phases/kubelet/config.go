@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // WriteConfigToDisk writes the kubelet config object down to a file

@@ -36,7 +36,7 @@ import (
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/normalizer"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 var (

@@ -27,7 +27,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // AddToSchemeFunc is a function that adds known types and API GroupVersions to a scheme

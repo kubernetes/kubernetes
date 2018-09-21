@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 var expiry = 180 * 24 * time.Hour

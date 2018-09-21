@@ -29,7 +29,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 )
 
 type fakeVersionGetter struct {

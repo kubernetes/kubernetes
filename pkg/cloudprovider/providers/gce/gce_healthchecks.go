@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/filter"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/master/ports"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 )
 
 const (

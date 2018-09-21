@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/discovery"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"

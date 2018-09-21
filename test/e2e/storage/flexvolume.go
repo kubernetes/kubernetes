@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e/storage/utils"

@@ -39,7 +39,7 @@ import (
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"

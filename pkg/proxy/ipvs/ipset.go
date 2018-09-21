@@ -19,7 +19,7 @@ package ipvs
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 
 	"fmt"
 	"github.com/golang/glog"

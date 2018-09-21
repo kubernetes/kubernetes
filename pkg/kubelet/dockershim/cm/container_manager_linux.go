@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )

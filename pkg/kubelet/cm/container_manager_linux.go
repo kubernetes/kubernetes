@@ -59,7 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 )
 
 const (

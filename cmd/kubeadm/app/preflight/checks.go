@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	utilsexec "k8s.io/utils/exec"
 )

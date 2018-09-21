@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 const (

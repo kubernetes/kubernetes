@@ -36,7 +36,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
