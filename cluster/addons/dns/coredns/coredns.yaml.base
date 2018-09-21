@@ -108,7 +108,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.2.2
+        image: rajansandeep/coredns:latest
         imagePullPolicy: IfNotPresent
         resources:
           limits:
