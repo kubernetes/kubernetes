@@ -1,9 +1,0 @@
-advertiseAddress: 192.168.2.2
-apiVersion: kubeadm.k8s.io/v1alpha2
-kind: NodeConfiguration
-discoveryTokenAPIServers:
-- kube-apiserver:6443
-discoveryTokenUnsafeSkipCAVerification: true
-nodeRegistration:
-  name: thegopher
-token: abcdef.0123456789abcdef

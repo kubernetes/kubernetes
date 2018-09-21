@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	node_v1alpha2YAML   = "testdata/conversion/node/v1alpha2.yaml"
-	node_v1alpha3YAML   = "testdata/conversion/node/v1alpha3.yaml"
-	node_internalYAML   = "testdata/conversion/node/internal.yaml"
-	node_incompleteYAML = "testdata/defaulting/node/incomplete.yaml"
-	node_defaultedYAML  = "testdata/defaulting/node/defaulted.yaml"
-	node_invalidYAML    = "testdata/validation/invalid_nodecfg.yaml"
+	node_v1alpha3YAML = "testdata/conversion/node/v1alpha3.yaml"
+	//TODO node_v1beta1YAML   = "testdata/conversion/node/v1beta1.yaml" after introducing v1beta1
+	node_internalYAML = "testdata/conversion/node/internal.yaml"
+	//TODO node_incompleteYAML = "testdata/defaulting/node/incomplete.yaml" (using v1alpha3) after introducing v1beta1
+	node_defaultedYAML = "testdata/defaulting/node/defaulted.yaml"
+	node_invalidYAML   = "testdata/validation/invalid_nodecfg.yaml"
 )
 
 func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
@@ -45,24 +45,14 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	}{
 		// These tests are reading one file, loading it using NodeConfigFileAndDefaultsToInternalConfig that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha2 -> internal
-			name:         "v1alpha2ToInternal",
-			in:           node_v1alpha2YAML,
-			out:          node_internalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
-		},
 		{ // v1alpha3 -> internal
 			name:         "v1alpha3ToInternal",
 			in:           node_v1alpha3YAML,
 			out:          node_internalYAML,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
-		{ // v1alpha2 -> internal -> v1alpha3
-			name:         "v1alpha2Tov1alpha3",
-			in:           node_v1alpha2YAML,
-			out:          node_v1alpha3YAML,
-			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
-		},
+		// TODO: implement v1beta1 <-> internal after introducing v1beta1
+		// TODO: implement v1alpha3 -> internal -> v1beta1 after introducing v1beta1
 		{ // v1alpha3 -> internal -> v1alpha3
 			name:         "v1alpha3Tov1alpha3",
 			in:           node_v1alpha3YAML,
@@ -71,13 +61,8 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using NodeConfigFileAndDefaultsToInternalConfig,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha2 -> default -> validate -> internal -> v1alpha3
-			name:         "incompleteYAMLToDefaulted",
-			in:           node_incompleteYAML,
-			out:          node_defaultedYAML,
-			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
-		},
-		{ // v1alpha2 -> validation should fail
+		// TODO: implement v1alpha3 -> default -> validate -> v1beta1 -> v1alpha3 after introducing v1beta1
+		{ // v1alpha3 -> validation should fail
 			name:        "invalidYAMLShouldFail",
 			in:          node_invalidYAML,
 			expectedErr: true,

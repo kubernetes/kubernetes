@@ -79,11 +79,11 @@ func DetectUnsupportedVersion(b []byte) error {
 	// tell them how to upgrade. The support matrix will look something like this now and in the future:
 	// v1.10 and earlier: v1alpha1
 	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
-	// v1.12: v1alpha2 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1
-	// v1.13 and v1.14: v1beta1 read-only, writes only v1 config. Warns if the user tries to use v1alpha1 or v1alpha2.
-	// v1.15: v1 is the only supported format.
+	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Warns if the user tries to use v1alpha1
+	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1 or v1alpha2
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
+		"kubeadm.k8s.io/v1alpha2": "v1.12",
 	}
 	// If we find an old API version in this gvk list, error out and tell the user why this doesn't work
 	knownKinds := map[string]bool{}
