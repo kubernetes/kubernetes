@@ -104,7 +104,7 @@ func getReadOnly(spec *volume.Spec) (bool, error) {
 	}
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
 		// ReadOnly is specified at the PV level
-		return spec.ReadOnly, nil
+		return spec.ReadOnly || spec.PersistentVolume.Spec.FlexVolume.ReadOnly, nil
 	}
 	return false, notFlexVolume
 }
