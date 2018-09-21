@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	"github.com/pkg/errors"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -250,7 +250,7 @@ type FakeVolumePlugin struct {
 	BlockVolumeMappers   []*FakeVolume
 	BlockVolumeUnmappers []*FakeVolume
 
-	CheckDevicePath     bool
+	CheckDevicePath    bool
 	DelayUnMountDevice time.Duration
 }
 

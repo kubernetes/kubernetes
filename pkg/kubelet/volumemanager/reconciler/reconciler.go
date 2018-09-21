@@ -279,7 +279,7 @@ func (rc *reconciler) reconcile() {
 		// Check DevicePath to avoid device unmounted slow, and with desiredStateOfWorld Volume is exists,
 		if (!rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName)) ||
-			attachedVolume.DevicePath == ""	{
+			attachedVolume.DevicePath == "" {
 			if attachedVolume.GloballyMounted {
 				// Volume is globally mounted to device, unmount it
 				glog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))

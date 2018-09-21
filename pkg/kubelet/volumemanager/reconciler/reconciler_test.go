@@ -27,28 +27,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
+	"k8s.io/kubernetes/pkg/kubelet/status"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
-	"k8s.io/kubernetes/pkg/kubelet/secret"
-	"k8s.io/kubernetes/pkg/kubelet/configmap"
-	"k8s.io/kubernetes/pkg/kubelet/status"
-	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
-	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
-	"k8s.io/kubernetes/pkg/kubelet/config"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -453,7 +453,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 // Call DesiredStateOfWorldPopulator() in Five Seconds
 // Verifies one UnMountDevice call is made.
 func Test_Run_DeviceUnMount(t *testing.T) {
-	run_DeviceUnMount(t, 1*reconcilerLoopSleepLongDuration)
+	runDeviceUnMount(t, 1*reconcilerLoopSleepLongDuration)
 }
 
 // Populates desiredStateOfWorld cache with one volume/pod.
@@ -465,7 +465,7 @@ func Test_Run_DeviceUnMount(t *testing.T) {
 // Call DesiredStateOfWorldPopulator() in Five Seconds
 // Verifies one UnMountDevice call is made.
 func Test_Run_DeviceUnMountDelay(t *testing.T) {
-	run_DeviceUnMount(t, 10*reconcilerLoopSleepLongDuration)
+	runDeviceUnMount(t, 10*reconcilerLoopSleepLongDuration)
 }
 
 // Populates desiredStateOfWorld cache with one volume/pod.
@@ -476,14 +476,14 @@ func Test_Run_DeviceUnMountDelay(t *testing.T) {
 // Deletes volume/pod from desired state of world.
 // Call DesiredStateOfWorldPopulator() in Five Seconds
 // Verifies one UnMountDevice call is made.
-func run_DeviceUnMount(t *testing.T, delay time.Duration) {
+func runDeviceUnMount(t *testing.T, delay time.Duration) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	fakePlugin.DelayUnMountDevice = delay
 	fakePlugin.CheckDevicePath = true
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
-	kubeClient :=createTestClient()
+	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -560,7 +560,7 @@ func run_DeviceUnMount(t *testing.T, delay time.Duration) {
 	time.Sleep(4 * reconcilerLoopSleepLongDuration)
 	generatedVolumeName, err = dsw.AddPodToVolume(
 		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
-	run_desired_state_of_world_populator(dsw, asw)
+	runDesiredStateOfWorldPopulator(dsw, asw)
 	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -568,8 +568,8 @@ func run_DeviceUnMount(t *testing.T, delay time.Duration) {
 		1 /* expectedUnMountDeviceCallCount */, fakePlugin))
 }
 
-func run_desired_state_of_world_populator(dsw cache.DesiredStateOfWorld,
-	asw cache.ActualStateOfWorld, ) {
+func runDesiredStateOfWorldPopulator(dsw cache.DesiredStateOfWorld,
+	asw cache.ActualStateOfWorld) {
 	containers := []v1.Container{
 		{
 			VolumeMounts: []v1.VolumeMount{
@@ -582,7 +582,7 @@ func run_desired_state_of_world_populator(dsw cache.DesiredStateOfWorld,
 	}
 
 	pv := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{Name: "pv", UID: "pvuid",},
+		ObjectMeta: metav1.ObjectMeta{Name: "pv", UID: "pvuid"},
 		Spec: v1.PersistentVolumeSpec{
 			ClaimRef: &v1.ObjectReference{Name: "pvc"},
 		},
