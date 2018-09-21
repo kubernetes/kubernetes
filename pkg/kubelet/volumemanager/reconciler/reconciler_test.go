@@ -33,18 +33,29 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
+	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/kubelet/secret"
+	"k8s.io/kubernetes/pkg/kubelet/configmap"
+	"k8s.io/kubernetes/pkg/kubelet/status"
+	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
+	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
+	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
 	// reconcilerLoopSleepDuration is the amount of time the reconciler loop
 	// waits between successive executions
 	reconcilerLoopSleepDuration     time.Duration = 1 * time.Nanosecond
+	reconcilerLoopSleepLongDuration time.Duration = 1 * time.Second
 	reconcilerSyncStatesSleepPeriod time.Duration = 10 * time.Minute
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
@@ -431,6 +442,222 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyTearDownCallCount(
 		1 /* expectedTearDownCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
+}
+
+// Populates desiredStateOfWorld cache with one volume/pod.
+// Enables controllerAttachDetachEnabled.
+// Set DelayUnMountDevice = 1 * 500 * time.Millisecond
+// Calls Run()
+// Verifies one mount call is made and no unmount calls.
+// Deletes volume/pod from desired state of world.
+// Call DesiredStateOfWorldPopulator() in Five Seconds
+// Verifies one UnMountDevice call is made.
+func Test_Run_DeviceUnMount(t *testing.T) {
+	run_DeviceUnMount(t, 1*reconcilerLoopSleepLongDuration)
+}
+
+// Populates desiredStateOfWorld cache with one volume/pod.
+// Enables controllerAttachDetachEnabled.
+// Set DelayUnMountDevice = 10 * 500 * time.Millisecond
+// Calls Run()
+// Verifies one mount call is made and no unmount calls.
+// Deletes volume/pod from desired state of world.
+// Call DesiredStateOfWorldPopulator() in Five Seconds
+// Verifies one UnMountDevice call is made.
+func Test_Run_DeviceUnMountDelay(t *testing.T) {
+	run_DeviceUnMount(t, 10*reconcilerLoopSleepLongDuration)
+}
+
+// Populates desiredStateOfWorld cache with one volume/pod.
+// Enables controllerAttachDetachEnabled.
+// Set DelayUnMountDevice = delay
+// Calls Run()
+// Verifies one mount call is made and no unmount calls.
+// Deletes volume/pod from desired state of world.
+// Call DesiredStateOfWorldPopulator() in Five Seconds
+// Verifies one UnMountDevice call is made.
+func run_DeviceUnMount(t *testing.T, delay time.Duration) {
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	fakePlugin.DelayUnMountDevice = delay
+	fakePlugin.CheckDevicePath = true
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	kubeClient :=createTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		false, /* checkNodeCapabilitiesBeforeMount */
+		fakeHandler))
+	reconciler := NewReconciler(
+		kubeClient,
+		true, /* controllerAttachDetachEnabled */
+		reconcilerLoopSleepLongDuration,
+		reconcilerSyncStatesSleepPeriod,
+		waitForAttachTimeout,
+		nodeName,
+		dsw,
+		asw,
+		hasAddedPods,
+		oex,
+		&mount.FakeMounter{},
+		volumePluginMgr,
+		kubeletPodsDir)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "fake-PVC",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	podName := util.GetUniquePodName(pod)
+	generatedVolumeName, err := dsw.AddPodToVolume(
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	runReconciler(reconciler)
+
+	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
+	waitForMount(t, fakePlugin, generatedVolumeName, asw)
+
+	// Assert
+	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
+	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
+		1 /* expectedWaitForAttachCallCount */, fakePlugin))
+	assert.NoError(t, volumetesting.VerifyMountDeviceCallCount(
+		1 /* expectedMountDeviceCallCount */, fakePlugin))
+	assert.NoError(t, volumetesting.VerifySetUpCallCount(
+		1 /* expectedSetUpCallCount */, fakePlugin))
+	assert.NoError(t, volumetesting.VerifyZeroTearDownCallCount(fakePlugin))
+	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
+
+	// Act
+	dsw.DeletePodFromVolume(podName, generatedVolumeName)
+	time.Sleep(4 * reconcilerLoopSleepLongDuration)
+	generatedVolumeName, err = dsw.AddPodToVolume(
+		podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+	run_desired_state_of_world_populator(dsw, asw)
+	waitForDetach(t, fakePlugin, generatedVolumeName, asw)
+
+	// Assert
+	assert.NoError(t, volumetesting.VerifyUnMountDeviceCallCount(
+		1 /* expectedUnMountDeviceCallCount */, fakePlugin))
+}
+
+func run_desired_state_of_world_populator(dsw cache.DesiredStateOfWorld,
+	asw cache.ActualStateOfWorld, ) {
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{Name: "pv", UID: "pvuid",},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef: &v1.ObjectReference{Name: "pvc"},
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: "pv",
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
+		},
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: "fake-PVC",
+						},
+					},
+				},
+			},
+			Containers: containers,
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPhase("Running"),
+		},
+	}
+
+	fakeClient := &fake.Clientset{}
+	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		return true, pvc, nil
+	})
+	fakeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
+		return true, pv, nil
+	})
+
+	fakeSecretManager := secret.NewFakeManager()
+	fakeConfigMapManager := configmap.NewFakeManager()
+	fakePodManager := kubepod.NewBasicPodManager(
+		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager, podtest.NewMockCheckpointManager())
+	fakeRuntime := &containertest.FakeRuntime{}
+	fakeStatusManager := status.NewManager(fakeClient, fakePodManager, &statustest.FakePodDeletionSafetyProvider{})
+
+	dswp := populator.NewDesiredStateOfWorldPopulator(
+		fakeClient,
+		100*time.Millisecond,
+		2*time.Second,
+		fakePodManager,
+		fakeStatusManager,
+		dsw,
+		asw,
+		fakeRuntime,
+		false,
+	)
+	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		return true, pvc, nil
+	})
+	fakeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
+		return true, pv, nil
+	})
+	fakePodManager.AddPod(pod)
+
+	go dswp.Run(sourcesReady, wait.NeverStop)
 }
 
 // Populates desiredStateOfWorld cache with one volume/pod.
