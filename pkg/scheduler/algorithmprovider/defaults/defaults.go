@@ -184,7 +184,10 @@ func ApplyFeatureGates() {
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		// Remove "CheckNodeCondition", "CheckNodeMemoryPressure", "CheckNodePIDPressurePred"
 		// and "CheckNodeDiskPressure" predicates
-		factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
+
+		// TODO(bsalamat): uncomment the following line to remove "CheckNodeCondition" in 1.13.
+		//                 We had to add it back in 1.12 to get the upgrade tests pass. Issue #68899.
+		// factory.RemoveFitPredicate(predicates.CheckNodeConditionPred)
 		factory.RemoveFitPredicate(predicates.CheckNodeMemoryPressurePred)
 		factory.RemoveFitPredicate(predicates.CheckNodeDiskPressurePred)
 		factory.RemoveFitPredicate(predicates.CheckNodePIDPressurePred)
@@ -192,7 +195,9 @@ func ApplyFeatureGates() {
 		// from ALL algorithm provider
 		// The key will be removed from all providers which in algorithmProviderMap[]
 		// if you just want remove specific provider, call func RemovePredicateKeyFromAlgoProvider()
-		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeConditionPred)
+
+		// TODO(bsalamat): same as above TODO. Uncomment the following line in 1.13.
+		// factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeConditionPred)
 		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeMemoryPressurePred)
 		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodeDiskPressurePred)
 		factory.RemovePredicateKeyFromAlgorithmProviderMap(predicates.CheckNodePIDPressurePred)
