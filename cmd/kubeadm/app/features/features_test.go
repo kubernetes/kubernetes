@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 var TestMinVersion = version.MustParseSemantic("v1.11.0-alpha.1")

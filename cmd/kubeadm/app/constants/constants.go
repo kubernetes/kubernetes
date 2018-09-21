@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // KubernetesDir is the directory kubernetes owns for storing various configuration files
