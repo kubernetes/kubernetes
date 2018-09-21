@@ -631,6 +631,12 @@ func (ss *scaleSet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, back
 		instanceIDs = append(instanceIDs, instanceID)
 	}
 
+	if len(instanceIDs) == 0 {
+		glog.V(3).Infof("scale set %q has 0 nodes, adding it to load balancer anyway", vmSetName)
+		// InstanceIDs is required to update vmss, use * instead here since there are no nodes actually.
+		instanceIDs = []string{"*"}
+	}
+
 	// Update instances to latest VMSS model.
 	vmInstanceIDs := computepreview.VirtualMachineScaleSetVMInstanceRequiredIDs{
 		InstanceIds: &instanceIDs,
