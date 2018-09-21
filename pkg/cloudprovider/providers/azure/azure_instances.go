@@ -28,6 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+const (
+	vmPowerStatePrefix      = "PowerState/"
+	vmPowerStateStopped     = "stopped"
+	vmPowerStateDeallocated = "deallocated"
+)
+
 // NodeAddresses returns the addresses of the specified instance.
 func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	// Returns nil for unmanaged nodes because azure cloud provider couldn't fetch information for them.
@@ -148,12 +154,13 @@ func (az *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID st
 		return false, err
 	}
 
-	provisioningState, err := az.vmSet.GetProvisioningStateByNodeName(string(nodeName))
+	powerStatus, err := az.vmSet.GetPowerStatusByNodeName(string(nodeName))
 	if err != nil {
 		return false, err
 	}
+	glog.V(5).Infof("InstanceShutdownByProviderID gets power status %q for node %q", powerStatus, nodeName)
 
-	return strings.ToLower(provisioningState) == "stopped" || strings.ToLower(provisioningState) == "deallocated", nil
+	return strings.ToLower(powerStatus) == vmPowerStateStopped || strings.ToLower(powerStatus) == vmPowerStateDeallocated, nil
 }
 
 // getComputeMetadata gets compute information from instance metadata.
