@@ -313,11 +313,12 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 }
 
 // adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.
-func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) error {
-	revisions, err := ssc.control.ListRevisions(set)
+func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet, selector labels.Selector) error {
+	revisions, err := ssc.control.ListRevisions(set, selector)
 	if err != nil {
 		return err
 	}
+
 	hasOrphans := false
 	for i := range revisions {
 		if metav1.GetControllerOf(revisions[i]) == nil {
@@ -325,6 +326,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 			break
 		}
 	}
+
 	if hasOrphans {
 		fresh, err := ssc.kubeClient.AppsV1().StatefulSets(set.Namespace).Get(set.Name, metav1.GetOptions{})
 		if err != nil {
@@ -335,6 +337,7 @@ func (ssc *StatefulSetController) adoptOrphanRevisions(set *apps.StatefulSet) er
 		}
 		return ssc.control.AdoptOrphanRevisions(set, revisions)
 	}
+
 	return nil
 }
 
@@ -439,7 +442,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 		return nil
 	}
 
-	if err := ssc.adoptOrphanRevisions(set); err != nil {
+	if err := ssc.adoptOrphanRevisions(set, selector); err != nil {
 		return err
 	}
 

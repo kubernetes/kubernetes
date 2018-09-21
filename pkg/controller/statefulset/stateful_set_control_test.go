@@ -512,7 +512,11 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		for i := range test.existing {
 			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i], test.set.Status.CollisionCount)
 		}
-		revisions, err := ssc.ListRevisions(test.set)
+		selector, err := metav1.LabelSelectorAsSelector(test.set.Spec.Selector)
+		if err != nil {
+			t.Fatal(err)
+		}
+		revisions, err := ssc.ListRevisions(test.set, selector)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -520,7 +524,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error getting statefulset revisions:%v", err)
 		}
-		revisions, err = ssc.ListRevisions(test.set)
+		revisions, err = ssc.ListRevisions(test.set, selector)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1241,7 +1245,7 @@ func TestStatefulSetControlLimitsHistory(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
-			revisions, err := ssc.ListRevisions(set)
+			revisions, err := ssc.ListRevisions(set, selector)
 			if err != nil {
 				t.Fatalf("%s: %s", test.name, err)
 			}
@@ -1315,7 +1319,7 @@ func TestStatefulSetControlRollback(t *testing.T) {
 		if err := test.validateUpdate(set, pods); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
-		revisions, err := ssc.ListRevisions(set)
+		revisions, err := ssc.ListRevisions(set, selector)
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}

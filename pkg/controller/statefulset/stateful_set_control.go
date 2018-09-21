@@ -25,6 +25,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
@@ -40,7 +41,7 @@ type StatefulSetControlInterface interface {
 	UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error
 	// ListRevisions returns a array of the ControllerRevisions that represent the revisions of set. If the returned
 	// error is nil, the returns slice of ControllerRevisions is valid.
-	ListRevisions(set *apps.StatefulSet) ([]*apps.ControllerRevision, error)
+	ListRevisions(set *apps.StatefulSet, selector labels.Selector) ([]*apps.ControllerRevision, error)
 	// AdoptOrphanRevisions adopts any orphaned ControllerRevisions that match set's Selector. If all adoptions are
 	// successful the returned error is nil.
 	AdoptOrphanRevisions(set *apps.StatefulSet, revisions []*apps.ControllerRevision) error
@@ -73,9 +74,12 @@ type defaultStatefulSetControl struct {
 // in no particular order. Clients using the burst strategy should be careful to ensure they
 // understand the consistency implications of having unpredictable numbers of pods available.
 func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
-
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return err
+	}
 	// list all revisions and sort them
-	revisions, err := ssc.ListRevisions(set)
+	revisions, err := ssc.ListRevisions(set, selector)
 	if err != nil {
 		return err
 	}
@@ -117,11 +121,7 @@ func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, p
 	return ssc.truncateHistory(set, pods, revisions, currentRevision, updateRevision)
 }
 
-func (ssc *defaultStatefulSetControl) ListRevisions(set *apps.StatefulSet) ([]*apps.ControllerRevision, error) {
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
+func (ssc *defaultStatefulSetControl) ListRevisions(set *apps.StatefulSet, selector labels.Selector) ([]*apps.ControllerRevision, error) {
 	return ssc.controllerHistory.ListControllerRevisions(set, selector)
 }
 
