@@ -105,9 +105,10 @@ func TestApplyFeatureGates(t *testing.T) {
 				t.Fatalf("Failed to find predicate: 'PodToleratesNodeTaints'")
 			}
 
-			if p.FitPredicateKeys.Has("CheckNodeCondition") {
-				t.Fatalf("Unexpected predicate: 'CheckNodeCondition'")
-			}
+			// TODO(bsalamat): Add this again in 1.13. Issue #68899.
+			//if p.FitPredicateKeys.Has("CheckNodeCondition") {
+			//	t.Fatalf("Unexpected predicate: 'CheckNodeCondition'")
+			//}
 		})
 	}
 }
