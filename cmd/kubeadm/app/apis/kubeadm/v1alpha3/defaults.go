@@ -33,7 +33,7 @@ const (
 	// DefaultClusterDNSIP defines default DNS IP
 	DefaultClusterDNSIP = "10.96.0.10"
 	// DefaultKubernetesVersion defines default kubernetes version
-	DefaultKubernetesVersion = "stable-1.11"
+	DefaultKubernetesVersion = "stable-1"
 	// DefaultAPIBindPort defines default API port
 	DefaultAPIBindPort = 6443
 	// DefaultCertificatesDir defines default certificate directory
