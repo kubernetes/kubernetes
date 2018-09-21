@@ -199,6 +199,24 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 			return nil, nil
 		}
 
+		// Get instanceView for vmssVM.
+		if result.InstanceView == nil {
+			viewCtx, viewCancel := getContextWithCancel()
+			defer viewCancel()
+			view, err := ss.VirtualMachineScaleSetVMsClient.GetInstanceView(viewCtx, resourceGroup, ssName, instanceID)
+			// It is possible that the vmssVM gets removed just before this call. So check whether the VM exist again.
+			exists, message, realErr = checkResourceExistsFromError(err)
+			if realErr != nil {
+				return nil, realErr
+			}
+			if !exists {
+				glog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
+				return nil, nil
+			}
+
+			result.InstanceView = &view
+		}
+
 		return &result, nil
 	}
 

@@ -128,13 +128,24 @@ func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm co
 	return ssName, instanceID, *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
 }
 
-func (ss *scaleSet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+// GetPowerStatusByNodeName returns the power state of the specified node.
+func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
 	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		return provisioningState, err
+		return powerState, err
 	}
 
-	return *vm.ProvisioningState, nil
+	if vm.InstanceView != nil && vm.InstanceView.Statuses != nil {
+		statuses := *vm.InstanceView.Statuses
+		for _, status := range statuses {
+			state := to.String(status.Code)
+			if strings.HasPrefix(state, vmPowerStatePrefix) {
+				return strings.TrimPrefix(state, vmPowerStatePrefix), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to get power status for node %q", name)
 }
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
