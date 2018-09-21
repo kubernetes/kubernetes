@@ -110,8 +110,11 @@ func NewNodeIpamController(
 		glog.Fatal("Controller: Must specify --cluster-cidr if --allocate-node-cidrs is set")
 	}
 	mask := clusterCIDR.Mask
-	if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
-		glog.Fatal("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than --node-cidr-mask-size")
+	if allocatorType != ipam.CloudAllocatorType {
+		// Cloud CIDR allocator does not rely on clusterCIDR or nodeCIDRMaskSize for allocation.
+		if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
+			glog.Fatal("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than --node-cidr-mask-size")
+		}
 	}
 
 	ic := &Controller{
