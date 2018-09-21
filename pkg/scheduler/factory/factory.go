@@ -131,7 +131,7 @@ type configFactory struct {
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
 
-	// always check all predicates even if the middle of one predicate fails.
+	// Always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
 
 	// Disable pod preemption or not.
@@ -162,7 +162,7 @@ type ConfigFactoryArgs struct {
 	BindTimeoutSeconds             int64
 }
 
-// NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
+// NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
 // return the interface.
 func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	stopEverything := make(chan struct{})

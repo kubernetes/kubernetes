@@ -186,7 +186,7 @@ func (sched *Scheduler) Run() {
 	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
 }
 
-// Config return scheduler's config pointer. It is exposed for testing purposes.
+// Config returns scheduler's config pointer. It is exposed for testing purposes.
 func (sched *Scheduler) Config() *Config {
 	return sched.config
 }
