@@ -19,6 +19,8 @@ limitations under the License.
 package internalversion
 
 import (
+	"time"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -80,11 +82,16 @@ func (c *deployments) Get(name string, options v1.GetOptions) (result *extension
 
 // List takes label and field selectors, and returns the list of Deployments that match those selectors.
 func (c *deployments) List(opts v1.ListOptions) (result *extensions.DeploymentList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds)
+	}
 	result = &extensions.DeploymentList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -92,11 +99,16 @@ func (c *deployments) List(opts v1.ListOptions) (result *extensions.DeploymentLi
 
 // Watch returns a watch.Interface that watches the requested deployments.
 func (c *deployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds)
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -154,10 +166,15 @@ func (c *deployments) Delete(name string, options *v1.DeleteOptions) error {
 
 // DeleteCollection deletes a collection of objects.
 func (c *deployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds)
+	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("deployments").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

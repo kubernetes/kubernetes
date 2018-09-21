@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -76,11 +78,16 @@ func (c *statefulSets) Get(name string, options metav1.GetOptions) (result *v1.S
 
 // List takes label and field selectors, and returns the list of StatefulSets that match those selectors.
 func (c *statefulSets) List(opts metav1.ListOptions) (result *v1.StatefulSetList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds)
+	}
 	result = &v1.StatefulSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -88,11 +95,16 @@ func (c *statefulSets) List(opts metav1.ListOptions) (result *v1.StatefulSetList
 
 // Watch returns a watch.Interface that watches the requested statefulSets.
 func (c *statefulSets) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds)
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -150,10 +162,15 @@ func (c *statefulSets) Delete(name string, options *metav1.DeleteOptions) error 
 
 // DeleteCollection deletes a collection of objects.
 func (c *statefulSets) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds)
+	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("statefulsets").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()
