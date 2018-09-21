@@ -96,6 +96,7 @@ ComponentConfigs:
     ContainerLogMaxFiles: 5
     ContainerLogMaxSize: 10Mi
     ContentType: application/vnd.kubernetes.protobuf
+    DefaultDNSOptions: null
     EnableContentionProfiling: false
     EnableControllerAttachDetach: true
     EnableDebuggingHandlers: true

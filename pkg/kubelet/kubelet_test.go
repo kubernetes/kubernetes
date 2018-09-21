@@ -476,7 +476,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		Namespace: "",
 	}
 	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}
 	pods := []*v1.Pod{
@@ -522,7 +522,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 		Namespace: "",
 	}
 	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	// default NodeName in test is 127.0.0.1
 	pods := []*v1.Pod{
@@ -565,7 +565,7 @@ func TestHandleNodeSelector(t *testing.T) {
 		Namespace: "",
 	}
 	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: map[string]string{"key": "A"}}),
@@ -605,7 +605,7 @@ func TestHandleMemExceeded(t *testing.T) {
 		Namespace: "",
 	}
 	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	spec := v1.PodSpec{NodeName: string(kl.nodeName),
 		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
@@ -700,7 +700,7 @@ func TestHandlePluginResources(t *testing.T) {
 		Namespace: "",
 	}
 	testClusterDNSDomain := "TEST"
-	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
 	// adjusts node.allocatableResource for this resource to a sufficient value.

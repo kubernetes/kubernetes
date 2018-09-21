@@ -38,11 +38,6 @@ import (
 	"k8s.io/klog"
 )
 
-var (
-	// The default dns opt strings.
-	defaultDNSOptions = []string{"ndots:5"}
-)
-
 type podDNSType int
 
 const (
@@ -65,17 +60,20 @@ type Configurer struct {
 	// the container's DNS resolver configuration file. This can be used in
 	// conjunction with clusterDomain and clusterDNS.
 	ResolverConfig string
+	// If not-nil, use this for default container DNS options
+	DefaultDNSOptions []string
 }
 
 // NewConfigurer returns a DNS configurer for launching pods.
-func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIP net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
+func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIP net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string, defaultDNSOptions []string) *Configurer {
 	return &Configurer{
-		recorder:       recorder,
-		nodeRef:        nodeRef,
-		nodeIP:         nodeIP,
-		clusterDNS:     clusterDNS,
-		ClusterDomain:  clusterDomain,
-		ResolverConfig: resolverConfig,
+		recorder:          recorder,
+		nodeRef:           nodeRef,
+		nodeIP:            nodeIP,
+		clusterDNS:        clusterDNS,
+		ClusterDomain:     clusterDomain,
+		ResolverConfig:    resolverConfig,
+		DefaultDNSOptions: defaultDNSOptions,
 	}
 }
 
@@ -355,7 +353,12 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 				dnsConfig.Servers = append(dnsConfig.Servers, ip.String())
 			}
 			dnsConfig.Searches = c.generateSearchesForDNSClusterFirst(dnsConfig.Searches, pod)
-			dnsConfig.Options = defaultDNSOptions
+			if c.DefaultDNSOptions == nil {
+				klog.V(4).Infof("Using Default DNS Options 'ndots:5'")
+				dnsConfig.Options = []string{"ndots:5"}
+			} else {
+				dnsConfig.Options = c.DefaultDNSOptions
+			}
 			break
 		}
 		// clusterDNS is not known. Pod with ClusterDNSFirst Policy cannot be created.

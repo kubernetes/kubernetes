@@ -158,6 +158,7 @@ var (
 		"ContainerLogMaxFiles",
 		"ContainerLogMaxSize",
 		"ContentType",
+		"DefaultDNSOptions[*]",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",
 		"EnableDebuggingHandlers",

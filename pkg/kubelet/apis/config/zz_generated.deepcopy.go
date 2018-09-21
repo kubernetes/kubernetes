@@ -124,6 +124,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	if in.DefaultDNSOptions != nil {
+		in, out := &in.DefaultDNSOptions, &out.DefaultDNSOptions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.CPUCFSQuotaPeriod = in.CPUCFSQuotaPeriod
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard

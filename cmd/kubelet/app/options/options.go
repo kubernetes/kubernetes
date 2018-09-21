@@ -563,6 +563,7 @@ func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfig
 	fs.Int64Var(&c.PodPidsLimit, "pod-max-pids", c.PodPidsLimit, "<Warning: Alpha feature> Set the maximum number of processes per pod.")
 
 	fs.StringVar(&c.ResolverConfig, "resolv-conf", c.ResolverConfig, "Resolver configuration file used as the basis for the container DNS resolution configuration.")
+	fs.StringSliceVar(&c.DefaultDNSOptions, "default-dns-options", c.DefaultDNSOptions, "A comma separated list of DNS options. The content of this list will be merged with the (optional) per-pod dnsConfig, with the per-pod settings taking precedence. If not specified, the default values are implementation-defined.")
 	fs.BoolVar(&c.CPUCFSQuota, "cpu-cfs-quota", c.CPUCFSQuota, "Enable CPU CFS quota enforcement for containers that specify CPU limits")
 	fs.DurationVar(&c.CPUCFSQuotaPeriod.Duration, "cpu-cfs-quota-period", c.CPUCFSQuotaPeriod.Duration, "Sets CPU CFS quota period value, cpu.cfs_period_us, defaults to Linux Kernel default")
 	fs.BoolVar(&c.EnableControllerAttachDetach, "enable-controller-attach-detach", c.EnableControllerAttachDetach, "Enables the Attach/Detach controller to manage attachment/detachment of volumes scheduled to this node, and disables kubelet from executing any attach/detach operations")

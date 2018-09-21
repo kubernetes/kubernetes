@@ -108,7 +108,7 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 	}
 	testClusterDNSDomain := "TEST"
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -170,7 +170,7 @@ func TestFormDNSNameserversFitsLimits(t *testing.T) {
 	}
 	testClusterDNSDomain := "TEST"
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -285,7 +285,7 @@ func TestGetPodDNSType(t *testing.T) {
 	clusterNS := "203.0.113.1"
 	testClusterDNS := []net.IP{net.ParseIP(clusterNS)}
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "", nil)
 
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -398,7 +398,7 @@ func TestGetPodDNS(t *testing.T) {
 	testClusterDNSDomain := "kubernetes.io"
 	testClusterDNS := []net.IP{net.ParseIP(clusterNS)}
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, "")
+	configurer := NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, "", nil)
 
 	pods := newTestPods(4)
 	pods[0].Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
@@ -445,7 +445,7 @@ func TestGetPodDNS(t *testing.T) {
 	}
 
 	testResolverConfig := "/etc/resolv.conf"
-	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig)
+	configurer = NewConfigurer(recorder, nodeRef, nil, testClusterDNS, testClusterDNSDomain, testResolverConfig, nil)
 	for i, pod := range pods {
 		var err error
 		dnsConfig, err := configurer.GetPodDNS(pod)
@@ -527,7 +527,8 @@ func TestGetPodDNSCustom(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{net.ParseIP(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
+	testDefaultDNSOptions := []string{"ndots:3", "timeout:3"}
+	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{net.ParseIP(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name(), testDefaultDNSOptions)
 
 	testCases := []struct {
 		desc                    string
@@ -543,7 +544,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
-				Options:  []string{"ndots:5"},
+				Options:  []string{"ndots:3", "timeout:3"},
 			},
 		},
 		{
@@ -585,7 +586,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "timeout:3", "debug"},
 			},
 		},
 		{
@@ -604,7 +605,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "timeout:3", "debug"},
 			},
 		},
 		{
