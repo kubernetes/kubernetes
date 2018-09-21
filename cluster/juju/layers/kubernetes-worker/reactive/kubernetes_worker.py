@@ -732,6 +732,12 @@ def configure_kubelet(dns, ingress_ip):
                 'DevicePlugins': True
             }
 
+        # Workaround for DNS on bionic
+        # https://github.com/juju-solutions/bundle-canonical-kubernetes/issues/655
+        systemd_resolv_path = '/run/systemd/resolve/resolv.conf'
+        if os.path.isfile(systemd_resolv_path):
+            kubelet_config['resolvConf'] = systemd_resolv_path
+
         # Add kubelet-extra-config. This needs to happen last so that it
         # overrides any config provided by the charm.
         kubelet_extra_config = hookenv.config('kubelet-extra-config')
@@ -759,6 +765,12 @@ def configure_kubelet(dns, ingress_ip):
             kubelet_opts['cluster-dns'] = dns['sdn-ip']
         if is_state('kubernetes-worker.gpu.enabled'):
             kubelet_opts['feature-gates'] = 'DevicePlugins=true'
+
+        # Workaround for DNS on bionic, for k8s 1.9
+        # https://github.com/juju-solutions/bundle-canonical-kubernetes/issues/655
+        systemd_resolv_path = '/run/systemd/resolve/resolv.conf'
+        if os.path.isfile(systemd_resolv_path):
+            kubelet_opts['resolv-conf'] = systemd_resolv_path
 
     if get_version('kubelet') >= (1, 11):
         kubelet_opts['dynamic-config-dir'] = '/root/cdk/kubelet/dynamic-config'
