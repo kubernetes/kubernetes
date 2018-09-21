@@ -894,6 +894,6 @@ func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, e
 	return nil, fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetProvisioningStateByNodeName(name string) (string, error) {
+func (f *fakeVMSet) GetPowerStatusByNodeName(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
 }

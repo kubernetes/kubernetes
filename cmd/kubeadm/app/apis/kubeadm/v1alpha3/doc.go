@@ -16,12 +16,47 @@ limitations under the License.
 
 // Package v1alpha3 is the API (config file) for driving the kubeadm binary.
 // Some of these options are also available as command line flags, but
-// the preferred way to configure kubeadm is to pass a YAML file in with the
-// --config option.
+// the preferred way to configure kubeadm is to pass a single YAML file with
+// multiple configuration types in with the --config option.
 //
-// A fully populated example of the schema:
+// kubeadm defines several configuration types:
+// * InitConfiguration
+// * JoinConfiguration
+// * ClusterConfiguration
+//
+// InitConfiguration and JoinConfiguration cannot share a single YAML file,
+// however it is expected that InitConfiguration and ClusterConfiguration will
+// share a single YAML file.
+//
+//  A fully populated example of a single YAML file containing multiple
+//  configuration types to be used during a `kubeadm init` run.
 //	apiVersion: kubeadm.k8s.io/v1alpha3
 //	kind: InitConfiguration
+//	bootstrapTokens:
+//	- token: "9a08jv.c0izixklcxtmnze7"
+//	  description: "kubeadm bootstrap token"
+//	  ttl: "24h"
+//	- token: "783bde.3f89s0fje9f38fhf"
+//	  description: "another bootstrap token"
+//	  usages:
+//	  - signing
+//	  groups:
+//	  - system:anonymous
+//	nodeRegistration:
+//	  name: "ec2-10-100-0-1"
+//	  criSocket: "/var/run/dockershim.sock"
+//	  taints:
+//	  - key: "kubeadmNode"
+//	    value: "master"
+//	    effect: "NoSchedule"
+//	  kubeletExtraArgs:
+//	    cgroupDriver: "cgroupfs"
+//	apiEndpoint:
+//	  advertiseAddress: "10.100.0.1"
+//	  bindPort: 6443
+//	---
+//	apiVersion: kubeadm.k8s.io/v1alpha3
+//	kind: ClusterConfiguration
 //	etcd:
 //	  # one of local or external
 //	  local:
@@ -52,13 +87,31 @@ limitations under the License.
 //	  node-cidr-mask-size: 20
 //	schedulerExtraArgs:
 //	  address: "10.100.0.1"
+//	apiServerExtraVolumes:
+//	- name: "some-volume"
+//	  hostPath: "/etc/some-path"
+//	  mountPath: "/etc/some-pod-path"
+//	  writable: true
+//	  pathType: File
+//	controllerManagerExtraVolumes:
+//	- name: "some-volume"
+//	  hostPath: "/etc/some-path"
+//	  mountPath: "/etc/some-pod-path"
+//	  writable: true
+//	  pathType: File
+//	schedulerExtraVolumes:
+//	- name: "some-volume"
+//	  hostPath: "/etc/some-path"
+//	  mountPath: "/etc/some-pod-path"
+//	  writable: true
+//	  pathType: File
 //	apiServerCertSANs:
 //	- "10.100.1.1"
 //	- "ec2-10-100-0-1.compute-1.amazonaws.com"
-//	certificateDirectory: "/etc/kubernetes/pki"
+//	certificatesDir: "/etc/kubernetes/pki"
 //	imageRepository: "k8s.gcr.io"
 //	unifiedControlPlaneImage: "k8s.gcr.io/controlplane:v1.12.0"
-//	auditPolicyConfiguration:
+//	auditPolicy:
 //	  # https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#audit-policy
 //	  path: "/var/log/audit/audit.json"
 //	  logDir: "/var/log/audit"
@@ -66,27 +119,6 @@ limitations under the License.
 //	featureGates:
 //	  selfhosting: false
 //	clusterName: "example-cluster"
-//	bootstrapTokens:
-//	- token: "9a08jv.c0izixklcxtmnze7"
-//	  description: "kubeadm bootstrap token"
-//	  ttl: "24h"
-//	  usages:
-//	  - "authentication"
-//	  - "signing"
-//	  groups:
-//	  - "system:bootstrappers:kubeadm:default-node-token"
-//	nodeRegistration:
-//	  name: "ec2-10-100-0-1"
-//	  criSocket: "/var/run/dockershim.sock"
-//	  taints:
-//	  - key: "kubeadmNode"
-//	    value: "master"
-//	    effect: "NoSchedule"
-//	  kubeletExtraArgs:
-//	    cgroupDriver: "cgroupfs"
-//	apiEndpoint:
-//	  advertiseAddress: "10.100.0.1"
-//	  bindPort: 6443
 //
 // TODO: The BootstrapTokenString object should move out to either k8s.io/client-go or k8s.io/api in the future
 // (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.

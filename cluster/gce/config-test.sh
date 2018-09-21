@@ -55,9 +55,6 @@ REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
 KUBE_APISERVER_REQUEST_TIMEOUT=300
 PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
 PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
-if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
-    NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
-fi
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
 CREATE_CUSTOM_NETWORK=${CREATE_CUSTOM_NETWORK:-false}
@@ -176,7 +173,7 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.2.24-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.2.24-1) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -214,6 +211,12 @@ KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
+
+if [[ "${PREEMPTIBLE_MASTER}" == "true" ]]; then
+    NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
+elif [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
+    NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
+fi
 
 # Optional: Enable netd.
 ENABLE_NETD="${KUBE_ENABLE_NETD:-false}"
@@ -260,7 +263,7 @@ fi
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
     FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
-        NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
+        NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
 fi
 

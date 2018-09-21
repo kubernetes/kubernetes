@@ -65,6 +65,6 @@ type VMSet interface {
 	// GetDataDisks gets a list of data disks attached to the node.
 	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
 
-	// GetProvisioningStateByNodeName gets the provisioning state by node name.
-	GetProvisioningStateByNodeName(name string) (string, error)
+	// GetPowerStatusByNodeName returns the power state of the specified node.
+	GetPowerStatusByNodeName(name string) (string, error)
 }

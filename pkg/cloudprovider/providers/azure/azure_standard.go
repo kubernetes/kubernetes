@@ -346,13 +346,24 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	return *machine.ID, nil
 }
 
-func (as *availabilitySet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+// GetPowerStatusByNodeName returns the power state of the specified node.
+func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
 	vm, err := as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
-		return provisioningState, err
+		return powerState, err
 	}
 
-	return *vm.ProvisioningState, nil
+	if vm.InstanceView != nil && vm.InstanceView.Statuses != nil {
+		statuses := *vm.InstanceView.Statuses
+		for _, status := range statuses {
+			state := to.String(status.Code)
+			if strings.HasPrefix(state, vmPowerStatePrefix) {
+				return strings.TrimPrefix(state, vmPowerStatePrefix), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to get power status for node %q", name)
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.
