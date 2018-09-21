@@ -34,7 +34,7 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
-var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func() {
+var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	var cs clientset.Interface
 	var nodeList *v1.NodeList
 	var ns string
@@ -315,7 +315,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial] [Feature:PodPreemption]", func
 	})
 })
 
-var _ = SIGDescribe("PodPriorityResolution [Serial] [Feature:PodPreemption]", func() {
+var _ = SIGDescribe("PodPriorityResolution [Serial]", func() {
 	var cs clientset.Interface
 	var ns string
 	f := framework.NewDefaultFramework("sched-pod-priority")

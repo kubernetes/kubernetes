@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.18 3.2.24] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,7 +26,7 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=2.2.1 2.3.7 3.0.17 3.1.12 3.2.18 3.2.24
+BUNDLED_ETCD_VERSIONS?=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
 LATEST_ETCD_VERSION?=3.2.24
@@ -34,17 +34,23 @@ LATEST_ETCD_VERSION?=3.2.24
 # REVISION provides a version number fo this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
 
 ARCH?=amd64
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 # Image should be pulled from k8s.gcr.io, which will auto-detect
 # region (us, eu, asia, ...) and pull from the closest.
 REGISTRY?=k8s.gcr.io
 # Images should be pushed to staging-k8s.gcr.io.
 PUSH_REGISTRY?=staging-k8s.gcr.io
+
+MANIFEST_IMAGE := $(PUSH_REGISTRY)/etcd
+
+# This option is for running docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version from https://github.com/coreos/etcd/releases for the current ETCD_VERSION.
 GOLANG_VERSION?=1.8.7
 GOARM=7
@@ -118,14 +124,25 @@ endif
 	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(TEMP_DIR)
 
 push: build
-	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(PUSH_REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG)
-	docker push $(PUSH_REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG)
+	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)
+	docker push $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)
 
-ifeq ($(ARCH),amd64)
-	# Backward compatibility. TODO: deprecate this image tag
-	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(PUSH_REGISTRY)/etcd:$(IMAGE_TAG)
-	docker push $(PUSH_REGISTRY)/etcd:$(IMAGE_TAG)
-endif
+sub-build-%:
+	$(MAKE) ARCH=$* build
+
+all-build: $(addprefix sub-build-,$(ALL_ARCH))
+
+sub-push-image-%:
+	$(MAKE) ARCH=$* push
+
+all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
+
+all-push: all-push-images push-manifest
+
+push-manifest:
+	docker manifest create --amend $(MANIFEST_IMAGE):$(IMAGE_TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(MANIFEST_IMAGE)\-&:$(IMAGE_TAG)~g")
+	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${MANIFEST_IMAGE}:${IMAGE_TAG} ${MANIFEST_IMAGE}-$${arch}:${IMAGE_TAG}; done
+	docker manifest push ${MANIFEST_IMAGE}:${IMAGE_TAG}
 
 unit-test:
 	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
@@ -146,5 +163,5 @@ integration-test:
 
 integration-build-test: build-integration-test-image integration-test
 test: unit-test integration-build-test
-all: build test
-.PHONY:	build push unit-test build-integration-test-image integration-test integration-build-test test
+all: all-build test
+.PHONY:	build push push-manifest all-push all-push-images all-build unit-test build-integration-test-image integration-test integration-build-test test
