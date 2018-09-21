@@ -12,7 +12,8 @@ go_library(
         "doc.go",
         "version.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/util/version",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/version",
+    importpath = "k8s.io/apimachinery/pkg/util/version",
 )
 
 go_test(
