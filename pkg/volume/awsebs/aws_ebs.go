@@ -175,9 +175,11 @@ func (plugin *awsElasticBlockStorePlugin) newMounterInternal(spec *volume.Spec, 
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
-		fsType:      fsType,
-		readOnly:    readOnly,
-		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		fsType:       fsType,
+		readOnly:     readOnly,
+		diskMounter:  util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mountOptions: util.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -343,7 +345,8 @@ type awsElasticBlockStoreMounter struct {
 	// Specifies whether the disk will be attached as read-only.
 	readOnly bool
 	// diskMounter provides the interface that is used to mount the actual block device.
-	diskMounter *mount.SafeFormatAndMount
+	diskMounter  *mount.SafeFormatAndMount
+	mountOptions []string
 }
 
 var _ volume.Mounter = &awsElasticBlockStoreMounter{}
@@ -392,7 +395,8 @@ func (b *awsElasticBlockStoreMounter) SetUpAt(dir string, fsGroup *int64) error 
 	if b.readOnly {
 		options = append(options, "ro")
 	}
-	err = b.mounter.Mount(globalPDPath, dir, "", options)
+	mountOptions := util.JoinMountOptions(options, b.mountOptions)
+	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {

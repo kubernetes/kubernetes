@@ -211,7 +211,8 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
-		readOnly: readOnly}, nil
+		mountOptions: util.MountOptionFromSpec(spec),
+		readOnly:     readOnly}, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -329,7 +330,8 @@ type gcePersistentDisk struct {
 type gcePersistentDiskMounter struct {
 	*gcePersistentDisk
 	// Specifies whether the disk will be mounted as read-only.
-	readOnly bool
+	readOnly     bool
+	mountOptions []string
 }
 
 var _ volume.Mounter = &gcePersistentDiskMounter{}
@@ -381,7 +383,9 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pdName)
 	glog.V(4).Infof("attempting to mount %s", dir)
 
-	err = b.mounter.Mount(globalPDPath, dir, "", options)
+	mountOptions := util.JoinMountOptions(b.mountOptions, options)
+
+	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
