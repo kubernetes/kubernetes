@@ -374,6 +374,12 @@ data:
       @type null
     </match>
 
+    # Add a unique insertId to each log entry that doesn't already have it.
+    # This helps guarantee the order and prevent log duplication.
+    <filter **>
+      @type add_insert_ids
+    </filter>
+
     # This section is exclusive for k8s_container logs. These logs come with
     # 'stderr'/'stdout' tags.
     # We use a separate output stanza for 'k8s_node' logs with a smaller buffer
