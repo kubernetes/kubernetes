@@ -59,7 +59,10 @@ func NewGRPCService(endpoint string) (Service, error) {
 		return nil, err
 	}
 
-	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(timeout), grpc.WithDialer(unixDial))
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	connection, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(unixDial))
 	if err != nil {
 		return nil, fmt.Errorf("connect remote KMS provider %q failed, error: %v", addr, err)
 	}
