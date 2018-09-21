@@ -514,8 +514,10 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks *bool) (map
 		}
 		serviceName := service.Name
 
-		// for the case whether the master service namespace is the namespace the pod
-		// is in, the pod should receive all the services in the namespace.
+		// We always want to add environment variabled for master services
+		// from the master service namespace, even if enableServiceLinks is false.
+		// We also add enviroment variables for other services in the same
+		// namespace, if enableServiceLinks is true.
 		if service.Namespace == kl.masterServiceNamespace && masterServices.Has(serviceName) {
 			if _, exists := serviceMap[serviceName]; !exists {
 				serviceMap[serviceName] = service
