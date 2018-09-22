@@ -442,6 +442,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 	apiServerHandler := NewAPIServerHandler(name, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
+	discoveryManager := delegationTarget.GroupManager()
+	if discoveryManager == nil {
+		discoveryManager = discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer)
+	}
+
 	s := &GenericAPIServer{
 		discoveryAddresses:     c.DiscoveryAddresses,
 		LoopbackClientConfig:   c.LoopbackClientConfig,
@@ -472,7 +477,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		healthzChecks: c.HealthzChecks,
 
-		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
+		DiscoveryGroupManager: discoveryManager,
 
 		enableAPIResponseCompression: c.EnableAPIResponseCompression,
 	}

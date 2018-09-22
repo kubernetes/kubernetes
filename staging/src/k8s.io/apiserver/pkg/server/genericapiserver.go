@@ -175,6 +175,9 @@ type DelegationTarget interface {
 
 	// NextDelegate returns the next delegationTarget in the chain of delegations
 	NextDelegate() DelegationTarget
+
+	// GroupManager returns instance managing api group discovery
+	GroupManager() discovery.GroupManager
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -196,6 +199,10 @@ func (s *GenericAPIServer) ListedPaths() []string {
 
 func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 	return s.delegationTarget
+}
+
+func (s *GenericAPIServer) GroupManager() discovery.GroupManager {
+	return s.DiscoveryGroupManager
 }
 
 type emptyDelegate struct {
@@ -221,6 +228,10 @@ func (s emptyDelegate) ListedPaths() []string {
 	return []string{}
 }
 func (s emptyDelegate) NextDelegate() DelegationTarget {
+	return nil
+}
+
+func (s emptyDelegate) GroupManager() discovery.GroupManager {
 	return nil
 }
 
