@@ -248,7 +248,7 @@ __kubectl_filedir() {
 		if [[ ! "${w}" = "${cur}"* ]]; then
 			continue
 		fi
-		if eval "[[ \"\${w}\" = *.$1 || -d \"\${w}\" ]]"; then
+		if eval "[[ \"\${w}\" = *${1:+".$1"} || -d \"\${w}\" ]]"; then
 			qw="$(__kubectl_quote "${w}")"
 			if [ -d "${w}" ]; then
 				COMPREPLY+=("${qw}/")
