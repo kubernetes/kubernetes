@@ -123,9 +123,6 @@ type Cache interface {
 	// Snapshot takes a snapshot on current cache
 	Snapshot() *Snapshot
 
-	// IsUpToDate returns true if the given NodeInfo matches the current data in the cache.
-	IsUpToDate(n *NodeInfo) bool
-
 	// NodeTree returns a node tree structure
 	NodeTree() *NodeTree
 }

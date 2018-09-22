@@ -849,13 +849,15 @@ func (c *configFactory) addNodeToCache(obj interface{}) {
 		return
 	}
 
-	if err := c.schedulerCache.AddNode(node); err != nil {
-		glog.Errorf("scheduler cache AddNode failed: %v", err)
-	}
-
+	// NOTE: Because the scheduler uses equivalence cache for nodes, we need
+	// to create it before adding node into scheduler cache.
 	if c.enableEquivalenceClassCache {
 		// GetNodeCache() will lazily create NodeCache for given node if it does not exist.
 		c.equivalencePodCache.GetNodeCache(node.GetName())
+	}
+
+	if err := c.schedulerCache.AddNode(node); err != nil {
+		glog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
 
 	c.podQueue.MoveAllToActiveQueue()
@@ -1166,7 +1168,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	// Init equivalence class cache
 	if c.enableEquivalenceClassCache {
-		c.equivalencePodCache = equivalence.NewCache()
+		c.equivalencePodCache = equivalence.NewCache(predicates.Ordering())
 		glog.Info("Created equivalence class cache")
 	}
 
