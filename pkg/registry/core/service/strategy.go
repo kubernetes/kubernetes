@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -47,6 +48,7 @@ func (svcStrategy) NamespaceScoped() bool {
 func (svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
+	service.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -54,6 +56,13 @@ func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldService.Spec, newService.Spec) {
+		newService.Generation = oldService.Generation + 1
+	}
 }
 
 // Validate validates a new service.

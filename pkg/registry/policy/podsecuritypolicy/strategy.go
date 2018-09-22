@@ -19,6 +19,7 @@ package podsecuritypolicy
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -57,6 +58,7 @@ func (strategy) AllowUnconditionalUpdate() bool {
 
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	psp := obj.(*policy.PodSecurityPolicy)
+	psp.Generation = 1
 
 	psputil.DropDisabledAlphaFields(&psp.Spec)
 }
@@ -67,6 +69,13 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 
 	psputil.DropDisabledAlphaFields(&newPsp.Spec)
 	psputil.DropDisabledAlphaFields(&oldPsp.Spec)
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldPsp.Spec, newPsp.Spec) {
+		newPsp.Generation = oldPsp.Generation + 1
+	}
 }
 
 func (strategy) Canonicalize(obj runtime.Object) {

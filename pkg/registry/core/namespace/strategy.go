@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,6 +71,7 @@ func (namespaceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
 		}
 	}
+	namespace.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -78,6 +80,13 @@ func (namespaceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
 	newNamespace.Status = oldNamespace.Status
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldNamespace.Spec, newNamespace.Spec) {
+		newNamespace.Generation = oldNamespace.Generation + 1
+	}
 }
 
 // Validate validates a new namespace.

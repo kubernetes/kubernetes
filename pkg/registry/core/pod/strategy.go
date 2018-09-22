@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,6 +72,7 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
 	}
+	pod.Generation = 1
 
 	podutil.DropDisabledAlphaFields(&pod.Spec)
 }
@@ -83,6 +85,13 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 
 	podutil.DropDisabledAlphaFields(&newPod.Spec)
 	podutil.DropDisabledAlphaFields(&oldPod.Spec)
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldPod.Spec, newPod.Spec) {
+		newPod.Generation = oldPod.Generation + 1
+	}
 }
 
 // Validate validates a new pod.

@@ -90,7 +90,6 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	if !apiequality.Semantic.DeepEqual(oldStatefulSet.Spec, newStatefulSet.Spec) {
 		newStatefulSet.Generation = oldStatefulSet.Generation + 1
 	}
-
 }
 
 // Validate validates a new StatefulSet.

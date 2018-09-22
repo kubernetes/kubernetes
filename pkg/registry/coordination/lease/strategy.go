@@ -19,6 +19,7 @@ package lease
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -43,10 +44,21 @@ func (leaseStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate prepares Lease for creation.
 func (leaseStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	lease := obj.(*coordination.Lease)
+	lease.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (leaseStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newLease := obj.(*coordination.Lease)
+	oldLease := obj.(*coordination.Lease)
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldLease.Spec, newLease.Spec) {
+		newLease.Generation = oldLease.Generation + 1
+	}
 }
 
 // Validate validates a new Lease.

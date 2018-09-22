@@ -19,6 +19,7 @@ package cronjob
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -53,6 +54,7 @@ func (cronJobStrategy) NamespaceScoped() bool {
 func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	cronJob := obj.(*batch.CronJob)
 	cronJob.Status = batch.CronJobStatus{}
+	cronJob.Generation = 1
 
 	pod.DropDisabledAlphaFields(&cronJob.Spec.JobTemplate.Spec.Template.Spec)
 }
@@ -65,6 +67,13 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 
 	pod.DropDisabledAlphaFields(&newCronJob.Spec.JobTemplate.Spec.Template.Spec)
 	pod.DropDisabledAlphaFields(&oldCronJob.Spec.JobTemplate.Spec.Template.Spec)
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldCronJob.Spec, newCronJob.Spec) {
+		newCronJob.Generation = oldCronJob.Generation + 1
+	}
 }
 
 // Validate validates a new scheduled job.

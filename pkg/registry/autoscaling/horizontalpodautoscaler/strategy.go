@@ -19,6 +19,7 @@ package horizontalpodautoscaler
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -48,6 +49,8 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 
 	// create cannot set status
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
+
+	newHPA.Generation = 1
 }
 
 // Validate validates a new autoscaler.
@@ -71,6 +74,13 @@ func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
 	// Update is not allowed to set status
 	newHPA.Status = oldHPA.Status
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldHPA.Spec, newHPA.Spec) {
+		newHPA.Generation = oldHPA.Generation + 1
+	}
 }
 
 // ValidateUpdate is the default update validation for an end user.

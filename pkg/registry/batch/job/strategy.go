@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,6 +63,7 @@ func (jobStrategy) NamespaceScoped() bool {
 func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
+	job.Generation = 1
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 		job.Spec.TTLSecondsAfterFinished = nil
@@ -83,6 +85,13 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 
 	pod.DropDisabledAlphaFields(&newJob.Spec.Template.Spec)
 	pod.DropDisabledAlphaFields(&oldJob.Spec.Template.Spec)
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldJob.Spec, newJob.Spec) {
+		newJob.Generation = oldJob.Generation + 1
+	}
 }
 
 // Validate validates a new job.

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -52,6 +53,7 @@ func (persistentvolumeStrategy) NamespaceScoped() bool {
 func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
+	pv.Generation = 1
 
 	pvutil.DropDisabledAlphaFields(&pv.Spec)
 }
@@ -78,6 +80,13 @@ func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 
 	pvutil.DropDisabledAlphaFields(&newPv.Spec)
 	pvutil.DropDisabledAlphaFields(&oldPv.Spec)
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldPv.Spec, newPv.Spec) {
+		newPv.Generation = oldPv.Generation + 1
+	}
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

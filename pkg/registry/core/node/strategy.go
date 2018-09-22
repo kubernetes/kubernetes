@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -65,6 +66,7 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	node := obj.(*api.Node)
+	node.Generation = 1
 	// Nodes allow *all* fields, including status, to be set on create.
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
@@ -81,6 +83,13 @@ func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 		newNode.Spec.ConfigSource = nil
 		oldNode.Spec.ConfigSource = nil
+	}
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldNode.Spec, newNode.Spec) {
+		newNode.Generation = oldNode.Generation + 1
 	}
 }
 

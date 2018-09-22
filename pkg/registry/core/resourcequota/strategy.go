@@ -19,6 +19,7 @@ package resourcequota
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -46,6 +47,7 @@ func (resourcequotaStrategy) NamespaceScoped() bool {
 func (resourcequotaStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	resourcequota := obj.(*api.ResourceQuota)
 	resourcequota.Status = api.ResourceQuotaStatus{}
+	resourcequota.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -53,6 +55,13 @@ func (resourcequotaStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	newResourcequota := obj.(*api.ResourceQuota)
 	oldResourcequota := old.(*api.ResourceQuota)
 	newResourcequota.Status = oldResourcequota.Status
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldResourcequota.Spec, newResourcequota.Spec) {
+		newResourcequota.Generation = oldResourcequota.Generation + 1
+	}
 }
 
 // Validate validates a new resourcequota.

@@ -19,6 +19,7 @@ package limitrange
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -46,9 +47,19 @@ func (limitrangeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	if len(limitRange.Name) == 0 {
 		limitRange.Name = string(uuid.NewUUID())
 	}
+	limitRange.Generation = 1
 }
 
 func (limitrangeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newLimitRange := obj.(*api.LimitRange)
+	oldLimitRange := old.(*api.LimitRange)
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(oldLimitRange.Spec, newLimitRange.Spec) {
+		newLimitRange.Generation = oldLimitRange.Generation + 1
+	}
 }
 
 func (limitrangeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
