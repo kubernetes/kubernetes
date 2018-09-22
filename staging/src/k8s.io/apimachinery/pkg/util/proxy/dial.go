@@ -19,9 +19,11 @@ package proxy
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 
 	"github.com/golang/glog"
@@ -30,7 +32,104 @@ import (
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
 )
 
-func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (net.Conn, error) {
+// DialRequest implements proxy support, see spdy:
+// https://github.com/kubernetes/kubernetes/blob/5e8e570dbda6ed89af9bc2e0a05e3d94bfdfcb61/staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy/roundtripper.go#L111
+func DialRequest(req *http.Request, transport http.RoundTripper) (net.Conn, error) {
+	glog.V(5).Info("received dial request")
+	ctx := req.Context()
+	proxier := utilnet.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
+	proxyURL, err := proxier(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if proxyURL == nil {
+		glog.V(5).Info("Dialing without proxy")
+		return DialURLWithoutProxy(ctx, req.URL, transport)
+	}
+
+	targetHost := netutil.CanonicalAddr(req.URL)
+	glog.V(5).Infof("dialing with proxy %s to target: %s", proxyURL, targetHost)
+
+	proxyReq := http.Request{
+		Method: "CONNECT",
+		URL:    &url.URL{},
+		Host:   targetHost,
+	}
+
+	if pa := proxyAuth(proxyURL); pa != "" {
+		proxyReq.Header = http.Header{}
+		proxyReq.Header.Set("Proxy-Authorization", pa)
+	}
+
+	proxyDialConn, err := DialURLWithoutProxy(ctx, proxyURL, transport)
+	if err != nil {
+		return nil, err
+	}
+
+	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
+	glog.V(5).Infof("proxy request: %#v", proxyReq)
+	_, err = proxyClientConn.Do(&proxyReq)
+	if err != nil && err != httputil.ErrPersistEOF {
+		return nil, err
+	}
+
+	glog.V(5).Infof("hijacking request: %#v", proxyClientConn)
+	rwc, _ := proxyClientConn.Hijack()
+
+	if req.URL.Scheme != "https" {
+		return rwc, nil
+	}
+
+	host, _, err := net.SplitHostPort(targetHost)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConfig, err := utilnet.TLSClientConfig(transport)
+	if err != nil {
+		glog.V(5).Infof("Unable to unwrap transport %T to get at TLS config: %v", transport, err)
+	}
+
+	switch {
+	case tlsConfig == nil:
+		tlsConfig = &tls.Config{ServerName: host}
+	case len(tlsConfig.ServerName) == 0:
+		tlsConfig = tlsConfig.Clone()
+		tlsConfig.ServerName = host
+	}
+
+	tlsConn := tls.Client(rwc, tlsConfig)
+
+	// need to manually call Handshake() so we can call VerifyHostname() below
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if tlsConfig.InsecureSkipVerify {
+		return tlsConn, nil
+	}
+
+	if err := tlsConn.VerifyHostname(tlsConfig.ServerName); err != nil {
+		return nil, err
+	}
+
+	return tlsConn, nil
+}
+
+// see proxyAuth from spdy
+// https://github.com/kubernetes/kubernetes/blob/5e8e570dbda6ed89af9bc2e0a05e3d94bfdfcb61/staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy/roundtripper.go#L236
+func proxyAuth(proxyURL *url.URL) string {
+	if proxyURL == nil || proxyURL.User == nil {
+		return ""
+	}
+	credentials := proxyURL.User.String()
+	encodedAuth := base64.StdEncoding.EncodeToString([]byte(credentials))
+	return fmt.Sprintf("Basic %s", encodedAuth)
+}
+
+func DialURLWithoutProxy(ctx context.Context, url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
 	dialer, err := utilnet.DialerFor(transport)
