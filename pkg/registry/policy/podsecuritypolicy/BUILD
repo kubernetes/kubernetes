@@ -17,6 +17,7 @@ go_library(
         "//pkg/api/podsecuritypolicy:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/policy/validation:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
