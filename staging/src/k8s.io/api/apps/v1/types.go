@@ -250,6 +250,7 @@ type StatefulSetList struct {
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata.
+	// The .metadata.generation number is incremented on changes to .spec or .metadata.annotations.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
