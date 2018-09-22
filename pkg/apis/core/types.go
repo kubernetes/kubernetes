@@ -2604,11 +2604,6 @@ type PodSpec struct {
 	EnableServiceLinks *bool
 }
 
-const (
-	// The default value for enableServiceLinks attribute.
-	DefaultEnableServiceLinks = true
-)
-
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
 // pod's hosts file.
 type HostAlias struct {

@@ -140,7 +140,7 @@ type testCase struct {
 
 func getTestCases(hostname types.NodeName) []*testCase {
 	grace := int64(30)
-	enableServiceLinks := api.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	return []*testCase{
 		{
 			lock: &sync.Mutex{},

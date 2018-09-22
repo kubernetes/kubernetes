@@ -129,7 +129,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	nodeName := "different-value"
 
 	grace := int64(30)
-	enableServiceLinks := api.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	var testCases = []struct {
 		desc     string
 		pods     runtime.Object

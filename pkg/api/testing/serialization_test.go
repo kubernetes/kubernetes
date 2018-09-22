@@ -214,7 +214,7 @@ func TestRoundTripTypes(t *testing.T) {
 // decoded without information loss or mutation.
 func TestEncodePtr(t *testing.T) {
 	grace := int64(30)
-	enableServiceLinks := api.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},

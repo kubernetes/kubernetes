@@ -37,7 +37,7 @@ func noDefault(*core.Pod) error { return nil }
 
 func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
-	enableServiceLinks := core.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "",
@@ -101,7 +101,7 @@ func TestDecodeSinglePod(t *testing.T) {
 
 func TestDecodePodList(t *testing.T) {
 	grace := int64(30)
-	enableServiceLinks := core.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "",

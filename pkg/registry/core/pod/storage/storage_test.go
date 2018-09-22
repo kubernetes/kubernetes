@@ -61,7 +61,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.Et
 
 func validNewPod() *api.Pod {
 	grace := int64(30)
-	enableServiceLinks := api.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -834,7 +834,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 	}
 
 	grace := int64(30)
-	enableServiceLinks := api.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	podIn := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -936,7 +936,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected := podStart
 	expected.ResourceVersion = "2"
 	grace := int64(30)
-	enableServiceLinks := api.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	expected.Spec.TerminationGracePeriodSeconds = &grace
 	expected.Spec.RestartPolicy = api.RestartPolicyAlways
 	expected.Spec.DNSPolicy = api.DNSClusterFirst

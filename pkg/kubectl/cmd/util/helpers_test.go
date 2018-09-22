@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -39,7 +40,7 @@ import (
 
 func TestMerge(t *testing.T) {
 	grace := int64(30)
-	enableServiceLinks := api.DefaultEnableServiceLinks
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	tests := []struct {
 		obj       runtime.Object
 		fragment  string

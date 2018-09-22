@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/parsers"
 	utilpointer "k8s.io/utils/pointer"
@@ -184,7 +183,7 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 		obj.SchedulerName = v1.DefaultSchedulerName
 	}
 	if obj.EnableServiceLinks == nil {
-		enableServiceLinks := core.DefaultEnableServiceLinks
+		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.EnableServiceLinks = &enableServiceLinks
 	}
 }
