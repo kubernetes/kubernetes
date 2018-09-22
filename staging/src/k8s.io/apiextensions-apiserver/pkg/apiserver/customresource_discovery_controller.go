@@ -40,8 +40,9 @@ import (
 )
 
 type DiscoveryController struct {
-	versionHandler *versionDiscoveryHandler
-	groupHandler   *groupDiscoveryHandler
+	versionHandler        *versionDiscoveryHandler
+	groupHandler          *groupDiscoveryHandler
+	discoveryGroupManager discovery.GroupManager
 
 	crdLister  listers.CustomResourceDefinitionLister
 	crdsSynced cache.InformerSynced
@@ -52,12 +53,13 @@ type DiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
+func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler, groupManager discovery.GroupManager) *DiscoveryController {
 	c := &DiscoveryController{
-		versionHandler: versionHandler,
-		groupHandler:   groupHandler,
-		crdLister:      crdInformer.Lister(),
-		crdsSynced:     crdInformer.Informer().HasSynced,
+		versionHandler:        versionHandler,
+		groupHandler:          groupHandler,
+		crdLister:             crdInformer.Lister(),
+		crdsSynced:            crdInformer.Informer().HasSynced,
+		discoveryGroupManager: groupManager,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
@@ -160,6 +162,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	if !foundGroup {
 		c.groupHandler.unsetDiscovery(version.Group)
 		c.versionHandler.unsetDiscovery(version)
+		c.discoveryGroupManager.RemoveGroup(version.Group)
 		return nil
 	}
 
@@ -173,6 +176,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 		PreferredVersion: apiVersionsForDiscovery[0],
 	}
 	c.groupHandler.setDiscovery(version.Group, discovery.NewAPIGroupHandler(Codecs, apiGroup))
+	c.discoveryGroupManager.AddGroup(apiGroup)
 
 	if !foundVersion {
 		c.versionHandler.unsetDiscovery(version)
