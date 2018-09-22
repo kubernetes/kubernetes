@@ -31,9 +31,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -75,7 +75,7 @@ func (sched *Scheduler) StopEverything() {
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
-func (sched *Scheduler) Cache() schedulercache.Cache {
+func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
 	return sched.config.SchedulerCache
 }
 
@@ -110,7 +110,7 @@ type Configurator interface {
 type Config struct {
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
-	SchedulerCache schedulercache.Cache
+	SchedulerCache schedulerinternalcache.Cache
 	// Ecache is used for optimistically invalid affected cache items after
 	// successfully binding a pod
 	Ecache     *equivalence.Cache

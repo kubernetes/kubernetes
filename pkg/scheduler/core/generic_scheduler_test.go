@@ -41,6 +41,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -433,7 +434,7 @@ func TestGenericScheduler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+			cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -475,7 +476,7 @@ func TestGenericScheduler(t *testing.T) {
 // makeScheduler makes a simple genericScheduler for testing.
 func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Node) *genericScheduler {
 	algorithmpredicates.SetPredicatesOrdering(order)
-	cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+	cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
@@ -1382,7 +1383,7 @@ func TestPreempt(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			stop := make(chan struct{})
-			cache := schedulercache.New(time.Duration(0), stop)
+			cache := schedulerinternalcache.New(time.Duration(0), stop)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -1460,7 +1461,7 @@ func TestPreempt(t *testing.T) {
 // syncingMockCache delegates method calls to an actual Cache,
 // but calls to UpdateNodeNameToInfoMap synchronize with the test.
 type syncingMockCache struct {
-	schedulercache.Cache
+	schedulerinternalcache.Cache
 	cycleStart, cacheInvalidated chan struct{}
 	once                         sync.Once
 }
@@ -1498,7 +1499,7 @@ func TestCacheInvalidationRace(t *testing.T) {
 	}
 
 	// Set up the mock cache.
-	cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+	cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
 	testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 	cache.AddNode(testNode)
 	mockCache := &syncingMockCache{
@@ -1586,7 +1587,7 @@ func TestCacheInvalidationRace2(t *testing.T) {
 	}
 
 	// Set up the mock cache.
-	cache := schedulercache.New(time.Duration(0), wait.NeverStop)
+	cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
 	testNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
 	cache.AddNode(testNode)
 

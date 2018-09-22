@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 
 	"github.com/golang/glog"
 )
@@ -57,7 +58,7 @@ type schedulerCache struct {
 	assumedPods map[string]bool
 	// a map from pod key to podState.
 	podStates map[string]*podState
-	nodes     map[string]*NodeInfo
+	nodes     map[string]*schedulercache.NodeInfo
 	nodeTree  *NodeTree
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
@@ -78,17 +79,9 @@ type imageState struct {
 	nodes sets.String
 }
 
-// ImageStateSummary provides summarized information about the state of an image.
-type ImageStateSummary struct {
-	// Size of the image
-	Size int64
-	// Used to track how many nodes have this image
-	NumNodes int
-}
-
 // createImageStateSummary returns a summarizing snapshot of the given image's state.
-func (cache *schedulerCache) createImageStateSummary(state *imageState) *ImageStateSummary {
-	return &ImageStateSummary{
+func (cache *schedulerCache) createImageStateSummary(state *imageState) *schedulercache.ImageStateSummary {
+	return &schedulercache.ImageStateSummary{
 		Size:     state.size,
 		NumNodes: len(state.nodes),
 	}
@@ -100,7 +93,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		period: period,
 		stop:   stop,
 
-		nodes:       make(map[string]*NodeInfo),
+		nodes:       make(map[string]*schedulercache.NodeInfo),
 		nodeTree:    newNodeTree(nil),
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
@@ -108,13 +101,13 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 	}
 }
 
-// Snapshot takes a snapshot of the current schedulerCache. The method has performance impact,
+// Snapshot takes a snapshot of the current schedulerinternalcache. The method has performance impact,
 // and should be only used in non-critical path.
 func (cache *schedulerCache) Snapshot() *Snapshot {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()
 
-	nodes := make(map[string]*NodeInfo)
+	nodes := make(map[string]*schedulercache.NodeInfo)
 	for k, v := range cache.nodes {
 		nodes[k] = v.Clone()
 	}
@@ -130,16 +123,16 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 	}
 }
 
-func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*NodeInfo) error {
+func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*schedulercache.NodeInfo) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
 	for name, info := range cache.nodes {
 		if utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes) && info.TransientInfo != nil {
 			// Transient scheduler info is reset here.
-			info.TransientInfo.resetTransientSchedulerInfo()
+			info.TransientInfo.ResetTransientSchedulerInfo()
 		}
-		if current, ok := nodeNameToInfo[name]; !ok || current.generation != info.generation {
+		if current, ok := nodeNameToInfo[name]; !ok || current.GetGeneration() != info.GetGeneration() {
 			nodeNameToInfo[name] = info.Clone()
 		}
 	}
@@ -164,11 +157,11 @@ func (cache *schedulerCache) FilteredList(podFilter PodFilter, selector labels.S
 	// pre-allocating capacity.
 	maxSize := 0
 	for _, info := range cache.nodes {
-		maxSize += len(info.pods)
+		maxSize += len(info.Pods())
 	}
 	pods := make([]*v1.Pod, 0, maxSize)
 	for _, info := range cache.nodes {
-		for _, pod := range info.pods {
+		for _, pod := range info.Pods() {
 			if podFilter(pod) && selector.Matches(labels.Set(pod.Labels)) {
 				pods = append(pods, pod)
 			}
@@ -178,7 +171,7 @@ func (cache *schedulerCache) FilteredList(podFilter PodFilter, selector labels.S
 }
 
 func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
-	key, err := getPodKey(pod)
+	key, err := schedulercache.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -204,7 +197,7 @@ func (cache *schedulerCache) FinishBinding(pod *v1.Pod) error {
 
 // finishBinding exists to make tests determinitistic by injecting now as an argument
 func (cache *schedulerCache) finishBinding(pod *v1.Pod, now time.Time) error {
-	key, err := getPodKey(pod)
+	key, err := schedulercache.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -223,7 +216,7 @@ func (cache *schedulerCache) finishBinding(pod *v1.Pod, now time.Time) error {
 }
 
 func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
-	key, err := getPodKey(pod)
+	key, err := schedulercache.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -255,7 +248,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 func (cache *schedulerCache) addPod(pod *v1.Pod) {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
-		n = NewNodeInfo()
+		n = schedulercache.NewNodeInfo()
 		cache.nodes[pod.Spec.NodeName] = n
 	}
 	n.AddPod(pod)
@@ -276,14 +269,14 @@ func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 	if err := n.RemovePod(pod); err != nil {
 		return err
 	}
-	if len(n.pods) == 0 && n.node == nil {
+	if len(n.Pods()) == 0 && n.Node() == nil {
 		delete(cache.nodes, pod.Spec.NodeName)
 	}
 	return nil
 }
 
 func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
-	key, err := getPodKey(pod)
+	key, err := schedulercache.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -318,7 +311,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 }
 
 func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
-	key, err := getPodKey(oldPod)
+	key, err := schedulercache.GetPodKey(oldPod)
 	if err != nil {
 		return err
 	}
@@ -346,7 +339,7 @@ func (cache *schedulerCache) UpdatePod(oldPod, newPod *v1.Pod) error {
 }
 
 func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
-	key, err := getPodKey(pod)
+	key, err := schedulercache.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
@@ -375,7 +368,7 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 }
 
 func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
-	key, err := getPodKey(pod)
+	key, err := schedulercache.GetPodKey(pod)
 	if err != nil {
 		return false, err
 	}
@@ -391,7 +384,7 @@ func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
 }
 
 func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
-	key, err := getPodKey(pod)
+	key, err := schedulercache.GetPodKey(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -413,10 +406,10 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 
 	n, ok := cache.nodes[node.Name]
 	if !ok {
-		n = NewNodeInfo()
+		n = schedulercache.NewNodeInfo()
 		cache.nodes[node.Name] = n
 	} else {
-		cache.removeNodeImageStates(n.node)
+		cache.removeNodeImageStates(n.Node())
 	}
 
 	cache.nodeTree.AddNode(node)
@@ -430,10 +423,10 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 
 	n, ok := cache.nodes[newNode.Name]
 	if !ok {
-		n = NewNodeInfo()
+		n = schedulercache.NewNodeInfo()
 		cache.nodes[newNode.Name] = n
 	} else {
-		cache.removeNodeImageStates(n.node)
+		cache.removeNodeImageStates(n.Node())
 	}
 
 	cache.nodeTree.UpdateNode(oldNode, newNode)
@@ -453,7 +446,7 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 	// We can't do it unconditionally, because notifications about pods are delivered
 	// in a different watch, and thus can potentially be observed later, even though
 	// they happened before node removal.
-	if len(n.pods) == 0 && n.node == nil {
+	if len(n.Pods()) == 0 && n.Node() == nil {
 		delete(cache.nodes, node.Name)
 	}
 
@@ -464,8 +457,8 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 
 // addNodeImageStates adds states of the images on given node to the given nodeInfo and update the imageStates in
 // scheduler cache. This function assumes the lock to scheduler cache has been acquired.
-func (cache *schedulerCache) addNodeImageStates(node *v1.Node, nodeInfo *NodeInfo) {
-	newSum := make(map[string]*ImageStateSummary)
+func (cache *schedulerCache) addNodeImageStates(node *v1.Node, nodeInfo *schedulercache.NodeInfo) {
+	newSum := make(map[string]*schedulercache.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
@@ -486,7 +479,7 @@ func (cache *schedulerCache) addNodeImageStates(node *v1.Node, nodeInfo *NodeInf
 			}
 		}
 	}
-	nodeInfo.imageStates = newSum
+	nodeInfo.SetImageStates(newSum)
 }
 
 // removeNodeImageStates removes the given node record from image entries having the node
