@@ -516,7 +516,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 
 		// We always want to add environment variabled for master services
 		// from the master service namespace, even if enableServiceLinks is false.
-		// We also add enviroment variables for other services in the same
+		// We also add environment variables for other services in the same
 		// namespace, if enableServiceLinks is true.
 		if service.Namespace == kl.masterServiceNamespace && masterServices.Has(serviceName) {
 			if _, exists := serviceMap[serviceName]; !exists {
