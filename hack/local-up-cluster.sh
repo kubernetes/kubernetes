@@ -141,6 +141,7 @@ fi
 set -e
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
+kube::util::ensure-gnu-sed
 
 function usage {
             echo "This script starts a local kube cluster. "
@@ -861,7 +862,7 @@ EOF
       #   foo: true
       #   bar: false
       for gate in $(echo ${FEATURE_GATES} | tr ',' ' '); do
-        echo $gate | sed -e 's/\(.*\)=\(.*\)/  \1: \2/'
+        echo $gate | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
       done
     fi >>/tmp/kube-proxy.yaml
 
@@ -884,9 +885,8 @@ EOF
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
-        sed -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
-        sed -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
-
+        ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
+        ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create kubedns addon
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml
