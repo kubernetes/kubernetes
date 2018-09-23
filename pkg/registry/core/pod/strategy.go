@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // podStrategy implements behavior for Pods
@@ -288,6 +289,10 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 				break
 			}
 		}
+	}
+
+	if err := proxyutil.IsProxyableIP(pod.Status.PodIP); err != nil {
+		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
 	loc := &url.URL{
