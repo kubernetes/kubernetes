@@ -74,7 +74,7 @@ func (t *NvidiaGPUUpgradeTest) startJob(f *framework.Framework) {
 			{
 				Name:    "vector-addition",
 				Image:   imageutils.GetE2EImage(imageutils.CudaVectorAdd),
-				Command: []string{"/bin/sh", "-c", "./vectorAdd && sleep 60"},
+				Command: []string{"/bin/sh", "-c", "trap exit TERM; ./vectorAdd && sleep 60"},
 				Resources: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						framework.NVIDIAGPUResourceName: *resource.NewQuantity(1, resource.DecimalSI),

@@ -320,7 +320,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				ssTester := framework.NewStatefulSetTester(c)
 
 				By("Creating a StatefulSet pod to initialize data")
-				writeCmd := "true"
+				writeCmd := "trap exit TERM; true"
 				for i := 0; i < numVols; i++ {
 					writeCmd += fmt.Sprintf("&& touch %v", getVolumeFile(i))
 				}
@@ -360,7 +360,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Creating a new Statefulset and validating the data")
-				validateCmd := "true"
+				validateCmd := "trap exit TERM; true"
 				for i := 0; i < numVols; i++ {
 					validateCmd += fmt.Sprintf("&& test -f %v", getVolumeFile(i))
 				}

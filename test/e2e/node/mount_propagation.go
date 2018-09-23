@@ -34,7 +34,7 @@ func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode
 	bTrue := true
 	var oneSecond int64 = 1
 	// The pod prepares /mnt/test/<podname> and sleeps.
-	cmd := fmt.Sprintf("mkdir /mnt/test/%[1]s; sleep 3600", name)
+	cmd := fmt.Sprintf("trap exit TERM; mkdir /mnt/test/%[1]s; sleep 3600", name)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

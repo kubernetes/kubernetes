@@ -5141,7 +5141,7 @@ func (f *Framework) NewTestPod(name string, requests v1.ResourceList, limits v1.
 
 // create empty file at given path on the pod.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
-	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
+	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("trap exit TERM; touch %s", filePath))
 	return err
 }
 

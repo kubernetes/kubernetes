@@ -142,7 +142,7 @@ func NewRepeatingLoggingPod(podName string, line string) LoggingPod {
 	cmd := []string{
 		"/bin/sh",
 		"-c",
-		fmt.Sprintf("while :; do echo '%s'; sleep 1; done", line),
+		fmt.Sprintf("trap exit TERM; while :; do echo '%s'; sleep 1; done", line),
 	}
 	return NewExecLoggingPod(podName, cmd)
 }

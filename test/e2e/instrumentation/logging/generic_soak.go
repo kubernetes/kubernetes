@@ -106,7 +106,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 					Args: []string{
 						"/bin/sh",
 						"-c",
-						fmt.Sprintf("while true ; do echo %v ; sleep %v; done", kilobyte, sleep.Seconds()),
+						fmt.Sprintf("trap exit TERM; while true ; do echo %v ; sleep %v; done", kilobyte, sleep.Seconds()),
 					},
 				}},
 				NodeName:      n.Name,

@@ -440,7 +440,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"while true ; do cat /opt/0/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done ",
+						"trap exit TERM; while true ; do cat /opt/0/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done ",
 					},
 					VolumeMounts: []v1.VolumeMount{},
 				},

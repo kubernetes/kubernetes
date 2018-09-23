@@ -487,7 +487,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:    "main",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
+						Command: []string{"/bin/sh", "-c", "trap exit TERM; echo container is alive; sleep 600"},
 					},
 				},
 			},
@@ -563,7 +563,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:    "main",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
+						Command: []string{"/bin/sh", "-c", "trap exit TERM; echo container is alive; sleep 10000"},
 					},
 				},
 			},
@@ -618,7 +618,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:    containerName,
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
+						Command: []string{"/bin/sh", "-c", "trap exit TERM; sleep 5", "/crash/missing"},
 					},
 				},
 			},
@@ -659,7 +659,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:    containerName,
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"/bin/sh", "-c", "sleep 5", "/crash/missing"},
+						Command: []string{"/bin/sh", "-c", "trap exit TERM; sleep 5", "/crash/missing"},
 					},
 				},
 			},
@@ -716,7 +716,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:    "pod-readiness-gate",
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
+						Command: []string{"/bin/sh", "-c", "trap exit TERM; echo container is alive; sleep 10000"},
 					},
 				},
 				ReadinessGates: []v1.PodReadinessGate{

@@ -85,7 +85,7 @@ while true; do sleep 1; done
 `
 					tmpCmd := fmt.Sprintf(cmdScripts, path.Join(restartCountVolumePath, "restartCount"))
 					testContainer.Name = testCase.Name
-					testContainer.Command = []string{"sh", "-c", tmpCmd}
+					testContainer.Command = []string{"sh", "-c", fmt.Sprintf("trap exit TERM; %s", tmpCmd)}
 					terminateContainer := ConformanceContainer{
 						PodClient:     f.PodClient(),
 						Container:     testContainer,
@@ -298,7 +298,7 @@ while true; do sleep 1; done
 				testCase := testCase
 				It(testCase.description+" [NodeConformance]", func() {
 					name := "image-pull-test"
-					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
+					command := []string{"/bin/sh", "-c", "trap exit TERM; while true; do sleep 1; done"}
 					container := ConformanceContainer{
 						PodClient: f.PodClient(),
 						Container: v1.Container{

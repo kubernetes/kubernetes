@@ -262,7 +262,7 @@ func MakeDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 							Name:    "write-pod",
 							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 							Command: []string{"/bin/sh"},
-							Args:    []string{"-c", command},
+							Args:    []string{"-c", fmt.Sprintf("trap exit TERM; %s", command)},
 							SecurityContext: &v1.SecurityContext{
 								Privileged: &isPrivileged,
 							},

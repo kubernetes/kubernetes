@@ -450,7 +450,7 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c"},
 					Args: []string{
-						"echo ${POD_NAME} >> /mnt/data/regional-pd/pods.txt;" +
+						"trap exit TERM; echo ${POD_NAME} >> /mnt/data/regional-pd/pods.txt;" +
 							"cat /mnt/data/regional-pd/pods.txt;" +
 							"sleep 3600;",
 					},

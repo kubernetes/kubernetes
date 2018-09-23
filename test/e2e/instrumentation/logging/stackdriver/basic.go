@@ -112,7 +112,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 				cmd := []string{
 					"/bin/sh",
 					"-c",
-					fmt.Sprintf("while :; do printf '%%*s' %d | tr ' ' 'A'; echo; sleep 60; done", maxLength+1),
+					fmt.Sprintf("trap exit TERM; while :; do printf '%%*s' %d | tr ' ' 'A'; echo; sleep 60; done", maxLength+1),
 				}
 
 				pod, err := utils.StartAndReturnSelf(utils.NewExecLoggingPod("synthlogger-4", cmd), f)

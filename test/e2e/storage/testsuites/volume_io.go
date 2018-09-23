@@ -216,7 +216,7 @@ func makePodSpec(config framework.VolumeTestConfig, dir, initCmd string, volsrc 
 					Command: []string{
 						"/bin/sh",
 						"-c",
-						"sleep 3600", // keep pod alive until explicitly deleted
+						"trap exit TERM; sleep 3600", // keep pod alive until explicitly deleted
 					},
 					VolumeMounts: []v1.VolumeMount{
 						{
