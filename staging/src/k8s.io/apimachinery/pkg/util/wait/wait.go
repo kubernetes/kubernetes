@@ -181,6 +181,13 @@ type Backoff struct {
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
 //
+// ExponentialBackoff is syntactic sugar on top of ExponentialBackoffUntil.
+func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
+	return ExponentialBackoffUntil(backoff, condition, NeverStop)
+}
+
+// ExponentialBackoffUntil repeats a condition check with exponential backoff.
+//
 // It checks the condition up to Steps times, increasing the wait by multiplying
 // the previous duration by Factor.
 //
@@ -189,7 +196,9 @@ type Backoff struct {
 //
 // If the condition never returns true, ErrWaitTimeout is returned. All other
 // errors terminate immediately.
-func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
+//
+// Close stopCh to stop. Pass NeverStop to if you don't want it stop.
+func ExponentialBackoffUntil(backoff Backoff, condition ConditionFunc, stopCh <-chan struct{}) error {
 	duration := backoff.Duration
 	for i := 0; i < backoff.Steps; i++ {
 		if i != 0 {
@@ -197,7 +206,15 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 			if backoff.Jitter > 0.0 {
 				adjusted = Jitter(duration, backoff.Jitter)
 			}
-			time.Sleep(adjusted)
+			// block until either:
+			// 1. the adjusted duration has expired
+			// 2. the stopCh has been closed
+			select {
+			case <-time.After(adjusted):
+				break
+			case <-stopCh:
+				return nil
+			}
 			duration = time.Duration(float64(duration) * backoff.Factor)
 		}
 		if ok, err := condition(); err != nil || ok {
