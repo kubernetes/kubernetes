@@ -246,6 +246,9 @@ const (
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
 	DefaultEtcdVersion = "3.2.24"
 
+	// PauseVersion indicates the default pause image version for kubeadm
+	PauseVersion = "3.1"
+
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
 	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
