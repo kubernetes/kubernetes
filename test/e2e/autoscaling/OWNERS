@@ -1,8 +1,6 @@
 reviewers:
   - jszczepkowski
   - sig-autoscaling-maintainers
-  - wasylkowski
 approvers:
   - jszczepkowski
   - sig-autoscaling-maintainers
-  - wasylkowski
