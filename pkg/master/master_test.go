@@ -17,8 +17,6 @@ limitations under the License.
 package master
 
 import (
-	"context"
-	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
 	"net"
@@ -33,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -108,10 +105,6 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
 	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
-	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
-		DialContext:     func(ctx context.Context, network, addr string) (net.Conn, error) { return nil, nil },
-		TLSClientConfig: &tls.Config{},
-	})
 
 	// set fake SecureServingInfo because the listener port is needed for the kubernetes service
 	config.GenericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
@@ -151,7 +144,6 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 
 	storageProvider := corerest.LegacyRESTStorageProvider{
 		StorageFactory:       masterCfg.ExtraConfig.StorageFactory,
-		ProxyTransport:       masterCfg.ExtraConfig.ProxyTransport,
 		KubeletClientConfig:  masterCfg.ExtraConfig.KubeletClientConfig,
 		EventTTL:             masterCfg.ExtraConfig.EventTTL,
 		ServiceIPRange:       masterCfg.ExtraConfig.ServiceIPRange,
