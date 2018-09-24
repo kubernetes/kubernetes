@@ -2762,11 +2762,11 @@ function main() {
   fi
 
   override-kubectl
+  start-kubelet
   # Run the containerized mounter once to pre-cache the container image.
   if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
     assemble-docker-flags
   fi
-  start-kubelet
 
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     compute-master-manifest-variables
