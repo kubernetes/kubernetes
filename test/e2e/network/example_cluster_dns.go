@@ -57,7 +57,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 	It("should create pod that uses dns", func() {
 		mkpath := func(file string) string {
-			return filepath.Join(framework.TestContext.RepoRoot, "examples/cluster-dns", file)
+			return filepath.Join(os.Getenv("GOPATH"), "src/k8s.io/examples/staging/cluster-dns", file)
 		}
 
 		// contrary to the example, this test does not use contexts, for simplicity
