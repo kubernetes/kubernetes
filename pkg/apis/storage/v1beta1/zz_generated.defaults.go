@@ -23,6 +23,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -31,6 +32,8 @@ import (
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.StorageClass{}, func(obj interface{}) { SetObjectDefaults_StorageClass(obj.(*v1beta1.StorageClass)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.StorageClassList{}, func(obj interface{}) { SetObjectDefaults_StorageClassList(obj.(*v1beta1.StorageClassList)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.VolumeAttachment{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachment(obj.(*v1beta1.VolumeAttachment)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.VolumeAttachmentList{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachmentList(obj.(*v1beta1.VolumeAttachmentList)) })
 	return nil
 }
 
@@ -42,5 +45,64 @@ func SetObjectDefaults_StorageClassList(in *v1beta1.StorageClassList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_StorageClass(a)
+	}
+}
+
+func SetObjectDefaults_VolumeAttachment(in *v1beta1.VolumeAttachment) {
+	if in.Spec.Source.InlineVolumeSource != nil {
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.HostPath != nil {
+			v1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.HostPath)
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.Secret != nil {
+			v1.SetDefaults_SecretVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.Secret)
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.ISCSI != nil {
+			v1.SetDefaults_ISCSIVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.ISCSI)
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.RBD != nil {
+			v1.SetDefaults_RBDVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.RBD)
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.DownwardAPI != nil {
+			v1.SetDefaults_DownwardAPIVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.DownwardAPI)
+			for i := range in.Spec.Source.InlineVolumeSource.VolumeSource.DownwardAPI.Items {
+				a := &in.Spec.Source.InlineVolumeSource.VolumeSource.DownwardAPI.Items[i]
+				if a.FieldRef != nil {
+					v1.SetDefaults_ObjectFieldSelector(a.FieldRef)
+				}
+			}
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.ConfigMap != nil {
+			v1.SetDefaults_ConfigMapVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.ConfigMap)
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.AzureDisk != nil {
+			v1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.AzureDisk)
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.Projected != nil {
+			v1.SetDefaults_ProjectedVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.Projected)
+			for i := range in.Spec.Source.InlineVolumeSource.VolumeSource.Projected.Sources {
+				a := &in.Spec.Source.InlineVolumeSource.VolumeSource.Projected.Sources[i]
+				if a.DownwardAPI != nil {
+					for j := range a.DownwardAPI.Items {
+						b := &a.DownwardAPI.Items[j]
+						if b.FieldRef != nil {
+							v1.SetDefaults_ObjectFieldSelector(b.FieldRef)
+						}
+					}
+				}
+				if a.ServiceAccountToken != nil {
+					v1.SetDefaults_ServiceAccountTokenProjection(a.ServiceAccountToken)
+				}
+			}
+		}
+		if in.Spec.Source.InlineVolumeSource.VolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOVolumeSource(in.Spec.Source.InlineVolumeSource.VolumeSource.ScaleIO)
+		}
+	}
+}
+
+func SetObjectDefaults_VolumeAttachmentList(in *v1beta1.VolumeAttachmentList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_VolumeAttachment(a)
 	}
 }

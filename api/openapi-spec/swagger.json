@@ -80064,6 +80064,49 @@
      }
     }
    },
+   "io.k8s.api.core.v1.CSIVolumeSource": {
+    "description": "Represents a source location of a volume to mount, managed by an external CSI driver",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "controllerPublishSecretRef": {
+      "description": "ControllerPublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerPublishVolume and ControllerUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.LocalObjectReference"
+     },
+     "driver": {
+      "description": "Driver is the name of the driver to use for this volume. Required.",
+      "type": "string"
+     },
+     "fsType": {
+      "description": "Filesystem type to mount. Ex. \"ext4\", \"xfs\", \"ntfs\". If not provided, the empty value is passed to the associated CSI driver which will determine the default filesystem to apply.",
+      "type": "string"
+     },
+     "nodePublishSecretRef": {
+      "description": "NodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.LocalObjectReference"
+     },
+     "nodeStageSecretRef": {
+      "description": "NodeStageSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodeStageVolume and NodeStageVolume and NodeUnstageVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.LocalObjectReference"
+     },
+     "readOnly": {
+      "description": "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
+      "type": "boolean"
+     },
+     "volumeAttributes": {
+      "description": "VolumeAttributes store immutable properties of the volume copied during provision. These attributes are passed back to the driver during controller publish calls.",
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     },
+     "volumeHandle": {
+      "description": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. If not provided, that handle will be auto-generated.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.core.v1.Capabilities": {
     "description": "Adds and removes POSIX capabilities from running containers.",
     "properties": {
@@ -84714,6 +84757,10 @@
       "description": "ConfigMap represents a configMap that should populate this volume",
       "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMapVolumeSource"
      },
+     "csi": {
+      "description": "CSI (Container Storage Interface) represents storage that handled by an external CSI driver (Beta feature).",
+      "$ref": "#/definitions/io.k8s.api.core.v1.CSIVolumeSource"
+     },
      "downwardAPI": {
       "description": "DownwardAPI represents downward API about the pod that should populate this volume",
       "$ref": "#/definitions/io.k8s.api.core.v1.DownwardAPIVolumeSource"
@@ -84877,6 +84924,123 @@
      "serviceAccountToken": {
       "description": "information about the serviceAccountToken data to project",
       "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccountTokenProjection"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.VolumeSource": {
+    "description": "Represents the source of a volume to mount. Only one of its members may be specified.",
+    "properties": {
+     "awsElasticBlockStore": {
+      "description": "AWSElasticBlockStore represents an AWS Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#awselasticblockstore",
+      "$ref": "#/definitions/io.k8s.api.core.v1.AWSElasticBlockStoreVolumeSource"
+     },
+     "azureDisk": {
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.AzureDiskVolumeSource"
+     },
+     "azureFile": {
+      "description": "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.AzureFileVolumeSource"
+     },
+     "cephfs": {
+      "description": "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
+      "$ref": "#/definitions/io.k8s.api.core.v1.CephFSVolumeSource"
+     },
+     "cinder": {
+      "description": "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
+      "$ref": "#/definitions/io.k8s.api.core.v1.CinderVolumeSource"
+     },
+     "configMap": {
+      "description": "ConfigMap represents a configMap that should populate this volume",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMapVolumeSource"
+     },
+     "csi": {
+      "description": "CSI (Container Storage Interface) represents storage that handled by an external CSI driver (Beta feature).",
+      "$ref": "#/definitions/io.k8s.api.core.v1.CSIVolumeSource"
+     },
+     "downwardAPI": {
+      "description": "DownwardAPI represents downward API about the pod that should populate this volume",
+      "$ref": "#/definitions/io.k8s.api.core.v1.DownwardAPIVolumeSource"
+     },
+     "emptyDir": {
+      "description": "EmptyDir represents a temporary directory that shares a pod's lifetime. More info: https://kubernetes.io/docs/concepts/storage/volumes#emptydir",
+      "$ref": "#/definitions/io.k8s.api.core.v1.EmptyDirVolumeSource"
+     },
+     "fc": {
+      "description": "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.FCVolumeSource"
+     },
+     "flexVolume": {
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.FlexVolumeSource"
+     },
+     "flocker": {
+      "description": "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
+      "$ref": "#/definitions/io.k8s.api.core.v1.FlockerVolumeSource"
+     },
+     "gcePersistentDisk": {
+      "description": "GCEPersistentDisk represents a GCE Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes#gcepersistentdisk",
+      "$ref": "#/definitions/io.k8s.api.core.v1.GCEPersistentDiskVolumeSource"
+     },
+     "gitRepo": {
+      "description": "GitRepo represents a git repository at a particular revision. DEPRECATED: GitRepo is deprecated. To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod's container.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.GitRepoVolumeSource"
+     },
+     "glusterfs": {
+      "description": "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
+      "$ref": "#/definitions/io.k8s.api.core.v1.GlusterfsVolumeSource"
+     },
+     "hostPath": {
+      "description": "HostPath represents a pre-existing file or directory on the host machine that is directly exposed to the container. This is generally used for system agents or other privileged things that are allowed to see the host machine. Most containers will NOT need this. More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath",
+      "$ref": "#/definitions/io.k8s.api.core.v1.HostPathVolumeSource"
+     },
+     "iscsi": {
+      "description": "ISCSI represents an ISCSI Disk resource that is attached to a kubelet's host machine and then exposed to the pod. More info: https://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ISCSIVolumeSource"
+     },
+     "nfs": {
+      "description": "NFS represents an NFS mount on the host that shares a pod's lifetime More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs",
+      "$ref": "#/definitions/io.k8s.api.core.v1.NFSVolumeSource"
+     },
+     "persistentVolumeClaim": {
+      "description": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
+      "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaimVolumeSource"
+     },
+     "photonPersistentDisk": {
+      "description": "PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine",
+      "$ref": "#/definitions/io.k8s.api.core.v1.PhotonPersistentDiskVolumeSource"
+     },
+     "portworxVolume": {
+      "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine",
+      "$ref": "#/definitions/io.k8s.api.core.v1.PortworxVolumeSource"
+     },
+     "projected": {
+      "description": "Items for all in one resources secrets, configmaps, and downward API",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ProjectedVolumeSource"
+     },
+     "quobyte": {
+      "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+      "$ref": "#/definitions/io.k8s.api.core.v1.QuobyteVolumeSource"
+     },
+     "rbd": {
+      "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
+      "$ref": "#/definitions/io.k8s.api.core.v1.RBDVolumeSource"
+     },
+     "scaleIO": {
+      "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.ScaleIOVolumeSource"
+     },
+     "secret": {
+      "description": "Secret represents a secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
+      "$ref": "#/definitions/io.k8s.api.core.v1.SecretVolumeSource"
+     },
+     "storageos": {
+      "description": "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.StorageOSVolumeSource"
+     },
+     "vsphereVolume": {
+      "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+      "$ref": "#/definitions/io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
      }
     }
    },
@@ -85058,6 +85222,18 @@
      },
      "state": {
       "description": "Information whether this series is ongoing or finished.",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.extensions.v1beta1.AllowedCSIDriver": {
+    "description": "AllowedCSIDriver represents a single CSI Driver that is allowed to be used.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "description": "Name of the CSI driver",
       "type": "string"
      }
     }
@@ -86028,6 +86204,13 @@
       "description": "allowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
       "type": "boolean"
      },
+     "allowedCSIDrivers": {
+      "description": "AllowedCSIDrivers is a whitelist of allowed CSI drivers.  This slice will be checked to verify which CSI driver is allowed to run in the cluster.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.AllowedCSIDriver"
+      }
+     },
      "allowedCapabilities": {
       "description": "allowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both allowedCapabilities and requiredDropCapabilities.",
       "type": "array",
@@ -86631,6 +86814,18 @@
      }
     }
    },
+   "io.k8s.api.policy.v1beta1.AllowedCSIDriver": {
+    "description": "AllowedCSIDriver represents a single CSI Driver that is allowed to be used.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "description": "Name of the CSI driver",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.api.policy.v1beta1.AllowedFlexVolume": {
     "description": "AllowedFlexVolume represents a single Flexvolume that is allowed to be used.",
     "required": [
@@ -86935,6 +87130,13 @@
      "allowPrivilegeEscalation": {
       "description": "allowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
       "type": "boolean"
+     },
+     "allowedCSIDrivers": {
+      "description": "AllowedCSIDrivers is a whitelist of allowed CSI drivers.  This slice will be checked to verify which CSI driver is allowed to run in the cluster.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.policy.v1beta1.AllowedCSIDriver"
+      }
      },
      "allowedCapabilities": {
       "description": "allowedCapabilities is a list of capabilities that can be requested to add to the container. Capabilities in this field may be added at the pod author's discretion. You must not list a capability in both allowedCapabilities and requiredDropCapabilities.",
@@ -88600,6 +88802,23 @@
      }
     ]
    },
+   "io.k8s.api.storage.v1alpha1.InlineVolumeSource": {
+    "description": "InlineVolumeSource represents the source location of a in-line volume in a pod.",
+    "required": [
+     "volumeSource",
+     "namespace"
+    ],
+    "properties": {
+     "namespace": {
+      "description": "Namespace of the pod with in-line volume. It is used to resolve references to Secrets in VolumeSource. Required.",
+      "type": "string"
+     },
+     "volumeSource": {
+      "description": "VolumeSource is copied from the pod. It ensures that attacher has enough information to detach a volume when the pod is deleted before detaching. Only CSIVolumeSource can be set. Required.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.VolumeSource"
+     }
+    }
+   },
    "io.k8s.api.storage.v1alpha1.VolumeAttachment": {
     "description": "VolumeAttachment captures the intent to attach or detach the specified volume to/from the specified node.\n\nVolumeAttachment objects are non-namespaced.",
     "required": [
@@ -88672,6 +88891,10 @@
    "io.k8s.api.storage.v1alpha1.VolumeAttachmentSource": {
     "description": "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistenVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
     "properties": {
+     "inlineVolumeSource": {
+      "description": "Represents the source location of a in-line volume in a pod.",
+      "$ref": "#/definitions/io.k8s.api.storage.v1alpha1.InlineVolumeSource"
+     },
      "persistentVolumeName": {
       "description": "Name of the persistent volume to attach.",
       "type": "string"
@@ -88737,6 +88960,23 @@
      "time": {
       "description": "Time the error was encountered.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
+     }
+    }
+   },
+   "io.k8s.api.storage.v1beta1.InlineVolumeSource": {
+    "description": "InlineVolumeSource represents the source location of a in-line volume in a pod.",
+    "required": [
+     "volumeSource",
+     "namespace"
+    ],
+    "properties": {
+     "namespace": {
+      "description": "Namespace of the pod with in-line volume. It is used to resolve references to Secrets in VolumeSource. Required.",
+      "type": "string"
+     },
+     "volumeSource": {
+      "description": "VolumeSource is copied from the pod. It ensures that attacher has enough information to detach a volume when the pod is deleted before detaching. Only CSIVolumeSource can be set. Required.",
+      "$ref": "#/definitions/io.k8s.api.core.v1.VolumeSource"
      }
     }
    },
@@ -88910,6 +89150,10 @@
    "io.k8s.api.storage.v1beta1.VolumeAttachmentSource": {
     "description": "VolumeAttachmentSource represents a volume that should be attached. Right now only PersistenVolumes can be attached via external attacher, in future we may allow also inline volumes in pods. Exactly one member can be set.",
     "properties": {
+     "inlineVolumeSource": {
+      "description": "Represents the source location of a in-line volume in a pod.",
+      "$ref": "#/definitions/io.k8s.api.storage.v1beta1.InlineVolumeSource"
+     },
      "persistentVolumeName": {
       "description": "Name of the persistent volume to attach.",
       "type": "string"

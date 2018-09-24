@@ -22,9 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // volumeAttachmentStrategy implements behavior for VolumeAttachment objects
@@ -43,6 +45,13 @@ func (volumeAttachmentStrategy) NamespaceScoped() bool {
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	va := obj.(*storage.VolumeAttachment)
+
+	// disable InlineVolumeSource
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		va.Spec.Source.InlineVolumeSource = nil
+		va.Spec.Source.InlineVolumeSource = nil
+	}
 }
 
 func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -60,6 +69,14 @@ func (volumeAttachmentStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
 func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newVA := obj.(*storage.VolumeAttachment)
+	oldVA := old.(*storage.VolumeAttachment)
+
+	// disable InlineVolumeSource
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		newVA.Spec.Source.InlineVolumeSource = nil
+		oldVA.Spec.Source.InlineVolumeSource = nil
+	}
 }
 
 func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
