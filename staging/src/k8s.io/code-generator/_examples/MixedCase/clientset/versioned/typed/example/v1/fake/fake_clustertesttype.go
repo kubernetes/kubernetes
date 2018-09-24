@@ -134,7 +134,7 @@ func (c *FakeClusterTestTypes) Patch(name string, pt types.PatchType, data []byt
 // GetScale takes name of the clusterTestType, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeClusterTestTypes) GetScale(clusterTestTypeName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootGetSubresourceAction(clustertesttypesResource, clusterTestTypeName), &autoscaling.Scale{})
+		Invokes(testing.NewRootGetSubresourceAction(clustertesttypesResource, "scale", clusterTestTypeName), &autoscaling.Scale{})
 	if obj == nil {
 		return nil, err
 	}
