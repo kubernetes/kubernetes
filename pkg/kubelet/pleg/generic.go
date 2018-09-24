@@ -132,6 +132,9 @@ func (g *GenericPLEG) Start() {
 
 func (g *GenericPLEG) Healthy() (bool, error) {
 	relistTime := g.getRelistTime()
+	if relistTime.IsZero() {
+		return false, fmt.Errorf("pleg has yet to be successful")
+	}
 	elapsed := g.clock.Since(relistTime)
 	if elapsed > relistThreshold {
 		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
