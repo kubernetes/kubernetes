@@ -4,6 +4,9 @@
     "metadata": {
         "name": "vpa-admission-controller",
         "namespace": "kube-system"
+        "annotations": {
+            "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
+        }
     },
     "spec": {
         "hostNetwork": true,
