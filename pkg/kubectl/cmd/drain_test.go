@@ -33,9 +33,9 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -273,14 +273,14 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	ds := extensions.DaemonSet{
+	ds := extensionsv1beta1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "ds",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			SelfLink:          testapi.Default.SelfLink("daemonsets", "ds"),
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: extensionsv1beta1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -373,14 +373,14 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	job := batch.Job{
+	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			SelfLink:          testapi.Default.SelfLink("jobs", "job"),
 		},
-		Spec: batch.JobSpec{
+		Spec: batchv1.JobSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -444,7 +444,7 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	rs := extensions.ReplicaSet{
+	rs := extensionsv1beta1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "rs",
 			Namespace:         "default",
@@ -452,7 +452,7 @@ func TestDrain(t *testing.T) {
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("replicasets", "rs"),
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: extensionsv1beta1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -535,7 +535,7 @@ func TestDrain(t *testing.T) {
 		expected      *corev1.Node
 		pods          []corev1.Pod
 		rcs           []corev1.ReplicationController
-		replicaSets   []extensions.ReplicaSet
+		replicaSets   []extensionsv1beta1.ReplicaSet
 		args          []string
 		expectWarning string
 		expectFatal   bool
@@ -637,7 +637,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{rs_pod},
-			replicaSets:  []extensions.ReplicaSet{rs},
+			replicaSets:  []extensionsv1beta1.ReplicaSet{rs},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -765,7 +765,7 @@ func TestDrain(t *testing.T) {
 						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
 							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &extensions.DaemonSet{})}, nil
+							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &extensionsv1beta1.DaemonSet{})}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
 							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Batch.Codec(), &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
