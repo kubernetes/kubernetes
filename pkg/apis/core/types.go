@@ -2597,6 +2597,11 @@ type PodSpec struct {
 	// This is an alpha feature and may change in the future.
 	// +optional
 	RuntimeClassName *string
+	// EnableServiceLinks indicates whether information about services should be injected into pod's
+	// environment variables, matching the syntax of Docker links.
+	// If not specified, the default is true.
+	// +optional
+	EnableServiceLinks *bool
 }
 
 // HostAlias holds the mapping between IP and hostnames that will be injected as an entry in the
