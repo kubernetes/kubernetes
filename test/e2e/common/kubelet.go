@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package common
 
 import (
 	"bytes"
@@ -39,12 +39,13 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a busybox command in a pod", func() {
 		podName := "busybox-scheduling-" + string(uuid.NewUUID())
+
 		/*
 			Release : v1.9
 			Testname: Kubelet, log output, default
 			Description: By default the stdout and stderr from the process being executed in a pod MUST be sent to the pod's logs.
 		*/
-		It("it should print the output to logs [NodeConformance]", func() {
+		It("should print the output to logs [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -54,7 +55,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   busyboxImage,
+							Image:   framework.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"sh", "-c", "echo 'Hello World' ; sleep 240"},
 						},
@@ -88,7 +89,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   busyboxImage,
+							Image:   framework.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"/bin/false"},
 						},
@@ -97,7 +98,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			})
 		})
 
-		It("should have an error terminated reason [NodeConformance]", func() {
+		It("should have an terminated reason [NodeConformance]", func() {
 			Eventually(func() error {
 				podData, err := podClient.Get(podName, metav1.GetOptions{})
 				if err != nil {
@@ -110,8 +111,8 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				if contTerminatedState == nil {
 					return fmt.Errorf("expected state to be terminated. Got pod status: %+v", podData.Status)
 				}
-				if contTerminatedState.Reason != "Error" {
-					return fmt.Errorf("expected terminated state reason to be error. Got %+v", contTerminatedState)
+				if contTerminatedState.ExitCode == 0 || contTerminatedState.Reason == "" {
+					return fmt.Errorf("expected non-zero exitCode and non-empty terminated state reason. Got exitCode: %+v and terminated state reason: %+v", contTerminatedState.ExitCode, contTerminatedState.Reason)
 				}
 				return nil
 			}, time.Minute, time.Second*4).Should(BeNil())
@@ -125,7 +126,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	Context("when scheduling a busybox Pod with hostAliases", func() {
 		podName := "busybox-host-aliases" + string(uuid.NewUUID())
 
-		It("it should write entries to /etc/hosts [NodeConformance]", func() {
+		It("should write entries to /etc/hosts [NodeConformance]", func() {
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -135,7 +136,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   busyboxImage,
+							Image:   framework.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"/bin/sh", "-c", "cat /etc/hosts; sleep 6000"},
 						},
@@ -169,12 +170,8 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 	Context("when scheduling a read only busybox container", func() {
 		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
-		/*
-			Release : v1.9
-			Testname: Kubelet, Pod with read only root file system
-			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
-		*/
-		It("it should not write to root filesystem [NodeConformance]", func() {
+
+		It("should not write to root filesystem [NodeConformance]", func() {
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -185,7 +182,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image:   busyboxImage,
+							Image:   framework.BusyBoxImage,
 							Name:    podName,
 							Command: []string{"/bin/sh", "-c", "echo test > /file; sleep 240"},
 							SecurityContext: &v1.SecurityContext{
