@@ -1370,3 +1370,11 @@ func TestSetDefaultHostPathVolumeSource(t *testing.T) {
 		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
 	}
 }
+
+func TestSetDefaultEnableServiceLinks(t *testing.T) {
+	pod := &v1.Pod{}
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != v1.DefaultEnableServiceLinks {
+		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
+	}
+}
