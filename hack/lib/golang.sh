@@ -557,6 +557,7 @@ kube::golang::build_some_binaries() {
      fi
    else
     V=2 kube::log::info "Coverage is disabled."
+    kube::log::status "go install" "${build_args[@]}" "$@"
     go install "${build_args[@]}" "$@"
    fi
 }
@@ -586,6 +587,7 @@ kube::golang::build_binaries_for_platform() {
       -installsuffix static
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
+      -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
     )
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
@@ -595,6 +597,7 @@ kube::golang::build_binaries_for_platform() {
     build_args=(
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
+      -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
@@ -608,6 +611,7 @@ kube::golang::build_binaries_for_platform() {
     go test -c \
       ${goflags:+"${goflags[@]}"} \
       -gcflags "${gogcflags:-}" \
+      -asmflags "${goasmflags:-}" \
       -ldflags "${goldflags:-}" \
       -o "${outfile}" \
       "${testpkg}"
@@ -661,10 +665,11 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     # Use eval to preserve embedded quoted strings.
-    local goflags goldflags gogcflags
+    local goflags goldflags goasmflags gogcflags
     eval "goflags=(${GOFLAGS:-})"
-    goldflags="${GOLDFLAGS:-} $(kube::version::ldflags)"
-    gogcflags="${GOGCFLAGS:-}"
+    goldflags="${GOLDFLAGS:-} -s -w $(kube::version::ldflags)"
+    goasmflags="-trimpath=${KUBE_ROOT}"
+    gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
     local -a targets=()
     local arg
