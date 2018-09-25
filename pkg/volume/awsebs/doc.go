@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package aws_ebs contains the internal representation of AWS Elastic
+// Package awsebs contains the internal representation of AWS Elastic
 // Block Store volumes.
-package aws_ebs // import "k8s.io/kubernetes/pkg/volume/aws_ebs"
+package awsebs // import "k8s.io/kubernetes/pkg/volume/awsebs"

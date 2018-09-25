@@ -69,7 +69,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/aws_ebs:all-srcs",
+        "//pkg/volume/awsebs:all-srcs",
         "//pkg/volume/azure_dd:all-srcs",
         "//pkg/volume/azure_file:all-srcs",
         "//pkg/volume/cephfs:all-srcs",

@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/rbac/v1alpha1
 
 // +groupName=rbac.authorization.k8s.io
+
 package v1alpha1 // import "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"

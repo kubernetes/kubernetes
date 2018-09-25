@@ -15,7 +15,7 @@ go_library(
         "aws_util.go",
         "doc.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/aws_ebs",
+    importpath = "k8s.io/kubernetes/pkg/volume/awsebs",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",

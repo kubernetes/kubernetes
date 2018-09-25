@@ -151,7 +151,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		kubeletapis.LabelArch,
 	}
 
-	var needsUpdate bool = false
+	needsUpdate := false
 	if existingNode.Labels == nil {
 		existingNode.Labels = make(map[string]string)
 	}
