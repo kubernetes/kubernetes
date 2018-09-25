@@ -501,7 +501,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
-// SystemVerificationCheck defines struct used for for running the system verification node check in test/e2e_node/system
+// SystemVerificationCheck defines struct used for running the system verification node check in test/e2e_node/system
 type SystemVerificationCheck struct {
 	IsDocker bool
 }
