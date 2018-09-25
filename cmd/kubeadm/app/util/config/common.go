@@ -94,7 +94,7 @@ func DetectUnsupportedVersion(b []byte) error {
 		knownKinds[gvk.Kind] = true
 	}
 	// InitConfiguration, MasterConfiguration and NodeConfiguration are mutually exclusive, error if more than one are specified
-	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.MasterConfigurationKind, constants.JoinConfigurationKind, constants.NodeConfigurationKind}
+	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.JoinConfigurationKind}
 	foundOne := false
 	for _, kind := range mutuallyExclusive {
 		if knownKinds[kind] {

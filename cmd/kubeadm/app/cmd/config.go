@@ -124,13 +124,13 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 
 func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	switch apiObject {
-	case constants.InitConfigurationKind, constants.MasterConfigurationKind:
+	case constants.InitConfigurationKind:
 		return getDefaultInitConfigBytes(constants.InitConfigurationKind)
 
 	case constants.ClusterConfigurationKind:
 		return getDefaultInitConfigBytes(constants.ClusterConfigurationKind)
 
-	case constants.JoinConfigurationKind, constants.NodeConfigurationKind:
+	case constants.JoinConfigurationKind:
 		return getDefaultNodeConfigBytes()
 
 	default:
@@ -153,8 +153,9 @@ func getSupportedAPIObjects() []string {
 }
 
 // getAllAPIObjectNames returns currently supported API object names and their historical aliases
+// NB. currently there is no historical supported API objects, but we keep this function for future changes
 func getAllAPIObjectNames() []string {
-	historicAPIObjectAliases := []string{constants.MasterConfigurationKind}
+	historicAPIObjectAliases := []string{}
 	objects := getSupportedAPIObjects()
 	objects = append(objects, historicAPIObjectAliases...)
 	return objects
