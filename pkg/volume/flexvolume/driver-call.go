@@ -220,14 +220,16 @@ type DriverStatus struct {
 }
 
 type DriverCapabilities struct {
-	Attach         bool `json:"attach"`
-	SELinuxRelabel bool `json:"selinuxRelabel"`
+	Attach          bool `json:"attach"`
+	SELinuxRelabel  bool `json:"selinuxRelabel"`
+	SupportsMetrics bool `json:"supportsMetrics"`
 }
 
 func defaultCapabilities() *DriverCapabilities {
 	return &DriverCapabilities{
-		Attach:         true,
-		SELinuxRelabel: true,
+		Attach:          true,
+		SELinuxRelabel:  true,
+		SupportsMetrics: false,
 	}
 }
 

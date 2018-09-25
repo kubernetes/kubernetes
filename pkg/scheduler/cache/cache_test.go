@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -1334,28 +1333,5 @@ func TestPDBOperations(t *testing.T) {
 			}
 
 		}
-	}
-}
-
-func TestIsUpToDate(t *testing.T) {
-	cache := New(time.Duration(0), wait.NeverStop)
-	if err := cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n1"}}); err != nil {
-		t.Errorf("Could not add node: %v", err)
-	}
-	s := cache.Snapshot()
-	node := s.Nodes["n1"]
-	if !cache.IsUpToDate(node) {
-		t.Errorf("Node incorrectly marked as stale")
-	}
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", UID: "p1"}, Spec: v1.PodSpec{NodeName: "n1"}}
-	if err := cache.AddPod(pod); err != nil {
-		t.Errorf("Could not add pod: %v", err)
-	}
-	if cache.IsUpToDate(node) {
-		t.Errorf("Node incorrectly marked as up to date")
-	}
-	badNode := &NodeInfo{node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n2"}}}
-	if cache.IsUpToDate(badNode) {
-		t.Errorf("Nonexistant node incorrectly marked as up to date")
 	}
 }
