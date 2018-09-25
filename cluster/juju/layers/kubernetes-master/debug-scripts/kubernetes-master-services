@@ -1,7 +1,7 @@
 #!/bin/sh
 set -ux
 
-for service in kube-apiserver kube-controller-manager kube-scheduler; do
+for service in kube-apiserver kube-controller-manager kube-scheduler kube-proxy; do
   systemctl status snap.$service.daemon > $DEBUG_SCRIPT_DIR/$service-systemctl-status
   journalctl -u snap.$service.daemon > $DEBUG_SCRIPT_DIR/$service-journal
 done
