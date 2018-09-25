@@ -59,6 +59,12 @@ func TestFindClusterID(t *testing.T) {
 		},
 		{
 			Tags: map[string]string{
+				TagNameKubernetesClusterPrefix + "a": "shared",
+			},
+			ExpectedNew: "a",
+		},
+		{
+			Tags: map[string]string{
 				TagNameKubernetesClusterPrefix + "a": "",
 			},
 			ExpectedNew: "a",
