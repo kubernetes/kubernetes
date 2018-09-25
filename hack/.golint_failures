@@ -128,7 +128,6 @@ pkg/controller/podautoscaler
 pkg/controller/podautoscaler/metrics
 pkg/controller/podgc
 pkg/controller/replicaset
-pkg/controller/replicaset/options
 pkg/controller/replication
 pkg/controller/resourcequota
 pkg/controller/route
