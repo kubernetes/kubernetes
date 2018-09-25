@@ -210,26 +210,28 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName string, clusterID st
 		glog.V(4).Infof("ensureExternalLoadBalancer(%s): Service needs local traffic health checks on: %d%s.", lbRefStr, healthCheckNodePort, path)
 		if hcLocalTrafficExisting == nil {
 			// This logic exists to detect a transition for non-OnlyLocal to OnlyLocal service
-			// turn on the tpNeedsRecreation flag to delete/recreate fwdrule/tpool updating the
-			// target pool to use local traffic health check.
+			// and update health checks for the target pool to use local traffic health check.
 			glog.V(2).Infof("ensureExternalLoadBalancer(%s): Updating from nodes health checks to local traffic health checks.", lbRefStr)
 			if supportsNodesHealthCheck {
 				hcToDelete = makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
 			}
-			tpNeedsRecreation = true
 		}
-		hcToCreate = makeHttpHealthCheck(loadBalancerName, path, healthCheckNodePort)
+		// If the target pool needs to be recreaed or is in a transition from
+		// non-OnlyLocal to Onlylocal service, a new heath check will be required.
+		if tpNeedsRecreation || hcLocalTrafficExisting == nil {
+			hcToCreate = makeHttpHealthCheck(loadBalancerName, path, healthCheckNodePort)
+		}
 	} else {
 		glog.V(4).Infof("ensureExternalLoadBalancer(%s): Service needs nodes health checks.", lbRefStr)
 		if hcLocalTrafficExisting != nil {
 			// This logic exists to detect a transition from OnlyLocal to non-OnlyLocal service
-			// and turn on the tpNeedsRecreation flag to delete/recreate fwdrule/tpool updating the
-			// target pool to use nodes health check.
+			// and create/delete health checks from the target pool.
 			glog.V(2).Infof("ensureExternalLoadBalancer(%s): Updating from local traffic health checks to nodes health checks.", lbRefStr)
 			hcToDelete = hcLocalTrafficExisting
-			tpNeedsRecreation = true
 		}
-		if supportsNodesHealthCheck {
+		// If the target pool needs to be recreaed or is in a transition from
+		// Onlylocal to non-OnlyLocal service, a new heath check will be required.
+		if (tpNeedsRecreation || hcLocalTrafficExisting != nil) && supportsNodesHealthCheck {
 			hcToCreate = makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
 		}
 	}
@@ -350,6 +352,52 @@ func (gce *GCECloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID st
 	return nil
 }
 
+func (gce *GCECloud) deleteHealthCheckAndFirewall(service *v1.Service, name, clusterID string, hcName string) error {
+	serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
+	lbRefStr := fmt.Sprintf("%v(%v)", name, serviceName)
+
+	// Check whether it is nodes health check, which has different name from the load-balancer.
+	isNodesHealthCheck := hcName != name
+	if isNodesHealthCheck {
+		// Lock to prevent deleting necessary nodes health check before it gets attached
+		// to target pool.
+		gce.sharedResourceLock.Lock()
+		defer gce.sharedResourceLock.Unlock()
+	}
+	glog.Infof("deleteHealthCheckAndFirewall(%v): Deleting health check %v.", lbRefStr, hcName)
+	if err := gce.DeleteHttpHealthCheck(hcName); err != nil {
+		// Delete nodes health checks will fail if any other target pool is using it.
+		if isInUsedByError(err) {
+			glog.V(4).Infof("deleteHealthCheckAndFirewall(%v): Health check %v is in used: %v.", lbRefStr, hcName, err)
+			return nil
+		} else if !isHTTPErrorCode(err, http.StatusNotFound) {
+			glog.Warningf("deleteHealthCheckAndFirewall(%v): Failed to delete health check %v: %v.", lbRefStr, hcName, err)
+			return err
+		}
+		// StatusNotFound could happen when:
+		// - This is the first attempt but we pass in a healthcheck that is already deleted
+		//   to prevent leaking.
+		// - This is the first attempt but user manually deleted the heathcheck.
+		// - This is a retry and in previous round we failed to delete the healthcheck firewall
+		//   after deleted the healthcheck.
+		// We continue to delete the healthcheck firewall to prevent leaking.
+		glog.V(4).Infof("deleteHealthCheckAndFirewall(%v): Health check %v is already deleted.", lbRefStr, hcName)
+	}
+	// If health check is deleted without error, it means no load-balancer is using it.
+	// So we should delete the health check firewall as well.
+	fwName := MakeHealthCheckFirewallName(clusterID, hcName, isNodesHealthCheck)
+	glog.Infof("deleteHealthCheckAndFirewall(%v): Deleting health check firewall %v.", lbRefStr, fwName)
+	if err := ignoreNotFound(gce.DeleteFirewall(fwName)); err != nil {
+		if isForbidden(err) && gce.OnXPN() {
+			glog.V(4).Infof("deleteHealthCheckAndFirewall(%v): Do not have permission to delete firewall rule %v (on XPN). Raising event.", lbRefStr, fwName)
+			gce.raiseFirewallChangeNeededEvent(service, FirewallToGCloudDeleteCmd(fwName, gce.NetworkProjectID()))
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 func (gce *GCECloud) DeleteExternalTargetPoolAndChecks(service *v1.Service, name, region, clusterID string, hcNames ...string) error {
 	serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	lbRefStr := fmt.Sprintf("%v(%v)", name, serviceName)
@@ -363,48 +411,7 @@ func (gce *GCECloud) DeleteExternalTargetPoolAndChecks(service *v1.Service, name
 
 	// Deletion of health checks is allowed only after the TargetPool reference is deleted
 	for _, hcName := range hcNames {
-		if err := func() error {
-			// Check whether it is nodes health check, which has different name from the load-balancer.
-			isNodesHealthCheck := hcName != name
-			if isNodesHealthCheck {
-				// Lock to prevent deleting necessary nodes health check before it gets attached
-				// to target pool.
-				gce.sharedResourceLock.Lock()
-				defer gce.sharedResourceLock.Unlock()
-			}
-			glog.Infof("DeleteExternalTargetPoolAndChecks(%v): Deleting health check %v.", lbRefStr, hcName)
-			if err := gce.DeleteHttpHealthCheck(hcName); err != nil {
-				// Delete nodes health checks will fail if any other target pool is using it.
-				if isInUsedByError(err) {
-					glog.V(4).Infof("DeleteExternalTargetPoolAndChecks(%v): Health check %v is in used: %v.", lbRefStr, hcName, err)
-					return nil
-				} else if !isHTTPErrorCode(err, http.StatusNotFound) {
-					glog.Warningf("DeleteExternalTargetPoolAndChecks(%v): Failed to delete health check %v: %v.", lbRefStr, hcName, err)
-					return err
-				}
-				// StatusNotFound could happen when:
-				// - This is the first attempt but we pass in a healthcheck that is already deleted
-				//   to prevent leaking.
-				// - This is the first attempt but user manually deleted the heathcheck.
-				// - This is a retry and in previous round we failed to delete the healthcheck firewall
-				//   after deleted the healthcheck.
-				// We continue to delete the healthcheck firewall to prevent leaking.
-				glog.V(4).Infof("DeleteExternalTargetPoolAndChecks(%v): Health check %v is already deleted.", lbRefStr, hcName)
-			}
-			// If health check is deleted without error, it means no load-balancer is using it.
-			// So we should delete the health check firewall as well.
-			fwName := MakeHealthCheckFirewallName(clusterID, hcName, isNodesHealthCheck)
-			glog.Infof("DeleteExternalTargetPoolAndChecks(%v): Deleting health check firewall %v.", lbRefStr, fwName)
-			if err := ignoreNotFound(gce.DeleteFirewall(fwName)); err != nil {
-				if isForbidden(err) && gce.OnXPN() {
-					glog.V(4).Infof("DeleteExternalTargetPoolAndChecks(%v): Do not have permission to delete firewall rule %v (on XPN). Raising event.", lbRefStr, fwName)
-					gce.raiseFirewallChangeNeededEvent(service, FirewallToGCloudDeleteCmd(fwName, gce.NetworkProjectID()))
-					return nil
-				}
-				return err
-			}
-			return nil
-		}(); err != nil {
+		if err := gce.deleteHealthCheckAndFirewall(service, name, clusterID, hcName); err != nil {
 			return err
 		}
 	}
@@ -477,6 +484,7 @@ func (gce *GCECloud) ensureTargetPoolAndHealthCheck(tpExists, tpNeedsRecreation 
 		}
 		glog.Infof("ensureTargetPoolAndHealthCheck(%s): Deleted target pool.", lbRefStr)
 	}
+
 	// Once we've deleted the resources (if necessary), build them back up (or for
 	// the first time if they're new).
 	if tpNeedsRecreation {
@@ -500,6 +508,56 @@ func (gce *GCECloud) ensureTargetPoolAndHealthCheck(tpExists, tpNeedsRecreation 
 			glog.Infof("ensureTargetPoolAndHealthCheck(%s): Updated target pool (with %d hosts).", lbRefStr, len(hosts)-maxTargetPoolCreateInstances)
 		}
 	} else if tpExists {
+		if hcToDelete != nil || hcToCreate != nil {
+			// Check if this target pool needs a new health check or delete an existing one.
+			pool, err := gce.GetTargetPool(loadBalancerName, gce.region)
+			if err != nil {
+				return err
+			}
+			if hcToDelete != nil {
+				for _, hc := range pool.HealthChecks {
+					if getHealthCheckNameFromLink(hc) == hcToDelete.Name {
+						healthchecks := []*compute.HealthCheckReference{{HealthCheck: hc}}
+						if err := gce.RemoveHealthChecksFromTargetPool(loadBalancerName, gce.region, healthchecks); err != nil {
+							return fmt.Errorf("failed to remove healthcheck from target pool for load balancer (%s): %v", lbRefStr, err)
+						}
+						if err := gce.deleteHealthCheckAndFirewall(svc, loadBalancerName, clusterID, hcToDelete.Name); err != nil {
+							return fmt.Errorf("failed to delete healthcheck for load balancer (%s): %v", lbRefStr, err)
+						}
+						// Mark that hcToDelete has been deleted.
+						hcToDelete = nil
+						break
+					}
+				}
+				if hcToDelete != nil {
+					glog.Errorf("Trying to delete a healthcheck which is not referred by the load balancer (%s): %s", lbRefStr, hcToDelete.Name)
+				}
+			}
+
+			if hcToCreate != nil {
+				for _, hc := range pool.HealthChecks {
+					if getHealthCheckNameFromLink(hc) == hcToCreate.Name {
+						glog.Warningf("Healthcheck to be created is already referred by the load balancer (%s): %s. Will update this hc instead.", lbRefStr, hcToCreate.Name)
+						if err := gce.UpdateHttpHealthCheck(hcToCreate); err != nil {
+							return fmt.Errorf("Failed to update http health check %v for load balancer (%s)", hcToCreate.Name, lbRefStr)
+						}
+						hcToCreate = nil
+						break
+					}
+				}
+				if hcToCreate != nil {
+					hcCreated, err := gce.createHealthCheckAndFirewall(svc, loadBalancerName, serviceName.String(), ipAddressToUse, gce.region, clusterID, hosts, hcToCreate)
+					if err != nil {
+						return err
+					}
+					healthchecks := []*compute.HealthCheckReference{{HealthCheck: hcCreated.SelfLink}}
+					if err := gce.AddHealthChecksToTargetPool(loadBalancerName, gce.region, healthchecks); err != nil {
+						return fmt.Errorf("failed to add healthcheck to target pool for load balancer (%s): %v", lbRefStr, err)
+					}
+				}
+			}
+		}
+
 		// Ensure hosts are updated even if there is no other changes required on target pool.
 		if err := gce.updateTargetPool(loadBalancerName, hosts); err != nil {
 			return fmt.Errorf("failed to update target pool for load balancer (%s): %v", lbRefStr, err)
@@ -509,27 +567,35 @@ func (gce *GCECloud) ensureTargetPoolAndHealthCheck(tpExists, tpNeedsRecreation 
 	return nil
 }
 
+func (gce *GCECloud) createHealthCheckAndFirewall(svc *v1.Service, name, serviceName, ipAddress, region, clusterID string, hosts []*gceInstance, hc *compute.HttpHealthCheck) (*compute.HttpHealthCheck, error) {
+	// Check whether it is nodes health check, which has different name from the load-balancer.
+	isNodesHealthCheck := hc.Name != name
+	if isNodesHealthCheck {
+		// Lock to prevent necessary nodes health check / firewall gets deleted.
+		gce.sharedResourceLock.Lock()
+		defer gce.sharedResourceLock.Unlock()
+	}
+
+	if err := gce.ensureHttpHealthCheckFirewall(svc, serviceName, ipAddress, region, clusterID, hosts, hc.Name, int32(hc.Port), isNodesHealthCheck); err != nil {
+		return nil, err
+	}
+	var err error
+	hcRequestPath, hcPort := hc.RequestPath, hc.Port
+	if hc, err = gce.ensureHttpHealthCheck(hc.Name, hc.RequestPath, int32(hc.Port)); err != nil || hc == nil {
+		return nil, fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", name, hcPort, hcRequestPath, err)
+	}
+	return hc, nil
+}
+
 func (gce *GCECloud) createTargetPoolAndHealthCheck(svc *v1.Service, name, serviceName, ipAddress, region, clusterID string, hosts []*gceInstance, hc *compute.HttpHealthCheck) error {
 	// health check management is coupled with targetPools to prevent leaks. A
 	// target pool is the only thing that requires a health check, so we delete
 	// associated checks on teardown, and ensure checks on setup.
 	hcLinks := []string{}
 	if hc != nil {
-		// Check whether it is nodes health check, which has different name from the load-balancer.
-		isNodesHealthCheck := hc.Name != name
-		if isNodesHealthCheck {
-			// Lock to prevent necessary nodes health check / firewall gets deleted.
-			gce.sharedResourceLock.Lock()
-			defer gce.sharedResourceLock.Unlock()
-		}
-
-		if err := gce.ensureHttpHealthCheckFirewall(svc, serviceName, ipAddress, region, clusterID, hosts, hc.Name, int32(hc.Port), isNodesHealthCheck); err != nil {
+		hc, err := gce.createHealthCheckAndFirewall(svc, name, serviceName, ipAddress, region, clusterID, hosts, hc)
+		if err != nil {
 			return err
-		}
-		var err error
-		hcRequestPath, hcPort := hc.RequestPath, hc.Port
-		if hc, err = gce.ensureHttpHealthCheck(hc.Name, hc.RequestPath, int32(hc.Port)); err != nil || hc == nil {
-			return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", name, hcPort, hcRequestPath, err)
 		}
 		hcLinks = append(hcLinks, hc.SelfLink)
 	}
@@ -619,6 +685,14 @@ func makeHttpHealthCheck(name, path string, port int32) *compute.HttpHealthCheck
 		HealthyThreshold:   gceHcHealthyThreshold,
 		UnhealthyThreshold: gceHcUnhealthyThreshold,
 	}
+}
+
+func getHealthCheckNameFromLink(url string) string {
+	parts := strings.Split(url, "/")
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[len(parts)-1]
 }
 
 func (gce *GCECloud) ensureHttpHealthCheck(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {

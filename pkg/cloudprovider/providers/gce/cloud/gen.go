@@ -14003,7 +14003,9 @@ type TargetPools interface {
 	List(ctx context.Context, region string, fl *filter.F) ([]*ga.TargetPool, error)
 	Insert(ctx context.Context, key *meta.Key, obj *ga.TargetPool) error
 	Delete(ctx context.Context, key *meta.Key) error
+	AddHealthCheck(context.Context, *meta.Key, *ga.TargetPoolsAddHealthCheckRequest) error
 	AddInstance(context.Context, *meta.Key, *ga.TargetPoolsAddInstanceRequest) error
+	RemoveHealthCheck(context.Context, *meta.Key, *ga.TargetPoolsRemoveHealthCheckRequest) error
 	RemoveInstance(context.Context, *meta.Key, *ga.TargetPoolsRemoveInstanceRequest) error
 }
 
@@ -14040,12 +14042,14 @@ type MockTargetPools struct {
 	// order to add your own logic. Return (true, _, _) to prevent the normal
 	// execution flow of the mock. Return (false, nil, nil) to continue with
 	// normal mock behavior/ after the hook function executes.
-	GetHook            func(ctx context.Context, key *meta.Key, m *MockTargetPools) (bool, *ga.TargetPool, error)
-	ListHook           func(ctx context.Context, region string, fl *filter.F, m *MockTargetPools) (bool, []*ga.TargetPool, error)
-	InsertHook         func(ctx context.Context, key *meta.Key, obj *ga.TargetPool, m *MockTargetPools) (bool, error)
-	DeleteHook         func(ctx context.Context, key *meta.Key, m *MockTargetPools) (bool, error)
-	AddInstanceHook    func(context.Context, *meta.Key, *ga.TargetPoolsAddInstanceRequest, *MockTargetPools) error
-	RemoveInstanceHook func(context.Context, *meta.Key, *ga.TargetPoolsRemoveInstanceRequest, *MockTargetPools) error
+	GetHook               func(ctx context.Context, key *meta.Key, m *MockTargetPools) (bool, *ga.TargetPool, error)
+	ListHook              func(ctx context.Context, region string, fl *filter.F, m *MockTargetPools) (bool, []*ga.TargetPool, error)
+	InsertHook            func(ctx context.Context, key *meta.Key, obj *ga.TargetPool, m *MockTargetPools) (bool, error)
+	DeleteHook            func(ctx context.Context, key *meta.Key, m *MockTargetPools) (bool, error)
+	AddHealthCheckHook    func(context.Context, *meta.Key, *ga.TargetPoolsAddHealthCheckRequest, *MockTargetPools) error
+	AddInstanceHook       func(context.Context, *meta.Key, *ga.TargetPoolsAddInstanceRequest, *MockTargetPools) error
+	RemoveHealthCheckHook func(context.Context, *meta.Key, *ga.TargetPoolsRemoveHealthCheckRequest, *MockTargetPools) error
+	RemoveInstanceHook    func(context.Context, *meta.Key, *ga.TargetPoolsRemoveInstanceRequest, *MockTargetPools) error
 
 	// X is extra state that can be used as part of the mock. Generated code
 	// will not use this field.
@@ -14194,10 +14198,26 @@ func (m *MockTargetPools) Obj(o *ga.TargetPool) *MockTargetPoolsObj {
 	return &MockTargetPoolsObj{o}
 }
 
+// AddHealthCheck is a mock for the corresponding method.
+func (m *MockTargetPools) AddHealthCheck(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsAddHealthCheckRequest) error {
+	if m.AddHealthCheckHook != nil {
+		return m.AddHealthCheckHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
 // AddInstance is a mock for the corresponding method.
 func (m *MockTargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsAddInstanceRequest) error {
 	if m.AddInstanceHook != nil {
 		return m.AddInstanceHook(ctx, key, arg0, m)
+	}
+	return nil
+}
+
+// RemoveHealthCheck is a mock for the corresponding method.
+func (m *MockTargetPools) RemoveHealthCheck(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsRemoveHealthCheckRequest) error {
+	if m.RemoveHealthCheckHook != nil {
+		return m.RemoveHealthCheckHook(ctx, key, arg0, m)
 	}
 	return nil
 }
@@ -14351,6 +14371,39 @@ func (g *GCETargetPools) Delete(ctx context.Context, key *meta.Key) error {
 	return err
 }
 
+// AddHealthCheck is a method on GCETargetPools.
+func (g *GCETargetPools) AddHealthCheck(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsAddHealthCheckRequest) error {
+	glog.V(5).Infof("GCETargetPools.AddHealthCheck(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCETargetPools.AddHealthCheck(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "AddHealthCheck",
+		Version:   meta.Version("ga"),
+		Service:   "TargetPools",
+	}
+	glog.V(5).Infof("GCETargetPools.AddHealthCheck(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetPools.AddHealthCheck(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.GA.TargetPools.AddHealthCheck(projectID, key.Region, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCETargetPools.AddHealthCheck(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetPools.AddHealthCheck(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
 // AddInstance is a method on GCETargetPools.
 func (g *GCETargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsAddInstanceRequest) error {
 	glog.V(5).Infof("GCETargetPools.AddInstance(%v, %v, ...): called", ctx, key)
@@ -14381,6 +14434,39 @@ func (g *GCETargetPools) AddInstance(ctx context.Context, key *meta.Key, arg0 *g
 	}
 	err = g.s.WaitForCompletion(ctx, op)
 	glog.V(4).Infof("GCETargetPools.AddInstance(%v, %v, ...) = %+v", ctx, key, err)
+	return err
+}
+
+// RemoveHealthCheck is a method on GCETargetPools.
+func (g *GCETargetPools) RemoveHealthCheck(ctx context.Context, key *meta.Key, arg0 *ga.TargetPoolsRemoveHealthCheckRequest) error {
+	glog.V(5).Infof("GCETargetPools.RemoveHealthCheck(%v, %v, ...): called", ctx, key)
+
+	if !key.Valid() {
+		glog.V(2).Infof("GCETargetPools.RemoveHealthCheck(%v, %v, ...): key is invalid (%#v)", ctx, key, key)
+		return fmt.Errorf("invalid GCE key (%+v)", key)
+	}
+	projectID := g.s.ProjectRouter.ProjectID(ctx, "ga", "TargetPools")
+	rk := &RateLimitKey{
+		ProjectID: projectID,
+		Operation: "RemoveHealthCheck",
+		Version:   meta.Version("ga"),
+		Service:   "TargetPools",
+	}
+	glog.V(5).Infof("GCETargetPools.RemoveHealthCheck(%v, %v, ...): projectID = %v, rk = %+v", ctx, key, projectID, rk)
+
+	if err := g.s.RateLimiter.Accept(ctx, rk); err != nil {
+		glog.V(4).Infof("GCETargetPools.RemoveHealthCheck(%v, %v, ...): RateLimiter error: %v", ctx, key, err)
+		return err
+	}
+	call := g.s.GA.TargetPools.RemoveHealthCheck(projectID, key.Region, key.Name, arg0)
+	call.Context(ctx)
+	op, err := call.Do()
+	if err != nil {
+		glog.V(4).Infof("GCETargetPools.RemoveHealthCheck(%v, %v, ...) = %+v", ctx, key, err)
+		return err
+	}
+	err = g.s.WaitForCompletion(ctx, op)
+	glog.V(4).Infof("GCETargetPools.RemoveHealthCheck(%v, %v, ...) = %+v", ctx, key, err)
 	return err
 }
 

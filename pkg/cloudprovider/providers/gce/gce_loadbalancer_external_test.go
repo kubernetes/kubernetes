@@ -308,6 +308,67 @@ func TestEnsureExternalLoadBalancer(t *testing.T) {
 	assertExternalLbResources(t, gce, svc, vals, nodeNames)
 }
 
+func TestHealthCheckChangesWhenServiceSwitchLocality(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	nodeName := "test-node-1"
+
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	svc := fakeLoadbalancerService("")
+	svc.Spec.HealthCheckNodePort = 10086
+
+	nodes, err := createAndInsertNodes(gce, []string{nodeName}, vals.ZoneName)
+
+	status, err := gce.ensureExternalLoadBalancer(
+		vals.ClusterName,
+		vals.ClusterID,
+		svc,
+		nil,
+		nodes,
+	)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+
+	lbName := cloudprovider.GetLoadBalancerName(svc)
+	hcName := MakeNodesHealthCheckName(vals.ClusterID)
+
+	// Check that TargetPool is created
+	pool, err := gce.GetTargetPool(lbName, gce.region)
+	require.NoError(t, err)
+	assert.Equal(t, lbName, pool.Name)
+	assert.NotEmpty(t, pool.HealthChecks)
+	assert.Equal(t, 1, len(pool.Instances))
+
+	// Check that node HealthCheck is created
+	healthcheck, err := gce.GetHttpHealthCheck(hcName)
+	require.NoError(t, err)
+	assert.Equal(t, hcName, healthcheck.Name)
+	assert.Equal(t, GetNodesHealthCheckPort(), int32(healthcheck.Port))
+
+	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	status, err = gce.ensureExternalLoadBalancer(
+		vals.ClusterName,
+		vals.ClusterID,
+		svc,
+		nil,
+		nodes,
+	)
+	assert.NoError(t, err)
+	pool, err = gce.GetTargetPool(lbName, gce.region)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(pool.Instances))
+
+	// Check that a new HealthCheck is created and the old one is deleted
+	healthcheck, err = gce.GetHttpHealthCheck(hcName)
+	assert.Error(t, err)
+	assert.Nil(t, healthcheck)
+
+	healthcheck, err = gce.GetHttpHealthCheck(lbName)
+	assert.Equal(t, lbName, healthcheck.Name)
+	assert.Equal(t, svc.Spec.HealthCheckNodePort, int32(healthcheck.Port))
+}
+
 func TestUpdateExternalLoadBalancer(t *testing.T) {
 	t.Parallel()
 
@@ -840,6 +901,64 @@ func TestEnsureTargetPoolAndHealthCheck(t *testing.T) {
 	assert.NoError(t, err)
 	pool, err = gce.GetTargetPool(lbName, region)
 	assert.Equal(t, 1, len(pool.Instances))
+}
+
+func TestEnsureTargetPoolMaintainsReferenceToHealthCheck(t *testing.T) {
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+
+	svc := fakeLoadbalancerService("")
+
+	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+	require.NoError(t, err)
+	status, err := gce.ensureExternalLoadBalancer(
+		vals.ClusterName,
+		vals.ClusterID,
+		svc,
+		nil,
+		nodes,
+	)
+	require.NotNil(t, status)
+	require.NoError(t, err)
+
+	hostNames := nodeNames(nodes)
+	hosts, err := gce.getInstancesByNames(hostNames)
+	clusterID := vals.ClusterID
+
+	ipAddr := status.Ingress[0].IP
+	lbName := cloudprovider.GetLoadBalancerName(svc)
+	region := vals.Region
+
+	// Should be able to create health check
+	err = gce.ensureTargetPoolAndHealthCheck(true, true, svc, lbName, clusterID, ipAddr, hosts, makeHttpHealthCheck("hc_a", "/healthz_a", 10086), nil)
+	assert.NoError(t, err)
+	pool, err := gce.GetTargetPool(lbName, region)
+	require.NotNil(t, pool)
+	assert.Equal(t, 1, len(pool.HealthChecks))
+	assert.Equal(t, "hc_a", getHealthCheckNameFromLink(pool.HealthChecks[0]))
+	hc, err := gce.GetHttpHealthCheck("hc_a")
+	require.NotNil(t, hc)
+	assert.Equal(t, "/healthz_a", hc.RequestPath)
+
+	// Should be able to update healthcheck the hcToCreate is already referred by the target pool
+	err = gce.ensureTargetPoolAndHealthCheck(true, false, svc, lbName, clusterID, ipAddr, hosts, makeHttpHealthCheck("hc_a", "/healthz_a_2", 10086), nil)
+	assert.NoError(t, err)
+	hc, err = gce.GetHttpHealthCheck("hc_a")
+	require.NotNil(t, hc)
+	assert.Equal(t, "/healthz_a_2", hc.RequestPath)
+
+	// Should be able to update healthcheck the hcToCreate is already referred by the target pool
+	err = gce.ensureTargetPoolAndHealthCheck(true, false, svc, lbName, clusterID, ipAddr, hosts, nil, makeHttpHealthCheck("hc_a", "/healthz_a_2", 10086))
+	assert.NoError(t, err)
+	pool, err = gce.GetTargetPool(lbName, region)
+	assert.Equal(t, 0, len(pool.HealthChecks))
+	hc, err = gce.GetHttpHealthCheck("hc_a")
+	assert.Nil(t, hc)
+
+	// Should not crash when the health check doesn't exists.
+	err = gce.ensureTargetPoolAndHealthCheck(true, false, svc, lbName, clusterID, ipAddr, hosts, nil, makeHttpHealthCheck("hc_a", "/healthz_a_2", 10086))
+	assert.NoError(t, err)
 }
 
 func TestCreateAndUpdateFirewallSucceedsOnXPN(t *testing.T) {

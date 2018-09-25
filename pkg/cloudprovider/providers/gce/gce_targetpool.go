@@ -78,3 +78,21 @@ func (gce *GCECloud) RemoveInstancesFromTargetPool(name, region string, instance
 	mc := newTargetPoolMetricContext("remove_instances", region)
 	return mc.Observe(gce.c.TargetPools().RemoveInstance(ctx, meta.RegionalKey(name, region), req))
 }
+
+// AddHealthCheckToTargetPool adds health checks by link to the TargetPool
+func (gce *GCECloud) AddHealthChecksToTargetPool(name, region string, hcRefs []*compute.HealthCheckReference) error {
+	req := &compute.TargetPoolsAddHealthCheckRequest{
+		HealthChecks: hcRefs,
+	}
+	mc := newTargetPoolMetricContext("add_healthchecks", region)
+	return mc.Observe(gce.c.TargetPools().AddHealthCheck(context.Background(), meta.RegionalKey(name, region), req))
+}
+
+// RemoveHealthCheckFromTargetPool removes health checks by link to the TargetPool
+func (gce *GCECloud) RemoveHealthChecksFromTargetPool(name, region string, hcRefs []*compute.HealthCheckReference) error {
+	req := &compute.TargetPoolsRemoveHealthCheckRequest{
+		HealthChecks: hcRefs,
+	}
+	mc := newTargetPoolMetricContext("remove_healthchecks", region)
+	return mc.Observe(gce.c.TargetPools().RemoveHealthCheck(context.Background(), meta.RegionalKey(name, region), req))
+}

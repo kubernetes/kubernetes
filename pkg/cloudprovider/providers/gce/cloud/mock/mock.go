@@ -92,6 +92,66 @@ func RemoveInstanceHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsR
 	return nil
 }
 
+// AddHealthCheckHook mocks adding healthcheck to MockTargetPools.
+func AddHealthCheckHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsAddHealthCheckRequest, m *cloud.MockTargetPools) error {
+	pool, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in TargetPools", key.String()),
+		}
+	}
+
+	for _, hc := range req.HealthChecks {
+		pool.HealthChecks = append(pool.HealthChecks, hc.HealthCheck)
+	}
+
+	return nil
+}
+
+// RemoveHealthCheckHook mocks removing healthcheck from MockTargetPools.
+func RemoveHealthCheckHook(ctx context.Context, key *meta.Key, req *ga.TargetPoolsRemoveHealthCheckRequest, m *cloud.MockTargetPools) error {
+	pool, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in TargetPools", key.String()),
+		}
+	}
+
+	for _, hcToRemove := range req.HealthChecks {
+		for i, hc := range pool.HealthChecks {
+			if hcToRemove.HealthCheck == hc {
+				// Delete health check from pool.HealthChecks without preserving order
+				pool.HealthChecks[i] = pool.HealthChecks[len(pool.HealthChecks)-1]
+				pool.HealthChecks = pool.HealthChecks[:len(pool.HealthChecks)-1]
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// UpdateHTTPHealthCheckHook defines the hook for updating a HttpHealthCheck. It
+// replaces the object with the same key in the mock with the updated object.
+func UpdateHTTPHealthCheckHook(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck, m *cloud.MockHttpHealthChecks) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in HealthChecks", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "httpHealthChecks")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "httpHealthChecks", key)
+
+	m.Objects[*key] = &cloud.MockHttpHealthChecksObj{Obj: obj}
+	return nil
+}
+
 func convertAndInsertAlphaForwardingRule(key *meta.Key, obj gceObject, mRules map[meta.Key]*cloud.MockForwardingRulesObj, version meta.Version, projectID string) (bool, error) {
 	if !key.Valid() {
 		return true, fmt.Errorf("invalid GCE key (%+v)", key)
