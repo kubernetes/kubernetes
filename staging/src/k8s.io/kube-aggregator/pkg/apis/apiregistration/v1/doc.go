@@ -19,7 +19,7 @@ limitations under the License.
 // +k8s:openapi-gen=true
 // +groupName=apiregistration.k8s.io
 
-// Package v1beta1 contains the API Registration API, which is responsible for
+// Package v1 contains the API Registration API, which is responsible for
 // registering an API `Group`/`Version` with another kubernetes like API server.
 // The `APIService` holds information about the other API server in
 // `APIServiceSpec` type as well as general `TypeMeta` and `ObjectMeta`. The
