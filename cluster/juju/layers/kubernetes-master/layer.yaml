@@ -36,3 +36,4 @@ options:
       - snap.kube-apiserver.daemon
       - snap.kube-controller-manager.daemon
       - snap.kube-scheduler.daemon
+      - snap.kube-proxy.daemon
