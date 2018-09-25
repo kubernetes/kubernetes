@@ -62,7 +62,6 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates[string(features.KubeletPluginsWatcher)] = enablePluginWatcher
 		})
-		//devicePluginSockPaths := []string{pluginapi.DevicePluginPath}
 		It("Verifies the Kubelet device plugin functionality.", func() {
 			By("Start stub device plugin")
 			// fake devices for e2e test
@@ -80,7 +79,7 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 			framework.ExpectNoError(err)
 
 			By("Register resources")
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+			err = dp1.Register(pluginapi.KubeletSocket, resourceName, pluginSockDir)
 			framework.ExpectNoError(err)
 
 			By("Waiting for the resource exported by the stub device plugin to become available on the local node")
@@ -108,16 +107,23 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 			devIdAfterRestart := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devIdAfterRestart).To(Equal(devId1))
 
+			restartTime := time.Now()
 			By("Restarting Kubelet")
 			restartKubelet()
 
-			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
-			By("Confirming that after a kubelet restart, fake-device assignement is kept")
-			devIdRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			Expect(devIdRestart1).To(Equal(devId1))
-
+			// We need to wait for node to be ready before re-registering stub device plugin.
+			// Otherwise, Kubelet DeviceManager may remove the re-registered sockets after it starts.
 			By("Wait for node is ready")
-			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			Eventually(func() bool {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for _, cond := range node.Status.Conditions {
+					if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue && cond.LastHeartbeatTime.After(restartTime) {
+						return true
+					}
+				}
+				return false
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
 
 			By("Re-Register resources")
 			dp1 = dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
@@ -127,6 +133,11 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 
 			err = dp1.Register(pluginapi.KubeletSocket, resourceName, pluginSockDir)
 			framework.ExpectNoError(err)
+
+			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
+			By("Confirming that after a kubelet restart, fake-device assignement is kept")
+			devIdRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
+			Expect(devIdRestart1).To(Equal(devId1))
 
 			By("Waiting for resource to become available on the local node after re-registration")
 			Eventually(func() bool {
@@ -190,18 +201,6 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 				framework.ExpectNoError(err)
 				return numberOfDevicesCapacity(node, resourceName) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
-
-			By("Restarting Kubelet second time.")
-			restartKubelet()
-
-			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet Eventually.")
-			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
-			devIdRestart1 = parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			Expect(devIdRestart1).To(Equal(devId1))
-
-			ensurePodContainerRestart(f, pod2.Name, pod2.Name)
-			devIdRestart2 = parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
-			Expect(devIdRestart2).To(Equal(devId2))
 
 			// Cleanup
 			f.PodClient().DeleteSync(pod1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
