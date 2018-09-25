@@ -85759,6 +85759,20 @@
      }
     }
    },
+   "io.k8s.api.core.v1.PodIPInfo": {
+    "description": "IP address information for entries in the (plural) PodIPs slice. Each entry includes:\n   IP: An IP address allocated to the pod. Routable at least within\n       the cluster.\n   Properties: Arbitrary metadata associated with the allocated IP.",
+    "properties": {
+     "iP": {
+      "type": "string"
+     },
+     "properties": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string"
+      }
+     }
+    }
+   },
    "io.k8s.api.core.v1.PodList": {
     "description": "PodList is a list of Pods.",
     "required": [
@@ -86058,6 +86072,13 @@
      "podIP": {
       "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
       "type": "string"
+     },
+     "podIPs": {
+      "description": "IP addresses allocated to the pod with associated metadata. This list is inclusive, i.e. it includes the default IP address stored in the \"PodIP\" field, and this default IP address must be recorded in the 0th entry (PodIPs[0]) of the slice. The list is empty if no IPs have been allocated yet.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.PodIPInfo"
+      }
      },
      "qosClass": {
       "description": "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md",

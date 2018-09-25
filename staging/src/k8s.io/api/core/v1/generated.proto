@@ -2770,6 +2770,17 @@ message PodExecOptions {
   repeated string command = 6;
 }
 
+// IP address information for entries in the (plural) PodIPs slice.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within
+//        the cluster.
+//    Properties: Arbitrary metadata associated with the allocated IP.
+message PodIPInfo {
+  optional string iP = 1;
+
+  map<string, string> properties = 2;
+}
+
 // PodList is a list of Pods.
 message PodList {
   // Standard list metadata.
@@ -3192,6 +3203,14 @@ message PodStatus {
   // Empty if not yet allocated.
   // +optional
   optional string podIP = 6;
+
+  // IP addresses allocated to the pod with associated metadata. This list
+  // is inclusive, i.e. it includes the default IP address stored in the
+  // "PodIP" field, and this default IP address must be recorded in the
+  // 0th entry (PodIPs[0]) of the slice. The list is empty if no IPs have
+  // been allocated yet.
+  // +optional
+  repeated PodIPInfo podIPs = 12;
 
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.

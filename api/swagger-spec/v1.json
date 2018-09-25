@@ -22954,6 +22954,13 @@
       "type": "string",
       "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated."
      },
+     "podIPs": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodIPInfo"
+      },
+      "description": "IP addresses allocated to the pod with associated metadata. This list is inclusive, i.e. it includes the default IP address stored in the \"PodIP\" field, and this default IP address must be recorded in the 0th entry (PodIPs[0]) of the slice. The list is empty if no IPs have been allocated yet."
+     },
      "startTime": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod."
@@ -23009,6 +23016,18 @@
      "message": {
       "type": "string",
       "description": "Human-readable message indicating details about last transition."
+     }
+    }
+   },
+   "v1.PodIPInfo": {
+    "id": "v1.PodIPInfo",
+    "description": "IP address information for entries in the (plural) PodIPs slice. Each entry includes:\n   IP: An IP address allocated to the pod. Routable at least within\n       the cluster.\n   Properties: Arbitrary metadata associated with the allocated IP.",
+    "properties": {
+     "iP": {
+      "type": "string"
+     },
+     "properties": {
+      "type": "object"
      }
     }
    },
