@@ -485,7 +485,7 @@ function start_apiserver {
     fi
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
-      priv_arg="--allow-privileged "
+      priv_arg="--allow-privileged=${ALLOW_PRIVILEGED} "
     fi
 
     if [[ ${ENABLE_ADMISSION_PLUGINS} == *"Initializers"* ]]; then
@@ -679,7 +679,7 @@ function start_kubelet {
 
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
-      priv_arg="--allow-privileged "
+      priv_arg="--allow-privileged=${ALLOW_PRIVILEGED} "
     fi
 
     cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
