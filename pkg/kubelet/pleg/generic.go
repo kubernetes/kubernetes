@@ -290,17 +290,13 @@ func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Containe
 		if p == nil {
 			continue
 		}
-		for _, c := range p.Containers {
-			cid := string(c.ID.ID)
-			if cidSet.Has(cid) {
-				continue
-			}
-			cidSet.Insert(cid)
-			containers = append(containers, c)
-		}
+		containerList := p.Containers
 		// Update sandboxes as containers
 		// TODO: keep track of sandboxes explicitly.
 		for _, c := range p.Sandboxes {
+			containerList = append(containerList, c)
+		}
+		for _, c := range containerList {
 			cid := string(c.ID.ID)
 			if cidSet.Has(cid) {
 				continue
