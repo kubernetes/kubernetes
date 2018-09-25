@@ -148,7 +148,6 @@ pkg/kubeapiserver/server
 pkg/kubectl
 pkg/kubectl/apps
 pkg/kubectl/cmd
-pkg/kubectl/cmd/auth
 pkg/kubectl/cmd/config
 pkg/kubectl/cmd/create
 pkg/kubectl/cmd/get
