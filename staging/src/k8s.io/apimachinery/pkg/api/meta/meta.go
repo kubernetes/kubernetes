@@ -114,31 +114,13 @@ func Accessor(obj interface{}) (metav1.Object, error) {
 }
 
 // AsPartialObjectMetadata takes the metav1 interface and returns a partial object.
-// TODO: consider making this solely a conversion action.
 func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata {
 	switch t := m.(type) {
 	case *metav1.ObjectMeta:
 		return &metav1beta1.PartialObjectMetadata{ObjectMeta: *t}
 	default:
 		return &metav1beta1.PartialObjectMetadata{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:                       m.GetName(),
-				GenerateName:               m.GetGenerateName(),
-				Namespace:                  m.GetNamespace(),
-				SelfLink:                   m.GetSelfLink(),
-				UID:                        m.GetUID(),
-				ResourceVersion:            m.GetResourceVersion(),
-				Generation:                 m.GetGeneration(),
-				CreationTimestamp:          m.GetCreationTimestamp(),
-				DeletionTimestamp:          m.GetDeletionTimestamp(),
-				DeletionGracePeriodSeconds: m.GetDeletionGracePeriodSeconds(),
-				Labels:          m.GetLabels(),
-				Annotations:     m.GetAnnotations(),
-				OwnerReferences: m.GetOwnerReferences(),
-				Finalizers:      m.GetFinalizers(),
-				ClusterName:     m.GetClusterName(),
-				Initializers:    m.GetInitializers(),
-			},
+			ObjectMeta: convertToObjectMeta(m),
 		}
 	}
 }
@@ -647,4 +629,25 @@ func extractFromTypeMeta(v reflect.Value, a *genericAccessor) error {
 		return err
 	}
 	return nil
+}
+
+func convertToObjectMeta(m metav1.Object) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:                       m.GetName(),
+		GenerateName:               m.GetGenerateName(),
+		Namespace:                  m.GetNamespace(),
+		SelfLink:                   m.GetSelfLink(),
+		UID:                        m.GetUID(),
+		ResourceVersion:            m.GetResourceVersion(),
+		Generation:                 m.GetGeneration(),
+		CreationTimestamp:          m.GetCreationTimestamp(),
+		DeletionTimestamp:          m.GetDeletionTimestamp(),
+		DeletionGracePeriodSeconds: m.GetDeletionGracePeriodSeconds(),
+		Labels:          m.GetLabels(),
+		Annotations:     m.GetAnnotations(),
+		OwnerReferences: m.GetOwnerReferences(),
+		Finalizers:      m.GetFinalizers(),
+		ClusterName:     m.GetClusterName(),
+		Initializers:    m.GetInitializers(),
+	}
 }
