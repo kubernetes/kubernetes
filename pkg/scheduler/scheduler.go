@@ -329,9 +329,11 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumed.Spec.NodeName = host
-	// NOTE: Because the scheduler uses snapshots of SchedulerCache and the live
-	// version of Ecache, updates must be written to SchedulerCache before
-	// invalidating Ecache.
+	// NOTE: Updates must be written to scheduler cache before invalidating
+	// equivalence cache, because we could snapshot equivalence cache after the
+	// invalidation and then snapshot the cache itself. If the cache is
+	// snapshotted before updates are written, we would update equivalence
+	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.config.SchedulerCache.AssumePod(assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
 
