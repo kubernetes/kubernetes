@@ -33,9 +33,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 type eventType int

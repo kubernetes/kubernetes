@@ -19,12 +19,13 @@ package core
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
@@ -79,23 +80,23 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 	evaluator := NewPersistentVolumeClaimEvaluator(nil)
 	testCases := map[string]struct {
 		pvc   *api.PersistentVolumeClaim
-		usage api.ResourceList
+		usage corev1.ResourceList
 	}{
 		"pvc-usage": {
 			pvc: validClaim,
-			usage: api.ResourceList{
-				api.ResourceRequestsStorage:                                                                       resource.MustParse("10Gi"),
-				api.ResourcePersistentVolumeClaims:                                                                resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("10Gi"),
+				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
 		},
 		"pvc-usage-by-class": {
 			pvc: validClaimByStorageClass,
-			usage: api.ResourceList{
-				api.ResourceRequestsStorage:                                                                       resource.MustParse("10Gi"),
-				api.ResourcePersistentVolumeClaims:                                                                resource.MustParse("1"),
-				ResourceByStorageClass(classGold, api.ResourceRequestsStorage):                                    resource.MustParse("10Gi"),
-				ResourceByStorageClass(classGold, api.ResourcePersistentVolumeClaims):                             resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsStorage:                                                                    resource.MustParse("10Gi"),
+				corev1.ResourcePersistentVolumeClaims:                                                             resource.MustParse("1"),
+				V1ResourceByStorageClass(classGold, corev1.ResourceRequestsStorage):                               resource.MustParse("10Gi"),
+				V1ResourceByStorageClass(classGold, corev1.ResourcePersistentVolumeClaims):                        resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "persistentvolumeclaims"}): resource.MustParse("1"),
 			},
 		},

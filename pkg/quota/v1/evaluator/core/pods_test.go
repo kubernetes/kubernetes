@@ -20,20 +20,21 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
 func TestPodConstraintsFunc(t *testing.T) {
 	testCases := map[string]struct {
 		pod      *api.Pod
-		required []api.ResourceName
+		required []corev1.ResourceName
 		err      string
 	}{
 		"init container resource missing": {
@@ -47,7 +48,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 					}},
 				},
 			},
-			required: []api.ResourceName{api.ResourceMemory},
+			required: []corev1.ResourceName{corev1.ResourceMemory},
 			err:      `must specify memory`,
 		},
 		"container resource missing": {
@@ -61,7 +62,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 					}},
 				},
 			},
-			required: []api.ResourceName{api.ResourceMemory},
+			required: []corev1.ResourceName{corev1.ResourceMemory},
 			err:      `must specify memory`,
 		},
 	}
@@ -90,7 +91,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 
 	testCases := map[string]struct {
 		pod   *api.Pod
-		usage api.ResourceList
+		usage corev1.ResourceList
 	}{
 		"init container CPU": {
 			pod: &api.Pod{
@@ -103,11 +104,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceRequestsCPU: resource.MustParse("1m"),
-				api.ResourceLimitsCPU:   resource.MustParse("2m"),
-				api.ResourcePods:        resource.MustParse("1"),
-				api.ResourceCPU:         resource.MustParse("1m"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1m"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("2m"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("1m"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -122,11 +123,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceRequestsMemory: resource.MustParse("1m"),
-				api.ResourceLimitsMemory:   resource.MustParse("2m"),
-				api.ResourcePods:           resource.MustParse("1"),
-				api.ResourceMemory:         resource.MustParse("1m"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsMemory:                                                   resource.MustParse("1m"),
+				corev1.ResourceLimitsMemory:                                                     resource.MustParse("2m"),
+				corev1.ResourcePods:                                                             resource.MustParse("1"),
+				corev1.ResourceMemory:                                                           resource.MustParse("1m"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -141,11 +142,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
-				api.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
-				api.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
-				api.ResourcePods:                     resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
+				corev1.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
+				corev1.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
+				corev1.ResourcePods:                     resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -159,10 +160,10 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"):         resource.MustParse("100Mi"),
-				api.ResourceName(api.ResourceRequestsHugePagesPrefix + "2Mi"): resource.MustParse("100Mi"),
-				api.ResourcePods:                                              resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceName(corev1.ResourceHugePagesPrefix + "2Mi"):         resource.MustParse("100Mi"),
+				corev1.ResourceName(corev1.ResourceRequestsHugePagesPrefix + "2Mi"): resource.MustParse("100Mi"),
+				corev1.ResourcePods:                                                 resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -177,9 +178,9 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceName("requests.example.com/dongle"): resource.MustParse("3"),
-				api.ResourcePods:                                resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceName("requests.example.com/dongle"): resource.MustParse("3"),
+				corev1.ResourcePods:                                resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -194,11 +195,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceRequestsCPU: resource.MustParse("1m"),
-				api.ResourceLimitsCPU:   resource.MustParse("2m"),
-				api.ResourcePods:        resource.MustParse("1"),
-				api.ResourceCPU:         resource.MustParse("1m"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1m"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("2m"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("1m"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -213,11 +214,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceRequestsMemory: resource.MustParse("1m"),
-				api.ResourceLimitsMemory:   resource.MustParse("2m"),
-				api.ResourcePods:           resource.MustParse("1"),
-				api.ResourceMemory:         resource.MustParse("1m"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsMemory:                                                   resource.MustParse("1m"),
+				corev1.ResourceLimitsMemory:                                                     resource.MustParse("2m"),
+				corev1.ResourcePods:                                                             resource.MustParse("1"),
+				corev1.ResourceMemory:                                                           resource.MustParse("1m"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -232,11 +233,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
-				api.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
-				api.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
-				api.ResourcePods:                     resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceEphemeralStorage:         resource.MustParse("32Mi"),
+				corev1.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
+				corev1.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
+				corev1.ResourcePods:                     resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -250,10 +251,10 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"):         resource.MustParse("100Mi"),
-				api.ResourceName(api.ResourceRequestsHugePagesPrefix + "2Mi"): resource.MustParse("100Mi"),
-				api.ResourcePods:                                              resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceName(api.ResourceHugePagesPrefix + "2Mi"):         resource.MustParse("100Mi"),
+				corev1.ResourceName(api.ResourceRequestsHugePagesPrefix + "2Mi"): resource.MustParse("100Mi"),
+				corev1.ResourcePods:                                              resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -268,9 +269,9 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					}},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceName("requests.example.com/dongle"): resource.MustParse("3"),
-				api.ResourcePods:                                resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceName("requests.example.com/dongle"): resource.MustParse("3"),
+				corev1.ResourcePods:                                resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -339,15 +340,15 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceRequestsCPU:                                                         resource.MustParse("4"),
-				api.ResourceRequestsMemory:                                                      resource.MustParse("100M"),
-				api.ResourceLimitsCPU:                                                           resource.MustParse("8"),
-				api.ResourceLimitsMemory:                                                        resource.MustParse("200M"),
-				api.ResourcePods:                                                                resource.MustParse("1"),
-				api.ResourceCPU:                                                                 resource.MustParse("4"),
-				api.ResourceMemory:                                                              resource.MustParse("100M"),
-				api.ResourceName("requests.example.com/dongle"):                                 resource.MustParse("4"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU:                                                      resource.MustParse("4"),
+				corev1.ResourceRequestsMemory:                                                   resource.MustParse("100M"),
+				corev1.ResourceLimitsCPU:                                                        resource.MustParse("8"),
+				corev1.ResourceLimitsMemory:                                                     resource.MustParse("200M"),
+				corev1.ResourcePods:                                                             resource.MustParse("1"),
+				corev1.ResourceCPU:                                                              resource.MustParse("4"),
+				corev1.ResourceMemory:                                                           resource.MustParse("100M"),
+				corev1.ResourceName("requests.example.com/dongle"):                              resource.MustParse("4"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -378,7 +379,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{
+			usage: corev1.ResourceList{
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
@@ -406,11 +407,11 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{
-				api.ResourceRequestsCPU: resource.MustParse("1"),
-				api.ResourceLimitsCPU:   resource.MustParse("2"),
-				api.ResourcePods:        resource.MustParse("1"),
-				api.ResourceCPU:         resource.MustParse("1"),
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("2"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},

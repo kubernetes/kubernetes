@@ -17,11 +17,11 @@ limitations under the License.
 package quota
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // UsageStatsOptions is an options structs that describes how stats should be calculated
@@ -29,37 +29,37 @@ type UsageStatsOptions struct {
 	// Namespace where stats should be calculate
 	Namespace string
 	// Scopes that must match counted objects
-	Scopes []api.ResourceQuotaScope
+	Scopes []corev1.ResourceQuotaScope
 	// Resources are the set of resources to include in the measurement
-	Resources     []api.ResourceName
-	ScopeSelector *api.ScopeSelector
+	Resources     []corev1.ResourceName
+	ScopeSelector *corev1.ScopeSelector
 }
 
 // UsageStats is result of measuring observed resource use in the system
 type UsageStats struct {
 	// Used maps resource to quantity used
-	Used api.ResourceList
+	Used corev1.ResourceList
 }
 
 // Evaluator knows how to evaluate quota usage for a particular group resource
 type Evaluator interface {
 	// Constraints ensures that each required resource is present on item
-	Constraints(required []api.ResourceName, item runtime.Object) error
+	Constraints(required []corev1.ResourceName, item runtime.Object) error
 	// GroupResource returns the groupResource that this object knows how to evaluate
 	GroupResource() schema.GroupResource
 	// Handles determines if quota could be impacted by the specified attribute.
 	// If true, admission control must perform quota processing for the operation, otherwise it is safe to ignore quota.
 	Handles(operation admission.Attributes) bool
 	// Matches returns true if the specified quota matches the input item
-	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error)
+	Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error)
 	// MatchingScopes takes the input specified list of scopes and input object and returns the set of scopes that matches input object.
-	MatchingScopes(item runtime.Object, scopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error)
+	MatchingScopes(item runtime.Object, scopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error)
 	// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes. It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
-	UncoveredQuotaScopes(limitedScopes []api.ScopedResourceSelectorRequirement, matchedQuotaScopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error)
+	UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error)
 	// MatchingResources takes the input specified list of resources and returns the set of resources evaluator matches.
-	MatchingResources(input []api.ResourceName) []api.ResourceName
+	MatchingResources(input []corev1.ResourceName) []corev1.ResourceName
 	// Usage returns the resource usage for the specified object
-	Usage(item runtime.Object) (api.ResourceList, error)
+	Usage(item runtime.Object) (corev1.ResourceList, error)
 	// UsageStats calculates latest observed usage stats for all objects
 	UsageStats(options UsageStatsOptions) (UsageStats, error)
 }

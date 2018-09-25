@@ -22,7 +22,7 @@ go_library(
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
-        "//pkg/quota/evaluator/core:go_default_library",
+        "//pkg/quota/v1/evaluator/core:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/util/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
