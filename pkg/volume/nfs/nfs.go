@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 // The volumeConfig arg provides the ability to configure recycler behavior.  It is implemented as a pointer to allow nils.
 // The nfsPlugin is used to store the volumeConfig and give it, when needed, to the func that creates NFS Recyclers.
 // Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.
@@ -220,21 +220,21 @@ type nfsMounter struct {
 
 var _ volume.Mounter = &nfsMounter{}
 
-func (b *nfsMounter) GetAttributes() volume.Attributes {
+func (nfsMounter *nfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
+		ReadOnly:        nfsMounter.readOnly,
 		Managed:         false,
 		SupportsSELinux: false,
 	}
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *nfsMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (nfsMounter *nfsMounter) SetUp(fsGroup *int64) error {
+	return nfsMounter.SetUpAt(nfsMounter.GetPath(), fsGroup)
 }
 
-func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
-	notMnt, err := b.mounter.IsNotMountPoint(dir)
+func (nfsMounter *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+	notMnt, err := nfsMounter.mounter.IsNotMountPoint(dir)
 	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -245,25 +245,25 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return err
 	}
-	source := fmt.Sprintf("%s:%s", b.server, b.exportPath)
+	source := fmt.Sprintf("%s:%s", nfsMounter.server, nfsMounter.exportPath)
 	options := []string{}
-	if b.readOnly {
+	if nfsMounter.readOnly {
 		options = append(options, "ro")
 	}
-	mountOptions := util.JoinMountOptions(b.mountOptions, options)
-	err = b.mounter.Mount(source, dir, "nfs", mountOptions)
+	mountOptions := util.JoinMountOptions(nfsMounter.mountOptions, options)
+	err = nfsMounter.mounter.Mount(source, dir, "nfs", mountOptions)
 	if err != nil {
-		notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
+		notMnt, mntErr := nfsMounter.mounter.IsNotMountPoint(dir)
 		if mntErr != nil {
 			glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 			return err
 		}
 		if !notMnt {
-			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
+			if mntErr = nfsMounter.mounter.Unmount(dir); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
+			notMnt, mntErr := nfsMounter.mounter.IsNotMountPoint(dir)
 			if mntErr != nil {
 				glog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 				return err

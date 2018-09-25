@@ -89,8 +89,8 @@ func TestRecycler(t *testing.T) {
 	plugMgr.InitPlugins([]volume.VolumePlugin{&nfsPlugin{nil, volume.VolumeConfig{}}}, nil, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	spec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{PersistentVolumeSource: v1.PersistentVolumeSource{NFS: &v1.NFSVolumeSource{Path: "/foo"}}}}}
-	_, plugin_err := plugMgr.FindRecyclablePluginBySpec(spec)
-	if plugin_err != nil {
+	_, pluginErr := plugMgr.FindRecyclablePluginBySpec(spec)
+	if pluginErr != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
 }
