@@ -40,21 +40,22 @@ type setOptions struct {
 	setRawBytes   flag.Tristate
 }
 
-var set_long = templates.LongDesc(`
+var setLong = templates.LongDesc(`
 	Sets an individual value in a kubeconfig file
 
 	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.
 
 	PROPERTY_VALUE is the new value you wish to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.`)
 
+// NewCmdConfigSet returns a Command instance for 'config set' sub command
 func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &setOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: "set PROPERTY_NAME PROPERTY_VALUE",
+		Use:                   "set PROPERTY_NAME PROPERTY_VALUE",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Sets an individual value in a kubeconfig file"),
-		Long:  set_long,
+		Short:                 i18n.T("Sets an individual value in a kubeconfig file"),
+		Long:                  setLong,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())

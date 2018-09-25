@@ -37,9 +37,9 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 	}
 
 	cmd := &cobra.Command{
-		Use: "config SUBCOMMAND",
+		Use:                   "config SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Modify kubeconfig files"),
+		Short:                 i18n.T("Modify kubeconfig files"),
 		Long: templates.LongDesc(`
 			Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"
 
@@ -88,5 +88,5 @@ func toBool(propertyValue string) (bool, error) {
 func helpErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 	cmd.Help()
 	msg := fmt.Sprintf(format, args...)
-	return fmt.Errorf("%s\n", msg)
+	return fmt.Errorf("%s", msg)
 }
