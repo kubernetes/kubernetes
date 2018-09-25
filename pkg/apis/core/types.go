@@ -2741,6 +2741,16 @@ type PodDNSConfigOption struct {
 	Value *string
 }
 
+// IP address information for entries in the (plural) PodIPs slice.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within
+//        the cluster.
+//    Properties: Arbitrary metadata associated with the allocated IP.
+type PodIPInfo struct {
+	IP         string
+	Properties map[string]string
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
@@ -2764,8 +2774,14 @@ type PodStatus struct {
 
 	// +optional
 	HostIP string
+
+	// IP addresses allocated to the pod with associated metadata. This list
+	// is inclusive, i.e. it includes the default IP address stored in the
+	// "PodIP" field, and this default IP address must be recorded in the
+	// 0th entry (PodIPs[0]) of the slice. The list is empty if no IPs have
+	// been allocated yet.
 	// +optional
-	PodIP string
+	PodIPs []PodIPInfo
 
 	// Date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.

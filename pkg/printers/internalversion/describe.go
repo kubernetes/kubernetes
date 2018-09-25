@@ -667,7 +667,11 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		if len(pod.Status.Message) > 0 {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
-		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
+		ip := ""
+		if len(pod.Status.PodIPs) > 0 {
+			ip = pod.Status.PodIPs[0].IP
+		}
+		w.Write(LEVEL_0, "IP:\t%s\n", ip)
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}

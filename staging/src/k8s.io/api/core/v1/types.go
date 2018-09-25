@@ -3007,6 +3007,16 @@ type PodDNSConfigOption struct {
 	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
 
+// IP address information for entries in the (plural) PodIPs slice.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within
+//        the cluster.
+//    Properties: Arbitrary metadata associated with the allocated IP.
+type PodIPInfo struct {
+	IP         string            `json:"iP,omitempty" protobuf:"bytes,1,opt,name=iP"`
+	Properties map[string]string `json:"properties,omitempty" protobuf:"bytes,2,opt,name=properties"`
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
@@ -3061,6 +3071,14 @@ type PodStatus struct {
 	// Empty if not yet allocated.
 	// +optional
 	PodIP string `json:"podIP,omitempty" protobuf:"bytes,6,opt,name=podIP"`
+
+	// IP addresses allocated to the pod with associated metadata. This list
+	// is inclusive, i.e. it includes the default IP address stored in the
+	// "PodIP" field, and this default IP address must be recorded in the
+	// 0th entry (PodIPs[0]) of the slice. The list is empty if no IPs have
+	// been allocated yet.
+	// +optional
+	PodIPs []PodIPInfo `json:"podIPs,omitempty" protobuf:"bytes,12,opt,name=podIPs"`
 
 	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.

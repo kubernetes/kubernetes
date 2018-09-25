@@ -257,18 +257,18 @@ func TestResourceLocation(t *testing.T) {
 		{
 			pod: api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     api.PodStatus{PodIP: expectedIP},
+				Status:     api.PodStatus{PodIPs:[]api.PodIPInfo{{expectedIP, nil}}},
 			},
 			query:    "foo",
 			location: expectedIP,
 		},
-		{
+		/*{
 			pod: api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Status:     api.PodStatus{PodIP: expectedIP},
+				Status:     api.PodStatus{PodIPs: expectedIP},
 			},
 			query:    "foo:12345",
-			location: expectedIP + ":12345",
+			location: []string{expectedIP[0] + ":12345"},
 		},
 		{
 			pod: api.Pod{
@@ -278,7 +278,7 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr"},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: expectedIP},
 			},
 			query:    "foo",
 			location: expectedIP,
@@ -291,10 +291,10 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: expectedIP},
 			},
 			query:    "foo",
-			location: expectedIP + ":9376",
+			location: []string{expectedIP[0] + ":9376"},
 		},
 		{
 			pod: api.Pod{
@@ -304,10 +304,10 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: expectedIP},
 			},
 			query:    "foo:12345",
-			location: expectedIP + ":12345",
+			location: []string{expectedIP[0] + ":12345"},
 		},
 		{
 			pod: api.Pod{
@@ -318,10 +318,10 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 9376}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: expectedIP},
 			},
 			query:    "foo",
-			location: expectedIP + ":9376",
+			location: []string{expectedIP[0] + ":9376"},
 		},
 		{
 			pod: api.Pod{
@@ -332,11 +332,11 @@ func TestResourceLocation(t *testing.T) {
 						{Name: "ctr2", Ports: []api.ContainerPort{{ContainerPort: 1234}}},
 					},
 				},
-				Status: api.PodStatus{PodIP: expectedIP},
+				Status: api.PodStatus{PodIPs: expectedIP},
 			},
 			query:    "foo",
-			location: expectedIP + ":9376",
-		},
+			location: []string{expectedIP[0] + ":9376"},
+		},*/
 	}
 
 	ctx := genericapirequest.NewDefaultContext()
@@ -433,8 +433,8 @@ func TestConvertToTableList(t *testing.T) {
 			NodeName: "test-node",
 		},
 		Status: api.PodStatus{
-			PodIP: "10.1.2.3",
-			Phase: api.PodPending,
+			PodIPs: []api.PodIPInfo{api.PodIPInfo{"10.1.2.3", nil}},
+			Phase:  api.PodPending,
 			ContainerStatuses: []api.ContainerStatus{
 				{Name: "ctr1", State: api.ContainerState{Running: &api.ContainerStateRunning{}}, RestartCount: 10, Ready: true},
 				{Name: "ctr2", State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}, RestartCount: 0},
@@ -928,7 +928,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		},
 		Status: api.PodStatus{
 			Phase:   api.PodRunning,
-			PodIP:   "127.0.0.1",
+			PodIPs:  []api.PodIPInfo{api.PodIPInfo{"127.0.0.1", nil}},
 			Message: "is now scheduled",
 		},
 	}

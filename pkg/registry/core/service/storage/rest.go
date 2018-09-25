@@ -521,8 +521,12 @@ func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Ge
 	if pod == nil {
 		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
 	}
-	if pod.Status.PodIP != addr.IP {
-		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIP, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
+	podIP := ""
+	if (len(pod.Status.PodIPs) > 0) {
+		podIP = pod.Status.PodIPs[0].IP
+	}
+	if podIP != addr.IP {
+		return fmt.Errorf("pod ip doesn't match endpoint ip, skipping: %s vs %s (%s/%s)", pod.Status.PodIPs[0], addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
 	}
 	return nil
 }

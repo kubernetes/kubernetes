@@ -346,3 +346,78 @@ func roundTripRS(t *testing.T, rs *extensions.ReplicaSet) *extensions.ReplicaSet
 	}
 	return obj3
 }
+
+func TestPodStatusConversionToCore(t *testing.T) {
+	testcases := map[string]struct {
+		singular    *v1.PodStatus
+		expected    *core.PodStatus
+		expectedErr bool
+	}{
+		"IPv4": {
+			singular: &v1.PodStatus{PodIP: "10.1.1.0"},
+			expected: &core.PodStatus{PodIPs: []core.PodIPInfo{core.PodIPInfo{"10.1.1.0",nil}}},
+		},
+		"nil": {
+			singular: &v1.PodStatus{},
+			expected: &core.PodStatus{PodIPs: nil},
+		},
+		"IPv6": {
+			singular: &v1.PodStatus{PodIP: "fd00:10:20:0:3::3"},
+			expected: &core.PodStatus{PodIPs: []core.PodIPInfo{core.PodIPInfo{"fd00:10:20:0:3::3", nil}}},
+		},
+		"PodIPs only": {
+			singular:    &v1.PodStatus{PodIPs: []v1.PodIPInfo{v1.PodIPInfo{"fd00::a", nil},
+				{"fd00::b", nil},{"fd00::c", nil}}},
+			expected:    &core.PodStatus{PodIPs: []core.PodIPInfo{core.PodIPInfo{"fd00::a", nil},
+				core.PodIPInfo{"fd00::b", nil},core.PodIPInfo{"fd00::c", nil}}},
+			expectedErr: true,
+		},
+		"Update PodIP with existing PodIPs": {
+			singular:    &v1.PodStatus{PodIPs: []v1.PodIPInfo{v1.PodIPInfo{"fd00:10:20:0:3::3", nil}}, PodIP: "fd00:10:20:0:3::4"},
+			expected:    &core.PodStatus{PodIPs: []core.PodIPInfo{core.PodIPInfo{"fd00:10:20:0:3::3", nil}}},
+			expectedErr: true,
+		},
+
+		"PodIPs[0]!=PodIP": {
+			singular:    &v1.PodStatus{PodIPs: []v1.PodIPInfo{v1.PodIPInfo{"fd00:10:20:0:3::3", nil}}, PodIP: "fd00:10:20:0:3::4"},
+			expected:    &core.PodStatus{PodIPs: []core.PodIPInfo{core.PodIPInfo{"fd00:10:20:0:3::3", nil}}},
+			expectedErr: true,
+		},
+	}
+	for k, tc := range testcases {
+		internal := &core.PodStatus{}
+
+		err := corev1.Convert_v1_PodStatus_To_core_PodStatus(tc.singular, internal, nil)
+		if (err != nil) && (tc.expectedErr == false) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		}
+		if !reflect.DeepEqual(internal, tc.expected) {
+			t.Errorf("%s: expected\n\t%#v, got \n\t%#v", k, tc.expected, internal)
+		}
+	}
+}
+
+func TestPodStatusConversionToV1(t *testing.T) {
+	testcases := map[string]struct {
+		int      *core.PodStatus
+		expected *v1.PodStatus
+	}{
+		"IPv4": {
+			int:      &core.PodStatus{PodIPs:[]core.PodIPInfo{core.PodIPInfo{"10.1.1.0", nil}}},
+			expected: &v1.PodStatus{PodIP: "10.1.1.0", PodIPs: []v1.PodIPInfo{v1.PodIPInfo{"10.1.1.0", nil}}},
+		},
+		"nil": {
+			int:      &core.PodStatus{},
+			expected: &v1.PodStatus{PodIP: "", PodIPs: nil},
+		},
+	}
+	for k, tc := range testcases {
+		versioned := &v1.PodStatus{}
+		if err := corev1.Convert_core_PodStatus_To_v1_PodStatus(tc.int, versioned, nil); err != nil {
+			t.Errorf("%s: unexpected error: %v", k, err)
+		}
+		if !reflect.DeepEqual(versioned, tc.expected) {
+			t.Errorf("%s: expected\n\t%#v, got \n\t%#v", k, tc.expected, versioned)
+		}
+	}
+}

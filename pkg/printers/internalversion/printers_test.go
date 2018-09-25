@@ -1663,7 +1663,7 @@ func TestPrintPodwide(t *testing.T) {
 				},
 				Status: api.PodStatus{
 					Phase: "podPhase",
-					PodIP: "1.1.1.1",
+					PodIPs: []api.PodIPInfo{api.PodIPInfo{"1.1.1.1", nil}},
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{RestartCount: 3},
@@ -1683,7 +1683,7 @@ func TestPrintPodwide(t *testing.T) {
 				},
 				Status: api.PodStatus{
 					Phase: "podPhase",
-					PodIP: "",
+					PodIPs: []api.PodIPInfo{api.PodIPInfo {"", nil}},
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},

@@ -37,8 +37,10 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_core_PodSpec_To_v1_PodSpec,
 		Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
 		Convert_core_ServiceSpec_To_v1_ServiceSpec,
+		Convert_core_PodStatus_To_v1_PodStatus,
 		Convert_v1_Pod_To_core_Pod,
 		Convert_v1_PodSpec_To_core_PodSpec,
+		Convert_v1_PodStatus_To_core_PodStatus,
 		Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec,
 		Convert_v1_Secret_To_core_Secret,
 		Convert_v1_ServiceSpec_To_core_ServiceSpec,
@@ -65,7 +67,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.schedulerName",
 				"spec.serviceAccountName",
 				"status.phase",
-				"status.podIP",
+				"status.podIPs",
 				"status.nominatedNodeName":
 				return label, value, nil
 			// This is for backwards compatibility with old v1 clients which send spec.host
@@ -324,6 +326,47 @@ func Convert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scope) e
 	// drop init container annotations so they don't show up as differences when receiving requests from old clients
 	out.Annotations = dropInitContainerAnnotations(out.Annotations)
 
+	return nil
+}
+
+func Convert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodStatus, s conversion.Scope) error {
+	autoConvert_v1_PodStatus_To_core_PodStatus(in, out, s)
+	// autoconvert sets the core PodIPs to the v1 PodIPs
+	// but does not handle the singular PodIP
+
+	if len(in.PodIPs) == 0 {
+		if in.PodIP != "" {
+			// Only PodIP is provided
+			if len(out.PodIPs) > 0 {
+				out.PodIPs[0].IP = in.PodIP
+			} else {
+				if in.PodIP != "" {
+					out.PodIPs = append(out.PodIPs, core.PodIPInfo{in.PodIP, nil})
+				}
+			}
+		} else {
+			// Nothing to do
+			return nil
+		}
+	} else if in.PodIP != "" {
+		// Both PodIP and PodIPs[] provided
+		if in.PodIPs[0].IP != in.PodIP {
+			return fmt.Errorf("Invalid PodIP")
+		}
+	//} else {
+		// Only PodIPs[] provided
+		// Nothing to do
+	}
+
+
+	return nil
+}
+
+func Convert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodStatus, s conversion.Scope) error {
+	autoConvert_core_PodStatus_To_v1_PodStatus(in, out, s)
+	if len(in.PodIPs) > 0 {
+		out.PodIP = in.PodIPs[0].IP
+	}
 	return nil
 }
 

@@ -243,7 +243,12 @@ func PodToSelectableFields(pod *api.Pod) fields.Set {
 	podSpecificFieldsSet["spec.schedulerName"] = string(pod.Spec.SchedulerName)
 	podSpecificFieldsSet["spec.serviceAccountName"] = string(pod.Spec.ServiceAccountName)
 	podSpecificFieldsSet["status.phase"] = string(pod.Status.Phase)
-	podSpecificFieldsSet["status.podIP"] = string(pod.Status.PodIP)
+	//
+	if len(pod.Status.PodIPs) > 0 {
+		podSpecificFieldsSet["status.podIPs"] = string(pod.Status.PodIPs[0].IP)
+	} else {
+		podSpecificFieldsSet["status.podIPs"] = "[]"
+	}
 	podSpecificFieldsSet["status.nominatedNodeName"] = string(pod.Status.NominatedNodeName)
 	return generic.AddObjectMetaFieldsSet(podSpecificFieldsSet, &pod.ObjectMeta, true)
 }
@@ -294,9 +299,13 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 		Scheme: scheme,
 	}
 	if port == "" {
-		loc.Host = pod.Status.PodIP
+		if len(pod.Status.PodIPs) > 0 {
+			loc.Host = pod.Status.PodIPs[0].IP
+		}
 	} else {
-		loc.Host = net.JoinHostPort(pod.Status.PodIP, port)
+		if len(pod.Status.PodIPs) > 0 {
+			loc.Host = net.JoinHostPort(pod.Status.PodIPs[0].IP, port)
+		}
 	}
 	return loc, rt, nil
 }
