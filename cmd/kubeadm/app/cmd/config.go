@@ -32,7 +32,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
@@ -228,7 +227,6 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			locally in the CLI tool without ever touching anything in the cluster.
 			In this version of kubeadm, the following API versions are supported:
 			- %s
-			- %s
 
 			Further, kubeadm can only write out config of version %q, but read both types.
 			So regardless of what version you pass to the --old-config parameter here, the API object will be
@@ -237,7 +235,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1alpha2.SchemeGroupVersion.String(), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1alpha3.SchemeGroupVersion.String()),
+		`), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1alpha3.SchemeGroupVersion.String()),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(oldCfgPath) == 0 {
 				kubeadmutil.CheckErr(fmt.Errorf("The --old-config flag is mandatory"))
