@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[sig-storage] Projected", func() {
+var _ = Describe("[sig-storage] Projected secret", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	/*
