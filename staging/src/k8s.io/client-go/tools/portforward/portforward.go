@@ -151,14 +151,14 @@ func (pf *PortForwarder) forward() error {
 	var err error
 
 	listenSuccess := false
-	for _, port := range pf.ports {
-		err = pf.listenOnPort(&port)
+	for i, _ := range pf.ports {
+		err = pf.listenOnPort(&pf.ports[i])
 		switch {
 		case err == nil:
 			listenSuccess = true
 		default:
 			if pf.errOut != nil {
-				fmt.Fprintf(pf.errOut, "Unable to listen on port %d: %v\n", port.Local, err)
+				fmt.Fprintf(pf.errOut, "Unable to listen on port %d: %v\n", pf.ports[i].Local, err)
 			}
 		}
 	}
