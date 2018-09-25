@@ -734,9 +734,9 @@ def configure_kubelet(dns, ingress_ip):
 
         # Workaround for DNS on bionic
         # https://github.com/juju-solutions/bundle-canonical-kubernetes/issues/655
-        systemd_resolv_path = '/run/systemd/resolve/resolv.conf'
-        if os.path.isfile(systemd_resolv_path):
-            kubelet_config['resolvConf'] = systemd_resolv_path
+        resolv_path = os.path.realpath('/etc/resolv.conf')
+        if resolv_path == '/run/systemd/resolve/stub-resolv.conf':
+            kubelet_config['resolvConf'] = '/run/systemd/resolve/resolv.conf'
 
         # Add kubelet-extra-config. This needs to happen last so that it
         # overrides any config provided by the charm.
@@ -768,9 +768,9 @@ def configure_kubelet(dns, ingress_ip):
 
         # Workaround for DNS on bionic, for k8s 1.9
         # https://github.com/juju-solutions/bundle-canonical-kubernetes/issues/655
-        systemd_resolv_path = '/run/systemd/resolve/resolv.conf'
-        if os.path.isfile(systemd_resolv_path):
-            kubelet_opts['resolv-conf'] = systemd_resolv_path
+        resolv_path = os.path.realpath('/etc/resolv.conf')
+        if resolv_path == '/run/systemd/resolve/stub-resolv.conf':
+            kubelet_opts['resolv-conf'] = '/run/systemd/resolve/resolv.conf'
 
     if get_version('kubelet') >= (1, 11):
         kubelet_opts['dynamic-config-dir'] = '/root/cdk/kubelet/dynamic-config'
