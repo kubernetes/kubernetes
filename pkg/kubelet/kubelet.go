@@ -69,6 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -598,7 +599,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		HairpinMode:        kubeletconfiginternal.HairpinMode(kubeCfg.HairpinMode),
 		NonMasqueradeCIDR:  nonMasqueradeCIDR,
 		PluginName:         crOptions.NetworkPluginName,
-		PluginConfDir:      crOptions.CNIConfDir,
+		PluginConfDirs:     cni.SplitDirs(crOptions.CNIConfDir),
 		PluginBinDirString: crOptions.CNIBinDir,
 		MTU:                int(crOptions.NetworkPluginMTU),
 	}

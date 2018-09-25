@@ -56,6 +56,7 @@ go_library(
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim:go_default_library",
+        "//pkg/kubelet/dockershim/network/cni:go_default_library",
         "//pkg/kubelet/dockershim/remote:go_default_library",
         "//pkg/kubelet/envvars:go_default_library",
         "//pkg/kubelet/events:go_default_library",

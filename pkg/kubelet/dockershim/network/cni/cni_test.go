@@ -189,7 +189,18 @@ func TestCNIPlugin(t *testing.T) {
 	testBinDir := path.Join(tmpDir, "opt", "cni", "bin")
 	testDataDir := path.Join(tmpDir, "output")
 	defer tearDownPlugin(tmpDir)
-	inputFile, outputFile, outputEnv := installPluginUnderTest(t, testBinDir, testConfDir, testDataDir, binName, netName)
+	_, _, _ = installPluginUnderTest(t, testBinDir, testConfDir, testDataDir, binName, netName)
+
+	tmpDir2 := utiltesting.MkTmpdirOrDie("cni-test-2-")
+	testConfDir2 := path.Join(tmpDir2, "etc", "cni", "net.d")
+	testBinDir2 := path.Join(tmpDir2, "opt", "cni", "bin")
+	testDataDir2 := path.Join(tmpDir2, "output")
+	binName2 := binName + "-2"
+	// As we are ordering the configuration files by name, prefixing it with
+	// `00-` we will make sure the plugin in tmpDir2 is always selected.
+	netName2 := "00-" + netName
+	defer tearDownPlugin(tmpDir2)
+	inputFile, outputFile, outputEnv := installPluginUnderTest(t, testBinDir2, testConfDir2, testDataDir2, binName2, netName2)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "test_infra_container"}
 	pods := []*containertest.FakePod{{
@@ -201,7 +212,7 @@ func TestCNIPlugin(t *testing.T) {
 		NetnsPath: "/proc/12345/ns/net",
 	}}
 
-	plugins := ProbeNetworkPlugins(testConfDir, []string{testBinDir})
+	plugins := ProbeNetworkPlugins([]string{testConfDir, testConfDir2}, []string{testBinDir, testBinDir2})
 	if len(plugins) != 1 {
 		t.Fatalf("Expected only one network plugin, got %d", len(plugins))
 	}

@@ -47,6 +47,7 @@ go_library(
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim:go_default_library",
+        "//pkg/kubelet/dockershim/network/cni:go_default_library",
         "//pkg/kubelet/dockershim/remote:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",

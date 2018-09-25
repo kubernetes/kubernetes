@@ -119,10 +119,10 @@ type NetworkPluginSettings struct {
 	// the plugin with PluginName may be found. The admin is responsible for
 	// provisioning these binaries before-hand.
 	PluginBinDirs []string
-	// PluginConfDir is the directory in which the admin places a CNI conf.
-	// Depending on the plugin, this may be an optional field, eg: kubenet
-	// generates its own plugin conf.
-	PluginConfDir string
+	// PluginConfDirs is an array of directories in which the admin places
+	// a CNI conf. Depending on the plugin, this may be an optional field,
+	// eg: kubenet generates its own plugin conf.
+	PluginConfDirs []string
 	// MTU is the desired MTU for network devices created by the plugin.
 	MTU int
 }
@@ -237,7 +237,7 @@ func NewDockerService(config *ClientConfig, podSandboxImage string, streamingCon
 
 	// dockershim currently only supports CNI plugins.
 	pluginSettings.PluginBinDirs = cni.SplitDirs(pluginSettings.PluginBinDirString)
-	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDir, pluginSettings.PluginBinDirs)
+	cniPlugins := cni.ProbeNetworkPlugins(pluginSettings.PluginConfDirs, pluginSettings.PluginBinDirs)
 	cniPlugins = append(cniPlugins, kubenet.NewPlugin(pluginSettings.PluginBinDirs))
 	netHost := &dockerNetworkHost{
 		&namespaceGetter{ds},

@@ -76,6 +76,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni"
 	dockerremote "k8s.io/kubernetes/pkg/kubelet/dockershim/remote"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -1159,7 +1160,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		HairpinMode:        kubeletconfiginternal.HairpinMode(c.HairpinMode),
 		NonMasqueradeCIDR:  f.NonMasqueradeCIDR,
 		PluginName:         r.NetworkPluginName,
-		PluginConfDir:      r.CNIConfDir,
+		PluginConfDirs:     cni.SplitDirs(r.CNIConfDir),
 		PluginBinDirString: r.CNIBinDir,
 		MTU:                int(r.NetworkPluginMTU),
 	}
