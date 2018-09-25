@@ -3556,11 +3556,6 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.EnableServiceLinks != nil {
-		in, out := &in.EnableServiceLinks, &out.EnableServiceLinks
-		*out = new(bool)
-		**out = **in
-	}
 	return
 }
 
