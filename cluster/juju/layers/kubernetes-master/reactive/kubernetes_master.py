@@ -1094,6 +1094,9 @@ def build_kubeconfig(server):
 
         # make a kubeconfig for kube-proxy
         proxy_token = get_token('system:kube-proxy')
+        if not proxy_token:
+            setup_tokens(None, 'system:kube-proxy', 'kube-proxy')
+            proxy_token = get_token('system:kube-proxy')
         create_kubeconfig(kubeproxyconfig_path, server, ca,
                           token=proxy_token, user='kube-proxy')
 
