@@ -19,31 +19,31 @@ package core
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	"k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
 
 // the name used for object count quota
-var serviceObjectCountName = generic.ObjectCountQuotaResourceNameFor(v1.SchemeGroupVersion.WithResource("services").GroupResource())
+var serviceObjectCountName = generic.ObjectCountQuotaResourceNameFor(corev1.SchemeGroupVersion.WithResource("services").GroupResource())
 
 // serviceResources are the set of resources managed by quota associated with services.
-var serviceResources = []api.ResourceName{
+var serviceResources = []corev1.ResourceName{
 	serviceObjectCountName,
-	api.ResourceServices,
-	api.ResourceServicesNodePorts,
-	api.ResourceServicesLoadBalancers,
+	corev1.ResourceServices,
+	corev1.ResourceServicesNodePorts,
+	corev1.ResourceServicesLoadBalancers,
 }
 
 // NewServiceEvaluator returns an evaluator that can evaluate services.
 func NewServiceEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
-	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, v1.SchemeGroupVersion.WithResource("services"))
+	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, corev1.SchemeGroupVersion.WithResource("services"))
 	serviceEvaluator := &serviceEvaluator{listFuncByNamespace: listFuncByNamespace}
 	return serviceEvaluator
 }
@@ -55,14 +55,14 @@ type serviceEvaluator struct {
 }
 
 // Constraints verifies that all required resources are present on the item
-func (p *serviceEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
+func (p *serviceEvaluator) Constraints(required []corev1.ResourceName, item runtime.Object) error {
 	// this is a no-op for services
 	return nil
 }
 
 // GroupResource that this evaluator tracks
 func (p *serviceEvaluator) GroupResource() schema.GroupResource {
-	return v1.SchemeGroupVersion.WithResource("services").GroupResource()
+	return corev1.SchemeGroupVersion.WithResource("services").GroupResource()
 }
 
 // Handles returns true of the evaluator should handle the specified operation.
@@ -73,36 +73,36 @@ func (p *serviceEvaluator) Handles(a admission.Attributes) bool {
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
-func (p *serviceEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
+func (p *serviceEvaluator) Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error) {
 	return generic.Matches(resourceQuota, item, p.MatchingResources, generic.MatchesNoScopeFunc)
 }
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
-func (p *serviceEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
+func (p *serviceEvaluator) MatchingResources(input []corev1.ResourceName) []corev1.ResourceName {
 	return quota.Intersection(input, serviceResources)
 }
 
 // MatchingScopes takes the input specified list of scopes and input object. Returns the set of scopes resource matches.
-func (p *serviceEvaluator) MatchingScopes(item runtime.Object, scopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
-	return []api.ScopedResourceSelectorRequirement{}, nil
+func (p *serviceEvaluator) MatchingScopes(item runtime.Object, scopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
+	return []corev1.ScopedResourceSelectorRequirement{}, nil
 }
 
 // UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes.
 // It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
-func (p *serviceEvaluator) UncoveredQuotaScopes(limitedScopes []api.ScopedResourceSelectorRequirement, matchedQuotaScopes []api.ScopedResourceSelectorRequirement) ([]api.ScopedResourceSelectorRequirement, error) {
-	return []api.ScopedResourceSelectorRequirement{}, nil
+func (p *serviceEvaluator) UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error) {
+	return []corev1.ScopedResourceSelectorRequirement{}, nil
 }
 
 // convert the input object to an internal service object or error.
-func toInternalServiceOrError(obj runtime.Object) (*api.Service, error) {
-	svc := &api.Service{}
+func toExternalServiceOrError(obj runtime.Object) (*corev1.Service, error) {
+	svc := &corev1.Service{}
 	switch t := obj.(type) {
-	case *v1.Service:
-		if err := k8s_api_v1.Convert_v1_Service_To_core_Service(t, svc, nil); err != nil {
+	case *corev1.Service:
+		svc = t
+	case *api.Service:
+		if err := k8s_api_v1.Convert_core_Service_To_v1_Service(t, svc, nil); err != nil {
 			return nil, err
 		}
-	case *api.Service:
-		svc = t
 	default:
 		return nil, fmt.Errorf("expect *api.Service or *v1.Service, got %v", t)
 	}
@@ -110,28 +110,28 @@ func toInternalServiceOrError(obj runtime.Object) (*api.Service, error) {
 }
 
 // Usage knows how to measure usage associated with services
-func (p *serviceEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
-	result := api.ResourceList{}
-	svc, err := toInternalServiceOrError(item)
+func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
+	result := corev1.ResourceList{}
+	svc, err := toExternalServiceOrError(item)
 	if err != nil {
 		return result, err
 	}
 	ports := len(svc.Spec.Ports)
 	// default service usage
 	result[serviceObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
-	result[api.ResourceServices] = *(resource.NewQuantity(1, resource.DecimalSI))
-	result[api.ResourceServicesLoadBalancers] = resource.Quantity{Format: resource.DecimalSI}
-	result[api.ResourceServicesNodePorts] = resource.Quantity{Format: resource.DecimalSI}
+	result[corev1.ResourceServices] = *(resource.NewQuantity(1, resource.DecimalSI))
+	result[corev1.ResourceServicesLoadBalancers] = resource.Quantity{Format: resource.DecimalSI}
+	result[corev1.ResourceServicesNodePorts] = resource.Quantity{Format: resource.DecimalSI}
 	switch svc.Spec.Type {
-	case api.ServiceTypeNodePort:
+	case corev1.ServiceTypeNodePort:
 		// node port services need to count node ports
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
-		result[api.ResourceServicesNodePorts] = *value
-	case api.ServiceTypeLoadBalancer:
+		result[corev1.ResourceServicesNodePorts] = *value
+	case corev1.ServiceTypeLoadBalancer:
 		// load balancer services need to count node ports and load balancers
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
-		result[api.ResourceServicesNodePorts] = *value
-		result[api.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
+		result[corev1.ResourceServicesNodePorts] = *value
+		result[corev1.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 	return result, nil
 }
@@ -144,12 +144,12 @@ func (p *serviceEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 var _ quota.Evaluator = &serviceEvaluator{}
 
 //GetQuotaServiceType returns ServiceType if the service type is eligible to track against a quota, nor return ""
-func GetQuotaServiceType(service *v1.Service) v1.ServiceType {
+func GetQuotaServiceType(service *corev1.Service) corev1.ServiceType {
 	switch service.Spec.Type {
-	case v1.ServiceTypeNodePort:
-		return v1.ServiceTypeNodePort
-	case v1.ServiceTypeLoadBalancer:
-		return v1.ServiceTypeLoadBalancer
+	case corev1.ServiceTypeNodePort:
+		return corev1.ServiceTypeNodePort
+	case corev1.ServiceTypeLoadBalancer:
+		return corev1.ServiceTypeLoadBalancer
 	}
-	return v1.ServiceType("")
+	return corev1.ServiceType("")
 }
