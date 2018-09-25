@@ -87,43 +87,44 @@ func (a customResourceStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (a customResourceStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) || a.status == nil {
-		return
-	}
-
 	newCustomResourceObject := obj.(*unstructured.Unstructured)
 	oldCustomResourceObject := old.(*unstructured.Unstructured)
 
 	newCustomResource := newCustomResourceObject.UnstructuredContent()
 	oldCustomResource := oldCustomResourceObject.UnstructuredContent()
 
-	// update is not allowed to set status
-	_, ok1 := newCustomResource["status"]
-	_, ok2 := oldCustomResource["status"]
-	switch {
-	case ok2:
-		newCustomResource["status"] = oldCustomResource["status"]
-	case ok1:
-		delete(newCustomResource, "status")
+	// If the /status subresource endpoint is installed, update is not allowed to set status.
+	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && a.status != nil {
+		_, ok1 := newCustomResource["status"]
+		_, ok2 := oldCustomResource["status"]
+		switch {
+		case ok2:
+			newCustomResource["status"] = oldCustomResource["status"]
+		case ok1:
+			delete(newCustomResource, "status")
+		}
 	}
 
-	// Any changes to the spec increment the generation number, any changes to the
-	// status should reflect the generation number of the corresponding object. We push
-	// the burden of managing the status onto the clients because we can't (in general)
-	// know here what version of spec the writer of the status has seen. It may seem like
-	// we can at first -- since obj contains spec -- but in the future we will probably make
-	// status its own object, and even if we don't, writes may be the result of a
-	// read-update-write loop, so the contents of spec may not actually be the spec that
-	// the CustomResource has *seen*.
-	newSpec, ok1 := newCustomResource["spec"]
-	oldSpec, ok2 := oldCustomResource["spec"]
-
-	// spec is changed, created or deleted
-	if (ok1 && ok2 && !apiequality.Semantic.DeepEqual(oldSpec, newSpec)) || (ok1 && !ok2) || (!ok1 && ok2) {
+	// except for the changes to `metadata`, any other changes
+	// cause the generation to increment.
+	newCopyContent := copyNonMetadata(newCustomResource)
+	oldCopyContent := copyNonMetadata(oldCustomResource)
+	if !apiequality.Semantic.DeepEqual(newCopyContent, oldCopyContent) {
 		oldAccessor, _ := meta.Accessor(oldCustomResourceObject)
 		newAccessor, _ := meta.Accessor(newCustomResourceObject)
 		newAccessor.SetGeneration(oldAccessor.GetGeneration() + 1)
 	}
+}
+
+func copyNonMetadata(original map[string]interface{}) map[string]interface{} {
+	ret := make(map[string]interface{})
+	for key, val := range original {
+		if key == "metadata" {
+			continue
+		}
+		ret[key] = val
+	}
+	return ret
 }
 
 // Validate validates a new CustomResource.
