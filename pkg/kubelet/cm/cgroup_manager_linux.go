@@ -204,18 +204,16 @@ func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 func (m *cgroupManagerImpl) Name(name CgroupName) string {
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		return name.ToSystemd()
-	} else {
-		return name.ToCgroupfs()
 	}
+	return name.ToCgroupfs()
 }
 
 // CgroupName converts the literal cgroupfs name on the host to an internal identifier.
 func (m *cgroupManagerImpl) CgroupName(name string) CgroupName {
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		return ParseSystemdToCgroupName(name)
-	} else {
-		return ParseCgroupfsToCgroupName(name)
 	}
+	return ParseCgroupfsToCgroupName(name)
 }
 
 // buildCgroupPaths builds a path to each cgroup subsystem for the specified name.

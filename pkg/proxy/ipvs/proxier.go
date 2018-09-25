@@ -991,7 +991,7 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			lps := make([]utilproxy.LocalPort, 0)
+			var lps []utilproxy.LocalPort
 			for address := range addresses {
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
@@ -1082,7 +1082,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Build ipvs kernel routes for each node ip address
-			nodeIPs := make([]net.IP, 0)
+			var nodeIPs []net.IP
 			for address := range addresses {
 				if !utilproxy.IsZeroCIDR(address) {
 					nodeIPs = append(nodeIPs, net.ParseIP(address))
