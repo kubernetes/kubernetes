@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_ebs
+package awsebs
 
 import (
 	"errors"
@@ -219,7 +219,7 @@ func (testcase *testcase) AttachDisk(diskName aws.KubernetesVolumeID, nodeName t
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
 		testcase.t.Errorf("Unexpected AttachDisk call!")
-		return "", errors.New("Unexpected AttachDisk call!")
+		return "", errors.New("unexpected AttachDisk call")
 	}
 
 	if expected.diskName != diskName {
@@ -244,7 +244,7 @@ func (testcase *testcase) DetachDisk(diskName aws.KubernetesVolumeID, nodeName t
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
 		testcase.t.Errorf("Unexpected DetachDisk call!")
-		return "", errors.New("Unexpected DetachDisk call!")
+		return "", errors.New("unexpected DetachDisk call")
 	}
 
 	if expected.diskName != diskName {

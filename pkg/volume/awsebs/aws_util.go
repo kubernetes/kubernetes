@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws_ebs
+package awsebs
 
 import (
 	"fmt"
@@ -45,8 +45,10 @@ const (
 	ebsMaxReplicasInAZ  = 1
 )
 
+// AWSDiskUtil provides operations for EBS volume.
 type AWSDiskUtil struct{}
 
+// DeleteVolume deletes an AWS EBS volume.
 func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 	cloud, err := getCloudProvider(d.awsElasticBlockStore.plugin.host.GetCloudProvider())
 	if err != nil {
@@ -198,11 +200,11 @@ func verifyDevicePath(devicePaths []string) (string, error) {
 func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 	allPathsRemoved := true
 	for _, path := range devicePaths {
-		if exists, err := volumeutil.PathExists(path); err != nil {
+		exists, err := volumeutil.PathExists(path)
+		if err != nil {
 			return false, fmt.Errorf("Error checking if path exists: %v", err)
-		} else {
-			allPathsRemoved = allPathsRemoved && !exists
 		}
+		allPathsRemoved = allPathsRemoved && !exists
 	}
 
 	return allPathsRemoved, nil
@@ -211,7 +213,7 @@ func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 // Returns list of all paths for given EBS mount
 // This is more interesting on GCE (where we are able to identify volumes under /dev/disk-by-id)
 // Here it is mostly about applying the partition path
-func getDiskByIdPaths(volumeID aws.KubernetesVolumeID, partition string, devicePath string) []string {
+func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, devicePath string) []string {
 	devicePaths := []string{}
 	if devicePath != "" {
 		devicePaths = append(devicePaths, devicePath)
