@@ -319,10 +319,11 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		// its own log based on PV + Pod
 		log = path.Join(p, b.pod.Name+"-glusterfs.log")
 
+		// Use derived log file in gluster fuse mount
+		options = append(options, "log-file="+log)
+
 	}
 
-	// Use derived/provided log file in gluster fuse mount
-	options = append(options, "log-file="+log)
 	options = append(options, "log-level=ERROR")
 
 	var addrlist []string
