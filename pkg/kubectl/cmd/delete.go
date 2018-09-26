@@ -292,7 +292,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		// if we requested to wait forever, set it to a week.
 		effectiveTimeout = 168 * time.Hour
 	}
-	waitOptions := kubectlwait.WaitOptions{
+	waitOptions := kubectlwait.Options{
 		ResourceFinder: genericclioptions.ResourceFinderForResult(resource.InfoListVisitor(deletedInfos)),
 		UIDMap:         uidMap,
 		DynamicClient:  o.DynamicClient,

@@ -160,7 +160,6 @@ pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/openapi
 pkg/kubectl/cmd/util/sanity
-pkg/kubectl/cmd/wait
 pkg/kubectl/metricsutil
 pkg/kubectl/util
 pkg/kubectl/util/slice
