@@ -325,7 +325,7 @@ func TestSelectorTest(t *testing.T) {
 	}
 
 	iostreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	o := &SetSelectorOptions{
+	o := &SelectorOptions{
 		selector:       labelToSet,
 		ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(info),
 		Recorder:       genericclioptions.NoopRecorder{},

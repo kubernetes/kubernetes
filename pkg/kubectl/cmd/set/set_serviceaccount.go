@@ -56,8 +56,8 @@ var (
 	`))
 )
 
-// serviceAccountConfig encapsulates the data required to perform the operation.
-type SetServiceAccountOptions struct {
+// ServiceAccountOptions encapsulates the data required to perform the operation.
+type ServiceAccountOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
@@ -77,8 +77,9 @@ type SetServiceAccountOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServiceAccountOptions {
-	return &SetServiceAccountOptions{
+// NewServiceAccountOptions returns an initialized ServiceAccountOptions instance
+func NewServiceAccountOptions(streams genericclioptions.IOStreams) *ServiceAccountOptions {
+	return &ServiceAccountOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("serviceaccount updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -90,10 +91,10 @@ func NewSetServiceAccountOptions(streams genericclioptions.IOStreams) *SetServic
 
 // NewCmdServiceAccount returns the "set serviceaccount" command.
 func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewSetServiceAccountOptions(streams)
+	o := NewServiceAccountOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
+		Use:                   "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"sa"},
 		Short:                 i18n.T("Update ServiceAccount of a resource"),
@@ -118,7 +119,7 @@ func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams
 }
 
 // Complete configures serviceAccountConfig from command line args.
-func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *ServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
 	o.RecordFlags.Complete(cmd)
@@ -171,7 +172,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 }
 
 // Run creates and applies the patch either locally or calling apiserver.
-func (o *SetServiceAccountOptions) Run() error {
+func (o *ServiceAccountOptions) Run() error {
 	patchErrs := []error{}
 	patchFn := func(obj runtime.Object) ([]byte, error) {
 		_, err := o.updatePodSpecForObject(obj, func(podSpec *v1.PodSpec) error {
@@ -193,7 +194,7 @@ func (o *SetServiceAccountOptions) Run() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			patchErrs = append(patchErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
 			continue
 		}
 		if o.local || o.dryRun {

@@ -86,7 +86,7 @@ func TestSetServiceAccountLocal(t *testing.T) {
 			cmd.Flags().Set("output", outputFormat)
 			cmd.Flags().Set("local", "true")
 			testapi.Default = testapi.Groups[input.apiGroup]
-			saConfig := SetServiceAccountOptions{
+			saConfig := ServiceAccountOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				fileNameOptions: resource.FilenameOptions{
 					Filenames: []string{input.yaml}},
@@ -123,7 +123,7 @@ func TestSetServiceAccountMultiLocal(t *testing.T) {
 	cmd := NewCmdServiceAccount(tf, streams)
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
-	opts := SetServiceAccountOptions{
+	opts := ServiceAccountOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		fileNameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
@@ -359,7 +359,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdServiceAccount(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
-			saConfig := SetServiceAccountOptions{
+			saConfig := ServiceAccountOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				local:     false,
@@ -400,7 +400,7 @@ func TestServiceAccountValidation(t *testing.T) {
 			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdServiceAccount(tf, streams)
 
-			saConfig := &SetServiceAccountOptions{
+			saConfig := &ServiceAccountOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 				IOStreams:  streams,
 			}

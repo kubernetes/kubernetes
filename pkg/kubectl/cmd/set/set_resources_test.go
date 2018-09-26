@@ -66,7 +66,7 @@ func TestResourcesLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := SetResourcesOptions{
+	opts := ResourcesOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
@@ -114,7 +114,7 @@ func TestSetMultiResourcesLimitsLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := SetResourcesOptions{
+	opts := ResourcesOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
@@ -488,7 +488,7 @@ func TestSetResourcesRemote(t *testing.T) {
 			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdResources(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
-			opts := SetResourcesOptions{
+			opts := ResourcesOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				Limits:            "cpu=200m,memory=512Mi",

@@ -67,7 +67,7 @@ func TestImageLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := SetImageOptions{
+	opts := ImageOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}},
@@ -94,17 +94,17 @@ func TestSetImageValidation(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		imageOptions *SetImageOptions
+		imageOptions *ImageOptions
 		expectErr    string
 	}{
 		{
 			name:         "test resource < 1 and filenames empty",
-			imageOptions: &SetImageOptions{PrintFlags: printFlags},
+			imageOptions: &ImageOptions{PrintFlags: printFlags},
 			expectErr:    "[one or more resources must be specified as <resource> <name> or <resource>/<name>, at least one image update is required]",
 		},
 		{
 			name: "test containerImages < 1",
-			imageOptions: &SetImageOptions{
+			imageOptions: &ImageOptions{
 				PrintFlags: printFlags,
 				Resources:  []string{"a", "b", "c"},
 
@@ -116,7 +116,7 @@ func TestSetImageValidation(t *testing.T) {
 		},
 		{
 			name: "test containerImages > 1 and all containers are already specified by *",
-			imageOptions: &SetImageOptions{
+			imageOptions: &ImageOptions{
 				PrintFlags: printFlags,
 				Resources:  []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{
@@ -131,7 +131,7 @@ func TestSetImageValidation(t *testing.T) {
 		},
 		{
 			name: "success case",
-			imageOptions: &SetImageOptions{
+			imageOptions: &ImageOptions{
 				PrintFlags: printFlags,
 				Resources:  []string{"a", "b", "c"},
 				FilenameOptions: resource.FilenameOptions{
@@ -179,7 +179,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	cmd.Flags().Set("output", outputFormat)
 	cmd.Flags().Set("local", "true")
 
-	opts := SetImageOptions{
+	opts := ImageOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
 			Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
@@ -565,7 +565,7 @@ func TestSetImageRemote(t *testing.T) {
 			streams := genericclioptions.NewTestIOStreamsDiscard()
 			cmd := NewCmdImage(tf, streams)
 			cmd.Flags().Set("output", outputFormat)
-			opts := SetImageOptions{
+			opts := ImageOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 
 				Local:     false,

@@ -25,19 +25,20 @@ import (
 )
 
 var (
-	set_long = templates.LongDesc(`
+	setLong = templates.LongDesc(`
 		Configure application resources
 
 		These commands help you make changes to existing application resources.`)
 )
 
+// NewCmdSet returns an initialized Command instance for 'set' sub command
 func NewCmdSet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "set SUBCOMMAND",
+		Use:                   "set SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Set specific features on objects"),
-		Long:  set_long,
-		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
+		Short:                 i18n.T("Set specific features on objects"),
+		Long:                  setLong,
+		Run:                   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
 	// add subcommands

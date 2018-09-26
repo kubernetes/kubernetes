@@ -38,7 +38,7 @@ import (
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type SetSelectorOptions struct {
+type SelectorOptions struct {
 	// Bound
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 	PrintFlags           *genericclioptions.PrintFlags
@@ -73,8 +73,9 @@ var (
         kubectl create deployment my-dep -o yaml --dry-run | kubectl label --local -f - environment=qa -o yaml | kubectl create -f -`)
 )
 
-func NewSelectorOptions(streams genericclioptions.IOStreams) *SetSelectorOptions {
-	return &SetSelectorOptions{
+// NewSelectorOptions returns an initialized SelectorOptions instance
+func NewSelectorOptions(streams genericclioptions.IOStreams) *SelectorOptions {
+	return &SelectorOptions{
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithScheme(scheme.Scheme).
 			WithAll(false).
@@ -95,11 +96,11 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o := NewSelectorOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
+		Use:                   "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Set the selector on a resource"),
-		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
-		Example: selectorExample,
+		Short:                 i18n.T("Set the selector on a resource"),
+		Long:                  fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
+		Example:               selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -118,7 +119,7 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 }
 
 // Complete assigns the SelectorOptions from args.
-func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
 	o.RecordFlags.Complete(cmd)
@@ -150,7 +151,7 @@ func (o *SetSelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 }
 
 // Validate basic inputs
-func (o *SetSelectorOptions) Validate() error {
+func (o *SelectorOptions) Validate() error {
 	if o.selector == nil {
 		return fmt.Errorf("one selector is required")
 	}
@@ -158,7 +159,7 @@ func (o *SetSelectorOptions) Validate() error {
 }
 
 // RunSelector executes the command.
-func (o *SetSelectorOptions) RunSelector() error {
+func (o *SelectorOptions) RunSelector() error {
 	r := o.ResourceFinder.Do()
 
 	return r.Visit(func(info *resource.Info, err error) error {

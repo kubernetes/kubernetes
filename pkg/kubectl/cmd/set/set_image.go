@@ -38,7 +38,7 @@ import (
 
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type SetImageOptions struct {
+type ImageOptions struct {
 	resource.FilenameOptions
 
 	PrintFlags  *genericclioptions.PrintFlags
@@ -63,16 +63,16 @@ type SetImageOptions struct {
 }
 
 var (
-	image_resources = `
+	imageResources = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`
 
-	image_long = templates.LongDesc(`
+	imageLong = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
 		Possible resources include (case insensitive):
-		` + image_resources)
+		` + imageResources)
 
-	image_example = templates.Examples(`
+	imageExample = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
@@ -86,8 +86,9 @@ var (
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
-func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
-	return &SetImageOptions{
+// NewImageOptions returns an initialized ImageOptions instance
+func NewImageOptions(streams genericclioptions.IOStreams) *ImageOptions {
+	return &ImageOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("image updated").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
@@ -97,15 +98,16 @@ func NewImageOptions(streams genericclioptions.IOStreams) *SetImageOptions {
 	}
 }
 
+// NewCmdImage returns an initialized Command instance for the 'set image' sub command
 func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewImageOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
+		Use:                   "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update image of a pod template"),
-		Long:    image_long,
-		Example: image_example,
+		Short:                 i18n.T("Update image of a pod template"),
+		Long:                  imageLong,
+		Example:               imageExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -126,7 +128,8 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	return cmd
 }
 
-func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete completes all required options
+func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 
 	o.RecordFlags.Complete(cmd)
@@ -191,7 +194,8 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	return nil
 }
 
-func (o *SetImageOptions) Validate() error {
+// Validate makes sure provided values in ImageOptions are valid
+func (o *ImageOptions) Validate() error {
 	errors := []error{}
 	if o.All && len(o.Selector) > 0 {
 		errors = append(errors, fmt.Errorf("cannot set --all and --selector at the same time"))
@@ -207,7 +211,8 @@ func (o *SetImageOptions) Validate() error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func (o *SetImageOptions) Run() error {
+// Run performs the execution of 'set image' sub command
+func (o *ImageOptions) Run() error {
 	allErrs := []error{}
 
 	patches := CalculatePatches(o.Infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
@@ -265,7 +270,7 @@ func (o *SetImageOptions) Run() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
 			continue
 		}
 
@@ -284,7 +289,7 @@ func (o *SetImageOptions) Run() error {
 		// patch the change
 		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v", err))
 			continue
 		}
 
