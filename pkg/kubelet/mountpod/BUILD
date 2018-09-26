@@ -18,6 +18,7 @@ go_test(
     srcs = ["mount_pod_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/configmap:go_default_library",
         "//pkg/kubelet/pod:go_default_library",
         "//pkg/kubelet/pod/testing:go_default_library",

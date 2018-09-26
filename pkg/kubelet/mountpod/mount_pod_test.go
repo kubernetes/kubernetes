@@ -27,13 +27,14 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 )
 
-func TestGetVolumeExec(t *testing.T) {
+func TestGetMountPod(t *testing.T) {
 	// prepare PodManager
 	pods := []*v1.Pod{
 		{
@@ -61,7 +62,7 @@ func TestGetVolumeExec(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(basePath)
-	regPath := path.Join(basePath, "plugin-containers")
+	regPath := path.Join(basePath, config.DefaultKubeletPluginContainersDirName)
 
 	mgr, err := NewManager(basePath, podManager)
 	if err != nil {
