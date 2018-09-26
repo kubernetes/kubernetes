@@ -192,10 +192,6 @@ const (
 	// TODO: Rename this to KubeadmConfigConfigMap
 	InitConfigurationConfigMap = "kubeadm-config"
 
-	// InitConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
-	// TODO: This was used in v1.11 with vi1alpha2 config and older. Remove in v1.13
-	InitConfigurationConfigMapKey = "MasterConfiguration"
-
 	// ClusterConfigurationConfigMapKey specifies in what ConfigMap key the cluster configuration should be stored
 	ClusterConfigurationConfigMapKey = "ClusterConfiguration"
 
@@ -310,16 +306,8 @@ const (
 	// InitConfigurationKind is the string kind value for the InitConfiguration struct
 	InitConfigurationKind = "InitConfiguration"
 
-	// MasterConfigurationKind is the string kind value for the v1alpha2-named MasterConfiguration struct
-	// In v1alpha3 and higher, this struct is now named InitConfiguration
-	MasterConfigurationKind = "MasterConfiguration"
-
 	// JoinConfigurationKind is the string kind value for the JoinConfiguration struct
 	JoinConfigurationKind = "JoinConfiguration"
-
-	// NodeConfigurationKind is the string kind value for the v1alpha2-named NodeConfiguration struct
-	// In v1alpha3 and higher, this struct is now named JoinConfiguration
-	NodeConfigurationKind = "NodeConfiguration"
 
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
