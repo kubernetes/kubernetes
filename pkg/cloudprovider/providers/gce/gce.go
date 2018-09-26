@@ -214,6 +214,7 @@ type CloudConfig struct {
 	TokenSource          oauth2.TokenSource
 	UseMetadataServer    bool
 	AlphaFeatureGate     *AlphaFeatureGate
+	NoConfigFile         bool
 }
 
 func init() {
@@ -304,6 +305,8 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 		cloudConfig.NodeTags = configFile.Global.NodeTags
 		cloudConfig.NodeInstancePrefix = configFile.Global.NodeInstancePrefix
 		cloudConfig.AlphaFeatureGate = NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
+	} else {
+		cloudConfig.NoConfigFile = true
 	}
 
 	// retrieve projectID and zone
@@ -464,26 +467,29 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	} else if config.SubnetworkName != "" {
 		subnetURL = gceSubnetworkURL(config.ApiEndpoint, netProjID, config.Region, config.SubnetworkName)
 	} else {
-		// Determine the type of network and attempt to discover the correct subnet for AUTO mode.
-		// Gracefully fail because kubelet calls CreateGCECloud without any config, and minions
-		// lack the proper credentials for API calls.
-		if networkName := lastComponent(networkURL); networkName != "" {
-			var n *compute.Network
-			if n, err = getNetwork(service, netProjID, networkName); err != nil {
-				glog.Warningf("Could not retrieve network %q; err: %v", networkName, err)
-			} else {
-				switch typeOfNetwork(n) {
-				case netTypeLegacy:
-					glog.Infof("Network %q is type legacy - no subnetwork", networkName)
-					isLegacyNetwork = true
-				case netTypeCustom:
-					glog.Warningf("Network %q is type custom - cannot auto select a subnetwork", networkName)
-				case netTypeAuto:
-					subnetURL, err = determineSubnetURL(service, netProjID, networkName, config.Region)
-					if err != nil {
-						glog.Warningf("Could not determine subnetwork for network %q and region %v; err: %v", networkName, config.Region, err)
-					} else {
-						glog.Infof("Auto selecting subnetwork %q", subnetURL)
+		// Skip if CreateGCECloud was executed without any config.
+		// Kubelet calls CreateGCECloud without any config, and minions lack the proper credentials for
+		// API calls(kubelet).
+		if !config.NoConfigFile {
+			// Determine the type of network and attempt to discover the correct subnet for AUTO mode.
+			if networkName := lastComponent(networkURL); networkName != "" {
+				var n *compute.Network
+				if n, err = getNetwork(service, netProjID, networkName); err != nil {
+					return nil, err
+				} else {
+					switch typeOfNetwork(n) {
+					case netTypeLegacy:
+						glog.Infof("Network %q is type legacy - no subnetwork", networkName)
+						isLegacyNetwork = true
+					case netTypeCustom:
+						glog.Warningf("Network %q is type custom - cannot auto select a subnetwork", networkName)
+					case netTypeAuto:
+						subnetURL, err = determineSubnetURL(service, netProjID, networkName, config.Region)
+						if err != nil {
+							glog.Warningf("Could not determine subnetwork for network %q and region %v; err: %v", networkName, config.Region, err)
+						} else {
+							glog.Infof("Auto selecting subnetwork %q", subnetURL)
+						}
 					}
 				}
 			}
