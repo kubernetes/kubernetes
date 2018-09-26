@@ -668,7 +668,7 @@ func (o *EditOptions) visitAnnotation(annotationVisitor resource.Visitor) error 
 	err := annotationVisitor.Visit(func(info *resource.Info, incomingErr error) error {
 		// put configuration annotation in "updates"
 		if o.ApplyAnnotation {
-			if err := kubectl.CreateOrUpdateAnnotation(true, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+			if err := kubectl.CreateOrUpdateAnnotation(true, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 				return err
 			}
 		}
