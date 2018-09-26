@@ -53,6 +53,11 @@ const (
 	iscsiPluginName = "kubernetes.io/iscsi"
 )
 
+// Required iSCSI Timeouts settings need to update
+var (
+	iscsiTimeoutSettings = []string{"node.session.timeo.replacement_timeout"}
+)
+
 func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
 	plugin.targetLocks = keymutex.NewHashed(0)
@@ -271,6 +276,7 @@ type iscsiDisk struct {
 	chap_discovery bool
 	chap_session   bool
 	secret         map[string]string
+	timeouts       map[string]string
 	InitiatorName  string
 	plugin         *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
@@ -506,7 +512,20 @@ func getISCSISecretNameAndNamespace(spec *volume.Spec, defaultSecretNamespace st
 	return "", "", fmt.Errorf("Spec does not reference an ISCSI volume type")
 }
 
+// Reading the iSCSI Timeout values provided from provisioner
+func getISCSITimeoutvalues(spec *volume.Spec) map[string]string {
+	timeouts := make(map[string]string)
+	for _, Node_Timeouts := range iscsiTimeoutSettings {
+		timeouts[Node_Timeouts] = spec.PersistentVolume.Annotations[Node_Timeouts]
+		if len(timeouts[Node_Timeouts]) <= 0 {
+			fmt.Errorf(" %s setting is not updated ", Node_Timeouts)
+		}
+	}
+	return timeouts
+}
+
 func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, manager diskManager, secret map[string]string) (*iscsiDisk, error) {
+	var timeouts map[string]string
 	tp, portals, iqn, lunStr, err := getISCSITargetInfo(spec)
 	if err != nil {
 		return nil, err
@@ -538,6 +557,9 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 		return nil, err
 	}
 
+	//Fetching the timeouts setting from spec
+	timeouts = getISCSITimeoutvalues(spec)
+
 	return &iscsiDisk{
 		podUID:         podUID,
 		VolName:        spec.Name(),
@@ -548,6 +570,7 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 		chap_discovery: chapDiscovery,
 		chap_session:   chapSession,
 		secret:         secret,
+		timeouts:       timeouts,
 		InitiatorName:  initiatorName,
 		manager:        manager,
 		plugin:         plugin}, nil

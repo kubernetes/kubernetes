@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"strconv"
+
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	"strconv"
 )
 
 var (
@@ -70,10 +71,31 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 			}
 		}
 	}
+
 	return nil
 }
 
+//updating the timeout settings from provisioner
+func updateISCSINodeTimeouts(b iscsiDiskMounter, tp string {
+	//Itterating over declared iSCSI Timeouts settings  and updating the
+	//corresponding settings to keep application mount point in RW state in node
+	//down scenario
+	for _, k := range iscsiTimeoutSettings {
+		v := b.timeouts[k]
+		if len(v) > 0 {
+			out, err := b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
+			if err != nil {
+				glog.Errorf("iscsi: %s setting is not update and error: %v:", k, string(out))
+			}
+		}
+	}
+
+}
+
 func updateISCSINode(b iscsiDiskMounter, tp string) error {
+	//Updating the iSCSI timeouts settings
+	updateISCSINodeTimeouts(b, tp)
+
 	if !b.chap_session {
 		return nil
 	}
