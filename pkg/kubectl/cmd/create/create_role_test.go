@@ -155,28 +155,28 @@ func TestValidate(t *testing.T) {
 	defer tf.Cleanup()
 
 	tests := map[string]struct {
-		roleOptions *CreateRoleOptions
+		roleOptions *RoleOptions
 		expectErr   bool
 	}{
 		"test-missing-name": {
-			roleOptions: &CreateRoleOptions{},
+			roleOptions: &RoleOptions{},
 			expectErr:   true,
 		},
 		"test-missing-verb": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name: "my-role",
 			},
 			expectErr: true,
 		},
 		"test-missing-resource": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
 			},
 			expectErr: true,
 		},
 		"test-missing-resource-existing-apigroup": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
 				Resources: []ResourceOptions{
@@ -188,7 +188,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-missing-resource-existing-subresource": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
 				Resources: []ResourceOptions{
@@ -200,7 +200,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-verb": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"invalid-verb"},
 				Resources: []ResourceOptions{
@@ -212,7 +212,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-nonresource-verb": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"post"},
 				Resources: []ResourceOptions{
@@ -224,7 +224,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-special-verb": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"use"},
 				Resources: []ResourceOptions{
@@ -236,7 +236,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-mix-verbs": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"impersonate", "use"},
 				Resources: []ResourceOptions{
@@ -249,7 +249,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-special-verb-with-wrong-apigroup": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"impersonate"},
 				Resources: []ResourceOptions{
@@ -263,7 +263,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-resource": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
 				Resources: []ResourceOptions{
@@ -275,7 +275,7 @@ func TestValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-resource-name-with-multiple-resources": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get"},
 				Resources: []ResourceOptions{
@@ -292,7 +292,7 @@ func TestValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-valid-case": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "role-binder",
 				Verbs: []string{"get", "list", "bind"},
 				Resources: []ResourceOptions{
@@ -306,7 +306,7 @@ func TestValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-valid-case-with-subresource": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"get", "list"},
 				Resources: []ResourceOptions{
@@ -320,7 +320,7 @@ func TestValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-valid-case-with-additional-resource": {
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				Name:  "my-role",
 				Verbs: []string{"impersonate"},
 				Resources: []ResourceOptions{
@@ -365,14 +365,14 @@ func TestComplete(t *testing.T) {
 	tests := map[string]struct {
 		params      []string
 		resources   string
-		roleOptions *CreateRoleOptions
-		expected    *CreateRoleOptions
+		roleOptions *RoleOptions
+		expected    *RoleOptions
 		expectErr   bool
 	}{
 		"test-missing-name": {
 			params:    []string{},
 			resources: defaultTestResources,
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 			},
 			expectErr: true,
@@ -380,7 +380,7 @@ func TestComplete(t *testing.T) {
 		"test-duplicate-verbs": {
 			params:    []string{roleName},
 			resources: defaultTestResources,
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
@@ -390,7 +390,7 @@ func TestComplete(t *testing.T) {
 					"get",
 				},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name: roleName,
 				Verbs: []string{
 					"get",
@@ -414,7 +414,7 @@ func TestComplete(t *testing.T) {
 		"test-verball": {
 			params:    []string{roleName},
 			resources: defaultTestResources,
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:       roleName,
 				Verbs: []string{
@@ -424,7 +424,7 @@ func TestComplete(t *testing.T) {
 					"*",
 				},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -444,12 +444,12 @@ func TestComplete(t *testing.T) {
 		"test-allresource": {
 			params:    []string{roleName},
 			resources: "*,pods",
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created"),
 				Name:       roleName,
 				Verbs:      []string{"*"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -464,12 +464,12 @@ func TestComplete(t *testing.T) {
 		"test-allresource-subresource": {
 			params:    []string{roleName},
 			resources: "*/scale,pods",
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created"),
 				Name:       roleName,
 				Verbs:      []string{"*"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -488,12 +488,12 @@ func TestComplete(t *testing.T) {
 		"test-allresrouce-allgroup": {
 			params:    []string{roleName},
 			resources: "*.*,pods",
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created"),
 				Name:       roleName,
 				Verbs:      []string{"*"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -512,12 +512,12 @@ func TestComplete(t *testing.T) {
 		"test-allresource-allgroup-subresource": {
 			params:    []string{roleName},
 			resources: "*.*/scale,pods",
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created"),
 				Name:       roleName,
 				Verbs:      []string{"*"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -537,12 +537,12 @@ func TestComplete(t *testing.T) {
 		"test-allresource-specificgroup": {
 			params:    []string{roleName},
 			resources: "*.extensions,pods",
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created"),
 				Name:       roleName,
 				Verbs:      []string{"*"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -561,12 +561,12 @@ func TestComplete(t *testing.T) {
 		"test-allresource-specificgroup-subresource": {
 			params:    []string{roleName},
 			resources: "*.extensions/scale,pods",
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags: genericclioptions.NewPrintFlags("created"),
 				Name:       roleName,
 				Verbs:      []string{"*"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -586,13 +586,13 @@ func TestComplete(t *testing.T) {
 		"test-duplicate-resourcenames": {
 			params:    []string{roleName},
 			resources: defaultTestResources,
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo", "foo"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{
@@ -612,13 +612,13 @@ func TestComplete(t *testing.T) {
 		"test-valid-complete-case": {
 			params:    []string{roleName},
 			resources: defaultTestResources,
-			roleOptions: &CreateRoleOptions{
+			roleOptions: &RoleOptions{
 				PrintFlags:    genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 				Name:          roleName,
 				Verbs:         []string{"*"},
 				ResourceNames: []string{"foo"},
 			},
-			expected: &CreateRoleOptions{
+			expected: &RoleOptions{
 				Name:  roleName,
 				Verbs: []string{"*"},
 				Resources: []ResourceOptions{

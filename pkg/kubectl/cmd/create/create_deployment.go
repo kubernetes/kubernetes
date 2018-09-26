@@ -35,8 +35,9 @@ var (
 	kubectl create deployment my-dep --image=busybox`))
 )
 
+// DeploymentOpts is returned by NewCmdCreateDeployment
 type DeploymentOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateDeployment is a macro command to create a new deployment.
@@ -44,11 +45,11 @@ type DeploymentOpts struct {
 // Note that this command overlaps significantly with the `kubectl run` command.
 func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &DeploymentOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "deployment NAME --image=image [--dry-run]",
+		Use:                   "deployment NAME --image=image [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
 		Short:                 i18n.T("Create a deployment with the specified name."),
@@ -111,6 +112,7 @@ func generatorFromName(
 	return nil, false
 }
 
+// Complete completes all the options
 func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -146,10 +148,7 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// createDeployment
-// 1. Reads user config values from Cobra.
-// 2. Sets up the correct Generator object.
-// 3. Calls RunCreateSubcommand.
+// Run performs the execution of 'create deployment' sub command
 func (o *DeploymentOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

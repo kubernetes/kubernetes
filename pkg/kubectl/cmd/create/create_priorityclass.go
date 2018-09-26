@@ -38,18 +38,19 @@ var (
 		kubectl create priorityclass default-priority --value=1000 --global-default=true --description="default priority"`))
 )
 
+// PriorityClassOpts holds the options for 'create priorityclass' sub command
 type PriorityClassOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreatePriorityClass is a macro command to create a new priorityClass.
 func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &PriorityClassOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run]",
+		Use:                   "priorityclass NAME --value=VALUE --global-default=BOOL [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pc"},
 		Short:                 i18n.T("Create a priorityclass with the specified name."),
@@ -73,6 +74,7 @@ func NewCmdCreatePriorityClass(f cmdutil.Factory, ioStreams genericclioptions.IO
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -95,7 +97,7 @@ func (o *PriorityClassOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreatePriorityClass implements the behavior to run the create priorityClass command.
+// Run calls the CreateSubcommandOptions.Run in the PriorityClassOpts instance
 func (o *PriorityClassOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

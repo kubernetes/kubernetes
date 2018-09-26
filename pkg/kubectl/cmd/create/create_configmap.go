@@ -56,18 +56,19 @@ var (
 		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
 )
 
+// ConfigMapOpts holds properties for create configmap sub-command
 type ConfigMapOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
-// ConfigMap is a command to ease creating ConfigMaps.
+// NewCmdCreateConfigMap initializes and returns ConfigMapOpts
 func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &ConfigMapOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use:                   "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"cm"},
 		Short:                 i18n.T("Create a configmap from a local file, directory or literal value"),
@@ -91,6 +92,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *ConfigMapOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -114,7 +116,7 @@ func (o *ConfigMapOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateConfigMap is the implementation of the create configmap command.
+// Run performs the execution of 'create' sub command options
 func (o *ConfigMapOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

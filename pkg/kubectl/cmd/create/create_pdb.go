@@ -40,18 +40,19 @@ var (
 		kubectl create pdb my-pdb --selector=app=nginx --min-available=50%`))
 )
 
+// PodDisruptionBudgetOpts holds the command-line options for poddisruptionbudget sub command
 type PodDisruptionBudgetOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreatePodDisruptionBudget is a macro command to create a new pod disruption budget.
 func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &PodDisruptionBudgetOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
+		Use:                   "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pdb"},
 		Short:                 i18n.T("Create a pod disruption budget with the specified name."),
@@ -75,6 +76,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericcliopti
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -103,7 +105,7 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreatePodDisruptionBudget implements the behavior to run the create pdb command.
+// Run calls the CreateSubcommandOptions.Run in PodDisruptionBudgetOpts instance
 func (o *PodDisruptionBudgetOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

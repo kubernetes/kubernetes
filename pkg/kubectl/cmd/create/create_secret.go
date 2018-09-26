@@ -72,22 +72,23 @@ var (
 	  kubectl create secret generic my-secret --from-env-file=path/to/bar.env`))
 )
 
+// SecretGenericOpts holds the options for 'create secret' sub command
 type SecretGenericOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
 func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &SecretGenericOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a secret from a local file, directory or literal value"),
-		Long:    secretLong,
-		Example: secretExample,
+		Short:                 i18n.T("Create a secret from a local file, directory or literal value"),
+		Long:                  secretLong,
+		Example:               secretExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Run())
@@ -107,6 +108,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *SecretGenericOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -131,7 +133,7 @@ func (o *SecretGenericOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateSecretGeneric is the implementation of the create secret generic command
+// Run calls the CreateSubcommandOptions.Run in SecretGenericOpts instance
 func (o *SecretGenericOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
@@ -157,22 +159,23 @@ var (
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`))
 )
 
+// SecretDockerRegistryOpts holds the options for 'create secret docker-registry' sub command
 type SecretDockerRegistryOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
 func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &SecretDockerRegistryOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
+		Use:                   "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a secret for use with a Docker registry"),
-		Long:    secretForDockerRegistryLong,
-		Example: secretForDockerRegistryExample,
+		Short:                 i18n.T("Create a secret for use with a Docker registry"),
+		Long:                  secretForDockerRegistryLong,
+		Example:               secretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Run())
@@ -196,6 +199,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *SecretDockerRegistryOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -231,7 +235,7 @@ func (o *SecretDockerRegistryOpts) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateSecretDockerRegistry is the implementation of the create secret docker-registry command
+// Run calls CreateSubcommandOptions.Run in SecretDockerRegistryOpts instance
 func (o *SecretDockerRegistryOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }
@@ -248,22 +252,23 @@ var (
 	  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`))
 )
 
+// SecretTLSOpts holds the options for 'create secret tls' sub command
 type SecretTLSOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries
 func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &SecretTLSOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
+		Use:                   "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a TLS secret"),
-		Long:    secretForTLSLong,
-		Example: secretForTLSExample,
+		Short:                 i18n.T("Create a TLS secret"),
+		Long:                  secretForTLSLong,
+		Example:               secretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Run())
@@ -281,6 +286,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -309,7 +315,7 @@ func (o *SecretTLSOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateSecretTLS is the implementation of the create secret tls command
+// Run calls CreateSubcommandOptions.Run in the SecretTLSOpts instance
 func (o *SecretTLSOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

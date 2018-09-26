@@ -105,13 +105,15 @@ var (
 	}
 )
 
+// ResourceOptions holds the related options for '--resource' option
 type ResourceOptions struct {
 	Group       string
 	Resource    string
 	SubResource string
 }
 
-type CreateRoleOptions struct {
+// RoleOptions holds the options for 'create role' sub command
+type RoleOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
 	Name          string
@@ -129,24 +131,25 @@ type CreateRoleOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
-	return &CreateRoleOptions{
+// NewRoleOptions returns an initialized RoleOptions instance
+func NewRoleOptions(ioStreams genericclioptions.IOStreams) *RoleOptions {
+	return &RoleOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
 }
 
-// Role is a command to ease creating Roles.
+// NewCmdCreateRole returnns an initialized Command instance for 'create role' sub command
 func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCreateRoleOptions(ioStreams)
+	o := NewRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
+		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   roleLong,
-		Long:    roleLong,
-		Example: roleExample,
+		Short:                 roleLong,
+		Long:                  roleLong,
+		Example:               roleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -166,7 +169,8 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	return cmd
 }
 
-func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete completes all the required options
+func (o *RoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -255,7 +259,8 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	return nil
 }
 
-func (o *CreateRoleOptions) Validate() error {
+// Validate makes sure there is no discrepency in provided option values
+func (o *RoleOptions) Validate() error {
 	if o.Name == "" {
 		return fmt.Errorf("name must be specified")
 	}
@@ -279,7 +284,7 @@ func (o *CreateRoleOptions) Validate() error {
 	return o.validateResource()
 }
 
-func (o *CreateRoleOptions) validateResource() error {
+func (o *RoleOptions) validateResource() error {
 	for _, r := range o.Resources {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
@@ -317,7 +322,8 @@ func (o *CreateRoleOptions) validateResource() error {
 	return nil
 }
 
-func (o *CreateRoleOptions) RunCreateRole() error {
+// RunCreateRole performs the execution of 'create role' sub command
+func (o *RoleOptions) RunCreateRole() error {
 	role := &rbacv1.Role{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "Role"},

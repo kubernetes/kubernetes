@@ -50,7 +50,8 @@ var (
 		kubectl create job test-job --from=cronjob/a-cronjob`))
 )
 
-type CreateJobOptions struct {
+// JobOptions is the command line options for 'create job'
+type JobOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
 	PrintObj func(obj runtime.Object) error
@@ -69,8 +70,9 @@ type CreateJobOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOptions {
-	return &CreateJobOptions{
+// NewJobOptions initializes and returns new JobOptions instance
+func NewJobOptions(ioStreams genericclioptions.IOStreams) *JobOptions {
+	return &JobOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
@@ -78,7 +80,7 @@ func NewCreateJobOptions(ioStreams genericclioptions.IOStreams) *CreateJobOption
 
 // NewCmdCreateJob is a command to ease creating Jobs from CronJobs.
 func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCreateJobOptions(ioStreams)
+	o := NewJobOptions(ioStreams)
 	cmd := &cobra.Command{
 		Use:     "job NAME [--image=image --from=cronjob/name] -- [COMMAND] [args...]",
 		Short:   jobLong,
@@ -102,7 +104,8 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	return cmd
 }
 
-func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete completes all the required options
+func (o *JobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -143,7 +146,8 @@ func (o *CreateJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	return nil
 }
 
-func (o *CreateJobOptions) Validate() error {
+// Validate makes sure provided values and valid Job options
+func (o *JobOptions) Validate() error {
 	if (len(o.Image) == 0 && len(o.From) == 0) || (len(o.Image) != 0 && len(o.From) != 0) {
 		return fmt.Errorf("either --image or --from must be specified")
 	}
@@ -153,7 +157,8 @@ func (o *CreateJobOptions) Validate() error {
 	return nil
 }
 
-func (o *CreateJobOptions) Run() error {
+// Run performs the execution of 'create job' sub command
+func (o *JobOptions) Run() error {
 	var job *batchv1.Job
 	if len(o.Image) > 0 {
 		job = o.createJob()
@@ -195,7 +200,7 @@ func (o *CreateJobOptions) Run() error {
 	return o.PrintObj(job)
 }
 
-func (o *CreateJobOptions) createJob() *batchv1.Job {
+func (o *JobOptions) createJob() *batchv1.Job {
 	return &batchv1.Job{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
@@ -219,7 +224,7 @@ func (o *CreateJobOptions) createJob() *batchv1.Job {
 	}
 }
 
-func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *batchv1.Job {
+func (o *JobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *batchv1.Job {
 	annotations := make(map[string]string)
 	annotations["cronjob.kubernetes.io/instantiate"] = "manual"
 	for k, v := range cronJob.Spec.JobTemplate.Annotations {

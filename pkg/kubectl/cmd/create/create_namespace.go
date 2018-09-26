@@ -35,18 +35,19 @@ var (
 	  kubectl create namespace my-namespace`))
 )
 
+// NamespaceOpts is the options for 'create namespare' sub command
 type NamespaceOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateNamespace is a macro command to create a new namespace
 func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := &NamespaceOpts{
-		CreateSubcommandOptions: NewCreateSubcommandOptions(ioStreams),
+		CreateSubcommandOptions: NewSubcommandOptions(ioStreams),
 	}
 
 	cmd := &cobra.Command{
-		Use: "namespace NAME [--dry-run]",
+		Use:                   "namespace NAME [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"ns"},
 		Short:                 i18n.T("Create a namespace with the specified name"),
@@ -67,6 +68,7 @@ func NewCmdCreateNamespace(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *NamespaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -84,7 +86,7 @@ func (o *NamespaceOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return o.CreateSubcommandOptions.Complete(f, cmd, args, generator)
 }
 
-// CreateNamespace implements the behavior to run the create namespace command
+// Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance
 func (o *NamespaceOpts) Run() error {
 	return o.CreateSubcommandOptions.Run()
 }

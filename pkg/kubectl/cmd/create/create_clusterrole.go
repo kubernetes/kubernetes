@@ -58,24 +58,25 @@ var (
 	validNonResourceVerbs = []string{"*", "get", "post", "put", "delete", "patch", "head", "options"}
 )
 
-type CreateClusterRoleOptions struct {
-	*CreateRoleOptions
+// ClusterRoleOptions is returned by NewCmdCreateClusterRole
+type ClusterRoleOptions struct {
+	*RoleOptions
 	NonResourceURLs []string
 	AggregationRule map[string]string
 }
 
-// ClusterRole is a command to ease creating ClusterRoles.
+// NewCmdCreateClusterRole initializes and returns new ClusterRoles command
 func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	c := &CreateClusterRoleOptions{
-		CreateRoleOptions: NewCreateRoleOptions(ioStreams),
-		AggregationRule:   map[string]string{},
+	c := &ClusterRoleOptions{
+		RoleOptions:     NewRoleOptions(ioStreams),
+		AggregationRule: map[string]string{},
 	}
 	cmd := &cobra.Command{
-		Use: "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
+		Use:                   "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   clusterRoleLong,
-		Long:    clusterRoleLong,
-		Example: clusterRoleExample,
+		Short:                 clusterRoleLong,
+		Long:                  clusterRoleLong,
+		Example:               clusterRoleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(c.Complete(f, cmd, args))
 			cmdutil.CheckErr(c.Validate())
@@ -97,7 +98,8 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 	return cmd
 }
 
-func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete completes all the required options
+func (c *ClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	// Remove duplicate nonResourceURLs
 	nonResourceURLs := []string{}
 	for _, n := range c.NonResourceURLs {
@@ -107,10 +109,11 @@ func (c *CreateClusterRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	}
 	c.NonResourceURLs = nonResourceURLs
 
-	return c.CreateRoleOptions.Complete(f, cmd, args)
+	return c.RoleOptions.Complete(f, cmd, args)
 }
 
-func (c *CreateClusterRoleOptions) Validate() error {
+// Validate makes sure there is no discrepency in ClusterRoleOptions
+func (c *ClusterRoleOptions) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("name must be specified")
 	}
@@ -170,7 +173,8 @@ func (c *CreateClusterRoleOptions) Validate() error {
 
 }
 
-func (c *CreateClusterRoleOptions) RunCreateRole() error {
+// RunCreateRole creates a new clusterRole
+func (c *ClusterRoleOptions) RunCreateRole() error {
 	clusterRole := &rbacv1.ClusterRole{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "ClusterRole"},

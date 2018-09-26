@@ -39,7 +39,7 @@ func TestExtraArgsFail(t *testing.T) {
 	defer f.Cleanup()
 
 	c := NewCmdCreate(f, genericclioptions.NewTestIOStreamsDiscard())
-	options := CreateOptions{}
+	options := Options{}
 	if options.ValidateArgs(c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
 	}
