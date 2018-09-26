@@ -299,8 +299,10 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
+	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
+		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
+		}
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -311,13 +313,17 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	// Set the conntrack sysctl we need for
-	if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
+	if val, _ := sysctl.GetSysctl(sysctlVSConnTrack); val != 1 {
+		if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
+		}
 	}
 
 	// Set the ip_forward sysctl we need for
-	if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
+	if val, _ := sysctl.GetSysctl(sysctlForward); val != 1 {
+		if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
+		}
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
