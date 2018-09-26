@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -64,5 +66,8 @@ func (o *PersistentVolumeBinderControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.PVClaimBinderSyncPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period for syncing persistent volumes and persistent volume claims %d must be greater than zero", o.PVClaimBinderSyncPeriod.Duration))
+	}
 	return errs
 }

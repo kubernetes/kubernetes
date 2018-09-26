@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -69,5 +71,17 @@ func (o *HPAControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.HorizontalPodAutoscalerSyncPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period for syncing the number of pods %d must be greater than zero", o.HorizontalPodAutoscalerSyncPeriod.Duration))
+	}
+	if o.HorizontalPodAutoscalerDownscaleStabilizationWindow.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period for which autoscaler will look backwards and not scale down below any recommendation it made %d must be greater than zero", o.HorizontalPodAutoscalerSyncPeriod.Duration))
+	}
+	if o.HorizontalPodAutoscalerCPUInitializationPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period after pod start %d must be greater than zero", o.HorizontalPodAutoscalerSyncPeriod.Duration))
+	}
+	if o.HorizontalPodAutoscalerInitialReadinessDelay.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period after pod start %d must be greater than zero", o.HorizontalPodAutoscalerSyncPeriod.Duration))
+	}
 	return errs
 }

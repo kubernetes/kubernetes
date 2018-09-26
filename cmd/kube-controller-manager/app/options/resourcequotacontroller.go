@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -56,5 +58,11 @@ func (o *ResourceQuotaControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentResourceQuotaSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("the number of resource quotas %d must be greater than zero", o.ConcurrentResourceQuotaSyncs))
+	}
+	if o.ResourceQuotaSyncPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period for syncing quota usage statushe number of TTL-after-finished controller workers %d must be greater than zero", o.ResourceQuotaSyncPeriod.Duration))
+	}
 	return errs
 }

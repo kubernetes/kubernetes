@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -56,5 +58,11 @@ func (o *NamespaceControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.NamespaceSyncPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period for syncing namespace life-cycle updates %d must be greater than zero", o.NamespaceSyncPeriod.Duration))
+	}
+	if o.ConcurrentNamespaceSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("the number of namespace objects %d must be greater than zero", o.ConcurrentNamespaceSyncs))
+	}
 	return errs
 }

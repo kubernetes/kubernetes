@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -56,5 +58,8 @@ func (o *NodeIPAMControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.NodeCIDRMaskSize <= 0 {
+		errs = append(errs, fmt.Errorf("mask size for node cidr %d must be greater than zero", o.NodeCIDRMaskSize))
+	}
 	return errs
 }

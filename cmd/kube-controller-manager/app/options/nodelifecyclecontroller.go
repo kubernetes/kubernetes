@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -72,5 +74,14 @@ func (o *NodeLifecycleControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.PodEvictionTimeout.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the grace period for deleting pods %d must be greater than zero", o.PodEvictionTimeout.Duration))
+	}
+	if o.NodeMonitorGracePeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the grace period for node monitor %d must be greater than zero", o.PodEvictionTimeout.Duration))
+	}
+	if o.NodeStartupGracePeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the grace period for node startup %d must be greater than zero", o.NodeStartupGracePeriod.Duration))
+	}
 	return errs
 }

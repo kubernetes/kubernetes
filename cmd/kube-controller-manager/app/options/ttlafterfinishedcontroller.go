@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -54,5 +56,8 @@ func (o *TTLAfterFinishedControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentTTLSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("the number of TTL-after-finished controller workers %d must be greater than zero", o.ConcurrentTTLSyncs))
+	}
 	return errs
 }

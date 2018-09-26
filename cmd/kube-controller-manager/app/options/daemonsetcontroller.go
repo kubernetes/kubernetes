@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -52,5 +54,8 @@ func (o *DaemonSetControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentDaemonSetSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("the number of daemonset %d must be greater than zero", o.ConcurrentDaemonSetSyncs))
+	}
 	return errs
 }

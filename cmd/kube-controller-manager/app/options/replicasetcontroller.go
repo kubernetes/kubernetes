@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -54,5 +56,8 @@ func (o *ReplicaSetControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentRSSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("the number of replica sets %d must be greater than zero", o.ConcurrentRSSyncs))
+	}
 	return errs
 }

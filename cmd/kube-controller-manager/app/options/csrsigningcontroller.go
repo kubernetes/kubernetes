@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -68,5 +70,8 @@ func (o *CSRSigningControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ClusterSigningDuration.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the length of duration signed certificates %d must be greater than zero", o.ClusterSigningDuration.Duration))
+	}
 	return errs
 }

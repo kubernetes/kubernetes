@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	"k8s.io/kubernetes/pkg/controller/apis/config/validation"
 )
 
 // KubeCloudSharedOptions holds the options shared between kube-controller-manager
@@ -102,7 +103,9 @@ func (o *KubeCloudSharedOptions) Validate() []error {
 	}
 
 	errs := []error{}
-	errs = append(errs, ValidateCloudProviderConfiguration(&o.CloudProvider)...)
+	if err := validation.ValidateCloudProviderConfiguration(&o.CloudProvider).ToAggregate(); err != nil {
+		errs = append(errs, err.Errors()...)
+	}
 
 	return errs
 }

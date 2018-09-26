@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -58,5 +60,8 @@ func (o *SAControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentSATokenSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("the number of service account token objects %d must be greater than zero", o.ConcurrentSATokenSyncs))
+	}
 	return errs
 }

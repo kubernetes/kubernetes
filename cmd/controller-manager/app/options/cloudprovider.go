@@ -22,13 +22,6 @@ import (
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
-// ValidateCloudProviderConfiguration ensures validation of the CloudProviderConfiguration struct.
-func ValidateCloudProviderConfiguration(s *kubectrlmgrconfig.CloudProviderConfiguration) []error {
-	allErrors := []error{}
-
-	return allErrors
-}
-
 // AddCloudProviderConfigurationFlags adds flags related to cloudprovider for controller manager to the specified FlagSet.
 func AddCloudProviderConfigurationFlags(s *kubectrlmgrconfig.CloudProviderConfiguration, fs *pflag.FlagSet) {
 	fs.StringVar(&s.Name, "cloud-provider", s.Name,

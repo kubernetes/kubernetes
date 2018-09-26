@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -54,5 +56,8 @@ func (o *PodGCControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.TerminatedPodGCThreshold <= 0 {
+		errs = append(errs, fmt.Errorf("number of terminated pods that can exist %d must be greater than zero", o.TerminatedPodGCThreshold))
+	}
 	return errs
 }

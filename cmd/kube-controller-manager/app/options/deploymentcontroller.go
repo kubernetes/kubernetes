@@ -17,6 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
@@ -56,5 +58,11 @@ func (o *DeploymentControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if o.ConcurrentDeploymentSyncs <= 0 {
+		errs = append(errs, fmt.Errorf("the number of deployment %d must be greater than zero", o.ConcurrentDeploymentSyncs))
+	}
+	if o.DeploymentControllerSyncPeriod.Duration <= 0 {
+		errs = append(errs, fmt.Errorf("the period for syncing the deployments %d must be greater than zero", o.DeploymentControllerSyncPeriod.Duration))
+	}
 	return errs
 }
