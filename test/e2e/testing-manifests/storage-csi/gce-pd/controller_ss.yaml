@@ -13,7 +13,6 @@ spec:
       labels:
         app: csi-gce-pd-driver
     spec:
-      serviceAccount: csi-gce-pd
       containers:
         - name: csi-external-provisioner
           imagePullPolicy: Always
@@ -42,7 +41,7 @@ spec:
               mountPath: /csi
         - name: gce-driver
           imagePullPolicy: Always
-          image: gcr.io/google-containers/volume-csi/compute-persistent-disk-csi-driver:v0.2.0.alpha
+          image: gcr.io/google-containers/volume-csi/gcp-compute-persistent-disk-csi-driver:v0.1.0.alpha
           args:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
