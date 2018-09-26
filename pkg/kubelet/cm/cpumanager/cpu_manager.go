@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
@@ -220,6 +221,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
+	activeContainers := sets.NewString()
 	for _, pod := range m.activePods() {
 		allContainers := pod.Spec.InitContainers
 		allContainers = append(allContainers, pod.Spec.Containers...)
@@ -237,6 +239,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
+			activeContainers.Insert(containerID)
 
 			// Check whether container is present in state, there may be 3 reasons why it's not present:
 			// - policy does not want to track the container
@@ -274,6 +277,17 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				continue
 			}
 			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
+		}
+	}
+	// We should remove the container from state if it isn't active
+	// These containers may be stopped by kubelet (liveness)
+	for containerID, cset := range m.state.GetCPUAssignments() {
+		if !activeContainers.Has(containerID) {
+			glog.V(4).Infof("[cpumanager] reconcileState: removing inactive container (container id: %s, cpuset: \"%v\")", containerID, cset)
+			err := m.RemoveContainer(containerID)
+			if err != nil {
+				glog.Errorf("[cpumanager] reconcileState: failed to remove inactive container (contaienr: %s, error: %v)", containerID, err)
+			}
 		}
 	}
 	return success, failure
