@@ -47,6 +47,8 @@ FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+# if cgroups per qos is enabled, optionally change cgroup root
+CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
 
@@ -639,6 +641,7 @@ function start_controller_manager {
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
       --leader-elect=false \
+      --cert-dir="$CERT_DIR" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -749,6 +752,7 @@ function start_kubelet {
       --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}"
       --cgroups-per-qos="${CGROUPS_PER_QOS}"
       --cgroup-driver="${CGROUP_DRIVER}"
+      --cgroup-root="${CGROUP_ROOT}"
       --eviction-hard="${EVICTION_HARD}"
       --eviction-soft="${EVICTION_SOFT}"
       --eviction-pressure-transition-period="${EVICTION_PRESSURE_TRANSITION_PERIOD}"
