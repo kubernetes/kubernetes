@@ -18,6 +18,7 @@ package azure
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -65,6 +66,15 @@ func (az *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// Fall back to ARM API if the address is empty string.
+		// TODO: this is a workaround because IMDS is not stable enough.
+		// It should be removed after IMDS fixing the issue.
+		if strings.TrimSpace(ipAddress.PrivateIP) == "" {
+			return addressGetter(name)
+		}
+
+		// Use ip address got from instance metadata.
 		addresses := []v1.NodeAddress{
 			{Type: v1.NodeInternalIP, Address: ipAddress.PrivateIP},
 			{Type: v1.NodeHostName, Address: string(name)},
