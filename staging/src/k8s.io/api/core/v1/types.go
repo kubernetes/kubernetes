@@ -3782,10 +3782,13 @@ type NodeSpec struct {
 	// ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	// +optional
 	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`
-	// Unschedulable controls node schedulability of new pods. By default, node is schedulable.
-	// More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration
+
+	// Deprecated. TaintNodeByCondition has replaced the existing node condition. After that
+	// feature becomes GA, this will be removed.
+	// see: https://github.com/kubernetes/kubernetes/issues/69010
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
+
 	// If specified, the node's taints.
 	// +optional
 	Taints []Taint `json:"taints,omitempty" protobuf:"bytes,5,opt,name=taints"`
