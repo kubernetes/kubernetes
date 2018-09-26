@@ -52,20 +52,21 @@ type PauseConfig struct {
 }
 
 var (
-	pause_long = templates.LongDesc(`
+	pauseLong = templates.LongDesc(`
 		Mark the provided resource as paused
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
 		Currently only deployments support being paused.`)
 
-	pause_example = templates.Examples(`
+	pauseExample = templates.Examples(`
 		# Mark the nginx deployment as paused. Any current state of
 		# the deployment will continue its function, new updates to the deployment will not
 		# have an effect as long as the deployment is paused.
 		kubectl rollout pause deployment/nginx`)
 )
 
+// NewCmdRolloutPause returns a Command instance for 'rollout pause' sub command
 func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PauseConfig{
 		PrintFlags: genericclioptions.NewPrintFlags("paused").WithTypeSetter(scheme.Scheme),
@@ -75,11 +76,11 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	validArgs := []string{"deployment"}
 
 	cmd := &cobra.Command{
-		Use: "pause RESOURCE",
+		Use:                   "pause RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark the provided resource as paused"),
-		Long:    pause_long,
-		Example: pause_example,
+		Short:                 i18n.T("Mark the provided resource as paused"),
+		Long:                  pauseLong,
+		Example:               pauseExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
 			err := o.Complete(f, cmd, args)
@@ -102,6 +103,7 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
+// Complete completes all the required options
 func (o *PauseConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
@@ -125,6 +127,7 @@ func (o *PauseConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	return nil
 }
 
+// RunPause performs the execution of 'rollout pause' sub command
 func (o PauseConfig) RunPause() error {
 	r := o.Builder().
 		WithScheme(legacyscheme.Scheme).

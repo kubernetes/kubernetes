@@ -152,7 +152,6 @@ pkg/kubectl/cmd/auth
 pkg/kubectl/cmd/config
 pkg/kubectl/cmd/create
 pkg/kubectl/cmd/get
-pkg/kubectl/cmd/rollout
 pkg/kubectl/cmd/set
 pkg/kubectl/cmd/templates
 pkg/kubectl/cmd/testing

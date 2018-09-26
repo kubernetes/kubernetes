@@ -45,7 +45,7 @@ import (
 )
 
 var (
-	status_long = templates.LongDesc(`
+	statusLong = templates.LongDesc(`
 		Show the status of the rollout.
 
 		By default 'rollout status' will watch the status of the latest rollout
@@ -55,12 +55,13 @@ var (
 		pin to a specific revision and abort if it is rolled over by another revision,
 		use --revision=N where N is the revision you need to watch for.`)
 
-	status_example = templates.Examples(`
+	statusExample = templates.Examples(`
 		# Watch the rollout status of a deployment
 		kubectl rollout status deployment/nginx`)
 )
 
-type RolloutStatusOptions struct {
+// StatusOptions holds the command-line options for 'rollout status' sub command
+type StatusOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
 	Namespace        string
@@ -79,8 +80,9 @@ type RolloutStatusOptions struct {
 	genericclioptions.IOStreams
 }
 
-func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
-	return &RolloutStatusOptions{
+// NewRolloutStatusOptions returns an initialized StatusOptions instance
+func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *StatusOptions {
+	return &StatusOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
 		IOStreams:       streams,
@@ -89,17 +91,18 @@ func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatus
 	}
 }
 
+// NewCmdRolloutStatus returns a Command instance for the 'rollout status' sub command
 func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutStatusOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "status (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "status (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Show the status of the rollout"),
-		Long:    status_long,
-		Example: status_example,
+		Short:                 i18n.T("Show the status of the rollout"),
+		Long:                  statusLong,
+		Example:               statusExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate(cmd, args))
@@ -117,7 +120,8 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	return cmd
 }
 
-func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error {
+// Complete completes all the required options
+func (o *StatusOptions) Complete(f cmdutil.Factory, args []string) error {
 	o.Builder = f.NewBuilder
 
 	var err error
@@ -144,7 +148,8 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	return nil
 }
 
-func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error {
+// Validate makes sure all the provided values for command-line options are valid
+func (o *StatusOptions) Validate(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
@@ -156,7 +161,8 @@ func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error
 	return nil
 }
 
-func (o *RolloutStatusOptions) Run() error {
+// Run performs the execution of 'rollout status' sub command
+func (o *StatusOptions) Run() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().

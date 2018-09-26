@@ -50,10 +50,10 @@ type UndoOptions struct {
 }
 
 var (
-	undo_long = templates.LongDesc(`
+	undoLong = templates.LongDesc(`
 		Rollback to a previous rollout.`)
 
-	undo_example = templates.Examples(`
+	undoExample = templates.Examples(`
 		# Rollback to the previous deployment
 		kubectl rollout undo deployment/abc
 
@@ -64,6 +64,7 @@ var (
 		kubectl rollout undo --dry-run=true deployment/abc`)
 )
 
+// NewRolloutUndoOptions returns an initialized UndoOptions instance
 func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
 	return &UndoOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("rolled back").WithTypeSetter(scheme.Scheme),
@@ -72,17 +73,18 @@ func NewRolloutUndoOptions(streams genericclioptions.IOStreams) *UndoOptions {
 	}
 }
 
+// NewCmdRolloutUndo returns a Command instance for the 'rollout undo' sub command
 func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutUndoOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "undo (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "undo (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Undo a previous rollout"),
-		Long:    undo_long,
-		Example: undo_example,
+		Short:                 i18n.T("Undo a previous rollout"),
+		Long:                  undoLong,
+		Example:               undoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
 			err := o.Complete(f, cmd, args)
@@ -106,6 +108,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	return cmd
 }
 
+// Complete completes al the required options
 func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
@@ -133,6 +136,7 @@ func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	return err
 }
 
+// RunUndo performs the execution of 'rollout undo' sub command
 func (o *UndoOptions) RunUndo() error {
 	r := o.Builder().
 		WithScheme(legacyscheme.Scheme).
