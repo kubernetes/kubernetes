@@ -50,8 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
-// GetOptions contains the input to the get command.
-type GetOptions struct {
+// Options contains the input to the get command.
+type Options struct {
 	PrintFlags             *PrintFlags
 	ToPrinter              func(*meta.RESTMapping, bool, bool) (printers.ResourcePrinterFunc, error)
 	IsHumanReadablePrinter bool
@@ -132,9 +132,9 @@ const (
 	useServerPrintColumns          = "server-print"
 )
 
-// NewGetOptions returns a GetOptions with default chunk size 500.
-func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
-	return &GetOptions{
+// NewGetOptions returns a Options with default chunk size 500.
+func NewGetOptions(parent string, streams genericclioptions.IOStreams) *Options {
+	return &Options{
 		PrintFlags: NewGetPrintFlags(),
 		CmdParent:  parent,
 
@@ -150,11 +150,11 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	o := NewGetOptions(parent, streams)
 
 	cmd := &cobra.Command{
-		Use: "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]",
+		Use:                   "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE[.VERSION][.GROUP] [NAME | -l label] | TYPE[.VERSION][.GROUP]/NAME ...) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Display one or many resources"),
-		Long:    getLong + "\n\n" + cmdutil.SuggestApiResources(parent),
-		Example: getExample,
+		Short:                 i18n.T("Display one or many resources"),
+		Long:                  getLong + "\n\n" + cmdutil.SuggestApiResources(parent),
+		Example:               getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
@@ -182,7 +182,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 }
 
 // Complete takes the command arguments and factory and infers any remaining options.
-func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
 		if len(args) > 0 {
 			return fmt.Errorf("arguments may not be passed when --raw is specified")
@@ -275,7 +275,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 }
 
 // Validate checks the set of flags provided by the user.
-func (o *GetOptions) Validate(cmd *cobra.Command) error {
+func (o *Options) Validate(cmd *cobra.Command) error {
 	if len(o.Raw) > 0 {
 		if o.Watch || o.WatchOnly || len(o.LabelSelector) > 0 || o.Export {
 			return fmt.Errorf("--raw may not be specified with other flags that filter the server request or alter the output")
@@ -296,16 +296,20 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
+// OriginalPositioner and NopPositioner is required for swap/sort operations of data in table format
 type OriginalPositioner interface {
 	OriginalPosition(int) int
 }
 
+// NopPositioner and OriginalPositioner is required for swap/sort operations of data in table format
 type NopPositioner struct{}
 
+// OriginalPosition returns the original position from NopPositioner object
 func (t *NopPositioner) OriginalPosition(ix int) int {
 	return ix
 }
 
+// RuntimeSorter holds the required objects to perform sorting of runtime objects
 type RuntimeSorter struct {
 	field      string
 	decoder    runtime.Decoder
@@ -313,6 +317,7 @@ type RuntimeSorter struct {
 	positioner OriginalPositioner
 }
 
+// Sort performs the sorting of runtime objects
 func (r *RuntimeSorter) Sort() error {
 	if len(r.objects) <= 1 {
 		// a list is only considered "sorted" if there are 0 or 1 items in it
@@ -360,6 +365,7 @@ func (r *RuntimeSorter) Sort() error {
 	return nil
 }
 
+// OriginalPosition returns the original position of a runtime object
 func (r *RuntimeSorter) OriginalPosition(ix int) int {
 	if r.positioner == nil {
 		return 0
@@ -367,12 +373,13 @@ func (r *RuntimeSorter) OriginalPosition(ix int) int {
 	return r.positioner.OriginalPosition(ix)
 }
 
-// allows custom decoder to be set for testing
+// WithDecoder allows custom decoder to be set for testing
 func (r *RuntimeSorter) WithDecoder(decoder runtime.Decoder) *RuntimeSorter {
 	r.decoder = decoder
 	return r
 }
 
+// NewRuntimeSorter returns a new instance of RuntimeSorter
 func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 	parsedField, err := printers.RelaxedJSONPathExpression(sortBy)
 	if err != nil {
@@ -388,7 +395,7 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *Options) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
 		return o.raw(f)
 	}
@@ -570,7 +577,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 // raw makes a simple HTTP request to the provided path on the server using the default
 // credentials.
-func (o *GetOptions) raw(f cmdutil.Factory) error {
+func (o *Options) raw(f cmdutil.Factory) error {
 	restClient, err := f.RESTClient()
 	if err != nil {
 		return err
@@ -591,7 +598,7 @@ func (o *GetOptions) raw(f cmdutil.Factory) error {
 
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
-func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *Options) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	r := f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
@@ -710,7 +717,7 @@ func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConv
 	return internalObject
 }
 
-func (o *GetOptions) decodeIntoTable(obj runtime.Object) (runtime.Object, error) {
+func (o *Options) decodeIntoTable(obj runtime.Object) (runtime.Object, error) {
 	if obj.GetObjectKind().GroupVersionKind().Kind != "Table" {
 		return nil, fmt.Errorf("attempt to decode non-Table object into a v1beta1.Table")
 	}
@@ -739,7 +746,7 @@ func (o *GetOptions) decodeIntoTable(obj runtime.Object) (runtime.Object, error)
 	return table, nil
 }
 
-func (o *GetOptions) printGeneric(r *resource.Result) error {
+func (o *Options) printGeneric(r *resource.Result) error {
 	// we flattened the data from the builder, so we have individual items, but now we'd like to either:
 	// 1. if there is more than one item, combine them all into a single list
 	// 2. if there is a single item and that item is a list, leave it as its specific list
@@ -833,12 +840,12 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
 }
 
-func addOpenAPIPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
+func addOpenAPIPrintColumnFlags(cmd *cobra.Command, opt *Options) {
 	cmd.Flags().BoolVar(&opt.PrintWithOpenAPICols, useOpenAPIPrintColumnFlagLabel, opt.PrintWithOpenAPICols, "If true, use x-kubernetes-print-column metadata (if present) from the OpenAPI schema for displaying a resource.")
 	cmd.Flags().MarkDeprecated(useOpenAPIPrintColumnFlagLabel, "deprecated in favor of server-side printing")
 }
 
-func addServerPrintColumnFlags(cmd *cobra.Command, opt *GetOptions) {
+func addServerPrintColumnFlags(cmd *cobra.Command, opt *Options) {
 	cmd.Flags().BoolVar(&opt.ServerPrint, useServerPrintColumns, opt.ServerPrint, "If true, have the server return the appropriate table output. Supports extension APIs and CRDs.")
 }
 

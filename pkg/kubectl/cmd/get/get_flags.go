@@ -64,6 +64,7 @@ func (f *PrintFlags) Copy() PrintFlags {
 	return printFlags
 }
 
+// AllowedFormats is the list of formats in which data can be displayed
 func (f *PrintFlags) AllowedFormats() []string {
 	formats := f.JSONYamlPrintFlags.AllowedFormats()
 	formats = append(formats, f.NamePrintFlags.AllowedFormats()...)
