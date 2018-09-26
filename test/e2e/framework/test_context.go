@@ -125,6 +125,10 @@ type TestContextType struct {
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
 
+	// Annotations used for to test existing annotation based features, e.g. seccomp profile, sandbox container etc.
+	// Usage: --default-pod-annotation=k1=v1,k2=v2.
+	DefaultPodAnnotations map[string]string
+
 	// Viper-only parameters.  These will in time replace all flags.
 
 	// Example: Create a file 'e2e.json' with the following:
@@ -234,6 +238,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
+	flag.Var(utilflag.NewMapStringString(&TestContext.DefaultPodAnnotations), "default-pod-annotations", "A set of key=value pairs that describe annotations which are used for annotation-based features, e.g. seccomp profile, sandbox container etc.")
 }
 
 // Register flags specific to the cluster e2e test suite.

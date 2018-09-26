@@ -411,6 +411,18 @@ func RunIfContainerRuntimeIs(runtimes ...string) {
 	Skipf("Skipped because container runtime %q is not in %s", TestContext.ContainerRuntime, runtimes)
 }
 
+func InjectDefaultPodAnnotations(pod *v1.Pod) {
+	defaultPodAnnotations := TestContext.DefaultPodAnnotations
+	if len(defaultPodAnnotations) == 0 {
+		return
+	}
+	annotations := pod.GetObjectMeta().GetAnnotations()
+	for k, v := range defaultPodAnnotations {
+		annotations[k] = v
+	}
+	pod.SetAnnotations(annotations)
+}
+
 func RunIfSystemSpecNameIs(names ...string) {
 	for _, name := range names {
 		if name == TestContext.SystemSpecName {
