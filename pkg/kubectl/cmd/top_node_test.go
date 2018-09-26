@@ -81,6 +81,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdTopNode(tf, nil, streams)
+	cmd.Flags().Set("no-headers", "true")
 	cmd.Run(cmd, []string{})
 
 	// Check the presence of node names in the output.
@@ -89,6 +90,9 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		if !strings.Contains(result, m.Name) {
 			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
 		}
+	}
+	if strings.Contains(result, "MEMORY") {
+		t.Errorf("should not print headers with --no-headers option set:\n%s\n", result)
 	}
 }
 

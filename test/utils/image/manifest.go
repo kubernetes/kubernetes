@@ -82,7 +82,7 @@ var (
 	PrivateRegistry       = registry.PrivateRegistry
 	sampleRegistry        = registry.SampleRegistry
 
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v2"}
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.13v1"}
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0"}
 	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0"}
 	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29"}

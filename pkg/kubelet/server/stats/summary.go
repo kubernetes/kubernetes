@@ -26,6 +26,8 @@ type SummaryProvider interface {
 	// Get provides a new Summary with the stats from Kubelet,
 	// and will update some stats if updateStats is true
 	Get(updateStats bool) (*statsapi.Summary, error)
+	// GetCPUAndMemoryStats provides a new Summary with the CPU and memory stats from Kubelet,
+	GetCPUAndMemoryStats() (*statsapi.Summary, error)
 }
 
 // summaryProviderImpl implements the SummaryProvider interface.
@@ -86,4 +88,33 @@ func (sp *summaryProviderImpl) Get(updateStats bool) (*statsapi.Summary, error) 
 		Pods: podStats,
 	}
 	return &summary, nil
+}
+
+func (sp *summaryProviderImpl) GetCPUAndMemoryStats() (*statsapi.Summary, error) {
+	summary, err := sp.Get(false)
+	if err != nil {
+		return nil, err
+	}
+	summary.Node.Network = nil
+	summary.Node.Fs = nil
+	summary.Node.Runtime = nil
+	summary.Node.Rlimit = nil
+	for i := 0; i < len(summary.Node.SystemContainers); i++ {
+		summary.Node.SystemContainers[i].Accelerators = nil
+		summary.Node.SystemContainers[i].Rootfs = nil
+		summary.Node.SystemContainers[i].Logs = nil
+		summary.Node.SystemContainers[i].UserDefinedMetrics = nil
+	}
+	for i := 0; i < len(summary.Pods); i++ {
+		summary.Pods[i].Network = nil
+		summary.Pods[i].VolumeStats = nil
+		summary.Pods[i].EphemeralStorage = nil
+		for j := 0; j < len(summary.Pods[i].Containers); j++ {
+			summary.Pods[i].Containers[j].Accelerators = nil
+			summary.Pods[i].Containers[j].Rootfs = nil
+			summary.Pods[i].Containers[j].Logs = nil
+			summary.Pods[i].Containers[j].UserDefinedMetrics = nil
+		}
+	}
+	return summary, nil
 }

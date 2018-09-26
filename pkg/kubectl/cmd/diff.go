@@ -44,11 +44,8 @@ import (
 
 var (
 	diffLong = templates.LongDesc(i18n.T(`
-		Diff configurations specified by filename or stdin between their local,
-		last-applied, live and/or "merged" versions.
-
-		LOCAL and LIVE versions are diffed by default. Other available keywords
-		are MERGED and LAST.
+		Diff configurations specified by filename or stdin between the current online
+		configuration, and the configuration as it would be if applied.
 
 		Output is always YAML.
 
@@ -56,52 +53,22 @@ var (
 		diff command. By default, the "diff" command available in your path will be
 		run with "-u" (unicode) and "-N" (treat new files as empty) options.`))
 	diffExample = templates.Examples(i18n.T(`
-		# Diff resources included in pod.json. By default, it will diff LOCAL and LIVE versions
+		# Diff resources included in pod.json.
 		kubectl alpha diff -f pod.json
 
-		# When one version is specified, diff that version against LIVE
-		cat service.yaml | kubectl alpha diff -f - MERGED
-
-		# Or specify both versions
-		kubectl alpha diff -f pod.json -f service.yaml LAST LOCAL`))
+		# Diff file read from stdin
+		cat service.yaml | kubectl alpha diff -f -`))
 )
 
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
 }
 
-func isValidArgument(arg string) error {
-	switch arg {
-	case "LOCAL", "LIVE", "LAST", "MERGED":
-		return nil
-	default:
-		return fmt.Errorf(`Invalid parameter %q, must be either "LOCAL", "LIVE", "LAST" or "MERGED"`, arg)
+func checkDiffArgs(cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
 	}
-
-}
-
-func parseDiffArguments(args []string) (string, string, error) {
-	if len(args) > 2 {
-		return "", "", fmt.Errorf("Invalid number of arguments: expected at most 2.")
-	}
-	// Default values
-	from := "LOCAL"
-	to := "LIVE"
-	if len(args) > 0 {
-		from = args[0]
-	}
-	if len(args) > 1 {
-		to = args[1]
-	}
-
-	if err := isValidArgument(to); err != nil {
-		return "", "", err
-	}
-	if err := isValidArgument(from); err != nil {
-		return "", "", err
-	}
-
-	return from, to, nil
+	return nil
 }
 
 func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -113,13 +80,12 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use: "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Diff different versions of configurations"),
+		Short:   i18n.T("Diff live version against would-be applied version"),
 		Long:    diffLong,
 		Example: diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			from, to, err := parseDiffArguments(args)
-			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(RunDiff(f, &diff, &options, from, to))
+			cmdutil.CheckErr(checkDiffArgs(cmd, args))
+			cmdutil.CheckErr(RunDiff(f, &diff, &options))
 		},
 	}
 
@@ -201,10 +167,6 @@ func (v *DiffVersion) getObject(obj Object) (map[string]interface{}, error) {
 		return obj.Live()
 	case "MERGED":
 		return obj.Merged()
-	case "LOCAL":
-		return obj.Local()
-	case "LAST":
-		return obj.Last()
 	}
 	return nil, fmt.Errorf("Unknown version: %v", v.Name)
 }
@@ -254,9 +216,7 @@ func (d *Directory) Delete() error {
 // Object is an interface that let's you retrieve multiple version of
 // it.
 type Object interface {
-	Local() (map[string]interface{}, error)
 	Live() (map[string]interface{}, error)
-	Last() (map[string]interface{}, error)
 	Merged() (map[string]interface{}, error)
 
 	Name() string
@@ -282,14 +242,6 @@ func (obj InfoObject) toMap(data []byte) (map[string]interface{}, error) {
 	return m, err
 }
 
-func (obj InfoObject) Local() (map[string]interface{}, error) {
-	data, err := runtime.Encode(obj.Encoder, obj.Info.Object)
-	if err != nil {
-		return nil, err
-	}
-	return obj.toMap(data)
-}
-
 func (obj InfoObject) Live() (map[string]interface{}, error) {
 	if obj.Remote == nil {
 		return nil, nil // Object doesn't exist on cluster.
@@ -298,10 +250,11 @@ func (obj InfoObject) Live() (map[string]interface{}, error) {
 }
 
 func (obj InfoObject) Merged() (map[string]interface{}, error) {
-	local, err := obj.Local()
+	data, err := runtime.Encode(obj.Encoder, obj.Info.Object)
 	if err != nil {
 		return nil, err
 	}
+	local, err := obj.toMap(data)
 
 	live, err := obj.Live()
 	if err != nil {
@@ -436,14 +389,14 @@ func (d *Downloader) Download(info *resource.Info) (*unstructured.Unstructured, 
 // RunDiff uses the factory to parse file arguments, find the version to
 // diff, and find each Info object for each files, and runs against the
 // differ.
-func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, to string) error {
+func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 	openapi, err := f.OpenAPISchema()
 	if err != nil {
 		return err
 	}
 	parser := &parse.Factory{Resources: openapi}
 
-	differ, err := NewDiffer(from, to)
+	differ, err := NewDiffer("LIVE", "MERGED")
 	if err != nil {
 		return err
 	}
