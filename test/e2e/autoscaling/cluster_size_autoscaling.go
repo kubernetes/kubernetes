@@ -1163,6 +1163,11 @@ func executeHTTPRequest(method string, url string, body string) (string, error) 
 		return "", err
 	}
 	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
