@@ -6,7 +6,6 @@ cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kubeadm/app
-cmd/kubeadm/app/apis/kubeadm/v1alpha2
 cmd/kubeadm/app/apis/kubeadm/v1alpha3
 cmd/kubeadm/app/util/config
 cmd/kubeadm/app/util/system
