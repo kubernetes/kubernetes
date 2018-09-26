@@ -73,7 +73,6 @@ import (
 // This is registered as a filter so that it never collides with any explicitly registered endpoints
 type crdHandler struct {
 	versionDiscoveryHandler *versionDiscoveryHandler
-	groupDiscoveryHandler   *groupDiscoveryHandler
 
 	customStorageLock sync.Mutex
 	// customStorage contains a crdStorageMap
@@ -123,7 +122,6 @@ type crdStorageMap map[types.UID]*crdInfo
 
 func NewCustomResourceDefinitionHandler(
 	versionDiscoveryHandler *versionDiscoveryHandler,
-	groupDiscoveryHandler *groupDiscoveryHandler,
 	crdInformer informers.CustomResourceDefinitionInformer,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
@@ -132,7 +130,6 @@ func NewCustomResourceDefinitionHandler(
 	masterCount int) *crdHandler {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
-		groupDiscoveryHandler:   groupDiscoveryHandler,
 		customStorage:           atomic.Value{},
 		crdLister:               crdInformer.Lister(),
 		delegate:                delegate,
@@ -166,11 +163,6 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// only registered under /apis
 		if len(pathParts) == 3 {
 			r.versionDiscoveryHandler.ServeHTTP(w, req)
-			return
-		}
-		// only match /apis/<group>
-		if len(pathParts) == 2 {
-			r.groupDiscoveryHandler.ServeHTTP(w, req)
 			return
 		}
 
