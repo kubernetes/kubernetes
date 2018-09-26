@@ -21,7 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -29,34 +29,13 @@ import (
 func canBeExposed(kind schema.GroupKind) error {
 	switch kind {
 	case
-		schema.GroupKind{
-			Group: corev1.GroupName,
-			Kind:  "ReplicationController",
-		},
-		schema.GroupKind{
-			Group: corev1.GroupName,
-			Kind:  "Service",
-		},
-		schema.GroupKind{
-			Group: corev1.GroupName,
-			Kind:  "Pod",
-		},
-		schema.GroupKind{
-			Group: appsv1.GroupName,
-			Kind:  "Deployment",
-		},
-		schema.GroupKind{
-			Group: appsv1.GroupName,
-			Kind:  "ReplicaSet",
-		},
-		schema.GroupKind{
-			Group: extensionsv1.GroupName,
-			Kind:  "Deployment",
-		},
-		schema.GroupKind{
-			Group: extensionsv1.GroupName,
-			Kind:  "ReplicaSet",
-		}:
+		corev1.SchemeGroupVersion.WithKind("ReplicationController").GroupKind(),
+		corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
+		corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
+		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
+		appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(),
+		extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
+		extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind():
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot expose a %s", kind)
