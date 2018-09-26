@@ -27,27 +27,13 @@ run_kubectl_diff_tests() {
     kube::log::status "Testing kubectl alpha diff"
 
     # Test that it works when the live object doesn't exist
-    output_message=$(kubectl alpha diff LOCAL LIVE -f hack/testdata/pod.yaml)
+    output_message=$(kubectl alpha diff -f hack/testdata/pod.yaml)
     kube::test::if_has_string "${output_message}" 'test-pod'
 
     kubectl apply -f hack/testdata/pod.yaml
 
-    # Ensure that selfLink has been added, and shown in the diff
-    output_message=$(kubectl alpha diff -f hack/testdata/pod.yaml)
-    kube::test::if_has_string "${output_message}" 'selfLink'
-    output_message=$(kubectl alpha diff LOCAL LIVE -f hack/testdata/pod.yaml)
-    kube::test::if_has_string "${output_message}" 'selfLink'
-    output_message=$(kubectl alpha diff LOCAL MERGED -f hack/testdata/pod.yaml)
-    kube::test::if_has_string "${output_message}" 'selfLink'
-
-    output_message=$(kubectl alpha diff MERGED MERGED -f hack/testdata/pod.yaml)
-    kube::test::if_empty_string "${output_message}"
-    output_message=$(kubectl alpha diff LIVE LIVE -f hack/testdata/pod.yaml)
-    kube::test::if_empty_string "${output_message}"
-    output_message=$(kubectl alpha diff LAST LAST -f hack/testdata/pod.yaml)
-    kube::test::if_empty_string "${output_message}"
-    output_message=$(kubectl alpha diff LOCAL LOCAL -f hack/testdata/pod.yaml)
-    kube::test::if_empty_string "${output_message}"
+    output_message=$(kubectl alpha diff -f hack/testdata/pod-changed.yaml)
+    kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
 
     kubectl delete -f  hack/testdata/pod.yaml
 
