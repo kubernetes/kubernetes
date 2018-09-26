@@ -41,7 +41,6 @@ import (
 
 type DiscoveryController struct {
 	versionHandler *versionDiscoveryHandler
-	groupHandler   *groupDiscoveryHandler
 
 	crdLister  listers.CustomResourceDefinitionLister
 	crdsSynced cache.InformerSynced
@@ -52,10 +51,9 @@ type DiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
+func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler) *DiscoveryController {
 	c := &DiscoveryController{
 		versionHandler: versionHandler,
-		groupHandler:   groupHandler,
 		crdLister:      crdInformer.Lister(),
 		crdsSynced:     crdInformer.Informer().HasSynced,
 
@@ -158,21 +156,11 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	}
 
 	if !foundGroup {
-		c.groupHandler.unsetDiscovery(version.Group)
 		c.versionHandler.unsetDiscovery(version)
 		return nil
 	}
 
 	sortGroupDiscoveryByKubeAwareVersion(apiVersionsForDiscovery)
-
-	apiGroup := metav1.APIGroup{
-		Name:     version.Group,
-		Versions: apiVersionsForDiscovery,
-		// the preferred versions for a group is the first item in
-		// apiVersionsForDiscovery after it put in the right ordered
-		PreferredVersion: apiVersionsForDiscovery[0],
-	}
-	c.groupHandler.setDiscovery(version.Group, discovery.NewAPIGroupHandler(Codecs, apiGroup))
 
 	if !foundVersion {
 		c.versionHandler.unsetDiscovery(version)
