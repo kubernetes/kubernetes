@@ -108,6 +108,8 @@ kube::etcd::install() {
     cd "${KUBE_ROOT}/third_party"
     os=$(uname | tr "[:upper:]" "[:lower:]")
     if [[ $(readlink etcd) == etcd-v${ETCD_VERSION}-${os}-* ]]; then
+      kube::log::info "etcd v${ETCD_VERSION} already installed at path:"
+      kube::log::info "$(pwd)/$(readlink etcd)"
       return  # already installed
     fi
     if [[ ${os} == "darwin" ]]; then
