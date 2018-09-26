@@ -155,7 +155,6 @@ pkg/kubectl/cmd/get
 pkg/kubectl/cmd/rollout
 pkg/kubectl/cmd/set
 pkg/kubectl/cmd/templates
-pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/util
 pkg/kubectl/cmd/util/editor
 pkg/kubectl/cmd/util/openapi
