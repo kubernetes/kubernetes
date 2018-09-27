@@ -78,6 +78,9 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
+
+	// timeout for request
+	timeout time.Duration
 }
 
 type Serializers struct {
@@ -116,6 +119,11 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	} else if rateLimiter != nil {
 		throttle = rateLimiter
 	}
+
+	timeout := 0 * time.Second
+	if client != nil {
+		timeout = client.Timeout
+	}
 	return &RESTClient{
 		base:             &base,
 		versionedAPIPath: versionedAPIPath,
@@ -124,7 +132,14 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 		createBackoffMgr: readExpBackoffConfig,
 		Throttle:         throttle,
 		Client:           client,
+		timeout:          timeout,
 	}, nil
+}
+
+// Set Timeout
+func (c *RESTClient) Timeout(timeout time.Duration) *RESTClient {
+	c.timeout = timeout
+	return c
 }
 
 // GetRateLimiter returns rate limier for a given client, or nil if it's called on a nil client
@@ -222,9 +237,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, 0)
+		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.timeout)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.Client.Timeout)
+	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").

@@ -120,6 +120,17 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 }
 
+func TestTimeOut(t *testing.T) {
+	wantedTimeout := 30 * time.Second
+	testServer, _, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+	c, _ := restClient(testServer)
+	url := c.Timeout(wantedTimeout).Get().URL()
+	obtainedTimeout := url.Query().Get("timeout")
+	if obtainedTimeout != wantedTimeout.String() {
+		t.Errorf("wanted timeout %s obtained timeout %s", wantedTimeout.String(), obtainedTimeout)
+	}
+}
 func TestDoRawRequestFailed(t *testing.T) {
 	status := &metav1.Status{
 		Code:    http.StatusNotFound,
