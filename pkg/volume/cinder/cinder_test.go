@@ -256,3 +256,25 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Deleter() failed: %v", err)
 	}
 }
+
+func TestConstructVolumeSpec(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
+	if err != nil {
+		t.Fatalf("Can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	if err != nil {
+		t.Errorf("can't find cinder plugin by name")
+	}
+
+	cinderSpec, err := plug.(*cinderPlugin).ConstructVolumeSpec("cinderVolume", "/cinderVolume/")
+	if err != nil {
+		t.Errorf("ConstructVolumeSpec failed: %v", err)
+	}
+	if cinderSpec.Name() != "cinderVolume" {
+		t.Errorf("Get wrong cinder spec name, got: %s", cinderSpec.Name())
+	}
+}
