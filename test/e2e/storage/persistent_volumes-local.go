@@ -535,7 +535,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 	})
 
-	Context("StatefulSet with pod affinity", func() {
+	Context("StatefulSet with pod affinity [Slow]", func() {
 		var testVols map[string][]*localTestVolume
 		const (
 			ssReplicas  = 3

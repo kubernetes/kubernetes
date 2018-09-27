@@ -360,7 +360,7 @@ func testSubPath(input *subPathTestInput) {
 		testReadFile(input.f, input.filePathInSubpath, input.pod, 0)
 	})
 
-	It("should fail for new directories when readOnly specified in the volumeSource", func() {
+	It("should fail for new directories when readOnly specified in the volumeSource [Slow]", func() {
 		if input.roVol == nil {
 			framework.Skipf("Volume type %v doesn't support readOnly source", input.volType)
 		}
