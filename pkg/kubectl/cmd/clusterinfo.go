@@ -21,15 +21,15 @@ import (
 	"io"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	ct "github.com/daviddengcn/go-colortext"
@@ -94,7 +94,7 @@ func (o *ClusterInfoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) err
 func (o *ClusterInfoOptions) Run() error {
 	// TODO use generalized labels once they are implemented (#341)
 	b := o.Builder.
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		LabelSelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
@@ -105,7 +105,7 @@ func (o *ClusterInfoOptions) Run() error {
 		}
 		printService(o.Out, "Kubernetes master", o.Client.Host)
 
-		services := r.Object.(*api.ServiceList).Items
+		services := r.Object.(*corev1.ServiceList).Items
 		for _, service := range services {
 			var link string
 			if len(service.Status.LoadBalancer.Ingress) > 0 {

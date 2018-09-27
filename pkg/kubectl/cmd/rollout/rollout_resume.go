@@ -26,7 +26,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -131,7 +130,7 @@ func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 func (o ResumeOptions) RunResume() error {
 	r := o.Builder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
@@ -154,7 +153,7 @@ func (o ResumeOptions) RunResume() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, cmdutil.InternalVersionJSONEncoder(), set.PatchFn(o.Resumer)) {
+	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Resumer)) {
 		info := patch.Info
 
 		if patch.Err != nil {
