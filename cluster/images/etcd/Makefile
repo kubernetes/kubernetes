@@ -142,7 +142,7 @@ all-push: all-push-images push-manifest
 push-manifest:
 	docker manifest create --amend $(MANIFEST_IMAGE):$(IMAGE_TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(MANIFEST_IMAGE)\-&:$(IMAGE_TAG)~g")
 	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${MANIFEST_IMAGE}:${IMAGE_TAG} ${MANIFEST_IMAGE}-$${arch}:${IMAGE_TAG}; done
-	docker manifest push ${MANIFEST_IMAGE}:${IMAGE_TAG}
+	docker manifest push --purge ${MANIFEST_IMAGE}:${IMAGE_TAG}
 
 unit-test:
 	docker run --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
