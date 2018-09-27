@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -44,7 +45,8 @@ import (
 )
 
 var (
-	order = []string{"false", "true", "matches", "nopods", algorithmpredicates.MatchInterPodAffinityPred}
+	errPrioritize = fmt.Errorf("priority map encounters an error")
+	order         = []string{"false", "true", "matches", "nopods", algorithmpredicates.MatchInterPodAffinityPred}
 )
 
 func falsePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
@@ -109,6 +111,26 @@ func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulercac
 	}
 
 	return reverseResult, nil
+}
+
+func trueMapPriority(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{
+		Host:  nodeInfo.Node().Name,
+		Score: 1,
+	}, nil
+}
+
+func falseMapPriority(pod *v1.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
+	return schedulerapi.HostPriority{}, errPrioritize
+}
+
+func getNodeReducePriority(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulercache.NodeInfo, result schedulerapi.HostPriorityList) error {
+	for _, host := range result {
+		if host.Host == "" {
+			return fmt.Errorf("unexpected empty host name")
+		}
+	}
+	return nil
 }
 
 func makeNodeList(nodeNames []string) []*v1.Node {
@@ -398,6 +420,14 @@ func TestGenericScheduler(t *testing.T) {
 					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate, algorithmpredicates.ErrFakePredicate},
 				},
 			},
+		},
+		{
+			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
+			prioritizers: []algorithm.PriorityConfig{{Map: falseMapPriority, Weight: 1}, {Map: trueMapPriority, Reduce: getNodeReducePriority, Weight: 2}},
+			nodes:        []string{"2", "1"},
+			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+			name:         "test error with priority map",
+			wErr:         errors.NewAggregate([]error{errPrioritize, errPrioritize}),
 		},
 	}
 	for _, test := range tests {
