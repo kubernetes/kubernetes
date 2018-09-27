@@ -40,10 +40,14 @@ var (
 		external bool
 		detail   string
 	}{
-		{"openstack", true, "https://github.com/kubernetes/cloud-provider-openstack"},
-		{"photon", false, "The Photon Controller project is no longer maintained."},
+		{"aws", false, "The AWS provider is deprecated and will be removed in a future release"},
+		{"azure", false, "The Azure provider is deprecated and will be removed in a future release"},
 		{"cloudstack", false, "The CloudStack Controller project is no longer maintained."},
+		{"gce", false, "The GCE provider is deprecated and will be removed in a future release"},
+		{"openstack", true, "https://github.com/kubernetes/cloud-provider-openstack"},
 		{"ovirt", false, "The ovirt Controller project is no longer maintained."},
+		{"photon", false, "The Photon Controller project is no longer maintained."},
+		{"vsphere", false, "The vSphere provider is deprecated and will be removed in a future release"},
 	}
 )
 
