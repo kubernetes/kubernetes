@@ -38,6 +38,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/ingress:go_default_library",
+        "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils/image:go_default_library",
