@@ -188,7 +188,7 @@ func (m *ManagerImpl) checkpointFile() string {
 	return filepath.Join(m.socketdir, kubeletDeviceManagerCheckpoint)
 }
 
-// Start starts the Device Plugin Manager amd start initialization of
+// Start starts the Device Plugin Manager and start initialization of
 // podDevices and allocatedDevices information from checkpoint-ed state and
 // starts device plugin registration service.
 func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error {
