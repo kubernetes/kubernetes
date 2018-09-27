@@ -42,7 +42,7 @@ const (
 	defaultFSType = "ext4"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&localVolumePlugin{}}
 }
@@ -321,10 +321,9 @@ func getVolumeSourceFSType(spec *volume.Spec) (string, error) {
 		spec.PersistentVolume.Spec.Local != nil {
 		if spec.PersistentVolume.Spec.Local.FSType != nil {
 			return *spec.PersistentVolume.Spec.Local.FSType, nil
-		} else {
-			// if the FSType is not set in local PV spec, setting it to default ("ext4")
-			return defaultFSType, nil
 		}
+		// if the FSType is not set in local PV spec, setting it to default ("ext4")
+		return defaultFSType, nil
 	}
 
 	return "", fmt.Errorf("spec does not reference a Local volume type")
@@ -577,15 +576,15 @@ func (u *localVolumeUnmapper) TearDownDevice(mapPath, devicePath string) error {
 
 // GetGlobalMapPath returns global map path and error.
 // path: plugins/kubernetes.io/kubernetes.io/local-volume/volumeDevices/{volumeName}
-func (lv *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	return filepath.Join(lv.plugin.host.GetVolumeDevicePluginDir(stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)),
-		lv.volName), nil
+func (l *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return filepath.Join(l.plugin.host.GetVolumeDevicePluginDir(stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)),
+		l.volName), nil
 }
 
 // GetPodDeviceMapPath returns pod device map path and volume name.
 // path: pods/{podUid}/volumeDevices/kubernetes.io~local-volume
 // volName: local-pv-ff0d6d4
-func (lv *localVolume) GetPodDeviceMapPath() (string, string) {
-	return lv.plugin.host.GetPodVolumeDeviceDir(lv.podUID,
-		stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)), lv.volName
+func (l *localVolume) GetPodDeviceMapPath() (string, string) {
+	return l.plugin.host.GetPodVolumeDeviceDir(l.podUID,
+		stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName)), l.volName
 }
