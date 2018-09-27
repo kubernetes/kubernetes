@@ -45,6 +45,7 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
