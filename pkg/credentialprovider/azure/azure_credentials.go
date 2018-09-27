@@ -146,7 +146,7 @@ func (a *acrProvider) loadConfig(rdr io.Reader) error {
 
 func (a *acrProvider) Enabled() bool {
 	if a.file == nil || len(*a.file) == 0 {
-		glog.V(5).Infof("Azure config unspecified, disabling")
+		glog.V(5).Info("Azure config unspecified, disabling")
 		return false
 	}
 
@@ -179,7 +179,7 @@ func (a *acrProvider) Provide() credentialprovider.DockerConfig {
 	defer cancel()
 
 	if a.config.UseManagedIdentityExtension {
-		glog.V(4).Infof("listing registries")
+		glog.V(4).Info("listing registries")
 		result, err := a.registryClient.List(ctx)
 		if err != nil {
 			glog.Errorf("Failed to list registries: %v", err)
@@ -223,7 +223,7 @@ func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credent
 		return nil, err
 	}
 
-	glog.V(4).Infof("exchanging an acr refresh_token")
+	glog.V(4).Info("exchanging an acr refresh_token")
 	registryRefreshToken, err := performTokenExchange(
 		loginServer, directive, a.config.TenantID, armAccessToken)
 	if err != nil {

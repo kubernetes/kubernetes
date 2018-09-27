@@ -145,7 +145,7 @@ func (m *manager) Start() {
 	// on the master, where the kubelet is responsible for bootstrapping the pods
 	// of the master components.
 	if m.kubeClient == nil {
-		glog.Infof("Kubernetes client is nil, not starting status manager.")
+		glog.Info("Kubernetes client is nil, not starting status manager.")
 		return
 	}
 

@@ -160,7 +160,7 @@ func newEcrProvider(region string, getter tokenGetter) *ecrProvider {
 // use ECR somehow?
 func (p *ecrProvider) Enabled() bool {
 	if p.region == "" {
-		glog.Errorf("Called ecrProvider.Enabled() with no region set")
+		glog.Error("Called ecrProvider.Enabled() with no region set")
 		return false
 	}
 
@@ -194,7 +194,7 @@ func (p *ecrProvider) Provide() credentialprovider.DockerConfig {
 		return cfg
 	}
 	if output == nil {
-		glog.Errorf("Got back no ECR token")
+		glog.Error("Got back no ECR token")
 		return cfg
 	}
 

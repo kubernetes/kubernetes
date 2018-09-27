@@ -164,7 +164,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
 	thresholdHandler := func(message string) {
-		glog.Infof(message)
+		glog.Info(message)
 		m.synchronize(diskInfoProvider, podFunc)
 	}
 	if m.config.KernelMemcgNotification {
@@ -223,7 +223,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return nil
 	}
 
-	glog.V(3).Infof("eviction manager: synchronize housekeeping")
+	glog.V(3).Info("eviction manager: synchronize housekeeping")
 	// build the ranking functions (if not yet known)
 	// TODO: have a function in cadvisor that lets us know if global housekeeping has completed
 	if m.dedicatedImageFs == nil {
@@ -314,7 +314,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	if len(thresholds) == 0 {
-		glog.V(3).Infof("eviction manager: no resources are starved")
+		glog.V(3).Info("eviction manager: no resources are starved")
 		return nil
 	}
 
@@ -348,7 +348,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// the only candidates viable for eviction are those pods that had anything running.
 	if len(activePods) == 0 {
-		glog.Errorf("eviction manager: eviction thresholds have been met, but no pods are active to evict")
+		glog.Error("eviction manager: eviction thresholds have been met, but no pods are active to evict")
 		return nil
 	}
 
@@ -377,7 +377,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 			return []*v1.Pod{pod}
 		}
 	}
-	glog.Infof("eviction manager: unable to evict any pods from the node")
+	glog.Info("eviction manager: unable to evict any pods from the node")
 	return nil
 }
 
