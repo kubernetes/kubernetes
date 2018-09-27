@@ -55,7 +55,7 @@ const (
 	// StorageEmulatorAccountName is the fixed storage account used by Azure Storage Emulator
 	StorageEmulatorAccountName = "devstoreaccount1"
 
-	// StorageEmulatorAccountKey is the the fixed storage account used by Azure Storage Emulator
+	// StorageEmulatorAccountKey is the fixed storage account used by Azure Storage Emulator
 	StorageEmulatorAccountKey = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
 
 	blobServiceName  = "blob"

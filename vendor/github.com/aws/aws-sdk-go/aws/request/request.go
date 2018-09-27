@@ -207,7 +207,7 @@ func (r *Request) Context() aws.Context {
 // panic.
 //
 // Unlike http.Request.WithContext, SetContext does not return a copy of the
-// Request. It is not safe to use use a single Request value for multiple
+// Request. It is not safe to use a single Request value for multiple
 // requests. A new Request should be created for each API operation request.
 //
 // Go 1.6 and below:

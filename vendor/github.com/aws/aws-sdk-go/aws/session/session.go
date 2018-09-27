@@ -145,7 +145,7 @@ type Options struct {
 	// will override the associated value provided by the SDK defaults,
 	// environment or config files where relevant.
 	//
-	// If not set, configuration values from from SDK defaults, environment,
+	// If not set, configuration values from SDK defaults, environment,
 	// config will be used.
 	Config aws.Config
 

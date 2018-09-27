@@ -719,7 +719,7 @@ func (l VirtualDeviceList) setDefaultSerialPortBacking(device *types.VirtualSeri
 	}
 }
 
-// CreateEthernetCard creates a new VirtualEthernetCard of the given name name and initialized with the given backing.
+// CreateEthernetCard creates a new VirtualEthernetCard of the given name and initialized with the given backing.
 func (l VirtualDeviceList) CreateEthernetCard(name string, backing types.BaseVirtualDeviceBackingInfo) (types.BaseVirtualDevice, error) {
 	ctypes := EthernetCardTypes()
 
