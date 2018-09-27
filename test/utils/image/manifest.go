@@ -54,7 +54,7 @@ func initReg() RegistryList {
 		DockerLibraryRegistry: "docker.io/library",
 		E2eRegistry:           "gcr.io/kubernetes-e2e-test-images",
 		GcRegistry:            "k8s.gcr.io",
-		PrivateRegistry:       "gcr.io/k8s-authenticated-test",
+		PrivateRegistry:       "gcr-staging.sandbox.google.com/k8s-authenticated-test",
 		SampleRegistry:        "gcr.io/google-samples",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
@@ -119,7 +119,7 @@ var (
 	Redis               = ImageConfig{e2eRegistry, "redis", "1.0"}
 	ResourceConsumer    = ImageConfig{e2eRegistry, "resource-consumer", "1.3"}
 	ResourceController  = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0"}
-	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.1"}
+	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname-amd64", "1.0"}
 	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0"}
 	VolumeNFSServer     = ImageConfig{e2eRegistry, "volume/nfs", "1.0"}
 	VolumeISCSIServer   = ImageConfig{e2eRegistry, "volume/iscsi", "1.0"}
