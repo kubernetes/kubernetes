@@ -23,8 +23,6 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/kubernetes"
-	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -35,34 +33,28 @@ type StatusViewer interface {
 }
 
 // StatusViewerFor returns a StatusViewer for the resource specified by kind.
-func StatusViewerFor(kind schema.GroupKind, c kubernetes.Interface) (StatusViewer, error) {
+func StatusViewerFor(kind schema.GroupKind) (StatusViewer, error) {
 	switch kind {
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
 		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind():
-		return &DeploymentStatusViewer{c.AppsV1()}, nil
+		return &DeploymentStatusViewer{}, nil
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(),
 		appsv1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind():
-		return &DaemonSetStatusViewer{c.AppsV1()}, nil
+		return &DaemonSetStatusViewer{}, nil
 	case appsv1.SchemeGroupVersion.WithKind("StatefulSet").GroupKind():
-		return &StatefulSetStatusViewer{c.AppsV1()}, nil
+		return &StatefulSetStatusViewer{}, nil
 	}
 	return nil, fmt.Errorf("no status viewer has been implemented for %v", kind)
 }
 
 // DeploymentStatusViewer implements the StatusViewer interface.
-type DeploymentStatusViewer struct {
-	c clientappsv1.DeploymentsGetter
-}
+type DeploymentStatusViewer struct{}
 
 // DaemonSetStatusViewer implements the StatusViewer interface.
-type DaemonSetStatusViewer struct {
-	c clientappsv1.DaemonSetsGetter
-}
+type DaemonSetStatusViewer struct{}
 
 // StatefulSetStatusViewer implements the StatusViewer interface.
-type StatefulSetStatusViewer struct {
-	c clientappsv1.StatefulSetsGetter
-}
+type StatefulSetStatusViewer struct{}
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done.
 func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
