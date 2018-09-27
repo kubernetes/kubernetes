@@ -101,8 +101,15 @@ func (m *containerManager) doWork() {
 
 func createCgroupManager(name string) (*fs.Manager, error) {
 	var memoryLimit uint64
+
 	memoryCapacity, err := getMemoryCapacity()
-	if err != nil || memoryCapacity*dockerMemoryLimitThresholdPercent/100 < minDockerMemoryLimit {
+	if err != nil {
+		glog.Errorf("Failed to get the memory capacity on machine: %v", err)
+	} else {
+		memoryLimit = memoryCapacity * dockerMemoryLimitThresholdPercent / 100
+	}
+
+	if err != nil || memoryLimit < minDockerMemoryLimit {
 		memoryLimit = minDockerMemoryLimit
 	}
 	glog.V(2).Infof("Configure resource-only container %q with memory limit: %d", name, memoryLimit)
