@@ -22,10 +22,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/polymorphichelpers",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
