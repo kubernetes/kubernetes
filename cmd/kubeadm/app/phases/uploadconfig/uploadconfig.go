@@ -42,7 +42,7 @@ const (
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
 func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
-	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+	fmt.Printf("[uploadconfig] storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
 	// Prepare the ClusterConfiguration for upload
 	// The components store their config in their own ConfigMaps, then reset the .ComponentConfig struct;
@@ -78,7 +78,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 
 	err = apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.InitConfigurationConfigMap,
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
@@ -97,7 +97,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.InitConfigurationConfigMap).RuleOrDie(),
+			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeadmConfigConfigMap).RuleOrDie(),
 		},
 	})
 	if err != nil {
@@ -134,7 +134,7 @@ func getClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, er
 	obj := &kubeadmapi.ClusterStatus{}
 
 	// Read the ConfigMap from the cluster
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.InitConfigurationConfigMap, metav1.GetOptions{})
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return obj, nil
 	}

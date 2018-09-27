@@ -119,7 +119,7 @@ func TestUploadConfiguration(t *testing.T) {
 				}
 			}
 			if tt.verifyResult {
-				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.InitConfigurationConfigMap, metav1.GetOptions{})
+				masterCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}
@@ -205,7 +205,7 @@ func createConfigMapWithStatus(statusToCreate *kubeadmapi.ClusterStatus, client 
 
 	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.InitConfigurationConfigMap,
+			Name:      kubeadmconstants.KubeadmConfigConfigMap,
 			Namespace: metav1.NamespaceSystem,
 		},
 		Data: map[string]string{
