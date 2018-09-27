@@ -106,6 +106,13 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 				return err
 			}
 		}
+
+		// if the Pod does not conform to the StatefulSet's nodeSelector, update the Pod's nodeSelector
+		if !nodeSelectorMatches(set, pod) {
+			updateNodeSelector(set, pod)
+			consistent = false
+		}
+
 		// if the Pod is not dirty, do nothing
 		if consistent {
 			return nil

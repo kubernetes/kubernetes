@@ -118,6 +118,36 @@ func TestStorageMatches(t *testing.T) {
 	}
 }
 
+func TestNodeSelectorMatches(t *testing.T) {
+	nodeSelector := map[string]string{
+		"selector1": "selector1",
+	}
+	set := newStatefulSetWithNodeSelector(nodeSelector)
+	pod := newStatefulSetPod(set, 1)
+
+	if !nodeSelectorMatches(set, pod) {
+		t.Error("Newly created Pod has a invalid nodeSelector")
+	}
+
+	pod = newStatefulSetPod(set, 1)
+	pod.Spec.NodeSelector = map[string]string{
+		"selector2": "selector2",
+	}
+
+	if nodeSelectorMatches(set, pod) {
+		t.Error("Pod with invalid nodeSelector matches for wrong StatefulSet's nodeSelector")
+	}
+
+	pod = newStatefulSetPod(set, 1)
+	pod.Spec.NodeSelector = map[string]string{
+		"selector1": "selector1",
+	}
+
+	if !nodeSelectorMatches(set, pod) {
+		t.Error("Pod with valid nodeSelector doesn't matches for StatefulSet's nodeSelector")
+	}
+}
+
 func TestUpdateIdentity(t *testing.T) {
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 1)
@@ -176,6 +206,32 @@ func TestUpdateStorage(t *testing.T) {
 	updateStorage(set, pod)
 	if !storageMatches(set, pod) {
 		t.Error("updateStorage failed to recreate volume claim names")
+	}
+}
+
+func TestUpdateNodeSelector(t *testing.T) {
+	nodeSelector := map[string]string{
+		"selector1": "selector1",
+	}
+	set := newStatefulSetWithNodeSelector(nodeSelector)
+	pod := newStatefulSetPod(set, 1)
+
+	if !nodeSelectorMatches(set, pod) {
+		t.Error("Newly created Pod has a invalid nodeSelector")
+	}
+
+	pod = newStatefulSetPod(set, 1)
+	pod.Spec.NodeSelector = map[string]string{
+		"selector2": "selector2",
+	}
+
+	if nodeSelectorMatches(set, pod) {
+		t.Error("Pod with invalid nodeSelector matches for wrong StatefulSet's nodeSelector")
+	}
+
+	updateNodeSelector(set, pod)
+	if !nodeSelectorMatches(set, pod) {
+		t.Error("updateNodeSelector failed to updated Pod's nodeSelector")
 	}
 }
 
@@ -360,6 +416,36 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 				limit := int32(2)
 				return &limit
 			}(),
+		},
+	}
+}
+
+func newStatefulSetWithNodeSelector(nodeSelector map[string]string) *apps.StatefulSet {
+	template := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx",
+				},
+			},
+			NodeSelector: nodeSelector,
+		},
+	}
+
+	return &apps.StatefulSet{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: v1.NamespaceDefault,
+			UID:       types.UID("test"),
+		},
+		Spec: apps.StatefulSetSpec{
+			Replicas: func() *int32 { i := int32(3); return &i }(),
+			Template: template,
 		},
 	}
 }

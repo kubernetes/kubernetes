@@ -357,6 +357,48 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 	}
 }
 
+func TestStatefulPodControlUpdatesPodNodeSelector(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	nodeSelector := map[string]string{
+		"selector1": "selector1",
+	}
+	set := newStatefulSetWithNodeSelector(nodeSelector)
+	pod := newStatefulSetPod(set, 0)
+	fakeClient := &fake.Clientset{}
+
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
+
+	fakeClient.AddReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		return true, update.GetObject(), nil
+	})
+	var updated *v1.Pod
+	fakeClient.PrependReactor("update", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		updated = update.GetObject().(*v1.Pod)
+		return true, update.GetObject(), nil
+	})
+
+	set.Spec.Template.Spec.NodeSelector = map[string]string{
+		"selector2": "selector2",
+	}
+	if err := control.UpdateStatefulPod(set, pod); err != nil {
+		t.Errorf("Successful update returned an error: %s", err)
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 1 {
+		t.Errorf("Pod nodeSelector update failed: got %d events, but want 2", eventCount)
+	}
+	for i := range events {
+		if !strings.Contains(events[i], v1.EventTypeNormal) {
+			t.Errorf("Found unexpected non-normal event %s", events[i])
+		}
+	}
+	if !nodeSelectorMatches(set, updated) {
+		t.Error("Pod update failed, nodeSelector does not match")
+	}
+}
+
 func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 	recorder := record.NewFakeRecorder(10)
 	set := newStatefulSet(3)

@@ -32,6 +32,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"reflect"
 )
 
 // maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
@@ -136,6 +137,19 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 		}
 	}
 	return true
+}
+
+// nodeSelectorMatches returns is pod has valid nodeSelector
+func nodeSelectorMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
+	setNodeSelector := set.Spec.Template.Spec.NodeSelector
+	podNodeSelector := pod.Spec.NodeSelector
+	return reflect.DeepEqual(setNodeSelector, podNodeSelector)
+}
+
+// updateNodeSelector updates pod's nodeSelector to conform with the latest nodeSelector from StatefulSet.
+func updateNodeSelector(set *apps.StatefulSet, pod *v1.Pod) {
+	newNodeSelector := set.Spec.Template.Spec.NodeSelector
+	pod.Spec.NodeSelector = newNodeSelector
 }
 
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
