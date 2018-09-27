@@ -54,10 +54,10 @@ var (
 		run with "-u" (unicode) and "-N" (treat new files as empty) options.`))
 	diffExample = templates.Examples(i18n.T(`
 		# Diff resources included in pod.json.
-		kubectl alpha diff -f pod.json
+		kubectl diff -f pod.json
 
 		# Diff file read from stdin
-		cat service.yaml | kubectl alpha diff -f -`))
+		cat service.yaml | kubectl diff -f -`))
 )
 
 type DiffOptions struct {
