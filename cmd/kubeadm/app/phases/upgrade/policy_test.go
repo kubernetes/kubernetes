@@ -19,7 +19,7 @@ package upgrade
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestEnforceVersionPolicies(t *testing.T) {

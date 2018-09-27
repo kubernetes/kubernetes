@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // KubernetesDir is the directory kubernetes owns for storing various configuration files
@@ -245,6 +245,9 @@ const (
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
 	DefaultEtcdVersion = "3.2.24"
+
+	// PauseVersion indicates the default pause image version for kubeadm
+	PauseVersion = "3.1"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"

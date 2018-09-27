@@ -139,7 +139,6 @@
 				"k8s.io/kubernetes/pkg/util/procfs",
 				"k8s.io/kubernetes/pkg/util/slice",
 				"k8s.io/kubernetes/pkg/util/taints",
-				"k8s.io/kubernetes/pkg/util/version",
 				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/version",
 				"k8s.io/kubernetes/pkg/volume",

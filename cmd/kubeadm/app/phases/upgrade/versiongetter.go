@@ -22,9 +22,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/pkg/version"
 )
 

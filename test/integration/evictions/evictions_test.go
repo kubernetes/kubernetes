@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/framework"
+	"reflect"
 )
 
 const (
@@ -165,6 +166,82 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	}
 }
 
+// TestTerminalPodEviction ensures that PDB is not checked for terminal pods.
+func TestTerminalPodEviction(t *testing.T) {
+	s, closeFn, rm, informers, clientSet := rmSetup(t)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("terminalpod-eviction", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	stopCh := make(chan struct{})
+	informers.Start(stopCh)
+	go rm.Run(stopCh)
+	defer close(stopCh)
+
+	config := restclient.Config{Host: s.URL}
+	clientSet, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Failed to create clientset: %v", err)
+	}
+
+	var gracePeriodSeconds int64 = 30
+	deleteOption := &metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriodSeconds,
+	}
+	pod := newPod("test-terminal-pod1")
+	if _, err := clientSet.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+		t.Errorf("Failed to create pod: %v", err)
+	}
+	addPodConditionSucceeded(pod)
+	if _, err := clientSet.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1)
+
+	pdb := newPDB()
+	if _, err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Create(pdb); err != nil {
+		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
+	}
+
+	pdbList, err := clientSet.Policy().PodDisruptionBudgets(ns.Name).List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Error while listing pod disruption budget")
+	}
+	oldPdb := pdbList.Items[0]
+	eviction := newEviction(ns.Name, pod.Name, deleteOption)
+	err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
+		e := clientSet.Policy().Evictions(ns.Name).Evict(eviction)
+		switch {
+		case errors.IsTooManyRequests(e):
+			return false, nil
+		case errors.IsConflict(e):
+			return false, fmt.Errorf("Unexpected Conflict (409) error caused by failing to handle concurrent PDB updates: %v", e)
+		case e == nil:
+			return true, nil
+		default:
+			return false, e
+		}
+	})
+	if err != nil {
+		t.Fatalf("Eviction of pod failed %v", err)
+	}
+	pdbList, err = clientSet.Policy().PodDisruptionBudgets(ns.Name).List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Error while listing pod disruption budget")
+	}
+	newPdb := pdbList.Items[0]
+	// We shouldn't see an update in pod disruption budget status' generation number as we are evicting terminal pods without checking for pod disruption.
+	if !reflect.DeepEqual(newPdb.Status.ObservedGeneration, oldPdb.Status.ObservedGeneration) {
+		t.Fatalf("Expected the pdb generation to be of same value %v but got %v", newPdb.Status.ObservedGeneration, oldPdb.Status.ObservedGeneration)
+	}
+
+	if err := clientSet.Policy().PodDisruptionBudgets(ns.Name).Delete(pdb.Name, deleteOption); err != nil {
+		t.Fatalf("Failed to delete pod disruption budget")
+	}
+}
+
 func newPod(podName string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -177,6 +254,18 @@ func newPod(podName string) *v1.Pod {
 					Name:  "fake-name",
 					Image: "fakeimage",
 				},
+			},
+		},
+	}
+}
+
+func addPodConditionSucceeded(pod *v1.Pod) {
+	pod.Status = v1.PodStatus{
+		Phase: v1.PodSucceeded,
+		Conditions: []v1.PodCondition{
+			{
+				Type:   v1.PodReady,
+				Status: v1.ConditionTrue,
 			},
 		},
 	}
