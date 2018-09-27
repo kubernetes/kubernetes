@@ -511,7 +511,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)
 }
 
-// rollbackEtcdData rolls back the the content of etcd folder if something went wrong.
+// rollbackEtcdData rolls back the content of etcd folder if something went wrong.
 // When the folder contents are successfully rolled back, nil is returned, otherwise an error is returned.
 func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathManager) error {
 	backupEtcdDir := pathMgr.BackupEtcdDir()
