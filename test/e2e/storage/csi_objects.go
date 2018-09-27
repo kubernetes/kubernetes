@@ -48,8 +48,8 @@ import (
 
 var csiImageVersions = map[string]string{
 	"hostpathplugin":   "canary", // TODO (verult) update tag once new hostpathplugin release is cut
-	"csi-attacher":     "v0.2.0",
-	"csi-provisioner":  "v0.2.1",
+	"csi-attacher":     "v0.3.0",
+	"csi-provisioner":  "v0.3.1",
 	"driver-registrar": "v0.3.0",
 }
 
@@ -64,11 +64,11 @@ func csiContainerImage(image string) string {
 	return fullName
 }
 
-// Create the driver registrar cluster role if it doesn't exist, no teardown so that tests
-// are parallelizable. This role will be shared with many of the CSI tests.
-func csiDriverRegistrarClusterRole(
+// Create the CSI roles if they doesn't exist yet, no teardown so that tests
+// are parallelizable. These roles will be shared with many of the CSI tests.
+func createCSIRoles(
 	config framework.VolumeTestConfig,
-) *rbacv1.ClusterRole {
+) {
 	// TODO(Issue: #62237) Remove impersonation workaround and cluster role when issue resolved
 	By("Creating an impersonating superuser kubernetes clientset to define cluster role")
 	rc, err := framework.LoadConfig()
@@ -81,7 +81,20 @@ func csiDriverRegistrarClusterRole(
 	framework.ExpectNoError(err, "Failed to create superuser clientset: %v", err)
 	By("Creating the CSI driver registrar cluster role")
 	clusterRoleClient := superuserClientset.RbacV1().ClusterRoles()
-	role := &rbacv1.ClusterRole{
+	createClusterRole := func(role *rbacv1.ClusterRole) {
+		if _, err := clusterRoleClient.Create(role); err != nil && !apierrs.IsAlreadyExists(err) {
+			framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
+		}
+	}
+	roleClient := superuserClientset.RbacV1().Roles(config.Namespace)
+	createRole := func(role *rbacv1.Role) {
+		// In contrast to ClusterRoles, Roles are limited to the per-test namespace and thus
+		// should not exist yet.
+		if _, err := roleClient.Create(role); err != nil {
+			framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
+		}
+	}
+	createClusterRole(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: csiDriverRegistrarClusterRoleName,
 		},
@@ -98,17 +111,109 @@ func csiDriverRegistrarClusterRole(
 				Verbs:     []string{"get", "update", "patch"},
 			},
 		},
-	}
+	})
+	createClusterRole(&rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csiExternalAttacherClusterRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
 
-	ret, err := clusterRoleClient.Create(role)
-	if err != nil {
-		if apierrs.IsAlreadyExists(err) {
-			return ret
-		}
-		framework.ExpectNoError(err, "Failed to create %s cluster role: %v", role.GetName(), err)
-	}
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumes"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"volumeattachments"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			},
+		},
+	})
+	createClusterRole(&rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csiExternalProvisionerClusterRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
 
-	return ret
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumes"},
+				Verbs:     []string{"create", "delete", "get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"persistentvolumeclaims"},
+				Verbs:     []string{"get", "list", "watch", "update", "patch"},
+			},
+			{
+				APIGroups: []string{"storage.k8s.io"},
+				Resources: []string{"storageclasses"},
+				Verbs:     []string{"list", "watch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"events"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"nodes"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				// This is only needed when the "CSINodeInfo" feature gate is enabled,
+				// but here we can't know whether it is, so we add it always.
+				APIGroups: []string{"csi.storage.k8s.io"},
+				Resources: []string{"csinodeinfos"},
+				Verbs:     []string{"get", "watch", "list"},
+			},
+		},
+	})
+
+	// For the leadership election in external-provisioner (to be
+	// introduced in 0.4.x).  Doing this with endpoints is
+	// temporary. See
+	// https://github.com/kubernetes/kubernetes/issues/68819#issuecomment-422827682
+	createRole(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csiExternalProvisionerRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
+
+			{
+				APIGroups: []string{""},
+				Resources: []string{"endpoints"},
+				Verbs:     []string{"get", "create", "update", "patch"},
+			},
+		},
+	})
+
+	// For leadership election in external-attacher. Leadership
+	// election must be turned on explicitly.
+	createRole(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: csiExternalAttacherRoleName,
+		},
+		Rules: []rbacv1.PolicyRule{
+
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"get", "watch", "list", "delete", "update", "create"},
+			},
+		},
+	})
 }
 
 func csiServiceAccount(
@@ -161,7 +266,7 @@ func csiClusterRoleBindings(
 	if teardown {
 		bindingString = "Unbinding"
 	}
-	By(fmt.Sprintf("%v cluster roles %v to the CSI service account %v", bindingString, clusterRolesNames, sa.GetName()))
+	By(fmt.Sprintf("%v cluster roles %v to the CSI service account %v in namespace %s", bindingString, clusterRolesNames, sa.GetName(), config.Namespace))
 	clusterRoleBindingClient := client.RbacV1().ClusterRoleBindings()
 	for _, clusterRoleName := range clusterRolesNames {
 		binding := &rbacv1.ClusterRoleBinding{
@@ -194,6 +299,57 @@ func csiClusterRoleBindings(
 		}
 
 		_, err = clusterRoleBindingClient.Create(binding)
+		if err != nil {
+			framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
+		}
+	}
+}
+
+func csiRoleBindings(
+	client clientset.Interface,
+	config framework.VolumeTestConfig,
+	teardown bool,
+	sa *v1.ServiceAccount,
+	rolesNames []string,
+) {
+	bindingString := "Binding"
+	if teardown {
+		bindingString = "Unbinding"
+	}
+	By(fmt.Sprintf("%v roles %v to the CSI service account %v in namespace %s", bindingString, rolesNames, sa.GetName(), config.Namespace))
+	roleBindingClient := client.RbacV1().RoleBindings(config.Namespace)
+	for _, roleName := range rolesNames {
+
+		binding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: config.Prefix + "-" + roleName + "-role-binding",
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      sa.GetName(),
+					Namespace: sa.GetNamespace(),
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind:     "Role",
+				Name:     roleName,
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		}
+
+		roleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
+		err := wait.Poll(2*time.Second, 10*time.Minute, func() (bool, error) {
+			_, err := roleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
+			return apierrs.IsNotFound(err), nil
+		})
+		framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
+
+		if teardown {
+			return
+		}
+
+		_, err = roleBindingClient.Create(binding)
 		if err != nil {
 			framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
 		}
@@ -277,6 +433,9 @@ func csiHostPathPod(
 					ImagePullPolicy: v1.PullAlways,
 					Args: []string{
 						"--v=5",
+						"--leader-election",
+						"--leader-election-namespace=" + config.Namespace,
+						"--leader-election-identity=external-attacher",
 						"--csi-address=$(ADDRESS)",
 					},
 					Env: []v1.EnvVar{

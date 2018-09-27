@@ -41,10 +41,17 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// All of these roles are getting created by createCSIRoles. They
+// mimick the permissions that real-world deployments of CSI drivers
+// must create themselves.
+//
+// The builtin system:csi* roles are deprecated.
 const (
-	csiExternalProvisionerClusterRoleName string = "system:csi-external-provisioner"
-	csiExternalAttacherClusterRoleName    string = "system:csi-external-attacher"
+	csiExternalProvisionerClusterRoleName string = "csi-external-provisioner"
+	csiExternalAttacherClusterRoleName    string = "csi-external-attacher"
 	csiDriverRegistrarClusterRoleName     string = "csi-driver-registrar"
+	csiExternalAttacherRoleName           string = "csi-external-attacher-role"
+	csiExternalProvisionerRoleName        string = "csi-external-provisioner-role"
 )
 
 type csiTestDriver interface {
@@ -84,7 +91,7 @@ var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
 			ServerNodeName:    node.Name,
 			WaitForCompletion: true,
 		}
-		csiDriverRegistrarClusterRole(config)
+		createCSIRoles(config)
 		createCSICRDs(crdclient)
 	})
 
@@ -298,6 +305,7 @@ func startPausePod(cs clientset.Interface, t storageClassTest, ns string) (*stor
 
 type hostpathCSIDriver struct {
 	combinedClusterRoleNames []string
+	combinedRoleNames        []string
 	serviceAccount           *v1.ServiceAccount
 
 	f      *framework.Framework
@@ -310,6 +318,10 @@ func initCSIHostpath(f *framework.Framework, config framework.VolumeTestConfig) 
 			csiExternalAttacherClusterRoleName,
 			csiExternalProvisionerClusterRoleName,
 			csiDriverRegistrarClusterRoleName,
+		},
+		combinedRoleNames: []string{
+			csiExternalAttacherRoleName,
+			csiExternalProvisionerRoleName,
 		},
 		f:      f,
 		config: config,
@@ -334,6 +346,7 @@ func (h *hostpathCSIDriver) createCSIDriver() {
 	config := h.config
 	h.serviceAccount = csiServiceAccount(cs, config, "hostpath", false)
 	csiClusterRoleBindings(cs, config, false, h.serviceAccount, h.combinedClusterRoleNames)
+	csiRoleBindings(cs, config, false, h.serviceAccount, h.combinedRoleNames)
 	csiHostPathPod(cs, config, false, f, h.serviceAccount)
 }
 
@@ -344,6 +357,7 @@ func (h *hostpathCSIDriver) cleanupCSIDriver() {
 	config := h.config
 	csiHostPathPod(cs, config, true, f, h.serviceAccount)
 	csiClusterRoleBindings(cs, config, true, h.serviceAccount, h.combinedClusterRoleNames)
+	csiRoleBindings(cs, config, true, h.serviceAccount, h.combinedRoleNames)
 	csiServiceAccount(cs, config, "hostpath", true)
 }
 
