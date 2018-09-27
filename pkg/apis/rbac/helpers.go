@@ -111,7 +111,7 @@ func (r PolicyRule) CompactString() string {
 }
 
 // +k8s:deepcopy-gen=false
-// PolicyRuleBuilder let's us attach methods.  A no-no for API types.
+// PolicyRuleBuilder let us attach methods.  A no-no for API types.
 // We use it to construct rules in code.  It's more compact than trying to write them
 // out in a literal and allows us to perform some basic checking during construction
 type PolicyRuleBuilder struct {
@@ -199,7 +199,7 @@ func (r *PolicyRuleBuilder) Rule() (PolicyRule, error) {
 }
 
 // +k8s:deepcopy-gen=false
-// ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types.
+// ClusterRoleBindingBuilder let us attach methods.  A no-no for API types.
 // We use it to construct bindings in code.  It's more compact than trying to write them
 // out in a literal.
 type ClusterRoleBindingBuilder struct {
@@ -257,7 +257,7 @@ func (r *ClusterRoleBindingBuilder) Binding() (ClusterRoleBinding, error) {
 }
 
 // +k8s:deepcopy-gen=false
-// RoleBindingBuilder let's us attach methods. It is similar to
+// RoleBindingBuilder let us attach methods. It is similar to
 // ClusterRoleBindingBuilder above.
 type RoleBindingBuilder struct {
 	RoleBinding RoleBinding
