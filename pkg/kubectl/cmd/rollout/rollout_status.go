@@ -102,7 +102,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example: status_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
-			cmdutil.CheckErr(o.Validate(cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 		ValidArgs: validArgs,
@@ -144,9 +144,9 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	return nil
 }
 
-func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
+func (o *RolloutStatusOptions) Validate() error {
+	if len(o.BuilderArgs) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+		return fmt.Errorf("required resource not specified")
 	}
 
 	if o.Revision < 0 {
