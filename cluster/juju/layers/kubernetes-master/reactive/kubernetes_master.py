@@ -26,7 +26,7 @@ import ipaddress
 
 from charms.leadership import leader_get, leader_set
 
-from shutil import move
+from shutil import move, copyfile
 from pathlib import Path
 from subprocess import check_call
 from subprocess import check_output
@@ -79,6 +79,12 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 snap_resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
                   'kube-scheduler', 'cdk-addons', 'kube-proxy']
+
+master_services = ['kube-apiserver',
+                   'kube-controller-manager',
+                   'kube-scheduler',
+                   'kube-proxy']
+
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 db = unitdata.kv()
@@ -204,10 +210,10 @@ def migrate_from_pre_snaps():
     remove_state('kubernetes-master.app_version.set')
 
     # disable old services
-    services = ['kube-apiserver',
-                'kube-controller-manager',
-                'kube-scheduler']
-    for service in services:
+    pre_snap_services = ['kube-apiserver',
+                         'kube-controller-manager',
+                         'kube-scheduler']
+    for service in pre_snap_services:
         service_stop(service)
 
     # rename auth files
@@ -530,16 +536,22 @@ def master_services_down():
     """Ensure master services are up and running.
 
     Return: list of failing services"""
-    services = ['kube-apiserver',
-                'kube-controller-manager',
-                'kube-scheduler',
-                'kube-proxy']
     failing_services = []
-    for service in services:
+    for service in master_services:
         daemon = 'snap.{}.daemon'.format(service)
         if not host.service_running(daemon):
             failing_services.append(service)
     return failing_services
+
+
+def add_systemd_restart_always():
+    for service in master_services:
+        dest_dir = '/etc/systemd/system/snap.{}.daemon.service.d' \
+            .format(service)
+        os.makedirs(dest_dir, exist_ok=True)
+        copyfile('templates/service-always-restart.conf',
+                 '{}/always-restart.conf'.format(dest_dir))
+    check_call(['systemctl', 'daemon-reload'])
 
 
 @when('etcd.available', 'tls_client.server.certificate.saved',
@@ -564,6 +576,9 @@ def start_master():
     # TODO: Make sure below relation is handled on change
     # https://github.com/kubernetes/kubernetes/issues/43461
     handle_etcd_relation(etcd)
+
+    # make all services restart all the time
+    add_systemd_restart_always()
 
     # Add CLI options to all components
     configure_apiserver(etcd.get_connection_string())
@@ -1060,10 +1075,8 @@ def shutdown():
     """ Stop the kubernetes master services
 
     """
-    service_stop('snap.kube-apiserver.daemon')
-    service_stop('snap.kube-controller-manager.daemon')
-    service_stop('snap.kube-scheduler.daemon')
-    service_stop('snap.kube-proxy.daemon')
+    for service in master_services:
+        service_stop('snap.%s.daemon' % service)
 
 
 def build_kubeconfig(server):
