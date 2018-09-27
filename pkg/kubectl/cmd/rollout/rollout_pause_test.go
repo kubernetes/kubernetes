@@ -23,23 +23,23 @@ import (
 	"net/url"
 	"testing"
 
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 var rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
-var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "extensions", Version: runtime.APIVersionInternal}
+var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "extensions", Version: "v1beta1"}
 
 func TestRolloutPause(t *testing.T) {
 	deploymentName := "deployment/nginx-deployment"
-	ns := legacyscheme.Codecs
+	ns := scheme.Codecs
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
@@ -50,7 +50,7 @@ func TestRolloutPause(t *testing.T) {
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == "/namespaces/test/deployments/nginx-deployment" && (m == "GET" || m == "PATCH"):
-					responseDeployment := &extensions.Deployment{}
+					responseDeployment := &extensionsv1beta1.Deployment{}
 					responseDeployment.Name = deploymentName
 					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: body}, nil
