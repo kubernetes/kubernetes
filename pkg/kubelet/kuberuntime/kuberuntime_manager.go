@@ -466,6 +466,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	if createPodSandbox {
 		if !shouldRestartOnFailure(pod) && attempt != 0 {
 			// Should not restart the pod, just return.
+			// we should not create a sandbox for a pod if it is already done.
+			// if all containers are done and should not be started, there is no need to create a new sandbox.
+			// this stops confusing logs on pods whose containers all have exit codes, but we recreate a sandbox before terminating it.
+			changes.CreateSandbox = false
 			return changes
 		}
 		if len(pod.Spec.InitContainers) != 0 {
