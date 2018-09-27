@@ -71,6 +71,17 @@ var _ = SIGDescribe("Security Context [Feature:SecurityContext]", func() {
 		f.TestContainerOutput("pod.Spec.SecurityContext.SupplementalGroups", pod, 0, groups)
 	})
 
+	It("RunAsUser should default to image's USER", func() {
+		pod := scTestPod(false, false)
+		// this userID comes from the image's USER 1002
+		userID := int64(1002)
+		pod.Spec.Containers[0].Image = "runcom/imageuser"
+		pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -u"}
+		f.TestContainerOutput("pod.Spec.SecurityContext.RunAsUser", pod, 0, []string{
+			fmt.Sprintf("%v", userID),
+		})
+	})
+
 	It("should support pod.Spec.SecurityContext.RunAsUser", func() {
 		pod := scTestPod(false, false)
 		userID := int64(1001)
