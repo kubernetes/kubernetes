@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=2.2.1 2.3.7 3.0.17 3.1.12 3.2.24] [REGISTRY=k8s.gcr.io] [ARCH=amd64] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -55,22 +55,7 @@ export DOCKER_CLI_EXPERIMENTAL := enabled
 GOLANG_VERSION?=1.8.7
 GOARM=7
 TEMP_DIR:=$(shell mktemp -d)
-
-ifeq ($(ARCH),amd64)
-	BASEIMAGE?=busybox
-endif
-ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/busybox
-endif
-ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/busybox
-endif
-ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/busybox
-endif
-ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/busybox
-endif
+BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):0.3.2
 
 build:
 	# Copy the content in this dir to the temp dir,
