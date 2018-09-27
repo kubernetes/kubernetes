@@ -288,13 +288,13 @@ while true; do sleep 1; done
 				},
 				{
 					description: "should not be able to pull from private registry without secret",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
+					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
 					phase:       v1.PodPending,
 					waiting:     true,
 				},
 				{
 					description: "should be able to pull from private registry with secret",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
+					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
 					secret:      true,
 					phase:       v1.PodRunning,
 					waiting:     false,
