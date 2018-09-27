@@ -602,7 +602,7 @@ filename | sha256 hash
 
 # v1.12.0-alpha.1
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.12.0-alpha.1
 
