@@ -380,6 +380,7 @@ func TestComponentPod(t *testing.T) {
 					},
 					PriorityClassName: "system-cluster-critical",
 					HostNetwork:       true,
+					DNSPolicy:         v1.DNSClusterFirstWithHostNet,
 					Volumes:           []v1.Volume{},
 				},
 			},
