@@ -2,9 +2,14 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["testfiles.go"],
+    srcs = [
+        "registered.go",
+        "testfiles.go",
+        "urls.go",
+    ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/testfiles",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(

@@ -32,6 +32,7 @@ go_test(
         "//test/e2e/servicecatalog:go_default_library",
         "//test/e2e/storage:go_default_library",
         "//test/e2e/ui:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 
