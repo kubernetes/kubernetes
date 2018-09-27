@@ -2153,7 +2153,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DeploymentStatus",
+      "type": "v1.Status",
       "method": "POST",
       "summary": "create rollback of a Deployment",
       "nickname": "createNamespacedDeploymentRollback",
@@ -2195,17 +2195,17 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DeploymentStatus"
+        "responseModel": "v1.Status"
        },
        {
         "code": 201,
         "message": "Created",
-        "responseModel": "v1beta1.DeploymentStatus"
+        "responseModel": "v1.Status"
        },
        {
         "code": 202,
         "message": "Accepted",
-        "responseModel": "v1beta1.DeploymentStatus"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
