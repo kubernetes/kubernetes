@@ -18,6 +18,10 @@ package gce
 
 import (
 	"context"
+	"errors"
+	"fmt"
+
+	"github.com/golang/glog"
 	container "google.golang.org/api/container/v1"
 )
 
@@ -41,16 +45,22 @@ func (gce *GCECloud) ListClusters(ctx context.Context) ([]string, error) {
 }
 
 func (gce *GCECloud) GetManagedClusters(ctx context.Context) ([]*container.Cluster, error) {
-	managedClusters := []*container.Cluster{}
-	for _, zone := range gce.managedZones {
-		clusters, err := gce.getClustersInZone(zone)
-		if err != nil {
-			return nil, err
-		}
-		managedClusters = append(managedClusters, clusters...)
+	var location string
+	if len(gce.managedZones) > 1 {
+		// Multiple managed zones means this is a regional cluster
+		// so use the regional location and not the zone.
+		location = gce.region
+	} else if len(gce.managedZones) == 1 {
+		location = gce.managedZones[0]
+	} else {
+		return nil, errors.New(fmt.Sprintf("no zones associated with this cluster(%s)", gce.ProjectID()))
+	}
+	clusters, err := gce.getClustersInLocation(location)
+	if err != nil {
+		return nil, err
 	}
 
-	return managedClusters, nil
+	return clusters, nil
 }
 
 func (gce *GCECloud) Master(ctx context.Context, clusterName string) (string, error) {
@@ -58,7 +68,7 @@ func (gce *GCECloud) Master(ctx context.Context, clusterName string) (string, er
 }
 
 func (gce *GCECloud) listClustersInZone(zone string) ([]string, error) {
-	clusters, err := gce.getClustersInZone(zone)
+	clusters, err := gce.getClustersInLocation(zone)
 	if err != nil {
 		return nil, err
 	}
@@ -70,12 +80,17 @@ func (gce *GCECloud) listClustersInZone(zone string) ([]string, error) {
 	return result, nil
 }
 
-func (gce *GCECloud) getClustersInZone(zone string) ([]*container.Cluster, error) {
-	mc := newClustersMetricContext("list_zone", zone)
+func (gce *GCECloud) getClustersInLocation(zoneOrRegion string) ([]*container.Cluster, error) {
+	// TODO: Issue/68913 migrate metric to list_location instead of list_zone.
+	mc := newClustersMetricContext("list_zone", zoneOrRegion)
 	// TODO: use PageToken to list all not just the first 500
-	list, err := gce.containerService.Projects.Zones.Clusters.List(gce.projectID, zone).Do()
+	location := getLocationName(gce.projectID, zoneOrRegion)
+	list, err := gce.containerService.Projects.Locations.Clusters.List(location).Do()
 	if err != nil {
 		return nil, mc.Observe(err)
+	}
+	if list.Header.Get("nextPageToken") != "" {
+		glog.Errorf("Failed to get all clusters for request, received next page token %s", list.Header.Get("nextPageToken"))
 	}
 
 	return list.Clusters, mc.Observe(nil)
