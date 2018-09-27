@@ -112,7 +112,7 @@ func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 		return liveGroups, err
 	}
 	if liveGroups == nil || len(liveGroups.Groups) == 0 {
-		glog.V(3).Infof("skipped caching discovery info, no groups found")
+		glog.V(3).Info("skipped caching discovery info, no groups found")
 		return liveGroups, err
 	}
 

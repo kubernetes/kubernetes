@@ -227,11 +227,11 @@ func (m *manager) Start() {
 	// signing API, so don't start the certificate manager if we don't have a
 	// client.
 	if m.certSigningRequestClient == nil {
-		glog.V(2).Infof("Certificate rotation is not enabled, no connection to the apiserver.")
+		glog.V(2).Info("Certificate rotation is not enabled, no connection to the apiserver.")
 		return
 	}
 
-	glog.V(2).Infof("Certificate rotation is enabled.")
+	glog.V(2).Info("Certificate rotation is enabled.")
 
 	templateChanged := make(chan struct{})
 	go wait.Forever(func() {
@@ -250,7 +250,7 @@ func (m *manager) Start() {
 					// if the template now matches what we last requested, restart the rotation deadline loop
 					return
 				}
-				glog.V(2).Infof("Certificate template changed, rotating")
+				glog.V(2).Info("Certificate template changed, rotating")
 			}
 		}
 
@@ -321,7 +321,7 @@ func getCurrentCertificateOrBootstrap(
 	if _, err := store.Update(bootstrapCertificatePEM, bootstrapKeyPEM); err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to set the cert/key pair to the bootstrap certificate: %v", err))
 	} else {
-		glog.V(4).Infof("Updated the store to contain the initial bootstrap certificate")
+		glog.V(4).Info("Updated the store to contain the initial bootstrap certificate")
 	}
 
 	return &bootstrapCert, true, nil
@@ -333,7 +333,7 @@ func getCurrentCertificateOrBootstrap(
 // This method also keeps track of "server health" by interpreting the responses it gets
 // from the server on the various calls it makes.
 func (m *manager) rotateCerts() (bool, error) {
-	glog.V(2).Infof("Rotating certificates")
+	glog.V(2).Info("Rotating certificates")
 
 	template, csrPEM, keyPEM, privateKey, err := m.generateCSR()
 	if err != nil {

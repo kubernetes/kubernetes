@@ -116,11 +116,11 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 		},
 		stopCh)
 	if err != nil {
-		glog.V(2).Infof("stop requested")
+		glog.V(2).Info("stop requested")
 		return false
 	}
 
-	glog.V(4).Infof("caches populated")
+	glog.V(4).Info("caches populated")
 	return true
 }
 
