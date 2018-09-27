@@ -387,7 +387,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 
 	}
 	if rt.levels[debugRequestHeaders] {
-		glog.Infof("Request Headers:")
+		glog.Info("Request Headers:")
 		for key, values := range reqInfo.RequestHeaders {
 			for _, value := range values {
 				glog.Infof("    %s: %s", key, value)
