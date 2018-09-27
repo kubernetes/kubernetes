@@ -24,7 +24,7 @@ import (
 const (
 	e2eRegistry     = "gcr.io/kubernetes-e2e-test-images"
 	gcRegistry      = "k8s.gcr.io"
-	PrivateRegistry = "gcr.io/k8s-authenticated-test"
+	PrivateRegistry = "gcr-staging.sandbox.google.com/k8s-authenticated-test"
 	sampleRegistry  = "gcr.io/google-samples"
 )
 
