@@ -124,8 +124,8 @@ func (p *lazyEcrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
 		glog.V(2).Infof("Creating ecrProvider for %s", p.region)
 		p.actualProvider = &credentialprovider.CachingDockerConfigProvider{
 			Provider: newEcrProvider(p.region, nil),
-			// Refresh credentials a little earlier than expiration time
-			Lifetime: 11*time.Hour + 55*time.Minute,
+			// Refresh credentials earlier than expiration time
+			Lifetime: 11 * time.Hour,
 		}
 		if !p.actualProvider.Enabled() {
 			return nil
