@@ -1,18 +1,17 @@
 package nl
 
 import (
+	"syscall"
 	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 type IfAddrmsg struct {
-	unix.IfAddrmsg
+	syscall.IfAddrmsg
 }
 
 func NewIfAddrmsg(family int) *IfAddrmsg {
 	return &IfAddrmsg{
-		IfAddrmsg: unix.IfAddrmsg{
+		IfAddrmsg: syscall.IfAddrmsg{
 			Family: uint8(family),
 		},
 	}
@@ -36,15 +35,15 @@ func NewIfAddrmsg(family int) *IfAddrmsg {
 // SizeofIfAddrmsg     = 0x8
 
 func DeserializeIfAddrmsg(b []byte) *IfAddrmsg {
-	return (*IfAddrmsg)(unsafe.Pointer(&b[0:unix.SizeofIfAddrmsg][0]))
+	return (*IfAddrmsg)(unsafe.Pointer(&b[0:syscall.SizeofIfAddrmsg][0]))
 }
 
 func (msg *IfAddrmsg) Serialize() []byte {
-	return (*(*[unix.SizeofIfAddrmsg]byte)(unsafe.Pointer(msg)))[:]
+	return (*(*[syscall.SizeofIfAddrmsg]byte)(unsafe.Pointer(msg)))[:]
 }
 
 func (msg *IfAddrmsg) Len() int {
-	return unix.SizeofIfAddrmsg
+	return syscall.SizeofIfAddrmsg
 }
 
 // struct ifa_cacheinfo {
