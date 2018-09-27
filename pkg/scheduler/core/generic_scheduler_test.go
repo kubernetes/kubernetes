@@ -425,6 +425,7 @@ func TestGenericScheduler(t *testing.T) {
 				[]algorithm.SchedulerExtender{},
 				nil,
 				pvcLister,
+				schedulertesting.FakePDBLister{},
 				test.alwaysCheckAllPredicates,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
@@ -457,7 +458,7 @@ func makeScheduler(predicates map[string]algorithm.FitPredicate, nodes []*v1.Nod
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
 		algorithm.EmptyPriorityMetadataProducer,
-		nil, nil, nil, false, false,
+		nil, nil, nil, nil, false, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateNodeNameToInfoMap(s.(*genericScheduler).cachedNodeInfoMap)
 	return s.(*genericScheduler)
@@ -1381,6 +1382,7 @@ func TestPreempt(t *testing.T) {
 				extenders,
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
+				schedulertesting.FakePDBLister{},
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)
@@ -1495,6 +1497,7 @@ func TestCacheInvalidationRace(t *testing.T) {
 	// Set up the scheduler.
 	prioritizers := []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
 	pvcLister := schedulertesting.FakePersistentVolumeClaimLister([]*v1.PersistentVolumeClaim{})
+	pdbLister := schedulertesting.FakePDBLister{}
 	scheduler := NewGenericScheduler(
 		mockCache,
 		eCache,
@@ -1503,7 +1506,8 @@ func TestCacheInvalidationRace(t *testing.T) {
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
 		algorithm.EmptyPriorityMetadataProducer,
-		nil, nil, pvcLister, true, false,
+		nil, nil, pvcLister, pdbLister,
+		true, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 
 	// First scheduling attempt should fail.
@@ -1576,6 +1580,7 @@ func TestCacheInvalidationRace2(t *testing.T) {
 	// Set up the scheduler.
 	prioritizers := []algorithm.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
 	pvcLister := schedulertesting.FakePersistentVolumeClaimLister([]*v1.PersistentVolumeClaim{})
+	pdbLister := schedulertesting.FakePDBLister{}
 	scheduler := NewGenericScheduler(
 		cache,
 		eCache,
@@ -1584,7 +1589,7 @@ func TestCacheInvalidationRace2(t *testing.T) {
 		algorithm.EmptyPredicateMetadataProducer,
 		prioritizers,
 		algorithm.EmptyPriorityMetadataProducer,
-		nil, nil, pvcLister, true, false,
+		nil, nil, pvcLister, pdbLister, true, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 
 	// First scheduling attempt should fail.

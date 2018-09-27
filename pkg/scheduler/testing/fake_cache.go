@@ -18,7 +18,6 @@ package testing
 
 import (
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
@@ -77,20 +76,6 @@ func (f *FakeCache) RemoveNode(node *v1.Node) error { return nil }
 // UpdateNodeNameToInfoMap is a fake method for testing.
 func (f *FakeCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
 	return nil
-}
-
-// AddPDB is a fake method for testing.
-func (f *FakeCache) AddPDB(pdb *policy.PodDisruptionBudget) error { return nil }
-
-// UpdatePDB is a fake method for testing.
-func (f *FakeCache) UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error { return nil }
-
-// RemovePDB is a fake method for testing.
-func (f *FakeCache) RemovePDB(pdb *policy.PodDisruptionBudget) error { return nil }
-
-// ListPDBs is a fake method for testing.
-func (f *FakeCache) ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error) {
-	return nil, nil
 }
 
 // List is a fake method for testing.

@@ -28,7 +28,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -258,15 +257,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	)
 	c.nodeLister = args.NodeInformer.Lister()
 
-	args.PdbInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.addPDBToCache,
-			UpdateFunc: c.updatePDBInCache,
-			DeleteFunc: c.deletePDBFromCache,
-		},
-	)
-	c.pdbLister = args.PdbInformer.Lister()
-
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
 	args.PvInformer.Informer().AddEventHandler(
@@ -320,7 +310,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	comparer := &cacheComparer{
 		podLister:  args.PodInformer.Lister(),
 		nodeLister: args.NodeInformer.Lister(),
-		pdbLister:  args.PdbInformer.Lister(),
 		cache:      c.schedulerCache,
 		podQueue:   c.podQueue,
 	}
@@ -1003,56 +992,6 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 	}
 }
 
-func (c *configFactory) addPDBToCache(obj interface{}) {
-	pdb, ok := obj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", obj)
-		return
-	}
-
-	if err := c.schedulerCache.AddPDB(pdb); err != nil {
-		glog.Errorf("scheduler cache AddPDB failed: %v", err)
-	}
-}
-
-func (c *configFactory) updatePDBInCache(oldObj, newObj interface{}) {
-	oldPDB, ok := oldObj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert oldObj to *v1beta1.PodDisruptionBudget: %v", oldObj)
-		return
-	}
-	newPDB, ok := newObj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert newObj to *v1beta1.PodDisruptionBudget: %v", newObj)
-		return
-	}
-
-	if err := c.schedulerCache.UpdatePDB(oldPDB, newPDB); err != nil {
-		glog.Errorf("scheduler cache UpdatePDB failed: %v", err)
-	}
-}
-
-func (c *configFactory) deletePDBFromCache(obj interface{}) {
-	var pdb *v1beta1.PodDisruptionBudget
-	switch t := obj.(type) {
-	case *v1beta1.PodDisruptionBudget:
-		pdb = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pdb, ok = t.Obj.(*v1beta1.PodDisruptionBudget)
-		if !ok {
-			glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t.Obj)
-			return
-		}
-	default:
-		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t)
-		return
-	}
-	if err := c.schedulerCache.RemovePDB(pdb); err != nil {
-		glog.Errorf("scheduler cache RemovePDB failed: %v", err)
-	}
-}
-
 // Create creates a scheduler with the default algorithm provider.
 func (c *configFactory) Create() (*scheduler.Config, error) {
 	return c.CreateFromProvider(DefaultProvider)
@@ -1203,6 +1142,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
+		c.pdbLister,
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
@@ -1281,6 +1221,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ReplicaSetLister:               c.replicaSetLister,
 		StatefulSetLister:              c.statefulSetLister,
 		NodeLister:                     &nodeLister{c.nodeLister},
+		PDBLister:                      c.pdbLister,
 		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: c.nodeLister},
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
