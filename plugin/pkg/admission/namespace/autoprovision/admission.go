@@ -104,12 +104,12 @@ func NewProvision() *Provision {
 	}
 }
 
-// SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
+// SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
 func (p *Provision) SetExternalKubeClientSet(client kubernetes.Interface) {
 	p.client = client
 }
 
-// SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
+// SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (p *Provision) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
