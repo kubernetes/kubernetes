@@ -31,7 +31,7 @@ go_library(
             "//pkg/kubelet/cm:go_default_library",
             "//pkg/kubelet/dockershim/libdocker:go_default_library",
             "//pkg/kubelet/qos:go_default_library",
-            "//pkg/util/version:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/github.com/golang/glog:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",

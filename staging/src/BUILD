@@ -58,6 +58,7 @@ filegroup(
         "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:all-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/util/version:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/waitgroup:all-srcs",
         "//staging/src/k8s.io/apimachinery/pkg/util/webhook:all-srcs",

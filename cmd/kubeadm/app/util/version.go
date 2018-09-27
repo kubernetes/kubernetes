@@ -27,7 +27,7 @@ import (
 
 	"github.com/golang/glog"
 	netutil "k8s.io/apimachinery/pkg/util/net"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	pkgversion "k8s.io/kubernetes/pkg/version"
 )
 
