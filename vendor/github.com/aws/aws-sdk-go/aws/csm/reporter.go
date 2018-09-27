@@ -202,7 +202,7 @@ func (rep *Reporter) Continue() {
 	rep.metricsCh.Continue()
 }
 
-// InjectHandlers will will enable client side metrics and inject the proper
+// InjectHandlers will enable client side metrics and inject the proper
 // handlers to handle how metrics are sent.
 //
 //	Example:

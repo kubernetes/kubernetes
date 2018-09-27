@@ -173,7 +173,7 @@ func (cfg *sharedConfig) setFromIniFiles(profile string, files []sharedConfigFil
 func (cfg *sharedConfig) setFromIniFile(profile string, file sharedConfigFile) error {
 	section, err := file.IniData.GetSection(profile)
 	if err != nil {
-		// Fallback to to alternate profile name: profile <name>
+		// Fallback to alternate profile name: profile <name>
 		section, err = file.IniData.GetSection(fmt.Sprintf("profile %s", profile))
 		if err != nil {
 			return SharedConfigProfileNotExistsError{Profile: profile, Err: err}
