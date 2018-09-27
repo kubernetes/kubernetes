@@ -270,7 +270,11 @@ func (j *JSONPath) evalArray(input []reflect.Value, node *ArrayNode) ([]reflect.
 		}
 
 		if !params[2].Known {
-			value = value.Slice(params[0].Value, params[1].Value)
+			if params[1].Value == 0 {
+				value = value.Slice(params[0].Value, sliceLength)
+			} else {
+				value = value.Slice(params[0].Value, params[1].Value)
+			}
 		} else {
 			value = value.Slice3(params[0].Value, params[1].Value, params[2].Value)
 		}

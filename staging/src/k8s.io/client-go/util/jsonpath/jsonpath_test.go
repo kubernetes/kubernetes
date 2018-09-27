@@ -286,6 +286,8 @@ func TestKubernetes(t *testing.T) {
 		{"hostname", `{.items[0].metadata.labels.kubernetes\.io/hostname}`, &nodesData, "127.0.0.1", false},
 		{"hostname filter", `{.items[?(@.metadata.labels.kubernetes\.io/hostname=="127.0.0.1")].kind}`, &nodesData, "None", false},
 		{"bool item", `{.items[?(@..ready==true)].metadata.name}`, &nodesData, "127.0.0.1", false},
+		{"last index", `{.items[1].metadata.name}`, &nodesData, "127.0.0.2", false},
+		{"first index", `{.items[0].metadata.name}`, &nodesData, "127.0.0.1", false},
 	}
 	testJSONPath(nodesTests, false, t)
 
