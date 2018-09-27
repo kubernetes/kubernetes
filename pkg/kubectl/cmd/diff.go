@@ -26,6 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
 	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -291,7 +291,7 @@ func (obj InfoObject) Last() (map[string]interface{}, error) {
 		return nil, nil // Not an error, just empty.
 	}
 
-	return obj.toMap([]byte(annots[api.LastAppliedConfigAnnotation]))
+	return obj.toMap([]byte(annots[corev1.LastAppliedConfigAnnotation]))
 }
 
 func (obj InfoObject) Name() string {
