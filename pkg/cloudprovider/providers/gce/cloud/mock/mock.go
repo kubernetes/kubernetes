@@ -476,6 +476,25 @@ func UpdateAlphaBackendServiceHook(ctx context.Context, key *meta.Key, obj *alph
 	return nil
 }
 
+// UpdateBetaBackendServiceHook defines the hook for updating an beta BackendService.
+// It replaces the object with the same key in the mock with the updated object.
+func UpdateBetaBackendServiceHook(ctx context.Context, key *meta.Key, obj *beta.BackendService, m *cloud.MockBetaBackendServices) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in BackendServices", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "backendServices")
+	obj.SelfLink = cloud.SelfLink(meta.VersionBeta, projectID, "backendServices", key)
+
+	m.Objects[*key] = &cloud.MockBackendServicesObj{Obj: obj}
+	return nil
+}
+
 // UpdateURLMapHook defines the hook for updating a UrlMap.
 // It replaces the object with the same key in the mock with the updated object.
 func UpdateURLMapHook(ctx context.Context, key *meta.Key, obj *ga.UrlMap, m *cloud.MockUrlMaps) error {
