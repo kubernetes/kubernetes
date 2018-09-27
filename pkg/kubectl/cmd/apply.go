@@ -44,7 +44,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -399,7 +398,7 @@ func (o *ApplyOptions) Run() error {
 			}
 
 			annotationMap := metadata.GetAnnotations()
-			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
+			if _, ok := annotationMap[v1.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
@@ -619,7 +618,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 			return err
 		}
 		annots := metadata.GetAnnotations()
-		if _, ok := annots[api.LastAppliedConfigAnnotation]; !ok {
+		if _, ok := annots[v1.LastAppliedConfigAnnotation]; !ok {
 			// don't prune resources not created with apply
 			continue
 		}
