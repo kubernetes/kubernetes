@@ -4982,3 +4982,65 @@ func TestGetMaxVols(t *testing.T) {
 		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }
+
+func TestCheckNodeUnschedulablePredicate(t *testing.T) {
+	testCases := []struct {
+		name string
+		pod  *v1.Pod
+		node *v1.Node
+		fit  bool
+	}{
+		{
+			name: "Does not schedule pod to unschedulable node (node.Spec.Unschedulable==true)",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: false,
+		},
+		{
+			name: "Schedule pod to normal node",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: false,
+				},
+			},
+			fit: true,
+		},
+		{
+			name: "Schedule pod with toleration to unschedulable node (node.Spec.Unschedulable==true)",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    algorithm.TaintNodeUnschedulable,
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: true,
+		},
+	}
+
+	for _, test := range testCases {
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(test.node)
+		fit, _, err := CheckNodeUnschedulablePredicate(test.pod, nil, nodeInfo)
+		if err != nil {
+			t.Fatalf("Failed to check node unschedulable: %v", err)
+		}
+
+		if fit != test.fit {
+			t.Errorf("Unexpected fit: expected %v, got %v", test.fit, fit)
+		}
+	}
+}
