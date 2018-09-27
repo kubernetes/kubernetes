@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -524,7 +525,7 @@ func GetApplyPatch(obj runtime.Unstructured) ([]byte, []byte, types.PatchType, e
 	if annotations == nil {
 		annotations = map[string]string{}
 	}
-	annotations[api.LastAppliedConfigAnnotation] = string(beforeJSON)
+	annotations[v1.LastAppliedConfigAnnotation] = string(beforeJSON)
 	accessor.SetAnnotations(objCopy, annotations)
 	afterJSON, err := encodeToJson(objCopy.(runtime.Unstructured))
 	if err != nil {
