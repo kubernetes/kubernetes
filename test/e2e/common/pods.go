@@ -472,7 +472,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}, maxRetries, "Container should have service environment variables set")
 	})
 
-	It("should support remote command execution over websockets [NodeConformance]", func() {
+	/*
+	  Release : v1.12
+	  Testname: Pods: websockets
+	  Description: Remote command execution must be supported through a websocket.
+	*/
+	framework.ConformanceIt("should support remote command execution over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
@@ -548,7 +553,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}, time.Minute, 10*time.Second).Should(BeNil())
 	})
 
-	It("should support retrieving logs from the container over websockets [NodeConformance]", func() {
+	/*
+	  Release : v1.12
+	  Testname: Pods: websockets
+	  Description: Pod log retrieval must be supported through a websocket.
+	*/
+	framework.ConformanceIt("should support retrieving logs from the container over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
 		Expect(err).NotTo(HaveOccurred(), "unable to get base config")
 
@@ -605,7 +615,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
-	It("should have their auto-restart back-off timer reset on image update [Slow][NodeConformance]", func() {
+	/*
+	  Release : v1.12
+	  Testname: Pods: back-off-timer reset.
+	  Description: Updating the image in a container must reset the back-off-timer in the pod.
+	*/
+	framework.ConformanceIt("should have their auto-restart back-off timer reset on image update [Slow][NodeConformance]", func() {
 		podName := "pod-back-off-image"
 		containerName := "back-off"
 		pod := &v1.Pod{
@@ -645,8 +660,13 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 	})
 
+	/*
+	  Release : v1.12
+	  Testname: Pods: back-off capping.
+	  Description: Back-off must be capped at MaxContainerBackOff.
+	*/
 	// Slow issue #19027 (20 mins)
-	It("should cap back-off at MaxContainerBackOff [Slow][NodeConformance]", func() {
+	framework.ConformanceIt("should cap back-off at MaxContainerBackOff [Slow][NodeConformance]", func() {
 		podName := "back-off-cap"
 		containerName := "back-off-cap"
 		pod := &v1.Pod{
