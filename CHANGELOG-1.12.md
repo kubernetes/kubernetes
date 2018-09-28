@@ -167,8 +167,8 @@ SIG Autoscaling focused on improving the Horizontal Pod Autoscaling API and algo
 ### SIG-Azure
 
 Sig Azure was focused on two primary new alpha features:
-# Adding Azure Availability Zones support to cloud provider.
-# Supporting Cross RG resources (disks, Azure File and node [Experimental]
+- Adding Azure Availability Zones support to cloud provider.
+- Supporting Cross RG resources (disks, Azure File and node [Experimental]
 
 Besides the above new features, support for Azure Virtual Machine Scale Sets (VMSS) and Cluster-Autoscaler is now stable and considered GA:
 
