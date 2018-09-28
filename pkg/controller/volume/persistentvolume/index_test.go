@@ -213,6 +213,9 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 			// this one we're pretending is already bound
 			ClaimRef: &v1.ObjectReference{UID: "abc123"},
 		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeBound,
+		},
 	}
 
 	pv2 := &v1.PersistentVolume{
@@ -228,6 +231,9 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
 		},
 	}
 
@@ -330,6 +336,9 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 				v1.ReadOnlyMany,
 			},
 		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
+		},
 	}
 
 	ebs := &v1.PersistentVolume{
@@ -340,6 +349,9 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 			AccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
 		},
 	}
 
@@ -353,6 +365,9 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 				v1.ReadOnlyMany,
 				v1.ReadWriteMany,
 			},
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
 		},
 	}
 
@@ -442,6 +457,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 				},
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -462,6 +480,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				// this one we're pretending is already bound
 				ClaimRef: &v1.ObjectReference{UID: "def456"},
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeBound,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -480,6 +501,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadOnlyMany,
 					v1.ReadWriteMany,
 				},
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
 			},
 		},
 		{
@@ -501,6 +525,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				// this one we're pretending is already bound
 				ClaimRef: &v1.ObjectReference{UID: "abc123"},
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeBound,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -520,6 +547,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadWriteMany,
 				},
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -537,6 +567,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadWriteOnce,
 					v1.ReadOnlyMany,
 				},
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
 			},
 		},
 		{
@@ -557,6 +590,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadWriteMany,
 				},
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -576,6 +612,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				AccessModes: []v1.PersistentVolumeAccessMode{
 					v1.ReadWriteOnce,
 				},
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
 			},
 		},
 		{
@@ -598,6 +637,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classSilver,
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -616,6 +658,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classSilver,
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -633,6 +678,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadWriteOnce,
 				},
 				StorageClassName: classGold,
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
 			},
 		},
 		{
@@ -654,6 +702,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classLarge,
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -673,6 +724,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 					v1.ReadWriteMany,
 				},
 				StorageClassName: classLarge,
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
 			},
 		},
 		{
@@ -694,6 +748,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				StorageClassName: classWait,
 				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -713,6 +770,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				},
 				StorageClassName: classWait,
 				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
 			},
 		},
 		{
@@ -735,6 +795,9 @@ func createTestVolumes() []*v1.PersistentVolume {
 				ClaimRef:         &v1.ObjectReference{Name: "claim02", Namespace: "myns"},
 				NodeAffinity:     getVolumeNodeAffinity("key1", "value1"),
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -755,6 +818,98 @@ func createTestVolumes() []*v1.PersistentVolume {
 				StorageClassName: classWait,
 				NodeAffinity:     getVolumeNodeAffinity("key1", "value3"),
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "affinity-pv4-pending",
+				Name: "affinity004-pending",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("200G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumePending,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "affinity-pv4-failed",
+				Name: "affinity004-failed",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("200G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeFailed,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "affinity-pv4-released",
+				Name: "affinity004-released",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("200G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeReleased,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:  "affinity-pv4-empty",
+				Name: "affinity004-empty",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse("200G"),
+				},
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					Local: &v1.LocalVolumeSource{},
+				},
+				AccessModes: []v1.PersistentVolumeAccessMode{
+					v1.ReadWriteOnce,
+					v1.ReadOnlyMany,
+				},
+				StorageClassName: classWait,
+				NodeAffinity:     getVolumeNodeAffinity("key1", "value4"),
+			},
 		},
 	}
 }
@@ -769,6 +924,9 @@ func testVolume(name, size string) *v1.PersistentVolume {
 			Capacity:               v1.ResourceList{v1.ResourceName(v1.ResourceStorage): resource.MustParse(size)},
 			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{}},
 			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
 		},
 	}
 }
@@ -811,6 +969,9 @@ func createVolumeModeBlockTestVolume() *v1.PersistentVolume {
 			},
 			VolumeMode: &blockMode,
 		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
+		},
 	}
 }
 
@@ -833,6 +994,9 @@ func createVolumeModeFilesystemTestVolume() *v1.PersistentVolume {
 				v1.ReadWriteOnce,
 			},
 			VolumeMode: &filesystemMode,
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
 		},
 	}
 }
@@ -1054,6 +1218,9 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{}},
 			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: v1.VolumeAvailable,
+		},
 	}
 
 	pvToDelete := pv.DeepCopy()
@@ -1274,6 +1441,11 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 			Labels: map[string]string{"key1": "value3"},
 		},
 	}
+	node4 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: map[string]string{"key1": "value4"},
+		},
+	}
 
 	scenarios := map[string]struct {
 		expectedMatch   string
@@ -1340,6 +1512,15 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 				pvc.Name = "claim02"
 			}),
 			node: node3,
+		},
+		"fail-nonavaiable": {
+			expectedMatch: "",
+			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
+				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+				pvc.Spec.StorageClassName = &classWait
+				pvc.Name = "claim04"
+			}),
+			node: node4,
 		},
 		"success-bad-and-good-node-affinity": {
 			expectedMatch: "affinity-pv3",

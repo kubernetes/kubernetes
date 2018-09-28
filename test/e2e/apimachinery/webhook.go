@@ -33,10 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -52,17 +52,18 @@ const (
 	roleBindingName = "webhook-auth-reader"
 
 	// The webhook configuration names should not be reused between test instances.
-	crWebhookConfigName           = "e2e-test-webhook-config-cr"
-	webhookConfigName             = "e2e-test-webhook-config"
-	attachingPodWebhookConfigName = "e2e-test-webhook-config-attaching-pod"
-	mutatingWebhookConfigName     = "e2e-test-mutating-webhook-config"
-	podMutatingWebhookConfigName  = "e2e-test-mutating-webhook-pod"
-	crMutatingWebhookConfigName   = "e2e-test-mutating-webhook-config-cr"
-	webhookFailClosedConfigName   = "e2e-test-webhook-fail-closed"
-	webhookForWebhooksConfigName  = "e2e-test-webhook-for-webhooks-config"
-	removableValidatingHookName   = "e2e-test-should-be-removable-validating-webhook-config"
-	removableMutatingHookName     = "e2e-test-should-be-removable-mutating-webhook-config"
-	crdWebhookConfigName          = "e2e-test-webhook-config-crd"
+	crWebhookConfigName                    = "e2e-test-webhook-config-cr"
+	webhookConfigName                      = "e2e-test-webhook-config"
+	attachingPodWebhookConfigName          = "e2e-test-webhook-config-attaching-pod"
+	mutatingWebhookConfigName              = "e2e-test-mutating-webhook-config"
+	podMutatingWebhookConfigName           = "e2e-test-mutating-webhook-pod"
+	crMutatingWebhookConfigName            = "e2e-test-mutating-webhook-config-cr"
+	webhookFailClosedConfigName            = "e2e-test-webhook-fail-closed"
+	validatingWebhookForWebhooksConfigName = "e2e-test-validating-webhook-for-webhooks-config"
+	mutatingWebhookForWebhooksConfigName   = "e2e-test-mutating-webhook-for-webhooks-config"
+	dummyValidatingWebhookConfigName       = "e2e-test-dummy-validating-webhook-config"
+	dummyMutatingWebhookConfigName         = "e2e-test-dummy-mutating-webhook-config"
+	crdWebhookConfigName                   = "e2e-test-webhook-config-crd"
 
 	skipNamespaceLabelKey   = "skip-webhook-admission"
 	skipNamespaceLabelValue = "yes"
@@ -75,6 +76,8 @@ const (
 	failNamespaceLabelKey   = "fail-closed-webhook"
 	failNamespaceLabelValue = "yes"
 	failNamespaceName       = "fail-closed-namesapce"
+	addedLabelKey           = "added-label"
+	addedLabelValue         = "yes"
 )
 
 var serverWebhookVersion = utilversion.MustParseSemantic("v1.8.0")
@@ -154,10 +157,12 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testMutatingPodWebhook(f)
 	})
 
-	It("Should not be able to prevent deleting validating-webhook-configurations or mutating-webhook-configurations", func() {
-		webhookCleanup := registerWebhookForWebhookConfigurations(f, context)
-		defer webhookCleanup()
-		testWebhookForWebhookConfigurations(f)
+	It("Should not be able to mutate or prevent deletion of webhook configuration objects", func() {
+		validatingWebhookCleanup := registerValidatingWebhookForWebhookConfigurations(f, context)
+		defer validatingWebhookCleanup()
+		mutatingWebhookCleanup := registerMutatingWebhookForWebhookConfigurations(f, context)
+		defer mutatingWebhookCleanup()
+		testWebhooksForWebhookConfigurations(f)
 	})
 
 	It("Should mutate custom resource", func() {
@@ -801,16 +806,18 @@ func testFailClosedWebhook(f *framework.Framework) {
 	}
 }
 
-func registerWebhookForWebhookConfigurations(f *framework.Framework, context *certContext) func() {
+func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, context *certContext) func() {
 	var err error
 	client := f.ClientSet
-	By("Registering a webhook on ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects, via the AdmissionRegistration API")
+	By("Registering a validating webhook on ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects, via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
-	configName := webhookForWebhooksConfigName
+	configName := validatingWebhookForWebhooksConfigName
 	failurePolicy := v1beta1.Fail
 
-	// This webhook will deny all requests to Delete admissionregistration objects
+	// This webhook denies all requests to Delete validating webhook configuration and
+	// mutating webhook configuration objects. It should never be called, however, because
+	// dynamic admission webhooks should not be called on requests involving webhook configuration objects.
 	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
@@ -841,7 +848,6 @@ func registerWebhookForWebhookConfigurations(f *framework.Framework, context *ce
 			},
 		},
 	})
-
 	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", configName, namespace)
 
 	// The webhook configuration is honored in 10s.
@@ -852,23 +858,76 @@ func registerWebhookForWebhookConfigurations(f *framework.Framework, context *ce
 	}
 }
 
-// This test assumes that the deletion-rejecting webhook defined in
-// registerWebhookForWebhookConfigurations is in place.
-func testWebhookForWebhookConfigurations(f *framework.Framework) {
+func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, context *certContext) func() {
 	var err error
 	client := f.ClientSet
-	By("Creating a validating-webhook-configuration object")
+	By("Registering a mutating webhook on ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects, via the AdmissionRegistration API")
+
+	namespace := f.Namespace.Name
+	configName := mutatingWebhookForWebhooksConfigName
+	failurePolicy := v1beta1.Fail
+
+	// This webhook adds a label to all requests create to validating webhook configuration and
+	// mutating webhook configuration objects. It should never be called, however, because
+	// dynamic admission webhooks should not be called on requests involving webhook configuration objects.
+	_, err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: configName,
+		},
+		Webhooks: []v1beta1.Webhook{
+			{
+				Name: "add-label-to-webhook-configurations.k8s.io",
+				Rules: []v1beta1.RuleWithOperations{{
+					Operations: []v1beta1.OperationType{v1beta1.Create},
+					Rule: v1beta1.Rule{
+						APIGroups:   []string{"admissionregistration.k8s.io"},
+						APIVersions: []string{"*"},
+						Resources: []string{
+							"validatingwebhookconfigurations",
+							"mutatingwebhookconfigurations",
+						},
+					},
+				}},
+				ClientConfig: v1beta1.WebhookClientConfig{
+					Service: &v1beta1.ServiceReference{
+						Namespace: namespace,
+						Name:      serviceName,
+						Path:      strPtr("/add-label"),
+					},
+					CABundle: context.signingCert,
+				},
+				FailurePolicy: &failurePolicy,
+			},
+		},
+	})
+	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", configName, namespace)
+
+	// The webhook configuration is honored in 10s.
+	time.Sleep(10 * time.Second)
+	return func() {
+		err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(configName, nil)
+		framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", configName, namespace)
+	}
+}
+
+// This test assumes that the deletion-rejecting webhook defined in
+// registerValidatingWebhookForWebhookConfigurations and the webhook-config-mutating
+// webhook defined in registerMutatingWebhookForWebhookConfigurations already exist.
+func testWebhooksForWebhookConfigurations(f *framework.Framework) {
+	var err error
+	client := f.ClientSet
+	By("Creating a dummy validating-webhook-configuration object")
 
 	namespace := f.Namespace.Name
 	failurePolicy := v1beta1.Ignore
 
-	_, err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
+	mutatedValidatingWebhookConfiguration, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&v1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: removableValidatingHookName,
+			Name: dummyValidatingWebhookConfigName,
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "should-be-removable-validating-webhook.k8s.io",
+				Name: "dummy-validating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					// This will not match any real resources so this webhook should never be called.
@@ -894,25 +953,28 @@ func testWebhookForWebhookConfigurations(f *framework.Framework) {
 			},
 		},
 	})
-	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", removableValidatingHookName, namespace)
+	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", dummyValidatingWebhookConfigName, namespace)
+	if mutatedValidatingWebhookConfiguration.ObjectMeta.Labels != nil && mutatedValidatingWebhookConfiguration.ObjectMeta.Labels[addedLabelKey] == addedLabelValue {
+		framework.Failf("expected %s not to be mutated by mutating webhooks but it was", dummyValidatingWebhookConfigName)
+	}
 
 	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
 
 	By("Deleting the validating-webhook-configuration, which should be possible to remove")
 
-	err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(removableValidatingHookName, nil)
-	framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", removableValidatingHookName, namespace)
+	err = client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Delete(dummyValidatingWebhookConfigName, nil)
+	framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", dummyValidatingWebhookConfigName, namespace)
 
-	By("Creating a mutating-webhook-configuration object")
+	By("Creating a dummy mutating-webhook-configuration object")
 
-	_, err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
+	mutatedMutatingWebhookConfiguration, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: removableMutatingHookName,
+			Name: dummyMutatingWebhookConfigName,
 		},
 		Webhooks: []v1beta1.Webhook{
 			{
-				Name: "should-be-removable-mutating-webhook.k8s.io",
+				Name: "dummy-mutating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					// This will not match any real resources so this webhook should never be called.
@@ -938,15 +1000,18 @@ func testWebhookForWebhookConfigurations(f *framework.Framework) {
 			},
 		},
 	})
-	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", removableMutatingHookName, namespace)
+	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", dummyMutatingWebhookConfigName, namespace)
+	if mutatedMutatingWebhookConfiguration.ObjectMeta.Labels != nil && mutatedMutatingWebhookConfiguration.ObjectMeta.Labels[addedLabelKey] == addedLabelValue {
+		framework.Failf("expected %s not to be mutated by mutating webhooks but it was", dummyMutatingWebhookConfigName)
+	}
 
 	// The webhook configuration is honored in 10s.
 	time.Sleep(10 * time.Second)
 
 	By("Deleting the mutating-webhook-configuration, which should be possible to remove")
 
-	err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(removableMutatingHookName, nil)
-	framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", removableMutatingHookName, namespace)
+	err = client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(dummyMutatingWebhookConfigName, nil)
+	framework.ExpectNoError(err, "deleting webhook config %s with namespace %s", dummyMutatingWebhookConfigName, namespace)
 }
 
 func createNamespace(f *framework.Framework, ns *v1.Namespace) error {

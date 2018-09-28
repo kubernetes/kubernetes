@@ -1461,7 +1461,7 @@ func checkNodeFitness(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 
-	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
+	// If ScheduleDaemonSetPods is enabled, only check nodeSelector, nodeAffinity and toleration/taint match.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 		fit, reasons, err := checkNodeFitness(pod, nil, nodeInfo)
 		if err != nil {

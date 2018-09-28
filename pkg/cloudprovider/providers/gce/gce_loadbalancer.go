@@ -41,10 +41,6 @@ var (
 	lbSrcRngsFlag cidrs
 )
 
-func newLoadBalancerMetricContext(request, region string) *metricContext {
-	return newGenericMetricContext("loadbalancer", request, region, unusedMetricLabel, computeV1Version)
-}
-
 func init() {
 	var err error
 	// LB L7 proxies and all L3/4/7 health checkers have client addresses within these known CIDRs.

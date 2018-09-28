@@ -18,7 +18,6 @@ package images
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -42,19 +41,6 @@ func TestGetGenericImage(t *testing.T) {
 	actual := GetGenericImage(prefix, image, tag)
 	if actual != expected {
 		t.Errorf("failed GetGenericImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
-	}
-}
-
-func TestGetGenericArchImage(t *testing.T) {
-	const (
-		prefix = "foo"
-		image  = "bar"
-		tag    = "baz"
-	)
-	expected := fmt.Sprintf("%s/%s-%s:%s", prefix, image, runtime.GOARCH, tag)
-	actual := GetGenericArchImage(prefix, image, tag)
-	if actual != expected {
-		t.Errorf("failed GetGenericArchImage:\n\texpected: %s\n\t  actual: %s", expected, actual)
 	}
 }
 

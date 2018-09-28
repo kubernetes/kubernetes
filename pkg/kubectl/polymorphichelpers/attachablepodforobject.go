@@ -21,23 +21,16 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 // attachablePodForObject returns the pod to which to attach given an object.
 func attachablePodForObject(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*corev1.Pod, error) {
 	switch t := object.(type) {
-	case *api.Pod:
-		externalPod := &corev1.Pod{}
-		err := apiv1.Convert_core_Pod_To_v1_Pod(t, externalPod, nil)
-		return externalPod, err
 	case *corev1.Pod:
 		return t, nil
 	}
@@ -55,7 +48,7 @@ func attachablePodForObject(restClientGetter genericclioptions.RESTClientGetter,
 	if err != nil {
 		return nil, fmt.Errorf("cannot attach to %T: %v", object, err)
 	}
-	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+	sortBy := func(pods []*corev1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 	pod, _, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	return pod, err
 }

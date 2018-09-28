@@ -36,6 +36,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -47,7 +48,6 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -293,8 +293,10 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
+	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
+		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
+		}
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers

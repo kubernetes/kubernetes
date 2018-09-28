@@ -28,6 +28,7 @@ import (
 // You shouldn't be using this.  It makes sig-auth sad.
 // DeprecatedInsecureServingInfo *ServingInfo
 
+// BuildInsecureHandlerChain sets up the server to listen to http. Should be removed.
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := apiHandler
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)

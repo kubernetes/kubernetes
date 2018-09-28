@@ -27,10 +27,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
+	utiltesting "k8s.io/client-go/util/testing"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csifake "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"testing"
 )
 
@@ -530,10 +532,23 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 		nodeName := tc.existingNode.Name
 		client := fake.NewSimpleClientset(tc.existingNode)
 		csiClient := csifake.NewSimpleClientset()
-		nim := NewNodeInfoManager(types.NodeName(nodeName), client, csiClient)
+
+		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
+		if err != nil {
+			t.Fatalf("can't create temp dir: %v", err)
+		}
+		host := volumetest.NewFakeVolumeHostWithCSINodeName(
+			tmpDir,
+			client,
+			csiClient,
+			nil,
+			nodeName,
+		)
+
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
 
 		// Act
-		err := nim.AddNodeInfo(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+		err = nim.AddNodeInfo(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
 		if err != nil {
 			t.Errorf("expected no error from AddNodeInfo call but got: %v", err)
 			continue
@@ -573,10 +588,21 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 		} else {
 			csiClient = csifake.NewSimpleClientset(tc.existingNodeInfo)
 		}
-		nim := NewNodeInfoManager(types.NodeName(nodeName), client, csiClient)
+
+		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
+		if err != nil {
+			t.Fatalf("can't create temp dir: %v", err)
+		}
+		host := volumetest.NewFakeVolumeHostWithCSINodeName(
+			tmpDir,
+			client,
+			csiClient,
+			nil,
+			nodeName,
+		)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
 
 		//// Act
-		var err error
 		if addNodeInfo {
 			err = nim.AddNodeInfo(tc.driverName, tc.inputNodeID, 0 /* maxVolumeLimit */, tc.inputTopology) // TODO test maxVolumeLimit
 		} else {

@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -36,7 +37,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
@@ -292,10 +292,14 @@ func getControllerManagerCommand(cfg *kubeadmapi.InitConfiguration, k8sVersion *
 		"cluster-signing-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
 		"use-service-account-credentials":  "true",
 		"controllers":                      "*,bootstrapsigner,tokencleaner",
-		"authentication-kubeconfig":        filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
-		"authorization-kubeconfig":         filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
-		"client-ca-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName),
-		"requestheader-client-ca-file":     filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName),
+	}
+
+	//add the extra arguments for v1.12+
+	if k8sVersion.Major() >= 1 && k8sVersion.Minor() >= 12 {
+		defaultArguments["authentication-kubeconfig"] = filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+		defaultArguments["authorization-kubeconfig"] = filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+		defaultArguments["client-ca-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)
+		defaultArguments["requestheader-client-ca-file"] = filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertName)
 	}
 
 	// If using external CA, pass empty string to controller manager instead of ca.key/ca.crt path,

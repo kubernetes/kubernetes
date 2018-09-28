@@ -21,12 +21,17 @@ package storage
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path"
+	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -35,6 +40,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/manifest"
 
 	. "github.com/onsi/ginkgo"
+
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	csicrd "k8s.io/csi-api/pkg/crd"
 )
 
 var csiImageVersions = map[string]string{
@@ -117,7 +126,8 @@ func csiServiceAccount(
 	serviceAccountClient := client.CoreV1().ServiceAccounts(config.Namespace)
 	sa := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: serviceAccountName,
+			Name:      serviceAccountName,
+			Namespace: config.Namespace,
 		},
 	}
 
@@ -154,14 +164,13 @@ func csiClusterRoleBindings(
 	By(fmt.Sprintf("%v cluster roles %v to the CSI service account %v", bindingString, clusterRolesNames, sa.GetName()))
 	clusterRoleBindingClient := client.RbacV1().ClusterRoleBindings()
 	for _, clusterRoleName := range clusterRolesNames {
-
 		binding := &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: config.Prefix + "-" + clusterRoleName + "-" + config.Namespace + "-role-binding",
+				Name: clusterRoleName + "-" + config.Namespace + "-" + string(uuid.NewUUID()),
 			},
 			Subjects: []rbacv1.Subject{
 				{
-					Kind:      "ServiceAccount",
+					Kind:      rbacv1.ServiceAccountKind,
 					Name:      sa.GetName(),
 					Namespace: sa.GetNamespace(),
 				},
@@ -426,4 +435,88 @@ func deployGCEPDCSIDriver(
 	_, err = client.AppsV1().DaemonSets(config.Namespace).Create(nodeds)
 	framework.ExpectNoError(err, "Failed to create DaemonSet: %v", nodeds.Name)
 
+}
+
+func createCSICRDs(c apiextensionsclient.Interface) {
+	By("Creating CSI CRDs")
+	crds := []*apiextensionsv1beta1.CustomResourceDefinition{
+		csicrd.CSIDriverCRD(),
+		csicrd.CSINodeInfoCRD(),
+	}
+
+	for _, crd := range crds {
+		_, err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+		framework.ExpectNoError(err, "Failed to create CSI CRD %q: %v", crd.Name, err)
+	}
+}
+
+func deleteCSICRDs(c apiextensionsclient.Interface) {
+	By("Deleting CSI CRDs")
+	csiDriverCRDName := csicrd.CSIDriverCRD().Name
+	csiNodeInfoCRDName := csicrd.CSINodeInfoCRD().Name
+	err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(csiDriverCRDName, &metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Failed to delete CSI CRD %q: %v", csiDriverCRDName, err)
+	err = c.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(csiNodeInfoCRDName, &metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Failed to delete CSI CRD %q: %v", csiNodeInfoCRDName, err)
+}
+
+func shredFile(filePath string) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		framework.Logf("File %v was not found, skipping shredding", filePath)
+		return
+	}
+	framework.Logf("Shredding file %v", filePath)
+	_, _, err := framework.RunCmd("shred", "--remove", filePath)
+	if err != nil {
+		framework.Logf("Failed to shred file %v: %v", filePath, err)
+	}
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		framework.Logf("File %v successfully shredded", filePath)
+		return
+	}
+	// Shred failed Try to remove the file for good meausure
+	err = os.Remove(filePath)
+	framework.ExpectNoError(err, "Failed to remove service account file %s", filePath)
+
+}
+
+// createGCESecrets downloads the GCP IAM Key for the default compute service account
+// and puts it in a secret for the GCE PD CSI Driver to consume
+func createGCESecrets(client clientset.Interface, config framework.VolumeTestConfig) {
+	saEnv := "E2E_GOOGLE_APPLICATION_CREDENTIALS"
+	saFile := fmt.Sprintf("/tmp/%s/cloud-sa.json", string(uuid.NewUUID()))
+
+	os.MkdirAll(path.Dir(saFile), 0750)
+	defer os.Remove(path.Dir(saFile))
+
+	premadeSAFile, ok := os.LookupEnv(saEnv)
+	if !ok {
+		framework.Logf("Could not find env var %v, please either create cloud-sa"+
+			" secret manually or rerun test after setting %v to the filepath of"+
+			" the GCP Service Account to give to the GCE Persistent Disk CSI Driver", saEnv, saEnv)
+		return
+	}
+
+	framework.Logf("Found CI service account key at %v", premadeSAFile)
+	// Need to copy it saFile
+	stdout, stderr, err := framework.RunCmd("cp", premadeSAFile, saFile)
+	framework.ExpectNoError(err, "error copying service account key: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
+	defer shredFile(saFile)
+	// Create Secret with this Service Account
+	fileBytes, err := ioutil.ReadFile(saFile)
+	framework.ExpectNoError(err, "Failed to read file %v", saFile)
+
+	s := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cloud-sa",
+			Namespace: config.Namespace,
+		},
+		Type: v1.SecretTypeOpaque,
+		Data: map[string][]byte{
+			filepath.Base(saFile): fileBytes,
+		},
+	}
+
+	_, err = client.CoreV1().Secrets(config.Namespace).Create(s)
+	framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
 }

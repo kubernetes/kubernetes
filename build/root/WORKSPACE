@@ -48,7 +48,7 @@ load("@io_bazel_rules_docker//docker:docker.bzl", "docker_pull", "docker_reposit
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.10.3",
+    go_version = "1.10.4",
 )
 
 docker_repositories()
@@ -67,18 +67,18 @@ http_file(
 
 docker_pull(
     name = "debian-iptables-amd64",
-    digest = "sha256:58e53e477d204fe32f761ec2718b792f653063d4192ae89efc79e4b6a8dbba91",
+    digest = "sha256:0987db7ce42949d20ed2647a65d4bee0b616b4d40c7ea54769cc24b7ad003677",
     registry = "k8s.gcr.io",
     repository = "debian-iptables-amd64",
-    tag = "v10.1",  # ignored, but kept here for documentation
+    tag = "v10.2",  # ignored, but kept here for documentation
 )
 
 docker_pull(
     name = "debian-hyperkube-base-amd64",
-    digest = "sha256:1c83ca9c8ac4a06e4585802edf8a1cd954011152409116e9c801f4736b97b956",
+    digest = "sha256:c50522965140c9f206900bf47d547d601c04943e1e59801ba5f70235773cfbb6",
     registry = "k8s.gcr.io",
     repository = "debian-hyperkube-base-amd64",
-    tag = "0.10.1",  # ignored, but kept here for documentation
+    tag = "0.10.2",  # ignored, but kept here for documentation
 )
 
 docker_pull(

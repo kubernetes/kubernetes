@@ -68,22 +68,6 @@ func TestNewReset(t *testing.T) {
 	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 }
 
-func TestNewCmdReset(t *testing.T) {
-	var out io.Writer
-	var in io.Reader
-	cmd := NewCmdReset(in, out)
-
-	tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
-	if err != nil {
-		t.Errorf("Unable to create temporary directory: %v", err)
-	}
-	args := []string{"--ignore-preflight-errors=all", "--cert-dir=" + tmpDir, "--force"}
-	cmd.SetArgs(args)
-	if err := cmd.Execute(); err != nil {
-		t.Errorf("Cannot execute reset command: %v", err)
-	}
-}
-
 func TestConfigDirCleaner(t *testing.T) {
 	tests := map[string]struct {
 		resetDir        string

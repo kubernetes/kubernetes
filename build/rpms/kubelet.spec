@@ -27,5 +27,5 @@ install -p -m 644 -t %{buildroot}%{_sysconfdir}/systemd/system/ {kubelet.service
 
 %files
 %{_bindir}/kubelet
-%{_sysconfdir}/systemd/system/kubelet.service
+%attr(644,-,-) %{_sysconfdir}/systemd/system/kubelet.service
 %{_sysconfdir}/kubernetes/manifests/

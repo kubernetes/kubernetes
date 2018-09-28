@@ -24,10 +24,11 @@ import (
 	"k8s.io/api/core/v1"
 
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	csi "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -54,23 +55,24 @@ type csiTestDriver interface {
 
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
 	"hostPath": initCSIHostpath,
-	// Feature tag to skip test in CI, pending fix of #62237
-	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
+	"gcePD":    initCSIgcePD,
 }
 
-var _ = utils.SIGDescribe("CSI Volumes", func() {
+var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (
-		cs     clientset.Interface
-		csics  csiclient.Interface
-		ns     *v1.Namespace
-		node   v1.Node
-		config framework.VolumeTestConfig
+		cs        clientset.Interface
+		crdclient apiextensionsclient.Interface
+		csics     csiclient.Interface
+		ns        *v1.Namespace
+		node      v1.Node
+		config    framework.VolumeTestConfig
 	)
 
 	BeforeEach(func() {
 		cs = f.ClientSet
+		crdclient = f.APIExtensionsClientSet
 		csics = f.CSIClientSet
 		ns = f.Namespace
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
@@ -83,13 +85,18 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			WaitForCompletion: true,
 		}
 		csiDriverRegistrarClusterRole(config)
+		createCSICRDs(crdclient)
+	})
+
+	AfterEach(func() {
+		deleteCSICRDs(crdclient)
 	})
 
 	for driverName, initCSIDriver := range csiTestDrivers {
 		curDriverName := driverName
 		curInitCSIDriver := initCSIDriver
 
-		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s", curDriverName), func() {
+		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s [Serial]", curDriverName), func() {
 			var (
 				driver csiTestDriver
 			)
@@ -205,13 +212,13 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	})
 })
 
-func createCSIDriver(csics csiclient.Interface, attachable bool) *csi.CSIDriver {
+func createCSIDriver(csics csiclient.Interface, attachable bool) *csiv1alpha1.CSIDriver {
 	By("Creating CSIDriver instance")
-	driver := &csi.CSIDriver{
+	driver := &csiv1alpha1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "csi-hostpath",
 		},
-		Spec: csi.CSIDriverSpec{
+		Spec: csiv1alpha1.CSIDriverSpec{
 			AttachRequired: &attachable,
 		},
 	}
@@ -353,9 +360,10 @@ type gcePDCSIDriver struct {
 func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
 	cs := f.ClientSet
 	framework.SkipUnlessProviderIs("gce", "gke")
-	// Currently you will need to manually add the required GCP Credentials as a secret "cloud-sa"
-	// kubectl create generic cloud-sa --from-file=PATH/TO/cloud-sa.json --namespace={{config.Namespace}}
-	// TODO(#62561): Inject the necessary credentials automatically to the driver containers in e2e test
+
+	// TODO(#62561): Use credentials through external pod identity when that goes GA instead of downloading keys.
+	createGCESecrets(cs, config)
+
 	framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
 
 	return &gcePDCSIDriver{
@@ -394,6 +402,8 @@ func (g *gcePDCSIDriver) createCSIDriver() {
 	g.nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false /* teardown */)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace,
+		false /* teardown */, []string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
 	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 }
 
@@ -405,6 +415,8 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace,
+		true /* teardown */, []string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
 	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
 }

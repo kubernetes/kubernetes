@@ -50,7 +50,7 @@ var (
 func NewCmdCertsRenewal() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
-		Short: "Renews certificates for a kubernetes cluster",
+		Short: "Renews certificates for a Kubernetes cluster",
 		Long:  cmdutil.MacroCommandLongDescription,
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
@@ -110,7 +110,7 @@ func addFlags(cmd *cobra.Command, cfg *renewConfig) {
 	options.AddConfigFlag(cmd.Flags(), &cfg.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &cfg.cfg.CertificatesDir)
 	options.AddKubeConfigFlag(cmd.Flags(), &cfg.kubeconfigPath)
-	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the kubernetes certificate API to renew certificates")
+	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the Kubernetes certificate API to renew certificates")
 }
 
 // generateCertCommand takes mostly strings instead of structs to avoid using structs in a for loop

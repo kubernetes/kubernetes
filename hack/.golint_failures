@@ -6,21 +6,12 @@ cmd/kube-apiserver/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kubeadm/app
-cmd/kubeadm/app/apis/kubeadm/v1alpha2
 cmd/kubeadm/app/apis/kubeadm/v1alpha3
 cmd/kubeadm/app/util/config
 cmd/kubeadm/app/util/system
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
-pkg/api/endpoints
-pkg/api/ref
-pkg/api/testapi
-pkg/api/testing
-pkg/api/testing/compat
-pkg/api/v1/endpoints
-pkg/api/v1/pod
-pkg/api/v1/resource
 pkg/apis/abac
 pkg/apis/abac/latest
 pkg/apis/abac/v0
@@ -97,9 +88,6 @@ pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
-pkg/client/chaosclient
-pkg/client/leaderelectionconfig
-pkg/client/tests
 pkg/cloudprovider
 pkg/cloudprovider/providers/aws
 pkg/cloudprovider/providers/fake
@@ -131,7 +119,6 @@ pkg/controller/podautoscaler
 pkg/controller/podautoscaler/metrics
 pkg/controller/podgc
 pkg/controller/replicaset
-pkg/controller/replicaset/options
 pkg/controller/replication
 pkg/controller/resourcequota
 pkg/controller/route
@@ -156,7 +143,6 @@ pkg/kubeapiserver/authenticator
 pkg/kubeapiserver/authorizer
 pkg/kubeapiserver/authorizer/modes
 pkg/kubeapiserver/options
-pkg/kubeapiserver/server
 pkg/kubectl
 pkg/kubectl/apps
 pkg/kubectl/cmd
@@ -211,12 +197,8 @@ pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
-pkg/kubelet/images
-pkg/kubelet/kuberuntime
-pkg/kubelet/leaky
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
-pkg/kubelet/pleg
 pkg/kubelet/pod
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
@@ -262,7 +244,7 @@ pkg/proxy/userspace
 pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
-pkg/quota/evaluator/core
+pkg/quota/v1/evaluator/core
 pkg/registry/admissionregistration/initializerconfiguration/storage
 pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
 pkg/registry/admissionregistration/rest
@@ -401,7 +383,6 @@ pkg/util/tolerations
 pkg/util/workqueue/prometheus
 pkg/version/verflag
 pkg/volume
-pkg/volume/aws_ebs
 pkg/volume/azure_dd
 pkg/volume/azure_file
 pkg/volume/cephfs

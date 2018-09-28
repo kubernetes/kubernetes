@@ -206,31 +206,24 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// apply volume ownership
-	if !c.readOnly && fsGroup != nil {
-		err := volume.SetVolumeOwnership(c, fsGroup)
-		if err != nil {
-			// attempt to rollback mount.
-			glog.Error(log("mounter.SetupAt failed to set fsgroup volume ownership for [%s]: %v", c.volumeID, err))
-			glog.V(4).Info(log("mounter.SetupAt attempting to unpublish volume %s due to previous error", c.volumeID))
-			if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
-				glog.Error(log(
-					"mounter.SetupAt failed to unpublish volume [%s]: %v (caused by previous NodePublish error: %v)",
-					c.volumeID, unpubErr, err,
-				))
-				return fmt.Errorf("%v (caused by %v)", unpubErr, err)
-			}
+	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
+	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
+	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
 
-			if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
-				glog.Error(log(
-					"mounter.SetupAt failed to clean mount dir [%s]: %v (caused by previous NodePublish error: %v)",
-					dir, unmountErr, err,
-				))
-				return fmt.Errorf("%v (caused by %v)", unmountErr, err)
-			}
-
-			return err
+	err = c.applyFSGroup(fsType, fsGroup)
+	if err != nil {
+		// attempt to rollback mount.
+		fsGrpErr := fmt.Errorf("applyFSGroup failed for vol %s: %v", c.volumeID, err)
+		if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
+			glog.Error(log("NodeUnpublishVolume failed for [%s]: %v", c.volumeID, unpubErr))
+			return fsGrpErr
 		}
-		glog.V(4).Info(log("mounter.SetupAt sets fsGroup to [%d] for %s", *fsGroup, c.volumeID))
+
+		if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
+			glog.Error(log("removeMountDir failed for [%s]: %v", dir, unmountErr))
+			return fsGrpErr
+		}
+		return fsGrpErr
 	}
 
 	glog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
@@ -326,6 +319,43 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 		return err
 	}
 	glog.V(4).Infof(log("mounte.TearDownAt successfully unmounted dir [%s]", dir))
+
+	return nil
+}
+
+// applyFSGroup applies the volume ownership it derives its logic
+// from https://github.com/kubernetes/kubernetes/issues/66323
+// 1) if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
+// 2) if fstype is provided and pv.AccessMode == ReadWriteOnly and !c.spec.ReadOnly then apply fsgroup
+func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
+	if fsGroup != nil {
+		if fsType == "" {
+			glog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, fsType not provided"))
+			return nil
+		}
+
+		accessModes := c.spec.PersistentVolume.Spec.AccessModes
+		if c.spec.PersistentVolume.Spec.AccessModes == nil {
+			glog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
+			return nil
+		}
+		if !hasReadWriteOnce(accessModes) {
+			glog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
+			return nil
+		}
+
+		if c.readOnly {
+			glog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, volume is readOnly"))
+			return nil
+		}
+
+		err := volume.SetVolumeOwnership(c, fsGroup)
+		if err != nil {
+			return err
+		}
+
+		glog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
+	}
 
 	return nil
 }

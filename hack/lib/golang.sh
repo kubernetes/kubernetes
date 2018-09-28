@@ -523,14 +523,14 @@ kube::golang::delete_coverage_dummy_test() {
 # Arguments: a list of kubernetes packages to build.
 # Expected variables: ${build_args} should be set to an array of Go build arguments.
 # In addition, ${package} and ${platform} should have been set earlier, and if
-# ${build_with_coverage} is set, coverage instrumentation will be enabled.
+# ${KUBE_BUILD_WITH_COVERAGE} is set, coverage instrumentation will be enabled.
 #
 # Invokes Go to actually build some packages. If coverage is disabled, simply invokes
 # go install. If coverage is enabled, builds covered binaries using go test, temporarily
 # producing the required unit test files and then cleaning up after itself.
 # Non-covered binaries are then built using go install as usual.
 kube::golang::build_some_binaries() {
-  if [[ -n "${build_with_coverage:-}" ]]; then
+  if [[ -n "${KUBE_BUILD_WITH_COVERAGE:-}" ]]; then
     local -a uncovered=()
     for package in "$@"; do
       if kube::golang::is_instrumented_package "${package}"; then
@@ -586,6 +586,7 @@ kube::golang::build_binaries_for_platform() {
       -installsuffix static
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
+      -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
     )
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
@@ -595,6 +596,7 @@ kube::golang::build_binaries_for_platform() {
     build_args=(
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
+      -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
@@ -608,6 +610,7 @@ kube::golang::build_binaries_for_platform() {
     go test -c \
       ${goflags:+"${goflags[@]}"} \
       -gcflags "${gogcflags:-}" \
+      -asmflags "${goasmflags:-}" \
       -ldflags "${goldflags:-}" \
       -o "${outfile}" \
       "${testpkg}"
@@ -661,11 +664,11 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     # Use eval to preserve embedded quoted strings.
-    local goflags goldflags gogcflags build_with_coverage
+    local goflags goldflags goasmflags gogcflags
     eval "goflags=(${GOFLAGS:-})"
-    goldflags="${GOLDFLAGS:-} $(kube::version::ldflags)"
-    gogcflags="${GOGCFLAGS:-}"
-    build_with_coverage="${KUBE_BUILD_WITH_COVERAGE:-}"
+    goldflags="${GOLDFLAGS:-} -s -w $(kube::version::ldflags)"
+    goasmflags="-trimpath=${KUBE_ROOT}"
+    gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
     local -a targets=()
     local arg

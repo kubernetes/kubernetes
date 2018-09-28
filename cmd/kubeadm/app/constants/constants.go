@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // KubernetesDir is the directory kubernetes owns for storing various configuration files
@@ -192,10 +192,6 @@ const (
 	// TODO: Rename this to KubeadmConfigConfigMap
 	InitConfigurationConfigMap = "kubeadm-config"
 
-	// InitConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
-	// TODO: This was used in v1.11 with vi1alpha2 config and older. Remove in v1.13
-	InitConfigurationConfigMapKey = "MasterConfiguration"
-
 	// ClusterConfigurationConfigMapKey specifies in what ConfigMap key the cluster configuration should be stored
 	ClusterConfigurationConfigMapKey = "ClusterConfiguration"
 
@@ -245,6 +241,9 @@ const (
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
 	DefaultEtcdVersion = "3.2.24"
+
+	// PauseVersion indicates the default pause image version for kubeadm
+	PauseVersion = "3.1"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -299,7 +298,7 @@ const (
 	LeaseEndpointReconcilerType = "lease"
 
 	// KubeDNSVersion is the version of kube-dns to be deployed if it is used
-	KubeDNSVersion = "1.14.10"
+	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
 	CoreDNSVersion = "1.2.2"
@@ -310,16 +309,8 @@ const (
 	// InitConfigurationKind is the string kind value for the InitConfiguration struct
 	InitConfigurationKind = "InitConfiguration"
 
-	// MasterConfigurationKind is the string kind value for the v1alpha2-named MasterConfiguration struct
-	// In v1alpha3 and higher, this struct is now named InitConfiguration
-	MasterConfigurationKind = "MasterConfiguration"
-
 	// JoinConfigurationKind is the string kind value for the JoinConfiguration struct
 	JoinConfigurationKind = "JoinConfiguration"
-
-	// NodeConfigurationKind is the string kind value for the v1alpha2-named NodeConfiguration struct
-	// In v1alpha3 and higher, this struct is now named JoinConfiguration
-	NodeConfigurationKind = "NodeConfiguration"
 
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
@@ -352,10 +343,10 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.10.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.11.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.10.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.11.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{

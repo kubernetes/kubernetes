@@ -500,3 +500,28 @@ func GetPersistentVolumeClaimClass(claim *v1.PersistentVolumeClaim) string {
 
 	return ""
 }
+
+// ScopedResourceSelectorRequirementsAsSelector converts the ScopedResourceSelectorRequirement api type into a struct that implements
+// labels.Selector.
+func ScopedResourceSelectorRequirementsAsSelector(ssr v1.ScopedResourceSelectorRequirement) (labels.Selector, error) {
+	selector := labels.NewSelector()
+	var op selection.Operator
+	switch ssr.Operator {
+	case v1.ScopeSelectorOpIn:
+		op = selection.In
+	case v1.ScopeSelectorOpNotIn:
+		op = selection.NotIn
+	case v1.ScopeSelectorOpExists:
+		op = selection.Exists
+	case v1.ScopeSelectorOpDoesNotExist:
+		op = selection.DoesNotExist
+	default:
+		return nil, fmt.Errorf("%q is not a valid scope selector operator", ssr.Operator)
+	}
+	r, err := labels.NewRequirement(string(ssr.ScopeName), op, ssr.Values)
+	if err != nil {
+		return nil, err
+	}
+	selector = selector.Add(*r)
+	return selector, nil
+}

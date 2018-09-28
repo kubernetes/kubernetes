@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -470,6 +471,43 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			if len(upm.pods) != 0 {
 				t.Errorf("Expected the map to be empty, but has %v elements.", len(upm.pods))
 			}
+		})
+	}
+}
+
+func TestSchedulingQueue_Close(t *testing.T) {
+	tests := []struct {
+		name        string
+		q           SchedulingQueue
+		expectedErr error
+	}{
+		{
+			name:        "FIFO close",
+			q:           NewFIFO(),
+			expectedErr: fmt.Errorf(queueClosed),
+		},
+		{
+			name:        "PriorityQueue close",
+			q:           NewPriorityQueue(),
+			expectedErr: fmt.Errorf(queueClosed),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				pod, err := test.q.Pop()
+				if err.Error() != test.expectedErr.Error() {
+					t.Errorf("Expected err %q from Pop() if queue is closed, but got %q", test.expectedErr.Error(), err.Error())
+				}
+				if pod != nil {
+					t.Errorf("Expected pod nil from Pop() if queue is closed, but got: %v", pod)
+				}
+			}()
+			test.q.Close()
+			wg.Wait()
 		})
 	}
 }

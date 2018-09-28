@@ -17,10 +17,11 @@ limitations under the License.
 package rollout
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
@@ -84,16 +85,9 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Long:    undo_long,
 		Example: undo_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			allErrs := []error{}
-			err := o.Complete(f, cmd, args)
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			err = o.RunUndo()
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunUndo())
 		},
 		ValidArgs: validArgs,
 	}
@@ -107,10 +101,6 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 }
 
 func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
-	}
-
 	o.Resources = args
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
@@ -131,6 +121,13 @@ func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	o.Builder = f.NewBuilder
 
 	return err
+}
+
+func (o *UndoOptions) Validate() error {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+		return fmt.Errorf("required resource not specified")
+	}
+	return nil
 }
 
 func (o *UndoOptions) RunUndo() error {

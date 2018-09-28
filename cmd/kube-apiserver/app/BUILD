@@ -33,7 +33,7 @@ go_library(
         "//pkg/master/controller/crdregistration:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
         "//pkg/master/tunneler:go_default_library",
-        "//pkg/quota/install:go_default_library",
+        "//pkg/quota/v1/install:go_default_library",
         "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/serviceaccount:go_default_library",

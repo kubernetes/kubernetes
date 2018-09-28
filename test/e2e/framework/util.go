@@ -63,6 +63,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
@@ -97,7 +98,6 @@ import (
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -4153,7 +4153,9 @@ func CheckNodesReady(c clientset.Interface, size int, timeout time.Duration) ([]
 
 		// Filter out not-ready nodes.
 		FilterNodes(nodes, func(node v1.Node) bool {
-			return IsNodeConditionSetAsExpected(&node, v1.NodeReady, true)
+			nodeReady := IsNodeConditionSetAsExpected(&node, v1.NodeReady, true)
+			networkReady := IsNodeConditionUnset(&node, v1.NodeNetworkUnavailable) || IsNodeConditionSetAsExpected(&node, v1.NodeNetworkUnavailable, false)
+			return nodeReady && networkReady
 		})
 		numReady := len(nodes.Items)
 

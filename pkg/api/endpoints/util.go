@@ -171,6 +171,7 @@ func (sl addrsReady) Less(i, j int) bool {
 	return lessAddrReady(sl[i], sl[j])
 }
 
+// LessEndpointAddress compares IP addresses lexicographically and returns true if first argument is lesser than second
 func LessEndpointAddress(a, b *api.EndpointAddress) bool {
 	ipComparison := bytes.Compare([]byte(a.IP), []byte(b.IP))
 	if ipComparison != 0 {
@@ -190,8 +191,8 @@ func LessEndpointAddress(a, b *api.EndpointAddress) bool {
 func SortSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	for i := range subsets {
 		ss := &subsets[i]
-		sort.Sort(addrsByIpAndUID(ss.Addresses))
-		sort.Sort(addrsByIpAndUID(ss.NotReadyAddresses))
+		sort.Sort(addrsByIPAndUID(ss.Addresses))
+		sort.Sort(addrsByIPAndUID(ss.NotReadyAddresses))
 		sort.Sort(portsByHash(ss.Ports))
 	}
 	sort.Sort(subsetsByHash(subsets))
@@ -214,11 +215,11 @@ func (sl subsetsByHash) Less(i, j int) bool {
 	return bytes.Compare(h1, h2) < 0
 }
 
-type addrsByIpAndUID []api.EndpointAddress
+type addrsByIPAndUID []api.EndpointAddress
 
-func (sl addrsByIpAndUID) Len() int      { return len(sl) }
-func (sl addrsByIpAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl addrsByIpAndUID) Less(i, j int) bool {
+func (sl addrsByIPAndUID) Len() int      { return len(sl) }
+func (sl addrsByIPAndUID) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrsByIPAndUID) Less(i, j int) bool {
 	return LessEndpointAddress(&sl[i], &sl[j])
 }
 

@@ -61,10 +61,10 @@ var _ = Interface(&NsenterMounter{})
 // Mount runs mount(8) in the host's root mount namespace.  Aside from this
 // aspect, Mount has the same semantics as the mounter returned by mount.New()
 func (n *NsenterMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := isBind(options)
 
 	if bind {
-		err := n.doNsenterMount(source, target, fstype, []string{"bind"})
+		err := n.doNsenterMount(source, target, fstype, bindOpts)
 		if err != nil {
 			return err
 		}
@@ -337,6 +337,13 @@ func (mounter *NsenterMounter) SafeMakeDir(subdir string, base string, perm os.F
 }
 
 func (mounter *NsenterMounter) GetMountRefs(pathname string) ([]string, error) {
+	exists, err := mounter.ExistsPath(pathname)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return []string{}, nil
+	}
 	hostpath, err := mounter.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
 		return nil, err

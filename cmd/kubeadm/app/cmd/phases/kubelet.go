@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -33,7 +34,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/util/normalizer"
-	"k8s.io/kubernetes/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -81,7 +81,7 @@ var (
 		kubeadm alpha phase kubelet config download
 
 		# Downloads the kubelet configuration from the ConfigMap in the cluster. Uses a specific desired kubelet version.
-		kubeadm alpha phase kubelet config download --kubelet-version v1.11.0
+		kubeadm alpha phase kubelet config download --kubelet-version v1.12.0
 		`)
 
 	kubeletConfigWriteToDiskLongDesc = normalizer.LongDesc(`
@@ -104,7 +104,7 @@ var (
 
 	kubeletConfigEnableDynamicExample = normalizer.Examples(`
 		# Enables dynamic kubelet configuration for a Node.
-		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version v1.11.0
+		kubeadm alpha phase kubelet enable-dynamic-config --node-name node-1 --kubelet-version v1.12.0
 
 		WARNING: This feature is still experimental, and disabled by default. Enable only if you know what you are doing, as it
 		may have surprising side-effects at this stage.

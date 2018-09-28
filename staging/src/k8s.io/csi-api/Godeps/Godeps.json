@@ -92,7 +92,7 @@
 		},
 		{
 			"ImportPath": "github.com/modern-go/reflect2",
-			"Rev": "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
+			"Rev": "94122c33edd36123c84d5368cfb2b69df93a0ec8"
 		},
 		{
 			"ImportPath": "github.com/peterbourgon/diskv",
@@ -288,6 +288,18 @@
 		},
 		{
 			"ImportPath": "k8s.io/api/storage/v1beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

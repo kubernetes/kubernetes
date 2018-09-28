@@ -19,4 +19,5 @@ limitations under the License.
 // +groupName=storage.k8s.io
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/storage/v1
+
 package v1

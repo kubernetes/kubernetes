@@ -26,10 +26,10 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 )
 
 type fakeVersionGetter struct {
@@ -715,7 +715,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 						KubeVersion:    "v1.12.0",
 						KubeadmVersion: "v1.12.0",
 						DNSType:        "kube-dns",
-						DNSVersion:     "1.14.10",
+						DNSVersion:     "1.14.13",
 						EtcdVersion:    "3.2.24",
 					},
 				},
