@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -852,11 +852,12 @@ const (
 
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)
-	obj := &extensions.Deployment{}
-	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
+	obj := &extensionsv1beta1.Deployment{}
+	codec := scheme.Codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion)
+	if err := runtime.DecodeInto(codec, raw, obj); err != nil {
 		t.Fatal(err)
 	}
-	objJSON, err := runtime.Encode(testapi.Extensions.Codec(), obj)
+	objJSON, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Fatal(err)
 	}
