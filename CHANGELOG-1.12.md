@@ -852,75 +852,79 @@ filename | sha256 hash
 
 * Service events are now added in azure-cloud-provider for easily identify the underground errors of Azure API. ([#68212](https://github.com/kubernetes/kubernetes/pull/68212), [@feiskyer](https://github.com/feiskyer))
     * Action required: The following clusterrole and clusterrolebinding should be applied:
-    *     kind: List
-    *     apiVersion: v1
-    *     items:
-    *     - apiVersion: rbac.authorization.k8s.io/v1
-    *       kind: ClusterRole
-    *       metadata:
-    *         labels:
-    *           kubernetes.io/cluster-service: "true"
-    *         name: system:azure-cloud-provider
-    *       rules:
-    *       - apiGroups: [""]
-    *         resources: ["events"]
-    *         verbs:
-    *         - create
-    *         - patch
-    *         - update
-    *     - apiVersion: rbac.authorization.k8s.io/v1
-    *       kind: ClusterRoleBinding
-    *       metadata:
-    *         labels:
-    *           kubernetes.io/cluster-service: "true"
-    *         name: system:azure-cloud-provider
-    *       roleRef:
-    *         apiGroup: rbac.authorization.k8s.io
-    *         kind: ClusterRole
-    *         name: system:azure-cloud-provider
-    *       subjects:
-    *       - kind: ServiceAccount
-    *         name: azure-cloud-provider
-    *         namespace: kube-system
+    ```
+         kind: List
+         apiVersion: v1
+         items:
+         - apiVersion: rbac.authorization.k8s.io/v1
+           kind: ClusterRole
+           metadata:
+             labels:
+               kubernetes.io/cluster-service: "true"
+             name: system:azure-cloud-provider
+           rules:
+           - apiGroups: [""]
+             resources: ["events"]
+             verbs:
+             - create
+             - patch
+             - update
+         - apiVersion: rbac.authorization.k8s.io/v1
+           kind: ClusterRoleBinding
+           metadata:
+             labels:
+               kubernetes.io/cluster-service: "true"
+             name: system:azure-cloud-provider
+           roleRef:
+             apiGroup: rbac.authorization.k8s.io
+             kind: ClusterRole
+             name: system:azure-cloud-provider
+           subjects:
+           - kind: ServiceAccount
+             name: azure-cloud-provider
+             namespace: kube-system
+    ```
     * If the clusterrole with same has already been provisioned (e.g. for accessing azurefile secrets), then the above yaml should be merged togather, e.g.
-    *     kind: List
-    *     apiVersion: v1
-    *     items:
-    *     - apiVersion: rbac.authorization.k8s.io/v1
-    *       kind: ClusterRole
-    *       metadata:
-    *         labels:
-    *           kubernetes.io/cluster-service: "true"
-    *         name: system:azure-cloud-provider
-    *       rules:
-    *       - apiGroups: [""]
-    *         resources: ["events"]
-    *         verbs:
-    *         - create
-    *         - patch
-    *         - update
-    *       - apiGroups: [""]
-    *         resources: ["secrets"]
-    *         verbs:
-    *         - get
-    *         - create
-    *     - apiVersion: rbac.authorization.k8s.io/v1
-    *       kind: ClusterRoleBinding
-    *       metadata:
-    *         labels:
-    *           kubernetes.io/cluster-service: "true"
-    *         name: system:azure-cloud-provider
-    *       roleRef:
-    *         apiGroup: rbac.authorization.k8s.io
-    *         kind: ClusterRole
-    *         name: system:azure-cloud-provider
-    *       subjects:
-    *       - kind: ServiceAccount
-    *         name: azure-cloud-provider
-    *         namespace: kube-system
-    *       - kind: ServiceAccount
-    *         name: persistent-volume-binder
-    *         namespace: kube-system
+    ```
+         kind: List
+         apiVersion: v1
+         items:
+         - apiVersion: rbac.authorization.k8s.io/v1
+           kind: ClusterRole
+           metadata:
+             labels:
+               kubernetes.io/cluster-service: "true"
+             name: system:azure-cloud-provider
+           rules:
+           - apiGroups: [""]
+             resources: ["events"]
+             verbs:
+             - create
+             - patch
+             - update
+           - apiGroups: [""]
+             resources: ["secrets"]
+             verbs:
+             - get
+             - create
+         - apiVersion: rbac.authorization.k8s.io/v1
+           kind: ClusterRoleBinding
+           metadata:
+             labels:
+               kubernetes.io/cluster-service: "true"
+             name: system:azure-cloud-provider
+           roleRef:
+             apiGroup: rbac.authorization.k8s.io
+             kind: ClusterRole
+             name: system:azure-cloud-provider
+           subjects:
+           - kind: ServiceAccount
+             name: azure-cloud-provider
+             namespace: kube-system
+           - kind: ServiceAccount
+             name: persistent-volume-binder
+             namespace: kube-system
+    ```
 
 ### Other notable changes
 
