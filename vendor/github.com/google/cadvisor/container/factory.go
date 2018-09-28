@@ -51,7 +51,6 @@ const (
 	NetworkUsageMetrics     MetricKind = "network"
 	NetworkTcpUsageMetrics  MetricKind = "tcp"
 	NetworkUdpUsageMetrics  MetricKind = "udp"
-	AcceleratorUsageMetrics MetricKind = "accelerator"
 	AppMetrics              MetricKind = "app"
 )
 

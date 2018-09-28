@@ -55,7 +55,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
-			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
+			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
 			return
 		}
 
@@ -265,7 +265,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	// Apply the patch.
 	patchedObjJS, err := p.applyJSPatch(currentObjJS)
 	if err != nil {
-		return nil, err
+		return nil, interpretPatchError(err)
 	}
 
 	// Construct the resulting typed, unversioned object.
@@ -284,13 +284,9 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(p.patchJS)
 		if err != nil {
-			return nil, errors.NewBadRequest(err.Error())
+			return nil, err
 		}
-		patchedJS, err := patchObj.Apply(versionedJS)
-		if err != nil {
-			return nil, errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
-		}
-		return patchedJS, nil
+		return patchObj.Apply(versionedJS)
 	case types.MergePatchType:
 		return jsonpatch.MergePatch(versionedJS, p.patchJS)
 	default:
@@ -419,7 +415,7 @@ func applyPatchToObject(
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
-		return interpretStrategicMergePatchError(err)
+		return interpretPatchError(err)
 	}
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
@@ -432,8 +428,8 @@ func applyPatchToObject(
 	return nil
 }
 
-// interpretStrategicMergePatchError interprets the error type and returns an error with appropriate HTTP code.
-func interpretStrategicMergePatchError(err error) error {
+// interpretPatchError interprets the error type and returns an error with appropriate HTTP code.
+func interpretPatchError(err error) error {
 	switch err {
 	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
 		return errors.NewBadRequest(err.Error())

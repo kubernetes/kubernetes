@@ -20,5 +20,4 @@ limitations under the License.
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/coordination/v1beta1
 
 // +groupName=coordination.k8s.io
-
 package v1beta1 // import "k8s.io/kubernetes/pkg/apis/coordination/v1beta1"

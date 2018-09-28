@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 )
 
@@ -39,12 +40,14 @@ type DockerConfigProvider interface {
 	LazyProvide() *DockerConfigEntry
 }
 
-func LazyProvide(creds LazyAuthConfiguration) AuthConfig {
+func LazyProvide(creds LazyAuthConfiguration) dockertypes.AuthConfig {
 	if creds.Provider != nil {
 		entry := *creds.Provider.LazyProvide()
 		return DockerConfigEntryToLazyAuthConfiguration(entry).AuthConfig
+	} else {
+		return creds.AuthConfig
 	}
-	return creds.AuthConfig
+
 }
 
 // A DockerConfigProvider that simply reads the .dockercfg file

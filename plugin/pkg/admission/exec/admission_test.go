@@ -19,13 +19,12 @@ package exec
 import (
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
 
 // newAllowEscalatingExec returns `admission.Interface` that allows execution on
@@ -42,18 +41,20 @@ func newAllowEscalatingExec() *DenyExec {
 func TestAdmission(t *testing.T) {
 	privPod := validPod("privileged")
 	priv := true
-	privPod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+	privPod.Spec.Containers[0].SecurityContext = &api.SecurityContext{
 		Privileged: &priv,
 	}
 
 	hostPIDPod := validPod("hostPID")
-	hostPIDPod.Spec.HostPID = true
+	hostPIDPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostPIDPod.Spec.SecurityContext.HostPID = true
 
 	hostIPCPod := validPod("hostIPC")
-	hostIPCPod.Spec.HostIPC = true
+	hostIPCPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostIPCPod.Spec.SecurityContext.HostIPC = true
 
 	testCases := map[string]struct {
-		pod          *corev1.Pod
+		pod          *api.Pod
 		shouldAccept bool
 	}{
 		"priv": {
@@ -105,7 +106,7 @@ func TestAdmission(t *testing.T) {
 	}
 }
 
-func testAdmission(t *testing.T, pod *corev1.Pod, handler *DenyExec, shouldAccept bool) {
+func testAdmission(t *testing.T, pod *api.Pod, handler *DenyExec, shouldAccept bool) {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		if action.(core.GetAction).GetName() == pod.Name {
@@ -115,7 +116,7 @@ func testAdmission(t *testing.T, pod *corev1.Pod, handler *DenyExec, shouldAccep
 		return true, nil, nil
 	})
 
-	handler.SetExternalKubeClientSet(mockClient)
+	handler.SetInternalKubeClientSet(mockClient)
 	admission.ValidateInitialization(handler)
 
 	// pods/exec
@@ -145,18 +146,20 @@ func testAdmission(t *testing.T, pod *corev1.Pod, handler *DenyExec, shouldAccep
 func TestDenyExecOnPrivileged(t *testing.T) {
 	privPod := validPod("privileged")
 	priv := true
-	privPod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+	privPod.Spec.Containers[0].SecurityContext = &api.SecurityContext{
 		Privileged: &priv,
 	}
 
 	hostPIDPod := validPod("hostPID")
-	hostPIDPod.Spec.HostPID = true
+	hostPIDPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostPIDPod.Spec.SecurityContext.HostPID = true
 
 	hostIPCPod := validPod("hostIPC")
-	hostIPCPod.Spec.HostIPC = true
+	hostIPCPod.Spec.SecurityContext = &api.PodSecurityContext{}
+	hostIPCPod.Spec.SecurityContext.HostIPC = true
 
 	testCases := map[string]struct {
-		pod          *corev1.Pod
+		pod          *api.Pod
 		shouldAccept bool
 	}{
 		"priv": {
@@ -192,11 +195,11 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 	}
 }
 
-func validPod(name string) *corev1.Pod {
-	return &corev1.Pod{
+func validPod(name string) *api.Pod {
+	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "test"},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
 				{Name: "ctr1", Image: "image"},
 				{Name: "ctr2", Image: "image2"},
 			},

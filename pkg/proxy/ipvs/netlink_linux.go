@@ -115,7 +115,7 @@ func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error list bound address of interface: %s, err: %v", devName, err)
 	}
-	var ips []string
+	ips := make([]string, 0)
 	for _, addr := range addrs {
 		ips = append(ips, addr.IP.String())
 	}

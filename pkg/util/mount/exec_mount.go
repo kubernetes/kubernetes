@@ -44,10 +44,10 @@ var _ Interface = &execMounter{}
 
 // Mount runs mount(8) using given exec interface.
 func (m *execMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindOpts, bindRemountOpts := isBind(options)
+	bind, bindRemountOpts := isBind(options)
 
 	if bind {
-		err := m.doExecMount(source, target, fstype, bindOpts)
+		err := m.doExecMount(source, target, fstype, []string{"bind"})
 		if err != nil {
 			return err
 		}

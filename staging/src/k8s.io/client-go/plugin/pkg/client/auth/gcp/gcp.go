@@ -174,13 +174,7 @@ func parseScopes(gcpConfig map[string]string) []string {
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	var resetCache map[string]string
-	if cts, ok := g.tokenSource.(*cachedTokenSource); ok {
-		resetCache = cts.baseCache()
-	} else {
-		resetCache = make(map[string]string)
-	}
-	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}, g.persister, resetCache}
+	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}, g.persister}
 }
 
 func (g *gcpAuthProvider) Login() error { return nil }
@@ -250,19 +244,6 @@ func (t *cachedTokenSource) update(tok *oauth2.Token) map[string]string {
 	}
 	ret["access-token"] = t.accessToken
 	ret["expiry"] = t.expiry.Format(time.RFC3339Nano)
-	return ret
-}
-
-// baseCache is the base configuration value for this TokenSource, without any cached ephemeral tokens.
-func (t *cachedTokenSource) baseCache() map[string]string {
-	t.lk.Lock()
-	defer t.lk.Unlock()
-	ret := map[string]string{}
-	for k, v := range t.cache {
-		ret[k] = v
-	}
-	delete(ret, "access-token")
-	delete(ret, "expiry")
 	return ret
 }
 
@@ -356,7 +337,6 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 type conditionalTransport struct {
 	oauthTransport *oauth2.Transport
 	persister      restclient.AuthProviderConfigPersister
-	resetCache     map[string]string
 }
 
 var _ net.RoundTripperWrapper = &conditionalTransport{}
@@ -374,7 +354,8 @@ func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 	if res.StatusCode == 401 {
 		glog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
-		t.persister.Persist(t.resetCache)
+		emptyCache := make(map[string]string)
+		t.persister.Persist(emptyCache)
 	}
 
 	return res, nil

@@ -18,6 +18,7 @@ package nodeinfomanager
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi/v0"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,14 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
-	utiltesting "k8s.io/client-go/util/testing"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csifake "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
-	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"testing"
 )
 
@@ -498,7 +496,9 @@ func TestRemoveNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 }
 
 func TestAddNodeInfoExistingAnnotation(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
+	csiNodeInfoEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.CSINodeInfo))
+	defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, csiNodeInfoEnabled))
 
 	driverName := "com.example.csi/driver1"
 	nodeID := "com.example.csi/some-node"
@@ -532,23 +532,10 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 		nodeName := tc.existingNode.Name
 		client := fake.NewSimpleClientset(tc.existingNode)
 		csiClient := csifake.NewSimpleClientset()
-
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(
-			tmpDir,
-			client,
-			csiClient,
-			nil,
-			nodeName,
-		)
-
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), client, csiClient)
 
 		// Act
-		err = nim.AddNodeInfo(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
+		err := nim.AddNodeInfo(driverName, nodeID, 0 /* maxVolumeLimit */, nil) // TODO test maxVolumeLimit
 		if err != nil {
 			t.Errorf("expected no error from AddNodeInfo call but got: %v", err)
 			continue
@@ -574,7 +561,9 @@ func TestAddNodeInfoExistingAnnotation(t *testing.T) {
 }
 
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
+	wasEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo)
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, csiNodeInfoEnabled))
+	defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.CSINodeInfo, wasEnabled))
 
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)
@@ -588,21 +577,10 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 		} else {
 			csiClient = csifake.NewSimpleClientset(tc.existingNodeInfo)
 		}
-
-		tmpDir, err := utiltesting.MkTmpdir("nodeinfomanager-test")
-		if err != nil {
-			t.Fatalf("can't create temp dir: %v", err)
-		}
-		host := volumetest.NewFakeVolumeHostWithCSINodeName(
-			tmpDir,
-			client,
-			csiClient,
-			nil,
-			nodeName,
-		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), client, csiClient)
 
 		//// Act
+		var err error
 		if addNodeInfo {
 			err = nim.AddNodeInfo(tc.driverName, tc.inputNodeID, 0 /* maxVolumeLimit */, tc.inputTopology) // TODO test maxVolumeLimit
 		} else {

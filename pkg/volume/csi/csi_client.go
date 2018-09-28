@@ -95,10 +95,6 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	nodeClient := csipb.NewNodeClient(conn)
 
 	res, err := nodeClient.NodeGetInfo(ctx, &csipb.NodeGetInfoRequest{})
-	if err != nil {
-		return "", 0, nil, err
-	}
-
 	return res.GetNodeId(), res.GetMaxVolumesPerNode(), res.GetAccessibleTopology(), nil
 }
 

@@ -53,7 +53,7 @@ func NewTopCmdPrinter(out io.Writer) *TopCmdPrinter {
 	return &TopCmdPrinter{out: out}
 }
 
-func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics, availableResources map[string]v1.ResourceList, noHeaders bool) error {
+func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics, availableResources map[string]v1.ResourceList) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -63,9 +63,8 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	sort.Slice(metrics, func(i, j int) bool {
 		return metrics[i].Name < metrics[j].Name
 	})
-	if !noHeaders {
-		printColumnNames(w, NodeColumns)
-	}
+
+	printColumnNames(w, NodeColumns)
 	var usage v1.ResourceList
 	for _, m := range metrics {
 		err := scheme.Scheme.Convert(&m.Usage, &usage, nil)
@@ -87,20 +86,18 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 	w := printers.GetNewTabWriter(printer.out)
 	defer w.Flush()
-	if !noHeaders {
-		if withNamespace {
-			printValue(w, NamespaceColumn)
-		}
-		if printContainers {
-			printValue(w, PodColumn)
-		}
-		printColumnNames(w, PodColumns)
+
+	if withNamespace {
+		printValue(w, NamespaceColumn)
+	}
+	if printContainers {
+		printValue(w, PodColumn)
 	}
 
 	sort.Slice(metrics, func(i, j int) bool {
@@ -109,6 +106,8 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		}
 		return metrics[i].Name < metrics[j].Name
 	})
+
+	printColumnNames(w, PodColumns)
 	for _, m := range metrics {
 		err := printSinglePodMetrics(w, &m, printContainers, withNamespace)
 		if err != nil {

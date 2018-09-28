@@ -28,7 +28,7 @@ func TestValidateDockerInfo(t *testing.T) {
 		Reporter: DefaultReporter,
 	}
 	spec := &DockerSpec{
-		Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.06\..*`},
+		Version:     []string{`1\.1[1-3]\..*`, `17\.03\..*`}, // Requires [1.11, 17.03].
 		GraphDriver: []string{"driver_1", "driver_2"},
 	}
 	for _, test := range []struct {
@@ -69,17 +69,7 @@ func TestValidateDockerInfo(t *testing.T) {
 		{
 			info: types.Info{Driver: "driver_2", ServerVersion: "17.06.0-ce"},
 			err:  false,
-			warn: false,
-		},
-		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "17.09.0-ce"},
-			err:  false,
-			warn: false,
-		},
-		{
-			info: types.Info{Driver: "driver_2", ServerVersion: "18.06.0-ce"},
-			err:  false,
-			warn: false,
+			warn: true,
 		},
 	} {
 		warn, err := v.validateDockerInfo(spec, test.info)

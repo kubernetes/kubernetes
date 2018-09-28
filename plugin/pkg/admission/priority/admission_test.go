@@ -22,31 +22,24 @@ import (
 
 	"github.com/golang/glog"
 
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) error {
+func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	ctrl.SetExternalKubeInformerFactory(informerFactory)
+	ctrl.SetInternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
 	for _, c := range priorityClasses {
-		s := &schedulingv1beta1.PriorityClass{}
-		if err := v1beta1.Convert_scheduling_PriorityClass_To_v1beta1_PriorityClass(c, s, nil); err != nil {
-			return err
-		}
-		informerFactory.Scheduling().V1beta1().PriorityClasses().Informer().GetStore().Add(s)
+		informerFactory.Scheduling().InternalVersion().PriorityClasses().Informer().GetStore().Add(c)
 	}
-	return nil
 }
 
 var defaultClass1 = &scheduling.PriorityClass{
@@ -142,9 +135,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 
 		ctrl := newPlugin()
 		// Add existing priority classes.
-		if err := addPriorityClasses(ctrl, test.existingClasses); err != nil {
-			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
-		}
+		addPriorityClasses(ctrl, test.existingClasses)
 		// Now add the new class.
 		attrs := admission.NewAttributesRecord(
 			test.newClass,
@@ -229,9 +220,7 @@ func TestDefaultPriority(t *testing.T) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 		ctrl := newPlugin()
-		if err := addPriorityClasses(ctrl, test.classesBefore); err != nil {
-			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
-		}
+		addPriorityClasses(ctrl, test.classesBefore)
 		defaultPriority, err := ctrl.getDefaultPriority()
 		if err != nil {
 			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
@@ -245,9 +234,7 @@ func TestDefaultPriority(t *testing.T) {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			}
 		}
-		if err := addPriorityClasses(ctrl, test.classesAfter); err != nil {
-			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
-		}
+		addPriorityClasses(ctrl, test.classesAfter)
 		defaultPriority, err = ctrl.getDefaultPriority()
 		if err != nil {
 			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
@@ -570,9 +557,7 @@ func TestPodAdmission(t *testing.T) {
 
 		ctrl := newPlugin()
 		// Add existing priority classes.
-		if err := addPriorityClasses(ctrl, test.existingClasses); err != nil {
-			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
-		}
+		addPriorityClasses(ctrl, test.existingClasses)
 
 		// Create pod.
 		attrs := admission.NewAttributesRecord(

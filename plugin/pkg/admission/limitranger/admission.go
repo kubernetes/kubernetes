@@ -23,9 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +32,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
-	genericadmissioninitailizer "k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	corev1listers "k8s.io/client-go/listers/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 const (
@@ -56,9 +55,9 @@ func Register(plugins *admission.Plugins) {
 // LimitRanger enforces usage limits on a per resource basis in the namespace
 type LimitRanger struct {
 	*admission.Handler
-	client  kubernetes.Interface
+	client  internalclientset.Interface
 	actions LimitRangerActions
-	lister  corev1listers.LimitRangeLister
+	lister  corelisters.LimitRangeLister
 
 	// liveLookups holds the last few live lookups we've done to help ammortize cost on repeated lookup failures.
 	// This let's us handle the case of latent caches, by looking up actual results for a namespace on cache miss/no results.
@@ -69,23 +68,17 @@ type LimitRanger struct {
 
 var _ admission.MutationInterface = &LimitRanger{}
 var _ admission.ValidationInterface = &LimitRanger{}
-
-var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &LimitRanger{}
-var _ genericadmissioninitailizer.WantsExternalKubeClientSet = &LimitRanger{}
+var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &LimitRanger{}
 
 type liveLookupEntry struct {
 	expiry time.Time
-	items  []*corev1.LimitRange
+	items  []*api.LimitRange
 }
 
-func (l *LimitRanger) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	limitRangeInformer := f.Core().V1().LimitRanges()
+func (l *LimitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
 	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
 	l.lister = limitRangeInformer.Lister()
-}
-
-func (a *LimitRanger) SetExternalKubeClientSet(client kubernetes.Interface) {
-	a.client = client
 }
 
 func (l *LimitRanger) ValidateInitialization() error {
@@ -108,9 +101,18 @@ func (l *LimitRanger) Validate(a admission.Attributes) (err error) {
 	return l.runLimitFunc(a, l.actions.ValidateLimit)
 }
 
-func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRange *corev1.LimitRange, kind string, obj runtime.Object) error) (err error) {
+func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRange *api.LimitRange, kind string, obj runtime.Object) error) (err error) {
 	if !l.actions.SupportsAttributes(a) {
 		return nil
+	}
+
+	obj := a.GetObject()
+	name := "Unknown"
+	if obj != nil {
+		name, _ = meta.NewAccessor().Name(obj)
+		if len(name) == 0 {
+			name, _ = meta.NewAccessor().GenerateName(obj)
+		}
 	}
 
 	// ignore all objects marked for deletion
@@ -146,7 +148,7 @@ func (l *LimitRanger) runLimitFunc(a admission.Attributes, limitFn func(limitRan
 	return nil
 }
 
-func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRange, error) {
+func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*api.LimitRange, error) {
 	items, err := l.lister.LimitRanges(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
 		return nil, admission.NewForbidden(a, fmt.Errorf("unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
@@ -161,7 +163,7 @@ func (l *LimitRanger) GetLimitRanges(a admission.Attributes) ([]*corev1.LimitRan
 			// If there is already in-flight List() for a given namespace, we should wait until
 			// it is finished and cache is updated instead of doing the same, also to avoid
 			// throttling - see #22422 for details.
-			liveList, err := l.client.CoreV1().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
+			liveList, err := l.client.Core().LimitRanges(a.GetNamespace()).List(metav1.ListOptions{})
 			if err != nil {
 				return nil, admission.NewForbidden(a, err)
 			}
@@ -202,24 +204,31 @@ func NewLimitRanger(actions LimitRangerActions) (*LimitRanger, error) {
 	}, nil
 }
 
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&LimitRanger{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&LimitRanger{})
+
+func (a *LimitRanger) SetInternalKubeClientSet(client internalclientset.Interface) {
+	a.client = client
+}
+
 // defaultContainerResourceRequirements returns the default requirements for a container
 // the requirement.Limits are taken from the LimitRange defaults (if specified)
 // the requirement.Requests are taken from the LimitRange default request (if specified)
-func defaultContainerResourceRequirements(limitRange *corev1.LimitRange) api.ResourceRequirements {
+func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.ResourceRequirements {
 	requirements := api.ResourceRequirements{}
 	requirements.Requests = api.ResourceList{}
 	requirements.Limits = api.ResourceList{}
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
-		if limit.Type == corev1.LimitTypeContainer {
+		if limit.Type == api.LimitTypeContainer {
 			for k, v := range limit.DefaultRequest {
 				value := v.Copy()
-				requirements.Requests[api.ResourceName(k)] = *value
+				requirements.Requests[k] = *value
 			}
 			for k, v := range limit.Default {
 				value := v.Copy()
-				requirements.Limits[api.ResourceName(k)] = *value
+				requirements.Limits[k] = *value
 			}
 		}
 	}
@@ -300,9 +309,9 @@ func requestLimitEnforcedValues(requestQuantity, limitQuantity, enforcedQuantity
 }
 
 // minConstraint enforces the min constraint over the specified resource
-func minConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
-	req, reqExists := request[api.ResourceName(resourceName)]
-	lim, limExists := limit[api.ResourceName(resourceName)]
+func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	lim, limExists := limit[resourceName]
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !reqExists {
@@ -319,8 +328,8 @@ func minConstraint(limitType string, resourceName string, enforced resource.Quan
 
 // maxRequestConstraint enforces the max constraint over the specified resource
 // use when specify LimitType resource doesn't recognize limit values
-func maxRequestConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList) error {
-	req, reqExists := request[api.ResourceName(resourceName)]
+func maxRequestConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList) error {
+	req, reqExists := request[resourceName]
 	observedReqValue, _, enforcedValue := requestLimitEnforcedValues(req, resource.Quantity{}, enforced)
 
 	if !reqExists {
@@ -333,9 +342,9 @@ func maxRequestConstraint(limitType string, resourceName string, enforced resour
 }
 
 // maxConstraint enforces the max constraint over the specified resource
-func maxConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
-	req, reqExists := request[api.ResourceName(resourceName)]
-	lim, limExists := limit[api.ResourceName(resourceName)]
+func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	lim, limExists := limit[resourceName]
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !limExists {
@@ -351,9 +360,9 @@ func maxConstraint(limitType string, resourceName string, enforced resource.Quan
 }
 
 // limitRequestRatioConstraint enforces the limit to request ratio over the specified resource
-func limitRequestRatioConstraint(limitType string, resourceName string, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
-	req, reqExists := request[api.ResourceName(resourceName)]
-	lim, limExists := limit[api.ResourceName(resourceName)]
+func limitRequestRatioConstraint(limitType api.LimitType, resourceName api.ResourceName, enforced resource.Quantity, request api.ResourceList, limit api.ResourceList) error {
+	req, reqExists := request[resourceName]
+	lim, limExists := limit[resourceName]
 	observedReqValue, observedLimValue, _ := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !reqExists || (observedReqValue == int64(0)) {
@@ -426,7 +435,7 @@ var _ LimitRangerActions = &DefaultLimitRangerActions{}
 // Limit enforces resource requirements of incoming resources against enumerated constraints
 // on the LimitRange.  It may modify the incoming object to apply default resource requirements
 // if not specified, and enumerated on the LimitRange
-func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, resourceName string, obj runtime.Object) error {
+func (d *DefaultLimitRangerActions) MutateLimit(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
 	switch resourceName {
 	case "pods":
 		return PodMutateLimitFunc(limitRange, obj.(*api.Pod))
@@ -437,7 +446,7 @@ func (d *DefaultLimitRangerActions) MutateLimit(limitRange *corev1.LimitRange, r
 // Limit enforces resource requirements of incoming resources against enumerated constraints
 // on the LimitRange.  It may modify the incoming object to apply default resource requirements
 // if not specified, and enumerated on the LimitRange
-func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *corev1.LimitRange, resourceName string, obj runtime.Object) error {
+func (d *DefaultLimitRangerActions) ValidateLimit(limitRange *api.LimitRange, resourceName string, obj runtime.Object) error {
 	switch resourceName {
 	case "pods":
 		return PodValidateLimitFunc(limitRange, obj.(*api.Pod))
@@ -458,7 +467,7 @@ func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) b
 }
 
 // SupportsLimit always returns true.
-func (d *DefaultLimitRangerActions) SupportsLimit(limitRange *corev1.LimitRange) bool {
+func (d *DefaultLimitRangerActions) SupportsLimit(limitRange *api.LimitRange) bool {
 	return true
 }
 
@@ -466,22 +475,22 @@ func (d *DefaultLimitRangerActions) SupportsLimit(limitRange *corev1.LimitRange)
 // Users request storage via pvc.Spec.Resources.Requests.  Min/Max is enforced by an admin with LimitRange.
 // Claims will not be modified with default values because storage is a required part of pvc.Spec.
 // All storage enforced values *only* apply to pvc.Spec.Resources.Requests.
-func PersistentVolumeClaimValidateLimitFunc(limitRange *corev1.LimitRange, pvc *api.PersistentVolumeClaim) error {
+func PersistentVolumeClaimValidateLimitFunc(limitRange *api.LimitRange, pvc *api.PersistentVolumeClaim) error {
 	var errs []error
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 		limitType := limit.Type
-		if limitType == corev1.LimitTypePersistentVolumeClaim {
+		if limitType == api.LimitTypePersistentVolumeClaim {
 			for k, v := range limit.Min {
 				// normal usage of minConstraint. pvc.Spec.Resources.Limits is not recognized as user input
-				if err := minConstraint(string(limitType), string(k), v, pvc.Spec.Resources.Requests, api.ResourceList{}); err != nil {
+				if err := minConstraint(limitType, k, v, pvc.Spec.Resources.Requests, api.ResourceList{}); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.Max {
 				// We want to enforce the max of the LimitRange against what
 				// the user requested.
-				if err := maxRequestConstraint(string(limitType), string(k), v, pvc.Spec.Resources.Requests); err != nil {
+				if err := maxRequestConstraint(limitType, k, v, pvc.Spec.Resources.Requests); err != nil {
 					errs = append(errs, err)
 				}
 			}
@@ -493,7 +502,7 @@ func PersistentVolumeClaimValidateLimitFunc(limitRange *corev1.LimitRange, pvc *
 // PodMutateLimitFunc sets resource requirements enumerated by the pod against
 // the specified LimitRange.  The pod may be modified to apply default resource
 // requirements if not specified, and enumerated on the LimitRange
-func PodMutateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
+func PodMutateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 	defaultResources := defaultContainerResourceRequirements(limitRange)
 	mergePodResourceRequirements(pod, &defaultResources)
 	return nil
@@ -501,28 +510,28 @@ func PodMutateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 
 // PodValidateLimitFunc enforces resource requirements enumerated by the pod against
 // the specified LimitRange.
-func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
+func PodValidateLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 	var errs []error
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 		limitType := limit.Type
 		// enforce container limits
-		if limitType == corev1.LimitTypeContainer {
+		if limitType == api.LimitTypeContainer {
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]
 				for k, v := range limit.Min {
-					if err := minConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)
 					}
 				}
 				for k, v := range limit.Max {
-					if err := maxConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+					if err := maxConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)
 					}
 				}
 				for k, v := range limit.MaxLimitRequestRatio {
-					if err := limitRequestRatioConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+					if err := limitRequestRatioConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)
 					}
 				}
@@ -530,17 +539,17 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 			for j := range pod.Spec.InitContainers {
 				container := &pod.Spec.InitContainers[j]
 				for k, v := range limit.Min {
-					if err := minConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)
 					}
 				}
 				for k, v := range limit.Max {
-					if err := maxConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+					if err := maxConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)
 					}
 				}
 				for k, v := range limit.MaxLimitRequestRatio {
-					if err := limitRequestRatioConstraint(string(limitType), string(k), v, container.Resources.Requests, container.Resources.Limits); err != nil {
+					if err := limitRequestRatioConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)
 					}
 				}
@@ -548,7 +557,7 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 		}
 
 		// enforce pod limits on init containers
-		if limitType == corev1.LimitTypePod {
+		if limitType == api.LimitTypePod {
 			containerRequests, containerLimits := []api.ResourceList{}, []api.ResourceList{}
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]
@@ -580,17 +589,17 @@ func PodValidateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 				}
 			}
 			for k, v := range limit.Min {
-				if err := minConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
+				if err := minConstraint(limitType, k, v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.Max {
-				if err := maxConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
+				if err := maxConstraint(limitType, k, v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
 				}
 			}
 			for k, v := range limit.MaxLimitRequestRatio {
-				if err := limitRequestRatioConstraint(string(limitType), string(k), v, podRequests, podLimits); err != nil {
+				if err := limitRequestRatioConstraint(limitType, k, v, podRequests, podLimits); err != nil {
 					errs = append(errs, err)
 				}
 			}

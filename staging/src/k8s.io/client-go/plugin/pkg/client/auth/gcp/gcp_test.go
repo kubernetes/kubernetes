@@ -442,61 +442,37 @@ func (t *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return t.res, nil
 }
 
-func Test_cmdTokenSource_roundTrip(t *testing.T) {
+func TestClearingCredentials(t *testing.T) {
 
-	accessToken := "fakeToken"
 	fakeExpiry := time.Now().Add(time.Hour)
-	fakeExpiryStr := fakeExpiry.Format(time.RFC3339Nano)
-	fs := &fakeTokenSource{
-		token: &oauth2.Token{
-			AccessToken: accessToken,
-			Expiry:      fakeExpiry,
-		},
+
+	cache := map[string]string{
+		"access-token": "fakeToken",
+		"expiry":       fakeExpiry.String(),
 	}
 
-	cmdCache := map[string]string{
-		"cmd-path": "/path/to/tokensource/cmd",
-		"cmd-args": "--output=json",
-	}
-	cmdCacheUpdated := map[string]string{
-		"cmd-path":     "/path/to/tokensource/cmd",
-		"cmd-args":     "--output=json",
-		"access-token": accessToken,
-		"expiry":       fakeExpiryStr,
-	}
-	simpleCacheUpdated := map[string]string{
-		"access-token": accessToken,
-		"expiry":       fakeExpiryStr,
+	cts := cachedTokenSource{
+		source:      nil,
+		accessToken: cache["access-token"],
+		expiry:      fakeExpiry,
+		persister:   nil,
+		cache:       nil,
 	}
 
 	tests := []struct {
-		name                     string
-		res                      http.Response
-		baseCache, expectedCache map[string]string
+		name  string
+		res   http.Response
+		cache map[string]string
 	}{
 		{
 			"Unauthorized",
 			http.Response{StatusCode: 401},
 			make(map[string]string),
-			make(map[string]string),
-		},
-		{
-			"Unauthorized, nonempty defaultCache",
-			http.Response{StatusCode: 401},
-			cmdCache,
-			cmdCache,
 		},
 		{
 			"Authorized",
 			http.Response{StatusCode: 200},
-			make(map[string]string),
-			simpleCacheUpdated,
-		},
-		{
-			"Authorized, nonempty defaultCache",
-			http.Response{StatusCode: 200},
-			cmdCache,
-			cmdCacheUpdated,
+			cache,
 		},
 	}
 
@@ -504,23 +480,17 @@ func Test_cmdTokenSource_roundTrip(t *testing.T) {
 	req := http.Request{Header: http.Header{}}
 
 	for _, tc := range tests {
-		cts, err := newCachedTokenSource(accessToken, fakeExpiry.String(), persister, fs, tc.baseCache)
-		if err != nil {
-			t.Fatalf("unexpected error from newCachedTokenSource: %v", err)
-		}
-		authProvider := gcpAuthProvider{cts, persister}
+		authProvider := gcpAuthProvider{&cts, persister}
 
 		fakeTransport := MockTransport{&tc.res}
+
 		transport := (authProvider.WrapTransport(&fakeTransport))
-		// call Token to persist/update cache
-		if _, err := cts.Token(); err != nil {
-			t.Fatalf("unexpected error from cachedTokenSource.Token(): %v", err)
-		}
+		persister.Persist(cache)
 
 		transport.RoundTrip(&req)
 
-		if got := persister.read(); !reflect.DeepEqual(got, tc.expectedCache) {
-			t.Errorf("got cache %v, want %v", got, tc.expectedCache)
+		if got := persister.read(); !reflect.DeepEqual(got, tc.cache) {
+			t.Errorf("got cache %v, want %v", got, tc.cache)
 		}
 	}
 

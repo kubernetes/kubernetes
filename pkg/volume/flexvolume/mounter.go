@@ -32,6 +32,7 @@ type flexVolumeMounter struct {
 	// the considered volume spec
 	spec     *volume.Spec
 	readOnly bool
+	volume.MetricsNil
 }
 
 var _ volume.Mounter = &flexVolumeMounter{}
@@ -92,9 +93,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !f.readOnly {
-		if f.plugin.capabilities.FSGroup {
-			volume.SetVolumeOwnership(f, fsGroup)
-		}
+		volume.SetVolumeOwnership(f, fsGroup)
 	}
 
 	return nil

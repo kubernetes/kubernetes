@@ -35,9 +35,6 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-// nodeMap stores a *NodeCache for each node.
-type nodeMap map[string]*NodeCache
-
 // Cache is a thread safe map saves and reuses the output of predicate functions,
 // it uses node name as key to access those cached results.
 //
@@ -45,23 +42,13 @@ type nodeMap map[string]*NodeCache
 // class". (Equivalence class is defined in the `Class` type.) Saved results
 // will be reused until an appropriate invalidation function is called.
 type Cache struct {
-	// NOTE(harry): Theoretically sync.Map has better performance in machine with 8+ CPUs, while
-	// the reality is lock contention in first level cache is rare.
-	mu             sync.RWMutex
-	nodeToCache    nodeMap
-	predicateIDMap map[string]int
+	// i.e. map[string]*NodeCache
+	sync.Map
 }
 
 // NewCache create an empty equiv class cache.
-func NewCache(predicates []string) *Cache {
-	predicateIDMap := make(map[string]int, len(predicates))
-	for id, predicate := range predicates {
-		predicateIDMap[predicate] = id
-	}
-	return &Cache{
-		nodeToCache:    make(nodeMap),
-		predicateIDMap: predicateIDMap,
-	}
+func NewCache() *Cache {
+	return new(Cache)
 }
 
 // NodeCache saves and reuses the output of predicate functions. Use RunPredicate to
@@ -76,77 +63,22 @@ func NewCache(predicates []string) *Cache {
 type NodeCache struct {
 	mu    sync.RWMutex
 	cache predicateMap
-	// generation is current generation of node cache, incremented on node
-	// invalidation.
-	generation uint64
-	// snapshotGeneration saves snapshot of generation of node cache.
-	snapshotGeneration uint64
-	// predicateGenerations stores generation numbers for predicates, incremented on
-	// predicate invalidation. Created on first update. Use 0 if does not
-	// exist.
-	predicateGenerations []uint64
-	// snapshotPredicateGenerations saves snapshot of generation numbers for predicates.
-	snapshotPredicateGenerations []uint64
 }
 
 // newNodeCache returns an empty NodeCache.
-func newNodeCache(n int) *NodeCache {
+func newNodeCache() *NodeCache {
 	return &NodeCache{
-		cache:                        make(predicateMap, n),
-		predicateGenerations:         make([]uint64, n),
-		snapshotPredicateGenerations: make([]uint64, n),
+		cache: make(predicateMap),
 	}
-}
-
-// Snapshot snapshots current generations of cache.
-// NOTE: We snapshot generations of all node caches before using it and these
-// operations are serialized, we can save snapshot as member of node cache
-// itself.
-func (c *Cache) Snapshot() {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, n := range c.nodeToCache {
-		n.mu.Lock()
-		// snapshot predicate generations
-		copy(n.snapshotPredicateGenerations, n.predicateGenerations)
-		// snapshot node generation
-		n.snapshotGeneration = n.generation
-		n.mu.Unlock()
-	}
-	return
 }
 
 // GetNodeCache returns the existing NodeCache for given node if present. Otherwise,
 // it creates the NodeCache and returns it.
 // The boolean flag is true if the value was loaded, false if created.
 func (c *Cache) GetNodeCache(name string) (nodeCache *NodeCache, exists bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if nodeCache, exists = c.nodeToCache[name]; !exists {
-		nodeCache = newNodeCache(len(c.predicateIDMap))
-		c.nodeToCache[name] = nodeCache
-	}
+	v, exists := c.LoadOrStore(name, newNodeCache())
+	nodeCache = v.(*NodeCache)
 	return
-}
-
-// LoadNodeCache returns the existing NodeCache for given node, nil if not
-// present.
-func (c *Cache) LoadNodeCache(node string) *NodeCache {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.nodeToCache[node]
-}
-
-func (c *Cache) predicateKeysToIDs(predicateKeys sets.String) []int {
-	predicateIDs := make([]int, 0, len(predicateKeys))
-	for predicateKey := range predicateKeys {
-		if id, ok := c.predicateIDMap[predicateKey]; ok {
-			predicateIDs = append(predicateIDs, id)
-		} else {
-			glog.Errorf("predicate key %q not found", predicateKey)
-		}
-	}
-	return predicateIDs
 }
 
 // InvalidatePredicates clears all cached results for the given predicates.
@@ -154,12 +86,11 @@ func (c *Cache) InvalidatePredicates(predicateKeys sets.String) {
 	if len(predicateKeys) == 0 {
 		return
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	predicateIDs := c.predicateKeysToIDs(predicateKeys)
-	for _, n := range c.nodeToCache {
-		n.invalidatePreds(predicateIDs)
-	}
+	c.Range(func(k, v interface{}) bool {
+		n := v.(*NodeCache)
+		n.invalidatePreds(predicateKeys)
+		return true
+	})
 	glog.V(5).Infof("Cache invalidation: node=*,predicates=%v", predicateKeys)
 
 }
@@ -169,22 +100,16 @@ func (c *Cache) InvalidatePredicatesOnNode(nodeName string, predicateKeys sets.S
 	if len(predicateKeys) == 0 {
 		return
 	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	predicateIDs := c.predicateKeysToIDs(predicateKeys)
-	if n, ok := c.nodeToCache[nodeName]; ok {
-		n.invalidatePreds(predicateIDs)
+	if v, ok := c.Load(nodeName); ok {
+		n := v.(*NodeCache)
+		n.invalidatePreds(predicateKeys)
 	}
 	glog.V(5).Infof("Cache invalidation: node=%s,predicates=%v", nodeName, predicateKeys)
 }
 
 // InvalidateAllPredicatesOnNode clears all cached results for one node.
 func (c *Cache) InvalidateAllPredicatesOnNode(nodeName string) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if node, ok := c.nodeToCache[nodeName]; ok {
-		node.invalidate()
-	}
+	c.Delete(nodeName)
 	glog.V(5).Infof("Cache invalidation: node=%s,predicates=*", nodeName)
 }
 
@@ -261,8 +186,8 @@ func NewClass(pod *v1.Pod) *Class {
 	return nil
 }
 
-// predicateMap stores resultMaps with predicate ID as the key.
-type predicateMap []resultMap
+// predicateMap stores resultMaps with predicate name as the key.
+type predicateMap map[string]resultMap
 
 // resultMap stores PredicateResult with pod equivalence hash as the key.
 type resultMap map[uint64]predicateResult
@@ -276,22 +201,22 @@ type predicateResult struct {
 // RunPredicate returns a cached predicate result. In case of a cache miss, the predicate will be
 // run and its results cached for the next call.
 //
-// NOTE: RunPredicate will not update the equivalence cache if generation does not match live version.
+// NOTE: RunPredicate will not update the equivalence cache if the given NodeInfo is stale.
 func (n *NodeCache) RunPredicate(
 	pred algorithm.FitPredicate,
 	predicateKey string,
-	predicateID int,
 	pod *v1.Pod,
 	meta algorithm.PredicateMetadata,
 	nodeInfo *schedulercache.NodeInfo,
 	equivClass *Class,
+	cache schedulercache.Cache,
 ) (bool, []algorithm.PredicateFailureReason, error) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen during tests.
 		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("nodeInfo is nil or node is invalid")
 	}
 
-	result, ok := n.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, predicateID, equivClass.hash)
+	result, ok := n.lookupResult(pod.GetName(), nodeInfo.Node().GetName(), predicateKey, equivClass.hash)
 	if ok {
 		return result.Fit, result.FailReasons, nil
 	}
@@ -299,22 +224,29 @@ func (n *NodeCache) RunPredicate(
 	if err != nil {
 		return fit, reasons, err
 	}
-	n.updateResult(pod.GetName(), predicateKey, predicateID, fit, reasons, equivClass.hash, nodeInfo)
+	if cache != nil {
+		n.updateResult(pod.GetName(), predicateKey, fit, reasons, equivClass.hash, cache, nodeInfo)
+	}
 	return fit, reasons, nil
 }
 
 // updateResult updates the cached result of a predicate.
 func (n *NodeCache) updateResult(
 	podName, predicateKey string,
-	predicateID int,
 	fit bool,
 	reasons []algorithm.PredicateFailureReason,
 	equivalenceHash uint64,
+	cache schedulercache.Cache,
 	nodeInfo *schedulercache.NodeInfo,
 ) {
 	if nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen during tests.
 		metrics.EquivalenceCacheWrites.WithLabelValues("discarded_bad_node").Inc()
+		return
+	}
+	// Skip update if NodeInfo is stale.
+	if !cache.IsUpToDate(nodeInfo) {
+		metrics.EquivalenceCacheWrites.WithLabelValues("discarded_stale").Inc()
 		return
 	}
 
@@ -325,24 +257,16 @@ func (n *NodeCache) updateResult(
 
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if (n.snapshotGeneration != n.generation) || (n.snapshotPredicateGenerations[predicateID] != n.predicateGenerations[predicateID]) {
-		// Generation of node or predicate has been updated since we last took
-		// a snapshot, this indicates that we received a invalidation request
-		// during this time. Cache may be stale, skip update.
-		metrics.EquivalenceCacheWrites.WithLabelValues("discarded_stale").Inc()
-		return
-	}
 	// If cached predicate map already exists, just update the predicate by key
-	if predicates := n.cache[predicateID]; predicates != nil {
+	if predicates, ok := n.cache[predicateKey]; ok {
 		// maps in golang are references, no need to add them back
 		predicates[equivalenceHash] = predicateItem
 	} else {
-		n.cache[predicateID] =
+		n.cache[predicateKey] =
 			resultMap{
 				equivalenceHash: predicateItem,
 			}
 	}
-	n.predicateGenerations[predicateID]++
 
 	glog.V(5).Infof("Cache update: node=%s, predicate=%s,pod=%s,value=%v",
 		nodeInfo.Node().Name, predicateKey, podName, predicateItem)
@@ -352,12 +276,11 @@ func (n *NodeCache) updateResult(
 // cache entry was found.
 func (n *NodeCache) lookupResult(
 	podName, nodeName, predicateKey string,
-	predicateID int,
 	equivalenceHash uint64,
 ) (value predicateResult, ok bool) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	value, ok = n.cache[predicateID][equivalenceHash]
+	value, ok = n.cache[predicateKey][equivalenceHash]
 	if ok {
 		metrics.EquivalenceCacheHits.Inc()
 	} else {
@@ -366,22 +289,13 @@ func (n *NodeCache) lookupResult(
 	return value, ok
 }
 
-// invalidatePreds deletes cached predicates by given IDs.
-func (n *NodeCache) invalidatePreds(predicateIDs []int) {
+// invalidatePreds deletes cached predicates by given keys.
+func (n *NodeCache) invalidatePreds(predicateKeys sets.String) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	for _, predicateID := range predicateIDs {
-		n.cache[predicateID] = nil
-		n.predicateGenerations[predicateID]++
+	for predicateKey := range predicateKeys {
+		delete(n.cache, predicateKey)
 	}
-}
-
-// invalidate invalidates node cache.
-func (n *NodeCache) invalidate() {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.cache = make(predicateMap, len(n.cache))
-	n.generation++
 }
 
 // equivalencePod is the set of pod attributes which must match for two pods to

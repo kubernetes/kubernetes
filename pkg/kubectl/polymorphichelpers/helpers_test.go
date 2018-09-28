@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -118,18 +119,18 @@ func TestGetFirstPod(t *testing.T) {
 			watching: []watch.Event{
 				{
 					Type: watch.Modified,
-					Object: &corev1.Pod{
+					Object: &api.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:              "pod-1",
 							Namespace:         metav1.NamespaceDefault,
 							CreationTimestamp: metav1.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC),
 							Labels:            map[string]string{"test": "selector"},
 						},
-						Status: corev1.PodStatus{
-							Conditions: []corev1.PodCondition{
+						Status: api.PodStatus{
+							Conditions: []api.PodCondition{
 								{
-									Status: corev1.ConditionTrue,
-									Type:   corev1.PodReady,
+									Status: api.ConditionTrue,
+									Type:   api.PodReady,
 								},
 							},
 						},

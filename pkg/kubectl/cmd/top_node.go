@@ -40,7 +40,6 @@ import (
 type TopNodeOptions struct {
 	ResourceName    string
 	Selector        string
-	NoHeaders       bool
 	NodeClient      corev1client.CoreV1Interface
 	HeapsterOptions HeapsterTopOptions
 	Client          *metricsutil.HeapsterMetricsClient
@@ -119,8 +118,6 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		Aliases: []string{"nodes", "no"},
 	}
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
-
 	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
@@ -219,7 +216,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		allocatable[n.Name] = n.Status.Allocatable
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders)
+	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable)
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {

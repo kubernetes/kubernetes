@@ -24,7 +24,7 @@
 #   go-tests = true
 #   unused-packages = true
 
-ignored = []
+ignored = ["github.com/modern-go/test","github.com/modern-go/test/must","github.com/modern-go/test/should"]
 
 [[constraint]]
   name = "github.com/modern-go/concurrent"

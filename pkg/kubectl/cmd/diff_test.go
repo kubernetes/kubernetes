@@ -25,16 +25,16 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/utils/exec"
 )
 
 type FakeObject struct {
 	name   string
+	local  map[string]interface{}
 	merged map[string]interface{}
 	live   map[string]interface{}
+	last   map[string]interface{}
 }
 
 var _ Object = &FakeObject{}
@@ -43,12 +43,97 @@ func (f *FakeObject) Name() string {
 	return f.name
 }
 
-func (f *FakeObject) Merged() (runtime.Object, error) {
-	return &unstructured.Unstructured{Object: f.merged}, nil
+func (f *FakeObject) Local() (map[string]interface{}, error) {
+	return f.local, nil
 }
 
-func (f *FakeObject) Live() runtime.Object {
-	return &unstructured.Unstructured{Object: f.live}
+func (f *FakeObject) Merged() (map[string]interface{}, error) {
+	return f.merged, nil
+}
+
+func (f *FakeObject) Live() (map[string]interface{}, error) {
+	return f.live, nil
+}
+
+func (f *FakeObject) Last() (map[string]interface{}, error) {
+	return f.last, nil
+}
+
+func TestArguments(t *testing.T) {
+	tests := []struct {
+		// Input
+		args []string
+
+		// Outputs
+		from string
+		to   string
+		err  string
+	}{
+		// Defaults
+		{
+			args: []string{},
+			from: "LOCAL",
+			to:   "LIVE",
+			err:  "",
+		},
+		// One valid argument
+		{
+			args: []string{"MERGED"},
+			from: "MERGED",
+			to:   "LIVE",
+			err:  "",
+		},
+		// One invalid argument
+		{
+			args: []string{"WRONG"},
+			from: "",
+			to:   "",
+			err:  `Invalid parameter "WRONG", must be either "LOCAL", "LIVE", "LAST" or "MERGED"`,
+		},
+		// Two valid arguments
+		{
+			args: []string{"MERGED", "LAST"},
+			from: "MERGED",
+			to:   "LAST",
+			err:  "",
+		},
+		// Two same arguments is fine
+		{
+			args: []string{"MERGED", "MERGED"},
+			from: "MERGED",
+			to:   "MERGED",
+			err:  "",
+		},
+		// Second argument is invalid
+		{
+			args: []string{"MERGED", "WRONG"},
+			from: "",
+			to:   "",
+			err:  `Invalid parameter "WRONG", must be either "LOCAL", "LIVE", "LAST" or "MERGED"`,
+		},
+		// Three arguments
+		{
+			args: []string{"MERGED", "LIVE", "LAST"},
+			from: "",
+			to:   "",
+			err:  `Invalid number of arguments: expected at most 2.`,
+		},
+	}
+
+	for _, test := range tests {
+		from, to, e := parseDiffArguments(test.args)
+		err := ""
+		if e != nil {
+			err = e.Error()
+		}
+		if from != test.from || to != test.to || err != test.err {
+			t.Errorf("parseDiffArguments(%v) = (%v, %v, %v), expected (%v, %v, %v)",
+				test.args,
+				from, to, err,
+				test.from, test.to, test.err,
+			)
+		}
+	}
 }
 
 func TestDiffProgram(t *testing.T) {
@@ -70,11 +155,11 @@ func TestDiffProgram(t *testing.T) {
 func TestPrinter(t *testing.T) {
 	printer := Printer{}
 
-	obj := &unstructured.Unstructured{Object: map[string]interface{}{
+	obj := map[string]interface{}{
 		"string": "string",
 		"list":   []int{1, 2, 3},
 		"int":    12,
-	}}
+	}
 	buf := bytes.Buffer{}
 	printer.Print(obj, &buf)
 	want := `int: 12
@@ -90,7 +175,7 @@ string: string
 }
 
 func TestDiffVersion(t *testing.T) {
-	diff, err := NewDiffVersion("MERGED")
+	diff, err := NewDiffVersion("LOCAL")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,6 +183,8 @@ func TestDiffVersion(t *testing.T) {
 
 	obj := FakeObject{
 		name:   "bla",
+		local:  map[string]interface{}{"local": true},
+		last:   map[string]interface{}{"last": true},
 		live:   map[string]interface{}{"live": true},
 		merged: map[string]interface{}{"merged": true},
 	}
@@ -109,7 +196,7 @@ func TestDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	econtent := "merged: true\n"
+	econtent := "local: true\n"
 	if string(fcontent) != econtent {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}
@@ -161,7 +248,7 @@ func TestDirectory(t *testing.T) {
 }
 
 func TestDiffer(t *testing.T) {
-	diff, err := NewDiffer("LIVE", "MERGED")
+	diff, err := NewDiffer("LOCAL", "LIVE")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,6 +256,8 @@ func TestDiffer(t *testing.T) {
 
 	obj := FakeObject{
 		name:   "bla",
+		local:  map[string]interface{}{"local": true},
+		last:   map[string]interface{}{"last": true},
 		live:   map[string]interface{}{"live": true},
 		merged: map[string]interface{}{"merged": true},
 	}
@@ -180,7 +269,7 @@ func TestDiffer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	econtent := "live: true\n"
+	econtent := "local: true\n"
 	if string(fcontent) != econtent {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}
@@ -189,7 +278,7 @@ func TestDiffer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	econtent = "merged: true\n"
+	econtent = "live: true\n"
 	if string(fcontent) != econtent {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}

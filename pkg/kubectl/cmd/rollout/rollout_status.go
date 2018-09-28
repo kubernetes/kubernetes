@@ -71,9 +71,9 @@ type RolloutStatusOptions struct {
 	Revision int64
 	Timeout  time.Duration
 
-	StatusViewerFn func(*meta.RESTMapping) (kubectl.StatusViewer, error)
-	Builder        func() *resource.Builder
-	DynamicClient  dynamic.Interface
+	StatusViewer  func(*meta.RESTMapping) (kubectl.StatusViewer, error)
+	Builder       func() *resource.Builder
+	DynamicClient dynamic.Interface
 
 	FilenameOptions *resource.FilenameOptions
 	genericclioptions.IOStreams
@@ -102,7 +102,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example: status_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
-			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Validate(cmd, args))
 			cmdutil.CheckErr(o.Run())
 		},
 		ValidArgs: validArgs,
@@ -127,7 +127,9 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	}
 
 	o.BuilderArgs = args
-	o.StatusViewerFn = polymorphichelpers.StatusViewerFn
+	o.StatusViewer = func(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
+		return polymorphichelpers.StatusViewerFn(f, mapping)
+	}
 
 	clientConfig, err := f.ToRESTConfig()
 	if err != nil {
@@ -142,9 +144,9 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	return nil
 }
 
-func (o *RolloutStatusOptions) Validate() error {
-	if len(o.BuilderArgs) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
-		return fmt.Errorf("required resource not specified")
+func (o *RolloutStatusOptions) Validate(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 
 	if o.Revision < 0 {
@@ -178,7 +180,7 @@ func (o *RolloutStatusOptions) Run() error {
 	info := infos[0]
 	mapping := info.ResourceMapping()
 
-	statusViewer, err := o.StatusViewerFn(mapping)
+	statusViewer, err := o.StatusViewer(mapping)
 	if err != nil {
 		return err
 	}

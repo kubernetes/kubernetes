@@ -144,18 +144,6 @@ func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error 
 	return runner.ipvsHandle.DelDestination(svc, dst)
 }
 
-func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error {
-	svc, err := toIPVSService(vs)
-	if err != nil {
-		return err
-	}
-	dst, err := toIPVSDestination(rs)
-	if err != nil {
-		return err
-	}
-	return runner.ipvsHandle.UpdateDestination(svc, dst)
-}
-
 // GetRealServers is part of ipvs.Interface.
 func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 	svc, err := toIPVSService(vs)
@@ -215,11 +203,9 @@ func toRealServer(dst *libipvs.Destination) (*RealServer, error) {
 		return nil, errors.New("ipvs destination should not be empty")
 	}
 	return &RealServer{
-		Address:      dst.Address,
-		Port:         dst.Port,
-		Weight:       dst.Weight,
-		ActiveConn:   dst.ActiveConnections,
-		InactiveConn: dst.InactiveConnections,
+		Address: dst.Address,
+		Port:    dst.Port,
+		Weight:  dst.Weight,
 	}, nil
 }
 

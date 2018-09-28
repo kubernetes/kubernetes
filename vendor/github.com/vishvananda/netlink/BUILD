@@ -13,6 +13,9 @@ go_library(
         "conntrack_unspecified.go",
         "filter.go",
         "filter_linux.go",
+        "fou.go",
+        "fou_linux.go",
+        "fou_unspecified.go",
         "genetlink_linux.go",
         "genetlink_unspecified.go",
         "gtp_linux.go",
@@ -51,6 +54,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vishvananda/netlink/nl:go_default_library",
+        "//vendor/golang.org/x/sys/unix:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/github.com/vishvananda/netns:go_default_library",

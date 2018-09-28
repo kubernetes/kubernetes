@@ -16,5 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +groupName=metrics.k8s.io
-
 package metrics

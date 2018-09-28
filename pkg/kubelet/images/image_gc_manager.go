@@ -44,7 +44,8 @@ type StatsProvider interface {
 	ImageFsStats() (*statsapi.FsStats, error)
 }
 
-// ImageGCManager is an interface for managing lifecycle of all images.
+// Manages lifecycle of all images.
+//
 // Implementation is thread-safe.
 type ImageGCManager interface {
 	// Applies the garbage collection policy. Errors include being unable to free
@@ -60,7 +61,7 @@ type ImageGCManager interface {
 	DeleteUnusedImages() error
 }
 
-// ImageGCPolicy is a policy for garbage collecting images. Policy defines an allowed band in
+// A policy for garbage collecting images. Policy defines an allowed band in
 // which garbage collection will be run.
 type ImageGCPolicy struct {
 	// Any usage above this threshold will always trigger garbage collection.
@@ -143,7 +144,6 @@ type imageRecord struct {
 	size int64
 }
 
-// NewImageGCManager instantiates a new ImageGCManager object.
 func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, sandboxImage string) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {

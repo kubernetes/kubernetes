@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -97,11 +96,8 @@ const (
 	// jitter factor for resyncInterval
 	workerResyncIntervalJitterFactor = 0.5
 
-	// jitter factor for backOffPeriod and backOffOnTransientErrorPeriod
+	// jitter factor for backOffPeriod
 	workerBackOffPeriodJitterFactor = 0.5
-
-	// backoff period when transient error occurred.
-	backOffOnTransientErrorPeriod = time.Second
 )
 
 type podWorkers struct {
@@ -267,9 +263,6 @@ func (p *podWorkers) wrapUp(uid types.UID, syncErr error) {
 	case syncErr == nil:
 		// No error; requeue at the regular resync interval.
 		p.workQueue.Enqueue(uid, wait.Jitter(p.resyncInterval, workerResyncIntervalJitterFactor))
-	case strings.Contains(syncErr.Error(), NetworkNotReadyErrorMsg):
-		// Network is not ready; back off for short period of time and retry as network might be ready soon.
-		p.workQueue.Enqueue(uid, wait.Jitter(backOffOnTransientErrorPeriod, workerBackOffPeriodJitterFactor))
 	default:
 		// Error occurred during the sync; back off and then retry.
 		p.workQueue.Enqueue(uid, wait.Jitter(p.backOffPeriod, workerBackOffPeriodJitterFactor))

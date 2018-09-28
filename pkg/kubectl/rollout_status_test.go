@@ -24,6 +24,7 @@ import (
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -133,7 +134,8 @@ func TestDeploymentStatusViewerStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dsv := &DeploymentStatusViewer{}
+			client := fake.NewSimpleClientset(d).Apps()
+			dsv := &DeploymentStatusViewer{c: client}
 			msg, done, err := dsv.Status(unstructuredD, 0)
 			if err != nil {
 				t.Fatalf("DeploymentStatusViewer.Status(): %v", err)
@@ -238,7 +240,8 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dsv := &DaemonSetStatusViewer{}
+			client := fake.NewSimpleClientset(d).Apps()
+			dsv := &DaemonSetStatusViewer{c: client}
 			msg, done, err := dsv.Status(unstructuredD, 0)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -389,7 +392,8 @@ func TestStatefulSetStatusViewerStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dsv := &StatefulSetStatusViewer{}
+			client := fake.NewSimpleClientset(s).AppsV1()
+			dsv := &StatefulSetStatusViewer{c: client}
 			msg, done, err := dsv.Status(unstructuredS, 0)
 			if test.err && err == nil {
 				t.Fatalf("%s: expected error", test.name)
@@ -427,7 +431,8 @@ func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dsv := &DaemonSetStatusViewer{}
+	client := fake.NewSimpleClientset(d).Apps()
+	dsv := &DaemonSetStatusViewer{c: client}
 	msg, done, err := dsv.Status(unstructuredD, 0)
 	errMsg := "rollout status is only available for RollingUpdate strategy type"
 	if err == nil || err.Error() != errMsg {

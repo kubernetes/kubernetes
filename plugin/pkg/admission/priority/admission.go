@@ -20,19 +20,18 @@ import (
 	"fmt"
 	"io"
 
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
-	genericadmissioninitializers "k8s.io/apiserver/pkg/admission/initializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	schedulingv1beta1listers "k8s.io/client-go/listers/scheduling/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	schedulinglisters "k8s.io/kubernetes/pkg/client/listers/scheduling/internalversion"
 	"k8s.io/kubernetes/pkg/features"
+	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -51,14 +50,14 @@ func Register(plugins *admission.Plugins) {
 // priorityPlugin is an implementation of admission.Interface.
 type priorityPlugin struct {
 	*admission.Handler
-	client kubernetes.Interface
-	lister schedulingv1beta1listers.PriorityClassLister
+	client internalclientset.Interface
+	lister schedulinglisters.PriorityClassLister
 }
 
 var _ admission.MutationInterface = &priorityPlugin{}
 var _ admission.ValidationInterface = &priorityPlugin{}
-var _ = genericadmissioninitializers.WantsExternalKubeInformerFactory(&priorityPlugin{})
-var _ = genericadmissioninitializers.WantsExternalKubeClientSet(&priorityPlugin{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&priorityPlugin{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&priorityPlugin{})
 
 // NewPlugin creates a new priority admission plugin.
 func newPlugin() *priorityPlugin {
@@ -79,13 +78,13 @@ func (p *priorityPlugin) ValidateInitialization() error {
 }
 
 // SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
-func (p *priorityPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
+func (p *priorityPlugin) SetInternalKubeClientSet(client internalclientset.Interface) {
 	p.client = client
 }
 
 // SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
-func (p *priorityPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	priorityInformer := f.Scheduling().V1beta1().PriorityClasses()
+func (p *priorityPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	priorityInformer := f.Scheduling().InternalVersion().PriorityClasses()
 	p.lister = priorityInformer.Lister()
 	p.SetReadyFunc(priorityInformer.Informer().HasSynced)
 }
@@ -242,14 +241,14 @@ func (p *priorityPlugin) validatePriorityClass(a admission.Attributes) error {
 	return nil
 }
 
-func (p *priorityPlugin) getDefaultPriorityClass() (*schedulingv1beta1.PriorityClass, error) {
+func (p *priorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, error) {
 	list, err := p.lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	// In case more than one global default priority class is added as a result of a race condition,
 	// we pick the one with the lowest priority value.
-	var defaultPC *schedulingv1beta1.PriorityClass
+	var defaultPC *scheduling.PriorityClass
 	for _, pci := range list {
 		if pci.GlobalDefault {
 			if defaultPC == nil || defaultPC.Value > pci.Value {

@@ -15,7 +15,7 @@
 package memory
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -25,9 +25,6 @@ import (
 
 	"github.com/golang/glog"
 )
-
-// ErrDataNotFound is the error resulting if failed to find a container in memory cache.
-var ErrDataNotFound = errors.New("unable to find data in memory cache")
 
 // TODO(vmarmol): See about refactoring this class, we have an unecessary redirection of containerCache and InMemoryCache.
 // containerCache is used to store per-container information
@@ -104,7 +101,7 @@ func (self *InMemoryCache) RecentStats(name string, start, end time.Time, maxSta
 		self.lock.RLock()
 		defer self.lock.RUnlock()
 		if cstore, ok = self.containerCacheMap[name]; !ok {
-			return ErrDataNotFound
+			return fmt.Errorf("unable to find data for container %v", name)
 		}
 		return nil
 	}()

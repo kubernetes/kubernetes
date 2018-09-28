@@ -252,25 +252,18 @@ func (o *LabelOptions) RunLabel() error {
 		}
 
 		var outputObj runtime.Object
-		var dataChangeMsg string
-		obj := info.Object
-		oldData, err := json.Marshal(obj)
-		if err != nil {
-			return err
-		}
+		dataChangeMsg := "not labeled"
 		if o.dryrun || o.local || o.list {
-			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			err = labelFunc(info.Object, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
 			}
-			newObj, err := json.Marshal(obj)
-			if err != nil {
-				return err
-			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
+			dataChangeMsg = "labeled"
 			outputObj = info.Object
 		} else {
+			obj := info.Object
 			name, namespace := info.Name, info.Namespace
+			oldData, err := json.Marshal(obj)
 			if err != nil {
 				return err
 			}
@@ -290,12 +283,14 @@ func (o *LabelOptions) RunLabel() error {
 			if err := o.Recorder.Record(obj); err != nil {
 				glog.V(4).Infof("error recording current command: %v", err)
 			}
-			newObj, err := json.Marshal(obj)
+			newData, err := json.Marshal(obj)
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
-			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
+			if !reflect.DeepEqual(oldData, newData) {
+				dataChangeMsg = "labeled"
+			}
+			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
@@ -347,14 +342,6 @@ func (o *LabelOptions) RunLabel() error {
 		printer.PrintObj(info.Object, o.Out)
 		return nil
 	})
-}
-
-func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
-	msg := "not labeled"
-	if !reflect.DeepEqual(oldObj, newObj) {
-		msg = "labeled"
-	}
-	return msg
 }
 
 func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {

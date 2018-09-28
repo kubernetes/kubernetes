@@ -494,9 +494,6 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 			},
 			StorageClassName: className,
 		},
-		Status: v1.PersistentVolumeStatus{
-			Phase: v1.VolumeAvailable,
-		},
 	}
 	if node != "" {
 		pv.Spec.NodeAffinity = getVolumeNodeAffinity(nodeLabelKey, node)

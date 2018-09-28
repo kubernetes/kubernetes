@@ -360,7 +360,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	Describe("DynamicProvisioner [Slow]", func() {
+	Describe("DynamicProvisioner", func() {
 		It("should provision storage with different parameters", func() {
 			cloudZone := getRandomCloudZone(c)
 

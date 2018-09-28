@@ -32,7 +32,6 @@ filegroup(
         "//vendor/github.com/google/cadvisor/container/crio:all-srcs",
         "//vendor/github.com/google/cadvisor/container/docker:all-srcs",
         "//vendor/github.com/google/cadvisor/container/libcontainer:all-srcs",
-        "//vendor/github.com/google/cadvisor/container/mesos:all-srcs",
         "//vendor/github.com/google/cadvisor/container/raw:all-srcs",
         "//vendor/github.com/google/cadvisor/container/rkt:all-srcs",
         "//vendor/github.com/google/cadvisor/container/systemd:all-srcs",

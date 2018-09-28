@@ -95,10 +95,6 @@ func serveAlwaysDeny(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, alwaysDeny)
 }
 
-func serveAddLabel(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, addLabel)
-}
-
 func servePods(w http.ResponseWriter, r *http.Request) {
 	serve(w, r, admitPods)
 }
@@ -137,7 +133,6 @@ func main() {
 	flag.Parse()
 
 	http.HandleFunc("/always-deny", serveAlwaysDeny)
-	http.HandleFunc("/add-label", serveAddLabel)
 	http.HandleFunc("/pods", servePods)
 	http.HandleFunc("/pods/attach", serveAttachingPods)
 	http.HandleFunc("/mutating-pods", serveMutatePods)

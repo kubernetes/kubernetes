@@ -26,7 +26,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +44,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -398,7 +399,7 @@ func (o *ApplyOptions) Run() error {
 			}
 
 			annotationMap := metadata.GetAnnotations()
-			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
+			if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
@@ -466,7 +467,7 @@ func (o *ApplyOptions) Run() error {
 
 		objToPrint := objs[0]
 		if len(objs) > 1 {
-			list := &corev1.List{
+			list := &v1.List{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "List",
 					APIVersion: "v1",
@@ -618,7 +619,7 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, includeUnini
 			return err
 		}
 		annots := metadata.GetAnnotations()
-		if _, ok := annots[corev1.LastAppliedConfigAnnotation]; !ok {
+		if _, ok := annots[api.LastAppliedConfigAnnotation]; !ok {
 			// don't prune resources not created with apply
 			continue
 		}
