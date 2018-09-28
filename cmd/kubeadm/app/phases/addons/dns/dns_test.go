@@ -95,8 +95,9 @@ func TestCompileManifests(t *testing.T) {
 	}{
 		{
 			manifest: KubeDNSDeployment,
-			data: struct{ ImageRepository, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
+			data: struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
 				ImageRepository: "foo",
+				Arch:            "foo",
 				Version:         "foo",
 				DNSBindAddr:     "foo",
 				DNSProbeAddr:    "foo",

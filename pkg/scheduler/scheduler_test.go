@@ -561,7 +561,6 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		[]algorithm.SchedulerExtender{},
 		nil,
 		schedulertesting.FakePersistentVolumeClaimLister{},
-		schedulertesting.FakePDBLister{},
 		false,
 		false,
 		api.DefaultPercentageOfNodesToScore)
@@ -612,7 +611,6 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		[]algorithm.SchedulerExtender{},
 		nil,
 		schedulertesting.FakePersistentVolumeClaimLister{},
-		schedulertesting.FakePDBLister{},
 		false,
 		false,
 		api.DefaultPercentageOfNodesToScore)

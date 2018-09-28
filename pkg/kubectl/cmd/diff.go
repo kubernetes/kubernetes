@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,28 +25,30 @@ import (
 	"path/filepath"
 
 	"github.com/ghodss/yaml"
-	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
-
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/client-go/dynamic"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubectl/apply/parse"
+	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/utils/exec"
 )
 
 var (
 	diffLong = templates.LongDesc(i18n.T(`
-		Diff configurations specified by filename or stdin between the current online
-		configuration, and the configuration as it would be if applied.
+		Diff configurations specified by filename or stdin between their local,
+		last-applied, live and/or "merged" versions.
+
+		LOCAL and LIVE versions are diffed by default. Other available keywords
+		are MERGED and LAST.
 
 		Output is always YAML.
 
@@ -53,22 +56,52 @@ var (
 		diff command. By default, the "diff" command available in your path will be
 		run with "-u" (unicode) and "-N" (treat new files as empty) options.`))
 	diffExample = templates.Examples(i18n.T(`
-		# Diff resources included in pod.json.
-		kubectl diff -f pod.json
+		# Diff resources included in pod.json. By default, it will diff LOCAL and LIVE versions
+		kubectl alpha diff -f pod.json
 
-		# Diff file read from stdin
-		cat service.yaml | kubectl diff -f -`))
+		# When one version is specified, diff that version against LIVE
+		cat service.yaml | kubectl alpha diff -f - MERGED
+
+		# Or specify both versions
+		kubectl alpha diff -f pod.json -f service.yaml LAST LOCAL`))
 )
 
 type DiffOptions struct {
 	FilenameOptions resource.FilenameOptions
 }
 
-func checkDiffArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+func isValidArgument(arg string) error {
+	switch arg {
+	case "LOCAL", "LIVE", "LAST", "MERGED":
+		return nil
+	default:
+		return fmt.Errorf(`Invalid parameter %q, must be either "LOCAL", "LIVE", "LAST" or "MERGED"`, arg)
 	}
-	return nil
+
+}
+
+func parseDiffArguments(args []string) (string, string, error) {
+	if len(args) > 2 {
+		return "", "", fmt.Errorf("Invalid number of arguments: expected at most 2.")
+	}
+	// Default values
+	from := "LOCAL"
+	to := "LIVE"
+	if len(args) > 0 {
+		from = args[0]
+	}
+	if len(args) > 1 {
+		to = args[1]
+	}
+
+	if err := isValidArgument(to); err != nil {
+		return "", "", err
+	}
+	if err := isValidArgument(from); err != nil {
+		return "", "", err
+	}
+
+	return from, to, nil
 }
 
 func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -80,12 +113,13 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use: "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Diff live version against would-be applied version"),
+		Short:   i18n.T("Diff different versions of configurations"),
 		Long:    diffLong,
 		Example: diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(checkDiffArgs(cmd, args))
-			cmdutil.CheckErr(RunDiff(f, &diff, &options))
+			from, to, err := parseDiffArguments(args)
+			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(RunDiff(f, &diff, &options, from, to))
 		},
 	}
 
@@ -130,7 +164,7 @@ func (d *DiffProgram) Run(from, to string) error {
 type Printer struct{}
 
 // Print the object inside the writer w.
-func (p *Printer) Print(obj runtime.Object, w io.Writer) error {
+func (p *Printer) Print(obj map[string]interface{}, w io.Writer) error {
 	if obj == nil {
 		return nil
 	}
@@ -161,12 +195,16 @@ func NewDiffVersion(name string) (*DiffVersion, error) {
 	}, nil
 }
 
-func (v *DiffVersion) getObject(obj Object) (runtime.Object, error) {
+func (v *DiffVersion) getObject(obj Object) (map[string]interface{}, error) {
 	switch v.Name {
 	case "LIVE":
-		return obj.Live(), nil
+		return obj.Live()
 	case "MERGED":
 		return obj.Merged()
+	case "LOCAL":
+		return obj.Local()
+	case "LAST":
+		return obj.Last()
 	}
 	return nil, fmt.Errorf("Unknown version: %v", v.Name)
 }
@@ -216,8 +254,10 @@ func (d *Directory) Delete() error {
 // Object is an interface that let's you retrieve multiple version of
 // it.
 type Object interface {
-	Live() runtime.Object
-	Merged() (runtime.Object, error)
+	Local() (map[string]interface{}, error)
+	Live() (map[string]interface{}, error)
+	Last() (map[string]interface{}, error)
+	Merged() (map[string]interface{}, error)
 
 	Name() string
 }
@@ -225,51 +265,80 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
-	LocalObj runtime.Object
-	Info     *resource.Info
-	Encoder  runtime.Encoder
-	OpenAPI  openapi.Resources
+	Remote  *unstructured.Unstructured
+	Info    *resource.Info
+	Encoder runtime.Encoder
+	Parser  *parse.Factory
 }
 
 var _ Object = &InfoObject{}
 
-// Returns the live version of the object
-func (obj InfoObject) Live() runtime.Object {
-	return obj.Info.Object
+func (obj InfoObject) toMap(data []byte) (map[string]interface{}, error) {
+	m := map[string]interface{}{}
+	if len(data) == 0 {
+		return m, nil
+	}
+	err := json.Unmarshal(data, &m)
+	return m, err
 }
 
-// Returns the "merged" object, as it would look like if applied or
-// created.
-func (obj InfoObject) Merged() (runtime.Object, error) {
-	// Build the patcher, and then apply the patch with dry-run, unless the object doesn't exist, in which case we need to create it.
-	if obj.Live() == nil {
-		// Dry-run create if the object doesn't exist.
-		return resource.NewHelper(obj.Info.Client, obj.Info.Mapping).Create(
-			obj.Info.Namespace,
-			true,
-			obj.LocalObj,
-			&metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-		)
+func (obj InfoObject) Local() (map[string]interface{}, error) {
+	data, err := runtime.Encode(obj.Encoder, obj.Info.Object)
+	if err != nil {
+		return nil, err
 	}
+	return obj.toMap(data)
+}
 
-	modified, err := kubectl.GetModifiedConfiguration(obj.LocalObj, false, unstructured.UnstructuredJSONScheme)
+func (obj InfoObject) Live() (map[string]interface{}, error) {
+	if obj.Remote == nil {
+		return nil, nil // Object doesn't exist on cluster.
+	}
+	return obj.Remote.UnstructuredContent(), nil
+}
+
+func (obj InfoObject) Merged() (map[string]interface{}, error) {
+	local, err := obj.Local()
 	if err != nil {
 		return nil, err
 	}
 
-	// This is using the patcher from apply, to keep the same behavior.
-	// We plan on replacing this with server-side apply when it becomes available.
-	patcher := &patcher{
-		mapping:       obj.Info.Mapping,
-		helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
-		overwrite:     true,
-		backOff:       clockwork.NewRealClock(),
-		serverDryRun:  true,
-		openapiSchema: obj.OpenAPI,
+	live, err := obj.Live()
+	if err != nil {
+		return nil, err
 	}
 
-	_, result, err := patcher.patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
-	return result, err
+	last, err := obj.Last()
+	if err != nil {
+		return nil, err
+	}
+
+	if live == nil || last == nil {
+		return local, nil // We probably don't have a live version, merged is local.
+	}
+
+	elmt, err := obj.Parser.CreateElement(last, local, live)
+	if err != nil {
+		return nil, err
+	}
+	result, err := elmt.Merge(strategy.Create(strategy.Options{}))
+	return result.MergedResult.(map[string]interface{}), err
+}
+
+func (obj InfoObject) Last() (map[string]interface{}, error) {
+	if obj.Remote == nil {
+		return nil, nil // No object is live, return empty
+	}
+	accessor, err := meta.Accessor(obj.Remote)
+	if err != nil {
+		return nil, err
+	}
+	annots := accessor.GetAnnotations()
+	if annots == nil {
+		return nil, nil // Not an error, just empty.
+	}
+
+	return obj.toMap([]byte(annots[api.LastAppliedConfigAnnotation]))
 }
 
 func (obj InfoObject) Name() string {
@@ -320,16 +389,61 @@ func (d *Differ) TearDown() {
 	d.To.Dir.Delete()   // Ignore error
 }
 
+type Downloader struct {
+	mapper  meta.RESTMapper
+	dclient dynamic.Interface
+	ns      string
+}
+
+func NewDownloader(f cmdutil.Factory) (*Downloader, error) {
+	var err error
+	var d Downloader
+
+	d.mapper, err = f.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+	d.dclient, err = f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	d.ns, _, _ = f.ToRawKubeConfigLoader().Namespace()
+
+	return &d, nil
+}
+
+func (d *Downloader) Download(info *resource.Info) (*unstructured.Unstructured, error) {
+	gvk := info.Object.GetObjectKind().GroupVersionKind()
+	mapping, err := d.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	var resource dynamic.ResourceInterface
+	switch mapping.Scope.Name() {
+	case meta.RESTScopeNameNamespace:
+		if info.Namespace == "" {
+			info.Namespace = d.ns
+		}
+		resource = d.dclient.Resource(mapping.Resource).Namespace(info.Namespace)
+	case meta.RESTScopeNameRoot:
+		resource = d.dclient.Resource(mapping.Resource)
+	}
+
+	return resource.Get(info.Name, metav1.GetOptions{})
+}
+
 // RunDiff uses the factory to parse file arguments, find the version to
 // diff, and find each Info object for each files, and runs against the
 // differ.
-func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
-	schema, err := f.OpenAPISchema()
+func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, to string) error {
+	openapi, err := f.OpenAPISchema()
 	if err != nil {
 		return err
 	}
+	parser := &parse.Factory{Resources: openapi}
 
-	differ, err := NewDiffer("LIVE", "MERGED")
+	differ, err := NewDiffer(from, to)
 	if err != nil {
 		return err
 	}
@@ -346,9 +460,15 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		Unstructured().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
+		Local().
 		Flatten().
 		Do()
 	if err := r.Err(); err != nil {
+		return err
+	}
+
+	dl, err := NewDownloader(f)
+	if err != nil {
 		return err
 	}
 
@@ -357,19 +477,12 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 			return err
 		}
 
-		local := info.Object.DeepCopyObject()
-		if err := info.Get(); err != nil {
-			if !errors.IsNotFound(err) {
-				return err
-			}
-			info.Object = nil
-		}
-
+		remote, _ := dl.Download(info)
 		obj := InfoObject{
-			LocalObj: local,
-			Info:     info,
-			Encoder:  scheme.DefaultJSONEncoder(),
-			OpenAPI:  schema,
+			Remote:  remote,
+			Info:    info,
+			Parser:  parser,
+			Encoder: cmdutil.InternalVersionJSONEncoder(),
 		}
 
 		return differ.Diff(obj, printer)
@@ -378,8 +491,7 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		return err
 	}
 
-	// Error ignore on purpose. diff(1) for example, returns an error if there is any diff.
-	_ = differ.Run(diff)
+	differ.Run(diff)
 
 	return nil
 }

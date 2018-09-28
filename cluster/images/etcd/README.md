@@ -62,14 +62,22 @@ $ make build test
 Last, build and push the docker images for all supported architectures.
 
 ```console
-# Build images for all the architecture and push the manifest image as well
-$ make all-push
+# Build for linux/amd64 (default)
+$ make push ARCH=amd64
+# ---> staging-k8s.gcr.io/etcd-amd64:TAG
+# ---> staging-k8s.gcr.io/etcd:TAG
 
-# Build images for all the architecture 
-$ make all-build
+$ make push ARCH=arm
+# ---> staging-k8s.gcr.io/etcd-arm:TAG
 
-# Build image for target architecture(default=amd64)
-$ make build ARCH=ppc64le
+$ make push ARCH=arm64
+# ---> staging-k8s.gcr.io/etcd-arm64:TAG
+
+$ make push ARCH=ppc64le
+# ---> staging-k8s.gcr.io/etcd-ppc64le:TAG
+
+$ make push ARCH=s390x
+# ---> staging-k8s.gcr.io/etcd-s390x:TAG
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

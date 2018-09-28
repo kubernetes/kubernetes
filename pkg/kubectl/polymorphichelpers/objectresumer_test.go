@@ -20,8 +20,8 @@ import (
 	"bytes"
 	"testing"
 
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestDefaultObjectResumer(t *testing.T) {
@@ -31,8 +31,8 @@ func TestDefaultObjectResumer(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			object: &extensionsv1beta1.Deployment{
-				Spec: extensionsv1beta1.DeploymentSpec{
+			object: &extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
 					Paused: true,
 				},
 			},
@@ -40,15 +40,15 @@ func TestDefaultObjectResumer(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			object: &extensionsv1beta1.Deployment{
-				Spec: extensionsv1beta1.DeploymentSpec{
+			object: &extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
 					Paused: false,
 				},
 			},
 			expectErr: true,
 		},
 		{
-			object:    &extensionsv1beta1.ReplicaSet{},
+			object:    &extensions.ReplicaSet{},
 			expectErr: true,
 		},
 	}

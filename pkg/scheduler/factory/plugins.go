@@ -41,7 +41,6 @@ type PluginFactoryArgs struct {
 	ReplicaSetLister               algorithm.ReplicaSetLister
 	StatefulSetLister              algorithm.StatefulSetLister
 	NodeLister                     algorithm.NodeLister
-	PDBLister                      algorithm.PDBLister
 	NodeInfo                       predicates.NodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo

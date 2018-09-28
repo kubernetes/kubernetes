@@ -19,10 +19,8 @@ package polymorphichelpers
 import (
 	"testing"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestCanBeExposed(t *testing.T) {
@@ -31,27 +29,11 @@ func TestCanBeExposed(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			kind:      corev1.SchemeGroupVersion.WithKind("ReplicationController").GroupKind(),
+			kind:      api.Kind("ReplicationController"),
 			expectErr: false,
 		},
 		{
-			kind:      corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
-			expectErr: false,
-		},
-		{
-			kind:      corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
-			expectErr: false,
-		},
-		{
-			kind:      appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
-			expectErr: false,
-		},
-		{
-			kind:      extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(),
-			expectErr: false,
-		},
-		{
-			kind:      corev1.SchemeGroupVersion.WithKind("Node").GroupKind(),
+			kind:      api.Kind("Node"),
 			expectErr: true,
 		},
 	}

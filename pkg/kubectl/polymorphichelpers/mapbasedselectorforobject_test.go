@@ -19,10 +19,10 @@ package polymorphichelpers
 import (
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func TestMapBasedSelectorForObject(t *testing.T) {
@@ -32,8 +32,8 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 		expectErr      bool
 	}{
 		{
-			object: &corev1.ReplicationController{
-				Spec: corev1.ReplicationControllerSpec{
+			object: &api.ReplicationController{
+				Spec: api.ReplicationControllerSpec{
 					Selector: map[string]string{
 						"foo": "bar",
 					},
@@ -42,11 +42,11 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 			expectSelector: "foo=bar",
 		},
 		{
-			object:    &corev1.Pod{},
+			object:    &api.Pod{},
 			expectErr: true,
 		},
 		{
-			object: &corev1.Pod{
+			object: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"foo": "bar",
@@ -56,8 +56,8 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 			expectSelector: "foo=bar",
 		},
 		{
-			object: &corev1.Service{
-				Spec: corev1.ServiceSpec{
+			object: &api.Service{
+				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
 					},
@@ -66,12 +66,12 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 			expectSelector: "foo=bar",
 		},
 		{
-			object:    &corev1.Service{},
+			object:    &api.Service{},
 			expectErr: true,
 		},
 		{
-			object: &extensionsv1beta1.Deployment{
-				Spec: extensionsv1beta1.DeploymentSpec{
+			object: &extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"foo": "bar",
@@ -82,8 +82,8 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 			expectSelector: "foo=bar",
 		},
 		{
-			object: &extensionsv1beta1.Deployment{
-				Spec: extensionsv1beta1.DeploymentSpec{
+			object: &extensions.Deployment{
+				Spec: extensions.DeploymentSpec{
 					Selector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{
 							{
@@ -96,8 +96,8 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			object: &extensionsv1beta1.ReplicaSet{
-				Spec: extensionsv1beta1.ReplicaSetSpec{
+			object: &extensions.ReplicaSet{
+				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							"foo": "bar",
@@ -108,8 +108,8 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 			expectSelector: "foo=bar",
 		},
 		{
-			object: &extensionsv1beta1.ReplicaSet{
-				Spec: extensionsv1beta1.ReplicaSetSpec{
+			object: &extensions.ReplicaSet{
+				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{
 							{
@@ -122,7 +122,7 @@ func TestMapBasedSelectorForObject(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			object:    &corev1.Node{},
+			object:    &api.Node{},
 			expectErr: true,
 		},
 	}

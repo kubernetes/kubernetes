@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
-	"sync"
 	"unsafe"
 )
 
@@ -16,17 +15,10 @@ func typelinks1() [][]unsafe.Pointer
 //go:linkname typelinks2 reflect.typelinks
 func typelinks2() (sections []unsafe.Pointer, offset [][]int32)
 
-// initOnce guards initialization of types and packages
-var initOnce sync.Once
+var types = map[string]reflect.Type{}
+var packages = map[string]map[string]reflect.Type{}
 
-var types map[string]reflect.Type
-var packages map[string]map[string]reflect.Type
-
-// discoverTypes initializes types and packages
-func discoverTypes() {
-	types = make(map[string]reflect.Type)
-	packages = make(map[string]map[string]reflect.Type)
-
+func init() {
 	ver := runtime.Version()
 	if ver == "go1.5" || strings.HasPrefix(ver, "go1.5.") {
 		loadGo15Types()
@@ -98,13 +90,11 @@ type emptyInterface struct {
 
 // TypeByName return the type by its name, just like Class.forName in java
 func TypeByName(typeName string) Type {
-	initOnce.Do(discoverTypes)
 	return Type2(types[typeName])
 }
 
 // TypeByPackageName return the type by its package and name
 func TypeByPackageName(pkgPath string, name string) Type {
-	initOnce.Do(discoverTypes)
 	pkgTypes := packages[pkgPath]
 	if pkgTypes == nil {
 		return nil

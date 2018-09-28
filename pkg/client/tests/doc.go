@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package tests runs tests against the client which require an internal client
+// This package runs tests against the client which require an internal client
 package tests

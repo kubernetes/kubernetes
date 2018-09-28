@@ -68,7 +68,7 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	return
 }
 
-// GetResourceRequest finds and returns the request for a specific resource.
+// finds and returns the request for a specific resource.
 func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	if resource == v1.ResourcePods {
 		return 1

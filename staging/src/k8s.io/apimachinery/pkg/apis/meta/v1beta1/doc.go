@@ -19,5 +19,4 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=meta.k8s.io
-
 package v1beta1

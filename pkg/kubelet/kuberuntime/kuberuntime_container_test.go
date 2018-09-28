@@ -56,17 +56,17 @@ func TestRemoveContainer(t *testing.T) {
 	_, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
 	assert.Equal(t, len(fakeContainers), 1)
 
-	containerID := fakeContainers[0].Id
+	containerId := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
-	err = m.removeContainer(containerID)
+	err = m.removeContainer(containerId)
 	assert.NoError(t, err)
 	// Verify container log is removed
 	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "12345678", "foo", "0.log")
-	expectedContainerLogSymlink := legacyLogSymlink(containerID, "foo", "bar", "new")
+	expectedContainerLogSymlink := legacyLogSymlink(containerId, "foo", "bar", "new")
 	assert.Equal(t, fakeOS.Removes, []string{expectedContainerLogPath, expectedContainerLogSymlink})
 	// Verify container is removed
 	assert.Contains(t, fakeRuntime.Called, "RemoveContainer")
-	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerID})
+	containers, err := fakeRuntime.ListContainers(&runtimeapi.ContainerFilter{Id: containerId})
 	assert.NoError(t, err)
 	assert.Empty(t, containers)
 }
@@ -257,10 +257,10 @@ func TestLifeCycleHook(t *testing.T) {
 	}
 
 	fakeRunner := &containertest.FakeContainerCommandRunner{}
-	fakeHTTP := &fakeHTTP{}
+	fakeHttp := &fakeHTTP{}
 
 	lcHanlder := lifecycle.NewHandlerRunner(
-		fakeHTTP,
+		fakeHttp,
 		fakeRunner,
 		nil)
 
@@ -277,11 +277,11 @@ func TestLifeCycleHook(t *testing.T) {
 
 	// Configured and working HTTP hook
 	t.Run("PreStop-HTTPGet", func(t *testing.T) {
-		defer func() { fakeHTTP.url = "" }()
+		defer func() { fakeHttp.url = "" }()
 		testPod.Spec.Containers[0].Lifecycle = httpLifeCycle
 		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriod)
 
-		if !strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
+		if !strings.Contains(fakeHttp.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Prestop hook was not invoked")
 		}
 	})
@@ -295,7 +295,7 @@ func TestLifeCycleHook(t *testing.T) {
 
 		m.killContainer(testPod, cID, "foo", "testKill", &gracePeriodLocal)
 
-		if strings.Contains(fakeHTTP.url, httpLifeCycle.PreStop.HTTPGet.Host) {
+		if strings.Contains(fakeHttp.url, httpLifeCycle.PreStop.HTTPGet.Host) {
 			t.Errorf("HTTP Should not execute when gracePeriod is 0")
 		}
 	})

@@ -62,11 +62,9 @@ type ChaosNotifier interface {
 // error.
 type ChaosFunc func(req *http.Request) (bool, *http.Response, error)
 
-// Intercept calls the nested method `Intercept`
 func (fn ChaosFunc) Intercept(req *http.Request) (bool, *http.Response, error) {
 	return fn.Intercept(req)
 }
-
 func (fn ChaosFunc) String() string {
 	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
 }
@@ -143,7 +141,7 @@ type Error struct {
 	error
 }
 
-// Intercept returns the nested error
+// C returns the nested error
 func (e Error) Intercept(_ *http.Request) (bool, *http.Response, error) {
 	return true, nil, e.error
 }

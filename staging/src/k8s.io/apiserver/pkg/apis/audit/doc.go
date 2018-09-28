@@ -16,5 +16,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +groupName=audit.k8s.io
-
 package audit // import "k8s.io/apiserver/pkg/apis/audit"

@@ -64,6 +64,7 @@ filegroup(
         "//pkg/util/term:all-srcs",
         "//pkg/util/threading:all-srcs",
         "//pkg/util/tolerations:all-srcs",
+        "//pkg/util/version:all-srcs",
         "//pkg/util/workqueue/prometheus:all-srcs",
     ],
     tags = ["automanaged"],

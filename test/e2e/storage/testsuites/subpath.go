@@ -110,7 +110,7 @@ func (s *subPathTestSuite) execTest(driver drivers.TestDriver, pattern testpatte
 			needsCleanup = true
 
 			// Setup test resource for driver and testpattern
-			resource = subPathTestResource{}
+			resource := subPathTestResource{}
 			resource.setupResource(driver, pattern)
 
 			// Create test input
@@ -151,7 +151,7 @@ func (s *subPathTestResource) setupResource(driver drivers.TestDriver, pattern t
 	switch volType {
 	case testpatterns.InlineVolume:
 		if iDriver, ok := driver.(drivers.InlineVolumeTestDriver); ok {
-			s.roVolSource = iDriver.GetVolumeSource(true, fsType, s.genericVolumeTestResource.driverTestResource)
+			s.roVolSource = iDriver.GetVolumeSource(true, fsType)
 		}
 	case testpatterns.PreprovisionedPV:
 		s.roVolSource = &v1.VolumeSource{
@@ -360,7 +360,7 @@ func testSubPath(input *subPathTestInput) {
 		testReadFile(input.f, input.filePathInSubpath, input.pod, 0)
 	})
 
-	It("should fail for new directories when readOnly specified in the volumeSource [Slow]", func() {
+	It("should fail for new directories when readOnly specified in the volumeSource", func() {
 		if input.roVol == nil {
 			framework.Skipf("Volume type %v doesn't support readOnly source", input.volType)
 		}

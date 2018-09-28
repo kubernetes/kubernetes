@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
+	kubeadmapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha2"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
@@ -124,13 +125,13 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 
 func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	switch apiObject {
-	case constants.InitConfigurationKind:
+	case constants.InitConfigurationKind, constants.MasterConfigurationKind:
 		return getDefaultInitConfigBytes(constants.InitConfigurationKind)
 
 	case constants.ClusterConfigurationKind:
 		return getDefaultInitConfigBytes(constants.ClusterConfigurationKind)
 
-	case constants.JoinConfigurationKind:
+	case constants.JoinConfigurationKind, constants.NodeConfigurationKind:
 		return getDefaultNodeConfigBytes()
 
 	default:
@@ -153,9 +154,8 @@ func getSupportedAPIObjects() []string {
 }
 
 // getAllAPIObjectNames returns currently supported API object names and their historical aliases
-// NB. currently there is no historical supported API objects, but we keep this function for future changes
 func getAllAPIObjectNames() []string {
-	historicAPIObjectAliases := []string{}
+	historicAPIObjectAliases := []string{constants.MasterConfigurationKind}
 	objects := getSupportedAPIObjects()
 	objects = append(objects, historicAPIObjectAliases...)
 	return objects
@@ -228,6 +228,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			locally in the CLI tool without ever touching anything in the cluster.
 			In this version of kubeadm, the following API versions are supported:
 			- %s
+			- %s
 
 			Further, kubeadm can only write out config of version %q, but read both types.
 			So regardless of what version you pass to the --old-config parameter here, the API object will be
@@ -236,7 +237,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1alpha3.SchemeGroupVersion.String()),
+		`), kubeadmapiv1alpha2.SchemeGroupVersion.String(), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1alpha3.SchemeGroupVersion.String()),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(oldCfgPath) == 0 {
 				kubeadmutil.CheckErr(fmt.Errorf("The --old-config flag is mandatory"))
@@ -379,7 +380,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 		return err
 	}
 	// No need to append \n as that already exists in the ConfigMap
-	fmt.Fprintf(out, "%s", cfgConfigMap.Data[constants.ClusterConfigurationConfigMapKey])
+	fmt.Fprintf(out, "%s", cfgConfigMap.Data[constants.InitConfigurationConfigMapKey])
 	return nil
 }
 

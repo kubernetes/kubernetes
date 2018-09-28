@@ -130,7 +130,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 	}
 	for _, r := range runs {
 		podProvider.setPods(r.inputPods)
-		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[critical], r.insufficientResources)
+		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(nil, r.insufficientResources)
 		outputPods := podKiller.getKilledPods()
 		if !r.expectErr && outErr != nil {
 			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
@@ -171,7 +171,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 	runs := []testRun{
 		{
 			testName:              "no requirements",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 0, 0),
 			expectErr:             false,
@@ -179,7 +178,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "no pods",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             true,
@@ -187,7 +185,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "equal pods and resources requirements",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(100, 100, 1),
 			expectErr:             false,
@@ -195,7 +192,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "higher requirements than pod requests",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(200, 200, 2),
 			expectErr:             true,
@@ -203,7 +199,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose between bestEffort and burstable",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[burstable], allPods[bestEffort]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             false,
@@ -211,7 +206,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose between burstable and guaranteed",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[burstable], allPods[guaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             false,
@@ -219,7 +213,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose lower request burstable if it meets requirements",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[highRequestBurstable], allPods[burstable]},
 			insufficientResources: getAdmissionRequirementList(100, 100, 0),
 			expectErr:             false,
@@ -227,7 +220,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "choose higher request burstable if lower does not meet requirements",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable]},
 			insufficientResources: getAdmissionRequirementList(150, 150, 0),
 			expectErr:             false,
@@ -235,7 +227,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "multiple pods required",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(350, 350, 0),
 			expectErr:             false,
@@ -243,7 +234,6 @@ func TestGetPodsToPreempt(t *testing.T) {
 		},
 		{
 			testName:              "evict guaranteed when we have to, and dont evict the extra burstable",
-			preemptor:             allPods[critical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,

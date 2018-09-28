@@ -43,16 +43,16 @@ type Handler struct {
 	cgroupManager   cgroups.Manager
 	rootFs          string
 	pid             int
-	includedMetrics container.MetricSet
+	ignoreMetrics   container.MetricSet
 	pidMetricsCache map[int]*info.CpuSchedstat
 }
 
-func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, includedMetrics container.MetricSet) *Handler {
+func NewHandler(cgroupManager cgroups.Manager, rootFs string, pid int, ignoreMetrics container.MetricSet) *Handler {
 	return &Handler{
 		cgroupManager:   cgroupManager,
 		rootFs:          rootFs,
 		pid:             pid,
-		includedMetrics: includedMetrics,
+		ignoreMetrics:   ignoreMetrics,
 		pidMetricsCache: make(map[int]*info.CpuSchedstat),
 	}
 }
@@ -66,10 +66,10 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
 	}
-	withPerCPU := h.includedMetrics.Has(container.PerCpuUsageMetrics)
+	withPerCPU := !h.ignoreMetrics.Has(container.PerCpuUsageMetrics)
 	stats := newContainerStats(libcontainerStats, withPerCPU)
 
-	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
+	if !h.ignoreMetrics.Has(container.ProcessSchedulerMetrics) {
 		pids, err := h.cgroupManager.GetAllPids()
 		if err != nil {
 			glog.V(4).Infof("Could not get PIDs for container %d: %v", h.pid, err)
@@ -85,7 +85,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 	if h.pid == 0 {
 		return stats, nil
 	}
-	if h.includedMetrics.Has(container.NetworkUsageMetrics) {
+	if !h.ignoreMetrics.Has(container.NetworkUsageMetrics) {
 		netStats, err := networkStatsFromProc(h.rootFs, h.pid)
 		if err != nil {
 			glog.V(4).Infof("Unable to get network stats from pid %d: %v", h.pid, err)
@@ -93,7 +93,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 			stats.Network.Interfaces = append(stats.Network.Interfaces, netStats...)
 		}
 	}
-	if h.includedMetrics.Has(container.NetworkTcpUsageMetrics) {
+	if !h.ignoreMetrics.Has(container.NetworkTcpUsageMetrics) {
 		t, err := tcpStatsFromProc(h.rootFs, h.pid, "net/tcp")
 		if err != nil {
 			glog.V(4).Infof("Unable to get tcp stats from pid %d: %v", h.pid, err)
@@ -108,7 +108,7 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 			stats.Network.Tcp6 = t6
 		}
 	}
-	if h.includedMetrics.Has(container.NetworkUdpUsageMetrics) {
+	if !h.ignoreMetrics.Has(container.NetworkUdpUsageMetrics) {
 		u, err := udpStatsFromProc(h.rootFs, h.pid, "net/udp")
 		if err != nil {
 			glog.V(4).Infof("Unable to get udp stats from pid %d: %v", h.pid, err)
@@ -498,17 +498,14 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.Usage = s.MemoryStats.Usage.Usage
 	ret.Memory.MaxUsage = s.MemoryStats.Usage.MaxUsage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
+	ret.Memory.Cache = s.MemoryStats.Stats["cache"]
 
 	if s.MemoryStats.UseHierarchy {
-		ret.Memory.Cache = s.MemoryStats.Stats["total_cache"]
 		ret.Memory.RSS = s.MemoryStats.Stats["total_rss"]
 		ret.Memory.Swap = s.MemoryStats.Stats["total_swap"]
-		ret.Memory.MappedFile = s.MemoryStats.Stats["total_mapped_file"]
 	} else {
-		ret.Memory.Cache = s.MemoryStats.Stats["cache"]
 		ret.Memory.RSS = s.MemoryStats.Stats["rss"]
 		ret.Memory.Swap = s.MemoryStats.Stats["swap"]
-		ret.Memory.MappedFile = s.MemoryStats.Stats["mapped_file"]
 	}
 	if v, ok := s.MemoryStats.Stats["pgfault"]; ok {
 		ret.Memory.ContainerData.Pgfault = v

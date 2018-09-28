@@ -321,10 +321,9 @@ type Dialer interface {
 
 // ConnectWithRedirects uses dialer to send req, following up to 10 redirects (relative to
 // originalLocation). It returns the opened net.Conn and the raw response bytes.
-// If requireSameHostRedirects is true, only redirects to the same host are permitted.
-func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer, requireSameHostRedirects bool) (net.Conn, []byte, error) {
+func ConnectWithRedirects(originalMethod string, originalLocation *url.URL, header http.Header, originalBody io.Reader, dialer Dialer) (net.Conn, []byte, error) {
 	const (
-		maxRedirects    = 9     // Fail on the 10th redirect
+		maxRedirects    = 10
 		maxResponseSize = 16384 // play it safe to allow the potential for lots of / large headers
 	)
 
@@ -388,6 +387,10 @@ redirectLoop:
 
 		resp.Body.Close() // not used
 
+		// Reset the connection.
+		intermediateConn.Close()
+		intermediateConn = nil
+
 		// Prepare to follow the redirect.
 		redirectStr := resp.Header.Get("Location")
 		if redirectStr == "" {
@@ -401,15 +404,6 @@ redirectLoop:
 		if err != nil {
 			return nil, nil, fmt.Errorf("malformed Location header: %v", err)
 		}
-
-		// Only follow redirects to the same host. Otherwise, propagate the redirect response back.
-		if requireSameHostRedirects && location.Hostname() != originalLocation.Hostname() {
-			break redirectLoop
-		}
-
-		// Reset the connection.
-		intermediateConn.Close()
-		intermediateConn = nil
 	}
 
 	connToReturn := intermediateConn

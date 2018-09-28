@@ -55,7 +55,7 @@ type crioFactory struct {
 	// Information about mounted filesystems.
 	fsInfo fs.FsInfo
 
-	includedMetrics container.MetricSet
+	ignoreMetrics container.MetricSet
 
 	client crioClient
 }
@@ -81,7 +81,7 @@ func (self *crioFactory) NewContainerHandler(name string, inHostNamespace bool) 
 		&self.cgroupSubsystems,
 		inHostNamespace,
 		metadataEnvs,
-		self.includedMetrics,
+		self.ignoreMetrics,
 	)
 	return
 }
@@ -136,7 +136,7 @@ var (
 )
 
 // Register root container before running this function!
-func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
+func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
 	client, err := Client()
 	if err != nil {
 		return err
@@ -162,7 +162,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		machineInfoFactory: factory,
 		storageDriver:      storageDriver(info.StorageDriver),
 		storageDir:         info.StorageRoot,
-		includedMetrics:    includedMetrics,
+		ignoreMetrics:      ignoreMetrics,
 	}
 
 	container.RegisterContainerHandlerFactory(f, []watcher.ContainerWatchSource{watcher.Raw})

@@ -21,16 +21,16 @@ import (
 	"testing"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 var (
@@ -151,9 +151,9 @@ func TestLogsForObject(t *testing.T) {
 		},
 		{
 			name: "replica set logs",
-			obj: &extensionsv1beta1.ReplicaSet{
+			obj: &extensions.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-				Spec: extensionsv1beta1.ReplicaSetSpec{
+				Spec: extensions.ReplicaSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
@@ -165,9 +165,9 @@ func TestLogsForObject(t *testing.T) {
 		},
 		{
 			name: "deployment logs",
-			obj: &extensionsv1beta1.Deployment{
+			obj: &extensions.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-				Spec: extensionsv1beta1.DeploymentSpec{
+				Spec: extensions.DeploymentSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
@@ -179,9 +179,9 @@ func TestLogsForObject(t *testing.T) {
 		},
 		{
 			name: "job logs",
-			obj: &batchv1.Job{
+			obj: &batch.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-				Spec: batchv1.JobSpec{
+				Spec: batch.JobSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},
@@ -193,9 +193,9 @@ func TestLogsForObject(t *testing.T) {
 		},
 		{
 			name: "stateful set logs",
-			obj: &appsv1.StatefulSet{
+			obj: &apps.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "hello", Namespace: "test"},
-				Spec: appsv1.StatefulSetSpec{
+				Spec: apps.StatefulSetSpec{
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
 			},

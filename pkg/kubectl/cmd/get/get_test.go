@@ -896,7 +896,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "spec": {
                 "containers": null,
                 "dnsPolicy": "ClusterFirst",
-                "enableServiceLinks": true,
                 "restartPolicy": "Always",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30
@@ -915,7 +914,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "spec": {
                 "containers": null,
                 "dnsPolicy": "ClusterFirst",
-                "enableServiceLinks": true,
                 "restartPolicy": "Always",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30

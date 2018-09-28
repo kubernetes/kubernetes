@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"sort"
 	"strings"
 	"testing"
 
@@ -102,9 +101,6 @@ func TestPrinterSupportsExpectedTemplateFormats(t *testing.T) {
 			printFlags := GoTemplatePrintFlags{
 				TemplateArgument: templateArg,
 			}
-			if !sort.StringsAreSorted(printFlags.AllowedFormats()) {
-				t.Fatalf("allowed formats are not sorted")
-			}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
@@ -177,9 +173,6 @@ func TestTemplatePrinterDefaultsAllowMissingKeysToTrue(t *testing.T) {
 			printFlags := GoTemplatePrintFlags{
 				TemplateArgument: &tc.templateArg,
 				AllowMissingKeys: tc.allowMissingKeys,
-			}
-			if !sort.StringsAreSorted(printFlags.AllowedFormats()) {
-				t.Fatalf("allowed formats are not sorted")
 			}
 
 			outputFormat := "template"

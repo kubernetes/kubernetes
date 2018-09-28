@@ -331,7 +331,7 @@ func (j *Join) Run(out io.Writer) error {
 		}
 
 		// run kubeadm init preflight checks for checking all the prequisites
-		fmt.Printf("[join] running pre-flight checks before initializing the new control plane instance\n")
+		glog.Infoln("[join] running pre-flight checks before initializing the new control plane instance")
 		preflight.RunInitMasterChecks(utilsexec.New(), initConfiguration, j.ignorePreflightErrors)
 
 		// Prepares the node for hosting a new control plane instance by writing necessary

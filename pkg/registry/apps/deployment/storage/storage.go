@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	externalappsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -148,7 +149,7 @@ func (r *RollbackREST) ProducesMIMETypes(verb string) []string {
 // ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
 // it is not nil. Only the type of the return object matters, the value will be ignored.
 func (r *RollbackREST) ProducesObject(verb string) interface{} {
-	return metav1.Status{}
+	return externalappsv1beta1.DeploymentStatus{}
 }
 
 var _ = rest.StorageMetadata(&RollbackREST{})

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	dockertypes "github.com/docker/docker/api/types"
 )
 
 func TestUrlsMatch(t *testing.T) {
@@ -503,7 +505,7 @@ func TestLazyKeyring(t *testing.T) {
 
 func TestDockerKeyringLookup(t *testing.T) {
 	ada := LazyAuthConfiguration{
-		AuthConfig: AuthConfig{
+		AuthConfig: dockertypes.AuthConfig{
 			Username: "ada",
 			Password: "smash",
 			Email:    "ada@example.com",
@@ -511,7 +513,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 	}
 
 	grace := LazyAuthConfiguration{
-		AuthConfig: AuthConfig{
+		AuthConfig: dockertypes.AuthConfig{
 			Username: "grace",
 			Password: "squash",
 			Email:    "grace@example.com",
@@ -574,7 +576,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 // NOTE: the above covers the case of a more specific match trumping just hostname.
 func TestIssue3797(t *testing.T) {
 	rex := LazyAuthConfiguration{
-		AuthConfig: AuthConfig{
+		AuthConfig: dockertypes.AuthConfig{
 			Username: "rex",
 			Password: "tiny arms",
 			Email:    "rex@example.com",

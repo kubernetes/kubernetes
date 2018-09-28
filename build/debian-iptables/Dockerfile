@@ -19,5 +19,4 @@ RUN clean-install \
     ebtables \
     ipset \
     iptables \
-    kmod \
-    netbase
+    kmod

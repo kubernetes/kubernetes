@@ -24,7 +24,6 @@ import (
 )
 
 const (
-	// DefaultLeaseDuration defines a default duration of lease.
 	DefaultLeaseDuration = 15 * time.Second
 )
 

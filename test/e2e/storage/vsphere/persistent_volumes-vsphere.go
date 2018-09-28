@@ -59,7 +59,6 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	*/
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
-		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		clientPod = nil

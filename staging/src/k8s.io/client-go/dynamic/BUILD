@@ -59,7 +59,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/dynamic/dynamiclister:all-srcs",
         "//staging/src/k8s.io/client-go/dynamic/fake:all-srcs",
     ],
     tags = ["automanaged"],

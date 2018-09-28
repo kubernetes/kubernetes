@@ -18,7 +18,6 @@ package rest
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -30,14 +29,13 @@ import (
 )
 
 // LocationStreamer is a resource that streams the contents of a particular
-// location URL.
+// location URL
 type LocationStreamer struct {
 	Location        *url.URL
 	Transport       http.RoundTripper
 	ContentType     string
 	Flush           bool
 	ResponseChecker HttpResponseChecker
-	RedirectChecker func(req *http.Request, via []*http.Request) error
 }
 
 // a LocationStreamer must implement a rest.ResourceStreamer
@@ -61,10 +59,7 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
-	client := &http.Client{
-		Transport:     transport,
-		CheckRedirect: s.RedirectChecker,
-	}
+	client := &http.Client{Transport: transport}
 	req, err := http.NewRequest("GET", s.Location.String(), nil)
 	// Pass the parent context down to the request to ensure that the resources
 	// will be release properly.
@@ -91,9 +86,4 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 	flush = s.Flush
 	stream = resp.Body
 	return
-}
-
-// PreventRedirects is a redirect checker that prevents the client from following a redirect.
-func PreventRedirects(_ *http.Request, _ []*http.Request) error {
-	return errors.New("redirects forbidden")
 }

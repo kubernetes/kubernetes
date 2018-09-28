@@ -81,7 +81,35 @@ constraints, affinity and anti-affinity specifications, data locality, inter-wor
 interference, deadlines, and so on. Workload-specific requirements will be exposed
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := run(cmd, args, opts); err != nil {
+			verflag.PrintAndExitIfRequested()
+			utilflag.PrintFlags(cmd.Flags())
+
+			if len(args) != 0 {
+				fmt.Fprint(os.Stderr, "arguments are not supported\n")
+			}
+
+			if errs := opts.Validate(); len(errs) > 0 {
+				fmt.Fprintf(os.Stderr, "%v\n", utilerrors.NewAggregate(errs))
+				os.Exit(1)
+			}
+
+			if len(opts.WriteConfigTo) > 0 {
+				if err := options.WriteConfigFile(opts.WriteConfigTo, &opts.ComponentConfig); err != nil {
+					fmt.Fprintf(os.Stderr, "%v\n", err)
+					os.Exit(1)
+				}
+				glog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
+				return
+			}
+
+			c, err := opts.Config()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+				os.Exit(1)
+			}
+
+			stopCh := make(chan struct{})
+			if err := Run(c.Complete(), stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -94,39 +122,8 @@ through the API as necessary.`,
 	return cmd
 }
 
-// run runs the scheduler.
-func run(cmd *cobra.Command, args []string, opts *options.Options) error {
-	verflag.PrintAndExitIfRequested()
-	utilflag.PrintFlags(cmd.Flags())
-
-	if len(args) != 0 {
-		fmt.Fprint(os.Stderr, "arguments are not supported\n")
-	}
-
-	if errs := opts.Validate(); len(errs) > 0 {
-		fmt.Fprintf(os.Stderr, "%v\n", utilerrors.NewAggregate(errs))
-		os.Exit(1)
-	}
-
-	if len(opts.WriteConfigTo) > 0 {
-		if err := options.WriteConfigFile(opts.WriteConfigTo, &opts.ComponentConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
-		}
-		glog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
-	}
-
-	c, err := opts.Config()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-
-	stopCh := make(chan struct{})
-
-	// Get the completed config
-	cc := c.Complete()
-
+// Run runs the Scheduler.
+func Run(c schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
@@ -142,7 +139,7 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 	}
 
 	// Build a scheduler config from the provided algorithm source.
-	schedulerConfig, err := NewSchedulerConfig(cc)
+	schedulerConfig, err := NewSchedulerConfig(c)
 	if err != nil {
 		return err
 	}
@@ -151,39 +148,39 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 	sched := scheduler.NewFromConfig(schedulerConfig)
 
 	// Prepare the event broadcaster.
-	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.Events("")})
+	if c.Broadcaster != nil && c.EventClient != nil {
+		c.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.EventClient.Events("")})
 	}
 
 	// Start up the healthz server.
-	if cc.InsecureServing != nil {
-		separateMetrics := cc.InsecureMetricsServing != nil
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, separateMetrics), nil, nil)
-		if err := cc.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+	if c.InsecureServing != nil {
+		separateMetrics := c.InsecureMetricsServing != nil
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, separateMetrics), nil, nil)
+		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
 			return fmt.Errorf("failed to start healthz server: %v", err)
 		}
 	}
-	if cc.InsecureMetricsServing != nil {
-		handler := buildHandlerChain(newMetricsHandler(&cc.ComponentConfig), nil, nil)
-		if err := cc.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
+	if c.InsecureMetricsServing != nil {
+		handler := buildHandlerChain(newMetricsHandler(&c.ComponentConfig), nil, nil)
+		if err := c.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
 			return fmt.Errorf("failed to start metrics server: %v", err)
 		}
 	}
-	if cc.SecureServing != nil {
-		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		if err := cc.SecureServing.Serve(handler, 0, stopCh); err != nil {
+	if c.SecureServing != nil {
+		handler := buildHandlerChain(newHealthzHandler(&c.ComponentConfig, false), c.Authentication.Authenticator, c.Authorization.Authorizer)
+		if err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start healthz server: %v", err)
 		}
 	}
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(stopCh)
-	cc.InformerFactory.Start(stopCh)
+	go c.PodInformer.Informer().Run(stopCh)
+	c.InformerFactory.Start(stopCh)
 
 	// Wait for all caches to sync before scheduling.
-	cc.InformerFactory.WaitForCacheSync(stopCh)
-	controller.WaitForCacheSync("scheduler", stopCh, cc.PodInformer.Informer().HasSynced)
+	c.InformerFactory.WaitForCacheSync(stopCh)
+	controller.WaitForCacheSync("scheduler", stopCh, c.PodInformer.Informer().HasSynced)
 
 	// Prepare a reusable run function.
 	run := func(ctx context.Context) {
@@ -203,14 +200,14 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 	}()
 
 	// If leader election is enabled, run via LeaderElector until done and exit.
-	if cc.LeaderElection != nil {
-		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
+	if c.LeaderElection != nil {
+		c.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
 				utilruntime.HandleError(fmt.Errorf("lost master"))
 			},
 		}
-		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
+		leaderElector, err := leaderelection.NewLeaderElector(*c.LeaderElection)
 		if err != nil {
 			return fmt.Errorf("couldn't create leader elector: %v", err)
 		}

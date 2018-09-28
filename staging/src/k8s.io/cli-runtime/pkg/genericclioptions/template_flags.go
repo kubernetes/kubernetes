@@ -19,7 +19,6 @@ package genericclioptions
 import (
 	"fmt"
 	"io/ioutil"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -52,7 +51,6 @@ func (f *GoTemplatePrintFlags) AllowedFormats() []string {
 	for format := range templateFormats {
 		formats = append(formats, format)
 	}
-	sort.Strings(formats)
 	return formats
 }
 

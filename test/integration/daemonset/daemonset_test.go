@@ -94,9 +94,6 @@ func setupScheduler(
 		return
 	}
 
-	// Enable Features.
-	algorithmprovider.ApplyFeatureGates()
-
 	schedulerConfigFactory := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  v1.DefaultSchedulerName,
 		Client:                         cs,
@@ -300,8 +297,7 @@ func validateDaemonSetPodsAndMarkReady(
 	podClient corev1typed.PodInterface,
 	podInformer cache.SharedIndexInformer,
 	numberPods int,
-	t *testing.T,
-) {
+	t *testing.T) {
 	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != numberPods {
@@ -488,15 +484,11 @@ func forEachFeatureGate(t *testing.T, tf func(t *testing.T)) {
 		func() {
 			enabled := utilfeature.DefaultFeatureGate.Enabled(fg)
 			defer func() {
-				if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled)); err != nil {
-					t.Fatalf("Failed to set FeatureGate %v to %t", fg, enabled)
-				}
+				utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled))
 			}()
 
 			for _, f := range []bool{true, false} {
-				if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, f)); err != nil {
-					t.Fatalf("Failed to set FeatureGate %v to %t", fg, f)
-				}
+				utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, f))
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
 			}
 		}()
@@ -704,23 +696,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	})
 }
 
-func setFeatureGate(t *testing.T, feature utilfeature.Feature, enabled bool) {
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", feature, enabled)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t: %v", feature, enabled, err)
-	}
-}
-
-// When ScheduleDaemonSetPods is disabled, DaemonSets should not launch onto nodes with insufficient capacity.
-// Look for TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled, we don't need this test anymore.
 func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
-	// Rollback feature gate.
-	defer func() {
-		if enabled {
-			setFeatureGate(t, features.ScheduleDaemonSetPods, true)
-		}
-	}()
-	setFeatureGate(t, features.ScheduleDaemonSetPods, false)
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
@@ -763,15 +739,11 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) {
 	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
 	defer func() {
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t",
-			features.ScheduleDaemonSetPods, enabled)); err != nil {
-			t.Fatalf("Failed to set FeatureGate %v to %t", features.ScheduleDaemonSetPods, enabled)
-		}
+		utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t",
+			features.ScheduleDaemonSetPods, enabled))
 	}()
 
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.ScheduleDaemonSetPods, true)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t", features.ScheduleDaemonSetPods, true)
-	}
+	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.ScheduleDaemonSetPods, true))
 
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
@@ -1001,90 +973,6 @@ func TestTaintedNode(t *testing.T) {
 			_, err = nodeClient.Update(nodeWithTaintCopy)
 			if err != nil {
 				t.Fatalf("Failed to update nodeWithTaint: %v", err)
-			}
-
-			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
-			validateDaemonSetStatus(dsClient, ds.Name, 2, t)
-		})
-	})
-}
-
-// TestUnschedulableNodeDaemonDoesLaunchPod tests that the DaemonSet Pods can still be scheduled
-// to the Unschedulable nodes when TaintNodesByCondition are enabled.
-func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
-	enabledTaint := utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition)
-	defer func() {
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t",
-			features.TaintNodesByCondition, enabledTaint)); err != nil {
-			t.Fatalf("Failed to set FeatureGate %v to %t", features.TaintNodesByCondition, enabledTaint)
-		}
-	}()
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.TaintNodesByCondition, true)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t", features.TaintNodesByCondition, true)
-	}
-
-	forEachFeatureGate(t, func(t *testing.T) {
-		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-			server, closeFn, dc, informers, clientset := setup(t)
-			defer closeFn()
-			ns := framework.CreateTestingNamespace("daemonset-unschedulable-test", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
-
-			dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-			podClient := clientset.CoreV1().Pods(ns.Name)
-			nodeClient := clientset.CoreV1().Nodes()
-			podInformer := informers.Core().V1().Pods().Informer()
-
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
-
-			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
-
-			ds := newDaemonSet("foo", ns.Name)
-			ds.Spec.UpdateStrategy = *strategy
-			ds.Spec.Template.Spec.HostNetwork = true
-			_, err := dsClient.Create(ds)
-			if err != nil {
-				t.Fatalf("Failed to create DaemonSet: %v", err)
-			}
-
-			defer cleanupDaemonSets(t, clientset, ds)
-
-			// Creates unschedulable node.
-			node := newNode("unschedulable-node", nil)
-			node.Spec.Unschedulable = true
-			node.Spec.Taints = []v1.Taint{
-				{
-					Key:    algorithm.TaintNodeUnschedulable,
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			}
-
-			_, err = nodeClient.Create(node)
-			if err != nil {
-				t.Fatalf("Failed to create node: %v", err)
-			}
-
-			// Creates network-unavailable node.
-			nodeNU := newNode("network-unavailable-node", nil)
-			nodeNU.Status.Conditions = []v1.NodeCondition{
-				{Type: v1.NodeReady, Status: v1.ConditionFalse},
-				{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionTrue},
-			}
-			nodeNU.Spec.Taints = []v1.Taint{
-				{
-					Key:    algorithm.TaintNodeNetworkUnavailable,
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			}
-
-			_, err = nodeClient.Create(nodeNU)
-			if err != nil {
-				t.Fatalf("Failed to create node: %v", err)
 			}
 
 			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)

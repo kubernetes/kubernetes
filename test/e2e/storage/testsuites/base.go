@@ -18,7 +18,6 @@ package testsuites
 
 import (
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -126,8 +125,6 @@ type genericVolumeTestResource struct {
 	pvc       *v1.PersistentVolumeClaim
 	pv        *v1.PersistentVolume
 	sc        *storagev1.StorageClass
-
-	driverTestResource interface{}
 }
 
 var _ TestResource = &genericVolumeTestResource{}
@@ -142,19 +139,19 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 	volType := pattern.VolType
 
 	// Create volume for pre-provisioned volume tests
-	r.driverTestResource = drivers.CreateVolume(driver, volType)
+	drivers.CreateVolume(driver, volType)
 
 	switch volType {
 	case testpatterns.InlineVolume:
 		framework.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(drivers.InlineVolumeTestDriver); ok {
-			r.volSource = iDriver.GetVolumeSource(false, fsType, r.driverTestResource)
+			r.volSource = iDriver.GetVolumeSource(false, fsType)
 			r.volType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
 		framework.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(drivers.PreprovisionedPVTestDriver); ok {
-			pvSource := pDriver.GetPersistentVolumeSource(false, fsType, r.driverTestResource)
+			pvSource := pDriver.GetPersistentVolumeSource(false, fsType)
 			if pvSource != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, false)
 			}
@@ -193,25 +190,9 @@ func (r *genericVolumeTestResource) cleanupResource(driver drivers.TestDriver, p
 	volType := pattern.VolType
 
 	if r.pvc != nil || r.pv != nil {
-		switch volType {
-		case testpatterns.PreprovisionedPV:
-			By("Deleting pv and pvc")
-			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
-				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
-			}
-		case testpatterns.DynamicPV:
-			By("Deleting pvc")
-			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
-			if r.pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
-				framework.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
-					r.pv.Name, v1.PersistentVolumeReclaimDelete)
-			}
-			err := framework.DeletePersistentVolumeClaim(f.ClientSet, r.pvc.Name, f.Namespace.Name)
-			framework.ExpectNoError(err, "Failed to delete PVC %v", r.pvc.Name)
-			err = framework.WaitForPersistentVolumeDeleted(f.ClientSet, r.pv.Name, 5*time.Second, 5*time.Minute)
-			framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", r.pv.Name)
-		default:
-			framework.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.pvc, r.pv)
+		By("Deleting pv and pvc")
+		if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
+			framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
 		}
 	}
 
@@ -221,7 +202,7 @@ func (r *genericVolumeTestResource) cleanupResource(driver drivers.TestDriver, p
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
-	drivers.DeleteVolume(driver, volType, r.driverTestResource)
+	drivers.DeleteVolume(driver, volType)
 }
 
 func createVolumeSourceWithPVCPV(

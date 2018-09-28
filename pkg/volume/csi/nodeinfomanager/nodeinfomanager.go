@@ -31,10 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -48,8 +49,9 @@ var nodeKind = v1.SchemeGroupVersion.WithKind("Node")
 // nodeInfoManager contains necessary common dependencies to update node info on both
 // the Node and CSINodeInfo objects.
 type nodeInfoManager struct {
-	nodeName   types.NodeName
-	volumeHost volume.VolumeHost
+	nodeName      types.NodeName
+	k8s           kubernetes.Interface
+	csiKubeClient csiclientset.Interface
 }
 
 // If no updates is needed, the function must return the same Node object as the input.
@@ -71,10 +73,12 @@ type Interface interface {
 // NewNodeInfoManager initializes nodeInfoManager
 func NewNodeInfoManager(
 	nodeName types.NodeName,
-	volumeHost volume.VolumeHost) Interface {
+	kubeClient kubernetes.Interface,
+	csiKubeClient csiclientset.Interface) Interface {
 	return &nodeInfoManager{
-		nodeName:   nodeName,
-		volumeHost: volumeHost,
+		nodeName:      nodeName,
+		k8s:           kubeClient,
+		csiKubeClient: csiKubeClient,
 	}
 }
 
@@ -139,12 +143,7 @@ func (nim *nodeInfoManager) updateNode(updateFuncs ...nodeUpdateFunc) error {
 		// existing changes are not overwritten. RetryOnConflict uses
 		// exponential backoff to avoid exhausting the apiserver.
 
-		kubeClient := nim.volumeHost.GetKubeClient()
-		if kubeClient == nil {
-			return fmt.Errorf("error getting kube client")
-		}
-
-		nodeClient := kubeClient.CoreV1().Nodes()
+		nodeClient := nim.k8s.CoreV1().Nodes()
 		node, err := nodeClient.Get(string(nim.nodeName), metav1.GetOptions{})
 		if err != nil {
 			return err // do not wrap error
@@ -316,13 +315,8 @@ func (nim *nodeInfoManager) updateCSINodeInfo(
 	driverNodeID string,
 	topology *csipb.Topology) error {
 
-	csiKubeClient := nim.volumeHost.GetCSIClient()
-	if csiKubeClient == nil {
-		return fmt.Errorf("error getting CSI client")
-	}
-
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		nodeInfo, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
+		nodeInfo, err := nim.csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
 		if nodeInfo == nil || errors.IsNotFound(err) {
 			return nim.createNodeInfoObject(driverName, driverNodeID, topology)
 		}
@@ -343,24 +337,14 @@ func (nim *nodeInfoManager) createNodeInfoObject(
 	driverNodeID string,
 	topology *csipb.Topology) error {
 
-	kubeClient := nim.volumeHost.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("error getting kube client")
-	}
-
-	csiKubeClient := nim.volumeHost.GetCSIClient()
-	if csiKubeClient == nil {
-		return fmt.Errorf("error getting CSI client")
-	}
-
-	topologyKeys := []string{} // must be an empty slice instead of nil to satisfy CRD OpenAPI Schema validation
+	var topologyKeys []string
 	if topology != nil {
 		for k := range topology.Segments {
 			topologyKeys = append(topologyKeys, k)
 		}
 	}
 
-	node, err := kubeClient.CoreV1().Nodes().Get(string(nim.nodeName), metav1.GetOptions{})
+	node, err := nim.k8s.CoreV1().Nodes().Get(string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return err // do not wrap error
 	}
@@ -386,7 +370,7 @@ func (nim *nodeInfoManager) createNodeInfoObject(
 		},
 	}
 
-	_, err = csiKubeClient.CsiV1alpha1().CSINodeInfos().Create(nodeInfo)
+	_, err = nim.csiKubeClient.CsiV1alpha1().CSINodeInfos().Create(nodeInfo)
 	return err // do not wrap error
 }
 
@@ -395,11 +379,6 @@ func (nim *nodeInfoManager) updateNodeInfoObject(
 	driverName string,
 	driverNodeID string,
 	topology *csipb.Topology) error {
-
-	csiKubeClient := nim.volumeHost.GetCSIClient()
-	if csiKubeClient == nil {
-		return fmt.Errorf("error getting CSI client")
-	}
 
 	topologyKeys := make(sets.String)
 	if topology != nil {
@@ -433,19 +412,14 @@ func (nim *nodeInfoManager) updateNodeInfoObject(
 	newDriverInfos = append(newDriverInfos, driverInfo)
 	nodeInfo.CSIDrivers = newDriverInfos
 
-	_, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
+	_, err := nim.csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
 	return err // do not wrap error
 }
 
 func (nim *nodeInfoManager) removeCSINodeInfo(csiDriverName string) error {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 
-		csiKubeClient := nim.volumeHost.GetCSIClient()
-		if csiKubeClient == nil {
-			return fmt.Errorf("error getting CSI client")
-		}
-
-		nodeInfoClient := csiKubeClient.CsiV1alpha1().CSINodeInfos()
+		nodeInfoClient := nim.csiKubeClient.CsiV1alpha1().CSINodeInfos()
 		nodeInfo, err := nodeInfoClient.Get(string(nim.nodeName), metav1.GetOptions{})
 		if nodeInfo == nil || errors.IsNotFound(err) {
 			// do nothing

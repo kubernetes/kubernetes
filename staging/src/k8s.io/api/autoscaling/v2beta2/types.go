@@ -200,18 +200,16 @@ type MetricTarget struct {
 	// type represents whether the metric type is Utilization, Value, or AverageValue
 	Type MetricTargetType `json:"type" protobuf:"bytes,1,name=type"`
 	// value is the target value of the metric (as a quantity).
-	// +optional
-	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,2,name=value"`
 	// averageValue is the target value of the average of the
 	// metric across all relevant pods (as a quantity)
-	// +optional
-	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,3,opt,name=averageValue"`
+	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,3,name=averageValue"`
+
 	// averageUtilization is the target value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
 	// Currently only valid for Resource metric source type
-	// +optional
-	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"bytes,4,opt,name=averageUtilization"`
+	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"bytes,4,name=averageUtilization"`
 }
 
 // MetricTargetType specifies the type of metric being targeted, and should be either
@@ -366,17 +364,14 @@ type ExternalMetricStatus struct {
 // MetricValueStatus holds the current value for a metric
 type MetricValueStatus struct {
 	// value is the current value of the metric (as a quantity).
-	// +optional
-	Value *resource.Quantity `json:"value,omitempty" protobuf:"bytes,1,opt,name=value"`
+	Value *resource.Quantity `json:"value" protobuf:"bytes,1,name=value"`
 	// averageValue is the current value of the average of the
 	// metric across all relevant pods (as a quantity)
-	// +optional
-	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,2,opt,name=averageValue"`
+	AverageValue *resource.Quantity `json:"averageValue" protobuf:"bytes,2,name=averageValue"`
 	// currentAverageUtilization is the current value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
-	// +optional
-	AverageUtilization *int32 `json:"averageUtilization,omitempty" protobuf:"bytes,3,opt,name=averageUtilization"`
+	AverageUtilization *int32 `json:"averageUtilization" protobuf:"bytes,3,name=averageUtilization"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

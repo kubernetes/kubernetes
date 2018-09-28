@@ -5,17 +5,10 @@ package ipvs
 import (
 	"net"
 	"syscall"
-	"time"
 
 	"fmt"
-
 	"github.com/vishvananda/netlink/nl"
 	"github.com/vishvananda/netns"
-)
-
-const (
-	netlinkRecvSocketsTimeout = 3 * time.Second
-	netlinkSendSocketTimeout  = 30 * time.Second
 )
 
 // Service defines an IPVS service in its entirety.
@@ -53,15 +46,13 @@ type SvcStats struct {
 // Destination defines an IPVS destination (real server) in its
 // entirety.
 type Destination struct {
-	Address             net.IP
-	Port                uint16
-	Weight              int
-	ConnectionFlags     uint32
-	AddressFamily       uint16
-	UpperThreshold      uint32
-	LowerThreshold      uint32
-	ActiveConnections   int
-	InactiveConnections int
+	Address         net.IP
+	Port            uint16
+	Weight          int
+	ConnectionFlags uint32
+	AddressFamily   uint16
+	UpperThreshold  uint32
+	LowerThreshold  uint32
 }
 
 // Handle provides a namespace specific ipvs handle to program ipvs
@@ -89,15 +80,6 @@ func New(path string) (*Handle, error) {
 
 	sock, err := nl.GetNetlinkSocketAt(n, netns.None(), syscall.NETLINK_GENERIC)
 	if err != nil {
-		return nil, err
-	}
-	// Add operation timeout to avoid deadlocks
-	tv := syscall.NsecToTimeval(netlinkSendSocketTimeout.Nanoseconds())
-	if err := sock.SetSendTimeout(&tv); err != nil {
-		return nil, err
-	}
-	tv = syscall.NsecToTimeval(netlinkRecvSocketsTimeout.Nanoseconds())
-	if err := sock.SetReceiveTimeout(&tv); err != nil {
 		return nil, err
 	}
 

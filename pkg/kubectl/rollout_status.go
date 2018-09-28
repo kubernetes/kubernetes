@@ -23,6 +23,9 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -33,28 +36,32 @@ type StatusViewer interface {
 }
 
 // StatusViewerFor returns a StatusViewer for the resource specified by kind.
-func StatusViewerFor(kind schema.GroupKind) (StatusViewer, error) {
+func StatusViewerFor(kind schema.GroupKind, c kubernetes.Interface) (StatusViewer, error) {
 	switch kind {
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
-		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind():
-		return &DeploymentStatusViewer{}, nil
-	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(),
-		appsv1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind():
-		return &DaemonSetStatusViewer{}, nil
-	case appsv1.SchemeGroupVersion.WithKind("StatefulSet").GroupKind():
-		return &StatefulSetStatusViewer{}, nil
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(), apps.Kind("Deployment"):
+		return &DeploymentStatusViewer{c.AppsV1()}, nil
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("DaemonSet").GroupKind(), apps.Kind("DaemonSet"):
+		return &DaemonSetStatusViewer{c.AppsV1()}, nil
+	case apps.Kind("StatefulSet"):
+		return &StatefulSetStatusViewer{c.AppsV1()}, nil
 	}
 	return nil, fmt.Errorf("no status viewer has been implemented for %v", kind)
 }
 
 // DeploymentStatusViewer implements the StatusViewer interface.
-type DeploymentStatusViewer struct{}
+type DeploymentStatusViewer struct {
+	c clientappsv1.DeploymentsGetter
+}
 
 // DaemonSetStatusViewer implements the StatusViewer interface.
-type DaemonSetStatusViewer struct{}
+type DaemonSetStatusViewer struct {
+	c clientappsv1.DaemonSetsGetter
+}
 
 // StatefulSetStatusViewer implements the StatusViewer interface.
-type StatefulSetStatusViewer struct{}
+type StatefulSetStatusViewer struct {
+	c clientappsv1.StatefulSetsGetter
+}
 
 // Status returns a message describing deployment status, and a bool value indicating if the status is considered done.
 func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64) (string, bool, error) {
@@ -134,7 +141,7 @@ func (s *StatefulSetStatusViewer) Status(obj runtime.Unstructured, revision int6
 	if sts.Spec.Replicas != nil && sts.Status.ReadyReplicas < *sts.Spec.Replicas {
 		return fmt.Sprintf("Waiting for %d pods to be ready...\n", *sts.Spec.Replicas-sts.Status.ReadyReplicas), false, nil
 	}
-	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType && sts.Spec.UpdateStrategy.RollingUpdate != nil {
+	if sts.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType && sts.Spec.UpdateStrategy.RollingUpdate != nil {
 		if sts.Spec.Replicas != nil && sts.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
 			if sts.Status.UpdatedReplicas < (*sts.Spec.Replicas - *sts.Spec.UpdateStrategy.RollingUpdate.Partition) {
 				return fmt.Sprintf("Waiting for partitioned roll out to finish: %d out of %d new pods have been updated...\n",

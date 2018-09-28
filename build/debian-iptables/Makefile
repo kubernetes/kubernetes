@@ -12,19 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY:	build push all all-build all-push-images all-push push-manifest
+.PHONY:	build push
 
 REGISTRY?="staging-k8s.gcr.io"
-IMAGE=$(REGISTRY)/debian-iptables
-TAG?=v10.2
+IMAGE=debian-iptables
+TAG?=v10.1
 ARCH?=amd64
-ALL_ARCH = amd64 arm arm64 ppc64le s390x
 TEMP_DIR:=$(shell mktemp -d)
 
 BASEIMAGE?=k8s.gcr.io/debian-base-$(ARCH):0.3.2
-
-# This option is for running docker manifest command
-export DOCKER_CLI_EXPERIMENTAL := enabled
 
 build:
 	cp ./* $(TEMP_DIR)
@@ -35,26 +31,9 @@ ifneq ($(ARCH),amd64)
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 endif
 
-	docker build --pull -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 
 push: build
-	docker push $(IMAGE)-$(ARCH):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
 
-sub-build-%:
-	$(MAKE) ARCH=$* build
-
-all-build: $(addprefix sub-build-,$(ALL_ARCH))
-
-sub-push-image-%:
-	$(MAKE) ARCH=$* push
-
-all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
-
-all-push: all-push-images push-manifest
-
-push-manifest:
-	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
-	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
-	docker manifest push ${IMAGE}:${TAG}
-
-all: all-push
+all: push

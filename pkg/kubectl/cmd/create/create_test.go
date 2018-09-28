@@ -26,6 +26,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest/fake"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -162,7 +163,6 @@ func initTestErrorHandler(t *testing.T) {
 }
 
 func testData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {
-	grace := int64(30)
 	pods := &corev1.PodList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
@@ -170,21 +170,11 @@ func testData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationContro
 		Items: []corev1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec: corev1.PodSpec{
-					RestartPolicy:                 corev1.RestartPolicyAlways,
-					DNSPolicy:                     corev1.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-					SecurityContext:               &corev1.PodSecurityContext{},
-				},
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec: corev1.PodSpec{
-					RestartPolicy:                 corev1.RestartPolicyAlways,
-					DNSPolicy:                     corev1.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-					SecurityContext:               &corev1.PodSecurityContext{},
-				},
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 	}

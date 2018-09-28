@@ -110,7 +110,7 @@ type dockerFactory struct {
 
 	dockerAPIVersion []int
 
-	includedMetrics container.MetricSet
+	ignoreMetrics container.MetricSet
 
 	thinPoolName    string
 	thinPoolWatcher *devicemapper.ThinPoolWatcher
@@ -141,7 +141,7 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 		inHostNamespace,
 		metadataEnvs,
 		self.dockerVersion,
-		self.includedMetrics,
+		self.ignoreMetrics,
 		self.thinPoolName,
 		self.thinPoolWatcher,
 		self.zfsWatcher,
@@ -309,7 +309,7 @@ func ensureThinLsKernelVersion(kernelVersion string) error {
 }
 
 // Register root container before running this function!
-func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics container.MetricSet) error {
+func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics container.MetricSet) error {
 	client, err := Client()
 	if err != nil {
 		return fmt.Errorf("unable to communicate with docker daemon: %v", err)
@@ -363,7 +363,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		machineInfoFactory: factory,
 		storageDriver:      storageDriver(dockerInfo.Driver),
 		storageDir:         RootDir(),
-		includedMetrics:    includedMetrics,
+		ignoreMetrics:      ignoreMetrics,
 		thinPoolName:       thinPoolName,
 		thinPoolWatcher:    thinPoolWatcher,
 		zfsWatcher:         zfsWatcher,

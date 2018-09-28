@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
-
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 	"k8s.io/metrics/pkg/client/external_metrics"
@@ -49,19 +48,9 @@ func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
 
 func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool, error) {
 	clientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
-	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
-
-	apiVersionsGetter := custom_metrics.NewAvailableAPIsGetter(hpaClient.Discovery())
-	// invalidate the discovery information roughly once per resync interval our API
-	// information is *at most* two resync intervals old.
-	go custom_metrics.PeriodicallyInvalidate(
-		apiVersionsGetter,
-		ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerSyncPeriod.Duration,
-		ctx.Stop)
-
 	metricsClient := metrics.NewRESTMetricsClient(
 		resourceclient.NewForConfigOrDie(clientConfig),
-		custom_metrics.NewForConfig(clientConfig, ctx.RESTMapper, apiVersionsGetter),
+		custom_metrics.NewForConfigOrDie(clientConfig),
 		external_metrics.NewForConfigOrDie(clientConfig),
 	)
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)

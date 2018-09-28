@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
-// TestSelectableFieldLabelConversionsOfKind verifies that given resource have field
+// TestSelectableFieldLabelConversions verifies that given resource have field
 // label conversion defined for each its selectable field.
 // fields contains selectable fields of the resource.
 // labelMap maps deprecated labels to their canonical names.

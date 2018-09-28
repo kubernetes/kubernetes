@@ -88,7 +88,6 @@ func overrideGenericFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
-// FuzzerFuncs is a list of fuzzer functions
 var FuzzerFuncs = fuzzer.MergeFuzzerFuncs(
 	genericfuzzer.Funcs,
 	overrideGenericFuncs,

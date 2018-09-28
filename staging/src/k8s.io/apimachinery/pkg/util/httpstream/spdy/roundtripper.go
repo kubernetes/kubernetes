@@ -67,9 +67,6 @@ type SpdyRoundTripper struct {
 	// followRedirects indicates if the round tripper should examine responses for redirects and
 	// follow them.
 	followRedirects bool
-	// requireSameHostRedirects restricts redirect following to only follow redirects to the same host
-	// as the original request.
-	requireSameHostRedirects bool
 }
 
 var _ utilnet.TLSClientConfigHolder = &SpdyRoundTripper{}
@@ -78,18 +75,14 @@ var _ utilnet.Dialer = &SpdyRoundTripper{}
 
 // NewRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig.
-func NewRoundTripper(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool) httpstream.UpgradeRoundTripper {
-	return NewSpdyRoundTripper(tlsConfig, followRedirects, requireSameHostRedirects)
+func NewRoundTripper(tlsConfig *tls.Config, followRedirects bool) httpstream.UpgradeRoundTripper {
+	return NewSpdyRoundTripper(tlsConfig, followRedirects)
 }
 
 // NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig. This function is mostly meant for unit tests.
-func NewSpdyRoundTripper(tlsConfig *tls.Config, followRedirects, requireSameHostRedirects bool) *SpdyRoundTripper {
-	return &SpdyRoundTripper{
-		tlsConfig:                tlsConfig,
-		followRedirects:          followRedirects,
-		requireSameHostRedirects: requireSameHostRedirects,
-	}
+func NewSpdyRoundTripper(tlsConfig *tls.Config, followRedirects bool) *SpdyRoundTripper {
+	return &SpdyRoundTripper{tlsConfig: tlsConfig, followRedirects: followRedirects}
 }
 
 // TLSClientConfig implements pkg/util/net.TLSClientConfigHolder for proper TLS checking during
@@ -264,7 +257,7 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	)
 
 	if s.followRedirects {
-		conn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s, s.requireSameHostRedirects)
+		conn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, req.URL, header, req.Body, s)
 	} else {
 		clone := utilnet.CloneRequest(req)
 		clone.Header = header

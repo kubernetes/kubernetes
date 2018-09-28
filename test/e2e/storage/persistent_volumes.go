@@ -312,7 +312,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.DeleteAllStatefulSets(c, ns)
 			})
 
-			It("should be reschedulable [Slow]", func() {
+			It("should be reschedulable", func() {
 				// Only run on providers with default storageclass
 				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
 

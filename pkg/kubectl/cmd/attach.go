@@ -31,6 +31,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -136,7 +137,7 @@ func defaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 			Stdout:    o.Out != nil,
 			Stderr:    !o.DisableStderr,
 			TTY:       raw,
-		}, scheme.ParameterCodec)
+		}, legacyscheme.ParameterCodec)
 
 		return o.Attach.Attach("POST", req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
 	}

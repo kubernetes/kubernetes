@@ -150,9 +150,6 @@ func (cfg *frozenConfig) TypeOf(obj interface{}) Type {
 }
 
 func (cfg *frozenConfig) Type2(type1 reflect.Type) Type {
-	if type1 == nil {
-		return nil
-	}
 	cacheKey := uintptr(unpackEFace(type1).data)
 	typeObj, found := cfg.cache.Load(cacheKey)
 	if found {

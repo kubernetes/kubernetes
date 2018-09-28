@@ -231,8 +231,7 @@ type Proxier struct {
 	nodePortAddresses []string
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
-	networkInterfacer     utilproxy.NetworkInterfacer
-	gracefuldeleteManager *GracefulTerminationManager
+	networkInterfacer utilproxy.NetworkInterfacer
 }
 
 // IPGetter helps get node network interface IP
@@ -300,10 +299,8 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
-		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
-		}
+	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
+		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -314,17 +311,13 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	// Set the conntrack sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlVSConnTrack); val != 1 {
-		if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
-		}
+	if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
+		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
 	}
 
 	// Set the ip_forward sysctl we need for
-	if val, _ := sysctl.GetSysctl(sysctlForward); val != 1 {
-		if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
-			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
-		}
+	if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
+		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -354,39 +347,38 @@ func NewProxier(ipt utiliptables.Interface,
 	healthChecker := healthcheck.NewServer(hostname, recorder, nil, nil) // use default implementations of deps
 
 	proxier := &Proxier{
-		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		serviceMap:            make(proxy.ServiceMap),
-		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
-		endpointsMap:          make(proxy.EndpointsMap),
-		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, &isIPv6, recorder),
-		syncPeriod:            syncPeriod,
-		minSyncPeriod:         minSyncPeriod,
-		excludeCIDRs:          excludeCIDRs,
-		iptables:              ipt,
-		masqueradeAll:         masqueradeAll,
-		masqueradeMark:        masqueradeMark,
-		exec:                  exec,
-		clusterCIDR:           clusterCIDR,
-		hostname:              hostname,
-		nodeIP:                nodeIP,
-		portMapper:            &listenPortOpener{},
-		recorder:              recorder,
-		healthChecker:         healthChecker,
-		healthzServer:         healthzServer,
-		ipvs:                  ipvs,
-		ipvsScheduler:         scheduler,
-		ipGetter:              &realIPGetter{nl: NewNetLinkHandle()},
-		iptablesData:          bytes.NewBuffer(nil),
-		filterChainsData:      bytes.NewBuffer(nil),
-		natChains:             bytes.NewBuffer(nil),
-		natRules:              bytes.NewBuffer(nil),
-		filterChains:          bytes.NewBuffer(nil),
-		filterRules:           bytes.NewBuffer(nil),
-		netlinkHandle:         NewNetLinkHandle(),
-		ipset:                 ipset,
-		nodePortAddresses:     nodePortAddresses,
-		networkInterfacer:     utilproxy.RealNetwork{},
-		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
+		portsMap:          make(map[utilproxy.LocalPort]utilproxy.Closeable),
+		serviceMap:        make(proxy.ServiceMap),
+		serviceChanges:    proxy.NewServiceChangeTracker(newServiceInfo, &isIPv6, recorder),
+		endpointsMap:      make(proxy.EndpointsMap),
+		endpointsChanges:  proxy.NewEndpointChangeTracker(hostname, nil, &isIPv6, recorder),
+		syncPeriod:        syncPeriod,
+		minSyncPeriod:     minSyncPeriod,
+		excludeCIDRs:      excludeCIDRs,
+		iptables:          ipt,
+		masqueradeAll:     masqueradeAll,
+		masqueradeMark:    masqueradeMark,
+		exec:              exec,
+		clusterCIDR:       clusterCIDR,
+		hostname:          hostname,
+		nodeIP:            nodeIP,
+		portMapper:        &listenPortOpener{},
+		recorder:          recorder,
+		healthChecker:     healthChecker,
+		healthzServer:     healthzServer,
+		ipvs:              ipvs,
+		ipvsScheduler:     scheduler,
+		ipGetter:          &realIPGetter{nl: NewNetLinkHandle()},
+		iptablesData:      bytes.NewBuffer(nil),
+		filterChainsData:  bytes.NewBuffer(nil),
+		natChains:         bytes.NewBuffer(nil),
+		natRules:          bytes.NewBuffer(nil),
+		filterChains:      bytes.NewBuffer(nil),
+		filterRules:       bytes.NewBuffer(nil),
+		netlinkHandle:     NewNetLinkHandle(),
+		ipset:             ipset,
+		nodePortAddresses: nodePortAddresses,
+		networkInterfacer: utilproxy.RealNetwork{},
 	}
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
@@ -399,7 +391,6 @@ func NewProxier(ipt utiliptables.Interface,
 	burstSyncs := 2
 	glog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
-	proxier.gracefuldeleteManager.Run()
 	return proxier, nil
 }
 
@@ -706,8 +697,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// This is to avoid memory reallocations and thus improve performance.
 	proxier.natChains.Reset()
 	proxier.natRules.Reset()
-	proxier.filterChains.Reset()
-	proxier.filterRules.Reset()
 
 	// Write table headers.
 	writeLine(proxier.filterChains, "*filter")
@@ -1000,7 +989,7 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			var lps []utilproxy.LocalPort
+			lps := make([]utilproxy.LocalPort, 0)
 			for address := range addresses {
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
@@ -1091,7 +1080,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Build ipvs kernel routes for each node ip address
-			var nodeIPs []net.IP
+			nodeIPs := make([]net.IP, 0)
 			for address := range addresses {
 				if !utilproxy.IsZeroCIDR(address) {
 					nodeIPs = append(nodeIPs, net.ParseIP(address))
@@ -1142,8 +1131,6 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Reset()
 	proxier.iptablesData.Write(proxier.natChains.Bytes())
 	proxier.iptablesData.Write(proxier.natRules.Bytes())
-	proxier.iptablesData.Write(proxier.filterChains.Bytes())
-	proxier.iptablesData.Write(proxier.filterRules.Bytes())
 
 	glog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
@@ -1513,72 +1500,53 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		newEndpoints.Insert(epInfo.String())
 	}
 
-	// Create new endpoints
-	for _, ep := range newEndpoints.List() {
-		ip, port, err := net.SplitHostPort(ep)
-		if err != nil {
-			glog.Errorf("Failed to parse endpoint: %v, error: %v", ep, err)
-			continue
-		}
-		portNum, err := strconv.Atoi(port)
-		if err != nil {
-			glog.Errorf("Failed to parse endpoint port %s, error: %v", port, err)
-			continue
-		}
-
-		newDest := &utilipvs.RealServer{
-			Address: net.ParseIP(ip),
-			Port:    uint16(portNum),
-			Weight:  1,
-		}
-
-		if curEndpoints.Has(ep) {
-			// check if newEndpoint is in gracefulDelete list, is true, delete this ep immediately
-			uniqueRS := GetUniqueRSName(vs, newDest)
-			if !proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
-				continue
-			}
-			glog.V(5).Infof("new ep %q is in graceful delete list", uniqueRS)
-			err := proxier.gracefuldeleteManager.MoveRSOutofGracefulDeleteList(uniqueRS)
+	if !curEndpoints.Equal(newEndpoints) {
+		// Create new endpoints
+		for _, ep := range newEndpoints.Difference(curEndpoints).UnsortedList() {
+			ip, port, err := net.SplitHostPort(ep)
 			if err != nil {
-				glog.Errorf("Failed to delete endpoint: %v in gracefulDeleteQueue, error: %v", ep, err)
+				glog.Errorf("Failed to parse endpoint: %v, error: %v", ep, err)
+				continue
+			}
+			portNum, err := strconv.Atoi(port)
+			if err != nil {
+				glog.Errorf("Failed to parse endpoint port %s, error: %v", port, err)
+				continue
+			}
+
+			newDest := &utilipvs.RealServer{
+				Address: net.ParseIP(ip),
+				Port:    uint16(portNum),
+				Weight:  1,
+			}
+			err = proxier.ipvs.AddRealServer(appliedVirtualServer, newDest)
+			if err != nil {
+				glog.Errorf("Failed to add destination: %v, error: %v", newDest, err)
 				continue
 			}
 		}
-		err = proxier.ipvs.AddRealServer(appliedVirtualServer, newDest)
-		if err != nil {
-			glog.Errorf("Failed to add destination: %v, error: %v", newDest, err)
-			continue
-		}
-	}
-	// Delete old endpoints
-	for _, ep := range curEndpoints.Difference(newEndpoints).UnsortedList() {
-		// if curEndpoint is in gracefulDelete, skip
-		uniqueRS := vs.String() + "/" + ep
-		if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
-			continue
-		}
-		ip, port, err := net.SplitHostPort(ep)
-		if err != nil {
-			glog.Errorf("Failed to parse endpoint: %v, error: %v", ep, err)
-			continue
-		}
-		portNum, err := strconv.Atoi(port)
-		if err != nil {
-			glog.Errorf("Failed to parse endpoint port %s, error: %v", port, err)
-			continue
-		}
+		// Delete old endpoints
+		for _, ep := range curEndpoints.Difference(newEndpoints).UnsortedList() {
+			ip, port, err := net.SplitHostPort(ep)
+			if err != nil {
+				glog.Errorf("Failed to parse endpoint: %v, error: %v", ep, err)
+				continue
+			}
+			portNum, err := strconv.Atoi(port)
+			if err != nil {
+				glog.Errorf("Failed to parse endpoint port %s, error: %v", port, err)
+				continue
+			}
 
-		delDest := &utilipvs.RealServer{
-			Address: net.ParseIP(ip),
-			Port:    uint16(portNum),
-		}
-
-		glog.V(5).Infof("Using graceful delete to delete: %v", delDest)
-		err = proxier.gracefuldeleteManager.GracefulDeleteRS(appliedVirtualServer, delDest)
-		if err != nil {
-			glog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
-			continue
+			delDest := &utilipvs.RealServer{
+				Address: net.ParseIP(ip),
+				Port:    uint16(portNum),
+			}
+			err = proxier.ipvs.DeleteRealServer(appliedVirtualServer, delDest)
+			if err != nil {
+				glog.Errorf("Failed to delete destination: %v, error: %v", delDest, err)
+				continue
+			}
 		}
 	}
 	return nil
@@ -1591,11 +1559,6 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 			// This service was not processed in the latest sync loop so before deleting it,
 			// make sure it does not fall within an excluded CIDR range.
 			okayToDelete := true
-			rsList, err := proxier.ipvs.GetRealServers(svc)
-			if len(rsList) != 0 && err == nil {
-				glog.V(5).Infof("Will not delete VS: %v, cause it have RS: %v", svc, rsList)
-				okayToDelete = false
-			}
 			for _, excludedCIDR := range proxier.excludeCIDRs {
 				// Any validation of this CIDR already should have occurred.
 				_, n, _ := net.ParseCIDR(excludedCIDR)
