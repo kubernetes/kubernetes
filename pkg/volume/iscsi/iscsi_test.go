@@ -94,7 +94,7 @@ type fakeDiskManager struct {
 	detachCalled bool
 }
 
-func NewFakeDiskManager() *fakeDiskManager {
+func newFakeDiskManager() *fakeDiskManager {
 	return &fakeDiskManager{
 		tmpDir: utiltesting.MkTmpdirOrDie("iscsi_test"),
 	}
@@ -157,7 +157,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fakeManager := NewFakeDiskManager()
+	fakeManager := newFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := &mount.FakeMounter{}
 	fakeExec := mount.NewFakeExec(nil)
@@ -186,7 +186,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		}
 	}
 
-	fakeManager2 := NewFakeDiskManager()
+	fakeManager2 := newFakeDiskManager()
 	defer fakeManager2.Cleanup()
 	unmounter, err := plug.(*iscsiPlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager2, fakeMounter, fakeExec)
 	if err != nil {

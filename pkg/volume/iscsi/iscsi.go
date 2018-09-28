@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&iscsiPlugin{}}
 }
@@ -103,7 +103,7 @@ func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.V
 	if err != nil {
 		return nil, err
 	}
-	return plugin.newMounterInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
+	return plugin.newMounterInternal(spec, pod.UID, &iscsiUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
 func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret map[string]string) (volume.Mounter, error) {
@@ -146,7 +146,7 @@ func (plugin *iscsiPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, 
 			return nil, err
 		}
 	}
-	return plugin.newBlockVolumeMapperInternal(spec, uid, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
+	return plugin.newBlockVolumeMapperInternal(spec, uid, &iscsiUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
 func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret map[string]string) (volume.BlockVolumeMapper, error) {
@@ -167,7 +167,7 @@ func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUI
 }
 
 func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, &iscsiUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Unmounter, error) {
@@ -187,7 +187,7 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 
 // NewBlockVolumeUnmapper creates a new volume.BlockVolumeUnmapper from recoverable state.
 func (plugin *iscsiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
-	return plugin.newUnmapperInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newUnmapperInternal(volName, podUID, &iscsiUtil{}, plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager, exec mount.Exec) (volume.BlockVolumeUnmapper, error) {
@@ -262,17 +262,17 @@ func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName
 }
 
 type iscsiDisk struct {
-	VolName        string
-	podUID         types.UID
-	Portals        []string
-	Iqn            string
-	Lun            string
-	Iface          string
-	chap_discovery bool
-	chap_session   bool
-	secret         map[string]string
-	InitiatorName  string
-	plugin         *iscsiPlugin
+	VolName       string
+	podUID        types.UID
+	Portals       []string
+	Iqn           string
+	Lun           string
+	Iface         string
+	chapDiscovery bool
+	chapSession   bool
+	secret        map[string]string
+	InitiatorName string
+	plugin        *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
 	volume.MetricsProvider
@@ -539,18 +539,18 @@ func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, m
 	}
 
 	return &iscsiDisk{
-		podUID:         podUID,
-		VolName:        spec.Name(),
-		Portals:        bkportal,
-		Iqn:            iqn,
-		Lun:            lun,
-		Iface:          iface,
-		chap_discovery: chapDiscovery,
-		chap_session:   chapSession,
-		secret:         secret,
-		InitiatorName:  initiatorName,
-		manager:        manager,
-		plugin:         plugin}, nil
+		podUID:        podUID,
+		VolName:       spec.Name(),
+		Portals:       bkportal,
+		Iqn:           iqn,
+		Lun:           lun,
+		Iface:         iface,
+		chapDiscovery: chapDiscovery,
+		chapSession:   chapSession,
+		secret:        secret,
+		InitiatorName: initiatorName,
+		manager:       manager,
+		plugin:        plugin}, nil
 }
 
 func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (map[string]string, error) {

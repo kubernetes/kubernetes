@@ -50,7 +50,7 @@ func (plugin *iscsiPlugin) NewAttacher() (volume.Attacher, error) {
 	return &iscsiAttacher{
 		host:        plugin.host,
 		targetLocks: plugin.targetLocks,
-		manager:     &ISCSIUtil{},
+		manager:     &iscsiUtil{},
 	}, nil
 }
 
@@ -147,7 +147,7 @@ func (plugin *iscsiPlugin) NewDetacher() (volume.Detacher, error) {
 	return &iscsiDetacher{
 		host:    plugin.host,
 		mounter: plugin.host.GetMounter(iscsiPluginName),
-		manager: &ISCSIUtil{},
+		manager: &iscsiUtil{},
 	}, nil
 }
 
@@ -191,7 +191,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks 
 	iscsiDisk, err := createISCSIDisk(spec,
 		podUID,
 		&iscsiPlugin{host: host, targetLocks: targetLocks},
-		&ISCSIUtil{},
+		&iscsiUtil{},
 		secret,
 	)
 	if err != nil {

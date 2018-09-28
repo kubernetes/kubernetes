@@ -38,12 +38,12 @@ import (
 )
 
 var (
-	chap_st = []string{
+	chapSt = []string{
 		"discovery.sendtargets.auth.username",
 		"discovery.sendtargets.auth.password",
 		"discovery.sendtargets.auth.username_in",
 		"discovery.sendtargets.auth.password_in"}
-	chap_sess = []string{
+	chapSess = []string{
 		"node.session.auth.username",
 		"node.session.auth.password",
 		"node.session.auth.username_in",
@@ -53,7 +53,7 @@ var (
 )
 
 func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
-	if !b.chap_discovery {
+	if !b.chapDiscovery {
 		return nil
 	}
 	out, err := b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", "discovery.sendtargets.auth.authmethod", "-v", "CHAP")
@@ -61,7 +61,7 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 		return fmt.Errorf("iscsi: failed to update discoverydb with CHAP, output: %v", string(out))
 	}
 
-	for _, k := range chap_st {
+	for _, k := range chapSt {
 		v := b.secret[k]
 		if len(v) > 0 {
 			out, err := b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
@@ -74,7 +74,7 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 }
 
 func updateISCSINode(b iscsiDiskMounter, tp string) error {
-	if !b.chap_session {
+	if !b.chapSession {
 		return nil
 	}
 
@@ -83,7 +83,7 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 		return fmt.Errorf("iscsi: failed to update node with CHAP, output: %v", string(out))
 	}
 
-	for _, k := range chap_sess {
+	for _, k := range chapSess {
 		v := b.secret[k]
 		if len(v) > 0 {
 			out, err := b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
@@ -97,15 +97,15 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 
 // stat a path, if not exists, retry maxRetries times
 // when iscsi transports other than default are used,  use glob instead as pci id of device is unknown
-type StatFunc func(string) (os.FileInfo, error)
-type GlobFunc func(string) ([]string, error)
+type statFunc func(string) (os.FileInfo, error)
+type globFunc func(string) ([]string, error)
 
 func waitForPathToExist(devicePath *string, maxRetries int, deviceTransport string) bool {
 	// This makes unit testing a lot easier
 	return waitForPathToExistInternal(devicePath, maxRetries, deviceTransport, os.Stat, filepath.Glob)
 }
 
-func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransport string, osStat StatFunc, filepathGlob GlobFunc) bool {
+func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransport string, osStat statFunc, filepathGlob globFunc) bool {
 	if devicePath == nil {
 		return false
 	}
@@ -173,19 +173,19 @@ func makeVDPDNameInternal(host volume.VolumeHost, portal string, iqn string, lun
 	return path.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
-type ISCSIUtil struct{}
+type iscsiUtil struct{}
 
 // MakeGlobalPDName returns path of global plugin dir
-func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
+func (util *iscsiUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
 	return makePDNameInternal(iscsi.plugin.host, iscsi.Portals[0], iscsi.Iqn, iscsi.Lun, iscsi.Iface)
 }
 
 // MakeGlobalVDPDName returns path of global volume device plugin dir
-func (util *ISCSIUtil) MakeGlobalVDPDName(iscsi iscsiDisk) string {
+func (util *iscsiUtil) MakeGlobalVDPDName(iscsi iscsiDisk) string {
 	return makeVDPDNameInternal(iscsi.plugin.host, iscsi.Portals[0], iscsi.Iqn, iscsi.Lun, iscsi.Iface)
 }
 
-func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
+func (util *iscsiUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 	file := path.Join(mnt, "iscsi.json")
 	fp, err := os.Create(file)
 	if err != nil {
@@ -194,12 +194,12 @@ func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 	defer fp.Close()
 	encoder := json.NewEncoder(fp)
 	if err = encoder.Encode(conf); err != nil {
-		return fmt.Errorf("iscsi: encode err: %v.", err)
+		return fmt.Errorf("iscsi: encode err: %v", err)
 	}
 	return nil
 }
 
-func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
+func (util *iscsiUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
 	file := path.Join(mnt, "iscsi.json")
 	fp, err := os.Open(file)
 	if err != nil {
@@ -208,7 +208,7 @@ func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
 	defer fp.Close()
 	decoder := json.NewDecoder(fp)
 	if err = decoder.Decode(conf); err != nil {
-		return fmt.Errorf("iscsi: decode err: %v.", err)
+		return fmt.Errorf("iscsi: decode err: %v", err)
 	}
 	return nil
 }
@@ -267,7 +267,7 @@ func waitForMultiPathToExist(devicePaths []string, maxRetries int, deviceUtil vo
 }
 
 // AttachDisk returns devicePath of volume if attach succeeded otherwise returns error
-func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
+func (util *iscsiUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var devicePath string
 	var devicePaths []string
 	var iscsiTransport string
@@ -433,13 +433,13 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 // iscsi configurations, and then format/mount the volume.
 // If the volumeMode is 'Block', plugin creates a dir and persists iscsi configurations.
 // Since volume type is block, plugin doesn't need to format/mount the volume.
-func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *ISCSIUtil) (string, error) {
+func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *iscsiUtil) (string, error) {
 	// TODO: remove feature gate check after no longer needed
 	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
 		glog.V(5).Infof("iscsi: AttachDisk volumeMode: %s", b.volumeMode)
 		if b.volumeMode == v1.PersistentVolumeBlock {
 			// If the volumeMode is 'Block', plugin don't need to format the volume.
-			return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
+			return func(b iscsiDiskMounter, devicePath string, util *iscsiUtil) (string, error) {
 				globalPDPath := b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
 				// Create dir like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/{ifaceName}/{portal-some_iqn-lun-lun_id}
 				if err := os.MkdirAll(globalPDPath, 0750); err != nil {
@@ -455,7 +455,7 @@ func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *I
 	}
 	// If the volumeMode is 'Filesystem', plugin needs to format the volume
 	// and mount it to globalPDPath.
-	return func(b iscsiDiskMounter, devicePath string, util *ISCSIUtil) (string, error) {
+	return func(b iscsiDiskMounter, devicePath string, util *iscsiUtil) (string, error) {
 		globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 		notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 		if err != nil && !os.IsNotExist(err) {
@@ -546,7 +546,7 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 }
 
 // DetachDisk unmounts and detaches a volume from node
-func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
+func (util *iscsiUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	if pathExists, pathErr := volumeutil.PathExists(mntPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
@@ -615,7 +615,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 }
 
 // DetachBlockISCSIDisk removes loopback device for a volume and detaches a volume from node
-func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
+func (util *iscsiUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
 	if pathExists, pathErr := volumeutil.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
@@ -697,7 +697,7 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	return nil
 }
 
-func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, iface, volName, initiatorName string, found bool) error {
+func (util *iscsiUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, iface, volName, initiatorName string, found bool) error {
 	for _, portal := range portals {
 		logoutArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"}
 		deleteArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"}

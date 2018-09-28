@@ -401,7 +401,6 @@ pkg/volume/flocker
 pkg/volume/gce_pd
 pkg/volume/git_repo
 pkg/volume/host_path
-pkg/volume/iscsi
 pkg/volume/photon_pd
 pkg/volume/portworx
 pkg/volume/rbd
