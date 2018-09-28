@@ -159,7 +159,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	}
 	key = path.Join(s.pathPrefix, key)
 
-	opts, err := s.ttlOpts(ctx, int64(ttl), nil)
+	opts, err := s.ttlOpts(ctx, ttl, nil)
 	if err != nil {
 		return err
 	}
@@ -302,7 +302,7 @@ func (s *store) GuaranteedUpdate(
 		ret, ttl, err := s.updateState(origState, tryUpdate, mustCheckData)
 		if err != nil {
 			// It's possible we were working with stale data
-			if err == errStaleTTL || mustCheckData && apierrors.IsConflict(err) {
+			if err == errIncompleteTTL || mustCheckData && apierrors.IsConflict(err) {
 				// Actually fetch
 				origState, err = getCurrentState()
 				if err != nil {
@@ -346,7 +346,7 @@ func (s *store) GuaranteedUpdate(
 			return storage.NewInternalError(err.Error())
 		}
 
-		opts, err := s.ttlOpts(ctx, int64(ttl), origState)
+		opts, err := s.ttlOpts(ctx, ttl, origState)
 		if err != nil {
 			return err
 		}
@@ -747,8 +747,6 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 	return state, nil
 }
 
-var errStaleTTL = errors.New("updateState needs current objState for TTL calculation")
-
 func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc, mustCheckData bool) (runtime.Object, uint64, error) {
 	ret, ttlPtr, err := userUpdate(st.obj, st.meta)
 	if err != nil {
@@ -759,12 +757,12 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc, mustChe
 	if ttlPtr != nil {
 		// if userUpdate asserts a TTL and we are using a cached object, it means that we passed a zero TTL
 		// to userUpdate as the existing object's TTL (because the cache does not know the TTL value).
-		// send a specific error in this case to signal that we need to get the actual object from ETCD
+		// send a specific error in this case to signal that we need to get the actual object from etcd
 		// so we can extract the lease's current TTL.  this check assumes that userUpdate will only assert
 		// a non-nil TTL when the associated object actually needs a TTL (or wants to remove a TTL).
 		// registry.Store.Update has the "correct" behavior in this regard.
 		if mustCheckData {
-			return nil, 0, errStaleTTL
+			return nil, 0, errIncompleteTTL
 		}
 		ttl = *ttlPtr
 	}
@@ -787,10 +785,12 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc, mustChe
 // ttlOpts returns client options based on given ttl.
 // ttl: if ttl is non-zero, it will attach the key to a lease with ttl of roughly the same length
 // if ttl is the same as st.meta.TTL, reuse the lease specified in st.lease
-func (s *store) ttlOpts(ctx context.Context, ttl int64, st *objState) ([]clientv3.OpOption, error) {
-	if ttl == 0 {
+func (s *store) ttlOpts(ctx context.Context, ttl_ uint64, st *objState) ([]clientv3.OpOption, error) {
+	if ttl_ == 0 {
 		return nil, nil
 	}
+
+	ttl := int64(ttl_)
 
 	// we want to keep the same TTL as before, so reuse the same lease
 	if st != nil && ttl == st.meta.TTL && st.lease != clientv3.NoLease {

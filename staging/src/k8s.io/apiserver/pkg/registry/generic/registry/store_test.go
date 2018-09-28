@@ -850,12 +850,12 @@ func TestReuseLeaseOnUpdate(t *testing.T) {
 	// store updated pod
 	updated := getPod()
 
-	// make sure ETCD considers this to be the same key
+	// make sure etcd considers this to be the same key
 	if created.CreateRevision != updated.CreateRevision {
 		t.Errorf("expected same create revision: create=%#v updated=%#v", created, updated)
 	}
 
-	// make sure ETCD saw this as a write
+	// make sure etcd saw this as a write
 	if created.ModRevision == updated.ModRevision {
 		t.Errorf("expected different resource version on mutating update: create=%#v updated=%#v", created, updated)
 	}
@@ -883,7 +883,7 @@ func TestReuseLeaseOnUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// ETCD3 lease manager adds 5% to the requested TTL
+	// etcd3 lease manager adds 5% to the requested TTL
 	// see newDefaultLeaseManager if this breaks
 	if ttlResp.GrantedTTL != defaultLeaseTTL+defaultLeaseTTL/20 {
 		t.Errorf("expected lease to match initial TTL request: %#v", ttlResp)

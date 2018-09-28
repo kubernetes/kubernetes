@@ -17,33 +17,42 @@ limitations under the License.
 package etcd3
 
 import (
-	"k8s.io/apimachinery/pkg/api/errors"
+	"errors"
 
 	etcdrpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-func interpretWatchError(err error) error {
-	switch {
-	case err == etcdrpc.ErrCompacted:
-		return errors.NewResourceExpired("The resourceVersion for the provided watch is too old.")
-	}
-	return err
-}
-
 const (
-	expired         string = "The resourceVersion for the provided list is too old."
-	continueExpired string = "The provided continue parameter is too old " +
+	expiredList     = "The resourceVersion for the provided list is too old."
+	expiredWatch    = "The resourceVersion for the provided watch is too old."
+	continueExpired = "The provided continue parameter is too old " +
 		"to display a consistent list result. You can start a new list without " +
 		"the continue parameter."
-	inconsistentContinue string = "The provided continue parameter is too old " +
+	inconsistentContinue = "The provided continue parameter is too old " +
 		"to display a consistent list result. You can start a new list without " +
 		"the continue parameter, or use the continue token in this response to " +
 		"retrieve the remainder of the results. Continuing with the provided " +
 		"token results in an inconsistent list - objects that were created, " +
 		"modified, or deleted between the time the first chunk was returned " +
 		"and now may show up in the list."
+	incompleteTTL = "store.updateState needs current objState for TTL calculation"
 )
+
+// errIncompleteTTL signals that we need to perform a TTL calculation on update,
+// but lack all of the information required to determine the correct value.
+// see store.updateState for further details
+var errIncompleteTTL = errors.New(incompleteTTL)
+
+func interpretWatchError(err error) error {
+	switch {
+	case err == etcdrpc.ErrCompacted:
+		return apierrors.NewResourceExpired(expiredWatch)
+	}
+	return err
+}
 
 func interpretListError(err error, paging bool, continueKey, keyPrefix string) error {
 	switch {
@@ -51,7 +60,7 @@ func interpretListError(err error, paging bool, continueKey, keyPrefix string) e
 		if paging {
 			return handleCompactedErrorForPaging(continueKey, keyPrefix)
 		}
-		return errors.NewResourceExpired(expired)
+		return apierrors.NewResourceExpired(expiredList)
 	}
 	return err
 }
@@ -63,9 +72,9 @@ func handleCompactedErrorForPaging(continueKey, keyPrefix string) error {
 	newToken, err := encodeContinue(continueKey, keyPrefix, -1)
 	if err != nil {
 		utilruntime.HandleError(err)
-		return errors.NewResourceExpired(continueExpired)
+		return apierrors.NewResourceExpired(continueExpired)
 	}
-	statusError := errors.NewResourceExpired(inconsistentContinue)
+	statusError := apierrors.NewResourceExpired(inconsistentContinue)
 	statusError.ErrStatus.ListMeta.Continue = newToken
 	return statusError
 }

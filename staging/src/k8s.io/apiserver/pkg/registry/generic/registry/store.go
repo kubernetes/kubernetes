@@ -346,9 +346,13 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	}
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	ttl, err := e.calculateTTL(obj, 0, false)
+	var ttl uint64
+	ttlPtr, err := e.calculateTTL(obj, 0, false)
 	if err != nil {
 		return nil, err
+	}
+	if ttlPtr != nil {
+		ttl = *ttlPtr
 	}
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
@@ -583,16 +587,11 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 				}
 			}
 
-			// always return a nil TTL when we have no TTL func so that the
-			// storage interface can distinguish between no TTL, 0 TTL, 1+ TTL
-			if e.TTLFunc == nil {
-				return obj, nil, nil
-			}
 			ttl, err := e.calculateTTL(obj, 0, false)
 			if err != nil {
 				return nil, nil, err
 			}
-			return obj, &ttl, nil
+			return obj, ttl, nil
 		}
 
 		creating = false
@@ -634,16 +633,11 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return nil, nil, errEmptiedFinalizers
 		}
 
-		// always return a nil TTL when we have no TTL func so that the
-		// storage interface can distinguish between no TTL, 0 TTL, 1+ TTL
-		if e.TTLFunc == nil {
-			return obj, nil, nil
-		}
 		ttl, err := e.calculateTTL(obj, res.TTL, true)
 		if err != nil {
 			return nil, nil, err
 		}
-		return obj, &ttl, nil
+		return obj, ttl, nil
 	}, dryrun.IsDryRun(options.DryRun))
 
 	if err != nil {
@@ -1210,23 +1204,27 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 	return w, nil
 }
 
-// calculateTTL is a helper for retrieving the updated TTL for an object or
-// returning an error if the TTL cannot be calculated. The defaultTTL is
-// changed to 1 if less than zero. Zero means no TTL, not expire immediately.
-func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (ttl uint64, err error) {
-	// TODO: validate this is assertion is still valid.
+// calculateTTL is a helper for retrieving the TTL for an
+// object or returning an error if the TTL cannot be calculated.
+// The defaultTTL is changed to 1 if less than zero.
+func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) (*uint64, error) {
+	// always return a nil TTL when we have no TTL func so that the
+	// storage interface can distinguish between no TTL, 0 TTL, 1+ TTL
+	// see storage.Interface.GuaranteedUpdate for further details
+	if e.TTLFunc == nil {
+		return nil, nil
+	}
 
+	// TODO: validate this is assertion is still valid.
 	// etcd may return a negative TTL for a node if the expiration has not
 	// occurred due to server lag - we will ensure that the value is at least
 	// set.
 	if defaultTTL < 0 {
 		defaultTTL = 1
 	}
-	ttl = uint64(defaultTTL)
-	if e.TTLFunc != nil {
-		ttl, err = e.TTLFunc(obj, ttl, update)
-	}
-	return ttl, err
+
+	ttl, err := e.TTLFunc(obj, uint64(defaultTTL), update)
+	return &ttl, err
 }
 
 // exportObjectMeta unsets the fields on the given object that should not be
