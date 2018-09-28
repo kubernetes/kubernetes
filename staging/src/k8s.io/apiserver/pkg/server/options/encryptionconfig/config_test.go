@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -239,7 +240,7 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 }
 
 // The factory method to create mock envelope service.
-func newMockEnvelopeService(endpoint string) (envelope.Service, error) {
+func newMockEnvelopeService(endpoint string, timeout time.Duration) (envelope.Service, error) {
 	return &testEnvelopeService{}, nil
 }
 
