@@ -24,7 +24,7 @@ limitations under the License.
 // FIFO is here for flag-gating purposes and allows us to use the traditional
 // scheduling queue when util.PodPriorityEnabled() returns false.
 
-package core
+package queue
 
 import (
 	"container/heap"
