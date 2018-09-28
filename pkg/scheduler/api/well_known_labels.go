@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package algorithm
+package api
 
 import (
 	api "k8s.io/kubernetes/pkg/apis/core"

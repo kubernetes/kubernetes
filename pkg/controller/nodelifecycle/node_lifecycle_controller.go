@@ -59,7 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
@@ -74,14 +74,14 @@ func init() {
 var (
 	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
 	UnreachableTaintTemplate = &v1.Taint{
-		Key:    algorithm.TaintNodeUnreachable,
+		Key:    schedulerapi.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	// NotReadyTaintTemplate is the taint for when a node is not ready for
 	// executing pods
 	NotReadyTaintTemplate = &v1.Taint{
-		Key:    algorithm.TaintNodeNotReady,
+		Key:    schedulerapi.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
@@ -91,34 +91,34 @@ var (
 	// for certain NodeConditionType, there are multiple {ConditionStatus,TaintKey} pairs
 	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]map[v1.ConditionStatus]string{
 		v1.NodeReady: {
-			v1.ConditionFalse:   algorithm.TaintNodeNotReady,
-			v1.ConditionUnknown: algorithm.TaintNodeUnreachable,
+			v1.ConditionFalse:   schedulerapi.TaintNodeNotReady,
+			v1.ConditionUnknown: schedulerapi.TaintNodeUnreachable,
 		},
 		v1.NodeMemoryPressure: {
-			v1.ConditionTrue: algorithm.TaintNodeMemoryPressure,
+			v1.ConditionTrue: schedulerapi.TaintNodeMemoryPressure,
 		},
 		v1.NodeOutOfDisk: {
-			v1.ConditionTrue: algorithm.TaintNodeOutOfDisk,
+			v1.ConditionTrue: schedulerapi.TaintNodeOutOfDisk,
 		},
 		v1.NodeDiskPressure: {
-			v1.ConditionTrue: algorithm.TaintNodeDiskPressure,
+			v1.ConditionTrue: schedulerapi.TaintNodeDiskPressure,
 		},
 		v1.NodeNetworkUnavailable: {
-			v1.ConditionTrue: algorithm.TaintNodeNetworkUnavailable,
+			v1.ConditionTrue: schedulerapi.TaintNodeNetworkUnavailable,
 		},
 		v1.NodePIDPressure: {
-			v1.ConditionTrue: algorithm.TaintNodePIDPressure,
+			v1.ConditionTrue: schedulerapi.TaintNodePIDPressure,
 		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
-		algorithm.TaintNodeNotReady:           v1.NodeReady,
-		algorithm.TaintNodeUnreachable:        v1.NodeReady,
-		algorithm.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
-		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
-		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
-		algorithm.TaintNodeDiskPressure:       v1.NodeDiskPressure,
-		algorithm.TaintNodePIDPressure:        v1.NodePIDPressure,
+		schedulerapi.TaintNodeNotReady:           v1.NodeReady,
+		schedulerapi.TaintNodeUnreachable:        v1.NodeReady,
+		schedulerapi.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
+		schedulerapi.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
+		schedulerapi.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
+		schedulerapi.TaintNodeDiskPressure:       v1.NodeDiskPressure,
+		schedulerapi.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
 )
 
@@ -455,21 +455,21 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 	taintsToDel := []*v1.Taint{}
 
 	for _, taint := range node.Spec.Taints {
-		if taint.Key == algorithm.DeprecatedTaintNodeNotReady {
+		if taint.Key == schedulerapi.DeprecatedTaintNodeNotReady {
 			tDel := taint
 			taintsToDel = append(taintsToDel, &tDel)
 
 			tAdd := taint
-			tAdd.Key = algorithm.TaintNodeNotReady
+			tAdd.Key = schedulerapi.TaintNodeNotReady
 			taintsToAdd = append(taintsToAdd, &tAdd)
 		}
 
-		if taint.Key == algorithm.DeprecatedTaintNodeUnreachable {
+		if taint.Key == schedulerapi.DeprecatedTaintNodeUnreachable {
 			tDel := taint
 			taintsToDel = append(taintsToDel, &tDel)
 
 			tAdd := taint
-			tAdd.Key = algorithm.TaintNodeUnreachable
+			tAdd.Key = schedulerapi.TaintNodeUnreachable
 			taintsToAdd = append(taintsToAdd, &tAdd)
 		}
 	}
@@ -530,7 +530,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	if node.Spec.Unschedulable {
 		// If unschedulable, append related taint.
 		taints = append(taints, v1.Taint{
-			Key:    algorithm.TaintNodeUnschedulable,
+			Key:    schedulerapi.TaintNodeUnschedulable,
 			Effect: v1.TaintEffectNoSchedule,
 		})
 	}
@@ -542,7 +542,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 			return false
 		}
 		// Find unschedulable taint of node.
-		if t.Key == algorithm.TaintNodeUnschedulable {
+		if t.Key == schedulerapi.TaintNodeUnschedulable {
 			return true
 		}
 		// Find node condition taints of node.

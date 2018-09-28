@@ -29,7 +29,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 // GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
@@ -55,7 +55,7 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns not ready.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeNotReady,
+		Key:      schedulerapi.TaintNodeNotReady,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -65,7 +65,7 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
 	// to survive taint-based eviction enforced by NodeController
 	// when node turns unreachable.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeUnreachable,
+		Key:      schedulerapi.TaintNodeUnreachable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoExecute,
 	})
@@ -74,26 +74,26 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
 	// MemoryPressure, DisPressure, Unschedulable and NetworkUnavailable taints,
 	// and the critical pods should tolerate OutOfDisk taint.
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeDiskPressure,
+		Key:      schedulerapi.TaintNodeDiskPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeMemoryPressure,
+		Key:      schedulerapi.TaintNodeMemoryPressure,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-		Key:      algorithm.TaintNodeUnschedulable,
+		Key:      schedulerapi.TaintNodeUnschedulable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
 	if spec.HostNetwork {
 		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-			Key:      algorithm.TaintNodeNetworkUnavailable,
+			Key:      schedulerapi.TaintNodeNetworkUnavailable,
 			Operator: v1.TolerationOpExists,
 			Effect:   v1.TaintEffectNoSchedule,
 		})
@@ -102,12 +102,12 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec, isCritical bool) {
 	// TODO(#48843) OutOfDisk taints will be removed in 1.10
 	if isCritical {
 		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-			Key:      algorithm.TaintNodeOutOfDisk,
+			Key:      schedulerapi.TaintNodeOutOfDisk,
 			Operator: v1.TolerationOpExists,
 			Effect:   v1.TaintEffectNoExecute,
 		})
 		v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
-			Key:      algorithm.TaintNodeOutOfDisk,
+			Key:      schedulerapi.TaintNodeOutOfDisk,
 			Operator: v1.TolerationOpExists,
 			Effect:   v1.TaintEffectNoSchedule,
 		})
@@ -167,7 +167,7 @@ func SplitByAvailablePods(minReadySeconds int32, pods []*v1.Pod) ([]*v1.Pod, []*
 // Note that this function assumes that no NodeAffinity conflicts with the selected nodeName.
 func ReplaceDaemonSetPodNodeNameNodeAffinity(affinity *v1.Affinity, nodename string) *v1.Affinity {
 	nodeSelReq := v1.NodeSelectorRequirement{
-		Key:      algorithm.NodeFieldSelectorKeyNodeName,
+		Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 		Operator: v1.NodeSelectorOpIn,
 		Values:   []string{nodename},
 	}
@@ -236,11 +236,11 @@ func GetTargetNodeName(pod *v1.Pod) (string, error) {
 
 	for _, term := range terms {
 		for _, exp := range term.MatchFields {
-			if exp.Key == algorithm.NodeFieldSelectorKeyNodeName &&
+			if exp.Key == schedulerapi.NodeFieldSelectorKeyNodeName &&
 				exp.Operator == v1.NodeSelectorOpIn {
 				if len(exp.Values) != 1 {
 					return "", fmt.Errorf("the matchFields value of '%s' is not unique for pod %s/%s",
-						algorithm.NodeFieldSelectorKeyNodeName, pod.Namespace, pod.Name)
+						schedulerapi.NodeFieldSelectorKeyNodeName, pod.Namespace, pod.Name)
 				}
 
 				return exp.Values[0], nil
