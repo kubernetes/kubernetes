@@ -194,3 +194,41 @@ func TestFakeTick(t *testing.T) {
 		t.Errorf("unexpected number of accumulated ticks: %d", accumulatedTicks)
 	}
 }
+
+// This test verifies that we can avoid missed ticker ticks using
+// FakeClock.Drain, even when there is high CPU contention. The simple way to
+// run with high contention is:
+// ```
+// go get -u golang.org/x/tools/cmd/stress
+// stress go test -run TestMissedTicks
+// ```
+func TestMissedTicks(t *testing.T) {
+	tc := NewFakeClock(time.Now())
+	oneSec := tc.NewTicker(time.Second).C()
+
+	done := make(chan struct{})
+	expectedTickCount := 5
+	go func() {
+		var tickCount int
+		for {
+			select {
+			case <-oneSec:
+				tickCount++
+			case <-done:
+				if tickCount != expectedTickCount {
+					t.Errorf("unexpected number of ticks: want %d got %d", expectedTickCount, tickCount)
+				}
+				done <- struct{}{}
+			}
+		}
+	}()
+
+	// Tick 5 times and wait for each tick to be delivered before continuing.
+	for i := 0; i < expectedTickCount; i++ {
+		tc.Step(time.Second)
+		tc.Drain()
+	}
+
+	done <- struct{}{}
+	<-done
+}

@@ -17,6 +17,7 @@ limitations under the License.
 package clock
 
 import (
+	"runtime"
 	"sync"
 	"time"
 )
@@ -203,6 +204,27 @@ func (f *FakeClock) HasWaiters() bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	return len(f.waiters) > 0
+}
+
+// Drain blocks until all channels from After, NewTimer, and NewTicker have
+// been drained.
+// Warning: SetTime and Step will block until Drain returns. It is recommended
+// to only call those three functions from a single goroutine in each test.
+func (f *FakeClock) Drain() {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	// FakeClock will not write to any destChans while we hold the lock.
+	drained := func() bool {
+		for _, w := range f.waiters {
+			if len(w.destChan) > 0 {
+				return false
+			}
+		}
+		return true
+	}
+	for !drained() {
+		runtime.Gosched()
+	}
 }
 
 func (f *FakeClock) Sleep(d time.Duration) {
