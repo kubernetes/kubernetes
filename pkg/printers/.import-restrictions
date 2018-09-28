@@ -1,8 +1,52 @@
 {
   "Rules": [
     {
-      "SelectorRegexp": "k8s[.]io/kubernetes/pkg/(api$|apis/)",
-      "ForbiddenPrefixes": [
+      "SelectorRegexp": "k8s[.]io/(api|client-go|cli-runtime)/",
+      "AllowedPrefixes": [
+        "k8s.io/api/admission",
+        "k8s.io/api/apps",
+        "k8s.io/api/authentication",
+        "k8s.io/api/authorization",
+        "k8s.io/api/autoscaling",
+        "k8s.io/api/batch",
+        "k8s.io/api/certificates",
+        "k8s.io/api/core",
+        "k8s.io/api/extensions",
+        "k8s.io/api/imagepolicy",
+        "k8s.io/api/networking",
+        "k8s.io/api/policy",
+        "k8s.io/api/rbac",
+        "k8s.io/api/scheduling",
+        "k8s.io/api/settings",
+        "k8s.io/api/storage",
+        "k8s.io/client-go/kubernetes/scheme",
+        "k8s.io/client-go/util/jsonpath",
+        "k8s.io/cli-runtime/pkg/genericclioptions"
+      ]
+    },
+    {
+      "SelectorRegexp": "github[.]com/",
+      "AllowedPrefixes": [
+        "github.com/spf13/cobra"
+      ]
+    },
+    {
+      "SelectorRegexp": "k8s[.]io/apimachinery/pkg/",
+      "AllowedPrefixes": [
+        "k8s.io/apimachinery/pkg/api/meta",
+        "k8s.io/apimachinery/pkg/apis/meta",
+        "k8s.io/apimachinery/pkg/labels",
+        "k8s.io/apimachinery/pkg/runtime",
+        "k8s.io/apimachinery/pkg/runtime/schema",
+        "k8s.io/apimachinery/pkg/util/runtime"
+      ]
+    },
+    {
+      "SelectorRegexp": "k8s[.]io/kubernetes/pkg/",
+      "AllowedPrefixes": [
+        "k8s.io/kubernetes/pkg/api/legacyscheme",
+        "k8s.io/kubernetes/pkg/apis/core",
+        "k8s.io/kubernetes/pkg/kubectl/scheme",
         "k8s.io/kubernetes/pkg/printers"
       ]
     }
