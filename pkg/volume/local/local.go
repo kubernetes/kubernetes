@@ -87,7 +87,7 @@ func (plugin *localVolumePlugin) RequiresRemount() bool {
 }
 
 func (plugin *localVolumePlugin) SupportsMountOption() bool {
-	return false
+	return true
 }
 
 func (plugin *localVolumePlugin) SupportsBulkVolumeVerification() bool {
