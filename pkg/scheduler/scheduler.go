@@ -34,6 +34,7 @@ import (
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -85,7 +86,7 @@ type Configurator interface {
 	// Exposed for testing
 	GetHardPodAffinitySymmetricWeight() int32
 	// Exposed for testing
-	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error)
+	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error)
 
 	// Predicate related accessors to be exposed for use by k8s.io/autoscaler/cluster-autoscaler
 	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
@@ -186,7 +187,7 @@ func (sched *Scheduler) Run() {
 	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
 }
 
-// Config return scheduler's config pointer. It is exposed for testing purposes.
+// Config returns scheduler's config pointer. It is exposed for testing purposes.
 func (sched *Scheduler) Config() *Config {
 	return sched.config
 }
@@ -329,9 +330,11 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumed.Spec.NodeName = host
-	// NOTE: Because the scheduler uses snapshots of SchedulerCache and the live
-	// version of Ecache, updates must be written to SchedulerCache before
-	// invalidating Ecache.
+	// NOTE: Updates must be written to scheduler cache before invalidating
+	// equivalence cache, because we could snapshot equivalence cache after the
+	// invalidation and then snapshot the cache itself. If the cache is
+	// snapshotted before updates are written, we would update equivalence
+	// cache with stale information which is based on snapshot of old cache.
 	if err := sched.config.SchedulerCache.AssumePod(assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
 
@@ -394,6 +397,10 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 // scheduleOne does the entire scheduling workflow for a single pod.  It is serialized on the scheduling algorithm's host fitting.
 func (sched *Scheduler) scheduleOne() {
 	pod := sched.config.NextPod()
+	// pod could be nil when schedulerQueue is closed
+	if pod == nil {
+		return
+	}
 	if pod.DeletionTimestamp != nil {
 		sched.config.Recorder.Eventf(pod, v1.EventTypeWarning, "FailedScheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		glog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
@@ -416,6 +423,13 @@ func (sched *Scheduler) scheduleOne() {
 			metrics.PreemptionAttempts.Inc()
 			metrics.SchedulingAlgorithmPremptionEvaluationDuration.Observe(metrics.SinceInMicroseconds(preemptionStartTime))
 			metrics.SchedulingLatency.WithLabelValues(metrics.PreemptionEvaluation).Observe(metrics.SinceInSeconds(preemptionStartTime))
+			// Pod did not fit anywhere, so it is counted as a failure. If preemption
+			// succeeds, the pod should get counted as a success the next time we try to
+			// schedule it. (hopefully)
+			metrics.PodScheduleFailures.Inc()
+		} else {
+			glog.Errorf("error selecting node for pod: %v", err)
+			metrics.PodScheduleErrors.Inc()
 		}
 		return
 	}
@@ -433,20 +447,26 @@ func (sched *Scheduler) scheduleOne() {
 	// This function modifies 'assumedPod' if volume binding is required.
 	allBound, err := sched.assumeVolumes(assumedPod, suggestedHost)
 	if err != nil {
+		glog.Errorf("error assuming volumes: %v", err)
+		metrics.PodScheduleErrors.Inc()
 		return
 	}
 
 	// assume modifies `assumedPod` by setting NodeName=suggestedHost
 	err = sched.assume(assumedPod, suggestedHost)
 	if err != nil {
+		glog.Errorf("error assuming pod: %v", err)
+		metrics.PodScheduleErrors.Inc()
 		return
 	}
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
 		// Bind volumes first before Pod
 		if !allBound {
-			err = sched.bindVolumes(assumedPod)
+			err := sched.bindVolumes(assumedPod)
 			if err != nil {
+				glog.Errorf("error binding volumes: %v", err)
+				metrics.PodScheduleErrors.Inc()
 				return
 			}
 		}
@@ -460,7 +480,10 @@ func (sched *Scheduler) scheduleOne() {
 		})
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
-			glog.Errorf("Internal error binding pod: (%v)", err)
+			glog.Errorf("error binding pod: %v", err)
+			metrics.PodScheduleErrors.Inc()
+		} else {
+			metrics.PodScheduleSuccesses.Inc()
 		}
 	}()
 }

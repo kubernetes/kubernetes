@@ -29807,19 +29807,19 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "202": {
        "description": "Accepted",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "401": {
@@ -50615,19 +50615,19 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "202": {
        "description": "Accepted",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentStatus"
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
        }
       },
       "401": {
@@ -79039,11 +79039,6 @@
    },
    "io.k8s.api.autoscaling.v2beta2.MetricValueStatus": {
     "description": "MetricValueStatus holds the current value for a metric",
-    "required": [
-     "value",
-     "averageValue",
-     "averageUtilization"
-    ],
     "properties": {
      "averageUtilization": {
       "description": "currentAverageUtilization is the current value of the average of the resource metric across all relevant pods, represented as a percentage of the requested value of the resource for the pods.",
@@ -83062,6 +83057,10 @@
       "description": "Set DNS policy for the pod. Defaults to \"ClusterFirst\". Valid values are 'ClusterFirstWithHostNet', 'ClusterFirst', 'Default' or 'None'. DNS parameters given in DNSConfig will be merged with the policy selected with DNSPolicy. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstWithHostNet'.",
       "type": "string"
      },
+     "enableServiceLinks": {
+      "description": "EnableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links.",
+      "type": "boolean"
+     },
      "hostAliases": {
       "description": "HostAliases is an optional list of hosts and IPs that will be injected into the pod's hosts file if specified. This is only valid for non-hostNetwork pods.",
       "type": "array",
@@ -84671,13 +84670,12 @@
    "io.k8s.api.core.v1.TypedLocalObjectReference": {
     "description": "TypedLocalObjectReference contains enough information to let you locate the typed referenced object inside the same namespace.",
     "required": [
-     "apiGroup",
      "kind",
      "name"
     ],
     "properties": {
      "apiGroup": {
-      "description": "APIGroup is the group for the resource being referenced",
+      "description": "APIGroup is the group for the resource being referenced. If APIGroup is not specified, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
       "type": "string"
      },
      "kind": {

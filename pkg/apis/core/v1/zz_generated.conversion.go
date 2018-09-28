@@ -5550,6 +5550,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	out.DNSConfig = (*core.PodDNSConfig)(unsafe.Pointer(in.DNSConfig))
 	out.ReadinessGates = *(*[]core.PodReadinessGate)(unsafe.Pointer(&in.ReadinessGates))
 	out.RuntimeClassName = (*string)(unsafe.Pointer(in.RuntimeClassName))
+	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
 	return nil
 }
 
@@ -5616,6 +5617,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	out.DNSConfig = (*v1.PodDNSConfig)(unsafe.Pointer(in.DNSConfig))
 	out.ReadinessGates = *(*[]v1.PodReadinessGate)(unsafe.Pointer(&in.ReadinessGates))
 	out.RuntimeClassName = (*string)(unsafe.Pointer(in.RuntimeClassName))
+	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
 	return nil
 }
 
@@ -7255,7 +7257,7 @@ func Convert_core_TopologySelectorTerm_To_v1_TopologySelectorTerm(in *core.Topol
 }
 
 func autoConvert_v1_TypedLocalObjectReference_To_core_TypedLocalObjectReference(in *v1.TypedLocalObjectReference, out *core.TypedLocalObjectReference, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
+	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
 	return nil
@@ -7267,7 +7269,7 @@ func Convert_v1_TypedLocalObjectReference_To_core_TypedLocalObjectReference(in *
 }
 
 func autoConvert_core_TypedLocalObjectReference_To_v1_TypedLocalObjectReference(in *core.TypedLocalObjectReference, out *v1.TypedLocalObjectReference, s conversion.Scope) error {
-	out.APIGroup = in.APIGroup
+	out.APIGroup = (*string)(unsafe.Pointer(in.APIGroup))
 	out.Kind = in.Kind
 	out.Name = in.Name
 	return nil

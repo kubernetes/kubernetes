@@ -2153,7 +2153,7 @@
     "description": "API at /apis/extensions/v1beta1",
     "operations": [
      {
-      "type": "v1beta1.DeploymentStatus",
+      "type": "v1.Status",
       "method": "POST",
       "summary": "create rollback of a Deployment",
       "nickname": "createNamespacedDeploymentRollback",
@@ -2195,17 +2195,17 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta1.DeploymentStatus"
+        "responseModel": "v1.Status"
        },
        {
         "code": 201,
         "message": "Created",
-        "responseModel": "v1beta1.DeploymentStatus"
+        "responseModel": "v1.Status"
        },
        {
         "code": 202,
         "message": "Accepted",
-        "responseModel": "v1beta1.DeploymentStatus"
+        "responseModel": "v1.Status"
        }
       ],
       "produces": [
@@ -7474,6 +7474,10 @@
      "runtimeClassName": {
       "type": "string",
       "description": "RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md This is an alpha feature and may change in the future."
+     },
+     "enableServiceLinks": {
+      "type": "boolean",
+      "description": "EnableServiceLinks indicates whether information about services should be injected into pod's environment variables, matching the syntax of Docker links."
      }
     }
    },

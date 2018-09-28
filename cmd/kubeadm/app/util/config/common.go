@@ -26,12 +26,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // AnyConfigFileAndDefaultsToInternal reads either a InitConfiguration or JoinConfiguration and unmarshals it
@@ -79,11 +79,11 @@ func DetectUnsupportedVersion(b []byte) error {
 	// tell them how to upgrade. The support matrix will look something like this now and in the future:
 	// v1.10 and earlier: v1alpha1
 	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
-	// v1.12: v1alpha2 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1
-	// v1.13 and v1.14: v1beta1 read-only, writes only v1 config. Warns if the user tries to use v1alpha1 or v1alpha2.
-	// v1.15: v1 is the only supported format.
+	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Warns if the user tries to use v1alpha1
+	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1 or v1alpha2
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
+		"kubeadm.k8s.io/v1alpha2": "v1.12",
 	}
 	// If we find an old API version in this gvk list, error out and tell the user why this doesn't work
 	knownKinds := map[string]bool{}
@@ -94,7 +94,7 @@ func DetectUnsupportedVersion(b []byte) error {
 		knownKinds[gvk.Kind] = true
 	}
 	// InitConfiguration, MasterConfiguration and NodeConfiguration are mutually exclusive, error if more than one are specified
-	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.MasterConfigurationKind, constants.JoinConfigurationKind, constants.NodeConfigurationKind}
+	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.JoinConfigurationKind}
 	foundOne := false
 	for _, kind := range mutuallyExclusive {
 		if knownKinds[kind] {

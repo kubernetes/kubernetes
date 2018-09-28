@@ -55,4 +55,4 @@ EXPOSE 80
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.1
 
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /run.sh $FLUENTD_ARGS
+CMD ["/run.sh"]

@@ -159,7 +159,7 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
 		volAttachRule := rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, volAttachRule)
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSISkipAttach) || utilfeature.DefaultFeatureGate.Enabled(features.CSIPodInfo) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie()
 			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 		}
@@ -402,7 +402,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				eventsRule(),
 				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				rbacv1helpers.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
-				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "secrets", "serviceaccounts").RuleOrDie(),
+				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "secrets", "serviceaccounts", "configmaps").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				// Needed to check API access.  These creates are non-mutating
 				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),

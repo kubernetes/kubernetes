@@ -31,7 +31,6 @@ type flexVolumeUnmounter struct {
 	*flexVolume
 	// Runner used to teardown the volume.
 	runner exec.Interface
-	volume.MetricsNil
 }
 
 var _ volume.Unmounter = &flexVolumeUnmounter{}

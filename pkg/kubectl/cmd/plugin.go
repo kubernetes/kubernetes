@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -108,7 +109,8 @@ func (o *PluginListOptions) Run() error {
 	pluginsFound := false
 	isFirstFile := true
 	pluginWarnings := 0
-	for _, dir := range filepath.SplitList(os.Getenv(path)) {
+	paths := sets.NewString(filepath.SplitList(os.Getenv(path))...)
+	for _, dir := range paths.List() {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			continue

@@ -26,6 +26,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	certscmdphase "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/certs"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -120,7 +121,10 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 	}
 	addFlags(saCmd, &cfgPath, cfg, false)
 
-	subCmds := []*cobra.Command{allCmd, saCmd}
+	// "renew" command
+	renewCmd := certscmdphase.NewCmdCertsRenewal()
+
+	subCmds := []*cobra.Command{allCmd, saCmd, renewCmd}
 
 	certTree, err := certsphase.GetDefaultCertList().AsMap().CertTree()
 	kubeadmutil.CheckErr(err)

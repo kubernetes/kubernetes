@@ -18,16 +18,19 @@ package image
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
-const (
-	dockerLibraryRegistry = "docker.io/library"
-	e2eRegistry           = "gcr.io/kubernetes-e2e-test-images"
-	gcRegistry            = "k8s.gcr.io"
-	PrivateRegistry       = "gcr.io/k8s-authenticated-test"
-	sampleRegistry        = "gcr.io/google-samples"
-)
-
+type RegistryList struct {
+	DockerLibraryRegistry string `yaml:"dockerLibraryRegistry"`
+	E2eRegistry           string `yaml:"e2eRegistry"`
+	GcRegistry            string `yaml:"gcRegistry"`
+	PrivateRegistry       string `yaml:"privateRegistry"`
+	SampleRegistry        string `yaml:"sampleRegistry"`
+}
 type ImageConfig struct {
 	registry string
 	name     string
@@ -46,8 +49,40 @@ func (i *ImageConfig) SetVersion(version string) {
 	i.version = version
 }
 
+func initReg() RegistryList {
+	registry := RegistryList{
+		DockerLibraryRegistry: "docker.io/library",
+		E2eRegistry:           "gcr.io/kubernetes-e2e-test-images",
+		GcRegistry:            "k8s.gcr.io",
+		PrivateRegistry:       "gcr.io/k8s-authenticated-test",
+		SampleRegistry:        "gcr.io/google-samples",
+	}
+	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
+	if repoList == "" {
+		return registry
+	}
+
+	fileContent, err := ioutil.ReadFile(repoList)
+	if err != nil {
+		panic(fmt.Errorf("Error reading '%v' file contents: %v", repoList, err))
+	}
+
+	err = yaml.Unmarshal(fileContent, &registry)
+	if err != nil {
+		panic(fmt.Errorf("Error unmarshalling '%v' YAML file: %v", repoList, err))
+	}
+	return registry
+}
+
 var (
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.12v2"}
+	registry              = initReg()
+	dockerLibraryRegistry = registry.DockerLibraryRegistry
+	e2eRegistry           = registry.E2eRegistry
+	gcRegistry            = registry.GcRegistry
+	PrivateRegistry       = registry.PrivateRegistry
+	sampleRegistry        = registry.SampleRegistry
+
+	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.13v1"}
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0"}
 	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0"}
 	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29"}

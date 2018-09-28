@@ -41,7 +41,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
-	"k8s.io/kubernetes/pkg/scheduler/core"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -296,7 +296,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
-	queue := &core.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
+	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
 	errFunc := factory.MakeDefaultErrorFunc(podBackoff, queue)
 

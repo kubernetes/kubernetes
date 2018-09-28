@@ -31,7 +31,6 @@ import (
 	"net/http"
 
 	"k8s.io/api/core/v1"
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
@@ -59,8 +58,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/quota/generic"
-	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
@@ -199,13 +198,10 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 	// csiClient works with CRDs that support json only
 	csiClientConfig.ContentType = "application/json"
 
-	crdClientConfig := ctx.ClientBuilder.ConfigOrDie("attachdetach-controller")
-
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
 			csiclientset.NewForConfigOrDie(csiClientConfig),
-			apiextensionsclient.NewForConfigOrDie(crdClientConfig),
 			ctx.InformerFactory.Core().V1().Pods(),
 			ctx.InformerFactory.Core().V1().Nodes(),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),

@@ -395,39 +395,38 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			Steps:    rbdImageWatcherSteps,
 		}
 		needValidUsed := true
-		// If accessModes contain ReadOnlyMany, we don't need check rbd status of being used.
 		if b.accessModes != nil {
-			for _, v := range b.accessModes {
-				if v != v1.ReadWriteOnce {
-					needValidUsed = false
-					break
+			// If accessModes only contains ReadOnlyMany, we don't need check rbd status of being used.
+			if len(b.accessModes) == 1 && b.accessModes[0] == v1.ReadOnlyMany {
+				needValidUsed = false
+			}
+		}
+		// If accessModes is nil, the volume is referenced by in-line volume.
+		// We can assume the AccessModes to be {"RWO" and "ROX"}, which is what the volume plugin supports.
+		// We do not need to consider ReadOnly here, because it is used for VolumeMounts.
+
+		if needValidUsed {
+			err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+				used, rbdOutput, err := util.rbdStatus(&b)
+				if err != nil {
+					return false, fmt.Errorf("fail to check rbd image status with: (%v), rbd output: (%s)", err, rbdOutput)
 				}
+				return !used, nil
+			})
+			// Return error if rbd image has not become available for the specified timeout.
+			if err == wait.ErrWaitTimeout {
+				return "", fmt.Errorf("rbd image %s/%s is still being used", b.Pool, b.Image)
 			}
-		} else {
-			// ReadOnly rbd volume should not check rbd status of being used to
-			// support mounted as read-only by multiple consumers simultaneously.
-			needValidUsed = !b.rbd.ReadOnly
-		}
-		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-			used, rbdOutput, err := util.rbdStatus(&b)
+			// Return error if any other errors were encountered during wating for the image to become available.
 			if err != nil {
-				return false, fmt.Errorf("fail to check rbd image status with: (%v), rbd output: (%s)", err, rbdOutput)
+				return "", err
 			}
-			return !needValidUsed || !used, nil
-		})
-		// Return error if rbd image has not become available for the specified timeout.
-		if err == wait.ErrWaitTimeout {
-			return "", fmt.Errorf("rbd image %s/%s is still being used", b.Pool, b.Image)
-		}
-		// Return error if any other errors were encountered during wating for the image to become available.
-		if err != nil {
-			return "", err
 		}
 
 		mon := util.kernelRBDMonitorsOpt(b.Mon)
 		glog.V(1).Infof("rbd: map mon %s", mon)
 
-		_, err = b.exec.Run("modprobe", "rbd")
+		_, err := b.exec.Run("modprobe", "rbd")
 		if err != nil {
 			glog.Warningf("rbd: failed to load rbd kernel module:%v", err)
 		}

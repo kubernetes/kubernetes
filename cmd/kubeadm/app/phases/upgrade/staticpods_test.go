@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,11 +33,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
 const (
@@ -451,9 +455,25 @@ func TestStaticPodControlPlane(t *testing.T) {
 			t.Fatalf("couldn't read temp file: %v", err)
 		}
 
-		newcfg, err := getConfig("v1.10.0", tempCertsDir, tmpEtcdDataDir)
+		newcfg, err := getConfig("v1.11.0", tempCertsDir, tmpEtcdDataDir)
 		if err != nil {
 			t.Fatalf("couldn't create config: %v", err)
+		}
+
+		// create the kubeadm etcd certs
+		caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(newcfg)
+		if err != nil {
+			t.Fatalf("couldn't create new CA certificate: %v", err)
+		}
+		for _, cert := range []*certsphase.KubeadmCert{
+			&certsphase.KubeadmCertEtcdServer,
+			&certsphase.KubeadmCertEtcdPeer,
+			&certsphase.KubeadmCertEtcdHealthcheck,
+			&certsphase.KubeadmCertEtcdAPIClient,
+		} {
+			if err := cert.CreateFromCA(newcfg, caCert, caKey); err != nil {
+				t.Fatalf("couldn't create certificate %s: %v", cert.Name, err)
+			}
 		}
 
 		actualErr := StaticPodControlPlane(
@@ -604,5 +624,115 @@ func TestCleanupDirs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRenewCerts(t *testing.T) {
+	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+	t.Run("all certs exist, should be rotated", func(t *testing.T) {
+	})
+	tests := []struct {
+		name               string
+		component          string
+		skipCreateCA       bool
+		shouldErrorOnRenew bool
+		certsShouldExist   []*certsphase.KubeadmCert
+	}{
+		{
+			name:      "all certs exist, should be rotated",
+			component: constants.Etcd,
+			certsShouldExist: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdServer,
+				&certsphase.KubeadmCertEtcdPeer,
+				&certsphase.KubeadmCertEtcdHealthcheck,
+			},
+		},
+		{
+			name:      "just renew API cert",
+			component: constants.KubeAPIServer,
+			certsShouldExist: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdAPIClient,
+			},
+		},
+		{
+			name:         "ignores other compnonents",
+			skipCreateCA: true,
+			component:    constants.KubeScheduler,
+		},
+		{
+			name:               "missing a cert to renew",
+			component:          constants.Etcd,
+			shouldErrorOnRenew: true,
+			certsShouldExist: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdServer,
+				&certsphase.KubeadmCertEtcdPeer,
+			},
+		},
+		{
+			name:               "no CA, cannot continue",
+			component:          constants.Etcd,
+			skipCreateCA:       true,
+			shouldErrorOnRenew: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Setup up basic requities
+			tmpDir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpDir)
+
+			cfg := testutil.GetDefaultInternalConfig(t)
+			cfg.CertificatesDir = tmpDir
+
+			if !test.skipCreateCA {
+				if err := pkiutil.WriteCertAndKey(tmpDir, constants.EtcdCACertAndKeyBaseName, caCert, caKey); err != nil {
+					t.Fatalf("couldn't write out CA: %v", err)
+				}
+			}
+
+			// Create expected certs
+			for _, kubeCert := range test.certsShouldExist {
+				if err := kubeCert.CreateFromCA(cfg, caCert, caKey); err != nil {
+					t.Fatalf("couldn't renew certificate %q: %v", kubeCert.Name, err)
+				}
+			}
+
+			// Load expected certs to check if serial numbers changes
+			certMaps := make(map[*certsphase.KubeadmCert]big.Int)
+			for _, kubeCert := range test.certsShouldExist {
+				cert, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
+				if err != nil {
+					t.Fatalf("couldn't load certificate %q: %v", kubeCert.Name, err)
+				}
+				certMaps[kubeCert] = *cert.SerialNumber
+			}
+
+			// Renew everything
+			err := renewCerts(cfg, test.component)
+			if test.shouldErrorOnRenew {
+				if err == nil {
+					t.Fatal("expected renewal error, got nothing")
+				}
+				// expected error, got error
+				return
+			}
+			if err != nil {
+				t.Fatalf("couldn't renew certificates: %v", err)
+			}
+
+			// See if the certificate serial numbers change
+			for kubeCert, cert := range certMaps {
+				newCert, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
+				if err != nil {
+					t.Errorf("couldn't load new certificate %q: %v", kubeCert.Name, err)
+					continue
+				}
+				if cert.Cmp(newCert.SerialNumber) == 0 {
+					t.Errorf("certifitate %v was not reissued", kubeCert.Name)
+				}
+			}
+		})
+
 	}
 }

@@ -30,13 +30,16 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -202,14 +205,7 @@ func TestAttacherAttach(t *testing.T) {
 }
 
 func TestAttacherWithCSIDriver(t *testing.T) {
-	originalFeatures := utilfeature.DefaultFeatureGate.DeepCopy()
-	defer func() {
-		utilfeature.DefaultFeatureGate = originalFeatures
-	}()
-	err := utilfeature.DefaultFeatureGate.Set("CSISkipAttach=true")
-	if err != nil {
-		t.Fatalf("Failed to set CSISkipAttach=true: %s", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
 
 	tests := []struct {
 		name                   string
@@ -277,14 +273,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 }
 
 func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
-	originalFeatures := utilfeature.DefaultFeatureGate.DeepCopy()
-	defer func() {
-		utilfeature.DefaultFeatureGate = originalFeatures
-	}()
-	err := utilfeature.DefaultFeatureGate.Set("CSISkipAttach=true")
-	if err != nil {
-		t.Fatalf("Failed to set CSISkipAttach=true: %s", err)
-	}
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
 
 	// In order to detect if the volume plugin would skip WaitForAttach for non-attachable drivers,
 	// we do not instantiate any VolumeAttachment. So if the plugin does not skip attach,  WaitForVolumeAttachment
@@ -940,11 +929,11 @@ func newTestWatchPlugin(t *testing.T, csiClient *fakecsi.Clientset) (*csiPlugin,
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
 	}
 
-	for {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
-		if csiPlug.csiDriverInformer.Informer().HasSynced() {
-			break
-		}
+		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
+			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
+		})
 	}
 
 	return csiPlug, fakeWatcher, tmpDir, fakeClient

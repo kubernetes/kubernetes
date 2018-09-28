@@ -346,13 +346,24 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 	return *machine.ID, nil
 }
 
-func (as *availabilitySet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+// GetPowerStatusByNodeName returns the power state of the specified node.
+func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
 	vm, err := as.getVirtualMachine(types.NodeName(name))
 	if err != nil {
-		return provisioningState, err
+		return powerState, err
 	}
 
-	return *vm.ProvisioningState, nil
+	if vm.InstanceView != nil && vm.InstanceView.Statuses != nil {
+		statuses := *vm.InstanceView.Statuses
+		for _, status := range statuses {
+			state := to.String(status.Code)
+			if strings.HasPrefix(state, vmPowerStatePrefix) {
+				return strings.TrimPrefix(state, vmPowerStatePrefix), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to get power status for node %q", name)
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.
@@ -620,8 +631,9 @@ func (as *availabilitySet) getPrimaryInterfaceWithVMSet(nodeName, vmSetName stri
 
 // ensureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
 // participating in the specified LoadBalancer Backend Pool.
-func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
+func (as *availabilitySet) ensureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
 	vmName := mapNodeNameToVMName(nodeName)
+	serviceName := getServiceName(service)
 	nic, err := as.getPrimaryInterfaceWithVMSet(vmName, vmSetName)
 	if err != nil {
 		if err == errNotInVMSet {
@@ -689,7 +701,7 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 		glog.V(10).Infof("InterfacesClient.CreateOrUpdate(%q): end", *nic.Name)
 		if as.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 			glog.V(2).Infof("nicupdate(%s) backing off: nic(%s) - updating, err=%v", serviceName, nicName, err)
-			retryErr := as.CreateOrUpdateInterfaceWithRetry(nic)
+			retryErr := as.CreateOrUpdateInterfaceWithRetry(service, nic)
 			if retryErr != nil {
 				err = retryErr
 				glog.V(2).Infof("nicupdate(%s) abort backoff: nic(%s) - updating", serviceName, nicName)
@@ -704,7 +716,7 @@ func (as *availabilitySet) ensureHostInPool(serviceName string, nodeName types.N
 
 // EnsureHostsInPool ensures the given Node's primary IP configurations are
 // participating in the specified LoadBalancer Backend Pool.
-func (as *availabilitySet) EnsureHostsInPool(serviceName string, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error {
+func (as *availabilitySet) EnsureHostsInPool(service *v1.Service, nodes []*v1.Node, backendPoolID string, vmSetName string, isInternal bool) error {
 	hostUpdates := make([]func() error, 0, len(nodes))
 	for _, node := range nodes {
 		localNodeName := node.Name
@@ -719,9 +731,9 @@ func (as *availabilitySet) EnsureHostsInPool(serviceName string, nodes []*v1.Nod
 		}
 
 		f := func() error {
-			err := as.ensureHostInPool(serviceName, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
+			err := as.ensureHostInPool(service, types.NodeName(localNodeName), backendPoolID, vmSetName, isInternal)
 			if err != nil {
-				return fmt.Errorf("ensure(%s): backendPoolID(%s) - failed to ensure host in pool: %q", serviceName, backendPoolID, err)
+				return fmt.Errorf("ensure(%s): backendPoolID(%s) - failed to ensure host in pool: %q", getServiceName(service), backendPoolID, err)
 			}
 			return nil
 		}
@@ -737,7 +749,7 @@ func (as *availabilitySet) EnsureHostsInPool(serviceName string, nodes []*v1.Nod
 }
 
 // EnsureBackendPoolDeleted ensures the loadBalancer backendAddressPools deleted from the specified vmSet.
-func (as *availabilitySet) EnsureBackendPoolDeleted(poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
+func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, poolID, vmSetName string, backendAddressPools *[]network.BackendAddressPool) error {
 	// Do nothing for availability set.
 	return nil
 }

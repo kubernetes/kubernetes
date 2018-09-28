@@ -72,7 +72,7 @@ func TestUploadConfiguration(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 				},
 				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
-					KubernetesVersion: "v1.10.10",
+					KubernetesVersion: "v1.11.10",
 				},
 				BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
 					{

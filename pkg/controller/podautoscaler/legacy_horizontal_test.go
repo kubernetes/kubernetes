@@ -98,7 +98,8 @@ type legacyTestCase struct {
 	resource *fakeResource
 
 	// Last scale time
-	lastScaleTime *metav1.Time
+	lastScaleTime   *metav1.Time
+	recommendations []timestampedRecommendation
 }
 
 // Needs to be called under a lock.
@@ -504,6 +505,10 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	)
 	hpaController.hpaListerSynced = alwaysReady
 
+	if tc.recommendations != nil {
+		hpaController.recommendations["test-namespace/test-hpa"] = tc.recommendations
+	}
+
 	stop := make(chan struct{})
 	defer close(stop)
 	informerFactory.Start(stop)
@@ -689,6 +694,7 @@ func TestLegacyScaleDown(t *testing.T) {
 		reportedLevels:      []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:       true,
+		recommendations:     []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -711,6 +717,7 @@ func TestLegacyScaleDownCM(t *testing.T) {
 		},
 		reportedLevels:      []uint64{12, 12, 12, 12, 12},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		recommendations:     []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }
@@ -728,6 +735,7 @@ func TestLegacyScaleDownIgnoresUnreadyPods(t *testing.T) {
 		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:        true,
 		reportedPodReadiness: []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		recommendations:      []timestampedRecommendation{},
 	}
 	tc.runTest(t)
 }

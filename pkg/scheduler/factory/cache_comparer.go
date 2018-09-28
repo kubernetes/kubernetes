@@ -22,20 +22,17 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	v1beta1 "k8s.io/client-go/listers/policy/v1beta1"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
-	"k8s.io/kubernetes/pkg/scheduler/core"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
 type cacheComparer struct {
 	nodeLister corelisters.NodeLister
 	podLister  corelisters.PodLister
-	pdbLister  v1beta1.PodDisruptionBudgetLister
 	cache      schedulercache.Cache
-	podQueue   core.SchedulingQueue
+	podQueue   internalqueue.SchedulingQueue
 
 	compareStrategy
 }
@@ -54,11 +51,6 @@ func (c *cacheComparer) Compare() error {
 		return err
 	}
 
-	pdbs, err := c.pdbLister.List(labels.Everything())
-	if err != nil {
-		return err
-	}
-
 	snapshot := c.cache.Snapshot()
 
 	waitingPods := c.podQueue.WaitingPods()
@@ -69,10 +61,6 @@ func (c *cacheComparer) Compare() error {
 
 	if missed, redundant := c.ComparePods(pods, waitingPods, snapshot.Nodes); len(missed)+len(redundant) != 0 {
 		glog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
-	}
-
-	if missed, redundant := c.ComparePdbs(pdbs, snapshot.Pdbs); len(missed)+len(redundant) != 0 {
-		glog.Warningf("cache mismatch: missed pdbs: %s; redundant pdbs: %s", missed, redundant)
 	}
 
 	return nil
@@ -109,20 +97,6 @@ func (c compareStrategy) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[
 	}
 	for _, pod := range waitingPods {
 		cached = append(cached, string(pod.UID))
-	}
-
-	return compareStrings(actual, cached)
-}
-
-func (c compareStrategy) ComparePdbs(pdbs []*policy.PodDisruptionBudget, pdbCache map[string]*policy.PodDisruptionBudget) (missed, redundant []string) {
-	actual := []string{}
-	for _, pdb := range pdbs {
-		actual = append(actual, string(pdb.UID))
-	}
-
-	cached := []string{}
-	for pdbUID := range pdbCache {
-		cached = append(cached, pdbUID)
 	}
 
 	return compareStrings(actual, cached)

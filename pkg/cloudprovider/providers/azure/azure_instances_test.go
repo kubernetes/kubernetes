@@ -24,23 +24,41 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
+	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func setTestVirtualMachines(c *Cloud, vmList []string) {
+// setTestVirtualMachines sets test virtual machine with powerstate.
+func setTestVirtualMachines(c *Cloud, vmList map[string]string) {
 	virtualMachineClient := c.VirtualMachinesClient.(*fakeAzureVirtualMachinesClient)
 	store := map[string]map[string]compute.VirtualMachine{
 		"rg": make(map[string]compute.VirtualMachine),
 	}
 
-	for i := range vmList {
-		nodeName := vmList[i]
-		instanceID := fmt.Sprintf("/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/%s", nodeName)
-		store["rg"][nodeName] = compute.VirtualMachine{
+	for nodeName, powerState := range vmList {
+		instanceID := fmt.Sprintf("/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/%s", nodeName)
+		vm := compute.VirtualMachine{
 			Name:     &nodeName,
 			ID:       &instanceID,
 			Location: &c.Location,
 		}
+		if powerState != "" {
+			status := []compute.InstanceViewStatus{
+				{
+					Code: to.StringPtr(powerState),
+				},
+				{
+					Code: to.StringPtr("ProvisioningState/succeeded"),
+				},
+			}
+			vm.VirtualMachineProperties = &compute.VirtualMachineProperties{
+				InstanceView: &compute.VirtualMachineInstanceView{
+					Statuses: &status,
+				},
+			}
+		}
+
+		store["rg"][nodeName] = vm
 	}
 
 	virtualMachineClient.setFakeStore(store)
@@ -63,14 +81,14 @@ func TestInstanceID(t *testing.T) {
 			vmList:       []string{"vm1"},
 			nodeName:     "vm1",
 			metadataName: "vm1",
-			expected:     "/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
+			expected:     "/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm1",
 		},
 		{
 			name:         "InstanceID should get instanceID from Azure API if node is not local instance",
 			vmList:       []string{"vm2"},
 			nodeName:     "vm2",
 			metadataName: "vm1",
-			expected:     "/subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm2",
+			expected:     "/subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm2",
 		},
 		{
 			name:        "InstanceID should report error if VM doesn't exist",
@@ -96,7 +114,11 @@ func TestInstanceID(t *testing.T) {
 		defer listener.Close()
 
 		cloud.metadata.baseURL = "http://" + listener.Addr().String() + "/"
-		setTestVirtualMachines(cloud, test.vmList)
+		vmListWithPowerState := make(map[string]string)
+		for _, vm := range test.vmList {
+			vmListWithPowerState[vm] = ""
+		}
+		setTestVirtualMachines(cloud, vmListWithPowerState)
 		instanceID, err := cloud.InstanceID(context.Background(), types.NodeName(test.nodeName))
 		if test.expectError {
 			if err == nil {
@@ -110,6 +132,85 @@ func TestInstanceID(t *testing.T) {
 
 		if instanceID != test.expected {
 			t.Errorf("Test [%s] unexpected instanceID: %s, expected %q", test.name, instanceID, test.expected)
+		}
+	}
+}
+
+func TestInstanceShutdownByProviderID(t *testing.T) {
+	testcases := []struct {
+		name        string
+		vmList      map[string]string
+		nodeName    string
+		expected    bool
+		expectError bool
+	}{
+		{
+			name:     "InstanceShutdownByProviderID should return false if the vm is in PowerState/Running status",
+			vmList:   map[string]string{"vm1": "PowerState/Running"},
+			nodeName: "vm1",
+			expected: false,
+		},
+		{
+			name:     "InstanceShutdownByProviderID should return true if the vm is in PowerState/Deallocated status",
+			vmList:   map[string]string{"vm2": "PowerState/Deallocated"},
+			nodeName: "vm2",
+			expected: true,
+		},
+		{
+			name:     "InstanceShutdownByProviderID should return false if the vm is in PowerState/Deallocating status",
+			vmList:   map[string]string{"vm3": "PowerState/Deallocating"},
+			nodeName: "vm3",
+			expected: false,
+		},
+		{
+			name:     "InstanceShutdownByProviderID should return false if the vm is in PowerState/Starting status",
+			vmList:   map[string]string{"vm4": "PowerState/Starting"},
+			nodeName: "vm4",
+			expected: false,
+		},
+		{
+			name:     "InstanceShutdownByProviderID should return true if the vm is in PowerState/Stopped status",
+			vmList:   map[string]string{"vm5": "PowerState/Stopped"},
+			nodeName: "vm5",
+			expected: true,
+		},
+		{
+			name:     "InstanceShutdownByProviderID should return false if the vm is in PowerState/Stopping status",
+			vmList:   map[string]string{"vm6": "PowerState/Stopping"},
+			nodeName: "vm6",
+			expected: false,
+		},
+		{
+			name:     "InstanceShutdownByProviderID should return false if the vm is in PowerState/Unknown status",
+			vmList:   map[string]string{"vm7": "PowerState/Unknown"},
+			nodeName: "vm7",
+			expected: false,
+		},
+		{
+			name:        "InstanceShutdownByProviderID should report error if VM doesn't exist",
+			vmList:      map[string]string{"vm1": "PowerState/running"},
+			nodeName:    "vm8",
+			expectError: true,
+		},
+	}
+
+	for _, test := range testcases {
+		cloud := getTestCloud()
+		setTestVirtualMachines(cloud, test.vmList)
+		providerID := "azure://" + cloud.getStandardMachineID("rg", test.nodeName)
+		hasShutdown, err := cloud.InstanceShutdownByProviderID(context.Background(), providerID)
+		if test.expectError {
+			if err == nil {
+				t.Errorf("Test [%s] unexpected nil err", test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+			}
+		}
+
+		if hasShutdown != test.expected {
+			t.Errorf("Test [%s] unexpected hasShutdown: %v, expected %v", test.name, hasShutdown, test.expected)
 		}
 	}
 }

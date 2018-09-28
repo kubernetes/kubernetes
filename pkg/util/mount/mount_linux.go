@@ -89,9 +89,9 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
 	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
-	bind, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := isBind(options)
 	if bind {
-		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, []string{"bind"})
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts)
 		if err != nil {
 			return err
 		}
@@ -1005,6 +1005,11 @@ func (mounter *Mounter) SafeMakeDir(subdir string, base string, perm os.FileMode
 }
 
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	if _, err := os.Stat(pathname); os.IsNotExist(err) {
+		return []string{}, nil
+	} else if err != nil {
+		return nil, err
+	}
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
 		return nil, err

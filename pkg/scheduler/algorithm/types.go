@@ -19,6 +19,7 @@ package algorithm
 import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
@@ -120,6 +121,12 @@ type ControllerLister interface {
 type ReplicaSetLister interface {
 	// Gets the replicasets for the given pod
 	GetPodReplicaSets(*v1.Pod) ([]*apps.ReplicaSet, error)
+}
+
+// PDBLister interface represents anything that can list PodDisruptionBudget objects.
+type PDBLister interface {
+	// List() returns a list of PodDisruptionBudgets matching the selector.
+	List(labels.Selector) ([]*policyv1beta1.PodDisruptionBudget, error)
 }
 
 var _ ControllerLister = &EmptyControllerLister{}

@@ -68,10 +68,7 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // YAMLPrinter is an implementation of ResourcePrinter which outputs an object as YAML.
 // The input object is assumed to be in the internal version of an API and is converted
 // to the given version first.
-type YAMLPrinter struct {
-	version   string
-	converter runtime.ObjectConvertor
-}
+type YAMLPrinter struct{}
 
 // PrintObj prints the data as YAML.
 func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {

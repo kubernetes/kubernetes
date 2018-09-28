@@ -98,7 +98,7 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 	framework.ExpectNoError(err, "getting node list")
 	var gpusAvailable int64
 	for _, node := range nodeList.Items {
-		if val, ok := node.Status.Capacity[gpuResourceName]; ok {
+		if val, ok := node.Status.Allocatable[gpuResourceName]; ok {
 			gpusAvailable += (&val).Value()
 		}
 	}

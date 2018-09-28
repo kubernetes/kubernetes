@@ -68,7 +68,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	bindSource := ""
 
 	// tell it's going to mount azure disk or azure file according to options
-	if bind, _ := isBind(options); bind {
+	if bind, _, _ := isBind(options); bind {
 		// mount azure disk
 		bindSource = normalizeWindowsPath(source)
 	} else {
@@ -458,12 +458,14 @@ func getAllParentLinks(path string) ([]string, error) {
 	return links, nil
 }
 
+// GetMountRefs : empty implementation here since there is no place to query all mount points on Windows
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	refs, err := getAllParentLinks(normalizeWindowsPath(pathname))
-	if err != nil {
+	if _, err := os.Stat(normalizeWindowsPath(pathname)); os.IsNotExist(err) {
+		return []string{}, nil
+	} else if err != nil {
 		return nil, err
 	}
-	return refs, nil
+	return []string{pathname}, nil
 }
 
 // Note that on windows, it always returns 0. We actually don't set FSGroup on
