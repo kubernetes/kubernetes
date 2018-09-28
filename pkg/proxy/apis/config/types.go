@@ -199,7 +199,7 @@ const (
 	DestinationHashing IPVSSchedulerMethod = "dh"
 	// ShortestExpectedDelay assigns an incoming job to the server with the shortest expected delay.
 	// The expected delay that the job will experience is (Ci + 1) / Ui if sent to the ith server, in which
-	// Ci is the number of jobs on the the ith server and Ui is the fixed service rate (weight) of the ith server.
+	// Ci is the number of jobs on the ith server and Ui is the fixed service rate (weight) of the ith server.
 	ShortestExpectedDelay IPVSSchedulerMethod = "sed"
 	// NeverQueue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
 	// if all the servers are busy, it adopts the ShortestExpectedDelay policy to assign the job.
