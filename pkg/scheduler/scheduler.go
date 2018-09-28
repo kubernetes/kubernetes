@@ -34,6 +34,7 @@ import (
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -85,7 +86,7 @@ type Configurator interface {
 	// Exposed for testing
 	GetHardPodAffinitySymmetricWeight() int32
 	// Exposed for testing
-	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error)
+	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error)
 
 	// Predicate related accessors to be exposed for use by k8s.io/autoscaler/cluster-autoscaler
 	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)

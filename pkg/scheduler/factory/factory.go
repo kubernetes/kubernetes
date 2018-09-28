@@ -60,6 +60,7 @@ import (
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -81,7 +82,7 @@ var (
 type configFactory struct {
 	client clientset.Interface
 	// queue for pods that need scheduling
-	podQueue core.SchedulingQueue
+	podQueue internalqueue.SchedulingQueue
 	// a means to list all known scheduled pods.
 	scheduledPodLister corelisters.PodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
@@ -175,7 +176,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       core.NewSchedulingQueue(),
+		podQueue:                       internalqueue.NewSchedulingQueue(),
 		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
@@ -1348,7 +1349,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 	}
 }
 
-func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error) {
+func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
