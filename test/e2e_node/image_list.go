@@ -53,6 +53,9 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageName(),
 	framework.GetGPUDevicePluginImage(),
+	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-is-amd64:1.0",
+	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-ep-amd64:1.0",
+	"gcr.io/kubernetes-e2e-test-images/node-perf/tf-wide-deep-amd64:1.0",
 )
 
 func init() {

@@ -8,6 +8,8 @@ go_library(
         "handler.go",
         "resource_analyzer.go",
         "summary.go",
+        "summary_sys_containers.go",
+        "summary_sys_containers_windows.go",
         "volume_stat_calculator.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/server/stats",
@@ -32,20 +34,65 @@ go_test(
     name = "go_default_test",
     srcs = [
         "summary_test.go",
+        "summary_windows_test.go",
         "volume_stat_calculator_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
-        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/server/stats/testing:go_default_library",
         "//pkg/volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

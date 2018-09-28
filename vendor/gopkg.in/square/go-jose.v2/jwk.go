@@ -148,17 +148,10 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 
 	if err == nil {
 		*k = JSONWebKey{Key: key, KeyID: raw.Kid, Algorithm: raw.Alg, Use: raw.Use}
-	}
 
-	k.Certificates = make([]*x509.Certificate, len(raw.X5c))
-	for i, cert := range raw.X5c {
-		raw, err := base64.StdEncoding.DecodeString(cert)
+		k.Certificates, err = parseCertificateChain(raw.X5c)
 		if err != nil {
-			return err
-		}
-		k.Certificates[i], err = x509.ParseCertificate(raw)
-		if err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal x5c field: %s", err)
 		}
 	}
 
@@ -247,11 +240,30 @@ func (k *JSONWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
 // IsPublic returns true if the JWK represents a public key (not symmetric, not private).
 func (k *JSONWebKey) IsPublic() bool {
 	switch k.Key.(type) {
-	case *ecdsa.PublicKey, *rsa.PublicKey, *ed25519.PublicKey:
+	case *ecdsa.PublicKey, *rsa.PublicKey, ed25519.PublicKey:
 		return true
 	default:
 		return false
 	}
+}
+
+// Public creates JSONWebKey with corresponding publik key if JWK represents asymmetric private key.
+func (k *JSONWebKey) Public() JSONWebKey {
+	if k.IsPublic() {
+		return *k
+	}
+	ret := *k
+	switch key := k.Key.(type) {
+	case *ecdsa.PrivateKey:
+		ret.Key = key.Public()
+	case *rsa.PrivateKey:
+		ret.Key = key.Public()
+	case ed25519.PrivateKey:
+		ret.Key = key.Public()
+	default:
+		return JSONWebKey{} // returning invalid key
+	}
+	return ret
 }
 
 // Valid checks that the key contains the expected parameters.
@@ -276,12 +288,12 @@ func (k *JSONWebKey) Valid() bool {
 		if key.N == nil || key.E == 0 || key.D == nil || len(key.Primes) < 2 {
 			return false
 		}
-	case *ed25519.PublicKey:
-		if len(*key) != 32 {
+	case ed25519.PublicKey:
+		if len(key) != 32 {
 			return false
 		}
-	case *ed25519.PrivateKey:
-		if len(*key) != 64 {
+	case ed25519.PrivateKey:
+		if len(key) != 64 {
 			return false
 		}
 	default:

@@ -30,7 +30,7 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
-        "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
+        "//pkg/proxy/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

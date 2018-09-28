@@ -101,7 +101,7 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 }
 
-func TestPatchInvalid(t *testing.T) {
+func TestStrategicMergePatchInvalid(t *testing.T) {
 	testGV := schema.GroupVersion{Group: "", Version: "v"}
 	scheme.AddKnownTypes(testGV, &testPatchType{})
 	defaulter := runtime.ObjectDefaulter(scheme)
@@ -120,6 +120,61 @@ func TestPatchInvalid(t *testing.T) {
 	}
 	if err.Error() != expectedError {
 		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
+	}
+}
+
+func TestJSONPatch(t *testing.T) {
+	for _, test := range []struct {
+		name              string
+		patch             string
+		expectedError     string
+		expectedErrorType metav1.StatusReason
+	}{
+		{
+			name:  "valid",
+			patch: `[{"op": "test", "value": "podA", "path": "/metadata/name"}]`,
+		},
+		{
+			name:              "invalid-syntax",
+			patch:             `invalid json patch`,
+			expectedError:     "invalid character 'i' looking for beginning of value",
+			expectedErrorType: metav1.StatusReasonBadRequest,
+		},
+		{
+			name:              "invalid-semantics",
+			patch:             `[{"op": "test", "value": "podA", "path": "/invalid/path"}]`,
+			expectedError:     "the server rejected our request due to an error in our request",
+			expectedErrorType: metav1.StatusReasonInvalid,
+		},
+	} {
+		p := &patcher{
+			patchType: types.JSONPatchType,
+			patchJS:   []byte(test.patch),
+		}
+		jp := jsonPatcher{p}
+		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
+		pod := &examplev1.Pod{}
+		pod.Name = "podA"
+		versionedJS, err := runtime.Encode(codec, pod)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+			continue
+		}
+		_, err = jp.applyJSPatch(versionedJS)
+		if err != nil {
+			if len(test.expectedError) == 0 {
+				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
+				continue
+			}
+			if err.Error() != test.expectedError {
+				t.Errorf("%s: expected error %v, but got %v", test.name, test.expectedError, err)
+			}
+			if test.expectedErrorType != apierrors.ReasonForError(err) {
+				t.Errorf("%s: expected error type %v, but got %v", test.name, test.expectedErrorType, apierrors.ReasonForError(err))
+			}
+		} else if len(test.expectedError) > 0 {
+			t.Errorf("%s: expected err %s", test.name, test.expectedError)
+		}
 	}
 }
 

@@ -55,7 +55,7 @@ const (
 
 func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.targetLocks = keymutex.NewKeyMutex()
+	plugin.targetLocks = keymutex.NewHashed(0)
 	return nil
 }
 

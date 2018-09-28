@@ -21,6 +21,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -213,4 +214,12 @@ func (f *fakePersistentVolumeClaimNamespaceLister) Get(name string) (*v1.Persist
 
 func (f fakePersistentVolumeClaimNamespaceLister) List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+// FakePDBLister implements PDBLister on a slice of PodDisruptionBudgets for test purposes.
+type FakePDBLister []*policy.PodDisruptionBudget
+
+// List returns a list of PodDisruptionBudgets.
+func (f FakePDBLister) List(labels.Selector) ([]*policy.PodDisruptionBudget, error) {
+	return f, nil
 }

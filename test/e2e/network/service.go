@@ -1571,6 +1571,9 @@ var _ = SIGDescribe("Services", func() {
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
+		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
+		framework.SkipIfProviderIs("aws")
+
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
@@ -1579,6 +1582,9 @@ var _ = SIGDescribe("Services", func() {
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters]", func() {
+		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
+		framework.SkipIfProviderIs("aws")
+
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
@@ -1587,6 +1593,9 @@ var _ = SIGDescribe("Services", func() {
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
+		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
+		framework.SkipIfProviderIs("aws")
+
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
@@ -1595,6 +1604,9 @@ var _ = SIGDescribe("Services", func() {
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 	It("should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters]", func() {
+		// L4 load balancer affinity `ClientIP` is not supported on AWS ELB.
+		framework.SkipIfProviderIs("aws")
+
 		svc := getServeHostnameService("service")
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster

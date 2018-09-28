@@ -18,12 +18,14 @@ package ipam
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +35,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -155,14 +156,19 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 				glog.Warning("Channel nodeCIDRUpdateChannel was unexpectedly closed")
 				return
 			}
-			if err := ca.updateCIDRAllocation(workItem); err != nil {
-				if ca.canRetry(workItem) {
-					time.AfterFunc(updateRetryTimeout, func() {
+			if err := ca.updateCIDRAllocation(workItem); err == nil {
+				glog.V(3).Infof("Updated CIDR for %q", workItem)
+			} else {
+				glog.Errorf("Error updating CIDR for %q: %v", workItem, err)
+				if canRetry, timeout := ca.retryParams(workItem); canRetry {
+					glog.V(2).Infof("Retrying update for %q after %v", workItem, timeout)
+					time.AfterFunc(timeout, func() {
 						// Requeue the failed node for update again.
 						ca.nodeUpdateChannel <- workItem
 					})
 					continue
 				}
+				glog.Errorf("Exceeded retry count for %q, dropping from queue", workItem)
 			}
 			ca.removeNodeFromProcessing(workItem)
 		case <-stopChan:
@@ -181,15 +187,34 @@ func (ca *cloudCIDRAllocator) insertNodeToProcessing(nodeName string) bool {
 	return true
 }
 
-func (ca *cloudCIDRAllocator) canRetry(nodeName string) bool {
+func (ca *cloudCIDRAllocator) retryParams(nodeName string) (bool, time.Duration) {
 	ca.lock.Lock()
 	defer ca.lock.Unlock()
-	count := ca.nodesInProcessing[nodeName].retries + 1
+
+	entry, ok := ca.nodesInProcessing[nodeName]
+	if !ok {
+		glog.Errorf("Cannot get retryParams for %q as entry does not exist", nodeName)
+		return false, 0
+	}
+
+	count := entry.retries + 1
 	if count > updateMaxRetries {
-		return false
+		return false, 0
 	}
 	ca.nodesInProcessing[nodeName].retries = count
-	return true
+
+	return true, nodeUpdateRetryTimeout(count)
+}
+
+func nodeUpdateRetryTimeout(count int) time.Duration {
+	timeout := updateRetryTimeout
+	for i := 0; i < count && timeout < maxUpdateRetryTimeout; i++ {
+		timeout *= 2
+	}
+	if timeout > maxUpdateRetryTimeout {
+		timeout = maxUpdateRetryTimeout
+	}
+	return time.Duration(timeout.Nanoseconds()/2 + rand.Int63n(timeout.Nanoseconds()))
 }
 
 func (ca *cloudCIDRAllocator) removeNodeFromProcessing(nodeName string) {

@@ -71,7 +71,7 @@ func logOSImages(f *framework.Framework) {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
 	for _, node := range nodeList.Items {
-		framework.Logf("OS Image: %v", node.Status.NodeInfo.OSImage)
+		framework.Logf("Nodename: %v, OS Image: %v", node.Name, node.Status.NodeInfo.OSImage)
 	}
 }
 
@@ -98,7 +98,7 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 	framework.ExpectNoError(err, "getting node list")
 	var gpusAvailable int64
 	for _, node := range nodeList.Items {
-		if val, ok := node.Status.Capacity[gpuResourceName]; ok {
+		if val, ok := node.Status.Allocatable[gpuResourceName]; ok {
 			gpusAvailable += (&val).Value()
 		}
 	}

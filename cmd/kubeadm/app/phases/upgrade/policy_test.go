@@ -19,7 +19,7 @@ package upgrade
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestEnforceVersionPolicies(t *testing.T) {
@@ -34,38 +34,38 @@ func TestEnforceVersionPolicies(t *testing.T) {
 		{
 			name: "minor upgrade",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.11.5",
 			},
-			newK8sVersion: "v1.10.5",
+			newK8sVersion: "v1.11.5",
 		},
 		{
 			name: "major upgrade",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.2",
-				kubeadmVersion: "v1.11.1",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.2",
+				kubeadmVersion: "v1.12.1",
 			},
-			newK8sVersion: "v1.11.0",
+			newK8sVersion: "v1.12.0",
 		},
 		{
 			name: "downgrade",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.10.3",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.11.3",
 			},
-			newK8sVersion: "v1.10.2",
+			newK8sVersion: "v1.11.2",
 		},
 		{
 			name: "same version upgrade",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.10.3",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.11.3",
 			},
-			newK8sVersion: "v1.10.3",
+			newK8sVersion: "v1.11.3",
 		},
 		{
 			name: "new version must be higher than v1.10.0",
@@ -92,103 +92,103 @@ func TestEnforceVersionPolicies(t *testing.T) {
 		{
 			name: "downgrading two minor versions in one go is not supported",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.12.3",
-				kubeletVersion: "v1.12.3",
-				kubeadmVersion: "v1.12.0",
+				clusterVersion: "v1.13.3",
+				kubeletVersion: "v1.13.3",
+				kubeadmVersion: "v1.13.0",
 			},
-			newK8sVersion:         "v1.10.3",
+			newK8sVersion:         "v1.11.3",
 			expectedMandatoryErrs: 1, // can't downgrade two minor versions
 			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
 		{
 			name: "kubeadm version must be higher than the new kube version. However, patch version skews may be forced",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.10.3",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.11.3",
 			},
-			newK8sVersion:         "v1.10.5",
+			newK8sVersion:         "v1.11.5",
 			expectedSkippableErrs: 1,
 		},
 		{
 			name: "kubeadm version must be higher than the new kube version. Trying to upgrade k8s to a higher minor version than kubeadm itself should never be supported",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.10.3",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.11.3",
 			},
-			newK8sVersion:         "v1.11.0",
+			newK8sVersion:         "v1.12.0",
 			expectedMandatoryErrs: 1,
 		},
 		{
 			name: "the maximum skew between the cluster version and the kubelet versions should be one minor version. This may be forced through though.",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.9.8",
-				kubeadmVersion: "v1.11.0",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.10.8",
+				kubeadmVersion: "v1.12.0",
 			},
-			newK8sVersion:         "v1.11.0",
+			newK8sVersion:         "v1.12.0",
 			expectedSkippableErrs: 1,
 		},
 		{
 			name: "experimental upgrades supported if the flag is set",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.11.0-beta.1",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.12.0-beta.1",
 			},
-			newK8sVersion:     "v1.11.0-beta.1",
+			newK8sVersion:     "v1.12.0-beta.1",
 			allowExperimental: true,
 		},
 		{
 			name: "release candidate upgrades supported if the flag is set",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.11.0-rc.1",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.12.0-rc.1",
 			},
-			newK8sVersion: "v1.11.0-rc.1",
+			newK8sVersion: "v1.12.0-rc.1",
 			allowRCs:      true,
 		},
 		{
 			name: "release candidate upgrades supported if the flag is set",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.11.0-rc.1",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.12.0-rc.1",
 			},
-			newK8sVersion:     "v1.11.0-rc.1",
+			newK8sVersion:     "v1.12.0-rc.1",
 			allowExperimental: true,
 		},
 		{
 			name: "the user should not be able to upgrade to an experimental version if they haven't opted into that",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.11.0-beta.1",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.12.0-beta.1",
 			},
-			newK8sVersion:         "v1.11.0-beta.1",
+			newK8sVersion:         "v1.12.0-beta.1",
 			allowRCs:              true,
 			expectedSkippableErrs: 1,
 		},
 		{
 			name: "the user should not be able to upgrade to an release candidate version if they haven't opted into that",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.11.0-rc.1",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.12.0-rc.1",
 			},
-			newK8sVersion:         "v1.11.0-rc.1",
+			newK8sVersion:         "v1.12.0-rc.1",
 			expectedSkippableErrs: 1,
 		},
 		{
 			name: "the user can't use a newer minor version of kubeadm to upgrade an older version of kubeadm",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.11.0",
+				clusterVersion: "v1.11.3",
+				kubeletVersion: "v1.11.3",
+				kubeadmVersion: "v1.12.0",
 			},
-			newK8sVersion:         "v1.10.6",
+			newK8sVersion:         "v1.11.6",
 			expectedSkippableErrs: 1, // can't upgrade old k8s with newer kubeadm
 		},
 	}

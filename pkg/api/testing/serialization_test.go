@@ -65,7 +65,7 @@ func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runti
 	return item
 }
 
-func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
+func ConvertV1beta1ReplicaSetToAPIReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
 	intermediate1 := &extensions.ReplicaSet{}
 	if err := k8s_v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
 		return err
@@ -80,7 +80,7 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := legacyscheme.Scheme.AddConversionFuncs(Convert_v1beta1_ReplicaSet_to_api_ReplicationController); err != nil {
+	if err := legacyscheme.Scheme.AddConversionFuncs(ConvertV1beta1ReplicaSetToAPIReplicationController); err != nil {
 		t.Fatal(err)
 	}
 
@@ -214,6 +214,7 @@ func TestRoundTripTypes(t *testing.T) {
 // decoded without information loss or mutation.
 func TestEncodePtr(t *testing.T) {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"name": "foo"},
@@ -224,8 +225,9 @@ func TestEncodePtr(t *testing.T) {
 
 			TerminationGracePeriodSeconds: &grace,
 
-			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SecurityContext:    &api.PodSecurityContext{},
+			SchedulerName:      api.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
 	obj := runtime.Object(pod)

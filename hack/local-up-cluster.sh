@@ -47,6 +47,8 @@ FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
 # name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
+# if cgroups per qos is enabled, optionally change cgroup root
+CGROUP_ROOT=${CGROUP_ROOT:-""}
 # owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
 
@@ -83,9 +85,6 @@ ENABLE_POD_PRIORITY_PREEMPTION=${ENABLE_POD_PRIORITY_PREEMPTION:-""}
 
 # enable kubernetes dashboard
 ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
-
-# enable audit log
-ENABLE_APISERVER_BASIC_AUDIT=${ENABLE_APISERVER_BASIC_AUDIT:-false}
 
 # RBAC Mode options
 AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
@@ -144,6 +143,7 @@ fi
 set -e
 
 source "${KUBE_ROOT}/hack/lib/init.sh"
+kube::util::ensure-gnu-sed
 
 function usage {
             echo "This script starts a local kube cluster. "
@@ -234,6 +234,9 @@ ROOT_CA_FILE=${CERT_DIR}/server-ca.crt
 ROOT_CA_KEY=${CERT_DIR}/server-ca.key
 CLUSTER_SIGNING_CERT_FILE=${CLUSTER_SIGNING_CERT_FILE:-"${ROOT_CA_FILE}"}
 CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${ROOT_CA_KEY}"}
+# Reuse certs will skip generate new ca/cert files under CERT_DIR
+# it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
+REUSE_CERTS=${REUSE_CERTS:-false}
 
 # name of the cgroup driver, i.e. cgroupfs or systemd
 if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
@@ -452,89 +455,7 @@ function set_service_accounts {
     fi
 }
 
-function start_apiserver {
-    security_admission=""
-    if [[ -n "${DENY_SECURITY_CONTEXT_ADMISSION}" ]]; then
-      security_admission=",SecurityContextDeny"
-    fi
-    if [[ -n "${PSP_ADMISSION}" ]]; then
-      security_admission=",PodSecurityPolicy"
-    fi
-    if [[ -n "${NODE_ADMISSION}" ]]; then
-      security_admission=",NodeRestriction"
-    fi
-    if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
-      security_admission=",Priority"
-      if [[ -n "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG+=","
-      fi
-      RUNTIME_CONFIG+="scheduling.k8s.io/v1alpha1=true"
-    fi
-
-
-    # Admission Controllers to invoke prior to persisting objects in cluster
-    #
-    # The order defined here dose not matter.
-    ENABLE_ADMISSION_PLUGINS=LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
-
-    audit_arg=""
-    APISERVER_BASIC_AUDIT_LOG=""
-    if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" = true ]]; then
-        # We currently only support enabling with a fixed path and with built-in log
-        # rotation "disabled" (large value) so it behaves like kube-apiserver.log.
-        # External log rotation should be set up the same as for kube-apiserver.log.
-        APISERVER_BASIC_AUDIT_LOG=/tmp/kube-apiserver-audit.log
-        audit_arg=" --audit-log-path=${APISERVER_BASIC_AUDIT_LOG}"
-        audit_arg+=" --audit-log-maxage=0"
-        audit_arg+=" --audit-log-maxbackup=0"
-        # Lumberjack doesn't offer any way to disable size-based rotation. It also
-        # has an in-memory counter that doesn't notice if you truncate the file.
-        # 2000000000 (in MiB) is a large number that fits in 31 bits. If the log
-        # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
-        # never restarts. Please manually restart apiserver before this time.
-        audit_arg+=" --audit-log-maxsize=2000000000"
-    fi
-
-    swagger_arg=""
-    if [[ "${ENABLE_SWAGGER_UI}" = true ]]; then
-      swagger_arg="--enable-swagger-ui=true "
-    fi
-
-    authorizer_arg=""
-    if [[ -n "${AUTHORIZATION_MODE}" ]]; then
-      authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
-    fi
-    priv_arg=""
-    if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
-      priv_arg="--allow-privileged "
-    fi
-
-    if [[ ${ENABLE_ADMISSION_PLUGINS} == *"Initializers"* ]]; then
-        if [[ -n "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG+=","
-        fi
-        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
-    fi
-
-    runtime_config=""
-    if [[ -n "${RUNTIME_CONFIG}" ]]; then
-      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
-    fi
-
-    # Let the API server pick a default address when API_HOST_IP
-    # is set to 127.0.0.1
-    advertise_address=""
-    if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
-        advertise_address="--advertise-address=${API_HOST_IP}"
-    fi
-    if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
-        advertise_address="--advertise-address=${ADVERTISE_ADDRESS}"
-    fi
-    node_port_range=""
-    if [[ "${NODE_PORT_RANGE}" != "" ]] ; then
-        node_port_range="--service-node-port-range=${NODE_PORT_RANGE}"
-    fi
-
+function generate_certs {
     # Create CA signers
     if [[ "${ENABLE_SINGLE_CA_SIGNER:-}" = true ]]; then
         kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" server '"client auth","server auth"'
@@ -565,6 +486,77 @@ function start_apiserver {
     # TODO remove masters and add rolebinding
     kube::util::create_client_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" 'client-ca' kube-aggregator system:kube-aggregator system:masters
     kube::util::write_client_kubeconfig "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "${ROOT_CA_FILE}" "${API_HOST}" "${API_SECURE_PORT}" kube-aggregator
+}
+
+function start_apiserver {
+    security_admission=""
+    if [[ -n "${DENY_SECURITY_CONTEXT_ADMISSION}" ]]; then
+      security_admission=",SecurityContextDeny"
+    fi
+    if [[ -n "${PSP_ADMISSION}" ]]; then
+      security_admission=",PodSecurityPolicy"
+    fi
+    if [[ -n "${NODE_ADMISSION}" ]]; then
+      security_admission=",NodeRestriction"
+    fi
+    if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
+      security_admission=",Priority"
+      if [[ -n "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG+=","
+      fi
+      RUNTIME_CONFIG+="scheduling.k8s.io/v1alpha1=true"
+    fi
+
+
+    # Admission Controllers to invoke prior to persisting objects in cluster
+    #
+    # The order defined here dose not matter.
+    ENABLE_ADMISSION_PLUGINS=LimitRanger,ServiceAccount${security_admission},DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,StorageObjectInUseProtection
+
+    swagger_arg=""
+    if [[ "${ENABLE_SWAGGER_UI}" = true ]]; then
+      swagger_arg="--enable-swagger-ui=true "
+    fi
+
+    authorizer_arg=""
+    if [[ -n "${AUTHORIZATION_MODE}" ]]; then
+      authorizer_arg="--authorization-mode=${AUTHORIZATION_MODE} "
+    fi
+    priv_arg=""
+    if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
+      priv_arg="--allow-privileged=${ALLOW_PRIVILEGED} "
+    fi
+
+    if [[ ${ENABLE_ADMISSION_PLUGINS} == *"Initializers"* ]]; then
+        if [[ -n "${RUNTIME_CONFIG}" ]]; then
+          RUNTIME_CONFIG+=","
+        fi
+        RUNTIME_CONFIG+="admissionregistration.k8s.io/v1alpha1"
+    fi
+
+    runtime_config=""
+    if [[ -n "${RUNTIME_CONFIG}" ]]; then
+      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
+    fi
+
+    # Let the API server pick a default address when API_HOST_IP
+    # is set to 127.0.0.1
+    advertise_address=""
+    if [[ "${API_HOST_IP}" != "127.0.0.1" ]]; then
+        advertise_address="--advertise-address=${API_HOST_IP}"
+    fi
+    if [[ "${ADVERTISE_ADDRESS}" != "" ]] ; then
+        advertise_address="--advertise-address=${ADVERTISE_ADDRESS}"
+    fi
+    node_port_range=""
+    if [[ "${NODE_PORT_RANGE}" != "" ]] ; then
+        node_port_range="--service-node-port-range=${NODE_PORT_RANGE}"
+    fi
+
+    if [[ "${REUSE_CERTS}" != true ]]; then
+      # Create Certs
+      generate_certs
+    fi
 
     cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
@@ -572,7 +564,7 @@ function start_apiserver {
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${audit_arg} ${authorizer_arg} ${priv_arg} ${runtime_config} \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver ${swagger_arg} ${authorizer_arg} ${priv_arg} ${runtime_config} \
       ${cloud_config_arg} \
       ${advertise_address} \
       ${node_port_range} \
@@ -660,6 +652,7 @@ function start_controller_manager {
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
       --leader-elect=false \
+      --cert-dir="$CERT_DIR" \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -700,7 +693,7 @@ function start_kubelet {
 
     priv_arg=""
     if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
-      priv_arg="--allow-privileged "
+      priv_arg="--allow-privileged=${ALLOW_PRIVILEGED} "
     fi
 
     cloud_config_arg="--cloud-provider=${CLOUD_PROVIDER} --cloud-config=${CLOUD_CONFIG}"
@@ -770,6 +763,7 @@ function start_kubelet {
       --enable-controller-attach-detach="${ENABLE_CONTROLLER_ATTACH_DETACH}"
       --cgroups-per-qos="${CGROUPS_PER_QOS}"
       --cgroup-driver="${CGROUP_DRIVER}"
+      --cgroup-root="${CGROUP_ROOT}"
       --eviction-hard="${EVICTION_HARD}"
       --eviction-soft="${EVICTION_SOFT}"
       --eviction-pressure-transition-period="${EVICTION_PRESSURE_TRANSITION_PERIOD}"
@@ -882,7 +876,7 @@ EOF
       #   foo: true
       #   bar: false
       for gate in $(echo ${FEATURE_GATES} | tr ',' ' '); do
-        echo $gate | sed -e 's/\(.*\)=\(.*\)/  \1: \2/'
+        echo $gate | ${SED} -e 's/\(.*\)=\(.*\)/  \1: \2/'
       done
     fi >>/tmp/kube-proxy.yaml
 
@@ -905,9 +899,8 @@ EOF
 function start_kubedns {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
-        sed -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
-        sed -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
-
+        ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
+        ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create kubedns addon
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml
@@ -967,10 +960,6 @@ Logs:
   ${PROXY_LOG:-}
   ${SCHEDULER_LOG:-}
 EOF
-fi
-
-if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" = true ]]; then
-  echo "  ${APISERVER_BASIC_AUDIT_LOG}"
 fi
 
 if [[ "${START_MODE}" == "all" ]]; then

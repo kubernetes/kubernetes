@@ -26,8 +26,10 @@ import (
 	"github.com/renstrom/dedent"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	certtestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
@@ -55,13 +57,16 @@ func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.Ini
 	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(`
 		apiVersion: kubeadm.k8s.io/v1alpha3
 		kind: InitConfiguration
-		certificatesDir: {{.CertificatesDir}}
-		api:
-		  advertiseAddress: {{.API.AdvertiseAddress}}
-		  bindPort: {{.API.BindPort}}
+		apiEndpoint:
+		  advertiseAddress: {{.APIEndpoint.AdvertiseAddress}}
+		  bindPort: {{.APIEndpoint.BindPort}}
 		nodeRegistration:
 		  name: {{.NodeRegistration.Name}}
-		kubernetesVersion: v1.10.0
+		---
+		apiVersion: kubeadm.k8s.io/v1alpha3
+		kind: ClusterConfiguration
+		certificatesDir: {{.CertificatesDir}}
+		kubernetesVersion: v1.11.0
 		`)))
 
 	f, err := os.Create(cfgPath)
@@ -136,4 +141,14 @@ func AssertFileExists(t *testing.T, dirName string, fileNames ...string) {
 			t.Errorf("file %s does not exist", fileName)
 		}
 	}
+}
+
+// GetDefaultInternalConfig returns a defaulted kubeadmapi.InitConfiguration
+func GetDefaultInternalConfig(t *testing.T) *kubeadmapi.InitConfiguration {
+	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.InitConfiguration{})
+	if err != nil {
+		t.Fatalf("unexpected error getting default config: %v", err)
+	}
+
+	return internalcfg
 }

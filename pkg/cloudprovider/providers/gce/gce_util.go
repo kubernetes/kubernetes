@@ -24,16 +24,54 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 
 	"cloud.google.com/go/compute/metadata"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
+
+func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
+	gce := simpleFakeGCECloud(vals)
+
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{})
+	gce.nodeInformerSynced = func() bool { return true }
+
+	mockGCE := gce.c.(*cloud.MockGCE)
+	mockGCE.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
+	mockGCE.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
+	mockGCE.MockForwardingRules.InsertHook = mock.InsertFwdRuleHook
+	mockGCE.MockAddresses.InsertHook = mock.InsertAddressHook
+	mockGCE.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
+	mockGCE.MockAlphaAddresses.X = mock.AddressAttributes{}
+	mockGCE.MockAddresses.X = mock.AddressAttributes{}
+
+	mockGCE.MockInstanceGroups.X = mock.InstanceGroupAttributes{
+		InstanceMap: make(map[meta.Key]map[string]*compute.InstanceWithNamedPorts),
+		Lock:        &sync.Mutex{},
+	}
+	mockGCE.MockInstanceGroups.AddInstancesHook = mock.AddInstancesHook
+	mockGCE.MockInstanceGroups.RemoveInstancesHook = mock.RemoveInstancesHook
+	mockGCE.MockInstanceGroups.ListInstancesHook = mock.ListInstancesHook
+
+	mockGCE.MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
+	mockGCE.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
+	mockGCE.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
+
+	keyGA := meta.GlobalKey("key-ga")
+	mockGCE.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
+		Obj: &compute.Zone{Name: vals.ZoneName, Region: gce.getRegionLink(vals.Region)},
+	}
+
+	return gce, nil
+}
 
 type gceInstance struct {
 	Zone  string
@@ -280,4 +318,8 @@ func typeOfNetwork(network *compute.Network) netType {
 	}
 
 	return netTypeCustom
+}
+
+func getLocationName(project, zoneOrRegion string) string {
+	return fmt.Sprintf("projects/%s/locations/%s", project, zoneOrRegion)
 }

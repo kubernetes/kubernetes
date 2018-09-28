@@ -17,7 +17,9 @@ limitations under the License.
 package azure_dd
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
@@ -84,8 +86,12 @@ var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.DeviceMountableVolumePlugin = &azureDataDiskPlugin{}
 
+// store vm size list in current region
+var vmSizeList *[]compute.VirtualMachineSize
+
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
+	defaultAzureVolumeLimit = 16
 )
 
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -129,24 +135,64 @@ func (plugin *azureDataDiskPlugin) SupportsBulkVolumeVerification() bool {
 
 func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.AzureVolumeLimitKey: 16,
+		util.AzureVolumeLimitKey: defaultAzureVolumeLimit,
 	}
 
-	cloud := plugin.host.GetCloudProvider()
-
-	// if we can't fetch cloudprovider we return an error
-	// hoping external CCM or admin can set it. Returning
-	// default values from here will mean, no one can
-	// override them.
-	if cloud == nil {
-		return nil, fmt.Errorf("No cloudprovider present")
+	az, err := getCloud(plugin.host)
+	if err != nil {
+		// if we can't fetch cloudprovider we return an error
+		// hoping external CCM or admin can set it. Returning
+		// default values from here will mean, no one can
+		// override them.
+		glog.Errorf("failed to get azure cloud in GetVolumeLimits, plugin.host: %s", plugin.host.GetHostName())
+		return volumeLimits, nil
 	}
 
-	if cloud.ProviderName() != azure.CloudProviderName {
-		return nil, fmt.Errorf("Expected Azure cloudprovider, got %s", cloud.ProviderName())
+	instances, ok := az.Instances()
+	if !ok {
+		glog.Warningf("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from Azure cloud provider, nodeName: %s", plugin.host.GetNodeName())
+		return volumeLimits, nil
+	}
+
+	if vmSizeList == nil {
+		result, err := az.VirtualMachineSizesClient.List(context.TODO(), az.Location)
+		if err != nil || result.Value == nil {
+			glog.Errorf("failed to list vm sizes in GetVolumeLimits, plugin.host: %s, location: %s", plugin.host.GetHostName(), az.Location)
+			return volumeLimits, nil
+		}
+		vmSizeList = result.Value
+	}
+
+	volumeLimits = map[string]int64{
+		util.AzureVolumeLimitKey: getMaxDataDiskCount(instanceType, vmSizeList),
 	}
 
 	return volumeLimits, nil
+}
+
+func getMaxDataDiskCount(instanceType string, sizeList *[]compute.VirtualMachineSize) int64 {
+	if sizeList == nil {
+		return defaultAzureVolumeLimit
+	}
+
+	vmsize := strings.ToUpper(instanceType)
+	for _, size := range *sizeList {
+		if size.Name == nil || size.MaxDataDiskCount == nil {
+			glog.Errorf("failed to get vm size in getMaxDataDiskCount")
+			continue
+		}
+		if strings.ToUpper(*size.Name) == vmsize {
+			glog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %s", *size.Name, *size.MaxDataDiskCount)
+			return int64(*size.MaxDataDiskCount)
+		}
+	}
+	return defaultAzureVolumeLimit
 }
 
 func (plugin *azureDataDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {

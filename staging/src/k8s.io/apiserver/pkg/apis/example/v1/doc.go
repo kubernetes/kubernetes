@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=example.apiserver.k8s.io
+
 package v1 // import "k8s.io/apiserver/pkg/apis/example/v1"

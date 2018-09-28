@@ -69,6 +69,11 @@ type TLSInfo struct {
 	// connection will be closed immediately afterwards.
 	HandshakeFailure func(*tls.Conn, error)
 
+	// CipherSuites is a list of supported cipher suites.
+	// If empty, Go auto-populates it by default.
+	// Note that cipher suites are prioritized in the given order.
+	CipherSuites []uint16
+
 	selfCert bool
 
 	// parseFunc exists to simplify testing. Typically, parseFunc
@@ -162,16 +167,20 @@ func (info TLSInfo) baseConfig() (*tls.Config, error) {
 		return nil, fmt.Errorf("KeyFile and CertFile must both be present[key: %v, cert: %v]", info.KeyFile, info.CertFile)
 	}
 
-	tlsCert, err := tlsutil.NewCert(info.CertFile, info.KeyFile, info.parseFunc)
+	_, err := tlsutil.NewCert(info.CertFile, info.KeyFile, info.parseFunc)
 	if err != nil {
 		return nil, err
 	}
 
 	cfg := &tls.Config{
-		Certificates: []tls.Certificate{*tlsCert},
-		MinVersion:   tls.VersionTLS12,
-		ServerName:   info.ServerName,
+		MinVersion: tls.VersionTLS12,
+		ServerName: info.ServerName,
 	}
+
+	if len(info.CipherSuites) > 0 {
+		cfg.CipherSuites = info.CipherSuites
+	}
+
 	// this only reloads certs when there's a client request
 	// TODO: support server-side refresh (e.g. inotify, SIGHUP), caching
 	cfg.GetCertificate = func(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {

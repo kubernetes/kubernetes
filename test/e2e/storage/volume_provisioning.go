@@ -44,6 +44,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -223,9 +224,14 @@ func testBindingWaitForFirstConsumer(client clientset.Interface, claim *v1.Persi
 	return pv, node
 }
 
+func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZone bool) {
+	checkZonesFromLabelAndAffinity(pv, sets.NewString(zone), matchZone)
+}
+
 // checkZoneLabelAndAffinity checks the LabelZoneFailureDomain label of PV and terms
-// with key LabelZoneFailureDomain in PV's node affinity match zone
-func checkZoneLabelAndAffinity(pv *v1.PersistentVolume, zone string) {
+// with key LabelZoneFailureDomain in PV's node affinity contains zone
+// matchZones is used to indicate if zones should match perfectly
+func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, matchZones bool) {
 	By("checking PV's zone label and node affinity terms match expected zone")
 	if pv == nil {
 		framework.Failf("nil pv passed")
@@ -235,14 +241,19 @@ func checkZoneLabelAndAffinity(pv *v1.PersistentVolume, zone string) {
 		framework.Failf("label %s not found on PV", kubeletapis.LabelZoneFailureDomain)
 	}
 
-	if zone != pvLabel {
-		framework.Failf("value of %s label for PV: %s does not match expected zone: %s", kubeletapis.LabelZoneFailureDomain, pvLabel, zone)
+	zonesFromLabel, err := volumeutil.LabelZonesToSet(pvLabel)
+	if err != nil {
+		framework.Failf("unable to parse zone labels %s: %v", pvLabel, err)
 	}
-
+	if matchZones && !zonesFromLabel.Equal(zones) {
+		framework.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", kubeletapis.LabelZoneFailureDomain, zonesFromLabel, zones)
+	}
+	if !matchZones && !zonesFromLabel.IsSuperset(zones) {
+		framework.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", kubeletapis.LabelZoneFailureDomain, zonesFromLabel, zones)
+	}
 	if pv.Spec.NodeAffinity == nil {
 		framework.Failf("node affinity not found in PV spec %v", pv.Spec)
 	}
-
 	if len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
 		framework.Failf("node selector terms not found in PV spec %v", pv.Spec)
 	}
@@ -250,17 +261,18 @@ func checkZoneLabelAndAffinity(pv *v1.PersistentVolume, zone string) {
 	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
 		keyFound := false
 		for _, r := range term.MatchExpressions {
-			if r.Key == kubeletapis.LabelZoneFailureDomain {
-				keyFound = true
-				for _, val := range r.Values {
-					if zone == val {
-						framework.Logf("expected zone %s detected", val)
-					} else {
-						framework.Failf("zone %s does not match expected zone %s", val, zone)
-					}
-				}
-				break
+			if r.Key != kubeletapis.LabelZoneFailureDomain {
+				continue
 			}
+			keyFound = true
+			zonesFromNodeAffinity := sets.NewString(r.Values...)
+			if matchZones && !zonesFromNodeAffinity.Equal(zones) {
+				framework.Failf("zones from NodeAffinity of PV: %v does not equal expected zone[s]: %v", zonesFromNodeAffinity, zones)
+			}
+			if !matchZones && !zonesFromNodeAffinity.IsSuperset(zones) {
+				framework.Failf("zones from NodeAffinity of PV: %v does not contain expected zone[s]: %v", zonesFromNodeAffinity, zones)
+			}
+			break
 		}
 		if !keyFound {
 			framework.Failf("label %s not found in term %v", kubeletapis.LabelZoneFailureDomain, term)
@@ -348,7 +360,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		ns = f.Namespace.Name
 	})
 
-	Describe("DynamicProvisioner", func() {
+	Describe("DynamicProvisioner [Slow]", func() {
 		It("should provision storage with different parameters", func() {
 			cloudZone := getRandomCloudZone(c)
 
@@ -774,17 +786,38 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	Describe("DynamicProvisioner External", func() {
 		It("should let an external dynamic provisioner create and delete persistent volumes [Slow]", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
-			// persistent-volume-provisioner role
-			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns,
-				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
+			// persistent-volume-provisioner clusterrole and a leader-locking role
+			serviceAccountName := "default"
+			subject := rbacv1beta1.Subject{
+				Kind:      rbacv1beta1.ServiceAccountKind,
+				Namespace: ns,
+				Name:      serviceAccountName,
+			}
 
-			err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
-				serviceaccount.MakeUsername(ns, "default"),
+			framework.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns, subject)
+
+			roleName := "leader-locking-nfs-provisioner"
+			_, err := f.ClientSet.RbacV1beta1().Roles(ns).Create(&rbacv1beta1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: roleName,
+				},
+				Rules: []rbacv1beta1.PolicyRule{{
+					APIGroups: []string{""},
+					Resources: []string{"endpoints"},
+					Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
+				}},
+			})
+			framework.ExpectNoError(err, "Failed to create leader-locking role")
+
+			framework.BindRoleInNamespace(c.RbacV1beta1(), roleName, ns, subject)
+
+			err = framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+				serviceaccount.MakeUsername(ns, serviceAccountName),
 				"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
-			framework.ExpectNoError(err, "Failed to update authorization: %v", err)
+			framework.ExpectNoError(err, "Failed to update authorization")
 
 			By("creating an external dynamic provisioner pod")
-			pod := startExternalProvisioner(c, ns)
+			pod := utils.StartExternalProvisioner(c, ns, externalPluginName)
 			defer framework.DeletePodOrFail(c, ns, pod.Name)
 
 			By("creating a StorageClass")
@@ -972,82 +1005,124 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
-	Describe("DynamicProvisioner delayed binding [Feature:DynamicProvisioningScheduling] [Slow]", func() {
-		It("should create persistent volume in the same zone as node after a pod mounting the claim is started", func() {
-			framework.SkipUnlessProviderIs("aws")
-
-			By("creating a claim with class with waitForFirstConsumer")
-			test := storageClassTest{
-				name:         "Delayed binding EBS storage class test",
-				provisioner:  "kubernetes.io/aws-ebs",
-				claimSize:    "2Gi",
-				delayBinding: true,
+	Describe("DynamicProvisioner delayed binding [Slow]", func() {
+		It("should create a persistent volume in the same zone as node after a pod mounting the claim is started", func() {
+			tests := []storageClassTest{
+				{
+					name:           "Delayed binding EBS storage class test",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					claimSize:      "2Gi",
+					delayBinding:   true,
+				},
+				{
+					name:           "Delayed binding GCE PD storage class test",
+					cloudProviders: []string{"gce", "gke"},
+					provisioner:    "kubernetes.io/gce-pd",
+					claimSize:      "2Gi",
+					delayBinding:   true,
+				},
 			}
-			suffix := "delayed-ebs"
-			class := newStorageClass(test, ns, suffix)
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &class.Name
-			pv, node := testBindingWaitForFirstConsumer(c, claim, class)
-			if node == nil {
-				framework.Failf("unexpected nil node found")
+			for _, test := range tests {
+				if !framework.ProviderIs(test.cloudProviders...) {
+					framework.Logf("Skipping %q: cloud providers is not %v", test.name, test.cloudProviders)
+					continue
+				}
+				By("creating a claim with class with waitForFirstConsumer")
+				suffix := "delayed"
+				class := newStorageClass(test, ns, suffix)
+				claim := newClaim(test, ns, suffix)
+				claim.Spec.StorageClassName = &class.Name
+				pv, node := testBindingWaitForFirstConsumer(c, claim, class)
+				if node == nil {
+					framework.Failf("unexpected nil node found")
+				}
+				zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
+				if !ok {
+					framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
+				}
+				checkZoneFromLabelAndAffinity(pv, zone, true)
 			}
-			zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
-			if !ok {
-				framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
-			}
-			checkZoneLabelAndAffinity(pv, zone)
 		})
 	})
-	Describe("DynamicProvisioner allowedTopology [Feature:DynamicProvisioningScheduling]", func() {
-		It("should create persistent volume in the zone specified in allowedTopology of storageclass", func() {
-			framework.SkipUnlessProviderIs("aws")
-
-			By("creating a claim with class with allowedTopology set")
-			test := storageClassTest{
-				name:         "Delayed binding EBS storage class test",
-				provisioner:  "kubernetes.io/aws-ebs",
-				claimSize:    "2Gi",
-				expectedSize: "2Gi",
+	Describe("DynamicProvisioner allowedTopologies", func() {
+		It("should create persistent volume in the zone specified in allowedTopologies of storageclass", func() {
+			tests := []storageClassTest{
+				{
+					name:           "AllowedTopologies EBS storage class test",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					claimSize:      "2Gi",
+					expectedSize:   "2Gi",
+				},
+				{
+					name:           "AllowedTopologies GCE PD storage class test",
+					cloudProviders: []string{"gce", "gke"},
+					provisioner:    "kubernetes.io/gce-pd",
+					claimSize:      "2Gi",
+					expectedSize:   "2Gi",
+				},
 			}
-			suffix := "topo-ebs"
-			class := newStorageClass(test, ns, suffix)
-			zone := getRandomCloudZone(c)
-			addSingleZoneAllowedTopologyToStorageClass(c, class, zone)
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &class.Name
-			pv := testDynamicProvisioning(test, c, claim, class)
-			checkZoneLabelAndAffinity(pv, zone)
+			for _, test := range tests {
+				if !framework.ProviderIs(test.cloudProviders...) {
+					framework.Logf("Skipping %q: cloud providers is not %v", test.name, test.cloudProviders)
+					continue
+				}
+				By("creating a claim with class with allowedTopologies set")
+				suffix := "topology"
+				class := newStorageClass(test, ns, suffix)
+				zone := getRandomCloudZone(c)
+				addSingleZoneAllowedTopologyToStorageClass(c, class, zone)
+				claim := newClaim(test, ns, suffix)
+				claim.Spec.StorageClassName = &class.Name
+				pv := testDynamicProvisioning(test, c, claim, class)
+				checkZoneFromLabelAndAffinity(pv, zone, true)
+			}
 		})
 	})
-	Describe("DynamicProvisioner delayed binding with allowedTopology [Feature:DynamicProvisioningScheduling] [Slow]", func() {
-		It("should create persistent volume in the same zone as specified in allowedTopology after a pod mounting the claim is started", func() {
-			framework.SkipUnlessProviderIs("aws")
-
-			By("creating a claim with class with waitForFirstConsumer")
-			test := storageClassTest{
-				name:         "Delayed binding EBS storage class test",
-				provisioner:  "kubernetes.io/aws-ebs",
-				claimSize:    "2Gi",
-				delayBinding: true,
+	Describe("DynamicProvisioner delayed binding with allowedTopologies [Slow]", func() {
+		It("should create persistent volume in the same zone as specified in allowedTopologies after a pod mounting the claim is started", func() {
+			tests := []storageClassTest{
+				{
+					name:           "AllowedTopologies and delayed binding EBS storage class test",
+					cloudProviders: []string{"aws"},
+					provisioner:    "kubernetes.io/aws-ebs",
+					claimSize:      "2Gi",
+					delayBinding:   true,
+				},
+				{
+					name:           "AllowedTopologies and delayed binding GCE PD storage class test",
+					cloudProviders: []string{"gce", "gke"},
+					provisioner:    "kubernetes.io/gce-pd",
+					claimSize:      "2Gi",
+					delayBinding:   true,
+				},
 			}
-			suffix := "delayed-topo-ebs"
-			class := newStorageClass(test, ns, suffix)
-			topoZone := getRandomCloudZone(c)
-			addSingleZoneAllowedTopologyToStorageClass(c, class, topoZone)
-			claim := newClaim(test, ns, suffix)
-			claim.Spec.StorageClassName = &class.Name
-			pv, node := testBindingWaitForFirstConsumer(c, claim, class)
-			if node == nil {
-				framework.Failf("unexpected nil node found")
+			for _, test := range tests {
+				if !framework.ProviderIs(test.cloudProviders...) {
+					framework.Logf("Skipping %q: cloud providers is not %v", test.name, test.cloudProviders)
+					continue
+				}
+				By("creating a claim with class with WaitForFirstConsumer and allowedTopologies")
+				suffix := "delayed-topo"
+				class := newStorageClass(test, ns, suffix)
+				topoZone := getRandomCloudZone(c)
+				addSingleZoneAllowedTopologyToStorageClass(c, class, topoZone)
+				claim := newClaim(test, ns, suffix)
+				claim.Spec.StorageClassName = &class.Name
+				pv, node := testBindingWaitForFirstConsumer(c, claim, class)
+				if node == nil {
+					framework.Failf("unexpected nil node found")
+				}
+				nodeZone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
+				if !ok {
+					framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
+				}
+				if topoZone != nodeZone {
+					framework.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, nodeZone)
+				}
+				checkZoneFromLabelAndAffinity(pv, topoZone, true)
 			}
-			nodeZone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
-			if !ok {
-				framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
-			}
-			if topoZone != nodeZone {
-				framework.Failf("zone specified in AllowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, nodeZone)
-			}
-			checkZoneLabelAndAffinity(pv, topoZone)
 		})
 	})
 
@@ -1105,7 +1180,7 @@ func updateDefaultStorageClass(c clientset.Interface, scName string, defaultStr 
 	verifyDefaultStorageClass(c, scName, expectedDefault)
 }
 
-func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
+func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
@@ -1117,13 +1192,17 @@ func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(t.claimSize),
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
 				},
 			},
 		},
 	}
 
 	return &claim
+}
+
+func newClaim(t storageClassTest, ns, suffix string) *v1.PersistentVolumeClaim {
+	return getClaim(t.claimSize, ns)
 }
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.
@@ -1217,6 +1296,20 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 	if t.delayBinding {
 		bindingMode = storage.VolumeBindingWaitForFirstConsumer
 	}
+	return getStorageClass(pluginName, t.parameters, &bindingMode, ns, suffix)
+}
+
+func getStorageClass(
+	provisioner string,
+	parameters map[string]string,
+	bindingMode *storage.VolumeBindingMode,
+	ns string,
+	suffix string,
+) *storage.StorageClass {
+	if bindingMode == nil {
+		defaultBindingMode := storage.VolumeBindingImmediate
+		bindingMode = &defaultBindingMode
+	}
 	return &storage.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
@@ -1225,9 +1318,9 @@ func newStorageClass(t storageClassTest, ns string, suffix string) *storage.Stor
 			// Name must be unique, so let's base it on namespace name
 			Name: ns + "-" + suffix,
 		},
-		Provisioner:       pluginName,
-		Parameters:        t.parameters,
-		VolumeBindingMode: &bindingMode,
+		Provisioner:       provisioner,
+		Parameters:        parameters,
+		VolumeBindingMode: bindingMode,
 	}
 }
 
@@ -1300,79 +1393,6 @@ func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
 	By("locating the provisioner pod")
 	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-	return pod
-}
-
-func startExternalProvisioner(c clientset.Interface, ns string) *v1.Pod {
-	podClient := c.CoreV1().Pods(ns)
-
-	provisionerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "external-provisioner-",
-		},
-
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "nfs-provisioner",
-					Image: "quay.io/kubernetes_incubator/nfs-provisioner:v1.0.9",
-					SecurityContext: &v1.SecurityContext{
-						Capabilities: &v1.Capabilities{
-							Add: []v1.Capability{"DAC_READ_SEARCH"},
-						},
-					},
-					Args: []string{
-						"-provisioner=" + externalPluginName,
-						"-grace-period=0",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "nfs", ContainerPort: 2049},
-						{Name: "mountd", ContainerPort: 20048},
-						{Name: "rpcbind", ContainerPort: 111},
-						{Name: "rpcbind-udp", ContainerPort: 111, Protocol: v1.ProtocolUDP},
-					},
-					Env: []v1.EnvVar{
-						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
-						},
-					},
-					ImagePullPolicy: v1.PullIfNotPresent,
-					VolumeMounts: []v1.VolumeMount{
-						{
-							Name:      "export-volume",
-							MountPath: "/export",
-						},
-					},
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name: "export-volume",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	provisionerPod, err := podClient.Create(provisionerPod)
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
-
-	By("locating the provisioner pod")
-	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-
 	return pod
 }
 

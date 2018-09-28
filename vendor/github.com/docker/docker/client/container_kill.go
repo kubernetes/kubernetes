@@ -1,9 +1,8 @@
 package client
 
 import (
+	"context"
 	"net/url"
-
-	"golang.org/x/net/context"
 )
 
 // ContainerKill terminates the container process but does not remove the container from the docker host.

@@ -314,6 +314,19 @@ func TestCreatePods(t *testing.T) {
 		"Body: %s", fakeHandler.RequestBody)
 }
 
+func TestDeletePodsAllowsMissing(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset()
+	podControl := RealPodControl{
+		KubeClient: fakeClient,
+		Recorder:   &record.FakeRecorder{},
+	}
+
+	controllerSpec := newReplicationController(1)
+
+	err := podControl.DeletePod("namespace-name", "podName", controllerSpec)
+	assert.NoError(t, err, "unexpected error: %v", err)
+}
+
 func TestActivePodFiltering(t *testing.T) {
 	// This rc is not needed by the test, only the newPodList to give the pods labels/a namespace.
 	rc := newReplicationController(0)

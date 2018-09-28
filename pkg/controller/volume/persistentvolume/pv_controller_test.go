@@ -237,12 +237,21 @@ func addVolumeAnnotation(volume *v1.PersistentVolume, annName, annValue string) 
 	return volume
 }
 
-func makePVCClass(scName *string) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
+func makePVCClass(scName *string, hasSelectNodeAnno bool) *v1.PersistentVolumeClaim {
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{},
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			StorageClassName: scName,
 		},
 	}
+
+	if hasSelectNodeAnno {
+		claim.Annotations[annSelectedNode] = "node-name"
+	}
+
+	return claim
 }
 
 func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
@@ -271,25 +280,29 @@ func TestDelayBinding(t *testing.T) {
 		shouldFail  bool
 	}{
 		"nil-class": {
-			pvc:         makePVCClass(nil),
+			pvc:         makePVCClass(nil, false),
 			shouldDelay: false,
 		},
 		"class-not-found": {
-			pvc:         makePVCClass(&classNotHere),
+			pvc:         makePVCClass(&classNotHere, false),
 			shouldDelay: false,
 		},
 		"no-mode-class": {
-			pvc:         makePVCClass(&classNoMode),
+			pvc:         makePVCClass(&classNoMode, false),
 			shouldDelay: false,
 			shouldFail:  true,
 		},
 		"immediate-mode-class": {
-			pvc:         makePVCClass(&classImmediateMode),
+			pvc:         makePVCClass(&classImmediateMode, false),
 			shouldDelay: false,
 		},
 		"wait-mode-class": {
-			pvc:         makePVCClass(&classWaitMode),
+			pvc:         makePVCClass(&classWaitMode, false),
 			shouldDelay: true,
+		},
+		"wait-mode-class-with-selectedNode": {
+			pvc:         makePVCClass(&classWaitMode, true),
+			shouldDelay: false,
 		},
 	}
 
@@ -314,7 +327,7 @@ func TestDelayBinding(t *testing.T) {
 
 	// When volumeScheduling feature gate is disabled, should always be delayed
 	name := "volumeScheduling-feature-disabled"
-	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode))
+	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode, false))
 	if err != nil {
 		t.Errorf("Test %q returned error: %v", name, err)
 	}
@@ -337,44 +350,5 @@ func TestDelayBinding(t *testing.T) {
 		if shouldDelay != test.shouldDelay {
 			t.Errorf("Test %q returned unexpected %v", name, test.shouldDelay)
 		}
-	}
-
-	// When dynamicProvisioningScheduling feature gate is disabled, should be delayed,
-	// even if the pvc has selectedNode annotation.
-	provisionedClaim := makePVCClass(&classWaitMode)
-	provisionedClaim.Annotations = map[string]string{annSelectedNode: "node-name"}
-	name = "dynamicProvisioningScheduling-feature-disabled"
-	shouldDelay, err = ctrl.shouldDelayBinding(provisionedClaim)
-	if err != nil {
-		t.Errorf("Test %q returned error: %v", name, err)
-	}
-	if !shouldDelay {
-		t.Errorf("Test %q returned false, expected true", name)
-	}
-
-	// Enable DynamicProvisioningScheduling feature gate
-	utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=false")
-
-	// When the pvc does not have selectedNode annotation, should be delayed,
-	// even if dynamicProvisioningScheduling feature gate is enabled.
-	name = "dynamicProvisioningScheduling-feature-enabled, selectedNode-annotation-not-set"
-	shouldDelay, err = ctrl.shouldDelayBinding(makePVCClass(&classWaitMode))
-	if err != nil {
-		t.Errorf("Test %q returned error: %v", name, err)
-	}
-	if !shouldDelay {
-		t.Errorf("Test %q returned false, expected true", name)
-	}
-
-	// Should not be delayed when dynamicProvisioningScheduling feature gate is enabled,
-	// and the pvc has selectedNode annotation.
-	name = "dynamicProvisioningScheduling-feature-enabled, selectedNode-annotation-set"
-	shouldDelay, err = ctrl.shouldDelayBinding(provisionedClaim)
-	if err != nil {
-		t.Errorf("Test %q returned error: %v", name, err)
-	}
-	if shouldDelay {
-		t.Errorf("Test %q returned true, expected false", name)
 	}
 }

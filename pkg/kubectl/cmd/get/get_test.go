@@ -19,6 +19,7 @@ package get
 import (
 	"bytes"
 	encjson "encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -34,12 +35,15 @@ import (
 	api "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -49,8 +53,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -260,11 +262,11 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	cmd.Flags().Set(useOpenAPIPrintColumnFlagLabel, "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
-	expected := `NAME      RSRC
-foo       10
+	expected := `NAME   RSRC
+foo    10
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -312,11 +314,11 @@ func TestGetObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -338,11 +340,11 @@ func TestGetObjectsShowKind(t *testing.T) {
 	cmd.Flags().Set("show-kind", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-pod/foo   0/0                 0          <unknown>
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+pod/foo   0/0              0          <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -394,14 +396,14 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"all"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-pod/foo   0/0                 0          <unknown>
-pod/bar   0/0                 0          <unknown>
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+pod/foo   0/0              0          <unknown>
+pod/bar   0/0              0          <unknown>
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -423,11 +425,11 @@ func TestGetObjectsShowLabels(t *testing.T) {
 	cmd.Flags().Set("show-labels", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE         LABELS
-foo       0/0                 0          <unknown>   <none>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE         LABELS
+foo    0/0              0          <unknown>   <none>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -516,14 +518,158 @@ func TestGetSortedObjects(t *testing.T) {
 	cmd.Flags().Set("sort-by", ".metadata.name")
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-a         0/0                 0          <unknown>
-b         0/0                 0          <unknown>
-c         0/0                 0          <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+a      0/0              0          <unknown>
+b      0/0              0          <unknown>
+c      0/0              0          <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
+}
+
+func sortTestData() []runtime.Object {
+	return []runtime.Object{
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
+			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
+			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+		},
+		&api.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
+			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+		},
+	}
+}
+
+func sortTestTableData() []runtime.Object {
+	return []runtime.Object{
+		&metav1beta1.Table{
+			TypeMeta: metav1.TypeMeta{Kind: "Table"},
+			Rows: []metav1beta1.TableRow{
+				{
+					Object: runtime.RawExtension{
+						Object: &api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
+							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+						},
+					},
+				},
+				{
+					Object: runtime.RawExtension{
+						Object: &api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
+							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+						},
+					},
+				},
+				{
+					Object: runtime.RawExtension{
+						Object: &api.Pod{
+							ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
+							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestRuntimeSorter(t *testing.T) {
+	tests := []struct {
+		name        string
+		field       string
+		objs        []runtime.Object
+		op          func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error
+		expect      string
+		expectError string
+	}{
+		{
+			name:  "ensure sorter returns original position",
+			field: "metadata.name",
+			objs:  sortTestData(),
+			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
+				for idx := range objs {
+					p := sorter.OriginalPosition(idx)
+					fmt.Fprintf(out, "%v,", p)
+				}
+				return nil
+			},
+			expect: "2,1,0,",
+		},
+		{
+			name:  "ensure sorter handles table object position",
+			field: "metadata.name",
+			objs:  sortTestTableData(),
+			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
+				for idx := range objs {
+					p := sorter.OriginalPosition(idx)
+					fmt.Fprintf(out, "%v,", p)
+				}
+				return nil
+			},
+			expect: "0,",
+		},
+		{
+			name:  "ensure sorter sorts table objects",
+			field: "metadata.name",
+			objs:  sortTestData(),
+			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
+				for _, o := range objs {
+					fmt.Fprintf(out, "%s,", o.(*api.Pod).Name)
+				}
+				return nil
+			},
+			expect: "a,b,c,",
+		},
+		{
+			name:        "ensure sorter rejects mixed Table + non-Table object lists",
+			field:       "metadata.name",
+			objs:        append(sortTestData(), sortTestTableData()...),
+			op:          func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error { return nil },
+			expectError: "sorting is not supported on mixed Table",
+		},
+		{
+			name:        "ensure sorter errors out on invalid jsonpath",
+			field:       "metadata.unknown",
+			objs:        sortTestData(),
+			op:          func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error { return nil },
+			expectError: "couldn't find any field with path",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			sorter := NewRuntimeSorter(tc.objs, tc.field)
+			if err := sorter.Sort(); err != nil {
+				if len(tc.expectError) > 0 && strings.Contains(err.Error(), tc.expectError) {
+					return
+				}
+
+				if len(tc.expectError) > 0 {
+					t.Fatalf("unexpected error: expecting %s, but got %s", tc.expectError, err)
+				}
+
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			out := bytes.NewBuffer([]byte{})
+			err := tc.op(sorter, tc.objs, out)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tc.expect != out.String() {
+				t.Fatalf("unexpected output: expecting %s, but got %s", tc.expect, out.String())
+			}
+
+		})
+	}
+
 }
 
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
@@ -544,11 +690,11 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -569,12 +715,12 @@ func TestGetListObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-bar       0/0                 0          <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
+bar    0/0              0          <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -601,7 +747,7 @@ serverbad       Unhealthy             bad status: 500
 serverunknown   Unhealthy             fizzbuzz error
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -663,7 +809,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 }
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -694,14 +840,14 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-pod/foo   0/0                 0          <unknown>
-pod/bar   0/0                 0          <unknown>
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+pod/foo   0/0              0          <unknown>
+pod/bar   0/0              0          <unknown>
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -750,6 +896,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "spec": {
                 "containers": null,
                 "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
                 "restartPolicy": "Always",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30
@@ -768,6 +915,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "spec": {
                 "containers": null,
                 "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
                 "restartPolicy": "Always",
                 "securityContext": {},
                 "terminationGracePeriodSeconds": 30
@@ -836,14 +984,14 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-pod/foo   0/0                 0          <unknown>
-pod/bar   0/0                 0          <unknown>
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+pod/foo   0/0              0          <unknown>
+pod/bar   0/0              0          <unknown>
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -879,14 +1027,14 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-pod/foo   0/0                 0          <unknown>
-pod/bar   0/0                 0          <unknown>
+	expected := `NAME      READY   STATUS   RESTARTS   AGE
+pod/foo   0/0              0          <unknown>
+pod/bar   0/0              0          <unknown>
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -925,11 +1073,11 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 
 	expected := `NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
-NAME       STATUS    ROLES     AGE         VERSION
-node/foo   Unknown   <none>    <unknown>   
+NAME       STATUS    ROLES    AGE         VERSION
+node/foo   Unknown   <none>   <unknown>   
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -1043,14 +1191,14 @@ func TestWatchLabelSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-bar       0/0                 0          <unknown>
-foo       0/0                 0          <unknown>
-foo       0/0                 0         <unknown>
-foo       0/0                 0         <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+bar    0/0              0          <unknown>
+foo    0/0              0          <unknown>
+foo   0/0         0     <unknown>
+foo   0/0         0     <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -1094,14 +1242,14 @@ func TestWatchFieldSelector(t *testing.T) {
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-bar       0/0                 0          <unknown>
-foo       0/0                 0          <unknown>
-foo       0/0                 0         <unknown>
-foo       0/0                 0         <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+bar    0/0              0          <unknown>
+foo    0/0              0          <unknown>
+foo   0/0         0     <unknown>
+foo   0/0         0     <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -1138,13 +1286,13 @@ func TestWatchResource(t *testing.T) {
 	cmd.Flags().Set("watch", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-foo       0/0                 0         <unknown>
-foo       0/0                 0         <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
+foo   0/0         0     <unknown>
+foo   0/0         0     <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -1182,13 +1330,13 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
 	cmd.Run(cmd, []string{})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-foo       0/0                 0         <unknown>
-foo       0/0                 0         <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
+foo   0/0         0     <unknown>
+foo   0/0         0     <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -1225,12 +1373,12 @@ func TestWatchOnlyResource(t *testing.T) {
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-foo       0/0                 0         <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
+foo   0/0         0     <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -1270,12 +1418,12 @@ func TestWatchOnlyList(t *testing.T) {
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods"})
 
-	expected := `NAME      READY     STATUS    RESTARTS   AGE
-foo       0/0                 0          <unknown>
-foo       0/0                 0         <unknown>
+	expected := `NAME   READY   STATUS   RESTARTS   AGE
+foo    0/0              0          <unknown>
+foo   0/0         0     <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
 

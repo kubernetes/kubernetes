@@ -28,7 +28,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,7 +130,7 @@ type configFactory struct {
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
 
-	// always check all predicates even if the middle of one predicate fails.
+	// Always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
 
 	// Disable pod preemption or not.
@@ -159,9 +158,10 @@ type ConfigFactoryArgs struct {
 	EnableEquivalenceClassCache    bool
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
+	BindTimeoutSeconds             int64
 }
 
-// NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
+// NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
 // return the interface.
 func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	stopEverything := make(chan struct{})
@@ -257,15 +257,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	)
 	c.nodeLister = args.NodeInformer.Lister()
 
-	args.PdbInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.addPDBToCache,
-			UpdateFunc: c.updatePDBInCache,
-			DeleteFunc: c.deletePDBFromCache,
-		},
-	)
-	c.pdbLister = args.PdbInformer.Lister()
-
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
 	args.PvInformer.Informer().AddEventHandler(
@@ -305,7 +296,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		// Setup volume binder
-		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer)
+		c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 		args.StorageClassInformer.Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
@@ -319,7 +310,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	comparer := &cacheComparer{
 		podLister:  args.PodInformer.Lister(),
 		nodeLister: args.NodeInformer.Lister(),
-		pdbLister:  args.PdbInformer.Lister(),
 		cache:      c.schedulerCache,
 		podQueue:   c.podQueue,
 	}
@@ -488,6 +478,10 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 		invalidPredicates.Insert(predicates.MaxAzureDiskVolumeCountPred)
 	}
 
+	if pv.Spec.CSI != nil && utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
+	}
+
 	// If PV contains zone related label, it may impact cached NoVolumeZoneConflict
 	for k := range pv.Labels {
 		if isZoneRegionLabel(k) {
@@ -564,6 +558,10 @@ func (c *configFactory) invalidatePredicatesForPvc(pvc *v1.PersistentVolumeClaim
 	// The bound volume type may change
 	invalidPredicates := sets.NewString(maxPDVolumeCountPredicateKeys...)
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
+	}
+
 	// The bound volume's label may change
 	invalidPredicates.Insert(predicates.NoVolumeZoneConflictPred)
 
@@ -584,6 +582,10 @@ func (c *configFactory) invalidatePredicatesForPvcUpdate(old, new *v1.Persistent
 		}
 		// The bound volume type may change
 		invalidPredicates.Insert(maxPDVolumeCountPredicateKeys...)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+			invalidPredicates.Insert(predicates.MaxCSIVolumeCountPred)
+		}
 	}
 
 	c.equivalencePodCache.InvalidatePredicates(invalidPredicates)
@@ -720,9 +722,11 @@ func (c *configFactory) updatePodInCache(oldObj, newObj interface{}) {
 		return
 	}
 
-	// NOTE: Because the scheduler uses snapshots of schedulerCache and the live
-	// version of equivalencePodCache, updates must be written to schedulerCache
-	// before invalidating equivalencePodCache.
+	// NOTE: Updates must be written to scheduler cache before invalidating
+	// equivalence cache, because we could snapshot equivalence cache after the
+	// invalidation and then snapshot the cache itself. If the cache is
+	// snapshotted before updates are written, we would update equivalence
+	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.UpdatePod(oldPod, newPod); err != nil {
 		glog.Errorf("scheduler cache UpdatePod failed: %v", err)
 	}
@@ -809,9 +813,11 @@ func (c *configFactory) deletePodFromCache(obj interface{}) {
 		glog.Errorf("cannot convert to *v1.Pod: %v", t)
 		return
 	}
-	// NOTE: Because the scheduler uses snapshots of schedulerCache and the live
-	// version of equivalencePodCache, updates must be written to schedulerCache
-	// before invalidating equivalencePodCache.
+	// NOTE: Updates must be written to scheduler cache before invalidating
+	// equivalence cache, because we could snapshot equivalence cache after the
+	// invalidation and then snapshot the cache itself. If the cache is
+	// snapshotted before updates are written, we would update equivalence
+	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.RemovePod(pod); err != nil {
 		glog.Errorf("scheduler cache RemovePod failed: %v", err)
 	}
@@ -848,13 +854,15 @@ func (c *configFactory) addNodeToCache(obj interface{}) {
 		return
 	}
 
-	if err := c.schedulerCache.AddNode(node); err != nil {
-		glog.Errorf("scheduler cache AddNode failed: %v", err)
-	}
-
+	// NOTE: Because the scheduler uses equivalence cache for nodes, we need
+	// to create it before adding node into scheduler cache.
 	if c.enableEquivalenceClassCache {
 		// GetNodeCache() will lazily create NodeCache for given node if it does not exist.
 		c.equivalencePodCache.GetNodeCache(node.GetName())
+	}
+
+	if err := c.schedulerCache.AddNode(node); err != nil {
+		glog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
 
 	c.podQueue.MoveAllToActiveQueue()
@@ -873,9 +881,11 @@ func (c *configFactory) updateNodeInCache(oldObj, newObj interface{}) {
 		return
 	}
 
-	// NOTE: Because the scheduler uses snapshots of schedulerCache and the live
-	// version of equivalencePodCache, updates must be written to schedulerCache
-	// before invalidating equivalencePodCache.
+	// NOTE: Updates must be written to scheduler cache before invalidating
+	// equivalence cache, because we could snapshot equivalence cache after the
+	// invalidation and then snapshot the cache itself. If the cache is
+	// snapshotted before updates are written, we would update equivalence
+	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.UpdateNode(oldNode, newNode); err != nil {
 		glog.Errorf("scheduler cache UpdateNode failed: %v", err)
 	}
@@ -969,64 +979,16 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 		glog.Errorf("cannot convert to *v1.Node: %v", t)
 		return
 	}
-	// NOTE: Because the scheduler uses snapshots of schedulerCache and the live
-	// version of equivalencePodCache, updates must be written to schedulerCache
-	// before invalidating equivalencePodCache.
+	// NOTE: Updates must be written to scheduler cache before invalidating
+	// equivalence cache, because we could snapshot equivalence cache after the
+	// invalidation and then snapshot the cache itself. If the cache is
+	// snapshotted before updates are written, we would update equivalence
+	// cache with stale information which is based on snapshot of old cache.
 	if err := c.schedulerCache.RemoveNode(node); err != nil {
 		glog.Errorf("scheduler cache RemoveNode failed: %v", err)
 	}
 	if c.enableEquivalenceClassCache {
 		c.equivalencePodCache.InvalidateAllPredicatesOnNode(node.GetName())
-	}
-}
-
-func (c *configFactory) addPDBToCache(obj interface{}) {
-	pdb, ok := obj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", obj)
-		return
-	}
-
-	if err := c.schedulerCache.AddPDB(pdb); err != nil {
-		glog.Errorf("scheduler cache AddPDB failed: %v", err)
-	}
-}
-
-func (c *configFactory) updatePDBInCache(oldObj, newObj interface{}) {
-	oldPDB, ok := oldObj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert oldObj to *v1beta1.PodDisruptionBudget: %v", oldObj)
-		return
-	}
-	newPDB, ok := newObj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert newObj to *v1beta1.PodDisruptionBudget: %v", newObj)
-		return
-	}
-
-	if err := c.schedulerCache.UpdatePDB(oldPDB, newPDB); err != nil {
-		glog.Errorf("scheduler cache UpdatePDB failed: %v", err)
-	}
-}
-
-func (c *configFactory) deletePDBFromCache(obj interface{}) {
-	var pdb *v1beta1.PodDisruptionBudget
-	switch t := obj.(type) {
-	case *v1beta1.PodDisruptionBudget:
-		pdb = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pdb, ok = t.Obj.(*v1beta1.PodDisruptionBudget)
-		if !ok {
-			glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t.Obj)
-			return
-		}
-	default:
-		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t)
-		return
-	}
-	if err := c.schedulerCache.RemovePDB(pdb); err != nil {
-		glog.Errorf("scheduler cache RemovePDB failed: %v", err)
 	}
 }
 
@@ -1085,7 +1047,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 		}
 	}
 
-	extenders := make([]algorithm.SchedulerExtender, 0)
+	var extenders []algorithm.SchedulerExtender
 	if len(policy.ExtenderConfigs) != 0 {
 		ignoredExtendedResources := sets.NewString()
 		for ii := range policy.ExtenderConfigs {
@@ -1165,7 +1127,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 
 	// Init equivalence class cache
 	if c.enableEquivalenceClassCache {
-		c.equivalencePodCache = equivalence.NewCache()
+		c.equivalencePodCache = equivalence.NewCache(predicates.Ordering())
 		glog.Info("Created equivalence class cache")
 	}
 
@@ -1180,6 +1142,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
+		c.pdbLister,
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
@@ -1258,6 +1221,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ReplicaSetLister:               c.replicaSetLister,
 		StatefulSetLister:              c.statefulSetLister,
 		NodeLister:                     &nodeLister{c.nodeLister},
+		PDBLister:                      c.pdbLister,
 		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: c.nodeLister},
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
@@ -1401,9 +1365,11 @@ func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue 
 					_, err := c.client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 					if err != nil && errors.IsNotFound(err) {
 						node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
-						// NOTE: Because the scheduler uses snapshots of schedulerCache and the live
-						// version of equivalencePodCache, updates must be written to schedulerCache
-						// before invalidating equivalencePodCache.
+						// NOTE: Updates must be written to scheduler cache before invalidating
+						// equivalence cache, because we could snapshot equivalence cache after the
+						// invalidation and then snapshot the cache itself. If the cache is
+						// snapshotted before updates are written, we would update equivalence
+						// cache with stale information which is based on snapshot of old cache.
 						c.schedulerCache.RemoveNode(&node)
 						// invalidate cached predicate for the node
 						if c.enableEquivalenceClassCache {

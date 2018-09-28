@@ -83,4 +83,4 @@ Refer to the [CHANGELOG](CHANGELOG.md) for version to version changes.
 
 ## License
 
-govmomi is available under the [Apache 2 license](LICENSE).
+govmomi is available under the [Apache 2 license](LICENSE.txt).

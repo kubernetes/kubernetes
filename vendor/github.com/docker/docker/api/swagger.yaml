@@ -19,10 +19,10 @@ produces:
 consumes:
   - "application/json"
   - "text/plain"
-basePath: "/v1.31"
+basePath: "/v1.38"
 info:
   title: "Docker Engine API"
-  version: "1.31"
+  version: "1.38"
   x-logo:
     url: "https://docs.docker.com/images/logo-docker-main.png"
   description: |
@@ -42,33 +42,26 @@ info:
 
     # Versioning
 
-    The API is usually changed in each release of Docker, so API calls are versioned to ensure that clients don't break.
+    The API is usually changed in each release, so API calls are versioned to
+    ensure that clients don't break. To lock to a specific version of the API,
+    you prefix the URL with its version, for example, call `/v1.30/info` to use
+    the v1.30 version of the `/info` endpoint. If the API version specified in
+    the URL is not supported by the daemon, a HTTP `400 Bad Request` error message
+    is returned.
 
-    For Docker Engine 17.06, the API version is 1.30. To lock to this version, you prefix the URL with `/v1.30`. For example, calling `/info` is the same as calling `/v1.30/info`.
+    If you omit the version-prefix, the current version of the API (v1.38) is used.
+    For example, calling `/info` is the same as calling `/v1.38/info`. Using the
+    API without a version-prefix is deprecated and will be removed in a future release.
 
-    Engine releases in the near future should support this version of the API, so your client will continue to work even if it is talking to a newer Engine.
+    Engine releases in the near future should support this version of the API,
+    so your client will continue to work even if it is talking to a newer Engine.
 
-    In previous versions of Docker, it was possible to access the API without providing a version. This behaviour is now deprecated will be removed in a future version of Docker.
+    The API uses an open schema model, which means server may add extra properties
+    to responses. Likewise, the server will ignore any extra query parameters and
+    request body properties. When you write clients, you need to ignore additional
+    properties in responses to ensure they do not break when talking to newer
+    daemons.
 
-    The API uses an open schema model, which means server may add extra properties to responses. Likewise, the server will ignore any extra query parameters and request body properties. When you write clients, you need to ignore additional properties in responses to ensure they do not break when talking to newer Docker daemons.
-
-    This documentation is for version 1.31 of the API. Use this table to find documentation for previous versions of the API:
-
-    Docker version  | API version | Changes
-    ----------------|-------------|---------
-    17.06.x | [1.30](https://docs.docker.com/engine/api/v1.30/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-30-api-changes)
-    17.05.x | [1.29](https://docs.docker.com/engine/api/v1.29/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-29-api-changes)
-    17.04.x | [1.28](https://docs.docker.com/engine/api/v1.28/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-28-api-changes)
-    17.03.1 | [1.27](https://docs.docker.com/engine/api/v1.27/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-27-api-changes)
-    1.13.1 & 17.03.0 | [1.26](https://docs.docker.com/engine/api/v1.26/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-26-api-changes)
-    1.13.0 | [1.25](https://docs.docker.com/engine/api/v1.25/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-25-api-changes)
-    1.12.x | [1.24](https://docs.docker.com/engine/api/v1.24/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-24-api-changes)
-    1.11.x | [1.23](https://docs.docker.com/engine/api/v1.23/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-23-api-changes)
-    1.10.x | [1.22](https://docs.docker.com/engine/api/v1.22/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-22-api-changes)
-    1.9.x | [1.21](https://docs.docker.com/engine/api/v1.21/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-21-api-changes)
-    1.8.x | [1.20](https://docs.docker.com/engine/api/v1.20/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-20-api-changes)
-    1.7.x | [1.19](https://docs.docker.com/engine/api/v1.19/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-19-api-changes)
-    1.6.x | [1.18](https://docs.docker.com/engine/api/v1.18/) | [API changes](https://docs.docker.com/engine/api/version-history/#v1-18-api-changes)
 
     # Authentication
 
@@ -143,6 +136,10 @@ tags:
     x-displayName: "Secrets"
     description: |
       Secrets are sensitive data that can be used by services. Swarm mode must be enabled for these endpoints to work.
+  - name: "Config"
+    x-displayName: "Configs"
+    description: |
+      Configs are application configurations that can be used by services. Swarm mode must be enabled for these endpoints to work.
   # System things
   - name: "Plugin"
     x-displayName: "Plugins"
@@ -158,6 +155,7 @@ definitions:
       IP:
         type: "string"
         format: "ip-address"
+        description: "Host IP address that the container's port is mapped to"
       PrivatePort:
         type: "integer"
         format: "uint16"
@@ -170,7 +168,7 @@ definitions:
       Type:
         type: "string"
         x-nullable: false
-        enum: ["tcp", "udp"]
+        enum: ["tcp", "udp", "sctp"]
     example:
       PrivatePort: 8080
       PublicPort: 80
@@ -257,6 +255,7 @@ definitions:
         properties:
           Propagation:
             description: "A propagation mode with the value `[r]private`, `[r]shared`, or `[r]slave`."
+            type: "string"
             enum:
               - "private"
               - "rprivate"
@@ -300,6 +299,7 @@ definitions:
           Mode:
             description: "The permission mode for the tmpfs mount in an integer."
             type: "integer"
+
   RestartPolicy:
     description: |
       The behavior to apply when the container exits. The default is not to restart.
@@ -334,6 +334,7 @@ definitions:
       Memory:
         description: "Memory limit in bytes."
         type: "integer"
+        format: "int64"
         default: 0
       # Applicable to UNIX platforms
       CgroupParent:
@@ -399,6 +400,7 @@ definitions:
       CpusetCpus:
         description: "CPUs in which to allow execution (e.g., `0-3`, `0,1`)"
         type: "string"
+        example: "0-3"
       CpusetMems:
         description: "Memory nodes (MEMs) in which to allow execution (0-3, 0,1). Only effective on NUMA systems."
         type: "string"
@@ -442,6 +444,10 @@ definitions:
       OomKillDisable:
         description: "Disable OOM Killer for the container."
         type: "boolean"
+      Init:
+        description: "Run an init inside the container that forwards signals and reaps processes. This field is omitted if empty, and the default (as configured on the daemon) is used."
+        type: "boolean"
+        x-nullable: true
       PidsLimit:
         description: "Tune a container's pids limit. Set -1 for unlimited."
         type: "integer"
@@ -493,14 +499,16 @@ definitions:
       NanoCPUs:
         type: "integer"
         format: "int64"
+        example: 4000000000
       MemoryBytes:
         type: "integer"
         format: "int64"
+        example: 8272408576
       GenericResources:
         $ref: "#/definitions/GenericResources"
 
   GenericResources:
-    description: "User defined Resources, can be either Integer resources (e.g: SSD=3) or String resources (e.g: GPU={UUID1, UUID2})"
+    description: "User-defined resources can be either Integer resources (e.g, `SSD=3`) or String resources (e.g, `GPU=UUID1`)"
     type: "array"
     items:
       type: "object"
@@ -520,6 +528,16 @@ definitions:
             Value:
               type: "integer"
               format: "int64"
+    example:
+      - DiscreteResourceSpec:
+          Kind: "SSD"
+          Value: 3
+      - NamedResourceSpec:
+          Kind: "GPU"
+          Value: "UUID1"
+      - NamedResourceSpec:
+          Kind: "GPU"
+          Value: "UUID2"
 
   HealthConfig:
     description: "A test to perform to check that the container is healthy."
@@ -562,7 +580,7 @@ definitions:
               A list of volume bindings for this container. Each volume binding is a string in one of these forms:
 
               - `host-src:container-dest` to bind-mount a host path into the container. Both `host-src`, and `container-dest` must be an _absolute_ path.
-              - `host-src:container-dest:ro` to make the bind-mount read-only inside the container. Both `host-src`, and `container-dest` must be an _absolute_ path.
+              - `host-src:container-dest:ro` to make the bind mount read-only inside the container. Both `host-src`, and `container-dest` must be an _absolute_ path.
               - `volume-name:container-dest` to bind-mount a volume managed by a volume driver into the container. `container-dest` must be an _absolute_ path.
               - `volume-name:container-dest:ro` to mount the volume read-only inside the container.  `container-dest` must be an _absolute_ path.
             items:
@@ -595,17 +613,7 @@ definitions:
             description: "Network mode to use for this container. Supported standard values are: `bridge`, `host`, `none`, and `container:<name|id>`. Any other value is taken
               as a custom network's name to which this container should connect to."
           PortBindings:
-            type: "object"
-            description: "A map of exposed container ports and the host port they should map to."
-            additionalProperties:
-              type: "object"
-              properties:
-                HostIp:
-                  type: "string"
-                  description: "The host IP address"
-                HostPort:
-                  type: "string"
-                  description: "The host port number, as a string"
+            $ref: "#/definitions/PortMap"
           RestartPolicy:
             $ref: "#/definitions/RestartPolicy"
           AutoRemove:
@@ -664,7 +672,17 @@ definitions:
               type: "string"
           IpcMode:
             type: "string"
-            description: "IPC namespace to use for the container."
+            description: |
+                    IPC sharing mode for the container. Possible values are:
+
+                    - `"none"`: own private IPC namespace, with /dev/shm not mounted
+                    - `"private"`: own private IPC namespace
+                    - `"shareable"`: own private IPC namespace, with a possibility to share it with other containers
+                    - `"container:<name|id>"`: join another (shareable) container's IPC namespace
+                    - `"host"`: use the host system's IPC namespace
+
+                    If not specified, daemon default is used, which can either be `"private"`
+                    or `"shareable"`, depending on daemon version and configuration.
           Cgroup:
             type: "string"
             description: "Cgroup to use for the container."
@@ -676,6 +694,7 @@ definitions:
           OomScoreAdj:
             type: "integer"
             description: "An integer value containing the score given to the container in order to tune OOM killer preferences."
+            example: 500
           PidMode:
             type: "string"
             description: |
@@ -688,7 +707,15 @@ definitions:
             description: "Gives the container full access to the host."
           PublishAllPorts:
             type: "boolean"
-            description: "Allocates a random host port for all of a container's exposed ports."
+            description: |
+              Allocates an ephemeral host port for all of a container's
+              exposed ports.
+
+              Ports are de-allocated when the container stops and allocated when the container starts.
+              The allocated port might be changed when restarting the container.
+
+              The port is selected from the ephemeral port range that depends on the kernel.
+              For example, on Linux the range is defined by `/proc/sys/net/ipv4/ip_local_port_range`.
           ReadonlyRootfs:
             type: "boolean"
             description: "Mount the container's root filesystem as read only."
@@ -745,6 +772,16 @@ definitions:
               - "default"
               - "process"
               - "hyperv"
+          MaskedPaths:
+            type: "array"
+            description: "The list of paths to be masked inside the container (this overrides the default set of paths)"
+            items:
+              type: "string"
+          ReadonlyPaths:
+            type: "array"
+            description: "The list of paths to be set as read-only inside the container (this overrides the default set of paths)"
+            items:
+              type: "string"
 
   ContainerConfig:
     description: "Configuration for a container that is portable between hosts"
@@ -775,7 +812,7 @@ definitions:
         description: |
           An object mapping ports to an empty object in the form:
 
-          `{"<port>/<tcp|udp>": {}}`
+          `{"<port>/<tcp|udp|sctp>": {}}`
         type: "object"
         additionalProperties:
           type: "object"
@@ -802,9 +839,7 @@ definitions:
           type: "string"
       Cmd:
         description: "Command to run specified as a string or an array of strings."
-        type:
-          - "array"
-          - "string"
+        type: "array"
         items:
           type: "string"
       Healthcheck:
@@ -818,12 +853,11 @@ definitions:
       Volumes:
         description: "An object mapping mount point paths inside the container to empty objects."
         type: "object"
-        properties:
-          additionalProperties:
-            type: "object"
-            enum:
-              - {}
-            default: {}
+        additionalProperties:
+          type: "object"
+          enum:
+            - {}
+          default: {}
       WorkingDir:
         description: "The working directory for commands to run in."
         type: "string"
@@ -832,9 +866,7 @@ definitions:
           The entry point for the container as a string or an array of strings.
 
           If the array consists of exactly one empty string (`[""]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
-        type:
-          - "array"
-          - "string"
+        type: "array"
         items:
           type: "string"
       NetworkDisabled:
@@ -867,26 +899,223 @@ definitions:
         items:
           type: "string"
 
-  NetworkConfig:
-    description: "TODO: check is correct"
+  NetworkSettings:
+    description: "NetworkSettings exposes the network settings in the API"
     type: "object"
     properties:
       Bridge:
+        description: Name of the network'a bridge (for example, `docker0`).
         type: "string"
-      Gateway:
+        example: "docker0"
+      SandboxID:
+        description: SandboxID uniquely represents a container's network stack.
         type: "string"
-      Address:
+        example: "9d12daf2c33f5959c8bf90aa513e4f65b561738661003029ec84830cd503a0c3"
+      HairpinMode:
+        description: |
+          Indicates if hairpin NAT should be enabled on the virtual interface.
+        type: "boolean"
+        example: false
+      LinkLocalIPv6Address:
+        description: IPv6 unicast address using the link-local prefix.
         type: "string"
-      IPPrefixLen:
+        example: "fe80::42:acff:fe11:1"
+      LinkLocalIPv6PrefixLen:
+        description: Prefix length of the IPv6 unicast address.
         type: "integer"
-      MacAddress:
-        type: "string"
-      PortMapping:
-        type: "string"
+        example: "64"
       Ports:
+        $ref: "#/definitions/PortMap"
+      SandboxKey:
+        description: SandboxKey identifies the sandbox
+        type: "string"
+        example: "/var/run/docker/netns/8ab54b426c38"
+
+      # TODO is SecondaryIPAddresses actually used?
+      SecondaryIPAddresses:
+        description: ""
         type: "array"
         items:
-          $ref: "#/definitions/Port"
+          $ref: "#/definitions/Address"
+        x-nullable: true
+
+      # TODO is SecondaryIPv6Addresses actually used?
+      SecondaryIPv6Addresses:
+        description: ""
+        type: "array"
+        items:
+          $ref: "#/definitions/Address"
+        x-nullable: true
+
+      # TODO properties below are part of DefaultNetworkSettings, which is
+      # marked as deprecated since Docker 1.9 and to be removed in Docker v17.12
+      EndpointID:
+        description: |
+          EndpointID uniquely represents a service endpoint in a Sandbox.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "string"
+        example: "b88f5b905aabf2893f3cbc4ee42d1ea7980bbc0a92e2c8922b1e1795298afb0b"
+      Gateway:
+        description: |
+          Gateway address for the default "bridge" network.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "string"
+        example: "172.17.0.1"
+      GlobalIPv6Address:
+        description: |
+          Global IPv6 address for the default "bridge" network.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "string"
+        example: "2001:db8::5689"
+      GlobalIPv6PrefixLen:
+        description: |
+          Mask length of the global IPv6 address.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "integer"
+        example: 64
+      IPAddress:
+        description: |
+          IPv4 address for the default "bridge" network.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "string"
+        example: "172.17.0.4"
+      IPPrefixLen:
+        description: |
+          Mask length of the IPv4 address.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "integer"
+        example: 16
+      IPv6Gateway:
+        description: |
+          IPv6 gateway address for this network.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "string"
+        example: "2001:db8:2::100"
+      MacAddress:
+        description: |
+          MAC address for the container on the default "bridge" network.
+
+          <p><br /></p>
+
+          > **Deprecated**: This field is only propagated when attached to the
+          > default "bridge" network. Use the information from the "bridge"
+          > network inside the `Networks` map instead, which contains the same
+          > information. This field was deprecated in Docker 1.9 and is scheduled
+          > to be removed in Docker 17.12.0
+        type: "string"
+        example: "02:42:ac:11:00:04"
+      Networks:
+        description: |
+          Information about all networks that the container is connected to.
+        type: "object"
+        additionalProperties:
+          $ref: "#/definitions/EndpointSettings"
+
+  Address:
+    description: Address represents an IPv4 or IPv6 IP address.
+    type: "object"
+    properties:
+      Addr:
+        description: IP address.
+        type: "string"
+      PrefixLen:
+        description: Mask length of the IP address.
+        type: "integer"
+
+  PortMap:
+    description: |
+      PortMap describes the mapping of container ports to host ports, using the
+      container's port-number and protocol as key in the format `<port>/<protocol>`,
+      for example, `80/udp`.
+
+      If a container's port is mapped for multiple protocols, separate entries
+      are added to the mapping table.
+    type: "object"
+    additionalProperties:
+      type: "array"
+      items:
+        $ref: "#/definitions/PortBinding"
+    example:
+      "443/tcp":
+        - HostIp: "127.0.0.1"
+          HostPort: "4443"
+      "80/tcp":
+        - HostIp: "0.0.0.0"
+          HostPort: "80"
+        - HostIp: "0.0.0.0"
+          HostPort: "8080"
+      "80/udp":
+        - HostIp: "0.0.0.0"
+          HostPort: "80"
+      "53/udp":
+        - HostIp: "0.0.0.0"
+          HostPort: "53"
+      "2377/tcp": null
+
+  PortBinding:
+    description: |
+      PortBinding represents a binding between a host IP address and a host
+      port.
+    type: "object"
+    x-nullable: true
+    properties:
+      HostIp:
+        description: "Host IP address that the container's port is mapped to."
+        type: "string"
+        example: "127.0.0.1"
+      HostPort:
+        description: "Host port number that the container's port is mapped to."
+        type: "string"
+        example: "4443"
 
   GraphDriverData:
     description: "Information about a container's graph driver."
@@ -1249,6 +1478,7 @@ definitions:
           type: "object"
           additionalProperties:
             type: "string"
+
   NetworkContainer:
     type: "object"
     properties:
@@ -1280,10 +1510,23 @@ definitions:
         type: "string"
       progressDetail:
         $ref: "#/definitions/ProgressDetail"
+      aux:
+        $ref: "#/definitions/ImageID"
+
+  ImageID:
+    type: "object"
+    description: "Image ID or Digest"
+    properties:
+      ID:
+        type: "string"
+    example:
+      ID: "sha256:85f05633ddc1c50679be2b16a0479ab6f7637f8884e0cfe0f4d20e1ebb3d6e7c"
 
   CreateImageInfo:
     type: "object"
     properties:
+      id:
+        type: "string"
       error:
         type: "string"
       status:
@@ -1304,6 +1547,7 @@ definitions:
         type: "string"
       progressDetail:
         $ref: "#/definitions/ProgressDetail"
+
   ErrorDetail:
     type: "object"
     properties:
@@ -1311,12 +1555,13 @@ definitions:
         type: "integer"
       message:
         type: "string"
+
   ProgressDetail:
     type: "object"
     properties:
-      code:
+      current:
         type: "integer"
-      message:
+      total:
         type: "integer"
 
   ErrorResponse:
@@ -1345,45 +1590,102 @@ definitions:
     description: "Configuration for a network endpoint."
     type: "object"
     properties:
+      # Configurations
       IPAMConfig:
-        description: "IPAM configurations for the endpoint"
-        type: "object"
-        properties:
-          IPv4Address:
-            type: "string"
-          IPv6Address:
-            type: "string"
-          LinkLocalIPs:
-            type: "array"
-            items:
-              type: "string"
+        $ref: "#/definitions/EndpointIPAMConfig"
       Links:
         type: "array"
         items:
           type: "string"
+        example:
+          - "container_1"
+          - "container_2"
       Aliases:
         type: "array"
         items:
           type: "string"
+        example:
+          - "server_x"
+          - "server_y"
+
+      # Operational data
       NetworkID:
+        description: |
+          Unique ID of the network.
         type: "string"
+        example: "08754567f1f40222263eab4102e1c733ae697e8e354aa9cd6e18d7402835292a"
       EndpointID:
+        description: |
+          Unique ID for the service endpoint in a Sandbox.
         type: "string"
+        example: "b88f5b905aabf2893f3cbc4ee42d1ea7980bbc0a92e2c8922b1e1795298afb0b"
       Gateway:
+        description: |
+          Gateway address for this network.
         type: "string"
+        example: "172.17.0.1"
       IPAddress:
+        description: |
+          IPv4 address.
         type: "string"
+        example: "172.17.0.4"
       IPPrefixLen:
+        description: |
+          Mask length of the IPv4 address.
         type: "integer"
+        example: 16
       IPv6Gateway:
+        description: |
+          IPv6 gateway address.
         type: "string"
+        example: "2001:db8:2::100"
       GlobalIPv6Address:
+        description: |
+          Global IPv6 address.
         type: "string"
+        example: "2001:db8::5689"
       GlobalIPv6PrefixLen:
+        description: |
+          Mask length of the global IPv6 address.
         type: "integer"
         format: "int64"
+        example: 64
       MacAddress:
+        description: |
+          MAC address for the endpoint on this network.
         type: "string"
+        example: "02:42:ac:11:00:04"
+      DriverOpts:
+        description: |
+          DriverOpts is a mapping of driver options and values. These options
+          are passed directly to the driver and are driver specific.
+        type: "object"
+        x-nullable: true
+        additionalProperties:
+          type: "string"
+        example:
+          com.example.some-label: "some-value"
+          com.example.some-other-label: "some-other-value"
+
+  EndpointIPAMConfig:
+    description: |
+      EndpointIPAMConfig represents an endpoint's IPAM configuration.
+    type: "object"
+    x-nullable: true
+    properties:
+      IPv4Address:
+        type: "string"
+        example: "172.20.30.33"
+      IPv6Address:
+        type: "string"
+        example: "2001:db8:abcd::3033"
+      LinkLocalIPs:
+        type: "array"
+        items:
+          type: "string"
+        example:
+          - "169.254.34.68"
+          - "fe80::3468"
 
   PluginMount:
     type: "object"
@@ -1420,6 +1722,7 @@ definitions:
         example:
           - "rbind"
           - "rw"
+
   PluginDevice:
     type: "object"
     required: [Name, Description, Settable, Path]
@@ -1566,6 +1869,13 @@ definitions:
                 type: "string"
                 x-nullable: false
                 example: "plugins.sock"
+              ProtocolScheme:
+                type: "string"
+                example: "some.protocol/v1.0"
+                description: "Protocol to use for clients connecting to the plugin."
+                enum:
+                  - ""
+                  - "moby.plugins.http/v1"
           Entrypoint:
             type: "array"
             items:
@@ -1691,7 +2001,8 @@ definitions:
     properties:
       Index:
         type: "integer"
-        format: "int64"
+        format: "uint64"
+        example: 373531
 
   NodeSpec:
     type: "object"
@@ -1699,6 +2010,7 @@ definitions:
       Name:
         description: "Name for the node."
         type: "string"
+        example: "my-node"
       Labels:
         description: "User-defined key/value metadata."
         type: "object"
@@ -1710,6 +2022,7 @@ definitions:
         enum:
           - "worker"
           - "manager"
+        example: "manager"
       Availability:
         description: "Availability of the node."
         type: "string"
@@ -1717,125 +2030,140 @@ definitions:
           - "active"
           - "pause"
           - "drain"
+        example: "active"
     example:
       Availability: "active"
       Name: "node-name"
       Role: "manager"
       Labels:
         foo: "bar"
+
   Node:
     type: "object"
     properties:
       ID:
         type: "string"
+        example: "24ifsmvkjbyhk"
       Version:
         $ref: "#/definitions/ObjectVersion"
       CreatedAt:
+        description: |
+          Date and time at which the node was added to the swarm in
+          [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         type: "string"
         format: "dateTime"
+        example: "2016-08-18T10:44:24.496525531Z"
       UpdatedAt:
+        description: |
+          Date and time at which the node was last updated in
+          [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         type: "string"
         format: "dateTime"
+        example: "2017-08-09T07:09:37.632105588Z"
       Spec:
         $ref: "#/definitions/NodeSpec"
       Description:
-        type: "object"
-        properties:
-          Hostname:
-            type: "string"
-          Platform:
-            type: "object"
-            properties:
-              Architecture:
-                type: "string"
-              OS:
-                type: "string"
-          Resources:
-            $ref: "#/definitions/ResourceObject"
-          Engine:
-            type: "object"
-            properties:
-              EngineVersion:
-                type: "string"
-              Labels:
-                type: "object"
-                additionalProperties:
-                  type: "string"
-              Plugins:
-                type: "array"
-                items:
-                  type: "object"
-                  properties:
-                    Type:
-                      type: "string"
-                    Name:
-                      type: "string"
-          TLSInfo:
-            $ref: "#/definitions/SwarmSpec"
-    example:
-      ID: "24ifsmvkjbyhk"
-      Version:
-        Index: 8
-      CreatedAt: "2016-06-07T20:31:11.853781916Z"
-      UpdatedAt: "2016-06-07T20:31:11.999868824Z"
-      Spec:
-        Name: "my-node"
-        Role: "manager"
-        Availability: "active"
-        Labels:
-          foo: "bar"
-      Description:
-        Hostname: "bf3067039e47"
-        Platform:
-          Architecture: "x86_64"
-          OS: "linux"
-        Resources:
-          NanoCPUs: 4000000000
-          MemoryBytes: 8272408576
-          GenericResources:
-            - DiscreteResourceSpec:
-                Kind: "SSD"
-                Value: 3
-            - NamedResourceSpec:
-                Kind: "GPU"
-                Value: "UUID1"
-            - NamedResourceSpec:
-                Kind: "GPU"
-                Value: "UUID2"
-        Engine:
-          EngineVersion: "17.04.0"
-          Labels:
-            foo: "bar"
-          Plugins:
-            - Type: "Volume"
-              Name: "local"
-            - Type: "Network"
-              Name: "bridge"
-            - Type: "Network"
-              Name: "null"
-            - Type: "Network"
-              Name: "overlay"
+        $ref: "#/definitions/NodeDescription"
       Status:
-        State: "ready"
-        Addr: "172.17.0.2"
+        $ref: "#/definitions/NodeStatus"
       ManagerStatus:
-        Leader: true
-        Reachability: "reachable"
-        Addr: "172.17.0.2:2377"
+        $ref: "#/definitions/ManagerStatus"
+
+  NodeDescription:
+    description: |
+      NodeDescription encapsulates the properties of the Node as reported by the
+      agent.
+    type: "object"
+    properties:
+      Hostname:
+        type: "string"
+        example: "bf3067039e47"
+      Platform:
+        $ref: "#/definitions/Platform"
+      Resources:
+        $ref: "#/definitions/ResourceObject"
+      Engine:
+        $ref: "#/definitions/EngineDescription"
       TLSInfo:
-        TrustRoot: |
-          -----BEGIN CERTIFICATE-----
-          MIIBajCCARCgAwIBAgIUbYqrLSOSQHoxD8CwG6Bi2PJi9c8wCgYIKoZIzj0EAwIw
-          EzERMA8GA1UEAxMIc3dhcm0tY2EwHhcNMTcwNDI0MjE0MzAwWhcNMzcwNDE5MjE0
-          MzAwWjATMREwDwYDVQQDEwhzd2FybS1jYTBZMBMGByqGSM49AgEGCCqGSM49AwEH
-          A0IABJk/VyMPYdaqDXJb/VXh5n/1Yuv7iNrxV3Qb3l06XD46seovcDWs3IZNV1lf
-          3Skyr0ofcchipoiHkXBODojJydSjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMB
-          Af8EBTADAQH/MB0GA1UdDgQWBBRUXxuRcnFjDfR/RIAUQab8ZV/n4jAKBggqhkjO
-          PQQDAgNIADBFAiAy+JTe6Uc3KyLCMiqGl2GyWGQqQDEcO3/YG36x7om65AIhAJvz
-          pxv6zFeVEkAEEkqIYi0omA9+CjanB/6Bz4n1uw8H
-          -----END CERTIFICATE-----
-        CertIssuerSubject: "MBMxETAPBgNVBAMTCHN3YXJtLWNh"
-        CertIssuerPublicKey: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmT9XIw9h1qoNclv9VeHmf/Vi6/uI2vFXdBveXTpcPjqx6i9wNazchk1XWV/dKTKvSh9xyGKmiIeRcE4OiMnJ1A=="
+        $ref: "#/definitions/TLSInfo"
+
+  Platform:
+    description: |
+      Platform represents the platform (Arch/OS).
+    type: "object"
+    properties:
+      Architecture:
+        description: |
+          Architecture represents the hardware architecture (for example,
+          `x86_64`).
+        type: "string"
+        example: "x86_64"
+      OS:
+        description: |
+          OS represents the Operating System (for example, `linux` or `windows`).
+        type: "string"
+        example: "linux"
+
+  EngineDescription:
+    description: "EngineDescription provides information about an engine."
+    type: "object"
+    properties:
+      EngineVersion:
+        type: "string"
+        example: "17.06.0"
+      Labels:
+        type: "object"
+        additionalProperties:
+          type: "string"
+        example:
+          foo: "bar"
+      Plugins:
+        type: "array"
+        items:
+          type: "object"
+          properties:
+            Type:
+              type: "string"
+            Name:
+              type: "string"
+        example:
+          - Type: "Log"
+            Name: "awslogs"
+          - Type: "Log"
+            Name: "fluentd"
+          - Type: "Log"
+            Name: "gcplogs"
+          - Type: "Log"
+            Name: "gelf"
+          - Type: "Log"
+            Name: "journald"
+          - Type: "Log"
+            Name: "json-file"
+          - Type: "Log"
+            Name: "logentries"
+          - Type: "Log"
+            Name: "splunk"
+          - Type: "Log"
+            Name: "syslog"
+          - Type: "Network"
+            Name: "bridge"
+          - Type: "Network"
+            Name: "host"
+          - Type: "Network"
+            Name: "ipvlan"
+          - Type: "Network"
+            Name: "macvlan"
+          - Type: "Network"
+            Name: "null"
+          - Type: "Network"
+            Name: "overlay"
+          - Type: "Volume"
+            Name: "local"
+          - Type: "Volume"
+            Name: "localhost:5000/vieux/sshfs:latest"
+          - Type: "Volume"
+            Name: "vieux/sshfs:latest"
+
   TLSInfo:
     description: "Information about the issuer of leaf TLS certificates and the trusted root CA certificate"
     type: "object"
@@ -1863,6 +2191,64 @@ definitions:
         -----END CERTIFICATE-----
       CertIssuerSubject: "MBMxETAPBgNVBAMTCHN3YXJtLWNh"
       CertIssuerPublicKey: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmT9XIw9h1qoNclv9VeHmf/Vi6/uI2vFXdBveXTpcPjqx6i9wNazchk1XWV/dKTKvSh9xyGKmiIeRcE4OiMnJ1A=="
+
+  NodeStatus:
+    description: |
+      NodeStatus represents the status of a node.
+
+      It provides the current status of the node, as seen by the manager.
+    type: "object"
+    properties:
+      State:
+        $ref: "#/definitions/NodeState"
+      Message:
+        type: "string"
+        example: ""
+      Addr:
+        description: "IP address of the node."
+        type: "string"
+        example: "172.17.0.2"
+
+  NodeState:
+    description: "NodeState represents the state of a node."
+    type: "string"
+    enum:
+      - "unknown"
+      - "down"
+      - "ready"
+      - "disconnected"
+    example: "ready"
+
+  ManagerStatus:
+    description: |
+      ManagerStatus represents the status of a manager.
+
+      It provides the current status of a node's manager component, if the node
+      is a manager.
+    x-nullable: true
+    type: "object"
+    properties:
+      Leader:
+        type: "boolean"
+        default: false
+        example: true
+      Reachability:
+        $ref: "#/definitions/Reachability"
+      Addr:
+        description: |
+          The IP address and port at which the manager is reachable.
+        type: "string"
+        example: "10.0.0.46:2377"
+
+  Reachability:
+    description: "Reachability represents the reachability of a node."
+    type: "string"
+    enum:
+      - "unknown"
+      - "unreachable"
+      - "reachable"
+    example: "reachable"
+
   SwarmSpec:
     description: "User modifiable swarm configuration."
     type: "object"
@@ -1870,19 +2256,25 @@ definitions:
       Name:
         description: "Name of the swarm."
         type: "string"
+        example: "default"
       Labels:
         description: "User-defined key/value metadata."
         type: "object"
         additionalProperties:
           type: "string"
+        example:
+          com.example.corp.type: "production"
+          com.example.corp.department: "engineering"
       Orchestration:
         description: "Orchestration configuration."
         type: "object"
+        x-nullable: true
         properties:
           TaskHistoryRetentionLimit:
             description: "The number of historic tasks to keep per instance or node. If negative, never remove completed or failed tasks."
             type: "integer"
             format: "int64"
+            example: 10
       Raft:
         description: "Raft configuration."
         type: "object"
@@ -1890,43 +2282,51 @@ definitions:
           SnapshotInterval:
             description: "The number of log entries between snapshots."
             type: "integer"
-            format: "int64"
+            format: "uint64"
+            example: 10000
           KeepOldSnapshots:
             description: "The number of snapshots to keep beyond the current snapshot."
             type: "integer"
-            format: "int64"
+            format: "uint64"
           LogEntriesForSlowFollowers:
             description: "The number of log entries to keep around to sync up slow followers after a snapshot is created."
             type: "integer"
-            format: "int64"
+            format: "uint64"
+            example: 500
           ElectionTick:
             description: |
               The number of ticks that a follower will wait for a message from the leader before becoming a candidate and starting an election. `ElectionTick` must be greater than `HeartbeatTick`.
 
               A tick currently defaults to one second, so these translate directly to seconds currently, but this is NOT guaranteed.
             type: "integer"
+            example: 3
           HeartbeatTick:
             description: |
               The number of ticks between heartbeats. Every HeartbeatTick ticks, the leader will send a heartbeat to the followers.
 
               A tick currently defaults to one second, so these translate directly to seconds currently, but this is NOT guaranteed.
             type: "integer"
+            example: 1
       Dispatcher:
         description: "Dispatcher configuration."
         type: "object"
+        x-nullable: true
         properties:
           HeartbeatPeriod:
             description: "The delay for an agent to send a heartbeat to the dispatcher."
             type: "integer"
             format: "int64"
+            example: 5000000000
       CAConfig:
         description: "CA configuration."
         type: "object"
+        x-nullable: true
         properties:
           NodeCertExpiry:
             description: "The duration node certificates are issued for."
             type: "integer"
             format: "int64"
+            example: 7776000000000000
           ExternalCAs:
             description: "Configuration for forwarding signing requests to an external certificate authority."
             type: "array"
@@ -1958,6 +2358,8 @@ definitions:
             type: "string"
           ForceRotate:
             description: "An integer whose purpose is to force swarm to generate a new signing CA certificate and key, if none have been specified in `SigningCACert` and `SigningCAKey`"
+            format: "uint64"
+            type: "integer"
       EncryptionConfig:
         description: "Parameters related to encryption-at-rest."
         type: "object"
@@ -1965,57 +2367,65 @@ definitions:
           AutoLockManagers:
             description: "If set, generate a key and use it to lock data stored on the managers."
             type: "boolean"
+            example: false
       TaskDefaults:
         description: "Defaults for creating tasks in this cluster."
         type: "object"
         properties:
           LogDriver:
             description: |
-              The log driver to use for tasks created in the orchestrator if unspecified by a service.
+              The log driver to use for tasks created in the orchestrator if
+              unspecified by a service.
 
-              Updating this value will only have an affect on new tasks. Old tasks will continue use their previously configured log driver until recreated.
+              Updating this value only affects new tasks. Existing tasks continue
+              to use their previously configured log driver until recreated.
             type: "object"
             properties:
               Name:
+                description: |
+                  The log driver to use as a default for new tasks.
                 type: "string"
+                example: "json-file"
               Options:
+                description: |
+                  Driver-specific options for the selectd log driver, specified
+                  as key/value pairs.
                 type: "object"
                 additionalProperties:
                   type: "string"
-    example:
-      Name: "default"
-      Orchestration:
-        TaskHistoryRetentionLimit: 10
-      Raft:
-        SnapshotInterval: 10000
-        LogEntriesForSlowFollowers: 500
-        HeartbeatTick: 1
-        ElectionTick: 3
-      Dispatcher:
-        HeartbeatPeriod: 5000000000
-      CAConfig:
-        NodeCertExpiry: 7776000000000000
-      JoinTokens:
-        Worker: "SWMTKN-1-3pu6hszjas19xyp7ghgosyx9k8atbfcr8p2is99znpy26u2lkl-1awxwuwd3z9j1z3puu7rcgdbx"
-        Manager: "SWMTKN-1-3pu6hszjas19xyp7ghgosyx9k8atbfcr8p2is99znpy26u2lkl-7p73s1dx5in4tatdymyhg9hu2"
-      EncryptionConfig:
-        AutoLockManagers: false
+                example:
+                  "max-file": "10"
+                  "max-size": "100m"
+
   # The Swarm information for `GET /info`. It is the same as `GET /swarm`, but
   # without `JoinTokens`.
   ClusterInfo:
+    description: |
+      ClusterInfo represents information about the swarm as is returned by the
+      "/info" endpoint. Join-tokens are not included.
+    x-nullable: true
     type: "object"
     properties:
       ID:
         description: "The ID of the swarm."
         type: "string"
+        example: "abajmipo7b4xz5ip2nrla6b11"
       Version:
         $ref: "#/definitions/ObjectVersion"
       CreatedAt:
+        description: |
+          Date and time at which the swarm was initialised in
+          [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         type: "string"
         format: "dateTime"
+        example: "2016-08-18T10:44:24.496525531Z"
       UpdatedAt:
+        description: |
+          Date and time at which the swarm was last updated in
+          [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt) format with nano-seconds.
         type: "string"
         format: "dateTime"
+        example: "2017-08-09T07:09:37.632105588Z"
       Spec:
         $ref: "#/definitions/SwarmSpec"
       TLSInfo:
@@ -2023,13 +2433,48 @@ definitions:
       RootRotationInProgress:
         description: "Whether there is currently a root CA rotation in progress for the swarm"
         type: "boolean"
+        example: false
+
+  JoinTokens:
+    description: |
+      JoinTokens contains the tokens workers and managers need to join the swarm.
+    type: "object"
+    properties:
+      Worker:
+        description: |
+          The token workers can use to join the swarm.
+        type: "string"
+        example: "SWMTKN-1-3pu6hszjas19xyp7ghgosyx9k8atbfcr8p2is99znpy26u2lkl-1awxwuwd3z9j1z3puu7rcgdbx"
+      Manager:
+        description: |
+          The token managers can use to join the swarm.
+        type: "string"
+        example: "SWMTKN-1-3pu6hszjas19xyp7ghgosyx9k8atbfcr8p2is99znpy26u2lkl-7p73s1dx5in4tatdymyhg9hu2"
+
+  Swarm:
+    type: "object"
+    allOf:
+      - $ref: "#/definitions/ClusterInfo"
+      - type: "object"
+        properties:
+          JoinTokens:
+            $ref: "#/definitions/JoinTokens"
+
   TaskSpec:
     description: "User modifiable task configuration."
     type: "object"
     properties:
       PluginSpec:
         type: "object"
-        description: "Invalid when specified with `ContainerSpec`."
+        description: |
+          Plugin spec for the service.  *(Experimental release only.)*
+
+          <p><br /></p>
+
+          > **Note**: ContainerSpec, NetworkAttachmentSpec, and PluginSpec are
+          > mutually exclusive. PluginSpec is only used when the Runtime field
+          > is set to `plugin`. NetworkAttachmentSpec is used when the Runtime
+          > field is set to `attachment`.
         properties:
           Name:
             description: "The name or 'alias' to use for the plugin."
@@ -2056,7 +2501,15 @@ definitions:
                     type: "string"
       ContainerSpec:
         type: "object"
-        description: "Invalid when specified with `PluginSpec`."
+        description: |
+          Container spec for the service.
+
+          <p><br /></p>
+
+          > **Note**: ContainerSpec, NetworkAttachmentSpec, and PluginSpec are
+          > mutually exclusive. PluginSpec is only used when the Runtime field
+          > is set to `plugin`. NetworkAttachmentSpec is used when the Runtime
+          > field is set to `attachment`.
         properties:
           Image:
             description: "The image name to use for the container"
@@ -2172,10 +2625,12 @@ definitions:
           Hosts:
             type: "array"
             description: |
-              A list of hostnames/IP mappings to add to the container's `/etc/hosts` file.
-              The format of extra hosts on swarmkit is specified in:
-              http://man7.org/linux/man-pages/man5/hosts.5.html
-                IP_address canonical_hostname [aliases...]
+              A list of hostname/IP mappings to add to the container's `hosts`
+              file. The format of extra hosts is specified in the
+              [hosts(5)](http://man7.org/linux/man-pages/man5/hosts.5.html)
+              man page:
+
+                  IP_address canonical_hostname [aliases...]
             items:
               type: "string"
           DNSConfig:
@@ -2259,7 +2714,33 @@ definitions:
                     ConfigName is the name of the config that this references, but this is just provided for
                     lookup/display purposes. The config in the reference will be identified by its ID.
                   type: "string"
+          Isolation:
+            type: "string"
+            description: "Isolation technology of the containers running the service. (Windows only)"
+            enum:
+              - "default"
+              - "process"
+              - "hyperv"
+          Init:
+            description: "Run an init inside the container that forwards signals and reaps processes. This field is omitted if empty, and the default (as configured on the daemon) is used."
+            type: "boolean"
+            x-nullable: true
+      NetworkAttachmentSpec:
+        description: |
+          Read-only spec type for non-swarm containers attached to swarm overlay
+          networks.
 
+          <p><br /></p>
+
+          > **Note**: ContainerSpec, NetworkAttachmentSpec, and PluginSpec are
+          > mutually exclusive. PluginSpec is only used when the Runtime field
+          > is set to `plugin`. NetworkAttachmentSpec is used when the Runtime
+          > field is set to `attachment`.
+        type: "object"
+        properties:
+          ContainerID:
+            description: "ID of the container represented by this task"
+            type: "string"
       Resources:
         description: "Resource requirements which apply to each individual container created as part of the service."
         type: "object"
@@ -2303,6 +2784,10 @@ definitions:
             type: "array"
             items:
               type: "string"
+            example:
+              - "node.hostname!=node3.corp.example.com"
+              - "node.role!=manager"
+              - "node.labels.type==production"
           Preferences:
             description: "Preferences provide a way to make the scheduler aware of factors such as topology. They are provided in order from highest to lowest precedence."
             type: "array"
@@ -2315,16 +2800,20 @@ definitions:
                     SpreadDescriptor:
                       description: "label descriptor, such as engine.labels.az"
                       type: "string"
+            example:
+              - Spread:
+                  SpreadDescriptor: "node.labels.datacenter"
+              - Spread:
+                  SpreadDescriptor: "node.labels.rack"
           Platforms:
-            description: "An array of supported platforms."
+            description: |
+              Platforms stores all the platforms that the service's image can
+              run on. This field is used in the platform filter for scheduling.
+              If empty, then the platform filter is off, meaning there are no
+              scheduling restrictions.
             type: "array"
             items:
-              type: "object"
-              properties:
-                Architecture:
-                  type: "string"
-                OS:
-                  type: "string"
+              $ref: "#/definitions/Platform"
       ForceUpdate:
         description: "A counter that triggers an update even if no relevant parameters have been changed."
         type: "integer"
@@ -2352,6 +2841,7 @@ definitions:
             type: "object"
             additionalProperties:
               type: "string"
+
   TaskState:
     type: "string"
     enum:
@@ -2368,6 +2858,9 @@ definitions:
       - "shutdown"
       - "failed"
       - "rejected"
+      - "remove"
+      - "orphaned"
+
   Task:
     type: "object"
     properties:
@@ -2491,6 +2984,7 @@ definitions:
         - NamedResourceSpec:
             Kind: "GPU"
             Value: "UUID2"
+
   ServiceSpec:
     description: "User modifiable configuration for a service."
     properties:
@@ -2595,6 +3089,7 @@ definitions:
                 type: "string"
       EndpointSpec:
         $ref: "#/definitions/EndpointSpec"
+
   EndpointPortConfig:
     type: "object"
     properties:
@@ -2605,12 +3100,32 @@ definitions:
         enum:
           - "tcp"
           - "udp"
+          - "sctp"
       TargetPort:
         description: "The port inside the container."
         type: "integer"
       PublishedPort:
         description: "The port on the swarm hosts."
         type: "integer"
+      PublishMode:
+        description: |
+          The mode in which port is published.
+
+          <p><br /></p>
+
+          - "ingress" makes the target port accessible on on every node,
+            regardless of whether there is a task for the service running on
+            that node or not.
+          - "host" bypasses the routing mesh and publish the port directly on
+            the swarm node where that service is running.
+
+        type: "string"
+        enum:
+          - "ingress"
+          - "host"
+        default: "ingress"
+        example: "ingress"
+
   EndpointSpec:
     description: "Properties that can be configured to access and load balance a service."
     type: "object"
@@ -2628,6 +3143,7 @@ definitions:
         type: "array"
         items:
           $ref: "#/definitions/EndpointPortConfig"
+
   Service:
     type: "object"
     properties:
@@ -2740,6 +3256,7 @@ definitions:
           -
             NetworkID: "4qvuz4ko70xaltuqbt8956gd1"
             Addr: "10.255.0.3/16"
+
   ImageDeleteResponseItem:
     type: "object"
     properties:
@@ -2749,6 +3266,7 @@ definitions:
       Deleted:
         description: "The image ID of an image that was deleted"
         type: "string"
+
   ServiceUpdateResponse:
     type: "object"
     properties:
@@ -2759,6 +3277,7 @@ definitions:
           type: "string"
     example:
       Warning: "unable to pin image doesnotexist:latest to digest: image library/doesnotexist:latest not found"
+
   ContainerSummary:
     type: "array"
     items:
@@ -2827,6 +3346,27 @@ definitions:
           type: "array"
           items:
             $ref: "#/definitions/Mount"
+
+  Driver:
+    description: "Driver represents a driver (network, logging, secrets)."
+    type: "object"
+    required: [Name]
+    properties:
+      Name:
+        description: "Name of the driver."
+        type: "string"
+        x-nullable: false
+        example: "some-driver"
+      Options:
+        description: "Key/value map of driver-specific options."
+        type: "object"
+        x-nullable: false
+        additionalProperties:
+          type: "string"
+        example:
+          OptionA: "value for driver-specific option A"
+          OptionB: "value for driver-specific option B"
+
   SecretSpec:
     type: "object"
     properties:
@@ -2838,26 +3378,48 @@ definitions:
         type: "object"
         additionalProperties:
           type: "string"
+        example:
+          com.example.some-label: "some-value"
+          com.example.some-other-label: "some-other-value"
       Data:
-        description: "Base64-url-safe-encoded secret data"
-        type: "array"
-        items:
-          type: "string"
+        description: |
+          Base64-url-safe-encoded ([RFC 4648](https://tools.ietf.org/html/rfc4648#section-3.2))
+          data to store as secret.
+
+          This field is only used to _create_ a secret, and is not returned by
+          other endpoints.
+        type: "string"
+        example: ""
+      Driver:
+        description: "Name of the secrets driver used to fetch the secret's value from an external secret store"
+        $ref: "#/definitions/Driver"
+      Templating:
+        description: |
+          Templating driver, if applicable
+
+          Templating controls whether and how to evaluate the config payload as
+          a template. If no driver is set, no templating is used.
+        $ref: "#/definitions/Driver"
+
   Secret:
     type: "object"
     properties:
       ID:
         type: "string"
+        example: "blt1owaxmitz71s9v5zh81zun"
       Version:
         $ref: "#/definitions/ObjectVersion"
       CreatedAt:
         type: "string"
         format: "dateTime"
+        example: "2017-07-20T13:55:28.678958722Z"
       UpdatedAt:
         type: "string"
         format: "dateTime"
+        example: "2017-07-20T13:55:28.678958722Z"
       Spec:
         $ref: "#/definitions/SecretSpec"
+
   ConfigSpec:
     type: "object"
     properties:
@@ -2870,10 +3432,18 @@ definitions:
         additionalProperties:
           type: "string"
       Data:
-        description: "Base64-url-safe-encoded config data"
-        type: "array"
-        items:
-          type: "string"
+        description: |
+          Base64-url-safe-encoded ([RFC 4648](https://tools.ietf.org/html/rfc4648#section-3.2))
+          config data.
+        type: "string"
+      Templating:
+        description: |
+          Templating driver, if applicable
+
+          Templating controls whether and how to evaluate the config payload as
+          a template. If no driver is set, no templating is used.
+        $ref: "#/definitions/Driver"
+
   Config:
     type: "object"
     properties:
@@ -2889,6 +3459,774 @@ definitions:
         format: "dateTime"
       Spec:
         $ref: "#/definitions/ConfigSpec"
+
+  SystemInfo:
+    type: "object"
+    properties:
+      ID:
+        description: |
+          Unique identifier of the daemon.
+
+          <p><br /></p>
+
+          > **Note**: The format of the ID itself is not part of the API, and
+          > should not be considered stable.
+        type: "string"
+        example: "7TRN:IPZB:QYBB:VPBQ:UMPP:KARE:6ZNR:XE6T:7EWV:PKF4:ZOJD:TPYS"
+      Containers:
+        description: "Total number of containers on the host."
+        type: "integer"
+        example: 14
+      ContainersRunning:
+        description: |
+          Number of containers with status `"running"`.
+        type: "integer"
+        example: 3
+      ContainersPaused:
+        description: |
+          Number of containers with status `"paused"`.
+        type: "integer"
+        example: 1
+      ContainersStopped:
+        description: |
+          Number of containers with status `"stopped"`.
+        type: "integer"
+        example: 10
+      Images:
+        description: |
+          Total number of images on the host.
+
+          Both _tagged_ and _untagged_ (dangling) images are counted.
+        type: "integer"
+        example: 508
+      Driver:
+        description: "Name of the storage driver in use."
+        type: "string"
+        example: "overlay2"
+      DriverStatus:
+        description: |
+          Information specific to the storage driver, provided as
+          "label" / "value" pairs.
+
+          This information is provided by the storage driver, and formatted
+          in a way consistent with the output of `docker info` on the command
+          line.
+
+          <p><br /></p>
+
+          > **Note**: The information returned in this field, including the
+          > formatting of values and labels, should not be considered stable,
+          > and may change without notice.
+        type: "array"
+        items:
+          type: "array"
+          items:
+            type: "string"
+        example:
+          - ["Backing Filesystem", "extfs"]
+          - ["Supports d_type", "true"]
+          - ["Native Overlay Diff", "true"]
+      DockerRootDir:
+        description: |
+          Root directory of persistent Docker state.
+
+          Defaults to `/var/lib/docker` on Linux, and `C:\ProgramData\docker`
+          on Windows.
+        type: "string"
+        example: "/var/lib/docker"
+      SystemStatus:
+        description: |
+          Status information about this node (standalone Swarm API).
+
+          <p><br /></p>
+
+          > **Note**: The information returned in this field is only propagated
+          > by the Swarm standalone API, and is empty (`null`) when using
+          > built-in swarm mode.
+        type: "array"
+        items:
+          type: "array"
+          items:
+            type: "string"
+        example:
+          - ["Role", "primary"]
+          - ["State", "Healthy"]
+          - ["Strategy", "spread"]
+          - ["Filters", "health, port, containerslots, dependency, affinity, constraint, whitelist"]
+          - ["Nodes", "2"]
+          - [" swarm-agent-00", "192.168.99.102:2376"]
+          - ["  └ ID", "5CT6:FBGO:RVGO:CZL4:PB2K:WCYN:2JSV:KSHH:GGFW:QOPG:6J5Q:IOZ2|192.168.99.102:2376"]
+          - ["  └ Status", "Healthy"]
+          - ["  └ Containers", "1 (1 Running, 0 Paused, 0 Stopped)"]
+          - ["  └ Reserved CPUs", "0 / 1"]
+          - ["  └ Reserved Memory", "0 B / 1.021 GiB"]
+          - ["  └ Labels", "kernelversion=4.4.74-boot2docker, operatingsystem=Boot2Docker 17.06.0-ce (TCL 7.2); HEAD : 0672754 - Thu Jun 29 00:06:31 UTC 2017, ostype=linux, provider=virtualbox, storagedriver=aufs"]
+          - ["  └ UpdatedAt", "2017-08-09T10:03:46Z"]
+          - ["  └ ServerVersion", "17.06.0-ce"]
+          - [" swarm-manager", "192.168.99.101:2376"]
+          - ["  └ ID", "TAMD:7LL3:SEF7:LW2W:4Q2X:WVFH:RTXX:JSYS:XY2P:JEHL:ZMJK:JGIW|192.168.99.101:2376"]
+          - ["  └ Status", "Healthy"]
+          - ["  └ Containers", "2 (2 Running, 0 Paused, 0 Stopped)"]
+          - ["  └ Reserved CPUs", "0 / 1"]
+          - ["  └ Reserved Memory", "0 B / 1.021 GiB"]
+          - ["  └ Labels", "kernelversion=4.4.74-boot2docker, operatingsystem=Boot2Docker 17.06.0-ce (TCL 7.2); HEAD : 0672754 - Thu Jun 29 00:06:31 UTC 2017, ostype=linux, provider=virtualbox, storagedriver=aufs"]
+          - ["  └ UpdatedAt", "2017-08-09T10:04:11Z"]
+          - ["  └ ServerVersion", "17.06.0-ce"]
+      Plugins:
+        $ref: "#/definitions/PluginsInfo"
+      MemoryLimit:
+        description: "Indicates if the host has memory limit support enabled."
+        type: "boolean"
+        example: true
+      SwapLimit:
+        description: "Indicates if the host has memory swap limit support enabled."
+        type: "boolean"
+        example: true
+      KernelMemory:
+        description: "Indicates if the host has kernel memory limit support enabled."
+        type: "boolean"
+        example: true
+      CpuCfsPeriod:
+        description: "Indicates if CPU CFS(Completely Fair Scheduler) period is supported by the host."
+        type: "boolean"
+        example: true
+      CpuCfsQuota:
+        description: "Indicates if CPU CFS(Completely Fair Scheduler) quota is supported by the host."
+        type: "boolean"
+        example: true
+      CPUShares:
+        description: "Indicates if CPU Shares limiting is supported by the host."
+        type: "boolean"
+        example: true
+      CPUSet:
+        description: |
+          Indicates if CPUsets (cpuset.cpus, cpuset.mems) are supported by the host.
+
+          See [cpuset(7)](https://www.kernel.org/doc/Documentation/cgroup-v1/cpusets.txt)
+        type: "boolean"
+        example: true
+      OomKillDisable:
+        description: "Indicates if OOM killer disable is supported on the host."
+        type: "boolean"
+      IPv4Forwarding:
+        description: "Indicates IPv4 forwarding is enabled."
+        type: "boolean"
+        example: true
+      BridgeNfIptables:
+        description: "Indicates if `bridge-nf-call-iptables` is available on the host."
+        type: "boolean"
+        example: true
+      BridgeNfIp6tables:
+        description: "Indicates if `bridge-nf-call-ip6tables` is available on the host."
+        type: "boolean"
+        example: true
+      Debug:
+        description: "Indicates if the daemon is running in debug-mode / with debug-level logging enabled."
+        type: "boolean"
+        example: true
+      NFd:
+        description: |
+          The total number of file Descriptors in use by the daemon process.
+
+          This information is only returned if debug-mode is enabled.
+        type: "integer"
+        example: 64
+      NGoroutines:
+        description: |
+          The  number of goroutines that currently exist.
+
+          This information is only returned if debug-mode is enabled.
+        type: "integer"
+        example: 174
+      SystemTime:
+        description: |
+          Current system-time in [RFC 3339](https://www.ietf.org/rfc/rfc3339.txt)
+          format with nano-seconds.
+        type: "string"
+        example: "2017-08-08T20:28:29.06202363Z"
+      LoggingDriver:
+        description: |
+          The logging driver to use as a default for new containers.
+        type: "string"
+      CgroupDriver:
+        description: |
+          The driver to use for managing cgroups.
+        type: "string"
+        enum: ["cgroupfs", "systemd"]
+        default: "cgroupfs"
+        example: "cgroupfs"
+      NEventsListener:
+        description: "Number of event listeners subscribed."
+        type: "integer"
+        example: 30
+      KernelVersion:
+        description: |
+          Kernel version of the host.
+
+          On Linux, this information obtained from `uname`. On Windows this
+          information is queried from the <kbd>HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\</kbd>
+          registry value, for example _"10.0 14393 (14393.1198.amd64fre.rs1_release_sec.170427-1353)"_.
+        type: "string"
+        example: "4.9.38-moby"
+      OperatingSystem:
+        description: |
+          Name of the host's operating system, for example: "Ubuntu 16.04.2 LTS"
+          or "Windows Server 2016 Datacenter"
+        type: "string"
+        example: "Alpine Linux v3.5"
+      OSType:
+        description: |
+          Generic type of the operating system of the host, as returned by the
+          Go runtime (`GOOS`).
+
+          Currently returned values are "linux" and "windows". A full list of
+          possible values can be found in the [Go documentation](https://golang.org/doc/install/source#environment).
+        type: "string"
+        example: "linux"
+      Architecture:
+        description: |
+          Hardware architecture of the host, as returned by the Go runtime
+          (`GOARCH`).
+
+          A full list of possible values can be found in the [Go documentation](https://golang.org/doc/install/source#environment).
+        type: "string"
+        example: "x86_64"
+      NCPU:
+        description: |
+          The number of logical CPUs usable by the daemon.
+
+          The number of available CPUs is checked by querying the operating
+          system when the daemon starts. Changes to operating system CPU
+          allocation after the daemon is started are not reflected.
+        type: "integer"
+        example: 4
+      MemTotal:
+        description: |
+          Total amount of physical memory available on the host, in kilobytes (kB).
+        type: "integer"
+        format: "int64"
+        example: 2095882240
+
+      IndexServerAddress:
+        description: |
+          Address / URL of the index server that is used for image search,
+          and as a default for user authentication for Docker Hub and Docker Cloud.
+        default: "https://index.docker.io/v1/"
+        type: "string"
+        example: "https://index.docker.io/v1/"
+      RegistryConfig:
+        $ref: "#/definitions/RegistryServiceConfig"
+      GenericResources:
+        $ref: "#/definitions/GenericResources"
+      HttpProxy:
+        description: |
+          HTTP-proxy configured for the daemon. This value is obtained from the
+          [`HTTP_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html) environment variable.
+
+          Containers do not automatically inherit this configuration.
+        type: "string"
+        example: "http://user:pass@proxy.corp.example.com:8080"
+      HttpsProxy:
+        description: |
+          HTTPS-proxy configured for the daemon. This value is obtained from the
+          [`HTTPS_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html) environment variable.
+
+          Containers do not automatically inherit this configuration.
+        type: "string"
+        example: "https://user:pass@proxy.corp.example.com:4443"
+      NoProxy:
+        description: |
+          Comma-separated list of domain extensions for which no proxy should be
+          used. This value is obtained from the [`NO_PROXY`](https://www.gnu.org/software/wget/manual/html_node/Proxies.html)
+          environment variable.
+
+          Containers do not automatically inherit this configuration.
+        type: "string"
+        example: "*.local, 169.254/16"
+      Name:
+        description: "Hostname of the host."
+        type: "string"
+        example: "node5.corp.example.com"
+      Labels:
+        description: |
+          User-defined labels (key/value metadata) as set on the daemon.
+
+          <p><br /></p>
+
+          > **Note**: When part of a Swarm, nodes can both have _daemon_ labels,
+          > set through the daemon configuration, and _node_ labels, set from a
+          > manager node in the Swarm. Node labels are not included in this
+          > field. Node labels can be retrieved using the `/nodes/(id)` endpoint
+          > on a manager node in the Swarm.
+        type: "array"
+        items:
+          type: "string"
+        example: ["storage=ssd", "production"]
+      ExperimentalBuild:
+        description: |
+          Indicates if experimental features are enabled on the daemon.
+        type: "boolean"
+        example: true
+      ServerVersion:
+        description: |
+          Version string of the daemon.
+
+          > **Note**: the [standalone Swarm API](https://docs.docker.com/swarm/swarm-api/)
+          > returns the Swarm version instead of the daemon  version, for example
+          > `swarm/1.2.8`.
+        type: "string"
+        example: "17.06.0-ce"
+      ClusterStore:
+        description: |
+          URL of the distributed storage backend.
+
+
+          The storage backend is used for multihost networking (to store
+          network and endpoint information) and by the node discovery mechanism.
+
+          <p><br /></p>
+
+          > **Note**: This field is only propagated when using standalone Swarm
+          > mode, and overlay networking using an external k/v store. Overlay
+          > networks with Swarm mode enabled use the built-in raft store, and
+          > this field will be empty.
+        type: "string"
+        example: "consul://consul.corp.example.com:8600/some/path"
+      ClusterAdvertise:
+        description: |
+          The network endpoint that the Engine advertises for the purpose of
+          node discovery. ClusterAdvertise is a `host:port` combination on which
+          the daemon is reachable by other hosts.
+
+          <p><br /></p>
+
+          > **Note**: This field is only propagated when using standalone Swarm
+          > mode, and overlay networking using an external k/v store. Overlay
+          > networks with Swarm mode enabled use the built-in raft store, and
+          > this field will be empty.
+        type: "string"
+        example: "node5.corp.example.com:8000"
+      Runtimes:
+        description: |
+          List of [OCI compliant](https://github.com/opencontainers/runtime-spec)
+          runtimes configured on the daemon. Keys hold the "name" used to
+          reference the runtime.
+
+          The Docker daemon relies on an OCI compliant runtime (invoked via the
+          `containerd` daemon) as its interface to the Linux kernel namespaces,
+          cgroups, and SELinux.
+
+          The default runtime is `runc`, and automatically configured. Additional
+          runtimes can be configured by the user and will be listed here.
+        type: "object"
+        additionalProperties:
+          $ref: "#/definitions/Runtime"
+        default:
+          runc:
+            path: "docker-runc"
+        example:
+          runc:
+            path: "docker-runc"
+          runc-master:
+            path: "/go/bin/runc"
+          custom:
+            path: "/usr/local/bin/my-oci-runtime"
+            runtimeArgs: ["--debug", "--systemd-cgroup=false"]
+      DefaultRuntime:
+        description: |
+          Name of the default OCI runtime that is used when starting containers.
+
+          The default can be overridden per-container at create time.
+        type: "string"
+        default: "runc"
+        example: "runc"
+      Swarm:
+        $ref: "#/definitions/SwarmInfo"
+      LiveRestoreEnabled:
+        description: |
+          Indicates if live restore is enabled.
+
+          If enabled, containers are kept running when the daemon is shutdown
+          or upon daemon start if running containers are detected.
+        type: "boolean"
+        default: false
+        example: false
+      Isolation:
+        description: |
+          Represents the isolation technology to use as a default for containers.
+          The supported values are platform-specific.
+
+          If no isolation value is specified on daemon start, on Windows client,
+          the default is `hyperv`, and on Windows server, the default is `process`.
+
+          This option is currently not used on other platforms.
+        default: "default"
+        type: "string"
+        enum:
+          - "default"
+          - "hyperv"
+          - "process"
+      InitBinary:
+        description: |
+          Name and, optional, path of the `docker-init` binary.
+
+          If the path is omitted, the daemon searches the host's `$PATH` for the
+          binary and uses the first result.
+        type: "string"
+        example: "docker-init"
+      ContainerdCommit:
+        $ref: "#/definitions/Commit"
+      RuncCommit:
+        $ref: "#/definitions/Commit"
+      InitCommit:
+        $ref: "#/definitions/Commit"
+      SecurityOptions:
+        description: |
+          List of security features that are enabled on the daemon, such as
+          apparmor, seccomp, SELinux, and user-namespaces (userns).
+
+          Additional configuration options for each security feature may
+          be present, and are included as a comma-separated list of key/value
+          pairs.
+        type: "array"
+        items:
+          type: "string"
+        example:
+          - "name=apparmor"
+          - "name=seccomp,profile=default"
+          - "name=selinux"
+          - "name=userns"
+
+
+  # PluginsInfo is a temp struct holding Plugins name
+  # registered with docker daemon. It is used by Info struct
+  PluginsInfo:
+    description: |
+      Available plugins per type.
+
+      <p><br /></p>
+
+      > **Note**: Only unmanaged (V1) plugins are included in this list.
+      > V1 plugins are "lazily" loaded, and are not returned in this list
+      > if there is no resource using the plugin.
+    type: "object"
+    properties:
+      Volume:
+        description: "Names of available volume-drivers, and network-driver plugins."
+        type: "array"
+        items:
+          type: "string"
+        example: ["local"]
+      Network:
+        description: "Names of available network-drivers, and network-driver plugins."
+        type: "array"
+        items:
+          type: "string"
+        example: ["bridge", "host", "ipvlan", "macvlan", "null", "overlay"]
+      Authorization:
+        description: "Names of available authorization plugins."
+        type: "array"
+        items:
+          type: "string"
+        example: ["img-authz-plugin", "hbm"]
+      Log:
+        description: "Names of available logging-drivers, and logging-driver plugins."
+        type: "array"
+        items:
+          type: "string"
+        example: ["awslogs", "fluentd", "gcplogs", "gelf", "journald", "json-file", "logentries", "splunk", "syslog"]
+
+
+  RegistryServiceConfig:
+    description: |
+      RegistryServiceConfig stores daemon registry services configuration.
+    type: "object"
+    x-nullable: true
+    properties:
+      AllowNondistributableArtifactsCIDRs:
+        description: |
+          List of IP ranges to which nondistributable artifacts can be pushed,
+          using the CIDR syntax [RFC 4632](https://tools.ietf.org/html/4632).
+
+          Some images (for example, Windows base images) contain artifacts
+          whose distribution is restricted by license. When these images are
+          pushed to a registry, restricted artifacts are not included.
+
+          This configuration override this behavior, and enables the daemon to
+          push nondistributable artifacts to all registries whose resolved IP
+          address is within the subnet described by the CIDR syntax.
+
+          This option is useful when pushing images containing
+          nondistributable artifacts to a registry on an air-gapped network so
+          hosts on that network can pull the images without connecting to
+          another server.
+
+          > **Warning**: Nondistributable artifacts typically have restrictions
+          > on how and where they can be distributed and shared. Only use this
+          > feature to push artifacts to private registries and ensure that you
+          > are in compliance with any terms that cover redistributing
+          > nondistributable artifacts.
+
+        type: "array"
+        items:
+          type: "string"
+        example: ["::1/128", "127.0.0.0/8"]
+      AllowNondistributableArtifactsHostnames:
+        description: |
+          List of registry hostnames to which nondistributable artifacts can be
+          pushed, using the format `<hostname>[:<port>]` or `<IP address>[:<port>]`.
+
+          Some images (for example, Windows base images) contain artifacts
+          whose distribution is restricted by license. When these images are
+          pushed to a registry, restricted artifacts are not included.
+
+          This configuration override this behavior for the specified
+          registries.
+
+          This option is useful when pushing images containing
+          nondistributable artifacts to a registry on an air-gapped network so
+          hosts on that network can pull the images without connecting to
+          another server.
+
+          > **Warning**: Nondistributable artifacts typically have restrictions
+          > on how and where they can be distributed and shared. Only use this
+          > feature to push artifacts to private registries and ensure that you
+          > are in compliance with any terms that cover redistributing
+          > nondistributable artifacts.
+        type: "array"
+        items:
+          type: "string"
+        example: ["registry.internal.corp.example.com:3000", "[2001:db8:a0b:12f0::1]:443"]
+      InsecureRegistryCIDRs:
+        description: |
+          List of IP ranges of insecure registries, using the CIDR syntax
+          ([RFC 4632](https://tools.ietf.org/html/4632)). Insecure registries
+          accept un-encrypted (HTTP) and/or untrusted (HTTPS with certificates
+          from unknown CAs) communication.
+
+          By default, local registries (`127.0.0.0/8`) are configured as
+          insecure. All other registries are secure. Communicating with an
+          insecure registry is not possible if the daemon assumes that registry
+          is secure.
+
+          This configuration override this behavior, insecure communication with
+          registries whose resolved IP address is within the subnet described by
+          the CIDR syntax.
+
+          Registries can also be marked insecure by hostname. Those registries
+          are listed under `IndexConfigs` and have their `Secure` field set to
+          `false`.
+
+          > **Warning**: Using this option can be useful when running a local
+          > registry, but introduces security vulnerabilities. This option
+          > should therefore ONLY be used for testing purposes. For increased
+          > security, users should add their CA to their system's list of trusted
+          > CAs instead of enabling this option.
+        type: "array"
+        items:
+          type: "string"
+        example: ["::1/128", "127.0.0.0/8"]
+      IndexConfigs:
+        type: "object"
+        additionalProperties:
+          $ref: "#/definitions/IndexInfo"
+        example:
+          "127.0.0.1:5000":
+            "Name": "127.0.0.1:5000"
+            "Mirrors": []
+            "Secure": false
+            "Official": false
+          "[2001:db8:a0b:12f0::1]:80":
+            "Name": "[2001:db8:a0b:12f0::1]:80"
+            "Mirrors": []
+            "Secure": false
+            "Official": false
+          "docker.io":
+            Name: "docker.io"
+            Mirrors: ["https://hub-mirror.corp.example.com:5000/"]
+            Secure: true
+            Official: true
+          "registry.internal.corp.example.com:3000":
+            Name: "registry.internal.corp.example.com:3000"
+            Mirrors: []
+            Secure: false
+            Official: false
+      Mirrors:
+        description: |
+          List of registry URLs that act as a mirror for the official
+          (`docker.io`) registry.
+
+        type: "array"
+        items:
+          type: "string"
+        example:
+          - "https://hub-mirror.corp.example.com:5000/"
+          - "https://[2001:db8:a0b:12f0::1]/"
+
+  IndexInfo:
+    description:
+      IndexInfo contains information about a registry.
+    type: "object"
+    x-nullable: true
+    properties:
+      Name:
+        description: |
+          Name of the registry, such as "docker.io".
+        type: "string"
+        example: "docker.io"
+      Mirrors:
+        description: |
+          List of mirrors, expressed as URIs.
+        type: "array"
+        items:
+          type: "string"
+        example:
+          - "https://hub-mirror.corp.example.com:5000/"
+          - "https://registry-2.docker.io/"
+          - "https://registry-3.docker.io/"
+      Secure:
+        description: |
+          Indicates if the registry is part of the list of insecure
+          registries.
+
+          If `false`, the registry is insecure. Insecure registries accept
+          un-encrypted (HTTP) and/or untrusted (HTTPS with certificates from
+          unknown CAs) communication.
+
+          > **Warning**: Insecure registries can be useful when running a local
+          > registry. However, because its use creates security vulnerabilities
+          > it should ONLY be enabled for testing purposes. For increased
+          > security, users should add their CA to their system's list of
+          > trusted CAs instead of enabling this option.
+        type: "boolean"
+        example: true
+      Official:
+        description: |
+          Indicates whether this is an official registry (i.e., Docker Hub / docker.io)
+        type: "boolean"
+        example: true
+
+  Runtime:
+    description: |
+      Runtime describes an [OCI compliant](https://github.com/opencontainers/runtime-spec)
+      runtime.
+
+      The runtime is invoked by the daemon via the `containerd` daemon. OCI
+      runtimes act as an interface to the Linux kernel namespaces, cgroups,
+      and SELinux.
+    type: "object"
+    properties:
+      path:
+        description: |
+          Name and, optional, path, of the OCI executable binary.
+
+          If the path is omitted, the daemon searches the host's `$PATH` for the
+          binary and uses the first result.
+        type: "string"
+        example: "/usr/local/bin/my-oci-runtime"
+      runtimeArgs:
+        description: |
+          List of command-line arguments to pass to the runtime when invoked.
+        type: "array"
+        x-nullable: true
+        items:
+          type: "string"
+        example: ["--debug", "--systemd-cgroup=false"]
+
+  Commit:
+    description: |
+      Commit holds the Git-commit (SHA1) that a binary was built from, as
+      reported in the version-string of external tools, such as `containerd`,
+      or `runC`.
+    type: "object"
+    properties:
+      ID:
+        description: "Actual commit ID of external tool."
+        type: "string"
+        example: "cfb82a876ecc11b5ca0977d1733adbe58599088a"
+      Expected:
+        description: |
+          Commit ID of external tool expected by dockerd as set at build time.
+        type: "string"
+        example: "2d41c047c83e09a6d61d464906feb2a2f3c52aa4"
+
+  SwarmInfo:
+    description: |
+      Represents generic information about swarm.
+    type: "object"
+    properties:
+      NodeID:
+        description: "Unique identifier of for this node in the swarm."
+        type: "string"
+        default: ""
+        example: "k67qz4598weg5unwwffg6z1m1"
+      NodeAddr:
+        description: |
+          IP address at which this node can be reached by other nodes in the
+          swarm.
+        type: "string"
+        default: ""
+        example: "10.0.0.46"
+      LocalNodeState:
+        $ref: "#/definitions/LocalNodeState"
+      ControlAvailable:
+        type: "boolean"
+        default: false
+        example: true
+      Error:
+        type: "string"
+        default: ""
+      RemoteManagers:
+        description: |
+          List of ID's and addresses of other managers in the swarm.
+        type: "array"
+        default: null
+        x-nullable: true
+        items:
+          $ref: "#/definitions/PeerNode"
+        example:
+          - NodeID: "71izy0goik036k48jg985xnds"
+            Addr: "10.0.0.158:2377"
+          - NodeID: "79y6h1o4gv8n120drcprv5nmc"
+            Addr: "10.0.0.159:2377"
+          - NodeID: "k67qz4598weg5unwwffg6z1m1"
+            Addr: "10.0.0.46:2377"
+      Nodes:
+        description: "Total number of nodes in the swarm."
+        type: "integer"
+        x-nullable: true
+        example: 4
+      Managers:
+        description: "Total number of managers in the swarm."
+        type: "integer"
+        x-nullable: true
+        example: 3
+      Cluster:
+        $ref: "#/definitions/ClusterInfo"
+
+  LocalNodeState:
+    description: "Current local status of this node."
+    type: "string"
+    default: ""
+    enum:
+      - ""
+      - "inactive"
+      - "pending"
+      - "active"
+      - "error"
+      - "locked"
+    example: "active"
+
+  PeerNode:
+    description: "Represents a peer-node in the swarm"
+    properties:
+      NodeID:
+        description: "Unique identifier of for this node in the swarm."
+        type: "string"
+      Addr:
+        description: |
+          IP address and ports at which this node can be reached.
+        type: "string"
 
 paths:
   /containers/json:
@@ -3238,6 +4576,8 @@ paths:
           description: "Container created successfully"
           schema:
             type: "object"
+            title: "ContainerCreateResponse"
+            description: "OK response to ContainerCreate operation"
             required: [Id, Warnings]
             properties:
               Id:
@@ -3265,10 +4605,6 @@ paths:
           examples:
             application/json:
               message: "No such container: c2ada9df5af8"
-        406:
-          description: "impossible to attach"
-          schema:
-            $ref: "#/definitions/ErrorResponse"
         409:
           description: "conflict"
           schema:
@@ -3290,6 +4626,7 @@ paths:
           description: "no error"
           schema:
             type: "object"
+            title: "ContainerInspectResponse"
             properties:
               Id:
                 description: "The ID of the container"
@@ -3379,7 +4716,11 @@ paths:
               AppArmorProfile:
                 type: "string"
               ExecIDs:
-                type: "string"
+                description: "IDs of exec instances that are running in the container."
+                type: "array"
+                items:
+                  type: "string"
+                x-nullable: true
               HostConfig:
                 $ref: "#/definitions/HostConfig"
               GraphDriver:
@@ -3399,7 +4740,7 @@ paths:
               Config:
                 $ref: "#/definitions/ContainerConfig"
               NetworkSettings:
-                $ref: "#/definitions/NetworkConfig"
+                $ref: "#/definitions/NetworkSettings"
           examples:
             application/json:
               AppArmorProfile: ""
@@ -3436,6 +4777,9 @@ paths:
                 StopTimeout: 10
               Created: "2015-01-06T15:47:31.485331387Z"
               Driver: "devicemapper"
+              ExecIDs:
+                - "b35395de42bc8abd327f9dd65d913b9ba28c74d2f0734eeeae84fa1c616a0fca"
+                - "3fc1232e5cd20c8de182ed81178503dc6437f4e7ef12b52cc5e8de020652f1c4"
               HostConfig:
                 MaximumIOps: 0
                 MaximumIOBps: 0
@@ -3498,8 +4842,6 @@ paths:
                 LinkLocalIPv6Address: ""
                 LinkLocalIPv6PrefixLen: 0
                 SandboxKey: ""
-                SecondaryIPAddresses: null
-                SecondaryIPv6Addresses: null
                 EndpointID: ""
                 Gateway: ""
                 GlobalIPv6Address: ""
@@ -3576,6 +4918,8 @@ paths:
           description: "no error"
           schema:
             type: "object"
+            title: "ContainerTopResponse"
+            description: "OK response to ContainerTop operation"
             properties:
               Titles:
                 description: "The ps column titles"
@@ -3700,6 +5044,11 @@ paths:
           description: "Only return logs since this time, as a UNIX timestamp"
           type: "integer"
           default: 0
+        - name: "until"
+          in: "query"
+          description: "Only return logs before this time, as a UNIX timestamp"
+          type: "integer"
+          default: 0
         - name: "timestamps"
           in: "query"
           description: "Add timestamps to every log line"
@@ -3731,6 +5080,8 @@ paths:
             items:
               type: "object"
               x-go-name: "ContainerChangeResponseItem"
+              title: "ContainerChangeResponseItem"
+              description: "change item in response to ContainerChanges operation"
               required: [Path, Kind]
               properties:
                 Path:
@@ -3804,9 +5155,9 @@ paths:
         This endpoint returns a live stream of a container’s resource usage
         statistics.
 
-        The `precpu_stats` is the CPU statistic of last read, which is used
-        for calculating the CPU usage percentage. It is not the same as the
-        `cpu_stats` field.
+        The `precpu_stats` is the CPU statistic of the *previous* read, and is
+        used to calculate the CPU usage percentage. It is not an exact copy
+        of the `cpu_stats` field.
 
         If either `precpu_stats.online_cpus` or `cpu_stats.online_cpus` is
         nil then for compatibility with older daemons the length of the
@@ -4081,6 +5432,13 @@ paths:
           examples:
             application/json:
               message: "No such container: c2ada9df5af8"
+        409:
+          description: "container is not running"
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+          examples:
+            application/json:
+              message: "Container d37cde0fe4ad63c3a7252023b2f9800282894247d145cb5933ddf6e52cc03a28 is not running"
         500:
           description: "server error"
           schema:
@@ -4109,6 +5467,8 @@ paths:
           description: "The container has been updated."
           schema:
             type: "object"
+            title: "ContainerUpdateResponse"
+            description: "OK response to ContainerUpdate operation"
             properties:
               Warnings:
                 type: "array"
@@ -4462,12 +5822,21 @@ paths:
           description: "The container has exit."
           schema:
             type: "object"
+            title: "ContainerWaitResponse"
+            description: "OK response to ContainerWait operation"
             required: [StatusCode]
             properties:
               StatusCode:
                 description: "Exit code of the container"
                 type: "integer"
                 x-nullable: false
+              Error:
+                description: "container waiting error, if any"
+                type: "object"
+                properties:
+                  Message:
+                    description: "Details of an error"
+                    type: "string"
         404:
           description: "no such container"
           schema:
@@ -4700,6 +6069,7 @@ paths:
           description: "No error"
           schema:
             type: "object"
+            title: "ContainerPruneResponse"
             properties:
               ContainersDeleted:
                 description: "Container IDs that were deleted"
@@ -4879,8 +6249,19 @@ paths:
           type: "integer"
         - name: "buildargs"
           in: "query"
-          description: "JSON map of string pairs for build-time variables. Users pass these values at build-time. Docker uses the buildargs as the environment context for commands run via the `Dockerfile` RUN instruction, or for variable expansion in other `Dockerfile` instructions. This is not meant for passing secret values. [Read more about the buildargs instruction.](https://docs.docker.com/engine/reference/builder/#arg)"
-          type: "integer"
+          description: >
+            JSON map of string pairs for build-time variables. Users pass these values at build-time. Docker
+            uses the buildargs as the environment context for commands run via the `Dockerfile` RUN
+            instruction, or for variable expansion in other `Dockerfile` instructions. This is not meant for
+            passing secret values.
+
+
+            For example, the build arg `FOO=bar` would become `{"FOO":"bar"}` in JSON. This would result in the
+            the query parameter `buildargs={"FOO":"bar"}`. Note that `{"FOO":"bar"}` should be URI component encoded.
+
+
+            [Read more about the buildargs instruction.](https://docs.docker.com/engine/reference/builder/#arg)
+          type: "string"
         - name: "shmsize"
           in: "query"
           description: "Size of `/dev/shm` in bytes. The size must be greater than 0. If omitted the system uses 64MB."
@@ -4928,6 +6309,16 @@ paths:
 
             Only the registry domain name (and port if not the default 443) are required. However, for legacy reasons, the Docker Hub registry must be specified with both a `https://` prefix and a `/v1/` suffix even though Docker will prefer to use the v2 registry API.
           type: "string"
+        - name: "platform"
+          in: "query"
+          description: "Platform in the format os[/arch[/variant]]"
+          type: "string"
+          default: ""
+        - name: "target"
+          in: "query"
+          description: "Target build stage"
+          type: "string"
+          default: ""
       responses:
         200:
           description: "no error"
@@ -4951,6 +6342,7 @@ paths:
           description: "No error"
           schema:
             type: "object"
+            title: "BuildPruneResponse"
             properties:
               SpaceReclaimed:
                 description: "Disk space reclaimed in bytes"
@@ -5009,6 +6401,11 @@ paths:
           in: "header"
           description: "A base64-encoded auth configuration. [See the authentication section for details.](#section/Authentication)"
           type: "string"
+        - name: "platform"
+          in: "query"
+          description: "Platform in the format os[/arch[/variant]]"
+          type: "string"
+          default: ""
       tags: ["Image"]
   /images/{name}/json:
     get:
@@ -5131,6 +6528,8 @@ paths:
             items:
               type: "object"
               x-go-name: HistoryResponseItem
+              title: "HistoryResponseItem"
+              description: "individual image layer information in response to ImageHistory operation"
               required: [Id, Created, CreatedBy, Tags, Size, Comment]
               properties:
                 Id:
@@ -5337,6 +6736,7 @@ paths:
             type: "array"
             items:
               type: "object"
+              title: "ImageSearchResponseItem"
               properties:
                 description:
                   type: "string"
@@ -5412,6 +6812,7 @@ paths:
           description: "No error"
           schema:
             type: "object"
+            title: "ImagePruneResponse"
             properties:
               ImagesDeleted:
                 description: "Images that were deleted"
@@ -5439,6 +6840,7 @@ paths:
           description: "An identity token was generated successfully."
           schema:
             type: "object"
+            title: "SystemAuthResponse"
             required: [Status]
             properties:
               Status:
@@ -5476,209 +6878,7 @@ paths:
         200:
           description: "No error"
           schema:
-            type: "object"
-            properties:
-              Architecture:
-                type: "string"
-              Containers:
-                type: "integer"
-              ContainersRunning:
-                type: "integer"
-              ContainersStopped:
-                type: "integer"
-              ContainersPaused:
-                type: "integer"
-              CpuCfsPeriod:
-                type: "boolean"
-              CpuCfsQuota:
-                type: "boolean"
-              Debug:
-                type: "boolean"
-              DiscoveryBackend:
-                type: "string"
-              DockerRootDir:
-                type: "string"
-              Driver:
-                type: "string"
-              DriverStatus:
-                type: "array"
-                items:
-                  type: "array"
-                  items:
-                    type: "string"
-              SystemStatus:
-                type: "array"
-                items:
-                  type: "array"
-                  items:
-                    type: "string"
-              Plugins:
-                type: "object"
-                properties:
-                  Volume:
-                    type: "array"
-                    items:
-                      type: "string"
-                  Network:
-                    type: "array"
-                    items:
-                      type: "string"
-                  Log:
-                    type: "array"
-                    items:
-                      type: "string"
-              ExperimentalBuild:
-                type: "boolean"
-              HttpProxy:
-                type: "string"
-              HttpsProxy:
-                type: "string"
-              ID:
-                type: "string"
-              IPv4Forwarding:
-                type: "boolean"
-              Images:
-                type: "integer"
-              IndexServerAddress:
-                type: "string"
-              InitPath:
-                type: "string"
-              InitSha1:
-                type: "string"
-              KernelVersion:
-                type: "string"
-              Labels:
-                type: "array"
-                items:
-                  type: "string"
-              MemTotal:
-                type: "integer"
-              GenericResources:
-                $ref: "#/definitions/GenericResources"
-              MemoryLimit:
-                type: "boolean"
-              NCPU:
-                type: "integer"
-              NEventsListener:
-                type: "integer"
-              NFd:
-                type: "integer"
-              NGoroutines:
-                type: "integer"
-              Name:
-                type: "string"
-              NoProxy:
-                type: "string"
-              OomKillDisable:
-                type: "boolean"
-              OSType:
-                type: "string"
-              OomScoreAdj:
-                type: "integer"
-              OperatingSystem:
-                type: "string"
-              RegistryConfig:
-                type: "object"
-                properties:
-                  IndexConfigs:
-                    type: "object"
-                    additionalProperties:
-                      type: "object"
-                      properties:
-                        Mirrors:
-                          type: "array"
-                          items:
-                            type: "string"
-                        Name:
-                          type: "string"
-                        Official:
-                          type: "boolean"
-                        Secure:
-                          type: "boolean"
-                  InsecureRegistryCIDRs:
-                    type: "array"
-                    items:
-                      type: "string"
-              SwapLimit:
-                type: "boolean"
-              SystemTime:
-                type: "string"
-              ServerVersion:
-                type: "string"
-          examples:
-            application/json:
-              Architecture: "x86_64"
-              ClusterStore: "etcd://localhost:2379"
-              CgroupDriver: "cgroupfs"
-              Containers: 11
-              ContainersRunning: 7
-              ContainersStopped: 3
-              ContainersPaused: 1
-              CpuCfsPeriod: true
-              CpuCfsQuota: true
-              Debug: false
-              DockerRootDir: "/var/lib/docker"
-              Driver: "btrfs"
-              DriverStatus:
-                -
-                  - ""
-              ExperimentalBuild: false
-              HttpProxy: "http://test:test@localhost:8080"
-              HttpsProxy: "https://test:test@localhost:8080"
-              ID: "7TRN:IPZB:QYBB:VPBQ:UMPP:KARE:6ZNR:XE6T:7EWV:PKF4:ZOJD:TPYS"
-              IPv4Forwarding: true
-              Images: 16
-              IndexServerAddress: "https://index.docker.io/v1/"
-              InitPath: "/usr/bin/docker"
-              InitSha1: ""
-              KernelMemory: true
-              KernelVersion: "3.12.0-1-amd64"
-              Labels:
-                - "storage=ssd"
-              MemTotal: 2099236864
-              MemoryLimit: true
-              NCPU: 1
-              NEventsListener: 0
-              NFd: 11
-              NGoroutines: 21
-              Name: "prod-server-42"
-              NoProxy: "9.81.1.160"
-              OomKillDisable: true
-              OSType: "linux"
-              OperatingSystem: "Boot2Docker"
-              Plugins:
-                Volume:
-                  - "local"
-                Network:
-                  - "null"
-                  - "host"
-                  - "bridge"
-              RegistryConfig:
-                IndexConfigs:
-                  docker.io:
-                    Name: "docker.io"
-                    Official: true
-                    Secure: true
-                InsecureRegistryCIDRs:
-                  - "127.0.0.0/8"
-              SecurityOptions:
-                - Key: "Name"
-                  Value: "seccomp"
-                - Key: "Profile"
-                  Value: "default"
-                - Key: "Name"
-                  Value: "apparmor"
-                - Key: "Name"
-                  Value: "selinux"
-                - Key: "Name"
-                  Value: "userns"
-              ServerVersion: "1.9.0"
-              SwapLimit: false
-              SystemStatus:
-                -
-                  - "State"
-                  - "Healthy"
-              SystemTime: "2015-03-10T11:11:23.730591467-07:00"
+            $ref: "#/definitions/SystemInfo"
         500:
           description: "Server error"
           schema:
@@ -5695,7 +6895,30 @@ paths:
           description: "no error"
           schema:
             type: "object"
+            title: "SystemVersionResponse"
             properties:
+              Platform:
+                type: "object"
+                required: [Name]
+                properties:
+                  Name:
+                    type: "string"
+              Components:
+                type: "array"
+                items:
+                  type: "object"
+                  x-go-name: ComponentVersion
+                  required: [Name, Version]
+                  properties:
+                    Name:
+                      type: "string"
+                    Version:
+                      type: "string"
+                      x-nullable: false
+                    Details:
+                      type: "object"
+                      x-nullable: true
+
               Version:
                 type: "string"
               ApiVersion:
@@ -5825,7 +7048,7 @@ paths:
 
         Various objects within Docker report events when something happens to them.
 
-        Containers report these events: `attach`, `commit`, `copy`, `create`, `destroy`, `detach`, `die`, `exec_create`, `exec_detach`, `exec_start`, `export`, `health_status`, `kill`, `oom`, `pause`, `rename`, `resize`, `restart`, `start`, `stop`, `top`, `unpause`, and `update`
+        Containers report these events: `attach`, `commit`, `copy`, `create`, `destroy`, `detach`, `die`, `exec_create`, `exec_detach`, `exec_start`, `exec_die`, `export`, `health_status`, `kill`, `oom`, `pause`, `rename`, `resize`, `restart`, `start`, `stop`, `top`, `unpause`, and `update`
 
         Images report these events: `delete`, `import`, `load`, `pull`, `push`, `save`, `tag`, and `untag`
 
@@ -5851,6 +7074,7 @@ paths:
           description: "no error"
           schema:
             type: "object"
+            title: "SystemEventsResponse"
             properties:
               Type:
                 description: "The type of object emitting the event"
@@ -5909,16 +7133,20 @@ paths:
           description: |
             A JSON encoded value of filters (a `map[string][]string`) to process on the event list. Available filters:
 
+            - `config=<string>` config name or ID
             - `container=<string>` container name or ID
             - `daemon=<string>` daemon name or ID
             - `event=<string>` event type
             - `image=<string>` image name or ID
             - `label=<string>` image or container label
             - `network=<string>` network name or ID
+            - `node=<string>` node ID
             - `plugin`=<string> plugin name or ID
-            - `scope`＝<string> local or swarm
-            - `type=<string>` object to filter by, one of `container`, `image`, `volume`, `network`, `daemon`, `plugin`, `node`, `service` or `secret`
-            - `volume=<string>` volume name or ID
+            - `scope`=<string> local or swarm
+            - `secret=<string>` secret name or ID
+            - `service=<string>` service name or ID
+            - `type=<string>` object to filter by, one of `container`, `image`, `volume`, `network`, `daemon`, `plugin`, `node`, `service`, `secret` or `config`
+            - `volume=<string>` volume name
           type: "string"
       tags: ["System"]
   /system/df:
@@ -5930,6 +7158,7 @@ paths:
           description: "no error"
           schema:
             type: "object"
+            title: "SystemDataUsageResponse"
             properties:
               LayersSize:
                 type: "integer"
@@ -6187,6 +7416,9 @@ paths:
               User:
                 type: "string"
                 description: "The user, and optionally, group to run the exec process inside the container. Format is one of: `user`, `user:group`, `uid`, or `uid:gid`."
+              WorkingDir:
+                type: "string"
+                description: "The working directory for the exec process inside the container."
             example:
               AttachStdin: false
               AttachStdout: true
@@ -6285,7 +7517,12 @@ paths:
           description: "No error"
           schema:
             type: "object"
+            title: "ExecInspectResponse"
             properties:
+              CanRemove:
+                type: "boolean"
+              DetachKeys:
+                type: "string"
               ID:
                 type: "string"
               Running:
@@ -6351,6 +7588,7 @@ paths:
           description: "Summary volume data that matches the query"
           schema:
             type: "object"
+            title: "VolumeListResponse"
             required: [Volumes, Warnings]
             properties:
               Volumes:
@@ -6532,6 +7770,7 @@ paths:
           description: "No error"
           schema:
             type: "object"
+            title: "VolumePruneResponse"
             properties:
               VolumesDeleted:
                 description: "Volumes that were deleted"
@@ -6710,6 +7949,7 @@ paths:
           description: "No error"
           schema:
             type: "object"
+            title: "NetworkCreateResponse"
             properties:
               Id:
                 description: "The ID of the created network."
@@ -6810,7 +8050,7 @@ paths:
       summary: "Connect a container to a network"
       operationId: "NetworkConnect"
       consumes:
-        - "application/octet-stream"
+        - "application/json"
       responses:
         200:
           description: "No error"
@@ -6912,6 +8152,7 @@ paths:
           description: "No error"
           schema:
             type: "object"
+            title: "NetworkPruneResponse"
             properties:
               NetworksDeleted:
                 description: "Networks that were deleted"
@@ -6963,6 +8204,7 @@ paths:
             items:
               description: "Describes a permission the user has to accept upon installing the plugin."
               type: "object"
+              title: "PluginPrivilegeItem"
               properties:
                 Name:
                   type: "string"
@@ -7449,60 +8691,7 @@ paths:
         200:
           description: "no error"
           schema:
-            allOf:
-              - $ref: "#/definitions/ClusterInfo"
-              - type: "object"
-                properties:
-                  JoinTokens:
-                    description: "The tokens workers and managers need to join the swarm."
-                    type: "object"
-                    properties:
-                      Worker:
-                        description: "The token workers can use to join the swarm."
-                        type: "string"
-                      Manager:
-                        description: "The token managers can use to join the swarm."
-                        type: "string"
-            example:
-              CreatedAt: "2016-08-15T16:00:20.349727406Z"
-              Spec:
-                Dispatcher:
-                  HeartbeatPeriod: 5000000000
-                Orchestration:
-                  TaskHistoryRetentionLimit: 10
-                CAConfig:
-                  NodeCertExpiry: 7776000000000000
-                Raft:
-                  LogEntriesForSlowFollowers: 500
-                  HeartbeatTick: 1
-                  SnapshotInterval: 10000
-                  ElectionTick: 3
-                TaskDefaults: {}
-                EncryptionConfig:
-                  AutoLockManagers: false
-                Name: "default"
-              JoinTokens:
-                Worker: "SWMTKN-1-1h8aps2yszaiqmz2l3oc5392pgk8e49qhx2aj3nyv0ui0hez2a-6qmn92w6bu3jdvnglku58u11a"
-                Manager: "SWMTKN-1-1h8aps2yszaiqmz2l3oc5392pgk8e49qhx2aj3nyv0ui0hez2a-8llk83c4wm9lwioey2s316r9l"
-              ID: "70ilmkj2f6sp2137c753w2nmt"
-              UpdatedAt: "2016-08-15T16:32:09.623207604Z"
-              Version:
-                Index: 51
-              RootRotationInProgress: false
-              TLSInfo:
-                TrustRoot: |
-                  -----BEGIN CERTIFICATE-----
-                  MIIBajCCARCgAwIBAgIUbYqrLSOSQHoxD8CwG6Bi2PJi9c8wCgYIKoZIzj0EAwIw
-                  EzERMA8GA1UEAxMIc3dhcm0tY2EwHhcNMTcwNDI0MjE0MzAwWhcNMzcwNDE5MjE0
-                  MzAwWjATMREwDwYDVQQDEwhzd2FybS1jYTBZMBMGByqGSM49AgEGCCqGSM49AwEH
-                  A0IABJk/VyMPYdaqDXJb/VXh5n/1Yuv7iNrxV3Qb3l06XD46seovcDWs3IZNV1lf
-                  3Skyr0ofcchipoiHkXBODojJydSjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMB
-                  Af8EBTADAQH/MB0GA1UdDgQWBBRUXxuRcnFjDfR/RIAUQab8ZV/n4jAKBggqhkjO
-                  PQQDAgNIADBFAiAy+JTe6Uc3KyLCMiqGl2GyWGQqQDEcO3/YG36x7om65AIhAJvz
-                  pxv6zFeVEkAEEkqIYi0omA9+CjanB/6Bz4n1uw8H
-                  -----END CERTIFICATE-----
-                CertIssuerSubject: "MBMxETAPBgNVBAMTCHN3YXJtLWNh"
-                CertIssuerPublicKey: "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmT9XIw9h1qoNclv9VeHmf/Vi6/uI2vFXdBveXTpcPjqx6i9wNazchk1XWV/dKTKvSh9xyGKmiIeRcE4OiMnJ1A=="
+            $ref: "#/definitions/Swarm"
         404:
           description: "no such swarm"
           schema:
@@ -7718,6 +8907,7 @@ paths:
           description: "no error"
           schema:
             type: "object"
+            title: "UnlockKeyResponse"
             properties:
               UnlockKey:
                 description: "The swarm's unlock key."
@@ -7809,6 +8999,7 @@ paths:
           description: "no error"
           schema:
             type: "object"
+            title: "ServiceCreateResponse"
             properties:
               ID:
                 description: "The ID of the created service."
@@ -8425,6 +9616,20 @@ paths:
             items:
               $ref: "#/definitions/Secret"
             example:
+              - ID: "blt1owaxmitz71s9v5zh81zun"
+                Version:
+                  Index: 85
+                CreatedAt: "2017-07-20T13:55:28.678958722Z"
+                UpdatedAt: "2017-07-20T13:55:28.678958722Z"
+                Spec:
+                  Name: "mysql-passwd"
+                  Labels:
+                    some.label: "some.value"
+                  Driver:
+                    Name: "secret-bucket"
+                    Options:
+                      OptionA: "value for driver option A"
+                      OptionB: "value for driver option B"
               - ID: "ktnbjxoalbkvbvedmg1urrz8h"
                 Version:
                   Index: 11
@@ -8432,6 +9637,8 @@ paths:
                 UpdatedAt: "2016-11-05T01:20:17.327670065Z"
                 Spec:
                   Name: "app-dev.crt"
+                  Labels:
+                    foo: "bar"
         500:
           description: "server error"
           schema:
@@ -8464,13 +9671,7 @@ paths:
         201:
           description: "no error"
           schema:
-            type: "object"
-            properties:
-              ID:
-                description: "The ID of the created secret."
-                type: "string"
-            example:
-              ID: "ktnbjxoalbkvbvedmg1urrz8h"
+            $ref: "#/definitions/IdResponse"
         409:
           description: "name conflicts with an existing object"
           schema:
@@ -8495,6 +9696,11 @@ paths:
                   Labels:
                     foo: "bar"
                   Data: "VEhJUyBJUyBOT1QgQSBSRUFMIENFUlRJRklDQVRFCg=="
+                  Driver:
+                    Name: "secret-bucket"
+                    Options:
+                      OptionA: "value for driver option A"
+                      OptionB: "value for driver option B"
       tags: ["Secret"]
   /secrets/{id}:
     get:
@@ -8516,6 +9722,14 @@ paths:
               UpdatedAt: "2016-11-05T01:20:17.327670065Z"
               Spec:
                 Name: "app-dev.crt"
+                Labels:
+                  foo: "bar"
+                Driver:
+                  Name: "secret-bucket"
+                  Options:
+                    OptionA: "value for driver option A"
+                    OptionB: "value for driver option B"
+
         404:
           description: "secret not found"
           schema:
@@ -8656,13 +9870,7 @@ paths:
         201:
           description: "no error"
           schema:
-            type: "object"
-            properties:
-              ID:
-                description: "The ID of the created config."
-                type: "string"
-            example:
-              ID: "ktnbjxoalbkvbvedmg1urrz8h"
+            $ref: "#/definitions/IdResponse"
         409:
           description: "name conflicts with an existing object"
           schema:
@@ -8808,6 +10016,7 @@ paths:
           schema:
             type: "object"
             x-go-name: DistributionInspect
+            title: "DistributionInspectResponse"
             required: [Descriptor, Platforms]
             properties:
               Descriptor:

@@ -39,8 +39,8 @@ func TestDropAlphaFields(t *testing.T) {
 	}
 
 	// Test that field gets dropped when feature gate is not set
-	if err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,DynamicProvisioningScheduling=false"); err != nil {
-		t.Fatalf("Failed to set feature gate for VolumeScheduling or DynamicProvisioningScheduling: %v", err)
+	if err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false"); err != nil {
+		t.Fatalf("Failed to set feature gate for VolumeScheduling: %v", err)
 	}
 	class := &storage.StorageClass{
 		VolumeBindingMode: &bindingMode,
@@ -59,8 +59,8 @@ func TestDropAlphaFields(t *testing.T) {
 		VolumeBindingMode: &bindingMode,
 		AllowedTopologies: allowedTopologies,
 	}
-	if err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true,DynamicProvisioningScheduling=true"); err != nil {
-		t.Fatalf("Failed to set feature gate for VolumeScheduling or DynamicProvisioningScheduling: %v", err)
+	if err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true"); err != nil {
+		t.Fatalf("Failed to set feature gate for VolumeScheduling: %v", err)
 	}
 	DropDisabledAlphaFields(class)
 	if class.VolumeBindingMode != &bindingMode {
@@ -70,7 +70,7 @@ func TestDropAlphaFields(t *testing.T) {
 		t.Errorf("AllowedTopologies field got unexpectantly modified: %+v", class.AllowedTopologies)
 	}
 
-	if err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false,DynamicProvisioningScheduling=false"); err != nil {
-		t.Fatalf("Failed to disable feature gate for VolumeScheduling or DynamicProvisioningScheduling: %v", err)
+	if err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false"); err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
 	}
 }

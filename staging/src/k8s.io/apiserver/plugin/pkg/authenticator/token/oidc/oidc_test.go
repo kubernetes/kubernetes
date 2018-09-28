@@ -1365,6 +1365,28 @@ func TestToken(t *testing.T) {
 			},
 			wantInitErr: true,
 		},
+		{
+			name: "accounts.google.com issuer",
+			options: Options{
+				IssuerURL:     "https://accounts.google.com",
+				ClientID:      "my-client",
+				UsernameClaim: "email",
+				now:           func() time.Time { return now },
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "accounts.google.com",
+				"email": "thomas.jefferson@gmail.com",
+				"aud": "my-client",
+				"exp": %d
+			}`, valid.Unix()),
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			want: &user.DefaultInfo{
+				Name: "thomas.jefferson@gmail.com",
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, test.run)

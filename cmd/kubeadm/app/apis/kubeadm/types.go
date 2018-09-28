@@ -19,46 +19,69 @@ package kubeadm
 import (
 	fuzz "github.com/google/gofuzz"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// InitConfiguration contains a list of elements which make up master's
-// configuration object.
+// InitConfiguration contains a list of fields that are specifically "kubeadm init"-only runtime
+// information. The cluster-wide config is stored in ClusterConfiguration. The InitConfiguration
+// object IS NOT uploaded to the kubeadm-config ConfigMap in the cluster, only the
+// ClusterConfiguration is.
 type InitConfiguration struct {
 	metav1.TypeMeta
 
-	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
-	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
-	// that is used by `kubeadm upgrade` for instance.
+	// ClusterConfiguration holds the cluster-wide information, and embeds that struct (which can be (un)marshalled separately as well)
+	// When InitConfiguration is marshalled to bytes in the external version, this information IS NOT preserved (which can be seen from
+	// the `json:"-"` tag in the external variant of these API types. Here, in the internal version `json:",inline"` is used, which means
+	// that all of ClusterConfiguration's fields will appear as they would be InitConfiguration's fields. This is used in practice solely
+	// in kubeadm API roundtrip unit testing. Check out `cmd/kubeadm/app/util/config/*_test.go` for more information. Normally, the internal
+	// type is NEVER marshalled, but always converted to some external version first.
+	ClusterConfiguration `json:",inline"`
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
-	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
 	BootstrapTokens []BootstrapToken
 
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions
 
+	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
+	APIEndpoint APIEndpoint
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
+type ClusterConfiguration struct {
+	metav1.TypeMeta
+
 	// ComponentConfigs holds internal ComponentConfig struct types known to kubeadm, should long-term only exist in the internal kubeadm API
 	// +k8s:conversion-gen=false
 	ComponentConfigs ComponentConfigs
 
-	// Cluster-wide configuration
-	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
-	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
-
-	// API holds configuration for the k8s apiserver.
-	API API
 	// Etcd holds configuration for etcd.
 	Etcd Etcd
+
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
+
+	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
+	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
+	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
+	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
+	// the BindPort is used.
+	// Possible usages are:
+	// e.g. In an cluster with more than one control plane instances, this field should be
+	// assigned the address of the external load balancer in front of the
+	// control plane instances.
+	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
+	// could be used for assigning a stable DNS to the control plane.
+	ControlPlaneEndpoint string
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -126,22 +149,23 @@ type ComponentConfigs struct {
 // the roundtrip is considered valid, as semi-static values are set and preserved during a roundtrip.
 func (cc ComponentConfigs) Fuzz(c fuzz.Continue) {}
 
-// API struct contains elements of API server address.
-type API struct {
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
+// ConfigMap in the cluster, and then updated by kubeadm when additional control plane instance joins or leaves the cluster.
+type ClusterStatus struct {
+	metav1.TypeMeta
+
+	// APIEndpoints currently available in the cluster, one for each control plane/api server instance.
+	// The key of the map is the IP of the host's default interface
+	APIEndpoints map[string]APIEndpoint
+}
+
+// APIEndpoint struct contains elements of API server instance deployed on a node.
+type APIEndpoint struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string
-	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
-	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
-	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
-	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
-	// the BindPort is used.
-	// Possible usages are:
-	// e.g. In an cluster with more than one control plane instances, this field should be
-	// assigned the address of the external load balancer in front of the
-	// control plane instances.
-	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
-	// could be used for assigning a stable DNS to the control plane.
-	ControlPlaneEndpoint string
+
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
 	BindPort int32
@@ -254,7 +278,6 @@ type ExternalEtcd struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // JoinConfiguration contains elements describing a particular node.
-// TODO: This struct should be replaced by dynamic kubelet configuration.
 type JoinConfiguration struct {
 	metav1.TypeMeta
 
@@ -304,9 +327,8 @@ type JoinConfiguration struct {
 	// control plane instance.
 	ControlPlane bool
 
-	// AdvertiseAddress sets the IP address for the API server to advertise; the
-	// API server will be installed only on nodes hosting an additional control plane instance.
-	AdvertiseAddress string
+	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
+	APIEndpoint APIEndpoint
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool
@@ -317,7 +339,7 @@ type JoinConfiguration struct {
 // It will override location with CI registry name in case user requests special
 // Kubernetes version from CI build area.
 // (See: kubeadmconstants.DefaultCIImageRepository)
-func (cfg *InitConfiguration) GetControlPlaneImageRepository() string {
+func (cfg *ClusterConfiguration) GetControlPlaneImageRepository() string {
 	if cfg.CIImageRepository != "" {
 		return cfg.CIImageRepository
 	}

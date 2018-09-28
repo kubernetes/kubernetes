@@ -513,6 +513,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				extenders,
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},
+				schedulertesting.FakePDBLister{},
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore)

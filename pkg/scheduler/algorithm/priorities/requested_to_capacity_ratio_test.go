@@ -209,19 +209,19 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 
 	for _, test := range tests {
 
-		nodeNames := make([]string, 0)
+		var nodeNames []string
 		for nodeName := range test.nodes {
 			nodeNames = append(nodeNames, nodeName)
 		}
 		sort.Strings(nodeNames)
 
-		nodes := make([]*v1.Node, 0)
+		var nodes []*v1.Node
 		for _, nodeName := range nodeNames {
 			node := test.nodes[nodeName]
 			nodes = append(nodes, makeNode(nodeName, node.capacity.cpu, node.capacity.mem))
 		}
 
-		scheduledPods := make([]*v1.Pod, 0)
+		var scheduledPods []*v1.Pod
 		for name, node := range test.nodes {
 			scheduledPods = append(scheduledPods,
 				buildResourcesPod(name, node.used))

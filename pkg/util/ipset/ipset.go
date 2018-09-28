@@ -153,7 +153,7 @@ type Entry struct {
 	// Port is the entry's Port.
 	Port int
 	// Protocol is the entry's Protocol.  The protocols of entries in the same ip set are all
-	// the same.  The accepted protocols are TCP and UDP.
+	// the same.  The accepted protocols are TCP, UDP and SCTP.
 	Protocol string
 	// Net is the entry's IP network address.  Network address with zero prefix size can NOT
 	// be stored.
@@ -286,7 +286,7 @@ func (runner *runner) CreateSet(set *IPSet, ignoreExistErr bool) error {
 // otherwise raised when the same set (setname and create parameters are identical) already exists.
 func (runner *runner) createSet(set *IPSet, ignoreExistErr bool) error {
 	args := []string{"create", set.Name, string(set.SetType)}
-	if set.SetType == HashIPPortIP || set.SetType == HashIPPort {
+	if set.SetType == HashIPPortIP || set.SetType == HashIPPort || set.SetType == HashIPPortNet {
 		args = append(args,
 			"family", set.HashFamily,
 			"hashsize", strconv.Itoa(set.HashSize),
@@ -482,10 +482,10 @@ func IsNotFoundError(err error) bool {
 
 // checks if given protocol is supported in entry
 func validateProtocol(protocol string) bool {
-	if protocol == ProtocolTCP || protocol == ProtocolUDP {
+	if protocol == ProtocolTCP || protocol == ProtocolUDP || protocol == ProtocolSCTP {
 		return true
 	}
-	glog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s]", protocol, ProtocolTCP, ProtocolUDP)
+	glog.Errorf("Invalid entry's protocol: %s, supported protocols are [%s, %s, %s]", protocol, ProtocolTCP, ProtocolUDP, ProtocolSCTP)
 	return false
 }
 

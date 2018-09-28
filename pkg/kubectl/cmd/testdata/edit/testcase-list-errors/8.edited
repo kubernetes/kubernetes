@@ -3,7 +3,7 @@
 # reopened with the relevant failures.
 #
 # services "svc1" was not valid:
-# * spec.ports[0].protocol: Unsupported value: "VHF": supported values: TCP, UDP
+# * spec.ports[0].protocol: Unsupported value: "VHF": supported values: TCP, UDP, SCTP
 #
 apiVersion: v1
 items:

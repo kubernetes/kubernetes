@@ -1129,6 +1129,48 @@ func printCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, w Prefix
 		"    VolumeHandle:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		csi.Driver, csi.VolumeHandle, csi.ReadOnly)
+	printCSIPersistentVolumeAttributesMultiline(w, "VolumeAttributes", csi.VolumeAttributes)
+}
+
+func printCSIPersistentVolumeAttributesMultiline(w PrefixWriter, title string, annotations map[string]string) {
+	printCSIPersistentVolumeAttributesMultilineIndent(w, "", title, "\t", annotations, sets.NewString())
+}
+
+func printCSIPersistentVolumeAttributesMultilineIndent(w PrefixWriter, initialIndent, title, innerIndent string, attributes map[string]string, skip sets.String) {
+	w.Write(LEVEL_2, "%s%s:%s", initialIndent, title, innerIndent)
+
+	if len(attributes) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	// to print labels in the sorted order
+	keys := make([]string, 0, len(attributes))
+	for key := range attributes {
+		if skip.Has(key) {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	if len(attributes) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+	sort.Strings(keys)
+
+	for i, key := range keys {
+		if i != 0 {
+			w.Write(LEVEL_2, initialIndent)
+			w.Write(LEVEL_2, innerIndent)
+		}
+		line := fmt.Sprintf("%s=%s", key, attributes[key])
+		if len(line) > maxAnnotationLen {
+			w.Write(LEVEL_2, "%s...\n", line[:maxAnnotationLen])
+		} else {
+			w.Write(LEVEL_2, "%s\n", line)
+		}
+		i++
+	}
 }
 
 type PersistentVolumeDescriber struct {
@@ -1197,8 +1239,8 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pv.Name)
-		printLabelsMultiline(w, "Labels", pv.Labels)
-		printAnnotationsMultiline(w, "Annotations", pv.Annotations)
+		printLabelsMultiline(w, "Labels", pv.ObjectMeta.Labels)
+		printAnnotationsMultiline(w, "Annotations", pv.ObjectMeta.Annotations)
 		w.Write(LEVEL_0, "Finalizers:\t%v\n", pv.ObjectMeta.Finalizers)
 		w.Write(LEVEL_0, "StorageClass:\t%s\n", helper.GetPersistentVolumeClass(pv))
 		if pv.ObjectMeta.DeletionTimestamp != nil {
@@ -2972,50 +3014,50 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 		for i, metric := range hpa.Spec.Metrics {
 			switch metric.Type {
 			case autoscaling.ExternalMetricSourceType:
-				if metric.External.TargetAverageValue != nil {
+				if metric.External.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil &&
-						hpa.Status.CurrentMetrics[i].External.CurrentAverageValue != nil {
-						current = hpa.Status.CurrentMetrics[i].External.CurrentAverageValue.String()
+						&hpa.Status.CurrentMetrics[i].External.Current.AverageValue != nil {
+						current = hpa.Status.CurrentMetrics[i].External.Current.AverageValue.String()
 					}
-					w.Write(LEVEL_1, "%q (target average value):\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetAverageValue.String())
+					w.Write(LEVEL_1, "%q (target average value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.AverageValue.String())
 				} else {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].External != nil {
-						current = hpa.Status.CurrentMetrics[i].External.CurrentValue.String()
+						current = hpa.Status.CurrentMetrics[i].External.Current.Value.String()
 					}
-					w.Write(LEVEL_1, "%q (target value):\t%s / %s\n", metric.External.MetricName, current, metric.External.TargetValue.String())
+					w.Write(LEVEL_1, "%q (target value):\t%s / %s\n", metric.External.Metric.Name, current, metric.External.Target.Value.String())
 
 				}
 			case autoscaling.PodsMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Pods != nil {
-					current = hpa.Status.CurrentMetrics[i].Pods.CurrentAverageValue.String()
+					current = hpa.Status.CurrentMetrics[i].Pods.Current.AverageValue.String()
 				}
-				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.MetricName, current, metric.Pods.TargetAverageValue.String())
+				w.Write(LEVEL_1, "%q on pods:\t%s / %s\n", metric.Pods.Metric.Name, current, metric.Pods.Target.AverageValue.String())
 			case autoscaling.ObjectMetricSourceType:
 				current := "<unknown>"
 				if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Object != nil {
-					current = hpa.Status.CurrentMetrics[i].Object.CurrentValue.String()
+					current = hpa.Status.CurrentMetrics[i].Object.Current.Value.String()
 				}
-				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.MetricName, metric.Object.Target.Kind, metric.Object.Target.Name, current, metric.Object.TargetValue.String())
+				w.Write(LEVEL_1, "%q on %s/%s:\t%s / %s\n", metric.Object.Metric.Name, metric.Object.DescribedObject.Kind, metric.Object.DescribedObject.Name, current, metric.Object.Target.Value.String())
 			case autoscaling.ResourceMetricSourceType:
 				w.Write(LEVEL_1, "resource %s on pods", string(metric.Resource.Name))
-				if metric.Resource.TargetAverageValue != nil {
+				if metric.Resource.Target.AverageValue != nil {
 					current := "<unknown>"
 					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil {
-						current = hpa.Status.CurrentMetrics[i].Resource.CurrentAverageValue.String()
+						current = hpa.Status.CurrentMetrics[i].Resource.Current.AverageValue.String()
 					}
-					w.Write(LEVEL_0, ":\t%s / %s\n", current, metric.Resource.TargetAverageValue.String())
+					w.Write(LEVEL_0, ":\t%s / %s\n", current, metric.Resource.Target.AverageValue.String())
 				} else {
 					current := "<unknown>"
-					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil && hpa.Status.CurrentMetrics[i].Resource.CurrentAverageUtilization != nil {
-						current = fmt.Sprintf("%d%% (%s)", *hpa.Status.CurrentMetrics[i].Resource.CurrentAverageUtilization, hpa.Status.CurrentMetrics[i].Resource.CurrentAverageValue.String())
+					if len(hpa.Status.CurrentMetrics) > i && hpa.Status.CurrentMetrics[i].Resource != nil && hpa.Status.CurrentMetrics[i].Resource.Current.AverageUtilization != nil {
+						current = fmt.Sprintf("%d%% (%s)", *hpa.Status.CurrentMetrics[i].Resource.Current.AverageUtilization, hpa.Status.CurrentMetrics[i].Resource.Current.AverageValue.String())
 					}
 
 					target := "<auto>"
-					if metric.Resource.TargetAverageUtilization != nil {
-						target = fmt.Sprintf("%d%%", *metric.Resource.TargetAverageUtilization)
+					if metric.Resource.Target.AverageUtilization != nil {
+						target = fmt.Sprintf("%d%%", *metric.Resource.Target.AverageUtilization)
 					}
 					w.Write(LEVEL_1, "(as a percentage of request):\t%s / %s\n", current, target)
 				}
@@ -3051,8 +3093,8 @@ func describeHorizontalPodAutoscaler(hpa *autoscaling.HorizontalPodAutoscaler, e
 
 func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node, w PrefixWriter) {
 	w.Write(LEVEL_0, "Non-terminated Pods:\t(%d in total)\n", len(nodeNonTerminatedPodsList.Items))
-	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\n")
-	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\n")
+	w.Write(LEVEL_1, "Namespace\tName\t\tCPU Requests\tCPU Limits\tMemory Requests\tMemory Limits\tAGE\n")
+	w.Write(LEVEL_1, "---------\t----\t\t------------\t----------\t---------------\t-------------\t---\n")
 	allocatable := node.Status.Capacity
 	if len(node.Status.Allocatable) > 0 {
 		allocatable = node.Status.Allocatable
@@ -3065,9 +3107,9 @@ func describeNodeResource(nodeNonTerminatedPodsList *api.PodList, node *api.Node
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionMemoryReq := float64(memoryReq.Value()) / float64(allocatable.Memory().Value()) * 100
 		fractionMemoryLimit := float64(memoryLimit.Value()) / float64(allocatable.Memory().Value()) * 100
-		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\n", pod.Namespace, pod.Name,
+		w.Write(LEVEL_1, "%s\t%s\t\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s (%d%%)\t%s\n", pod.Namespace, pod.Name,
 			cpuReq.String(), int64(fractionCpuReq), cpuLimit.String(), int64(fractionCpuLimit),
-			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit))
+			memoryReq.String(), int64(fractionMemoryReq), memoryLimit.String(), int64(fractionMemoryLimit), translateTimestampSince(pod.CreationTimestamp))
 	}
 
 	w.Write(LEVEL_0, "Allocated resources:\n  (Total limits may be over 100 percent, i.e., overcommitted.)\n")
@@ -3474,12 +3516,47 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 		if sc.VolumeBindingMode != nil {
 			w.Write(LEVEL_0, "VolumeBindingMode:\t%s\n", *sc.VolumeBindingMode)
 		}
+		if sc.AllowedTopologies != nil {
+			printAllowedTopologies(w, sc.AllowedTopologies)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
 
 		return nil
 	})
+}
+
+func printAllowedTopologies(w PrefixWriter, topologies []api.TopologySelectorTerm) {
+	w.Write(LEVEL_0, "AllowedTopologies:\t")
+	if len(topologies) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+	w.WriteLine("")
+	for i, term := range topologies {
+		printTopologySelectorTermsMultilineWithIndent(w, LEVEL_1, fmt.Sprintf("Term %d", i), "\t", term.MatchLabelExpressions)
+	}
+}
+
+func printTopologySelectorTermsMultilineWithIndent(w PrefixWriter, indentLevel int, title, innerIndent string, reqs []api.TopologySelectorLabelRequirement) {
+	w.Write(indentLevel, "%s:%s", title, innerIndent)
+
+	if len(reqs) == 0 {
+		w.WriteLine("<none>")
+		return
+	}
+
+	for i, req := range reqs {
+		if i != 0 {
+			w.Write(indentLevel, "%s", innerIndent)
+		}
+		exprStr := fmt.Sprintf("%s %s", req.Key, "in")
+		if len(req.Values) > 0 {
+			exprStr = fmt.Sprintf("%s [%s]", exprStr, strings.Join(req.Values, ", "))
+		}
+		w.Write(LEVEL_0, "%s\n", exprStr)
+	}
 }
 
 type PodDisruptionBudgetDescriber struct {

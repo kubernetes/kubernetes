@@ -68,7 +68,7 @@ import (
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/aws_ebs"
+	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
@@ -172,7 +172,7 @@ func newTestKubeletWithImageList(
 	kubelet := &Kubelet{}
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
-	kubelet.heartbeatClient = fakeKubeClient.CoreV1()
+	kubelet.heartbeatClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
 	kubelet.mounter = &mount.FakeMounter{}
 
@@ -180,7 +180,7 @@ func newTestKubeletWithImageList(
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
 	kubelet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	kubelet.runtimeState.setNetworkState(nil)
-	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
+	if tempDir, err := ioutil.TempDir("", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	} else {
 		kubelet.rootDirectory = tempDir
@@ -313,12 +313,12 @@ func newTestKubeletWithImageList(
 	if initFakeVolumePlugin {
 		allPlugins = append(allPlugins, plug)
 	} else {
-		allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	}
 
-	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 	kubelet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(kubelet.kubeClient), allPlugins, prober)
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")

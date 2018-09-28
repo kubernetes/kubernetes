@@ -226,20 +226,6 @@ data:
     </source>
 
     # Example:
-    # I1104 10:36:20.242766       5 rescheduler.go:73] Running Rescheduler
-    <source>
-      @type tail
-      format multiline
-      multiline_flush_interval 5s
-      format_firstline /^\w\d{4}/
-      format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
-      time_format %m%d %H:%M:%S.%N
-      path /var/log/rescheduler.log
-      pos_file /var/log/gcp-rescheduler.log.pos
-      tag rescheduler
-    </source>
-
-    # Example:
     # I0603 15:31:05.793605       6 cluster_manager.go:230] Reading config from path /etc/gce.conf
     <source>
       @type tail

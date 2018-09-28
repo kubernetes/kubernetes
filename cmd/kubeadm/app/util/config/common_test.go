@@ -84,10 +84,12 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 		{
 			name:         "Master_v1alpha2",
 			fileContents: files["Master_v1alpha2"],
+			expectedErr:  true,
 		},
 		{
 			name:         "Node_v1alpha2",
 			fileContents: files["Node_v1alpha2"],
+			expectedErr:  true,
 		},
 		{
 			name:         "Init_v1alpha3",
@@ -96,16 +98,6 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 		{
 			name:         "Join_v1alpha3",
 			fileContents: files["Join_v1alpha3"],
-		},
-		{
-			name:         "DuplicateMaster",
-			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Master_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "DuplicateNode",
-			fileContents: bytes.Join([][]byte{files["Node_v1alpha2"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
 		},
 		{
 			name:         "DuplicateInit",
@@ -132,31 +124,7 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1alpha1"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
-		{
-			name:         "MustNotMixMasterNode",
-			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "MustNotMixMasterJoin",
-			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "MustNotMixJoinNode",
-			fileContents: bytes.Join([][]byte{files["Join_v1alpha3"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "MustNotMixInitMaster",
-			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Master_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
-		{
-			name:         "MustNotMixInitNode",
-			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
-		},
+		// TODO: implement mustnotMix v1alpha3 v1beta1 after introducing v1beta1
 		{
 			name:         "MustNotMixInitJoin",
 			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
@@ -204,7 +172,9 @@ func TestLowercaseSANs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := &kubeadmapiv1alpha3.InitConfiguration{
-				APIServerCertSANs: test.in,
+				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+					APIServerCertSANs: test.in,
+				},
 			}
 
 			LowercaseSANs(cfg.APIServerCertSANs)
@@ -217,6 +187,56 @@ func TestLowercaseSANs(t *testing.T) {
 				if cfg.APIServerCertSANs[i] != expected {
 					t.Errorf("expected element %d to be %q, got %q", i, expected, cfg.APIServerCertSANs[i])
 				}
+			}
+		})
+	}
+}
+
+func TestVerifyAPIServerBindAddress(t *testing.T) {
+	tests := []struct {
+		name          string
+		address       string
+		expectedError bool
+	}{
+		{
+			name:    "valid address: IPV4",
+			address: "192.168.0.1",
+		},
+		{
+			name:    "valid address: IPV6",
+			address: "2001:db8:85a3::8a2e:370:7334",
+		},
+		{
+			name:          "invalid address: not a global unicast 0.0.0.0",
+			address:       "0.0.0.0",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: not a global unicast 127.0.0.1",
+			address:       "127.0.0.1",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: not a global unicast ::",
+			address:       "::",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: cannot parse IPV4",
+			address:       "255.255.255.255.255",
+			expectedError: true,
+		},
+		{
+			name:          "invalid address: cannot parse IPV6",
+			address:       "2a00:800::2a00:800:10102a00",
+			expectedError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := VerifyAPIServerBindAddress(test.address); (err != nil) != test.expectedError {
+				t.Errorf("expected error: %v, got %v, error: %v", test.expectedError, (err != nil), err)
 			}
 		})
 	}

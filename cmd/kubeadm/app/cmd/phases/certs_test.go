@@ -32,7 +32,7 @@ import (
 )
 
 // phaseTestK8sVersion is a fake kubernetes version to use when testing
-const phaseTestK8sVersion = "v1.10.0"
+const phaseTestK8sVersion = "v1.11.0"
 
 func TestCertsSubCommandsHasFlags(t *testing.T) {
 
@@ -259,14 +259,16 @@ func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(strings.Join(test.subCmds, ","), func(t *testing.T) {
-			// Create temp folder for the test case
 
+			// Create temp folder for the test case
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
 			cfg := &kubeadmapi.InitConfiguration{
-				API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-				CertificatesDir:  tmpdir,
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					CertificatesDir: tmpdir,
+				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
 			}
 			configPath := testutil.SetupInitConfigurationFile(t, tmpdir, cfg)

@@ -85,6 +85,7 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/client-go/util/integer:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -103,6 +104,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/apis/config:all-srcs",
         "//pkg/controller/bootstrap:all-srcs",
         "//pkg/controller/certificates:all-srcs",
         "//pkg/controller/cloud:all-srcs",
@@ -129,6 +131,7 @@ filegroup(
         "//pkg/controller/statefulset:all-srcs",
         "//pkg/controller/testutil:all-srcs",
         "//pkg/controller/ttl:all-srcs",
+        "//pkg/controller/ttlafterfinished:all-srcs",
         "//pkg/controller/util/node:all-srcs",
         "//pkg/controller/volume/attachdetach:all-srcs",
         "//pkg/controller/volume/events:all-srcs",

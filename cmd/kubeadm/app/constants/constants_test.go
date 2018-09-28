@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -170,7 +170,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		},
 		{
 			kubernetesVersion: "1.12.1",
-			expectedVersion:   version.MustParseSemantic("3.2.18"),
+			expectedVersion:   version.MustParseSemantic("3.2.24"),
 			expectedError:     nil,
 		},
 	}

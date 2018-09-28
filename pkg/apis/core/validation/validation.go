@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -255,6 +256,17 @@ var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 // ValidatePiorityClassName can be used to check whether the given priority
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
+
+// ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, msg := range apimachineryvalidation.NameIsDNSSubdomain(name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
+	}
+	return allErrs
+}
 
 // Validates that given value is not negative.
 func ValidateNonnegativeField(value int64, fldPath *field.Path) field.ErrorList {
@@ -1490,6 +1502,10 @@ var supportedReclaimPolicy = sets.NewString(string(core.PersistentVolumeReclaimD
 
 var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), string(core.PersistentVolumeFilesystem))
 
+var supportedDataSourceAPIGroupKinds = map[schema.GroupKind]bool{
+	{Group: "snapshot.storage.k8s.io", Kind: "VolumeSnapshot"}: true,
+}
+
 func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	metaPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, metaPath)
@@ -1813,6 +1829,27 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	} else if spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*spec.VolumeMode)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumeMode"), *spec.VolumeMode, supportedVolumeModes.List()))
 	}
+
+	if spec.DataSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("dataSource"), "VolumeSnapshotDataSource is disabled by feature-gate"))
+	} else if spec.DataSource != nil {
+		if len(spec.DataSource.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "name"), ""))
+		}
+
+		groupKind := schema.GroupKind{Group: "", Kind: spec.DataSource.Kind}
+		if spec.DataSource.APIGroup != nil {
+			groupKind.Group = string(*spec.DataSource.APIGroup)
+		}
+		groupKindList := make([]string, 0, len(supportedDataSourceAPIGroupKinds))
+		for grp := range supportedDataSourceAPIGroupKinds {
+			groupKindList = append(groupKindList, grp.String())
+		}
+		if !supportedDataSourceAPIGroupKinds[groupKind] {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), groupKind.String(), groupKindList))
+		}
+	}
+
 	return allErrs
 }
 
@@ -1907,7 +1944,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	return allErrs
 }
 
-var supportedPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP))
+var supportedPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP), string(core.ProtocolSCTP))
 
 func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1940,6 +1977,8 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
+		} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
+			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 		}
@@ -2999,6 +3038,10 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		}
 	}
 
+	if spec.RuntimeClassName != nil && utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		allErrs = append(allErrs, ValidateRuntimeClassName(*spec.RuntimeClassName, fldPath.Child("runtimeClassName"))...)
+	}
+
 	return allErrs
 }
 
@@ -3090,30 +3133,55 @@ func ValidateNodeSelector(nodeSelector *core.NodeSelector, fldPath *field.Path) 
 	return allErrs
 }
 
-// validateTopologySelectorLabelRequirement tests that the specified TopologySelectorLabelRequirement fields has valid data
-func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequirement, fldPath *field.Path) field.ErrorList {
+// validateTopologySelectorLabelRequirement tests that the specified TopologySelectorLabelRequirement fields has valid data,
+// and constructs a set containing all of its Values.
+func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequirement, fldPath *field.Path) (sets.String, field.ErrorList) {
 	allErrs := field.ErrorList{}
+	valueSet := make(sets.String)
+	valuesPath := fldPath.Child("values")
 	if len(rq.Values) == 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "must specify as least one value"))
+		allErrs = append(allErrs, field.Required(valuesPath, ""))
 	}
+
+	// Validate set property of Values field
+	for i, value := range rq.Values {
+		if valueSet.Has(value) {
+			allErrs = append(allErrs, field.Duplicate(valuesPath.Index(i), value))
+		}
+		valueSet.Insert(value)
+	}
+
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(rq.Key, fldPath.Child("key"))...)
 
-	return allErrs
+	return valueSet, allErrs
 }
 
-// ValidateTopologySelectorTerm tests that the specified topology selector term has valid data
-func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
+// ValidateTopologySelectorTerm tests that the specified topology selector term has valid data,
+// and constructs a map representing the term in raw form.
+func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field.Path) (map[string]sets.String, field.ErrorList) {
 	allErrs := field.ErrorList{}
+	exprMap := make(map[string]sets.String)
+	exprPath := fldPath.Child("matchLabelExpressions")
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
+
 		for i, req := range term.MatchLabelExpressions {
-			allErrs = append(allErrs, validateTopologySelectorLabelRequirement(req, fldPath.Child("matchLabelExpressions").Index(i))...)
+			idxPath := exprPath.Index(i)
+			valueSet, exprErrs := validateTopologySelectorLabelRequirement(req, idxPath)
+			allErrs = append(allErrs, exprErrs...)
+
+			// Validate no duplicate keys exist.
+			if _, exists := exprMap[req.Key]; exists {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("key"), req.Key))
+			}
+			exprMap[req.Key] = valueSet
 		}
 	} else if len(term.MatchLabelExpressions) != 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
-	return allErrs
+	return exprMap, allErrs
 }
 
 // ValidateAvoidPodsInNodeAnnotations tests that the serialized AvoidPods in Node.Annotations has valid data
@@ -3711,8 +3779,10 @@ func ValidateService(service *core.Service) field.ErrorList {
 		includeProtocols := sets.NewString()
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP ports"))
+			if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && service.Spec.Ports[i].Protocol == core.ProtocolSCTP {
+				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
+			} else if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP/SCTP ports"))
 			} else {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
 			}
@@ -3810,6 +3880,8 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && sp.Protocol == core.ProtocolSCTP {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
@@ -5052,50 +5124,16 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 	return allErrs
 }
 
-// Construct lookup map of old subset IPs to NodeNames.
-func updateEpAddrToNodeNameMap(ipToNodeName map[string]string, addresses []core.EndpointAddress) {
-	for n := range addresses {
-		if addresses[n].NodeName == nil {
-			continue
-		}
-		ipToNodeName[addresses[n].IP] = *addresses[n].NodeName
-	}
-}
-
-// Build a map across all subsets of IP -> NodeName
-func buildEndpointAddressNodeNameMap(subsets []core.EndpointSubset) map[string]string {
-	ipToNodeName := make(map[string]string)
-	for i := range subsets {
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].Addresses)
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].NotReadyAddresses)
-	}
-	return ipToNodeName
-}
-
-func validateEpAddrNodeNameTransition(addr *core.EndpointAddress, ipToNodeName map[string]string, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
-	existingNodeName, found := ipToNodeName[addr.IP]
-	if !found {
-		return errList
-	}
-	if addr.NodeName == nil || *addr.NodeName == existingNodeName {
-		return errList
-	}
-	// NodeName entry found for this endpoint IP, but user is attempting to change NodeName
-	return append(errList, field.Forbidden(fldPath, fmt.Sprintf("Cannot change NodeName for %s to %s", addr.IP, *addr.NodeName)))
-}
-
 // ValidateEndpoints tests if required fields are set.
 func ValidateEndpoints(endpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(endpoints.Annotations, field.NewPath("annotations"))...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, []core.EndpointSubset{}, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))...)
 	return allErrs
 }
 
-func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
+func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	ipToNodeName := buildEndpointAddressNodeNameMap(oldSubsets)
 	for i := range subsets {
 		ss := &subsets[i]
 		idxPath := fldPath.Index(i)
@@ -5106,10 +5144,10 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
 		}
 		for addr := range ss.Addresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr))...)
 		}
 		for addr := range ss.NotReadyAddresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr))...)
 		}
 		for port := range ss.Ports {
 			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, idxPath.Child("ports").Index(port))...)
@@ -5119,7 +5157,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 	return allErrs
 }
 
-func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path, ipToNodeName map[string]string) field.ErrorList {
+func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsValidIP(address.IP) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
@@ -5132,10 +5170,6 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 		for _, msg := range ValidateNodeName(*address.NodeName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
 		}
-	}
-	allErrs = append(allErrs, validateEpAddrNodeNameTransition(address, ipToNodeName, fldPath.Child("nodeName"))...)
-	if len(allErrs) > 0 {
-		return allErrs
 	}
 	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
 	return allErrs
@@ -5179,6 +5213,8 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}
@@ -5186,9 +5222,11 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 }
 
 // ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
+// NodeName changes are allowed during update to accommodate the case where nodeIP or PodCIDR is reused.
+// An existing endpoint ip will have a different nodeName if this happens.
 func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, oldEndpoints.Subsets, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, field.NewPath("subsets"))...)
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(newEndpoints.Annotations, field.NewPath("annotations"))...)
 	return allErrs
 }

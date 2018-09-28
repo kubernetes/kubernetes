@@ -458,7 +458,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				}
 
 				// Verify the proxy server logs saw the connection
-				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimRight(strings.TrimLeft(framework.TestContext.Host, "https://"), "/api"))
+				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(framework.TestContext.Host, "https://"), "/api"))
 
 				proxyLog := proxyLogs.String()
 				if !strings.Contains(proxyLog, expectedProxyLog) {
@@ -799,11 +799,11 @@ metadata:
 			By("apply file doesn't have replicas")
 			framework.RunKubectlOrDieInput(deployment2Yaml, "apply", "set-last-applied", "-f", "-", nsFlag)
 
-			By("check last-applied has been updated, annotations doesn't replicas")
+			By("check last-applied has been updated, annotations doesn't have replicas")
 			output = framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
 			requiredString = "\"replicas\": 2"
 			if strings.Contains(output, requiredString) {
-				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
+				framework.Failf("Presenting %s in kubectl view-last-applied", requiredString)
 			}
 
 			By("scale set replicas to 3")

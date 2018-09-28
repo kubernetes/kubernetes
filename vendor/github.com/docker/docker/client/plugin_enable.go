@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // PluginEnable enables a plugin

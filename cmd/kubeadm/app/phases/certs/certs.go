@@ -137,7 +137,7 @@ func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert,
 		return fmt.Errorf("Expected CAname for %s to be %q, but was %s", certSpec.Name, certSpec.CAName, caCertSpec.Name)
 	}
 
-	caCert, caKey, err := loadCertificateAuthority(cfg.CertificatesDir, caCertSpec.BaseName)
+	caCert, caKey, err := LoadCertificateAuthority(cfg.CertificatesDir, caCertSpec.BaseName)
 	if err != nil {
 		return fmt.Errorf("Couldn't load CA certificate %s: %v", caCertSpec.Name, err)
 	}
@@ -158,7 +158,8 @@ func newCertAndKeyFromSpec(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfigurat
 	return cert, key, err
 }
 
-func loadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
+// LoadCertificateAuthority tries to load a CA in the given directory with the given name.
+func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
 	// Checks if certificate authority exists in the PKI directory
 	if !pkiutil.CertOrKeyExist(pkiDir, baseName) {
 		return nil, nil, fmt.Errorf("couldn't load %s certificate authority from %s", baseName, pkiDir)
@@ -395,6 +396,11 @@ func validateSignedCert(l certKeyLocation) error {
 		return fmt.Errorf("failure loading certificate authority for %s: %v", l.uxName, err)
 	}
 
+	return validateSignedCertWithCA(l, caCert)
+}
+
+// validateSignedCertWithCA tries to load a certificate and validate it with the given caCert
+func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error {
 	// Try to load key and signed certificate
 	signedCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(l.pkiDir, l.baseName)
 	if err != nil {

@@ -12,11 +12,11 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
-			"Rev": "19f72df4d05d31cbe1c56bfc8045c96babff6c7e"
+			"Rev": "d6e3b3328b783f23731bc4d058875b0371ff8109"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm/winterm",
-			"Rev": "19f72df4d05d31cbe1c56bfc8045c96babff6c7e"
+			"Rev": "d6e3b3328b783f23731bc4d058875b0371ff8109"
 		},
 		{
 			"ImportPath": "github.com/NYTimes/gziphandler",
@@ -36,51 +36,51 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/auth/authpb",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/client",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/clientv3",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdserverpb",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/mvcc/mvccpb",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/srv",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/tlsutil",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/transport",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/version",
-			"Rev": "95a726a27e09030f9ccbd9982a1508f5a6d25ada"
+			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-semver/semver",
@@ -96,11 +96,11 @@
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/term",
-			"Rev": "4f3616fb1c112e206b88cb7a9922bf49067a7756"
+			"Rev": "a9fbbdc8dd8794b20af358382ab780559bca589d"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/term/windows",
-			"Rev": "4f3616fb1c112e206b88cb7a9922bf49067a7756"
+			"Rev": "a9fbbdc8dd8794b20af358382ab780559bca589d"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
@@ -120,7 +120,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Rev": "94e38aa1586e8a6c8a75770bddf5ff84c48a106b"
+			"Rev": "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
@@ -252,7 +252,7 @@
 		},
 		{
 			"ImportPath": "github.com/modern-go/reflect2",
-			"Rev": "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
+			"Rev": "94122c33edd36123c84d5368cfb2b69df93a0ec8"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
@@ -341,6 +341,14 @@
 		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "1c05540f6879653db88113bc4a2b70aec4bd491f"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2",
+			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2/internal",
+			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
@@ -536,6 +544,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/api/autoscaling/v2beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/api/autoscaling/v2beta2",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -887,6 +899,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/apiserver/pkg/admission/plugin/webhook/util",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/apiserver/pkg/admission/plugin/webhook/validating",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -988,6 +1004,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/authorization/authorizerfactory",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/apiserver/pkg/authorization/path",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -1243,6 +1263,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/informers/autoscaling/v2beta2",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/informers/batch",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -1423,6 +1447,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/kubernetes/typed/batch/v1",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
@@ -1524,6 +1552,10 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/listers/autoscaling/v2beta1",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/listers/autoscaling/v2beta2",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
@@ -1668,10 +1700,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/client-go/tools/reference",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/client-go/tools/watch",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{

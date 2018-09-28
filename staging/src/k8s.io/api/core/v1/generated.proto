@@ -749,7 +749,7 @@ message ContainerPort {
   // This must be a valid port number, 0 < x < 65536.
   optional int32 containerPort = 3;
 
-  // Protocol for port. Must be UDP or TCP.
+  // Protocol for port. Must be UDP, TCP, or SCTP.
   // Defaults to "TCP".
   // +optional
   optional string protocol = 4;
@@ -968,7 +968,7 @@ message EndpointPort {
   optional int32 port = 2;
 
   // The IP protocol for this port.
-  // Must be UDP or TCP.
+  // Must be UDP, TCP, or SCTP.
   // Default is TCP.
   // +optional
   optional string protocol = 3;
@@ -1724,10 +1724,14 @@ message LocalObjectReference {
 message LocalVolumeSource {
   // The full path to the volume on the node.
   // It can be either a directory or block device (disk, partition, ...).
-  // Directories can be represented only by PersistentVolume with VolumeMode=Filesystem.
-  // Block devices can be represented only by VolumeMode=Block, which also requires the
-  // BlockVolume alpha feature gate to be enabled.
   optional string path = 1;
+
+  // Filesystem type to mount.
+  // It applies only when the Path is a block device.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a fileystem if unspecified.
+  // +optional
+  optional string fsType = 2;
 }
 
 // Represents an NFS mount that lasts the lifetime of a pod.
@@ -2292,6 +2296,17 @@ message PersistentVolumeClaimSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string volumeMode = 6;
+
+  // This field requires the VolumeSnapshotDataSource alpha feature gate to be
+  // enabled and currently VolumeSnapshot is the only supported data source.
+  // If the provisioner can support VolumeSnapshot data source, it will create
+  // a new volume and data will be restored to the volume at the same time.
+  // If the provisioner does not support VolumeSnapshot data source, volume will
+  // not be created and the failure will be reported as an event.
+  // In the future, we plan to support more data source types and the behavior
+  // of the provisioner may change.
+  // +optional
+  optional TypedLocalObjectReference dataSource = 7;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -3102,6 +3117,20 @@ message PodSpec {
   // More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
   // +optional
   repeated PodReadinessGate readinessGates = 28;
+
+  // RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used
+  // to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
+  // If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
+  // empty definition that uses the default runtime handler.
+  // More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md
+  // This is an alpha feature and may change in the future.
+  // +optional
+  optional string runtimeClassName = 29;
+
+  // EnableServiceLinks indicates whether information about services should be injected into pod's
+  // environment variables, matching the syntax of Docker links.
+  // +optional
+  optional bool enableServiceLinks = 30;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -4020,6 +4049,13 @@ message SecurityContext {
   // 2) has CAP_SYS_ADMIN
   // +optional
   optional bool allowPrivilegeEscalation = 7;
+
+  // procMount denotes the type of proc mount to use for the containers.
+  // The default is DefaultProcMount which uses the container runtime defaults for
+  // readonly paths and masked paths.
+  // This requires the ProcMountType feature flag to be enabled.
+  // +optional
+  optional string procMount = 9;
 }
 
 // SerializedReference is a reference to serialized object.
@@ -4139,7 +4175,7 @@ message ServicePort {
   // +optional
   optional string name = 1;
 
-  // The IP protocol for this port. Supports "TCP" and "UDP".
+  // The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".
   // Default is TCP.
   // +optional
   optional string protocol = 2;
@@ -4467,6 +4503,22 @@ message TopologySelectorTerm {
   // A list of topology selector requirements by labels.
   // +optional
   repeated TopologySelectorLabelRequirement matchLabelExpressions = 1;
+}
+
+// TypedLocalObjectReference contains enough information to let you locate the
+// typed referenced object inside the same namespace.
+message TypedLocalObjectReference {
+  // APIGroup is the group for the resource being referenced.
+  // If APIGroup is not specified, the specified Kind must be in the core API group.
+  // For any other third-party types, APIGroup is required.
+  // +optional
+  optional string apiGroup = 1;
+
+  // Kind is the type of resource being referenced
+  optional string kind = 2;
+
+  // Name is the name of resource being referenced
+  optional string name = 3;
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

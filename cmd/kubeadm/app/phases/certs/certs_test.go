@@ -351,7 +351,9 @@ func TestSharedCertificateExists(t *testing.T) {
 			defer os.RemoveAll(tmpdir)
 
 			cfg := &kubeadmapi.InitConfiguration{
-				CertificatesDir: tmpdir,
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					CertificatesDir: tmpdir,
+				},
 			}
 
 			// created expected keys
@@ -370,6 +372,89 @@ func TestSharedCertificateExists(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
+	caCert, caKey := createCACert(t)
+	fpCACert, fpCAKey := createCACert(t)
+	etcdCACert, etcdCAKey := createCACert(t)
+
+	fpCert, fpKey := createTestCert(t, fpCACert, fpCAKey)
+
+	tests := []struct {
+		name        string
+		files       pkiFiles
+		expectError bool
+	}{
+		{
+			name: "nothing present",
+		},
+		{
+			name: "CAs already exist",
+			files: pkiFiles{
+				"ca.crt":             caCert,
+				"ca.key":             caKey,
+				"front-proxy-ca.crt": fpCACert,
+				"front-proxy-ca.key": fpCAKey,
+				"etcd/ca.crt":        etcdCACert,
+				"etcd/ca.key":        etcdCAKey,
+			},
+		},
+		{
+			name: "CA certs only",
+			files: pkiFiles{
+				"ca.crt":             caCert,
+				"front-proxy-ca.crt": fpCACert,
+				"etcd/ca.crt":        etcdCACert,
+			},
+			expectError: true,
+		},
+		{
+			name: "FrontProxyCA with certs",
+			files: pkiFiles{
+				"ca.crt":                 caCert,
+				"ca.key":                 caKey,
+				"front-proxy-ca.crt":     fpCACert,
+				"front-proxy-client.crt": fpCert,
+				"front-proxy-client.key": fpKey,
+				"etcd/ca.crt":            etcdCACert,
+				"etcd/ca.key":            etcdCAKey,
+			},
+		},
+		{
+			name: "FrontProxy certs missing CA",
+			files: pkiFiles{
+				"front-proxy-client.crt": fpCert,
+				"front-proxy-client.key": fpKey,
+			},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
+
+			cfg := testutil.GetDefaultInternalConfig(t)
+			cfg.ClusterConfiguration.CertificatesDir = tmpdir
+
+			writePKIFiles(t, tmpdir, test.files)
+
+			err := CreatePKIAssets(cfg)
+			if err != nil {
+				if test.expectError {
+					return
+				}
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if test.expectError {
+				t.Fatal("Expected error from CreatePKIAssets, got none")
+			}
+			assertCertsExist(t, tmpdir)
+		})
+	}
+
 }
 
 func TestUsingExternalCA(t *testing.T) {
@@ -398,10 +483,12 @@ func TestUsingExternalCA(t *testing.T) {
 		defer os.RemoveAll(dir)
 
 		cfg := &kubeadmapi.InitConfiguration{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-			Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				CertificatesDir: dir,
+			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
-			CertificatesDir:  dir,
 		}
 
 		for _, f := range test.setupFuncs {
@@ -565,11 +652,13 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 
 		cfg := &kubeadmapi.InitConfiguration{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4"},
-			Etcd:             kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
-			Networking:       kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+			APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				Etcd:            kubeadmapi.Etcd{Local: &kubeadmapi.LocalEtcd{}},
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+				CertificatesDir: tmpdir,
+			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
-			CertificatesDir:  tmpdir,
 		}
 
 		if test.externalEtcd {
@@ -603,4 +692,25 @@ func deleteFrontProxyCAKey(cfg *kubeadmapi.InitConfiguration) error {
 		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
 	}
 	return nil
+}
+
+func assertCertsExist(t *testing.T, dir string) {
+	tree, err := GetDefaultCertList().AsMap().CertTree()
+	if err != nil {
+		t.Fatalf("unexpected error getting certificates: %v", err)
+	}
+
+	for caCert, certs := range tree {
+		if err := validateCACert(certKeyLocation{dir, caCert.BaseName, "", caCert.Name}); err != nil {
+			t.Errorf("couldn't validate CA certificate %v: %v", caCert.Name, err)
+			// Don't bother validating child certs, but do try the other CAs
+			continue
+		}
+
+		for _, cert := range certs {
+			if err := validateSignedCert(certKeyLocation{dir, caCert.BaseName, cert.BaseName, cert.Name}); err != nil {
+				t.Errorf("couldn't validate certificate %v: %v", cert.Name, err)
+			}
+		}
+	}
 }

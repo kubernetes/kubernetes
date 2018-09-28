@@ -74,6 +74,7 @@ type Manager struct {
 // * If refresh fails and the old token is no longer valid, return an error
 func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
 	key := keyFunc(name, namespace, tr)
+
 	ctr, ok := m.get(key)
 
 	if ok && !m.requiresRefresh(ctr) {
@@ -147,5 +148,15 @@ func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 
 // keys should be nonconfidential and safe to log
 func keyFunc(name, namespace string, tr *authenticationv1.TokenRequest) string {
-	return fmt.Sprintf("%q/%q/%#v", name, namespace, tr.Spec)
+	var exp int64
+	if tr.Spec.ExpirationSeconds != nil {
+		exp = *tr.Spec.ExpirationSeconds
+	}
+
+	var ref authenticationv1.BoundObjectReference
+	if tr.Spec.BoundObjectRef != nil {
+		ref = *tr.Spec.BoundObjectRef
+	}
+
+	return fmt.Sprintf("%q/%q/%#v/%#v/%#v", name, namespace, tr.Spec.Audiences, exp, ref)
 }

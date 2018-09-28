@@ -42,6 +42,8 @@ var (
 	}{
 		{"openstack", true, "https://github.com/kubernetes/cloud-provider-openstack"},
 		{"photon", false, "The Photon Controller project is no longer maintained."},
+		{"cloudstack", false, "The CloudStack Controller project is no longer maintained."},
+		{"ovirt", false, "The ovirt Controller project is no longer maintained."},
 	}
 )
 

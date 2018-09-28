@@ -28,10 +28,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -81,6 +81,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdTopNode(tf, nil, streams)
+	cmd.Flags().Set("no-headers", "true")
 	cmd.Run(cmd, []string{})
 
 	// Check the presence of node names in the output.
@@ -89,6 +90,9 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		if !strings.Contains(result, m.Name) {
 			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
 		}
+	}
+	if strings.Contains(result, "MEMORY") {
+		t.Errorf("should not print headers with --no-headers option set:\n%s\n", result)
 	}
 }
 

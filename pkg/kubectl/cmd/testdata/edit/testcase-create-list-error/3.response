@@ -3,7 +3,7 @@
 	"apiVersion": "v1",
 	"metadata": {},
 	"status": "Failure",
-	"message": "Service \"svc2\" is invalid: [spec.ports[0].protocol: Unsupported value: \"VHF\": supported values: TCP, UDP, spec.clusterIP: Invalid value: \"10.0.0.182.1\": must be empty, 'None', or a valid IP address]",
+	"message": "Service \"svc2\" is invalid: [spec.ports[0].protocol: Unsupported value: \"VHF\": supported values: TCP, UDP, SCTP, spec.clusterIP: Invalid value: \"10.0.0.182.1\": must be empty, 'None', or a valid IP address]",
 	"reason": "Invalid",
 	"details": {
 		"name": "svc2",
@@ -11,7 +11,7 @@
 		"causes": [
 			{
 				"reason": "FieldValueNotSupported",
-				"message": "Unsupported value: \"VHF\": supported values: TCP, UDP",
+				"message": "Unsupported value: \"VHF\": supported values: TCP, UDP, SCTP",
 				"field": "spec.ports[0].protocol"
 			},
 			{

@@ -128,6 +128,8 @@ var ipsetInfo = []struct {
 	{kubeNodePortLocalSetTCP, utilipset.BitmapPort, false, kubeNodePortLocalSetTCPComment},
 	{kubeNodePortSetUDP, utilipset.BitmapPort, false, kubeNodePortSetUDPComment},
 	{kubeNodePortLocalSetUDP, utilipset.BitmapPort, false, kubeNodePortLocalSetUDPComment},
+	{kubeNodePortSetSCTP, utilipset.BitmapPort, false, kubeNodePortSetSCTPComment},
+	{kubeNodePortLocalSetSCTP, utilipset.BitmapPort, false, kubeNodePortLocalSetSCTPComment},
 }
 
 // ipsetWithIptablesChain is the ipsets list with iptables source chain and the chain jump to
@@ -152,6 +154,8 @@ var ipsetWithIptablesChain = []struct {
 	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
 	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
 	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
+	{kubeNodePortSetSCTP, string(kubeServicesChain), string(KubeNodePortChain), "dst", "sctp"},
+	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst", "sctp"},
 }
 
 var ipvsModules = []string{
@@ -213,11 +217,12 @@ type Proxier struct {
 	ipGetter IPGetter
 	// The following buffers are used to reuse memory and avoid allocations
 	// that are significantly impacting performance.
-	iptablesData *bytes.Buffer
-	natChains    *bytes.Buffer
-	filterChains *bytes.Buffer
-	natRules     *bytes.Buffer
-	filterRules  *bytes.Buffer
+	iptablesData     *bytes.Buffer
+	filterChainsData *bytes.Buffer
+	natChains        *bytes.Buffer
+	filterChains     *bytes.Buffer
+	natRules         *bytes.Buffer
+	filterRules      *bytes.Buffer
 	// Added as a member to the struct to allow injection for testing.
 	netlinkHandle NetLinkHandle
 	// ipsetList is the list of ipsets that ipvs proxier used.
@@ -294,8 +299,10 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses []string,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
+	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
+		if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
+		}
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
@@ -306,13 +313,17 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	// Set the conntrack sysctl we need for
-	if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
+	if val, _ := sysctl.GetSysctl(sysctlVSConnTrack); val != 1 {
+		if err := sysctl.SetSysctl(sysctlVSConnTrack, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlVSConnTrack, err)
+		}
 	}
 
 	// Set the ip_forward sysctl we need for
-	if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
-		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
+	if val, _ := sysctl.GetSysctl(sysctlForward); val != 1 {
+		if err := sysctl.SetSysctl(sysctlForward, 1); err != nil {
+			return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlForward, err)
+		}
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -365,6 +376,7 @@ func NewProxier(ipt utiliptables.Interface,
 		ipvsScheduler:     scheduler,
 		ipGetter:          &realIPGetter{nl: NewNetLinkHandle()},
 		iptablesData:      bytes.NewBuffer(nil),
+		filterChainsData:  bytes.NewBuffer(nil),
 		natChains:         bytes.NewBuffer(nil),
 		natRules:          bytes.NewBuffer(nil),
 		filterChains:      bytes.NewBuffer(nil),
@@ -691,6 +703,8 @@ func (proxier *Proxier) syncProxyRules() {
 	// This is to avoid memory reallocations and thus improve performance.
 	proxier.natChains.Reset()
 	proxier.natRules.Reset()
+	proxier.filterChains.Reset()
+	proxier.filterRules.Reset()
 
 	// Write table headers.
 	writeLine(proxier.filterChains, "*filter")
@@ -805,7 +819,9 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, externalIP := range svcInfo.ExternalIPs {
 			if local, err := utilproxy.IsLocalIP(externalIP); err != nil {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
-			} else if local {
+				// We do not start listening on SCTP ports, according to our agreement in the
+				// SCTP support KEP
+			} else if local && (svcInfo.GetProtocol() != v1.ProtocolSCTP) {
 				lp := utilproxy.LocalPort{
 					Description: "externalIP for " + svcNameString,
 					IP:          externalIP,
@@ -981,7 +997,7 @@ func (proxier *Proxier) syncProxyRules() {
 				continue
 			}
 
-			lps := make([]utilproxy.LocalPort, 0)
+			var lps []utilproxy.LocalPort
 			for address := range addresses {
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
@@ -1004,7 +1020,9 @@ func (proxier *Proxier) syncProxyRules() {
 				if proxier.portsMap[lp] != nil {
 					glog.V(4).Infof("Port %s was open before and is still needed", lp.String())
 					replacementPortsMap[lp] = proxier.portsMap[lp]
-				} else {
+					// We do not start listening on SCTP ports, according to our agreement in the
+					// SCTP support KEP
+				} else if svcInfo.GetProtocol() != v1.ProtocolSCTP {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
 						glog.Errorf("can't open %s, skipping this nodePort: %v", lp.String(), err)
@@ -1032,6 +1050,8 @@ func (proxier *Proxier) syncProxyRules() {
 				nodePortSet = proxier.ipsetList[kubeNodePortSetTCP]
 			case "udp":
 				nodePortSet = proxier.ipsetList[kubeNodePortSetUDP]
+			case "sctp":
+				nodePortSet = proxier.ipsetList[kubeNodePortSetSCTP]
 			default:
 				// It should never hit
 				glog.Errorf("Unsupported protocol type: %s", protocol)
@@ -1052,6 +1072,8 @@ func (proxier *Proxier) syncProxyRules() {
 					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetTCP]
 				case "udp":
 					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetUDP]
+				case "sctp":
+					nodePortLocalSet = proxier.ipsetList[kubeNodePortLocalSetSCTP]
 				default:
 					// It should never hit
 					glog.Errorf("Unsupported protocol type: %s", protocol)
@@ -1066,7 +1088,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Build ipvs kernel routes for each node ip address
-			nodeIPs := make([]net.IP, 0)
+			var nodeIPs []net.IP
 			for address := range addresses {
 				if !utilproxy.IsZeroCIDR(address) {
 					nodeIPs = append(nodeIPs, net.ParseIP(address))
@@ -1117,6 +1139,8 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.Reset()
 	proxier.iptablesData.Write(proxier.natChains.Bytes())
 	proxier.iptablesData.Write(proxier.natRules.Bytes())
+	proxier.iptablesData.Write(proxier.filterChains.Bytes())
+	proxier.iptablesData.Write(proxier.filterRules.Bytes())
 
 	glog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
@@ -1345,10 +1369,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 
 // createAndLinkeKubeChain create all kube chains that ipvs proxier need and write basic link.
 func (proxier *Proxier) createAndLinkeKubeChain() {
-	// TODO: Filter table is small so we're not reusing this buffer over rounds.
-	// However, to optimize it further, we should do that.
-	filterBuffer := bytes.NewBuffer(nil)
-	existingFilterChains := proxier.getExistingChains(filterBuffer, utiliptables.TableFilter)
+	existingFilterChains := proxier.getExistingChains(proxier.filterChainsData, utiliptables.TableFilter)
 	existingNATChains := proxier.getExistingChains(proxier.iptablesData, utiliptables.TableNAT)
 
 	// Make sure we keep stats for the top-level chains

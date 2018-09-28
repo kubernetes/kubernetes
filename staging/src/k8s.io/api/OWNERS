@@ -48,3 +48,5 @@ reviewers:
 - yifan-gu
 - yujuhong
 - zmerlynn
+labels:
+- sig/architecture

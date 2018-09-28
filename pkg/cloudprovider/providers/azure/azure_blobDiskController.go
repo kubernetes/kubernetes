@@ -80,7 +80,7 @@ func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error
 // If no storage account is given, search all the storage accounts associated with the resource group and pick one that
 // fits storage type and location.
 func (c *BlobDiskController) CreateVolume(blobName, accountName, accountType, location string, requestGB int) (string, string, int, error) {
-	account, key, err := c.common.cloud.ensureStorageAccount(accountName, accountType, location, dedicatedDiskAccountNamePrefix)
+	account, key, err := c.common.cloud.ensureStorageAccount(accountName, accountType, c.common.resourceGroup, location, dedicatedDiskAccountNamePrefix)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
@@ -108,7 +108,7 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse vhd URI %v", err)
 	}
-	key, err := c.common.cloud.getStorageAccesskey(accountName)
+	key, err := c.common.cloud.getStorageAccesskey(accountName, c.common.resourceGroup)
 	if err != nil {
 		return fmt.Errorf("no key for storage account %s, err %v", accountName, err)
 	}

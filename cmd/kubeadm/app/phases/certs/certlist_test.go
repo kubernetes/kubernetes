@@ -116,9 +116,11 @@ func TestCreateCertificateChain(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	ic := &kubeadmapi.InitConfiguration{
-		CertificatesDir: dir,
 		NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 			Name: "test-node",
+		},
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			CertificatesDir: dir,
 		},
 	}
 

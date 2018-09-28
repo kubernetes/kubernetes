@@ -134,7 +134,7 @@ type NetworkPolicyEgressRule struct {
 
 // NetworkPolicyPort describes a port to allow traffic on
 type NetworkPolicyPort struct {
-	// The protocol (TCP or UDP) which traffic must match. If not specified, this
+	// The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this
 	// field defaults to TCP.
 	// +optional
 	Protocol *api.Protocol

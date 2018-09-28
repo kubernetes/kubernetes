@@ -27,13 +27,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -89,7 +88,8 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 		StreamOptions: StreamOptions{
 			IOStreams: streams,
 		},
-		Attach: &DefaultRemoteAttach{},
+		Attach:     &DefaultRemoteAttach{},
+		AttachFunc: defaultAttachFunc,
 	}
 }
 
@@ -136,7 +136,7 @@ func defaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 			Stdout:    o.Out != nil,
 			Stderr:    !o.DisableStderr,
 			TTY:       raw,
-		}, legacyscheme.ParameterCodec)
+		}, scheme.ParameterCodec)
 
 		return o.Attach.Attach("POST", req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
 	}
@@ -192,8 +192,6 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return err
 	}
 	o.Config = config
-
-	o.AttachFunc = defaultAttachFunc
 
 	if o.CommandName == "" {
 		o.CommandName = cmd.CommandPath()

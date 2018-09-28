@@ -252,6 +252,11 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 		*out = new(v1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.SideEffects != nil {
+		in, out := &in.SideEffects, &out.SideEffects
+		*out = new(SideEffectClass)
+		**out = **in
+	}
 	return
 }
 

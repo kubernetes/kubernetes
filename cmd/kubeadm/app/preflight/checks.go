@@ -41,6 +41,7 @@ import (
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -501,7 +501,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
-// SystemVerificationCheck defines struct used for for running the system verification node check in test/e2e_node/system
+// SystemVerificationCheck defines struct used for running the system verification node check in test/e2e_node/system
 type SystemVerificationCheck struct {
 	IsDocker bool
 }
@@ -855,15 +855,15 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
-		PortOpenCheck{port: int(cfg.API.BindPort)},
+		FirewalldCheck{ports: []int{int(cfg.APIEndpoint.BindPort), 10250}},
+		PortOpenCheck{port: int(cfg.APIEndpoint.BindPort)},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress},
+		HTTPProxyCheck{Proto: "https", Host: cfg.APIEndpoint.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
@@ -898,7 +898,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
-	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
+	if ip := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress); ip != nil {
 		if ip.To4() == nil && ip.To16() != nil {
 			checks = append(checks,
 				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
@@ -1014,7 +1014,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(cfg)},
+		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(&cfg.ClusterConfiguration)},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }

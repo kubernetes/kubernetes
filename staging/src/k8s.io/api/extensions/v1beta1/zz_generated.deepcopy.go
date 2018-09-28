@@ -1134,6 +1134,11 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.AllowedProcMountTypes != nil {
+		in, out := &in.AllowedProcMountTypes, &out.AllowedProcMountTypes
+		*out = make([]corev1.ProcMountType, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

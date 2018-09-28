@@ -17,13 +17,13 @@ limitations under the License.
 package componentconfigs
 
 import (
+	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -33,7 +33,7 @@ const (
 )
 
 // DefaultKubeProxyConfiguration assigns default values for the kube-proxy ComponentConfig
-func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
+func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
 	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
@@ -45,12 +45,12 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
 		externalproxycfg.ClusterCIDR = internalcfg.Networking.PodSubnet
 	}
 
-	if externalproxycfg.ClientConnection.KubeConfigFile == "" {
-		externalproxycfg.ClientConnection.KubeConfigFile = KubeproxyKubeConfigFileName
+	if externalproxycfg.ClientConnection.Kubeconfig == "" {
+		externalproxycfg.ClientConnection.Kubeconfig = KubeproxyKubeConfigFileName
 	}
 
 	// Run the rest of the kube-proxy defaulting code
-	kubeproxyconfigv1alpha1.SetDefaults_KubeProxyConfiguration(externalproxycfg)
+	Scheme.Default(externalproxycfg)
 
 	if internalcfg.ComponentConfigs.KubeProxy == nil {
 		internalcfg.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
@@ -62,7 +62,7 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
 }
 
 // DefaultKubeletConfiguration assigns default values for the kubelet ComponentConfig
-func DefaultKubeletConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
+func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
 	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalkubeletcfg := &kubeletconfigv1beta1.KubeletConfiguration{}
@@ -108,7 +108,7 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.InitConfiguration) {
 	externalkubeletcfg.HealthzBindAddress = "127.0.0.1"
 	externalkubeletcfg.HealthzPort = utilpointer.Int32Ptr(constants.KubeletHealthzPort)
 
-	kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(externalkubeletcfg)
+	Scheme.Default(externalkubeletcfg)
 
 	if internalcfg.ComponentConfigs.Kubelet == nil {
 		internalcfg.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}

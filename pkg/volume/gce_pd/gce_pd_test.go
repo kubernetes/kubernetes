@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
+	"sort"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -27,10 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -78,9 +82,10 @@ func TestGetAccessModes(t *testing.T) {
 type fakePDManager struct {
 }
 
-func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
+func (fake *fakePDManager) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels["fakepdmanager"] = "yes"
+	labels[kubeletapis.LabelZoneFailureDomain] = "zone1__zone2"
 	return "test-gce-volume-name", 100, labels, "", nil
 }
 
@@ -89,6 +94,15 @@ func (fake *fakePDManager) DeleteVolume(cd *gcePersistentDiskDeleter) error {
 		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.pdName)
 	}
 	return nil
+}
+
+func getNodeSelectorRequirementWithKey(key string, term v1.NodeSelectorTerm) (*v1.NodeSelectorRequirement, error) {
+	for _, r := range term.MatchExpressions {
+		if r.Key == key {
+			return &r, nil
+		}
+	}
+	return nil, fmt.Errorf("key %s not found", key)
 }
 
 func TestPlugin(t *testing.T) {
@@ -182,7 +196,35 @@ func TestPlugin(t *testing.T) {
 	}
 
 	if persistentSpec.Labels["fakepdmanager"] != "yes" {
-		t.Errorf("Provision() returned unexpected labels: %v", persistentSpec.Labels)
+		t.Errorf("Provision() returned unexpected value for fakepdmanager: %v", persistentSpec.Labels["fakepdmanager"])
+	}
+
+	if persistentSpec.Labels[kubeletapis.LabelZoneFailureDomain] != "zone1__zone2" {
+		t.Errorf("Provision() returned unexpected value for %s: %v", kubeletapis.LabelZoneFailureDomain, persistentSpec.Labels[kubeletapis.LabelZoneFailureDomain])
+	}
+
+	if persistentSpec.Spec.NodeAffinity == nil {
+		t.Errorf("Unexpected nil NodeAffinity found")
+	}
+	if len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms) != 1 {
+		t.Errorf("Unexpected number of NodeSelectorTerms")
+	}
+	term := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0]
+	if len(term.MatchExpressions) != 2 {
+		t.Errorf("Unexpected number of NodeSelectorRequirements in volume NodeAffinity: %d", len(term.MatchExpressions))
+	}
+	r, _ := getNodeSelectorRequirementWithKey("fakepdmanager", term)
+	if r == nil || r.Values[0] != "yes" || r.Operator != v1.NodeSelectorOpIn {
+		t.Errorf("NodeSelectorRequirement fakepdmanager-in-yes not found in volume NodeAffinity")
+	}
+	zones, _ := volumeutil.ZonesToSet("zone1,zone2")
+	r, _ = getNodeSelectorRequirementWithKey(kubeletapis.LabelZoneFailureDomain, term)
+	if r == nil {
+		t.Errorf("NodeSelectorRequirement %s-in-%v not found in volume NodeAffinity", kubeletapis.LabelZoneFailureDomain, zones)
+	}
+	sort.Strings(r.Values)
+	if !reflect.DeepEqual(r.Values, zones.List()) {
+		t.Errorf("ZoneFailureDomain elements %v does not match zone labels %v", r.Values, zones)
 	}
 
 	// Test Deleter

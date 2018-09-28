@@ -15,3 +15,5 @@ reviewers:
 - gnufied
 - verult
 - davidz627
+labels:
+- sig/storage

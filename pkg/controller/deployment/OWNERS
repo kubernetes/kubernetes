@@ -8,3 +8,5 @@ reviewers:
 - kargakis
 - mfojtik
 - tnozicka
+labels:
+- sig/apps

@@ -18,9 +18,10 @@
 #   [ARCH=amd64] [REGISTRY="staging-k8s.gcr.io"] make (build|push)
 
 REGISTRY?=staging-k8s.gcr.io
-IMAGE?=debian-hyperkube-base
-TAG=0.10.1
+IMAGE?=$(REGISTRY)/debian-hyperkube-base
+TAG=0.10.2
 ARCH?=amd64
+ALL_ARCH = amd64 arm arm64 ppc64le s390x
 CACHEBUST?=1
 
 BASEIMAGE=k8s.gcr.io/debian-base-$(ARCH):0.3.2
@@ -29,9 +30,29 @@ CNI_VERSION=v0.6.0
 TEMP_DIR:=$(shell mktemp -d)
 CNI_TARBALL=cni-plugins-$(ARCH)-$(CNI_VERSION).tgz
 
-.PHONY: all build push clean
+# This option is for running docker manifest command
+export DOCKER_CLI_EXPERIMENTAL := enabled
 
-all: push
+.PHONY: all build push clean all-build all-push-images all-push push-manifest
+
+all: all-push
+
+sub-build-%:
+	$(MAKE) ARCH=$* build
+
+all-build: $(addprefix sub-build-,$(ALL_ARCH))
+
+sub-push-image-%:
+	$(MAKE) ARCH=$* push
+
+all-push-images: $(addprefix sub-push-image-,$(ALL_ARCH))
+
+all-push: all-push-images push-manifest
+
+push-manifest:
+	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
+	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
+	docker manifest push ${IMAGE}:${TAG}
 
 cni-tars/$(CNI_TARBALL):
 	mkdir -p cni-tars/
@@ -55,8 +76,8 @@ ifneq ($(ARCH),amd64)
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 endif
-	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
+	docker build --pull -t $(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
 
 push: build
-	docker push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
+	docker push $(IMAGE)-$(ARCH):$(TAG)

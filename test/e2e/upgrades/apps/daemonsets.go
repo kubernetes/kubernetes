@@ -126,11 +126,11 @@ func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector m
 
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
-		if len(node.Spec.Taints) == 0 {
-			nodeNames = append(nodeNames, node.Name)
-		} else {
-			framework.Logf("Node %v not expected to have DaemonSet pod, has taints %v", node.Name, node.Spec.Taints)
+		if len(node.Spec.Taints) != 0 {
+			framework.Logf("Ignore taints %v on Node %v for DaemonSet Pod.", node.Spec.Taints, node.Name)
 		}
+		// DaemonSet Pods are expected to run on all the nodes in e2e.
+		nodeNames = append(nodeNames, node.Name)
 	}
 
 	return checkDaemonPodOnNodes(f, namespace, selector, nodeNames)

@@ -344,6 +344,47 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
+func TestSyncEndpointsProtocolSCTP(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	endpoints := newController(testServer.URL)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
+			Ports:     []v1.EndpointPort{{Port: 1000, Protocol: "SCTP"}},
+		}},
+	})
+	addPods(endpoints.podStore, ns, 1, 1, 0)
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{},
+			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "SCTP"}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+
+	endpointsHandler.ValidateRequestCount(t, 1)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []v1.EndpointPort{{Port: 8080, Protocol: "SCTP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+}
+
 func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
@@ -861,6 +902,34 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 		Subsets: []v1.EndpointSubset{},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+}
+
+func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	endpoints := newController(testServer.URL)
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector:  map[string]string{"foo": "bar"},
+			ClusterIP: "None",
+			Ports:     nil,
+		},
+	})
+	addPods(endpoints.podStore, ns, 1, 1, 0)
+	endpoints.syncService(ns + "/foo")
+	endpointsHandler.ValidateRequestCount(t, 1)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     nil,
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
 // There are 3*5 possibilities(3 types of RestartPolicy by 5 types of PodPhase). Not list them all here.

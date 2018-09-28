@@ -52,6 +52,7 @@ import (
 var (
 	ErrCreateContainerConfig = errors.New("CreateContainerConfigError")
 	ErrCreateContainer       = errors.New("CreateContainerError")
+	ErrPreStartHook          = errors.New("PreStartHookError")
 	ErrPostStartHook         = errors.New("PostStartHookError")
 )
 
@@ -123,8 +124,8 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	}
 	err = m.internalLifecycle.PreStartContainer(pod, container, containerID)
 	if err != nil {
-		m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", err)
-		return "Internal PreStartContainer hook failed", err
+		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", grpc.ErrorDesc(err))
+		return grpc.ErrorDesc(err), ErrPreStartHook
 	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container")
 

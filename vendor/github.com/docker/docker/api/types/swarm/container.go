@@ -55,6 +55,7 @@ type ContainerSpec struct {
 	User            string                  `json:",omitempty"`
 	Groups          []string                `json:",omitempty"`
 	Privileges      *Privileges             `json:",omitempty"`
+	Init            *bool                   `json:",omitempty"`
 	StopSignal      string                  `json:",omitempty"`
 	TTY             bool                    `json:",omitempty"`
 	OpenStdin       bool                    `json:",omitempty"`
@@ -65,8 +66,9 @@ type ContainerSpec struct {
 	// The format of extra hosts on swarmkit is specified in:
 	// http://man7.org/linux/man-pages/man5/hosts.5.html
 	//    IP_address canonical_hostname [aliases...]
-	Hosts     []string           `json:",omitempty"`
-	DNSConfig *DNSConfig         `json:",omitempty"`
-	Secrets   []*SecretReference `json:",omitempty"`
-	Configs   []*ConfigReference `json:",omitempty"`
+	Hosts     []string            `json:",omitempty"`
+	DNSConfig *DNSConfig          `json:",omitempty"`
+	Secrets   []*SecretReference  `json:",omitempty"`
+	Configs   []*ConfigReference  `json:",omitempty"`
+	Isolation container.Isolation `json:",omitempty"`
 }

@@ -358,6 +358,9 @@ type MemoryStats struct {
 	// Units: Bytes.
 	Swap uint64 `json:"swap"`
 
+	// The amount of memory used for mapped files (includes tmpfs/shmem)
+	MappedFile uint64 `json:"mapped_file"`
+
 	// The amount of working set memory, this includes recently accessed memory,
 	// dirty memory, and kernel memory. Working set is <= "usage".
 	// Units: Bytes.

@@ -45,13 +45,12 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	var systemPodsNo int32
 	var c clientset.Interface
 	var ns string
-	ignoreLabels := framework.ImagePullerLabels
 	var group string
 
 	BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
+		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
@@ -104,10 +103,8 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
-			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, ignoreLabels)
+			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
 			Expect(err).NotTo(HaveOccurred())
-			By("waiting for image prepulling pods to complete")
-			framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout)
 		})
 
 		It("should be able to delete nodes", func() {

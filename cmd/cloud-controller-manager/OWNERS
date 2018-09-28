@@ -11,3 +11,4 @@ reviewers:
 - stewart-yu
 labels:
 - sig/api-machinery
+- sig/cloud-provider

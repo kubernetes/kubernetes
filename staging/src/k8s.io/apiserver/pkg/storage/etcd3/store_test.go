@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -44,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd"
 	storagetests "k8s.io/apiserver/pkg/storage/tests"
 	"k8s.io/apiserver/pkg/storage/value"
 )
@@ -1179,6 +1181,153 @@ func TestListContinuation(t *testing.T) {
 	}
 	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[2].storedObj) {
 		t.Fatalf("Unexpected third page: %#v", out.Items)
+	}
+
+}
+
+func TestListInconsistentContinuation(t *testing.T) {
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
+	defer cluster.Terminate(t)
+	store := newStore(cluster.RandClient(), false, true, codec, "", prefixTransformer{prefix: []byte(defaultTestPrefix)})
+	ctx := context.Background()
+
+	// Setup storage with the following structure:
+	//  /
+	//   - one-level/
+	//  |            - test
+	//  |
+	//   - two-level/
+	//               - 1/
+	//              |   - test
+	//              |
+	//               - 2/
+	//                  - test
+	//
+	preset := []struct {
+		key       string
+		obj       *example.Pod
+		storedObj *example.Pod
+	}{
+		{
+			key: "/one-level/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/1/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
+		{
+			key: "/two-level/2/test",
+			obj: &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+		},
+	}
+
+	for i, ps := range preset {
+		preset[i].storedObj = &example.Pod{}
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		if err != nil {
+			t.Fatalf("Set failed: %v", err)
+		}
+	}
+
+	pred := func(limit int64, continueValue string) storage.SelectionPredicate {
+		return storage.SelectionPredicate{
+			Limit:    limit,
+			Continue: continueValue,
+			Label:    labels.Everything(),
+			Field:    fields.Everything(),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+				pod := obj.(*example.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
+			},
+		}
+	}
+
+	out := &example.PodList{}
+	if err := store.List(ctx, "/", "0", pred(1, ""), out); err != nil {
+		t.Fatalf("Unable to get initial list: %v", err)
+	}
+	if len(out.Continue) == 0 {
+		t.Fatalf("No continuation token set")
+	}
+	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[0].storedObj) {
+		t.Fatalf("Unexpected first page: %#v", out.Items)
+	}
+
+	continueFromSecondItem := out.Continue
+
+	// update /two-level/2/test/bar
+	oldName := preset[2].obj.Name
+	newPod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: oldName,
+			Labels: map[string]string{
+				"state": "new",
+			},
+		},
+	}
+	if err := store.GuaranteedUpdate(ctx, preset[2].key, preset[2].storedObj, false, nil,
+		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			return newPod, nil, nil
+		}, newPod); err != nil {
+		t.Fatalf("update failed: %v", err)
+	}
+
+	// compact to latest revision.
+	versioner := etcd.APIObjectVersioner{}
+	lastRVString := preset[2].storedObj.ResourceVersion
+	lastRV, err := versioner.ParseResourceVersion(lastRVString)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cluster.Client(0).KV.Compact(ctx, int64(lastRV), clientv3.WithCompactPhysical()); err != nil {
+		t.Fatalf("Unable to compact, %v", err)
+	}
+
+	// The old continue token should have expired
+	err = store.List(ctx, "/", "0", pred(0, continueFromSecondItem), out)
+	if err == nil {
+		t.Fatalf("unexpected no error")
+	}
+	if !strings.Contains(err.Error(), inconsistentContinue) {
+		t.Fatalf("unexpected error message %v", err)
+	}
+	status, ok := err.(apierrors.APIStatus)
+	if !ok {
+		t.Fatalf("expect error of implements the APIStatus interface, got %v", reflect.TypeOf(err))
+	}
+	inconsistentContinueFromSecondItem := status.Status().ListMeta.Continue
+	if len(inconsistentContinueFromSecondItem) == 0 {
+		t.Fatalf("expect non-empty continue token")
+	}
+
+	out = &example.PodList{}
+	if err := store.List(ctx, "/", "0", pred(1, inconsistentContinueFromSecondItem), out); err != nil {
+		t.Fatalf("Unable to get second page: %v", err)
+	}
+	if len(out.Continue) == 0 {
+		t.Fatalf("No continuation token set")
+	}
+	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[1].storedObj) {
+		t.Fatalf("Unexpected second page: %#v", out.Items)
+	}
+	if out.ResourceVersion != lastRVString {
+		t.Fatalf("Expected list resource version to be %s, got %s", lastRVString, out.ResourceVersion)
+	}
+	continueFromThirdItem := out.Continue
+	out = &example.PodList{}
+	if err := store.List(ctx, "/", "0", pred(1, continueFromThirdItem), out); err != nil {
+		t.Fatalf("Unable to get second page: %v", err)
+	}
+	if len(out.Continue) != 0 {
+		t.Fatalf("Unexpected continuation token set")
+	}
+	if len(out.Items) != 1 || !reflect.DeepEqual(&out.Items[0], preset[2].storedObj) {
+		t.Fatalf("Unexpected third page: %#v", out.Items)
+	}
+	if out.ResourceVersion != lastRVString {
+		t.Fatalf("Expected list resource version to be %s, got %s", lastRVString, out.ResourceVersion)
 	}
 }
 

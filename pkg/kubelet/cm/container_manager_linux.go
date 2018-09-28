@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -59,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -307,6 +307,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			cgroupManager:     cm.cgroupManager,
 			podPidsLimit:      cm.ExperimentalPodPidsLimit,
 			enforceCPULimits:  cm.EnforceCPULimits,
+			cpuCFSQuotaPeriod: uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
 		}
 	}
 	return &podContainerManagerNoop{
@@ -604,8 +605,8 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	return nil
 }
 
-func (cm *containerManagerImpl) GetPluginRegistrationHandlerCallback() pluginwatcher.RegisterCallbackFn {
-	return cm.deviceManager.GetWatcherCallback()
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return cm.deviceManager.GetWatcherHandler()
 }
 
 // TODO: move the GetResources logic to PodContainerManager.

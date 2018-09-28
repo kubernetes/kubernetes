@@ -319,10 +319,11 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 		// its own log based on PV + Pod
 		log = path.Join(p, b.pod.Name+"-glusterfs.log")
 
+		// Use derived log file in gluster fuse mount
+		options = append(options, "log-file="+log)
+
 	}
 
-	// Use derived/provided log file in gluster fuse mount
-	options = append(options, "log-file="+log)
 	options = append(options, "log-level=ERROR")
 
 	var addrlist []string
@@ -708,8 +709,6 @@ func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTop
 		return nil, err
 	}
 	p.provisionerConfig = *cfg
-
-	glog.V(4).Infof("creating volume with configuration %+v", p.provisionerConfig)
 
 	gidTable, err := p.plugin.getGidTable(scName, cfg.gidMin, cfg.gidMax)
 	if err != nil {
@@ -1171,7 +1170,7 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 		return oldSize, err
 	}
 
-	glog.V(4).Infof("expanding volume: %q with configuration: %+v", volumeID, cfg)
+	glog.V(4).Infof("expanding volume: %q", volumeID)
 
 	//Create REST server connection
 	cli := gcli.NewClient(cfg.url, cfg.user, cfg.secretValue)

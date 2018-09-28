@@ -34,11 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -252,18 +252,25 @@ func (o *LabelOptions) RunLabel() error {
 		}
 
 		var outputObj runtime.Object
-		dataChangeMsg := "not labeled"
+		var dataChangeMsg string
+		obj := info.Object
+		oldData, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
 		if o.dryrun || o.local || o.list {
-			err = labelFunc(info.Object, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = "labeled"
+			newObj, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
 			outputObj = info.Object
 		} else {
-			obj := info.Object
 			name, namespace := info.Name, info.Namespace
-			oldData, err := json.Marshal(obj)
 			if err != nil {
 				return err
 			}
@@ -283,14 +290,12 @@ func (o *LabelOptions) RunLabel() error {
 			if err := o.Recorder.Record(obj); err != nil {
 				glog.V(4).Infof("error recording current command: %v", err)
 			}
-			newData, err := json.Marshal(obj)
+			newObj, err := json.Marshal(obj)
 			if err != nil {
 				return err
 			}
-			if !reflect.DeepEqual(oldData, newData) {
-				dataChangeMsg = "labeled"
-			}
-			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
+			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
 			createdPatch := err == nil
 			if err != nil {
 				glog.V(2).Infof("couldn't compute patch: %v", err)
@@ -304,7 +309,7 @@ func (o *LabelOptions) RunLabel() error {
 			helper := resource.NewHelper(client, mapping)
 
 			if createdPatch {
-				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes)
+				outputObj, err = helper.Patch(namespace, name, types.MergePatchType, patchBytes, nil)
 			} else {
 				outputObj, err = helper.Replace(namespace, name, false, obj)
 			}
@@ -342,6 +347,14 @@ func (o *LabelOptions) RunLabel() error {
 		printer.PrintObj(info.Object, o.Out)
 		return nil
 	})
+}
+
+func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
+	msg := "not labeled"
+	if !reflect.DeepEqual(oldObj, newObj) {
+		msg = "labeled"
+	}
+	return msg
 }
 
 func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {

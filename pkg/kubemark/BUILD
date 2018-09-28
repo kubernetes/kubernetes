@@ -19,7 +19,7 @@ go_library(
         "//cmd/kubelet/app/options:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubelet:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
