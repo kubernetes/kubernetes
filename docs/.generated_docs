@@ -194,7 +194,6 @@ docs/man/man1/kubeadm-upgrade-plan.1
 docs/man/man1/kubeadm-upgrade.1
 docs/man/man1/kubeadm-version.1
 docs/man/man1/kubeadm.1
-docs/man/man1/kubectl-alpha-diff.1
 docs/man/man1/kubectl-alpha.1
 docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-resources.1
@@ -255,6 +254,7 @@ docs/man/man1/kubectl-create-serviceaccount.1
 docs/man/man1/kubectl-create.1
 docs/man/man1/kubectl-delete.1
 docs/man/man1/kubectl-describe.1
+docs/man/man1/kubectl-diff.1
 docs/man/man1/kubectl-drain.1
 docs/man/man1/kubectl-edit.1
 docs/man/man1/kubectl-exec.1
@@ -297,8 +297,6 @@ docs/man/man1/kubectl-wait.1
 docs/man/man1/kubectl.1
 docs/man/man1/kubelet.1
 docs/user-guide/kubectl/kubectl.md
-docs/user-guide/kubectl/kubectl_alpha.md
-docs/user-guide/kubectl/kubectl_alpha_diff.md
 docs/user-guide/kubectl/kubectl_annotate.md
 docs/user-guide/kubectl/kubectl_api-resources.md
 docs/user-guide/kubectl/kubectl_api-versions.md
@@ -358,6 +356,7 @@ docs/user-guide/kubectl/kubectl_create_service_nodeport.md
 docs/user-guide/kubectl/kubectl_create_serviceaccount.md
 docs/user-guide/kubectl/kubectl_delete.md
 docs/user-guide/kubectl/kubectl_describe.md
+docs/user-guide/kubectl/kubectl_diff.md
 docs/user-guide/kubectl/kubectl_drain.md
 docs/user-guide/kubectl/kubectl_edit.md
 docs/user-guide/kubectl/kubectl_exec.md
@@ -414,6 +413,7 @@ docs/yaml/kubectl/kubectl_cp.yaml
 docs/yaml/kubectl/kubectl_create.yaml
 docs/yaml/kubectl/kubectl_delete.yaml
 docs/yaml/kubectl/kubectl_describe.yaml
+docs/yaml/kubectl/kubectl_diff.yaml
 docs/yaml/kubectl/kubectl_drain.yaml
 docs/yaml/kubectl/kubectl_edit.yaml
 docs/yaml/kubectl/kubectl_exec.yaml

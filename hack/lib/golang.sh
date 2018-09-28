@@ -557,7 +557,6 @@ kube::golang::build_some_binaries() {
      fi
    else
     V=2 kube::log::info "Coverage is disabled."
-    kube::log::status "go install" "${build_args[@]}" "$@"
     go install "${build_args[@]}" "$@"
    fi
 }

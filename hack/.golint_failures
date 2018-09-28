@@ -143,7 +143,6 @@ pkg/kubeapiserver/authenticator
 pkg/kubeapiserver/authorizer
 pkg/kubeapiserver/authorizer/modes
 pkg/kubeapiserver/options
-pkg/kubeapiserver/server
 pkg/kubectl
 pkg/kubectl/apps
 pkg/kubectl/cmd
