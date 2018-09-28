@@ -81,6 +81,7 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
@@ -218,6 +219,11 @@ var (
 
 	// Serve hostname image name
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
+
+	// cache whether presence of a default storage class has been queried
+	DefaultStorageClassQueried = false
+	// cache presence of default storage class
+	DefaultStorageClassPresent = true
 )
 
 type Address struct {
@@ -399,6 +405,26 @@ func SkipIfContainerRuntimeIs(runtimes ...string) {
 		if runtime == TestContext.ContainerRuntime {
 			Skipf("Not supported under container runtime %s", runtime)
 		}
+	}
+}
+
+func SkipUnlessDefaultStorageClassPresent(c clientset.Interface, queryStorageClasses bool) {
+	if !DefaultStorageClassQueried || queryStorageClasses {
+		list, err := c.StorageV1().StorageClasses().List(metav1.ListOptions{})
+		if err != nil {
+			Skipf("Error listing storage classes: %v", err)
+		}
+		DefaultStorageClassQueried = true
+		DefaultStorageClassPresent = false
+		for _, sc := range list.Items {
+			if storageutil.IsDefaultAnnotation(sc.ObjectMeta) {
+				DefaultStorageClassPresent = true
+				break
+			}
+		}
+	}
+	if !DefaultStorageClassPresent {
+		Skipf("No default storage class found")
 	}
 }
 

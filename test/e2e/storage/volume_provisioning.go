@@ -839,7 +839,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 	Describe("DynamicProvisioner Default", func() {
 		It("should create and delete default persistent volumes [Slow]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
-
+			framework.SkipUnlessDefaultStorageClassPresent(c, false)
 			By("creating a claim with no annotation")
 			test := storageClassTest{
 				name:         "default",
@@ -854,6 +854,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			framework.SkipUnlessDefaultStorageClassPresent(c, false)
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
 				name:      "default",
@@ -885,6 +886,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
+			framework.SkipUnlessDefaultStorageClassPresent(c, false)
 			scName := getDefaultStorageClassName(c)
 			test := storageClassTest{
 				name:      "default",
