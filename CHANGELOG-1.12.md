@@ -9,8 +9,6 @@
     - [SIG API Machinery](#sig-api-machinery)
     - [SIG-autoscaling](#sig-autoscaling)
     - [SIG-Azure](#sig-azure)
-- [Adding Azure Availability Zones support to cloud provider.](#adding-azure-availability-zones-support-to-cloud-provider)
-- [Supporting Cross RG resources (disks, Azure File and node [Experimental]](#supporting-cross-rg-resources-disks-azure-file-and-node-experimental)
     - [SIG-cli](#sig-cli)
     - [SIG-cloud-provider](#sig-cloud-provider)
     - [SIG-cluster-lifecycle](#sig-cluster-lifecycle)
@@ -167,16 +165,13 @@ SIG Autoscaling focused on improving the Horizontal Pod Autoscaling API and algo
 ### SIG-Azure
 
 Sig Azure was focused on two primary new alpha features:
-# Adding Azure Availability Zones support to cloud provider.
-# Supporting Cross RG resources (disks, Azure File and node [Experimental]
+- Adding Azure Availability Zones support to cloud provider.
+- Supporting Cross RG resources (disks, Azure File and node [Experimental]
 
 Besides the above new features, support for Azure Virtual Machine Scale Sets (VMSS) and Cluster-Autoscaler is now stable and considered GA:
 
-- Azure virtual machine scale sets (VMSS) allow you to create and manage identical load balanced
-VMs that automatically increase or decrease based on demand or a set schedule.
-- With this new stable feature, Kubernetes supports the scaling of containerized applications
-with Azure VMSS, including the ability to integrate it with cluster-autoscaler to automatically
-adjust the size of the Kubernetes clusters based on the same conditions. 
+- Azure virtual machine scale sets (VMSS) allow you to create and manage identical load balanced VMs that automatically increase or decrease based on demand or a set schedule.
+- With this new stable feature, Kubernetes supports the scaling of containerized applications with Azure VMSS, including the ability to integrate it with cluster-autoscaler to automatically adjust the size of the Kubernetes clusters based on the same conditions. 
 
 ### SIG-cli
 
