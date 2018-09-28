@@ -34,12 +34,12 @@ const (
 
 // DefaultKubeProxyConfiguration assigns default values for the kube-proxy ComponentConfig
 func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
-	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
-	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 
 	// Do a roundtrip to the external version for defaulting
-	Scheme.Convert(internalcfg.ComponentConfigs.KubeProxy, externalproxycfg, nil)
+	if internalcfg.ComponentConfigs.KubeProxy != nil {
+		Scheme.Convert(internalcfg.ComponentConfigs.KubeProxy, externalproxycfg, nil)
+	}
 
 	if externalproxycfg.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
 		externalproxycfg.ClusterCIDR = internalcfg.Networking.PodSubnet
@@ -63,12 +63,12 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 
 // DefaultKubeletConfiguration assigns default values for the kubelet ComponentConfig
 func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
-	// IMPORTANT NOTE: If you're changing this code you should mirror it to cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go
-	// and cmd/kubeadm/app/apis/kubeadm/v1alpha3/conversion.go. TODO: Remove this requirement when v1alpha2 is removed.
 	externalkubeletcfg := &kubeletconfigv1beta1.KubeletConfiguration{}
 
 	// Do a roundtrip to the external version for defaulting
-	Scheme.Convert(internalcfg.ComponentConfigs.Kubelet, externalkubeletcfg, nil)
+	if internalcfg.ComponentConfigs.Kubelet != nil {
+		Scheme.Convert(internalcfg.ComponentConfigs.Kubelet, externalkubeletcfg, nil)
+	}
 
 	if externalkubeletcfg.StaticPodPath == "" {
 		externalkubeletcfg.StaticPodPath = kubeadmapiv1alpha3.DefaultManifestsDir

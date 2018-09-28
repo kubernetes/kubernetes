@@ -88,6 +88,10 @@ func TestUploadConfiguration(t *testing.T) {
 				},
 			}
 			cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", initialcfg)
+
+			// cleans up component config to make cfg and decodedcfg comparable (now component config are not stored anymore in kubeadm-config config map)
+			cfg.ComponentConfigs = kubeadmapi.ComponentConfigs{}
+
 			if err != nil {
 				t2.Fatalf("UploadConfiguration() error = %v", err)
 			}
