@@ -18,21 +18,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Runs tests for kubectl alpha diff
+# Runs tests for kubectl diff
 run_kubectl_diff_tests() {
     set -o nounset
     set -o errexit
 
     create_and_use_new_namespace
-    kube::log::status "Testing kubectl alpha diff"
+    kube::log::status "Testing kubectl diff"
 
     # Test that it works when the live object doesn't exist
-    output_message=$(kubectl alpha diff -f hack/testdata/pod.yaml)
+    output_message=$(kubectl diff -f hack/testdata/pod.yaml)
     kube::test::if_has_string "${output_message}" 'test-pod'
 
     kubectl apply -f hack/testdata/pod.yaml
 
-    output_message=$(kubectl alpha diff -f hack/testdata/pod-changed.yaml)
+    output_message=$(kubectl diff -f hack/testdata/pod-changed.yaml)
     kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.0'
 
     kubectl delete -f  hack/testdata/pod.yaml
