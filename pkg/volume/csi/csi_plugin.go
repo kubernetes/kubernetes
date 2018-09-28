@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -25,10 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"context"
-
 	"github.com/golang/glog"
-
 	api "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -136,10 +134,10 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
-	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
+	driverNodeID, maxVolumePerNode, accessibleTopology, err := getNodeInfoWithFallback(ctx, csi)
 	if err != nil {
 		unregisterDriver(pluginName)
-		return fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
+		return fmt.Errorf("error during CSI NodeGetInfo()/NodeGetId() call: %v", err)
 	}
 
 	err = nim.AddNodeInfo(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)

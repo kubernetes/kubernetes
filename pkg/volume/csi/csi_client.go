@@ -31,12 +31,47 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-type csiClient interface {
+type csiNodeInfoGetter interface {
 	NodeGetInfo(ctx context.Context) (
 		nodeID string,
 		maxVolumePerNode int64,
 		accessibleTopology *csipb.Topology,
 		err error)
+	// for pre-v1.0
+	NodeGetId(ctx context.Context) (nodeID string, err error)
+}
+
+// getNodeInfo tries to call NodeGetInfo() and falls back to NodeGetId() when
+// the former is not implemented.
+//
+// NodeGetId() is only called when NodeGetInfo() returns an "unknown method"
+// error, all other errors are immediately bubbled up and NodeGetId() is not
+// used at all.
+//
+// TODO(hoegaarden): e2e test with a driver which only supports NodeGetId() but
+//                   not NodeGetInfo()
+func getNodeInfoWithFallback(ctx context.Context, c csiNodeInfoGetter) (
+	nodeID string,
+	maxVolumePerNode int64,
+	accessibleTopology *csipb.Topology,
+	err error) {
+
+	nodeID, maxVolumePerNode, accessibleTopology, err = c.NodeGetInfo(ctx)
+	if err == nil {
+		return nodeID, maxVolumePerNode, accessibleTopology, err
+	}
+
+	if !isUnimplementedMethodErr(err) {
+		return "", 0, nil, err
+	}
+
+	glog.Warning(log("NodeGetInfo() not supported, falling back to deprecated NodeGetId()"))
+	nodeID, err = c.NodeGetId(ctx)
+	return nodeID, 0, nil, err
+}
+
+type csiClient interface {
+	csiNodeInfoGetter
 	NodePublishVolume(
 		ctx context.Context,
 		volumeid string,
@@ -100,6 +135,24 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	}
 
 	return res.GetNodeId(), res.GetMaxVolumesPerNode(), res.GetAccessibleTopology(), nil
+}
+
+// for pre-v1.0
+func (c *csiDriverClient) NodeGetId(ctx context.Context) (nodeID string, err error) {
+	glog.V(4).Info(log("calling NodeGetId rpc"))
+
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+	nodeClient := csipb.NewNodeClient(conn)
+
+	res, err := nodeClient.NodeGetId(ctx, &csipb.NodeGetIdRequest{})
+	if err != nil {
+		return "", err
+	}
+	return res.GetNodeId(), nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(

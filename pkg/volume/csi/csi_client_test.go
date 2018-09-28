@@ -19,12 +19,14 @@ package csi
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
-	"reflect"
 )
 
 type fakeCsiDriverClient struct {
@@ -46,6 +48,12 @@ func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 	err error) {
 	resp, err := c.nodeClient.NodeGetInfo(ctx, &csipb.NodeGetInfoRequest{})
 	return resp.GetNodeId(), resp.GetMaxVolumesPerNode(), resp.GetAccessibleTopology(), err
+}
+
+// for pre-v1.0
+func (c *fakeCsiDriverClient) NodeGetId(ctx context.Context) (nodeID string, err error) {
+	resp, err := c.nodeClient.NodeGetId(ctx, &csipb.NodeGetIdRequest{})
+	return resp.GetNodeId(), err
 }
 
 func (c *fakeCsiDriverClient) NodePublishVolume(
@@ -205,6 +213,48 @@ func TestClientNodeGetInfo(t *testing.T) {
 	}
 }
 
+func TestClientNodeGetId(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectedNodeID string
+		mustFail       bool
+		err            error
+	}{
+		{
+			name:           "test ok",
+			expectedNodeID: "node1",
+		},
+		{
+			name:     "grpc error",
+			mustFail: true,
+			err:      errors.New("grpc error"),
+		},
+	}
+
+	client := setupClient(t, false /* stageUnstageSet */)
+
+	for _, tc := range testCases {
+		t.Logf("test case: %s", tc.name)
+		client.(*fakeCsiDriverClient).nodeClient.SetNextError(tc.err)
+		client.(*fakeCsiDriverClient).nodeClient.SetNodeGetIdResp(&csipb.NodeGetIdResponse{
+			NodeId: tc.expectedNodeID,
+		})
+		nodeID, err := client.NodeGetId(context.Background())
+
+		if tc.mustFail && err == nil {
+			t.Error("expected an error but got none")
+		}
+
+		if !tc.mustFail && err != nil {
+			t.Errorf("expected no errors but got: %v", err)
+		}
+
+		if nodeID != tc.expectedNodeID {
+			t.Errorf("expected nodeID: %v; got: %v", tc.expectedNodeID, nodeID)
+		}
+	}
+}
+
 func TestClientNodePublishVolume(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -337,4 +387,101 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 			t.Error("test must fail, but err is nil")
 		}
 	}
+}
+
+func TestGetNodeInfoWithFallback(t *testing.T) {
+	var errRandom = errors.New("some other error")
+	var errUnimplemented = status.Error(codes.Unimplemented, "unknown method someRandomMethod")
+
+	testCases := map[string]struct {
+		nodeGetInfoErr          error
+		nodeGetIdErr            error
+		expectedErr             error
+		expectedGetNodeInfoCall bool
+		expectedGetNodeIdCall   bool
+	}{
+		"no error on neither method": {
+			nodeGetInfoErr:          nil,
+			nodeGetIdErr:            nil,
+			expectedErr:             nil,
+			expectedGetNodeInfoCall: true,
+			expectedGetNodeIdCall:   false,
+		},
+		"unimplemented NodeGetInfo": {
+			nodeGetInfoErr:          errUnimplemented,
+			nodeGetIdErr:            nil,
+			expectedErr:             nil,
+			expectedGetNodeInfoCall: true,
+			expectedGetNodeIdCall:   true,
+		},
+		"other error for NodeGetInfo": {
+			nodeGetInfoErr:          errRandom,
+			nodeGetIdErr:            nil,
+			expectedErr:             errRandom,
+			expectedGetNodeInfoCall: true,
+			expectedGetNodeIdCall:   false,
+		},
+		"unimplemented NodeGetInfo and error on NodeGetId": {
+			nodeGetInfoErr:          errUnimplemented,
+			nodeGetIdErr:            errRandom,
+			expectedErr:             errRandom,
+			expectedGetNodeInfoCall: true,
+			expectedGetNodeIdCall:   true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.TODO()
+			ig := &nodeInfoGetter{
+				nodeGetInfoErr: tc.nodeGetInfoErr,
+				nodeGetIdErr:   tc.nodeGetIdErr,
+			}
+			_, _, _, err := getNodeInfoWithFallback(ctx, ig)
+			if err != tc.expectedErr {
+				t.Errorf("Expected error %v, got: %v", tc.expectedErr, err)
+			}
+			checkCall(t, ig.nodeGetInfoCallCount, tc.expectedGetNodeInfoCall, "NodeGetInfo")
+			checkCall(t, ig.nodeGetIdCallCount, tc.expectedGetNodeIdCall, "NodeGetId")
+		})
+	}
+}
+
+func checkCall(t *testing.T, callCount int, expectedCall bool, funcName string) {
+	t.Helper()
+
+	if expectedCall {
+		if callCount < 1 {
+			t.Errorf("Expected %s to be called, was not called", funcName)
+		}
+		return
+	}
+
+	if callCount > 0 {
+		t.Errorf("Expected %s not to be calle, was called %d times", funcName, callCount)
+	}
+}
+
+type nodeInfoGetter struct {
+	nodeGetIdErr   error
+	nodeGetInfoErr error
+
+	nodeGetIdCallCount   int
+	nodeGetInfoCallCount int
+}
+
+func (g *nodeInfoGetter) NodeGetId(ctx context.Context) (string, error) {
+	g.nodeGetIdCallCount += 1
+	if err := g.nodeGetIdErr; err != nil {
+		return "", err
+	}
+	return "some node id", nil
+}
+
+func (g *nodeInfoGetter) NodeGetInfo(ctx context.Context) (string, int64, *csipb.Topology, error) {
+	g.nodeGetInfoCallCount += 1
+	if err := g.nodeGetInfoErr; err != nil {
+		return "", 0, nil, err
+	}
+	return "some node id", 0, nil, nil
 }
