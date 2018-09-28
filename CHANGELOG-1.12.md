@@ -490,7 +490,7 @@ is now under 'kubescheduler.config.k8s.io/v1alpha1'.  ([#66916](https://github.c
 
 - The cloudstack cloud provider now reports a `Hostname` address type for nodes based on the `local-hostname` metadata key. ([#67719](https://github.com/kubernetes/kubernetes/pull/67719), [@liggitt](https://github.com/liggitt))
 - The OpenStack cloud provider now reports a `Hostname` address type for nodes ([#67748](https://github.com/kubernetes/kubernetes/pull/67748), [@FengyunPan2](https://github.com/FengyunPan2))
-- The vSphere cloud provider now suppoerts zones. ([#66795](https://github.com/kubernetes/kubernetes/pull/66795), [@jiatongw](https://github.com/jiatongw))
+- The vSphere cloud provider now supports zones. ([#66795](https://github.com/kubernetes/kubernetes/pull/66795), [@jiatongw](https://github.com/jiatongw))
 
 ### SIG Cluster Lifecycle
 
