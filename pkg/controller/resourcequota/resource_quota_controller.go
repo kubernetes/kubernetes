@@ -147,15 +147,12 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 	)
 
 	if options.DiscoveryFunc != nil {
-		qm := &QuotaMonitor{
-			informersStarted:  options.InformersStarted,
-			informerFactory:   options.InformerFactory,
-			ignoredResources:  options.IgnoredResourcesFunc(),
-			resourceChanges:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resource_quota_controller_resource_changes"),
-			resyncPeriod:      options.ReplenishmentResyncPeriod,
-			replenishmentFunc: rq.replenishQuota,
-			registry:          rq.registry,
-		}
+		qm := NewQuotaMonitor(options.InformersStarted,
+			options.InformerFactory,
+			options.IgnoredResourcesFunc(),
+			options.ReplenishmentResyncPeriod,
+			rq.replenishQuota,
+			rq.registry)
 
 		rq.quotaMonitor = qm
 
