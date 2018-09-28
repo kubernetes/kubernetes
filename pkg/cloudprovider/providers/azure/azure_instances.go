@@ -87,6 +87,15 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 		if err != nil {
 			return nil, err
 		}
+
+		// Fall back to ARM API if the address is empty string.
+		// TODO: this is a workaround because IMDS is not stable enough.
+		// It should be removed after IMDS fixing the issue.
+		if strings.TrimSpace(ipAddress.PrivateIP) == "" {
+			return addressGetter(name)
+		}
+
+		// Use ip address got from instance metadata.
 		addresses := []v1.NodeAddress{
 			{Type: v1.NodeInternalIP, Address: ipAddress.PrivateIP},
 			{Type: v1.NodeHostName, Address: string(name)},
