@@ -23,13 +23,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	alwayspullimagesapi "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages/apis/alwayspullimages"
 )
 
 // TestAdmission verifies all create requests for pods result in every container's image pull policy
 // set to Always
 func TestAdmission(t *testing.T) {
 	namespace := "test"
-	handler := &AlwaysPullImages{}
+	handler := &AlwaysPullImages{config: &alwayspullimagesapi.Configuration{}}
 	pod := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
@@ -63,9 +64,99 @@ func TestAdmission(t *testing.T) {
 	}
 }
 
+// TestAdmissionAllowExcludeAnnotationDisabled verifies all create requests for pods when Exclude Annotation is disabled
+// result in every container's image pull policy set to Always
+func TestAdmissionEnableExcludeAnnotationDisabled(t *testing.T) {
+	namespace := "test"
+	handler := &AlwaysPullImages{config: &alwayspullimagesapi.Configuration{EnableExcludeAnnotation: false}}
+	pod := api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "123",
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"alwayspullimages.admission.kubernetes.io/exclude": "true",
+			},
+		},
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{Name: "init1", Image: "image"},
+				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+			Containers: []api.Container{
+				{Name: "ctr1", Image: "image"},
+				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+		},
+	}
+	err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+	for _, c := range pod.Spec.InitContainers {
+		if c.ImagePullPolicy != api.PullAlways {
+			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		if c.ImagePullPolicy != api.PullAlways {
+			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
+		}
+	}
+}
+
+// TestAdmissionAllowExcludeAnnotationDisabled verifies all create requests for pods when Exclude Annotation is enabled
+// result in every container's image pull policy remain unchanged
+func TestAdmissionEnableExcludeAnnotationEnabled(t *testing.T) {
+	namespace := "test"
+	handler := &AlwaysPullImages{config: &alwayspullimagesapi.Configuration{EnableExcludeAnnotation: true}}
+	pod := api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "123",
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"alwayspullimages.admission.kubernetes.io/exclude": "true",
+			},
+		},
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{Name: "init1", Image: "image"},
+				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+			Containers: []api.Container{
+				{Name: "ctr1", Image: "image"},
+				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+		},
+	}
+	podCopy := pod.DeepCopy()
+
+	err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+	for i, c := range pod.Spec.InitContainers {
+		if c.ImagePullPolicy != podCopy.Spec.InitContainers[i].ImagePullPolicy {
+			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
+		}
+	}
+	for i, c := range pod.Spec.Containers {
+		if c.ImagePullPolicy != podCopy.Spec.InitContainers[i].ImagePullPolicy {
+			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
+		}
+	}
+}
+
 func TestValidate(t *testing.T) {
 	namespace := "test"
-	handler := &AlwaysPullImages{}
+	handler := &AlwaysPullImages{config: &alwayspullimagesapi.Configuration{}}
 	pod := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
