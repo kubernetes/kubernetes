@@ -26,8 +26,9 @@ func (c *FakeEvictions) Evict(eviction *policy.Eviction) error {
 	action := core.GetActionImpl{}
 	action.Verb = "post"
 	action.Namespace = c.ns
-	action.Resource = schema.GroupVersionResource{Group: "", Version: "", Resource: "pods"}
+	action.Resource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	action.Subresource = "eviction"
+	action.Name = eviction.Name
 	_, err := c.Fake.Invokes(action, eviction)
 	return err
 }
