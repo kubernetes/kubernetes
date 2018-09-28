@@ -38,7 +38,7 @@ func TestRecordOperation(t *testing.T) {
 	assert.NoError(t, err)
 	defer l.Close()
 
-	prometheusUrl := "http://" + temporalServer + "/metrics"
+	prometheusURL := "http://" + temporalServer + "/metrics"
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", prometheus.Handler())
 	server := &http.Server{
@@ -55,11 +55,11 @@ func TestRecordOperation(t *testing.T) {
 
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
-	}), "GET", prometheusUrl, nil, runtimeOperationsCounterExpected)
+	}), "GET", prometheusURL, nil, runtimeOperationsCounterExpected)
 
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
-	}), "GET", prometheusUrl, nil, runtimeOperationsLatencyExpected)
+	}), "GET", prometheusURL, nil, runtimeOperationsLatencyExpected)
 }
 
 func TestInstrumentedVersion(t *testing.T) {

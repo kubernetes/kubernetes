@@ -318,6 +318,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 		for {
 			select {
 			case <-c.StopEverything:
+				c.podQueue.Close()
 				return
 			case <-ch:
 				comparer.Compare()

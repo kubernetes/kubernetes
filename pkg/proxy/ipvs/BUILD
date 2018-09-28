@@ -37,6 +37,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "graceful_termination.go",
         "ipset.go",
         "netlink.go",
         "netlink_linux.go",

@@ -197,12 +197,8 @@ pkg/kubelet/dockershim/network/hostport/testing
 pkg/kubelet/dockershim/network/kubenet
 pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
-pkg/kubelet/images
-pkg/kubelet/kuberuntime
-pkg/kubelet/leaky
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
-pkg/kubelet/pleg
 pkg/kubelet/pod
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption

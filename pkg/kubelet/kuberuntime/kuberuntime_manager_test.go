@@ -54,7 +54,7 @@ func customTestRuntimeManager(keyring *credentialprovider.BasicDockerKeyring) (*
 	// we may want to set memory capacity.
 	machineInfo := &cadvisorapi.MachineInfo{}
 	osInterface := &containertest.FakeOS{}
-	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring)
+	manager, err := newFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, keyring)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
