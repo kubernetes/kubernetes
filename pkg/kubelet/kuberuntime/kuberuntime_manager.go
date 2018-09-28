@@ -125,6 +125,7 @@ type kubeGenericRuntimeManager struct {
 	runtimeClassManager *runtimeclass.Manager
 }
 
+// KubeGenericRuntime is a interface contains interfaces for container runtime and command.
 type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.StreamingRuntime
@@ -216,7 +217,7 @@ func NewKubeGenericRuntimeManager(
 		imagePullQPS,
 		imagePullBurst)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
-	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
+	kubeRuntimeManager.containerGC = newContainerGC(runtimeService, podStateProvider, kubeRuntimeManager)
 
 	kubeRuntimeManager.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -543,7 +544,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			reason = "Container failed liveness probe."
 		} else {
 			// Keep the container.
-			keepCount += 1
+			keepCount++
 			continue
 		}
 
