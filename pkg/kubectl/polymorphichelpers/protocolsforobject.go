@@ -26,30 +26,20 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func protocolsForObject(object runtime.Object) (map[string]string, error) {
 	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
 	switch t := object.(type) {
-	case *api.ReplicationController:
-		return getProtocolsInternal(t.Spec.Template.Spec), nil
 	case *corev1.ReplicationController:
 		return getProtocols(t.Spec.Template.Spec), nil
 
-	case *api.Pod:
-		return getProtocolsInternal(t.Spec), nil
 	case *corev1.Pod:
 		return getProtocols(t.Spec), nil
 
-	case *api.Service:
-		return getServiceProtocolsInternal(t.Spec), nil
 	case *corev1.Service:
 		return getServiceProtocols(t.Spec), nil
 
-	case *extensions.Deployment:
-		return getProtocolsInternal(t.Spec.Template.Spec), nil
 	case *extensionsv1beta1.Deployment:
 		return getProtocols(t.Spec.Template.Spec), nil
 	case *appsv1.Deployment:
@@ -59,8 +49,6 @@ func protocolsForObject(object runtime.Object) (map[string]string, error) {
 	case *appsv1beta1.Deployment:
 		return getProtocols(t.Spec.Template.Spec), nil
 
-	case *extensions.ReplicaSet:
-		return getProtocolsInternal(t.Spec.Template.Spec), nil
 	case *extensionsv1beta1.ReplicaSet:
 		return getProtocols(t.Spec.Template.Spec), nil
 	case *appsv1.ReplicaSet:
@@ -71,25 +59,6 @@ func protocolsForObject(object runtime.Object) (map[string]string, error) {
 	default:
 		return nil, fmt.Errorf("cannot extract protocols from %T", object)
 	}
-}
-
-func getProtocolsInternal(spec api.PodSpec) map[string]string {
-	result := make(map[string]string)
-	for _, container := range spec.Containers {
-		for _, port := range container.Ports {
-			result[strconv.Itoa(int(port.ContainerPort))] = string(port.Protocol)
-		}
-	}
-	return result
-}
-
-// Extracts the protocols exposed by a service from the given service spec.
-func getServiceProtocolsInternal(spec api.ServiceSpec) map[string]string {
-	result := make(map[string]string)
-	for _, servicePort := range spec.Ports {
-		result[strconv.Itoa(int(servicePort.Port))] = string(servicePort.Protocol)
-	}
-	return result
 }
 
 func getProtocols(spec corev1.PodSpec) map[string]string {
