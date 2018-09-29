@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,9 +45,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"gopkg.in/gcfg.v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -198,6 +199,11 @@ const ServiceAnnotationLoadBalancerHCTimeout = "service.beta.kubernetes.io/aws-l
 // ServiceAnnotationLoadBalancerHCInterval is the annotation used on the
 // service to specify, in seconds, the interval between health checks.
 const ServiceAnnotationLoadBalancerHCInterval = "service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval"
+
+// ServiceAnnotationLoadBalancerEIPAllocations is the annotation used on the
+// service to specify a comma separated list of EIP allocations to use as
+// static IP addresses for the NLB. Only supported on elbv2 (NLB)
+const ServiceAnnotationLoadBalancerEIPAllocations = "service.beta.kubernetes.io/aws-load-balancer-eip-allocations"
 
 // Event key when a volume is stuck on attaching state when being attached to a volume
 const volumeAttachmentStuck = "VolumeAttachmentStuck"
@@ -3281,9 +3287,16 @@ func (c *Cloud) findELBSubnets(internalELB bool) ([]string, error) {
 		continue
 	}
 
+	var azNames []string
+	for key := range subnetsByAZ {
+		azNames = append(azNames, key)
+	}
+
+	sort.Strings(azNames)
+
 	var subnetIDs []string
-	for _, subnet := range subnetsByAZ {
-		subnetIDs = append(subnetIDs, aws.StringValue(subnet.SubnetId))
+	for _, key := range azNames {
+		subnetIDs = append(subnetIDs, aws.StringValue(subnetsByAZ[key].SubnetId))
 	}
 
 	return subnetIDs, nil
