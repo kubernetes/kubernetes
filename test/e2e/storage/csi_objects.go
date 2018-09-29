@@ -229,6 +229,9 @@ func csiHostPathPod(
 					Name:            "external-provisioner",
 					Image:           csiContainerImage("csi-provisioner"),
 					ImagePullPolicy: v1.PullAlways,
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &priv,
+					},
 					Args: []string{
 						"--v=5",
 						"--provisioner=csi-hostpath",
@@ -245,6 +248,9 @@ func csiHostPathPod(
 					Name:            "driver-registrar",
 					Image:           csiContainerImage("driver-registrar"),
 					ImagePullPolicy: v1.PullAlways,
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &priv,
+					},
 					Args: []string{
 						"--v=5",
 						"--csi-address=/csi/csi.sock",
@@ -275,6 +281,9 @@ func csiHostPathPod(
 					Name:            "external-attacher",
 					Image:           csiContainerImage("csi-attacher"),
 					ImagePullPolicy: v1.PullAlways,
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &priv,
+					},
 					Args: []string{
 						"--v=5",
 						"--csi-address=$(ADDRESS)",
