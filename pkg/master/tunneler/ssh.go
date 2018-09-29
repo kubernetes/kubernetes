@@ -34,10 +34,13 @@ import (
 	utilpath "k8s.io/utils/path"
 )
 
+// InstallSSHKey func type define.
 type InstallSSHKey func(ctx context.Context, user string, data []byte) error
 
+// AddressFunc func type define.
 type AddressFunc func() (addresses []string, err error)
 
+// Tunneler type declare the tunner interface.
 type Tunneler interface {
 	Run(AddressFunc)
 	Stop()
@@ -70,6 +73,7 @@ func TunnelSyncHealthChecker(tunneler Tunneler) func(req *http.Request) error {
 	}
 }
 
+// SSHTunneler define the tunneler struct.
 type SSHTunneler struct {
 	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
 	// See: https://golang.org/pkg/sync/atomic/ for more information
@@ -81,13 +85,14 @@ type SSHTunneler struct {
 	InstallSSHKey  InstallSSHKey
 	HealthCheckURL *url.URL
 
-	tunnels *ssh.SSHTunnelList
+	tunnels *ssh.SecureTunnelList
 	clock   clock.Clock
 
 	getAddresses AddressFunc
 	stopChan     chan struct{}
 }
 
+// New a SSHTunneler Instance
 func New(sshUser, sshKeyfile string, healthCheckURL *url.URL, installSSHKey InstallSSHKey) Tunneler {
 	return &SSHTunneler{
 		SSHUser:        sshUser,
@@ -129,7 +134,7 @@ func (c *SSHTunneler) Run(getAddresses AddressFunc) {
 		}
 	}
 
-	c.tunnels = ssh.NewSSHTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
+	c.tunnels = ssh.NewSecureTunnelList(c.SSHUser, c.SSHKeyfile, c.HealthCheckURL, c.stopChan)
 	// Sync loop to ensure that the SSH key has been installed.
 	c.lastSSHKeySync = c.clock.Now().Unix()
 	c.installSSHKeySyncLoop(c.SSHUser, publicKeyFile)
@@ -146,22 +151,26 @@ func (c *SSHTunneler) Stop() {
 	}
 }
 
+// Dial call the tunnels.Dial func.
 func (c *SSHTunneler) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
 	return c.tunnels.Dial(ctx, net, addr)
 }
 
+// SecondsSinceSync count the sync time
 func (c *SSHTunneler) SecondsSinceSync() int64 {
 	now := c.clock.Now().Unix()
 	then := atomic.LoadInt64(&c.lastSync)
 	return now - then
 }
 
+// SecondsSinceSSHKeySync count the SSH key sync time
 func (c *SSHTunneler) SecondsSinceSSHKeySync() int64 {
 	now := c.clock.Now().Unix()
 	then := atomic.LoadInt64(&c.lastSSHKeySync)
 	return now - then
 }
 
+// installSSHKeySyncLoop make the SSH Key sync loop
 func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 	go wait.Until(func() {
 		if c.InstallSSHKey == nil {
@@ -201,6 +210,7 @@ func (c *SSHTunneler) nodesSyncLoop() {
 	}, 15*time.Second, c.stopChan)
 }
 
+// generateSSHKey make the SSH Key
 func generateSSHKey(privateKeyfile, publicKeyfile string) error {
 	private, public, err := ssh.GenerateKey(2048)
 	if err != nil {

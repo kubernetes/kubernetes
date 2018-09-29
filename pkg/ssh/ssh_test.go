@@ -121,7 +121,7 @@ func runTestSSHServer(user, password string) (*testSSHServer, error) {
 	return result, nil
 }
 
-func TestSSHTunnel(t *testing.T) {
+func TestSecureTunnel(t *testing.T) {
 	private, public, err := GenerateKey(2048)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -134,7 +134,7 @@ func TestSSHTunnel(t *testing.T) {
 	}
 
 	privateData := EncodePrivateKey(private)
-	tunnel, err := newSSHTunnelFromBytes("foo", privateData, server.Host)
+	tunnel, err := NewSecureTunnelFromBytes("foo", privateData, server.Host)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -183,13 +183,13 @@ func (*fakeTunnel) Dial(ctx context.Context, network, address string) (net.Conn,
 
 type fakeTunnelCreator struct{}
 
-func (*fakeTunnelCreator) newSSHTunnel(string, string, string) (tunnel, error) {
+func (*fakeTunnelCreator) NewSecureTunnel(string, string, string) (tunnel, error) {
 	return &fakeTunnel{}, nil
 }
 
-func TestSSHTunnelListUpdate(t *testing.T) {
+func TestSecureTunnelListUpdate(t *testing.T) {
 	// Start with an empty tunnel list.
-	l := &SSHTunnelList{
+	l := &SecureTunnelList{
 		adding:        make(map[string]bool),
 		tunnelCreator: &fakeTunnelCreator{},
 	}
@@ -219,7 +219,7 @@ func TestSSHTunnelListUpdate(t *testing.T) {
 	checkTunnelsCorrect(t, l, addressStrings)
 }
 
-func checkTunnelsCorrect(t *testing.T, tunnelList *SSHTunnelList, addresses []string) {
+func checkTunnelsCorrect(t *testing.T, tunnelList *SecureTunnelList, addresses []string) {
 	if err := wait.Poll(100*time.Millisecond, 2*time.Second, func() (bool, error) {
 		return hasCorrectTunnels(tunnelList, addresses), nil
 	}); err != nil {
@@ -227,7 +227,7 @@ func checkTunnelsCorrect(t *testing.T, tunnelList *SSHTunnelList, addresses []st
 	}
 }
 
-func hasCorrectTunnels(tunnelList *SSHTunnelList, addresses []string) bool {
+func hasCorrectTunnels(tunnelList *SecureTunnelList, addresses []string) bool {
 	tunnelList.tunnelsLock.Lock()
 	defer tunnelList.tunnelsLock.Unlock()
 	wantMap := make(map[string]bool)
@@ -356,10 +356,10 @@ func TestTimeoutDialer(t *testing.T) {
 	listener.Close()
 }
 
-func newSSHTunnelFromBytes(user string, privateKey []byte, host string) (*sshTunnel, error) {
+func NewSecureTunnelFromBytes(user string, privateKey []byte, host string) (*SecureTunnel, error) {
 	signer, err := MakePrivateKeySignerFromBytes(privateKey)
 	if err != nil {
 		return nil, err
 	}
-	return makeSSHTunnel(user, signer, host)
+	return makeSecureTunnel(user, signer, host)
 }

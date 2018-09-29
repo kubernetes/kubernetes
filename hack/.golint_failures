@@ -178,7 +178,6 @@ pkg/kubelet/types
 pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
-pkg/master/tunneler
 pkg/proxy
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
@@ -269,7 +268,6 @@ pkg/security/podsecuritypolicy/selinux
 pkg/security/podsecuritypolicy/user
 pkg/security/podsecuritypolicy/util
 pkg/serviceaccount
-pkg/ssh
 pkg/util/config
 pkg/util/ebtables
 pkg/util/env

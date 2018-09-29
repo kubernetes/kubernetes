@@ -67,27 +67,32 @@ func init() {
 
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:
 // https://godoc.org/golang.org/x/crypto/ssh#ServerConn
-type sshTunnel struct {
+
+// SecureTunnel struct define the ssh info.
+type SecureTunnel struct {
 	Config  *ssh.ClientConfig
 	Host    string
 	SSHPort string
 	client  *ssh.Client
 }
 
-func makeSSHTunnel(user string, signer ssh.Signer, host string) (*sshTunnel, error) {
+// makeSecureTunnel func init the new secure ssh tunnel by given config.
+func makeSecureTunnel(user string, signer ssh.Signer, host string) (*SecureTunnel, error) {
+
 	config := ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	return &sshTunnel{
+	return &SecureTunnel{
 		Config:  &config,
 		Host:    host,
 		SSHPort: "22",
 	}, nil
 }
 
-func (s *sshTunnel) Open() error {
+// Open func make the ssh dial and record the failure or success times.
+func (s *SecureTunnel) Open() error {
 	var err error
 	s.client, err = realTimeoutDialer.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
 	tunnelOpenCounter.Inc()
@@ -97,17 +102,20 @@ func (s *sshTunnel) Open() error {
 	return err
 }
 
-func (s *sshTunnel) Dial(ctx context.Context, network, address string) (net.Conn, error) {
+// Dial func make the ssh dial method.
+func (s *SecureTunnel) Dial(ctx context.Context, network, address string) (net.Conn, error) {
 	if s.client == nil {
-		return nil, errors.New("tunnel is not opened.")
+		return nil, errors.New("tunnel is not opened")
 	}
 	// This Dial method does not allow to pass a context unfortunately
 	return s.client.Dial(network, address)
 }
 
-func (s *sshTunnel) Close() error {
+// Close func close the ssh tunnel.
+func (s *SecureTunnel) Close() error {
+
 	if s.client == nil {
-		return errors.New("Cannot close tunnel. Tunnel was not opened.")
+		return errors.New("Cannot close tunnel. Tunnel was not opened")
 	}
 	if err := s.client.Close(); err != nil {
 		return err
@@ -219,6 +227,7 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 	return bout.String(), berr.String(), code, err
 }
 
+// MakePrivateKeySignerFromFile func get the Private Key from file.
 func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	// Create an actual signer.
 	buffer, err := ioutil.ReadFile(key)
@@ -228,6 +237,7 @@ func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	return MakePrivateKeySignerFromBytes(buffer)
 }
 
+// MakePrivateKeySignerFromBytes func get the Private Key from string.
 func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	signer, err := ssh.ParsePrivateKey(buffer)
 	if err != nil {
@@ -236,6 +246,7 @@ func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	return signer, nil
 }
 
+// ParsePublicKeyFromFile func get the Public Key from file.
 func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
 	buffer, err := ioutil.ReadFile(keyFile)
 	if err != nil {
@@ -262,29 +273,30 @@ type tunnel interface {
 	Dial(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-type sshTunnelEntry struct {
+type secureTunnelEntry struct {
 	Address string
 	Tunnel  tunnel
 }
 
-type sshTunnelCreator interface {
-	newSSHTunnel(user, keyFile, host string) (tunnel, error)
+type secureTunnelCreator interface {
+	NewSecureTunnel(user, keyFile, healthCheckURL string) (tunnel, error)
 }
 
 type realTunnelCreator struct{}
 
-func (*realTunnelCreator) newSSHTunnel(user, keyFile, host string) (tunnel, error) {
+func (*realTunnelCreator) NewSecureTunnel(user, keyFile, host string) (tunnel, error) {
 	signer, err := MakePrivateKeySignerFromFile(keyFile)
 	if err != nil {
 		return nil, err
 	}
-	return makeSSHTunnel(user, signer, host)
+	return makeSecureTunnel(user, signer, host)
 }
 
-type SSHTunnelList struct {
-	entries       []sshTunnelEntry
+// SecureTunnelList - a list for ssh tunnel
+type SecureTunnelList struct {
+	entries       []secureTunnelEntry
 	adding        map[string]bool
-	tunnelCreator sshTunnelCreator
+	tunnelCreator secureTunnelCreator
 	tunnelsLock   sync.Mutex
 
 	user           string
@@ -292,8 +304,9 @@ type SSHTunnelList struct {
 	healthCheckURL *url.URL
 }
 
-func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan chan struct{}) *SSHTunnelList {
-	l := &SSHTunnelList{
+// NewSecureTunnelList func instantiate an new ssh tunnel.
+func NewSecureTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan chan struct{}) *SecureTunnelList {
+	l := &SecureTunnelList{
 		adding:         make(map[string]bool),
 		tunnelCreator:  &realTunnelCreator{},
 		user:           user,
@@ -315,7 +328,7 @@ func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan ch
 	return l
 }
 
-func (l *SSHTunnelList) delayedHealthCheck(e sshTunnelEntry, delay time.Duration) {
+func (l *SecureTunnelList) delayedHealthCheck(e secureTunnelEntry, delay time.Duration) {
 	go func() {
 		defer runtime.HandleCrash()
 		time.Sleep(delay)
@@ -327,7 +340,7 @@ func (l *SSHTunnelList) delayedHealthCheck(e sshTunnelEntry, delay time.Duration
 	}()
 }
 
-func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
+func (l *SecureTunnelList) healthCheck(e secureTunnelEntry) error {
 	// GET the healthcheck path using the provided tunnel's dial function.
 	transport := utilnet.SetTransportDefaults(&http.Transport{
 		DialContext: e.Tunnel.Dial,
@@ -346,7 +359,7 @@ func (l *SSHTunnelList) healthCheck(e sshTunnelEntry) error {
 	return nil
 }
 
-func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
+func (l *SecureTunnelList) removeAndReAdd(e secureTunnelEntry) {
 	// Find the entry to replace.
 	l.tunnelsLock.Lock()
 	for i, entry := range l.entries {
@@ -363,7 +376,8 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 	go l.createAndAddTunnel(e.Address)
 }
 
-func (l *SSHTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
+// Dial func pick the right tunnel.
+func (l *SecureTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
 	start := time.Now()
 	id := mathrand.Int63() // So you can match begins/ends in the log.
 	klog.Infof("[%x: %v] Dialing...", id, addr)
@@ -377,7 +391,7 @@ func (l *SSHTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, e
 	return tunnel.Dial(ctx, net, addr)
 }
 
-func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
+func (l *SecureTunnelList) pickTunnel(addr string) (tunnel, error) {
 	l.tunnelsLock.Lock()
 	defer l.tunnelsLock.Unlock()
 	if len(l.entries) == 0 {
@@ -399,7 +413,7 @@ func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 // tunnels that are not in addresses are removed from entries and closed in a
 // background goroutine. New tunnels specified in addresses are opened in a
 // background goroutine and then added to entries.
-func (l *SSHTunnelList) Update(addrs []string) {
+func (l *SecureTunnelList) Update(addrs []string) {
 	haveAddrsMap := make(map[string]bool)
 	wantAddrsMap := make(map[string]bool)
 	func() {
@@ -427,7 +441,7 @@ func (l *SSHTunnelList) Update(addrs []string) {
 			wantAddrsMap[addrs[i]] = true
 		}
 		// Determine any necessary deletions.
-		var newEntries []sshTunnelEntry
+		var newEntries []secureTunnelEntry
 		for i := range l.entries {
 			if _, ok := wantAddrsMap[l.entries[i].Address]; !ok {
 				tunnelEntry := l.entries[i]
@@ -446,9 +460,9 @@ func (l *SSHTunnelList) Update(addrs []string) {
 	}()
 }
 
-func (l *SSHTunnelList) createAndAddTunnel(addr string) {
+func (l *SecureTunnelList) createAndAddTunnel(addr string) {
 	klog.Infof("Trying to add tunnel to %q", addr)
-	tunnel, err := l.tunnelCreator.newSSHTunnel(l.user, l.keyfile, addr)
+	tunnel, err := l.tunnelCreator.NewSecureTunnel(l.user, l.keyfile, addr)
 	if err != nil {
 		klog.Errorf("Failed to create tunnel for %q: %v", addr, err)
 		return
@@ -461,12 +475,13 @@ func (l *SSHTunnelList) createAndAddTunnel(addr string) {
 		return
 	}
 	l.tunnelsLock.Lock()
-	l.entries = append(l.entries, sshTunnelEntry{addr, tunnel})
+	l.entries = append(l.entries, secureTunnelEntry{addr, tunnel})
 	delete(l.adding, addr)
 	l.tunnelsLock.Unlock()
 	klog.Infof("Successfully added tunnel for %q", addr)
 }
 
+// EncodePrivateKey func encode the Private key.
 func EncodePrivateKey(private *rsa.PrivateKey) []byte {
 	return pem.EncodeToMemory(&pem.Block{
 		Bytes: x509.MarshalPKCS1PrivateKey(private),
@@ -474,6 +489,7 @@ func EncodePrivateKey(private *rsa.PrivateKey) []byte {
 	})
 }
 
+// EncodePublicKey func encode the public key.
 func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
 	publicBytes, err := x509.MarshalPKIXPublicKey(public)
 	if err != nil {
@@ -485,6 +501,7 @@ func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
 	}), nil
 }
 
+// EncodeSSHKey func encode the ssh key.
 func EncodeSSHKey(public *rsa.PublicKey) ([]byte, error) {
 	publicKey, err := ssh.NewPublicKey(public)
 	if err != nil {
@@ -493,6 +510,7 @@ func EncodeSSHKey(public *rsa.PublicKey) ([]byte, error) {
 	return ssh.MarshalAuthorizedKey(publicKey), nil
 }
 
+// GenerateKey func generate the rsa key.
 func GenerateKey(bits int) (*rsa.PrivateKey, *rsa.PublicKey, error) {
 	private, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
