@@ -45,9 +45,8 @@ import (
 )
 
 const (
-	enableEquivalenceCache = true
-	disablePodPreemption   = false
-	bindTimeoutSeconds     = 600
+	disablePodPreemption = false
+	bindTimeoutSeconds   = 600
 )
 
 func TestCreate(t *testing.T) {
@@ -532,7 +531,6 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
 		disablePodPreemption,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,

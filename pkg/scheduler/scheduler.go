@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -38,7 +37,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -70,7 +68,6 @@ func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
 type schedulerOptions struct {
 	schedulerName                  string
 	hardPodAffinitySymmetricWeight int32
-	enableEquivalenceClassCache    bool
 	disablePreemption              bool
 	percentageOfNodesToScore       int32
 	bindTimeoutSeconds             int64
@@ -90,13 +87,6 @@ func WithName(schedulerName string) Option {
 func WithHardPodAffinitySymmetricWeight(hardPodAffinitySymmetricWeight int32) Option {
 	return func(o *schedulerOptions) {
 		o.hardPodAffinitySymmetricWeight = hardPodAffinitySymmetricWeight
-	}
-}
-
-// WithEquivalenceClassCacheEnabled sets enableEquivalenceClassCache for Scheduler, the default value is false
-func WithEquivalenceClassCacheEnabled(enableEquivalenceClassCache bool) Option {
-	return func(o *schedulerOptions) {
-		o.enableEquivalenceClassCache = enableEquivalenceClassCache
 	}
 }
 
@@ -124,7 +114,6 @@ func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
 var defaultSchedulerOptions = schedulerOptions{
 	schedulerName:                  v1.DefaultSchedulerName,
 	hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-	enableEquivalenceClassCache:    false,
 	disablePreemption:              false,
 	percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 	bindTimeoutSeconds:             BindTimeoutSeconds,
@@ -167,7 +156,6 @@ func New(client clientset.Interface,
 		PdbInformer:                    pdbInformer,
 		StorageClassInformer:           storageClassInformer,
 		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    options.enableEquivalenceClassCache,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
@@ -370,12 +358,6 @@ func (sched *Scheduler) assumeVolumes(assumed *v1.Pod, host string) (allBound bo
 			sched.recordSchedulingFailure(assumed, err, SchedulerError,
 				fmt.Sprintf("AssumePodVolumes failed: %v", err))
 		}
-		// Invalidate ecache because assumed volumes could have affected the cached
-		// pvs for other pods
-		if sched.config.Ecache != nil {
-			invalidPredicates := sets.NewString(predicates.CheckVolumeBindingPred)
-			sched.config.Ecache.InvalidatePredicates(invalidPredicates)
-		}
 	}
 	return
 }
@@ -416,11 +398,7 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumed.Spec.NodeName = host
-	// NOTE: Updates must be written to scheduler cache before invalidating
-	// equivalence cache, because we could snapshot equivalence cache after the
-	// invalidation and then snapshot the cache itself. If the cache is
-	// snapshotted before updates are written, we would update equivalence
-	// cache with stale information which is based on snapshot of old cache.
+
 	if err := sched.config.SchedulerCache.AssumePod(assumed); err != nil {
 		klog.Errorf("scheduler cache AssumePod failed: %v", err)
 
@@ -438,12 +416,6 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 		sched.config.SchedulingQueue.DeleteNominatedPodIfExists(assumed)
 	}
 
-	// Optimistically assume that the binding will succeed, so we need to invalidate affected
-	// predicates in equivalence cache.
-	// If the binding fails, these invalidated item will not break anything.
-	if sched.config.Ecache != nil {
-		sched.config.Ecache.InvalidateCachedPredicateItemForPodAdd(assumed, host)
-	}
 	return nil
 }
 

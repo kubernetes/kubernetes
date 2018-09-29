@@ -124,12 +124,6 @@ const (
 	// Add priority to pods. Priority affects scheduling and preemption of pods.
 	PodPriority utilfeature.Feature = "PodPriority"
 
-	// owner: @resouer
-	// alpha: v1.8
-	//
-	// Enable equivalence class cache for scheduler.
-	EnableEquivalenceClassCache utilfeature.Feature = "EnableEquivalenceClassCache"
-
 	// owner: @k82cn
 	// beta: v1.12
 	//
@@ -418,7 +412,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
 	PodShareProcessNamespace:                    {Default: true, PreRelease: utilfeature.Beta},
 	PodPriority:                                 {Default: true, PreRelease: utilfeature.Beta},
-	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
 	TaintNodesByCondition:                       {Default: true, PreRelease: utilfeature.Beta},
 	MountPropagation:                            {Default: true, PreRelease: utilfeature.GA},
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},

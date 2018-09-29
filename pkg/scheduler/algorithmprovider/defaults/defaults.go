@@ -49,13 +49,6 @@ func init() {
 	registerAlgorithmProvider(defaultPredicates(), defaultPriorities())
 
 	// IMPORTANT NOTES for predicate developers:
-	// We are using cached predicate result for pods belonging to the same equivalence class.
-	// So when implementing a new predicate, you are expected to check whether the result
-	// of your predicate function can be affected by related API object change (ADD/DELETE/UPDATE).
-	// If yes, you are expected to invalidate the cached predicate result for related API object change.
-	// For example:
-	// https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
-
 	// Registers predicates and priorities that are not enabled by default, but user can pick when creating their
 	// own set of priorities/predicates.
 
