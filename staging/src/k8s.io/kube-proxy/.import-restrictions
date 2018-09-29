@@ -1,0 +1,14 @@
+{
+  "Rules": [
+    {
+      "SelectorRegexp": "k8s[.]io/apimachinery/",
+      "AllowedPrefixes": [
+        "k8s.io/apimachinery/pkg/runtime",
+        "k8s.io/apimachinery/pkg/runtime/schema",
+        "k8s.io/apimachinery/pkg/apis/config/v1alpha1",
+        "k8s.io/apimachinery/pkg/apis/meta/v1"
+      ],
+      "ForbiddenPrefixes": []
+    }
+  ]
+}
