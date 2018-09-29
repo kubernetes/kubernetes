@@ -20,7 +20,6 @@ package ipvs
 
 import (
 	"fmt"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -60,4 +59,9 @@ func (h *emptyHandle) ListBindAddress(devName string) ([]string, error) {
 // GetLocalAddresses is part of interface.
 func (h *emptyHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
 	return nil, fmt.Errorf("netlink is not supported in this platform")
+}
+
+// ChangeLORouteSrc is part of interface.
+func (h *netlinkHandle) ChangeLORouteSrc(typ ChangeLoRouteSrcType) error {
+	return fmt.Errorf("netlink is not supported in this platform")
 }

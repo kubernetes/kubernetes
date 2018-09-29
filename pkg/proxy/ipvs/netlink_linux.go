@@ -23,6 +23,7 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -31,6 +32,12 @@ import (
 type netlinkHandle struct {
 	netlink.Handle
 }
+
+const (
+	localHostAddr = "127.0.0.1"
+	typeNodeIP    = "nodeIP"
+	typeLocalHost = "localHost"
+)
 
 // NewNetLinkHandle will crate a new NetLinkHandle
 func NewNetLinkHandle() NetLinkHandle {
@@ -160,19 +167,7 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 		filterLinkIndex = link.Attrs().Index
 	}
 
-	routeFilter := &netlink.Route{
-		Table:    unix.RT_TABLE_LOCAL,
-		Type:     unix.RTN_LOCAL,
-		Protocol: unix.RTPROT_KERNEL,
-	}
-	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
-
-	// find chosen device
-	if chosenLinkIndex != -1 {
-		routeFilter.LinkIndex = chosenLinkIndex
-		filterMask |= netlink.RT_FILTER_OIF
-	}
-	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
+	routes, err := h.listRoutesForLink(chosenLinkIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error list route table, err: %v", err)
 	}
@@ -186,4 +181,99 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 		}
 	}
 	return res, nil
+}
+
+// ChangeLORouteSrc change the src of route rule for 127.0.0.1 in table local
+// it's equivalent to exec:
+// ip route get 127.0.0.1 > result
+// ip route change <result> src <src>
+func (h *netlinkHandle) ChangeLORouteSrc(typ string) (err error) {
+	var src net.IP
+	switch typ {
+	case typeNodeIP:
+		src, err = h.getUniqueAddress()
+		if err != nil {
+			return err
+		}
+	case typeLocalHost:
+		src = net.ParseIP(localHostAddr)
+	default:
+		src = net.ParseIP(localHostAddr)
+	}
+
+	routes, err := h.RouteGet(net.ParseIP(localHostAddr))
+	if err != nil {
+		return fmt.Errorf("list routes for %q err: %v", localHostAddr, err)
+	}
+
+	if len(routes) != 0 {
+		for _, r := range routes {
+			if r.Type != unix.RTN_LOCAL {
+				continue
+			}
+			route := netlink.Route{
+				Dst:       r.Dst,
+				Table:     r.Table,
+				Src:       src,
+				LinkIndex: r.LinkIndex,
+				Protocol:  r.Protocol,
+				Scope:     r.Scope,
+				Type:      unix.RTN_LOCAL,
+			}
+			if err := h.RouteReplace(&route); err != nil {
+				return fmt.Errorf("change route err: change to: %v, err: %v", route, err)
+			}
+		}
+	}
+	return nil
+}
+
+// getUniqueAddress to get a unique ip address for one node
+func (h *netlinkHandle) getUniqueAddress() (net.IP, error) {
+	routeFilter := &netlink.Route{
+		Table: unix.RT_TABLE_MAIN,
+		Dst:   nil,
+	}
+	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_DST
+	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
+	if err != nil {
+		return nil, fmt.Errorf("get default route rule err: %v", err)
+	}
+	var linkIndex int
+	if len(routes) > 0 {
+		if len(routes) != 1 {
+			klog.Errorf("should only got 1 default route rule, but got %d, will only use the first one", len(routes))
+		}
+		linkIndex = routes[0].LinkIndex
+	} else {
+		return nil, fmt.Errorf("get none default route rule")
+	}
+
+	routes, err = h.listRoutesForLink(linkIndex)
+	if err != nil {
+		return nil, fmt.Errorf("get route for link %q err: %v", linkIndex, err)
+	}
+	for _, route := range routes {
+		if route.Src != nil {
+			return route.Src, nil
+		}
+	}
+
+	return nil, fmt.Errorf("can't get unique ip address")
+}
+
+func (h *netlinkHandle) listRoutesForLink(linkIndex int) ([]netlink.Route, error) {
+	routeFilter := &netlink.Route{
+		Table:    unix.RT_TABLE_LOCAL,
+		Type:     unix.RTN_LOCAL,
+		Protocol: unix.RTPROT_KERNEL,
+	}
+	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
+
+	// find chosen device
+	if linkIndex != -1 {
+		routeFilter.LinkIndex = linkIndex
+		filterMask |= netlink.RT_FILTER_OIF
+	}
+	return h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
 }

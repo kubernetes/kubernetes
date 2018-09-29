@@ -146,3 +146,8 @@ func (h *FakeNetlinkHandle) SetLocalAddresses(dev string, ips ...string) error {
 	h.localAddresses[dev] = append(h.localAddresses[dev], ips...)
 	return nil
 }
+
+// ChangeLORouteSrc is a mock implementation
+func (h *FakeNetlinkHandle) ChangeLORouteSrc(typ string) error {
+	return nil
+}

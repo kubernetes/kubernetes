@@ -35,4 +35,6 @@ type NetLinkHandle interface {
 	// GetLocalAddresses returns all unique local type IP addresses based on specified device and filter device
 	// If device is not specified, it will list all unique local type addresses except filter device addresses
 	GetLocalAddresses(dev, filterDev string) (sets.String, error)
+	// ChangeLORouteSrc change the src of lo link in table local
+	ChangeLORouteSrc(typ string) error
 }

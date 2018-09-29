@@ -412,6 +412,12 @@ func NewProxier(ipt utiliptables.Interface,
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	proxier.gracefuldeleteManager.Run()
+
+	// change lo route rules src to support localhost:nodePort
+	err := proxier.netlinkHandle.ChangeLORouteSrc(typeNodeIP)
+	if err != nil {
+		klog.Errorf("modify route rule for lo err, can't access localhost:nodePor: %v", err)
+	}
 	return proxier, nil
 }
 
@@ -588,6 +594,12 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	err := nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		klog.Errorf("Error deleting dummy device %s created by IPVS proxier: %v", DefaultDummyDevice, err)
+		encounteredError = true
+	}
+	// Change localhost route rule back
+	err = nl.ChangeLORouteSrc(typeLocalHost)
+	if err != nil {
+		klog.Errorf("Error change route rule for localhost back: %v", err)
 		encounteredError = true
 	}
 	// Clear iptables created by ipvs Proxier.
