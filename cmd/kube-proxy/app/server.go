@@ -178,6 +178,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 }
 
+// NewOptions returns base options for the server.
 func NewOptions() *Options {
 	return &Options{
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
@@ -197,11 +198,11 @@ func (o *Options) Complete() error {
 
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
-		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
+		c, err := o.loadConfigFromFile(o.ConfigFile)
+		if err != nil {
 			return err
-		} else {
-			o.config = c
 		}
+		o.config = c
 	}
 
 	err := utilfeature.DefaultFeatureGate.SetFromMap(o.config.FeatureGates)
@@ -225,6 +226,7 @@ func (o *Options) Validate(args []string) error {
 	return nil
 }
 
+// Run creates and runs a new ProxyServer using the current options.
 func (o *Options) Run() error {
 	if len(o.WriteConfigTo) > 0 {
 		return o.writeConfigFile()
@@ -312,6 +314,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 	return config, nil
 }
 
+// ApplyDefaults applies defaults to the specified configuration.
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
@@ -451,7 +454,7 @@ func (s *ProxyServer) Run() error {
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
 		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
 		if encounteredError {
-			return errors.New("encountered an error while tearing down rules.")
+			return errors.New("encountered an error while tearing down rules")
 		}
 		return nil
 	}
@@ -513,10 +516,10 @@ func (s *ProxyServer) Run() error {
 		if max > 0 {
 			err := s.Conntracker.SetMax(max)
 			if err != nil {
-				if err != readOnlySysFSError {
+				if err != errReadOnlySysFS {
 					return err
 				}
-				// readOnlySysFSError is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
+				// errReadOnlySysFS is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
 				// the only remediation we know is to restart the docker daemon.
 				// Here we'll send an node event with specific reason and message, the
 				// administrator should decide whether and how to handle this issue,

@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	// register pprof's http handlers
+	// https://golang.org/pkg/net/http/pprof/
 	_ "net/http/pprof"
 
 	"k8s.io/api/core/v1"
