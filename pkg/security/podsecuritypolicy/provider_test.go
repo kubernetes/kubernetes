@@ -186,22 +186,39 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 
 	failSupplementalGroupPod := defaultPod()
 	failSupplementalGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{999}
-	failSupplementalGroupPSP := defaultPSP()
-	failSupplementalGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+	failSupplementalGroupMustPSP := defaultPSP()
+	failSupplementalGroupMustPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
+		},
+	}
+	failSupplementalGroupMayPSP := defaultPSP()
+	failSupplementalGroupMayPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+		Rule: policy.SupplementalGroupsStrategyMayRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 50, Max: 50},
+			{Min: 55, Max: 998},
+			{Min: 1000, Max: 1000},
 		},
 	}
 
 	failFSGroupPod := defaultPod()
 	fsGroup := int64(999)
 	failFSGroupPod.Spec.SecurityContext.FSGroup = &fsGroup
-	failFSGroupPSP := defaultPSP()
-	failFSGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+	failFSGroupMustPSP := defaultPSP()
+	failFSGroupMustPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 1},
+		},
+	}
+	failFSGroupMayPSP := defaultPSP()
+	failFSGroupMayPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+		Rule: policy.FSGroupStrategyMayRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 10, Max: 20},
+			{Min: 1000, Max: 1001},
 		},
 	}
 
@@ -334,24 +351,34 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			psp:           defaultPSP(),
 			expectedError: "Host IPC is not allowed to be used",
 		},
-		"failSupplementalGroupOutOfRange": {
+		"failSupplementalGroupOutOfMustRange": {
 			pod:           failSupplementalGroupPod,
-			psp:           failSupplementalGroupPSP,
+			psp:           failSupplementalGroupMustPSP,
 			expectedError: "group 999 must be in the ranges: [{1 1}]",
 		},
-		"failSupplementalGroupEmpty": {
+		"failSupplementalGroupOutOfMayRange": {
+			pod:           failSupplementalGroupPod,
+			psp:           failSupplementalGroupMayPSP,
+			expectedError: "group 999 must be in the ranges: [{50 50} {55 998} {1000 1000}]",
+		},
+		"failSupplementalGroupMustEmpty": {
 			pod:           defaultPod(),
-			psp:           failSupplementalGroupPSP,
+			psp:           failSupplementalGroupMustPSP,
 			expectedError: "unable to validate empty groups against required ranges",
 		},
-		"failFSGroupOutOfRange": {
+		"failFSGroupOutOfMustRange": {
 			pod:           failFSGroupPod,
-			psp:           failFSGroupPSP,
+			psp:           failFSGroupMustPSP,
 			expectedError: "group 999 must be in the ranges: [{1 1}]",
 		},
-		"failFSGroupEmpty": {
+		"failFSGroupOutOfMayRange": {
+			pod:           failFSGroupPod,
+			psp:           failFSGroupMayPSP,
+			expectedError: "group 999 must be in the ranges: [{10 20} {1000 1001}]",
+		},
+		"failFSGroupMustEmpty": {
 			pod:           defaultPod(),
-			psp:           failFSGroupPSP,
+			psp:           failFSGroupMustPSP,
 			expectedError: "unable to validate empty groups against required ranges",
 		},
 		"failNilSELinux": {
@@ -616,9 +643,16 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	hostIPCPod := defaultPod()
 	hostIPCPod.Spec.SecurityContext.HostIPC = true
 
-	supGroupPSP := defaultPSP()
-	supGroupPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+	supGroupMustPSP := defaultPSP()
+	supGroupMustPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
 		Rule: policy.SupplementalGroupsStrategyMustRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 1, Max: 5},
+		},
+	}
+	supGroupMayPSP := defaultPSP()
+	supGroupMayPSP.Spec.SupplementalGroups = policy.SupplementalGroupsStrategyOptions{
+		Rule: policy.SupplementalGroupsStrategyMayRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
@@ -626,9 +660,16 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 	supGroupPod := defaultPod()
 	supGroupPod.Spec.SecurityContext.SupplementalGroups = []int64{3}
 
-	fsGroupPSP := defaultPSP()
-	fsGroupPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+	fsGroupMustPSP := defaultPSP()
+	fsGroupMustPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
 		Rule: policy.FSGroupStrategyMustRunAs,
+		Ranges: []policy.IDRange{
+			{Min: 1, Max: 5},
+		},
+	}
+	fsGroupMayPSP := defaultPSP()
+	fsGroupMayPSP.Spec.FSGroup = policy.FSGroupStrategyOptions{
+		Rule: policy.FSGroupStrategyMayRunAs,
 		Ranges: []policy.IDRange{
 			{Min: 1, Max: 5},
 		},
@@ -793,13 +834,29 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 			pod: hostIPCPod,
 			psp: hostIPCPSP,
 		},
-		"pass supplemental group validating PSP": {
+		"pass required supplemental group validating PSP": {
 			pod: supGroupPod,
-			psp: supGroupPSP,
+			psp: supGroupMustPSP,
 		},
-		"pass fs group validating PSP": {
+		"pass optional supplemental group validation PSP": {
+			pod: supGroupPod,
+			psp: supGroupMayPSP,
+		},
+		"pass optional supplemental group validation PSP - no pod group specified": {
+			pod: defaultPod(),
+			psp: supGroupMayPSP,
+		},
+		"pass required fs group validating PSP": {
 			pod: fsGroupPod,
-			psp: fsGroupPSP,
+			psp: fsGroupMustPSP,
+		},
+		"pass optional fs group validating PSP": {
+			pod: fsGroupPod,
+			psp: fsGroupMayPSP,
+		},
+		"pass optional fs group validating PSP - no pod group specified": {
+			pod: defaultPod(),
+			psp: fsGroupMayPSP,
 		},
 		"pass selinux validating PSP": {
 			pod: seLinuxPod,

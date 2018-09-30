@@ -390,12 +390,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"no fsgroup options": {
 			psp:         noFSGroupOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"no sup group options": {
 			psp:         noSupplementalGroupsOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid user strategy type": {
 			psp:         invalidUserStratType,
@@ -410,12 +410,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"invalid sup group strategy type": {
 			psp:         invalidSupGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid fs group strategy type": {
 			psp:         invalidFSGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid uid": {
 			psp:         invalidUIDPSP,
