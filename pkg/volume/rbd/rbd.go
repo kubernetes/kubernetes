@@ -667,6 +667,9 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	if r.Id == "" {
 		r.Id = r.adminId
 	}
+	if fstype == "" {
+		fstype = "ext4"
+	}
 
 	// create random image name
 	image := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
