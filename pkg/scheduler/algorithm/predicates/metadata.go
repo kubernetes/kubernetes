@@ -492,7 +492,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 }
 
 // targetPodMatchesAffinityOfPod returns true if "targetPod" matches ALL affinity terms of
-// "pod". Similar to getPodsMatchingAffinity, this function does not check topology.
+// "pod". This function does not check topology.
 // So, whether the targetPod actually matches or not needs further checks for a specific
 // node.
 func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
@@ -509,7 +509,7 @@ func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
 }
 
 // targetPodMatchesAntiAffinityOfPod returns true if "targetPod" matches ANY anti-affinity
-// term of "pod". Similar to getPodsMatchingAffinity, this function does not check topology.
+// term of "pod". This function does not check topology.
 // So, whether the targetPod actually matches or not needs further checks for a specific
 // node.
 func targetPodMatchesAntiAffinityOfPod(pod, targetPod *v1.Pod) bool {
