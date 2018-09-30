@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"golang.org/x/oauth2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -313,19 +314,24 @@ func DefaultKubernetesUserAgent() string {
 // running inside a pod running on kubernetes. It will return ErrNotInCluster
 // if called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
+	config, _, err := InClusterConfigAndTokenSource()
+	return config, err
+}
+
+func InClusterConfigAndTokenSource() (*Config, *oauth2.TokenSource, error) {
 	const (
 		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	)
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {
-		return nil, ErrNotInCluster
+		return nil, nil, ErrNotInCluster
 	}
 
 	ts := newCachedPathTokenSource(tokenFile)
 
 	if _, err := ts.Token(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tlsClientConfig := TLSClientConfig{}
@@ -341,7 +347,7 @@ func InClusterConfig() (*Config, error) {
 		Host:            "https://" + net.JoinHostPort(host, port),
 		TLSClientConfig: tlsClientConfig,
 		WrapTransport:   TokenSourceWrapTransport(ts),
-	}, nil
+	}, &ts, nil
 }
 
 // IsConfigTransportTLS returns true if and only if the provided
