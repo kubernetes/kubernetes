@@ -370,12 +370,13 @@ func ServerPreferredNamespacedResources(d DiscoveryInterface) ([]*metav1.APIReso
 
 // ServerVersion retrieves and parses the server's version (git version).
 func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
-	body, err := d.restClient.Get().AbsPath("/version").Do().Raw()
-	if err != nil {
+	result := d.restClient.Get().AbsPath("/version").Do()
+	if err := result.Error(); err != nil {
 		return nil, err
 	}
+	body, _ := result.Raw()
 	var info version.Info
-	err = json.Unmarshal(body, &info)
+	err := json.Unmarshal(body, &info)
 	if err != nil {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
@@ -384,21 +385,22 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 
 // OpenAPISchema fetches the open api schema using a rest client and parses the proto.
 func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do().Raw()
-	if err != nil {
+	result := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do()
+	if err := result.Error(); err != nil {
 		if errors.IsForbidden(err) || errors.IsNotFound(err) || errors.IsNotAcceptable(err) {
 			// single endpoint not found/registered in old server, try to fetch old endpoint
 			// TODO(roycaihw): remove this in 1.11
-			data, err = d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do().Raw()
-			if err != nil {
+			result = d.restClient.Get().AbsPath("/swagger-2.0.0.pb-v1").Do()
+			if err = result.Error(); err != nil {
 				return nil, err
 			}
 		} else {
 			return nil, err
 		}
 	}
+	data, _ := result.Raw()
 	document := &openapi_v2.Document{}
-	err = proto.Unmarshal(data, document)
+	err := proto.Unmarshal(data, document)
 	if err != nil {
 		return nil, err
 	}
