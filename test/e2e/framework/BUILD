@@ -156,6 +156,7 @@ go_library(
         "//vendor/github.com/spf13/viper:go_default_library",
         "//vendor/golang.org/x/crypto/ssh:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
+        "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",

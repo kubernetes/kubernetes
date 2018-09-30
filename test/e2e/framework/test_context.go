@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
+	"golang.org/x/oauth2"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -334,7 +335,7 @@ func ViperizeFlags() {
 	AfterReadingAllFlags(&TestContext)
 }
 
-func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
+func createKubeConfig(clientCfg *restclient.Config, ts oauth2.TokenSource) *clientcmdapi.Config {
 	clusterNick := "cluster"
 	userNick := "user"
 	contextNick := "context"
@@ -342,7 +343,11 @@ func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
 	config := clientcmdapi.NewConfig()
 
 	credentials := clientcmdapi.NewAuthInfo()
-	credentials.Token = clientCfg.BearerToken
+	if ts != nil {
+		if token, err := ts.Token(); err == nil {
+			credentials.Token = token.AccessToken
+		}
+	}
 	credentials.ClientCertificate = clientCfg.TLSClientConfig.CertFile
 	if len(credentials.ClientCertificate) == 0 {
 		credentials.ClientCertificateData = clientCfg.TLSClientConfig.CertData
@@ -377,9 +382,9 @@ func AfterReadingAllFlags(t *TestContextType) {
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config
-		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
+		if clusterConfig, ts, err := restclient.InClusterConfigAndTokenSource(); err == nil {
 			if tempFile, err := ioutil.TempFile(os.TempDir(), "kubeconfig-"); err == nil {
-				kubeConfig := createKubeConfig(clusterConfig)
+				kubeConfig := createKubeConfig(clusterConfig, *ts)
 				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
 				t.KubeConfig = tempFile.Name()
 				glog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
