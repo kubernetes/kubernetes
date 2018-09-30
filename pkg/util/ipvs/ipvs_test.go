@@ -209,12 +209,10 @@ func TestRealServerEqual(t *testing.T) {
 			rsA: &RealServer{
 				Address: net.ParseIP("10.20.30.40"),
 				Port:    80,
-				Weight:  1,
 			},
 			rsB: &RealServer{
 				Address: net.ParseIP("10.20.30.41"),
 				Port:    80,
-				Weight:  1,
 			},
 			equal:  false,
 			reason: "IPv4 address not equal",
@@ -223,12 +221,10 @@ func TestRealServerEqual(t *testing.T) {
 			rsA: &RealServer{
 				Address: net.ParseIP("2012::beef"),
 				Port:    80,
-				Weight:  1,
 			},
 			rsB: &RealServer{
 				Address: net.ParseIP("2017::beef"),
 				Port:    80,
-				Weight:  1,
 			},
 			equal:  false,
 			reason: "IPv6 address not equal",
@@ -237,40 +233,22 @@ func TestRealServerEqual(t *testing.T) {
 			rsA: &RealServer{
 				Address: net.ParseIP("2012::beef"),
 				Port:    80,
-				Weight:  1,
 			},
 			rsB: &RealServer{
 				Address: net.ParseIP("2012::beef"),
 				Port:    8080,
-				Weight:  1,
 			},
 			equal:  false,
 			reason: "Port not equal",
 		},
 		{
 			rsA: &RealServer{
-				Address: net.ParseIP("10.20.30.40"),
-				Port:    8080,
-				Weight:  1,
-			},
-			rsB: &RealServer{
-				Address: net.ParseIP("10.20.30.40"),
-				Port:    8080,
-				Weight:  10,
-			},
-			equal:  false,
-			reason: "Weight not equal",
-		},
-		{
-			rsA: &RealServer{
 				Address: net.ParseIP("1.2.3.4"),
 				Port:    3080,
-				Weight:  10,
 			},
 			rsB: &RealServer{
 				Address: net.ParseIP("1.2.3.4"),
 				Port:    3080,
-				Weight:  10,
 			},
 			equal:  true,
 			reason: "All fields equal",
@@ -279,12 +257,10 @@ func TestRealServerEqual(t *testing.T) {
 			rsA: &RealServer{
 				Address: net.ParseIP("2012::beef"),
 				Port:    3080,
-				Weight:  10,
 			},
 			rsB: &RealServer{
 				Address: net.ParseIP("2012::beef"),
 				Port:    3080,
-				Weight:  10,
 			},
 			equal:  true,
 			reason: "All fields equal",
