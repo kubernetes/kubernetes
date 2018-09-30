@@ -82,9 +82,6 @@ func (q *graceTerminateRSList) remove(rs *listItem) bool {
 }
 
 func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (bool, error)) bool {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
 	success := true
 	for name, rs := range q.list {
 		deleted, err := handler(rs)
@@ -105,8 +102,8 @@ func (q *graceTerminateRSList) exist(uniqueRS string) (*listItem, bool) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	if _, ok := q.list[uniqueRS]; ok {
-		return nil, false
+	if rs, ok := q.list[uniqueRS]; ok {
+		return rs, true
 	}
 	return nil, false
 }
@@ -144,7 +141,7 @@ func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer
 	}
 	deleted, err := m.deleteRsFunc(ele)
 	if err != nil {
-		glog.Errorf("Delete rs %q err: %v", err)
+		glog.Errorf("Delete rs %q err: %v", ele.String(), err)
 	}
 	if deleted {
 		return nil
@@ -178,7 +175,7 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 			return true, nil
 		}
 	}
-	return false, fmt.Errorf("Failed to delete rs %q, can't find the real server", rsToDelete.String())
+	return true, fmt.Errorf("Failed to delete rs %q, can't find the real server", rsToDelete.String())
 }
 
 func (m *GracefulTerminationManager) tryDeleteRs() {
