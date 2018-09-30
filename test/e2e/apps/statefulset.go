@@ -983,7 +983,7 @@ func (m *mysqlGaleraTester) deploy(ns string) *apps.StatefulSet {
 func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
-		cmd := fmt.Sprintf("use  statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
+		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
 		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
 	}
 }
