@@ -208,8 +208,8 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		if len(req.URL.RawQuery) > 0 {
 			queryPart = "?" + req.URL.RawQuery
 		}
-		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
-		w.WriteHeader(http.StatusMovedPermanently)
+		req.URL.Path += "/"
+		http.Redirect(w, req, queryPart, http.StatusMovedPermanently)
 		return
 	}
 
