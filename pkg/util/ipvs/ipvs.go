@@ -108,6 +108,5 @@ func (rs *RealServer) String() string {
 // We don't use struct == since it doesn't work because of slice.
 func (rs *RealServer) Equal(other *RealServer) bool {
 	return rs.Address.Equal(other.Address) &&
-		rs.Port == other.Port &&
-		rs.Weight == other.Weight
+		rs.Port == other.Port
 }
