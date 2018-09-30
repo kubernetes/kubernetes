@@ -1533,7 +1533,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 		}
 
 		if curEndpoints.Has(ep) {
-			// check if newEndpoint is in gracefulDelete list, is true, delete this ep immediately
+			// check if newEndpoint is in gracefulDelete list, if true, delete this ep immediately
 			uniqueRS := GetUniqueRSName(vs, newDest)
 			if !proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
 				continue
@@ -1591,10 +1591,14 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 			// This service was not processed in the latest sync loop so before deleting it,
 			// make sure it does not fall within an excluded CIDR range.
 			okayToDelete := true
-			rsList, err := proxier.ipvs.GetRealServers(svc)
-			if len(rsList) != 0 && err == nil {
-				glog.V(5).Infof("Will not delete VS: %v, cause it have RS: %v", svc, rsList)
-				okayToDelete = false
+			rsList, _ := proxier.ipvs.GetRealServers(svc)
+			for _, rs := range rsList {
+				uniqueRS := GetUniqueRSName(svc, rs)
+				// if there are in terminating real server in this service, then handle it later
+				if proxier.gracefuldeleteManager.InTerminationList(uniqueRS) {
+					okayToDelete = false
+					break
+				}
 			}
 			for _, excludedCIDR := range proxier.excludeCIDRs {
 				// Any validation of this CIDR already should have occurred.
