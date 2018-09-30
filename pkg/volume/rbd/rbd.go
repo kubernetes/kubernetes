@@ -71,7 +71,6 @@ const (
 	rbdDefaultAdminId              = "admin"
 	rbdDefaultAdminSecretNamespace = "default"
 	rbdDefaultPool                 = "rbd"
-	rbdDefaultUserId               = rbdDefaultAdminId
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -244,21 +243,9 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 	if err != nil {
 		return nil, err
 	}
-	secret := ""
-	if len(secretName) > 0 && len(secretNs) > 0 {
-		// if secret is provideded, retrieve it
-		kubeClient := plugin.host.GetKubeClient()
-		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
-		}
-		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
-		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
-			return nil, err
-		}
-		for _, data := range secrets.Data {
-			secret = string(data)
-		}
+	secret, err := plugin.getSecretData(secretName, secretNs)
+	if err != nil {
+		return nil, err
 	}
 
 	return &rbdMounter{
@@ -272,26 +259,34 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 	}, nil
 }
 
-func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
-	if err != nil {
-		return nil, err
-	}
+func (plugin *rbdPlugin) getSecretData(secretName string, secretNs string) (string, error) {
 	secret := ""
 	if len(secretName) > 0 && len(secretNs) > 0 {
 		// if secret is provideded, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
+			return secret, fmt.Errorf("Cannot get kube client")
 		}
 		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
 		if err != nil {
 			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
-			return nil, err
+			return secret, err
 		}
 		for _, data := range secrets.Data {
 			secret = string(data)
 		}
+	}
+	return secret, nil
+}
+
+func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+	secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	secret, err := plugin.getSecretData(secretName, secretNs)
+	if err != nil {
+		return nil, err
 	}
 
 	// Inject real implementations here, test through the internal function.
@@ -449,26 +444,16 @@ func (plugin *rbdPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ 
 	if pod != nil {
 		uid = pod.UID
 	}
+
 	secret := ""
 	if pod != nil {
 		secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
 		if err != nil {
 			return nil, err
 		}
-		if len(secretName) > 0 && len(secretNs) > 0 {
-			// if secret is provideded, retrieve it
-			kubeClient := plugin.host.GetKubeClient()
-			if kubeClient == nil {
-				return nil, fmt.Errorf("Cannot get kube client")
-			}
-			secrets, err := kubeClient.Core().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
-			if err != nil {
-				err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
-				return nil, err
-			}
-			for _, data := range secrets.Data {
-				secret = string(data)
-			}
+		secret, err = plugin.getSecretData(secretName, secretNs)
+		if err != nil {
+			return nil, err
 		}
 	}
 
