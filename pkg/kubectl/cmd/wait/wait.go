@@ -89,6 +89,7 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
 			WithLabelSelector("").
 			WithAllNamespaces(false).
+			WithLocal(false).
 			WithLatest(),
 
 		Timeout: 30 * time.Second,
@@ -160,6 +161,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		DynamicClient:  dynamicClient,
 		Timeout:        effectiveTimeout,
 
+		IsLocal:     *flags.ResourceBuilderFlags.Local,
 		Printer:     printer,
 		ConditionFn: conditionFn,
 		IOStreams:   flags.IOStreams,
@@ -202,6 +204,7 @@ type WaitOptions struct {
 	DynamicClient dynamic.Interface
 	Timeout       time.Duration
 
+	IsLocal     bool
 	Printer     printers.ResourcePrinter
 	ConditionFn ConditionFunc
 	genericclioptions.IOStreams
@@ -240,6 +243,10 @@ func (o *WaitOptions) RunWait() error {
 
 // IsDeleted is a condition func for waiting for something to be deleted
 func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+	if o.IsLocal {
+		return nil, false, fmt.Errorf("--local cannot be used with this condition")
+	}
+
 	endTime := time.Now().Add(o.Timeout)
 	for {
 		gottenObj, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(info.Name, metav1.GetOptions{})
@@ -306,6 +313,23 @@ type ConditionalWait struct {
 
 // IsConditionMet is a conditionfunc for waiting on an API condition to be met
 func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+	if o.IsLocal {
+		unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(info.Object)
+		if err != nil {
+			return info.Object, false, err
+		}
+		conditionMet, err := w.checkCondition(&unstructured.Unstructured{Object: unstructuredObj})
+		if conditionMet {
+			return info.Object, true, nil
+		}
+		if err != nil {
+			return info.Object, false, err
+		}
+
+		// technically we timed out waiting for answer.  This makes errors appear consistently
+		return info.Object, false, wait.ErrWaitTimeout
+	}
+
 	endTime := time.Now().Add(o.Timeout)
 	for {
 		resourceVersion := ""

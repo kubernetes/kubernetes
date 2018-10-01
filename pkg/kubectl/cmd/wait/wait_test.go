@@ -327,6 +327,7 @@ func TestWaitForCondition(t *testing.T) {
 		infos      []*resource.Info
 		fakeClient func() *dynamicfakeclient.FakeDynamicClient
 		timeout    time.Duration
+		local      bool
 
 		expectedErr     string
 		validateActions func(t *testing.T, actions []clienttesting.Action)
@@ -544,6 +545,31 @@ func TestWaitForCondition(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "handles raw",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+					Object:    &unstructured.Unstructured{Object: map[string]interface{}{}},
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				return dynamicfakeclient.NewSimpleDynamicClient(scheme)
+			},
+			timeout: 10 * time.Second,
+			local:   true,
+
+			expectedErr: wait.ErrWaitTimeout.Error(),
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 0 {
+					t.Fatal(spew.Sdump(actions))
+				}
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -553,6 +579,7 @@ func TestWaitForCondition(t *testing.T) {
 				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
 				DynamicClient:  fakeClient,
 				Timeout:        test.timeout,
+				IsLocal:        test.local,
 
 				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value"}.IsConditionMet,
