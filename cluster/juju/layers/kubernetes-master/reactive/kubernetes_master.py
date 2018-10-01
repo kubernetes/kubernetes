@@ -1319,6 +1319,8 @@ def configure_controller_manager():
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
+    server_cert_path = layer_options.get('server_certificate_path')
+    server_key_path = layer_options.get('server_key_path')
 
     # Default to 3 minute resync. TODO: Make this configurable?
     controller_opts['min-resync-period'] = '3m'
@@ -1326,9 +1328,10 @@ def configure_controller_manager():
     controller_opts['root-ca-file'] = ca_cert_path
     controller_opts['logtostderr'] = 'true'
     controller_opts['master'] = 'http://127.0.0.1:8080'
-
     controller_opts['service-account-private-key-file'] = \
         '/root/cdk/serviceaccount.key'
+    controller_opts['tls-cert-file'] = server_cert_path
+    controller_opts['tls-private-key-file'] = server_key_path
 
     cm_cloud_config_path = cloud_config_path('kube-controller-manager')
     if is_state('endpoint.aws.ready'):
