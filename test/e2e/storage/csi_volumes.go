@@ -228,7 +228,7 @@ func createCSIDriver(csics csiclient.Interface, attachable bool) *csiv1alpha1.CS
 }
 
 func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) string {
-	// re-get the claim to the the latest state with bound volume
+	// re-get the claim to the latest state with bound volume
 	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.ExpectNoError(err, "Cannot get PVC")

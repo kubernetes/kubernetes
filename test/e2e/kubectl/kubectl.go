@@ -1093,7 +1093,7 @@ metadata:
 			Release : v1.9
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
-			Starting a Pod should have a log line indicating the the server is running and ready to accept connections. 			   Also log command options MUST work as expected and described below.
+			Starting a Pod should have a log line indicating the server is running and ready to accept connections. 			   Also log command options MUST work as expected and described below.
 				‘kubectl log -tail=1’ should generate a output of one line, the last line in the log.
 				‘kubectl --limit-bytes=1’ should generate a single byte output.
 				‘kubectl --tail=1 --timestamp should genrate one line with timestamp in RFC3339 format
@@ -1188,7 +1188,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, version
-			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the the Client and the Server that the kubectl is configured to connect to.
+			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
 			version := framework.RunKubectlOrDie("version")

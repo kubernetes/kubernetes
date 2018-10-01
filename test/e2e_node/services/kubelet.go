@@ -430,7 +430,7 @@ func kubeletConfigCWDPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
-	// DO NOT name this file "kubelet" - you will overwrite the the kubelet binary and be very confused :)
+	// DO NOT name this file "kubelet" - you will overwrite the kubelet binary and be very confused :)
 	return filepath.Join(cwd, "kubelet-config"), nil
 }
 
