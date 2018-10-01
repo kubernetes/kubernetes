@@ -1,0 +1,25 @@
+diff -Naupr -x BUILD -x 'AUTHORS*' -x 'CONTRIBUTORS*' vendor/k8s.io/apiserver/pkg/storage/etcd/testing/utils.go /tmp/gopath.qtqLRB/src/k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd/testing/utils.go
+--- vendor/k8s.io/apiserver/pkg/storage/etcd/testing/utils.go	2018-10-01 16:58:52.811248049 -0700
++++ /tmp/gopath.qtqLRB/src/k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd/testing/utils.go	2018-10-01 16:55:15.000000000 -0700
+@@ -189,7 +189,7 @@ func configureTestCluster(t *testing.T,
+ // launch will attempt to start the etcd server
+ func (m *EtcdTestServer) launch(t *testing.T) error {
+ 	var err error
+-	if m.s, err = etcdserver.NewServer(m.ServerConfig); err != nil {
++	if m.s, err = etcdserver.NewServer(&m.ServerConfig); err != nil {
+ 		return fmt.Errorf("failed to initialize the etcd server: %v", err)
+ 	}
+ 	m.s.SyncTicker = time.NewTicker(500 * time.Millisecond)
+@@ -297,7 +297,7 @@ func NewUnsecuredEtcd3TestClientServer(t
+ 		Prefix:                   etcdtest.PathPrefix(),
+ 		ServerList:               server.V3Client.Endpoints(),
+ 		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
+-		Paging:                   true,
++		Paging: true,
+ 	}
+ 	return server, config
+ }
+Only in vendor/k8s.io/apiserver/pkg/storage/etcd3: 127.0.0.1:21001114727
+Only in vendor/k8s.io/apiserver/pkg/storage/etcd3: 127.0.0.1:21002114727
+Only in vendor/k8s.io/apiserver/pkg/storage/etcd3: localhost:7941259886567686464
+Only in vendor/k8s.io/apiserver/pkg/storage/etcd3: localhost:79412598865676864640

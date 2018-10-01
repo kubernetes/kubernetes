@@ -25,8 +25,8 @@ package main
 import (
 	"log"
 	"time"
+	"context"
 
-	"golang.org/x/net/context"
 	"github.com/coreos/etcd/client"
 )
 

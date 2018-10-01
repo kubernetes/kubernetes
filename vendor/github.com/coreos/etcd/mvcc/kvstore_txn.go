@@ -51,7 +51,7 @@ func (tr *storeTxnRead) End() {
 }
 
 type storeTxnWrite struct {
-	*storeTxnRead
+	storeTxnRead
 	tx backend.BatchTx
 	// beginRev is the revision where the txn begins; it will write to the next revision.
 	beginRev int64
@@ -63,7 +63,7 @@ func (s *store) Write() TxnWrite {
 	tx := s.b.BatchTx()
 	tx.Lock()
 	tw := &storeTxnWrite{
-		storeTxnRead: &storeTxnRead{s, tx, 0, 0},
+		storeTxnRead: storeTxnRead{s, tx, 0, 0},
 		tx:           tx,
 		beginRev:     s.currentRev,
 		changes:      make([]mvccpb.KeyValue, 0, 4),
@@ -120,7 +120,7 @@ func (tr *storeTxnRead) rangeKeys(key, end []byte, curRev int64, ro RangeOptions
 		return &RangeResult{KVs: nil, Count: -1, Rev: 0}, ErrCompacted
 	}
 
-	_, revpairs := tr.s.kvindex.Range(key, end, int64(rev))
+	revpairs := tr.s.kvindex.Revisions(key, end, int64(rev))
 	if len(revpairs) == 0 {
 		return &RangeResult{KVs: nil, Count: 0, Rev: curRev}, nil
 	}
@@ -128,21 +128,21 @@ func (tr *storeTxnRead) rangeKeys(key, end []byte, curRev int64, ro RangeOptions
 		return &RangeResult{KVs: nil, Count: len(revpairs), Rev: curRev}, nil
 	}
 
-	var kvs []mvccpb.KeyValue
-	for _, revpair := range revpairs {
-		start, end := revBytesRange(revpair)
-		_, vs := tr.tx.UnsafeRange(keyBucketName, start, end, 0)
+	limit := int(ro.Limit)
+	if limit <= 0 || limit > len(revpairs) {
+		limit = len(revpairs)
+	}
+
+	kvs := make([]mvccpb.KeyValue, limit)
+	revBytes := newRevBytes()
+	for i, revpair := range revpairs[:len(kvs)] {
+		revToBytes(revpair, revBytes)
+		_, vs := tr.tx.UnsafeRange(keyBucketName, revBytes, nil, 0)
 		if len(vs) != 1 {
 			plog.Fatalf("range cannot find rev (%d,%d)", revpair.main, revpair.sub)
 		}
-
-		var kv mvccpb.KeyValue
-		if err := kv.Unmarshal(vs[0]); err != nil {
+		if err := kvs[i].Unmarshal(vs[0]); err != nil {
 			plog.Fatalf("cannot unmarshal event: %v", err)
-		}
-		kvs = append(kvs, kv)
-		if ro.Limit > 0 && len(kvs) >= int(ro.Limit) {
-			break
 		}
 	}
 	return &RangeResult{KVs: kvs, Count: len(revpairs), Rev: curRev}, nil

@@ -270,7 +270,6 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 	testingPkg := imports.NewImport("testing")
 	randPkg := imports.NewImport("math/rand")
 	timePkg := imports.NewImport("time")
-	unsafePkg := imports.NewImport("unsafe")
 	protoPkg := imports.NewImport("github.com/gogo/protobuf/proto")
 	if !gogoproto.ImportsGoGoProto(file.FileDescriptorProto) {
 		protoPkg = imports.NewImport("github.com/golang/protobuf/proto")
@@ -280,21 +279,11 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 		if message.DescriptorProto.GetOptions().GetMapEntry() {
 			continue
 		}
-		hasUnsafe := gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) ||
-			gogoproto.IsUnsafeUnmarshaler(file.FileDescriptorProto, message.DescriptorProto)
 		if gogoproto.HasTestGen(file.FileDescriptorProto, message.DescriptorProto) {
 			used = true
 
 			p.P(`func Test`, ccTypeName, `Proto(t *`, testingPkg.Use(), `.T) {`)
 			p.In()
-			if hasUnsafe {
-				p.P(`var bigendian uint32 = 0x01020304`)
-				p.P(`if *(*byte)(`, unsafePkg.Use(), `.Pointer(&bigendian)) == 1 {`)
-				p.In()
-				p.P(`t.Skip("unsafe does not work on big endian architectures")`)
-				p.Out()
-				p.P(`}`)
-			}
 			p.P(`seed := `, timePkg.Use(), `.Now().UnixNano()`)
 			p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(seed))`)
 			p.P(`p := NewPopulated`, ccTypeName, `(popr, false)`)
@@ -351,14 +340,6 @@ func (p *testProto) Generate(imports generator.PluginImports, file *generator.Fi
 			if gogoproto.IsMarshaler(file.FileDescriptorProto, message.DescriptorProto) || gogoproto.IsUnsafeMarshaler(file.FileDescriptorProto, message.DescriptorProto) {
 				p.P(`func Test`, ccTypeName, `MarshalTo(t *`, testingPkg.Use(), `.T) {`)
 				p.In()
-				if hasUnsafe {
-					p.P(`var bigendian uint32 = 0x01020304`)
-					p.P(`if *(*byte)(`, unsafePkg.Use(), `.Pointer(&bigendian)) == 1 {`)
-					p.In()
-					p.P(`t.Skip("unsafe does not work on big endian architectures")`)
-					p.Out()
-					p.P(`}`)
-				}
 				p.P(`seed := `, timePkg.Use(), `.Now().UnixNano()`)
 				p.P(`popr := `, randPkg.Use(), `.New(`, randPkg.Use(), `.NewSource(seed))`)
 				p.P(`p := NewPopulated`, ccTypeName, `(popr, false)`)

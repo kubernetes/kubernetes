@@ -15,109 +15,114 @@
 package rpctypes
 
 import (
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
+// server-side error
 var (
-	// server-side error
-	ErrGRPCEmptyKey      = grpc.Errorf(codes.InvalidArgument, "etcdserver: key is not provided")
-	ErrGRPCKeyNotFound   = grpc.Errorf(codes.InvalidArgument, "etcdserver: key not found")
-	ErrGRPCValueProvided = grpc.Errorf(codes.InvalidArgument, "etcdserver: value is provided")
-	ErrGRPCLeaseProvided = grpc.Errorf(codes.InvalidArgument, "etcdserver: lease is provided")
-	ErrGRPCTooManyOps    = grpc.Errorf(codes.InvalidArgument, "etcdserver: too many operations in txn request")
-	ErrGRPCDuplicateKey  = grpc.Errorf(codes.InvalidArgument, "etcdserver: duplicate key given in txn request")
-	ErrGRPCCompacted     = grpc.Errorf(codes.OutOfRange, "etcdserver: mvcc: required revision has been compacted")
-	ErrGRPCFutureRev     = grpc.Errorf(codes.OutOfRange, "etcdserver: mvcc: required revision is a future revision")
-	ErrGRPCNoSpace       = grpc.Errorf(codes.ResourceExhausted, "etcdserver: mvcc: database space exceeded")
+	ErrGRPCEmptyKey      = status.New(codes.InvalidArgument, "etcdserver: key is not provided").Err()
+	ErrGRPCKeyNotFound   = status.New(codes.InvalidArgument, "etcdserver: key not found").Err()
+	ErrGRPCValueProvided = status.New(codes.InvalidArgument, "etcdserver: value is provided").Err()
+	ErrGRPCLeaseProvided = status.New(codes.InvalidArgument, "etcdserver: lease is provided").Err()
+	ErrGRPCTooManyOps    = status.New(codes.InvalidArgument, "etcdserver: too many operations in txn request").Err()
+	ErrGRPCDuplicateKey  = status.New(codes.InvalidArgument, "etcdserver: duplicate key given in txn request").Err()
+	ErrGRPCCompacted     = status.New(codes.OutOfRange, "etcdserver: mvcc: required revision has been compacted").Err()
+	ErrGRPCFutureRev     = status.New(codes.OutOfRange, "etcdserver: mvcc: required revision is a future revision").Err()
+	ErrGRPCNoSpace       = status.New(codes.ResourceExhausted, "etcdserver: mvcc: database space exceeded").Err()
 
-	ErrGRPCLeaseNotFound    = grpc.Errorf(codes.NotFound, "etcdserver: requested lease not found")
-	ErrGRPCLeaseExist       = grpc.Errorf(codes.FailedPrecondition, "etcdserver: lease already exists")
-	ErrGRPCLeaseTTLTooLarge = grpc.Errorf(codes.OutOfRange, "etcdserver: too large lease TTL")
+	ErrGRPCLeaseNotFound    = status.New(codes.NotFound, "etcdserver: requested lease not found").Err()
+	ErrGRPCLeaseExist       = status.New(codes.FailedPrecondition, "etcdserver: lease already exists").Err()
+	ErrGRPCLeaseTTLTooLarge = status.New(codes.OutOfRange, "etcdserver: too large lease TTL").Err()
 
-	ErrGRPCMemberExist            = grpc.Errorf(codes.FailedPrecondition, "etcdserver: member ID already exist")
-	ErrGRPCPeerURLExist           = grpc.Errorf(codes.FailedPrecondition, "etcdserver: Peer URLs already exists")
-	ErrGRPCMemberNotEnoughStarted = grpc.Errorf(codes.FailedPrecondition, "etcdserver: re-configuration failed due to not enough started members")
-	ErrGRPCMemberBadURLs          = grpc.Errorf(codes.InvalidArgument, "etcdserver: given member URLs are invalid")
-	ErrGRPCMemberNotFound         = grpc.Errorf(codes.NotFound, "etcdserver: member not found")
+	ErrGRPCMemberExist            = status.New(codes.FailedPrecondition, "etcdserver: member ID already exist").Err()
+	ErrGRPCPeerURLExist           = status.New(codes.FailedPrecondition, "etcdserver: Peer URLs already exists").Err()
+	ErrGRPCMemberNotEnoughStarted = status.New(codes.FailedPrecondition, "etcdserver: re-configuration failed due to not enough started members").Err()
+	ErrGRPCMemberBadURLs          = status.New(codes.InvalidArgument, "etcdserver: given member URLs are invalid").Err()
+	ErrGRPCMemberNotFound         = status.New(codes.NotFound, "etcdserver: member not found").Err()
 
-	ErrGRPCRequestTooLarge        = grpc.Errorf(codes.InvalidArgument, "etcdserver: request is too large")
-	ErrGRPCRequestTooManyRequests = grpc.Errorf(codes.ResourceExhausted, "etcdserver: too many requests")
+	ErrGRPCRequestTooLarge        = status.New(codes.InvalidArgument, "etcdserver: request is too large").Err()
+	ErrGRPCRequestTooManyRequests = status.New(codes.ResourceExhausted, "etcdserver: too many requests").Err()
 
-	ErrGRPCRootUserNotExist     = grpc.Errorf(codes.FailedPrecondition, "etcdserver: root user does not exist")
-	ErrGRPCRootRoleNotExist     = grpc.Errorf(codes.FailedPrecondition, "etcdserver: root user does not have root role")
-	ErrGRPCUserAlreadyExist     = grpc.Errorf(codes.FailedPrecondition, "etcdserver: user name already exists")
-	ErrGRPCUserEmpty            = grpc.Errorf(codes.InvalidArgument, "etcdserver: user name is empty")
-	ErrGRPCUserNotFound         = grpc.Errorf(codes.FailedPrecondition, "etcdserver: user name not found")
-	ErrGRPCRoleAlreadyExist     = grpc.Errorf(codes.FailedPrecondition, "etcdserver: role name already exists")
-	ErrGRPCRoleNotFound         = grpc.Errorf(codes.FailedPrecondition, "etcdserver: role name not found")
-	ErrGRPCAuthFailed           = grpc.Errorf(codes.InvalidArgument, "etcdserver: authentication failed, invalid user ID or password")
-	ErrGRPCPermissionDenied     = grpc.Errorf(codes.PermissionDenied, "etcdserver: permission denied")
-	ErrGRPCRoleNotGranted       = grpc.Errorf(codes.FailedPrecondition, "etcdserver: role is not granted to the user")
-	ErrGRPCPermissionNotGranted = grpc.Errorf(codes.FailedPrecondition, "etcdserver: permission is not granted to the role")
-	ErrGRPCAuthNotEnabled       = grpc.Errorf(codes.FailedPrecondition, "etcdserver: authentication is not enabled")
-	ErrGRPCInvalidAuthToken     = grpc.Errorf(codes.Unauthenticated, "etcdserver: invalid auth token")
-	ErrGRPCInvalidAuthMgmt      = grpc.Errorf(codes.InvalidArgument, "etcdserver: invalid auth management")
+	ErrGRPCRootUserNotExist     = status.New(codes.FailedPrecondition, "etcdserver: root user does not exist").Err()
+	ErrGRPCRootRoleNotExist     = status.New(codes.FailedPrecondition, "etcdserver: root user does not have root role").Err()
+	ErrGRPCUserAlreadyExist     = status.New(codes.FailedPrecondition, "etcdserver: user name already exists").Err()
+	ErrGRPCUserEmpty            = status.New(codes.InvalidArgument, "etcdserver: user name is empty").Err()
+	ErrGRPCUserNotFound         = status.New(codes.FailedPrecondition, "etcdserver: user name not found").Err()
+	ErrGRPCRoleAlreadyExist     = status.New(codes.FailedPrecondition, "etcdserver: role name already exists").Err()
+	ErrGRPCRoleNotFound         = status.New(codes.FailedPrecondition, "etcdserver: role name not found").Err()
+	ErrGRPCAuthFailed           = status.New(codes.InvalidArgument, "etcdserver: authentication failed, invalid user ID or password").Err()
+	ErrGRPCPermissionDenied     = status.New(codes.PermissionDenied, "etcdserver: permission denied").Err()
+	ErrGRPCRoleNotGranted       = status.New(codes.FailedPrecondition, "etcdserver: role is not granted to the user").Err()
+	ErrGRPCPermissionNotGranted = status.New(codes.FailedPrecondition, "etcdserver: permission is not granted to the role").Err()
+	ErrGRPCAuthNotEnabled       = status.New(codes.FailedPrecondition, "etcdserver: authentication is not enabled").Err()
+	ErrGRPCInvalidAuthToken     = status.New(codes.Unauthenticated, "etcdserver: invalid auth token").Err()
+	ErrGRPCInvalidAuthMgmt      = status.New(codes.InvalidArgument, "etcdserver: invalid auth management").Err()
 
-	ErrGRPCNoLeader                   = grpc.Errorf(codes.Unavailable, "etcdserver: no leader")
-	ErrGRPCNotCapable                 = grpc.Errorf(codes.Unavailable, "etcdserver: not capable")
-	ErrGRPCStopped                    = grpc.Errorf(codes.Unavailable, "etcdserver: server stopped")
-	ErrGRPCTimeout                    = grpc.Errorf(codes.Unavailable, "etcdserver: request timed out")
-	ErrGRPCTimeoutDueToLeaderFail     = grpc.Errorf(codes.Unavailable, "etcdserver: request timed out, possibly due to previous leader failure")
-	ErrGRPCTimeoutDueToConnectionLost = grpc.Errorf(codes.Unavailable, "etcdserver: request timed out, possibly due to connection lost")
-	ErrGRPCUnhealthy                  = grpc.Errorf(codes.Unavailable, "etcdserver: unhealthy cluster")
+	ErrGRPCNoLeader                   = status.New(codes.Unavailable, "etcdserver: no leader").Err()
+	ErrGRPCNotLeader                  = status.New(codes.FailedPrecondition, "etcdserver: not leader").Err()
+	ErrGRPCNotCapable                 = status.New(codes.Unavailable, "etcdserver: not capable").Err()
+	ErrGRPCStopped                    = status.New(codes.Unavailable, "etcdserver: server stopped").Err()
+	ErrGRPCTimeout                    = status.New(codes.Unavailable, "etcdserver: request timed out").Err()
+	ErrGRPCTimeoutDueToLeaderFail     = status.New(codes.Unavailable, "etcdserver: request timed out, possibly due to previous leader failure").Err()
+	ErrGRPCTimeoutDueToConnectionLost = status.New(codes.Unavailable, "etcdserver: request timed out, possibly due to connection lost").Err()
+	ErrGRPCUnhealthy                  = status.New(codes.Unavailable, "etcdserver: unhealthy cluster").Err()
+	ErrGRPCCorrupt                    = status.New(codes.DataLoss, "etcdserver: corrupt cluster").Err()
 
 	errStringToError = map[string]error{
-		grpc.ErrorDesc(ErrGRPCEmptyKey):      ErrGRPCEmptyKey,
-		grpc.ErrorDesc(ErrGRPCKeyNotFound):   ErrGRPCKeyNotFound,
-		grpc.ErrorDesc(ErrGRPCValueProvided): ErrGRPCValueProvided,
-		grpc.ErrorDesc(ErrGRPCLeaseProvided): ErrGRPCLeaseProvided,
+		ErrorDesc(ErrGRPCEmptyKey):      ErrGRPCEmptyKey,
+		ErrorDesc(ErrGRPCKeyNotFound):   ErrGRPCKeyNotFound,
+		ErrorDesc(ErrGRPCValueProvided): ErrGRPCValueProvided,
+		ErrorDesc(ErrGRPCLeaseProvided): ErrGRPCLeaseProvided,
 
-		grpc.ErrorDesc(ErrGRPCTooManyOps):   ErrGRPCTooManyOps,
-		grpc.ErrorDesc(ErrGRPCDuplicateKey): ErrGRPCDuplicateKey,
-		grpc.ErrorDesc(ErrGRPCCompacted):    ErrGRPCCompacted,
-		grpc.ErrorDesc(ErrGRPCFutureRev):    ErrGRPCFutureRev,
-		grpc.ErrorDesc(ErrGRPCNoSpace):      ErrGRPCNoSpace,
+		ErrorDesc(ErrGRPCTooManyOps):   ErrGRPCTooManyOps,
+		ErrorDesc(ErrGRPCDuplicateKey): ErrGRPCDuplicateKey,
+		ErrorDesc(ErrGRPCCompacted):    ErrGRPCCompacted,
+		ErrorDesc(ErrGRPCFutureRev):    ErrGRPCFutureRev,
+		ErrorDesc(ErrGRPCNoSpace):      ErrGRPCNoSpace,
 
-		grpc.ErrorDesc(ErrGRPCLeaseNotFound):    ErrGRPCLeaseNotFound,
-		grpc.ErrorDesc(ErrGRPCLeaseExist):       ErrGRPCLeaseExist,
-		grpc.ErrorDesc(ErrGRPCLeaseTTLTooLarge): ErrGRPCLeaseTTLTooLarge,
+		ErrorDesc(ErrGRPCLeaseNotFound):    ErrGRPCLeaseNotFound,
+		ErrorDesc(ErrGRPCLeaseExist):       ErrGRPCLeaseExist,
+		ErrorDesc(ErrGRPCLeaseTTLTooLarge): ErrGRPCLeaseTTLTooLarge,
 
-		grpc.ErrorDesc(ErrGRPCMemberExist):            ErrGRPCMemberExist,
-		grpc.ErrorDesc(ErrGRPCPeerURLExist):           ErrGRPCPeerURLExist,
-		grpc.ErrorDesc(ErrGRPCMemberNotEnoughStarted): ErrGRPCMemberNotEnoughStarted,
-		grpc.ErrorDesc(ErrGRPCMemberBadURLs):          ErrGRPCMemberBadURLs,
-		grpc.ErrorDesc(ErrGRPCMemberNotFound):         ErrGRPCMemberNotFound,
+		ErrorDesc(ErrGRPCMemberExist):            ErrGRPCMemberExist,
+		ErrorDesc(ErrGRPCPeerURLExist):           ErrGRPCPeerURLExist,
+		ErrorDesc(ErrGRPCMemberNotEnoughStarted): ErrGRPCMemberNotEnoughStarted,
+		ErrorDesc(ErrGRPCMemberBadURLs):          ErrGRPCMemberBadURLs,
+		ErrorDesc(ErrGRPCMemberNotFound):         ErrGRPCMemberNotFound,
 
-		grpc.ErrorDesc(ErrGRPCRequestTooLarge):        ErrGRPCRequestTooLarge,
-		grpc.ErrorDesc(ErrGRPCRequestTooManyRequests): ErrGRPCRequestTooManyRequests,
+		ErrorDesc(ErrGRPCRequestTooLarge):        ErrGRPCRequestTooLarge,
+		ErrorDesc(ErrGRPCRequestTooManyRequests): ErrGRPCRequestTooManyRequests,
 
-		grpc.ErrorDesc(ErrGRPCRootUserNotExist):     ErrGRPCRootUserNotExist,
-		grpc.ErrorDesc(ErrGRPCRootRoleNotExist):     ErrGRPCRootRoleNotExist,
-		grpc.ErrorDesc(ErrGRPCUserAlreadyExist):     ErrGRPCUserAlreadyExist,
-		grpc.ErrorDesc(ErrGRPCUserEmpty):            ErrGRPCUserEmpty,
-		grpc.ErrorDesc(ErrGRPCUserNotFound):         ErrGRPCUserNotFound,
-		grpc.ErrorDesc(ErrGRPCRoleAlreadyExist):     ErrGRPCRoleAlreadyExist,
-		grpc.ErrorDesc(ErrGRPCRoleNotFound):         ErrGRPCRoleNotFound,
-		grpc.ErrorDesc(ErrGRPCAuthFailed):           ErrGRPCAuthFailed,
-		grpc.ErrorDesc(ErrGRPCPermissionDenied):     ErrGRPCPermissionDenied,
-		grpc.ErrorDesc(ErrGRPCRoleNotGranted):       ErrGRPCRoleNotGranted,
-		grpc.ErrorDesc(ErrGRPCPermissionNotGranted): ErrGRPCPermissionNotGranted,
-		grpc.ErrorDesc(ErrGRPCAuthNotEnabled):       ErrGRPCAuthNotEnabled,
-		grpc.ErrorDesc(ErrGRPCInvalidAuthToken):     ErrGRPCInvalidAuthToken,
-		grpc.ErrorDesc(ErrGRPCInvalidAuthMgmt):      ErrGRPCInvalidAuthMgmt,
+		ErrorDesc(ErrGRPCRootUserNotExist):     ErrGRPCRootUserNotExist,
+		ErrorDesc(ErrGRPCRootRoleNotExist):     ErrGRPCRootRoleNotExist,
+		ErrorDesc(ErrGRPCUserAlreadyExist):     ErrGRPCUserAlreadyExist,
+		ErrorDesc(ErrGRPCUserEmpty):            ErrGRPCUserEmpty,
+		ErrorDesc(ErrGRPCUserNotFound):         ErrGRPCUserNotFound,
+		ErrorDesc(ErrGRPCRoleAlreadyExist):     ErrGRPCRoleAlreadyExist,
+		ErrorDesc(ErrGRPCRoleNotFound):         ErrGRPCRoleNotFound,
+		ErrorDesc(ErrGRPCAuthFailed):           ErrGRPCAuthFailed,
+		ErrorDesc(ErrGRPCPermissionDenied):     ErrGRPCPermissionDenied,
+		ErrorDesc(ErrGRPCRoleNotGranted):       ErrGRPCRoleNotGranted,
+		ErrorDesc(ErrGRPCPermissionNotGranted): ErrGRPCPermissionNotGranted,
+		ErrorDesc(ErrGRPCAuthNotEnabled):       ErrGRPCAuthNotEnabled,
+		ErrorDesc(ErrGRPCInvalidAuthToken):     ErrGRPCInvalidAuthToken,
+		ErrorDesc(ErrGRPCInvalidAuthMgmt):      ErrGRPCInvalidAuthMgmt,
 
-		grpc.ErrorDesc(ErrGRPCNoLeader):                   ErrGRPCNoLeader,
-		grpc.ErrorDesc(ErrGRPCNotCapable):                 ErrGRPCNotCapable,
-		grpc.ErrorDesc(ErrGRPCStopped):                    ErrGRPCStopped,
-		grpc.ErrorDesc(ErrGRPCTimeout):                    ErrGRPCTimeout,
-		grpc.ErrorDesc(ErrGRPCTimeoutDueToLeaderFail):     ErrGRPCTimeoutDueToLeaderFail,
-		grpc.ErrorDesc(ErrGRPCTimeoutDueToConnectionLost): ErrGRPCTimeoutDueToConnectionLost,
-		grpc.ErrorDesc(ErrGRPCUnhealthy):                  ErrGRPCUnhealthy,
+		ErrorDesc(ErrGRPCNoLeader):                   ErrGRPCNoLeader,
+		ErrorDesc(ErrGRPCNotLeader):                  ErrGRPCNotLeader,
+		ErrorDesc(ErrGRPCNotCapable):                 ErrGRPCNotCapable,
+		ErrorDesc(ErrGRPCStopped):                    ErrGRPCStopped,
+		ErrorDesc(ErrGRPCTimeout):                    ErrGRPCTimeout,
+		ErrorDesc(ErrGRPCTimeoutDueToLeaderFail):     ErrGRPCTimeoutDueToLeaderFail,
+		ErrorDesc(ErrGRPCTimeoutDueToConnectionLost): ErrGRPCTimeoutDueToConnectionLost,
+		ErrorDesc(ErrGRPCUnhealthy):                  ErrGRPCUnhealthy,
+		ErrorDesc(ErrGRPCCorrupt):                    ErrGRPCCorrupt,
 	}
+)
 
-	// client-side error
+// client-side error
+var (
 	ErrEmptyKey      = Error(ErrGRPCEmptyKey)
 	ErrKeyNotFound   = Error(ErrGRPCKeyNotFound)
 	ErrValueProvided = Error(ErrGRPCValueProvided)
@@ -157,12 +162,14 @@ var (
 	ErrInvalidAuthMgmt      = Error(ErrGRPCInvalidAuthMgmt)
 
 	ErrNoLeader                   = Error(ErrGRPCNoLeader)
+	ErrNotLeader                  = Error(ErrGRPCNotLeader)
 	ErrNotCapable                 = Error(ErrGRPCNotCapable)
 	ErrStopped                    = Error(ErrGRPCStopped)
 	ErrTimeout                    = Error(ErrGRPCTimeout)
 	ErrTimeoutDueToLeaderFail     = Error(ErrGRPCTimeoutDueToLeaderFail)
 	ErrTimeoutDueToConnectionLost = Error(ErrGRPCTimeoutDueToConnectionLost)
 	ErrUnhealthy                  = Error(ErrGRPCUnhealthy)
+	ErrCorrupt                    = Error(ErrGRPCCorrupt)
 )
 
 // EtcdError defines gRPC server errors.
@@ -186,11 +193,18 @@ func Error(err error) error {
 	if err == nil {
 		return nil
 	}
-	verr, ok := errStringToError[grpc.ErrorDesc(err)]
+	verr, ok := errStringToError[ErrorDesc(err)]
 	if !ok { // not gRPC error
 		return err
 	}
-	return EtcdError{code: grpc.Code(verr), desc: grpc.ErrorDesc(verr)}
+	ev, ok := status.FromError(verr)
+	var desc string
+	if ok {
+		desc = ev.Message()
+	} else {
+		desc = verr.Error()
+	}
+	return EtcdError{code: ev.Code(), desc: desc}
 }
 
 func ErrorDesc(err error) string {

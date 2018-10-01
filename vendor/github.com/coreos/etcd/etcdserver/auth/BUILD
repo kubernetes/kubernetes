@@ -16,7 +16,6 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
         "//vendor/golang.org/x/crypto/bcrypt:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
     ],
 )
 

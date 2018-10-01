@@ -198,7 +198,6 @@ pkg/kubelet
 pkg/kubelet/apis
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
-pkg/kubelet/apis/cri/runtime/v1alpha2
 pkg/kubelet/apis/cri/testing
 pkg/kubelet/apis/deviceplugin/v1alpha
 pkg/kubelet/apis/deviceplugin/v1beta1
@@ -253,8 +252,6 @@ pkg/kubelet/types
 pkg/kubelet/util
 pkg/kubelet/util/cache
 pkg/kubelet/util/pluginwatcher
-pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1
-pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2
 pkg/kubelet/util/queue
 pkg/kubelet/util/sliceutils
 pkg/kubemark
@@ -621,7 +618,6 @@ staging/src/k8s.io/apiserver/pkg/storage/storagebackend
 staging/src/k8s.io/apiserver/pkg/storage/testing
 staging/src/k8s.io/apiserver/pkg/storage/tests
 staging/src/k8s.io/apiserver/pkg/storage/value
-staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1
 staging/src/k8s.io/apiserver/pkg/util/feature
 staging/src/k8s.io/apiserver/pkg/util/flag
 staging/src/k8s.io/apiserver/pkg/util/proxy

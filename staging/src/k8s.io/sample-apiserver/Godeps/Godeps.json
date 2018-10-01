@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/sample-apiserver",
-	"GoVersion": "go1.10",
+	"GoVersion": "go1.11",
 	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
@@ -36,35 +36,35 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/auth/authpb",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/clientv3",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdserverpb",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/mvcc/mvccpb",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/tlsutil",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/transport",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
+			"Rev": "fca8add78a9d926166eb739b8e4a124434025ba3"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
@@ -123,12 +123,20 @@
 			"Rev": "f3f9494671f93fcff853e3c6e9e948b3eb71e590"
 		},
 		{
+			"ImportPath": "github.com/gogo/protobuf/gogoproto",
+			"Rev": "342cbe0a04158f6dcb03ca0079991a51a4248c02"
+		},
+		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
-			"Rev": "c0656edd0d9eab7c66d1eb0c568f9039345796f7"
+			"Rev": "342cbe0a04158f6dcb03ca0079991a51a4248c02"
+		},
+		{
+			"ImportPath": "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
+			"Rev": "342cbe0a04158f6dcb03ca0079991a51a4248c02"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/sortkeys",
-			"Rev": "c0656edd0d9eab7c66d1eb0c568f9039345796f7"
+			"Rev": "342cbe0a04158f6dcb03ca0079991a51a4248c02"
 		},
 		{
 			"ImportPath": "github.com/golang/glog",
@@ -136,10 +144,6 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
-		},
-		{
-			"ImportPath": "github.com/golang/protobuf/protoc-gen-go/descriptor",
 			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
 		},
 		{
@@ -381,10 +385,6 @@
 		{
 			"ImportPath": "golang.org/x/time/rate",
 			"Rev": "f51c12702a4d776e4c1fa9b0fabab841babae631"
-		},
-		{
-			"ImportPath": "google.golang.org/genproto/googleapis/api/annotations",
-			"Rev": "09f6ed296fc66555a25fe4ce95173148778dfa85"
 		},
 		{
 			"ImportPath": "google.golang.org/genproto/googleapis/rpc/status",

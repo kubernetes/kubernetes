@@ -19,22 +19,33 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"strings"
 	"sync"
 )
 
 // tlsListener overrides a TLS listener so it will reject client
-// certificates with insufficient SAN credentials.
+// certificates with insufficient SAN credentials or CRL revoked
+// certificates.
 type tlsListener struct {
 	net.Listener
 	connc            chan net.Conn
 	donec            chan struct{}
 	err              error
 	handshakeFailure func(*tls.Conn, error)
+	check            tlsCheckFunc
 }
 
-func newTLSListener(l net.Listener, tlsinfo *TLSInfo) (net.Listener, error) {
+type tlsCheckFunc func(context.Context, *tls.Conn) error
+
+// NewTLSListener handshakes TLS connections and performs optional CRL checking.
+func NewTLSListener(l net.Listener, tlsinfo *TLSInfo) (net.Listener, error) {
+	check := func(context.Context, *tls.Conn) error { return nil }
+	return newTLSListener(l, tlsinfo, check)
+}
+
+func newTLSListener(l net.Listener, tlsinfo *TLSInfo, check tlsCheckFunc) (net.Listener, error) {
 	if tlsinfo == nil || tlsinfo.Empty() {
 		l.Close()
 		return nil, fmt.Errorf("cannot listen on TLS for %s: KeyFile and CertFile are not presented", l.Addr().String())
@@ -48,11 +59,27 @@ func newTLSListener(l net.Listener, tlsinfo *TLSInfo) (net.Listener, error) {
 	if hf == nil {
 		hf = func(*tls.Conn, error) {}
 	}
+
+	if len(tlsinfo.CRLFile) > 0 {
+		prevCheck := check
+		check = func(ctx context.Context, tlsConn *tls.Conn) error {
+			if err := prevCheck(ctx, tlsConn); err != nil {
+				return err
+			}
+			st := tlsConn.ConnectionState()
+			if certs := st.PeerCertificates; len(certs) > 0 {
+				return checkCRL(tlsinfo.CRLFile, certs)
+			}
+			return nil
+		}
+	}
+
 	tlsl := &tlsListener{
 		Listener:         tls.NewListener(l, tlscfg),
 		connc:            make(chan net.Conn),
 		donec:            make(chan struct{}),
 		handshakeFailure: hf,
+		check:            check,
 	}
 	go tlsl.acceptLoop()
 	return tlsl, nil
@@ -65,6 +92,15 @@ func (l *tlsListener) Accept() (net.Conn, error) {
 	case <-l.donec:
 		return nil, l.err
 	}
+}
+
+func checkSAN(ctx context.Context, tlsConn *tls.Conn) error {
+	st := tlsConn.ConnectionState()
+	if certs := st.PeerCertificates; len(certs) > 0 {
+		addr := tlsConn.RemoteAddr().String()
+		return checkCertSAN(ctx, certs[0], addr)
+	}
+	return nil
 }
 
 // acceptLoop launches each TLS handshake in a separate goroutine
@@ -111,20 +147,16 @@ func (l *tlsListener) acceptLoop() {
 			pendingMu.Lock()
 			delete(pending, conn)
 			pendingMu.Unlock()
+
 			if herr != nil {
 				l.handshakeFailure(tlsConn, herr)
 				return
 			}
-
-			st := tlsConn.ConnectionState()
-			if len(st.PeerCertificates) > 0 {
-				cert := st.PeerCertificates[0]
-				addr := tlsConn.RemoteAddr().String()
-				if cerr := checkCert(ctx, cert, addr); cerr != nil {
-					l.handshakeFailure(tlsConn, cerr)
-					return
-				}
+			if err := l.check(ctx, tlsConn); err != nil {
+				l.handshakeFailure(tlsConn, err)
+				return
 			}
+
 			select {
 			case l.connc <- tlsConn:
 				conn = nil
@@ -134,11 +166,34 @@ func (l *tlsListener) acceptLoop() {
 	}
 }
 
-func checkCert(ctx context.Context, cert *x509.Certificate, remoteAddr string) error {
-	h, _, herr := net.SplitHostPort(remoteAddr)
+func checkCRL(crlPath string, cert []*x509.Certificate) error {
+	// TODO: cache
+	crlBytes, err := ioutil.ReadFile(crlPath)
+	if err != nil {
+		return err
+	}
+	certList, err := x509.ParseCRL(crlBytes)
+	if err != nil {
+		return err
+	}
+	revokedSerials := make(map[string]struct{})
+	for _, rc := range certList.TBSCertList.RevokedCertificates {
+		revokedSerials[string(rc.SerialNumber.Bytes())] = struct{}{}
+	}
+	for _, c := range cert {
+		serial := string(c.SerialNumber.Bytes())
+		if _, ok := revokedSerials[serial]; ok {
+			return fmt.Errorf("transport: certificate serial %x revoked", serial)
+		}
+	}
+	return nil
+}
+
+func checkCertSAN(ctx context.Context, cert *x509.Certificate, remoteAddr string) error {
 	if len(cert.IPAddresses) == 0 && len(cert.DNSNames) == 0 {
 		return nil
 	}
+	h, _, herr := net.SplitHostPort(remoteAddr)
 	if herr != nil {
 		return herr
 	}

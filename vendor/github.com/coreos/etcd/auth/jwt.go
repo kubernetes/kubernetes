@@ -15,11 +15,11 @@
 package auth
 
 import (
+	"context"
 	"crypto/rsa"
 	"io/ioutil"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"golang.org/x/net/context"
 )
 
 type tokenJWT struct {
@@ -97,7 +97,9 @@ func prepareOpts(opts map[string]string) (jwtSignMethod, jwtPubKeyPath, jwtPrivK
 			return "", "", "", ErrInvalidAuthOpts
 		}
 	}
-
+	if len(jwtSignMethod) == 0 {
+		return "", "", "", ErrInvalidAuthOpts
+	}
 	return jwtSignMethod, jwtPubKeyPath, jwtPrivKeyPath, nil
 }
 

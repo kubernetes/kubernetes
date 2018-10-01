@@ -31,8 +31,9 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/etcd/rafthttp:go_default_library",
         "//vendor/github.com/coreos/pkg/capnslog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
+        "//vendor/github.com/soheilhy/cmux:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/google.golang.org/grpc/keepalive:go_default_library",
     ],
 )
