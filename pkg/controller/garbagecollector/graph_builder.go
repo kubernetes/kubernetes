@@ -459,10 +459,7 @@ func deletionStarts(oldObj interface{}, newAccessor metav1.Object) bool {
 	// event, so if there is no oldObj, we just return if the newObj (via
 	// newAccessor) is being deleted.
 	if oldObj == nil {
-		if newAccessor.GetDeletionTimestamp() == nil {
-			return false
-		}
-		return true
+		return beingDeleted(newAccessor)
 	}
 	oldAccessor, err := meta.Accessor(oldObj)
 	if err != nil {
