@@ -141,6 +141,7 @@ ComponentConfigs:
     MaxOpenFiles: 1000000
     MaxPods: 110
     NodeLeaseDurationSeconds: 40
+    NodeStatusReportFrequency: 1m0s
     NodeStatusUpdateFrequency: 10s
     OOMScoreAdj: -999
     PodCIDR: ""
