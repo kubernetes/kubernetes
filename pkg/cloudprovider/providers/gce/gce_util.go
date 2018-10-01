@@ -176,11 +176,6 @@ func mapNodeNameToInstanceName(nodeName types.NodeName) string {
 	return string(nodeName)
 }
 
-// mapInstanceToNodeName maps a GCE Instance to a k8s NodeName
-func mapInstanceToNodeName(instance *compute.Instance) types.NodeName {
-	return types.NodeName(instance.Name)
-}
-
 // GetGCERegion returns region of the gce zone. Zone names
 // are of the form: ${region-name}-${ix}.
 // For example, "us-central1-b" has a region of "us-central1".

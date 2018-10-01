@@ -1016,10 +1016,6 @@ func updateConfigZone(cfg *CloudConfig, metadata EC2Metadata) error {
 	return nil
 }
 
-func getInstanceType(metadata EC2Metadata) (string, error) {
-	return metadata.GetMetadata("instance-type")
-}
-
 func getAvailabilityZone(metadata EC2Metadata) (string, error) {
 	return metadata.GetMetadata("placement/availability-zone")
 }
@@ -1968,23 +1964,6 @@ func (c *Cloud) buildSelfAWSInstance() (*awsInstance, error) {
 		return nil, fmt.Errorf("error finding instance %s: %q", instanceID, err)
 	}
 	return newAWSInstance(c.ec2, instance), nil
-}
-
-// Gets the awsInstance with for the node with the specified nodeName, or the 'self' instance if nodeName == ""
-func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
-	var awsInstance *awsInstance
-	if nodeName == "" {
-		awsInstance = c.selfAWSInstance
-	} else {
-		instance, err := c.getInstanceByNodeName(nodeName)
-		if err != nil {
-			return nil, err
-		}
-
-		awsInstance = newAWSInstance(c.ec2, instance)
-	}
-
-	return awsInstance, nil
 }
 
 // wrapAttachError wraps the error returned by an AttachVolume request with

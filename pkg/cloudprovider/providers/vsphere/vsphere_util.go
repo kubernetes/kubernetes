@@ -80,18 +80,6 @@ func getVSphereConfig() (*VSphereConfig, error) {
 	return &cfg, nil
 }
 
-func getVSphereConn(cfg *VSphereConfig) *vclib.VSphereConnection {
-	vSphereConn := &vclib.VSphereConnection{
-		Username:          cfg.Global.User,
-		Password:          cfg.Global.Password,
-		Hostname:          cfg.Global.VCenterIP,
-		Insecure:          cfg.Global.InsecureFlag,
-		RoundTripperCount: cfg.Global.RoundTripperCount,
-		Port:              cfg.Global.VCenterPort,
-	}
-	return vSphereConn
-}
-
 // Returns the accessible datastores for the given node VM.
 func getAccessibleDatastores(ctx context.Context, nodeVmDetail *NodeDetails, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
 	accessibleDatastores, err := nodeVmDetail.vm.GetAllAccessibleDatastores(ctx)
