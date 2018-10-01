@@ -39,7 +39,7 @@ var (
 		This enables correct configuration of system components and a seamless user experience when upgrading.
 
 		Alternatively, you can use kubeadm config.
-		`+cmdutil.AlphaDisclaimer), kubeadmconstants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+		`+cmdutil.AlphaDisclaimer), kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
 	uploadConfigExample = normalizer.Examples(`
 		# uploads the configuration of your cluster

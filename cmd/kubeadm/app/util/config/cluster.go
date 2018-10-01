@@ -61,7 +61,7 @@ func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPa
 	}
 
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
-	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.InitConfigurationConfigMap)
+	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	return getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
 }
 
@@ -88,7 +88,7 @@ func loadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
