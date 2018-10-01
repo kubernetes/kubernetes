@@ -23,6 +23,7 @@ package balancer
 import (
 	"errors"
 	"net"
+	"strings"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/connectivity"
@@ -33,24 +34,23 @@ import (
 var (
 	// m is a map from name to balancer builder.
 	m = make(map[string]Builder)
-	// defaultBuilder is the default balancer to use.
-	defaultBuilder Builder // TODO(bar) install pickfirst as default.
 )
 
 // Register registers the balancer builder to the balancer map.
-// b.Name will be used as the name registered with this builder.
+// b.Name (lowercased) will be used as the name registered with
+// this builder.
 func Register(b Builder) {
-	m[b.Name()] = b
+	m[strings.ToLower(b.Name())] = b
 }
 
 // Get returns the resolver builder registered with the given name.
-// If no builder is register with the name, the default pickfirst will
-// be used.
+// Note that the compare is done in a case-insenstive fashion.
+// If no builder is register with the name, nil will be returned.
 func Get(name string) Builder {
-	if b, ok := m[name]; ok {
+	if b, ok := m[strings.ToLower(name)]; ok {
 		return b
 	}
-	return defaultBuilder
+	return nil
 }
 
 // SubConn represents a gRPC sub connection.
@@ -66,6 +66,11 @@ func Get(name string) Builder {
 // When the connection encounters an error, it will reconnect immediately.
 // When the connection becomes IDLE, it will not reconnect unless Connect is
 // called.
+//
+// This interface is to be implemented by gRPC. Users should not need a
+// brand new implementation of this interface. For the situations like
+// testing, the new implementation should embed this interface. This allows
+// gRPC to add new methods to this interface.
 type SubConn interface {
 	// UpdateAddresses updates the addresses used in this SubConn.
 	// gRPC checks if currently-connected address is still in the new list.
@@ -83,6 +88,11 @@ type SubConn interface {
 type NewSubConnOptions struct{}
 
 // ClientConn represents a gRPC ClientConn.
+//
+// This interface is to be implemented by gRPC. Users should not need a
+// brand new implementation of this interface. For the situations like
+// testing, the new implementation should embed this interface. This allows
+// gRPC to add new methods to this interface.
 type ClientConn interface {
 	// NewSubConn is called by balancer to create a new SubConn.
 	// It doesn't block and wait for the connections to be established.
@@ -98,6 +108,9 @@ type ClientConn interface {
 	// gRPC will update the connectivity state of the ClientConn, and will call pick
 	// on the new picker to pick new SubConn.
 	UpdateBalancerState(s connectivity.State, p Picker)
+
+	// ResolveNow is called by balancer to notify gRPC to do a name resolving.
+	ResolveNow(resolver.ResolveNowOption)
 
 	// Target returns the dial target for this ClientConn.
 	Target() string
@@ -131,6 +144,10 @@ type PickOptions struct{}
 type DoneInfo struct {
 	// Err is the rpc error the RPC finished with. It could be nil.
 	Err error
+	// BytesSent indicates if any bytes have been sent to the server.
+	BytesSent bool
+	// BytesReceived indicates if any byte has been received from the server.
+	BytesReceived bool
 }
 
 var (
@@ -161,7 +178,7 @@ type Picker interface {
 	// If a SubConn is returned:
 	// - If it is READY, gRPC will send the RPC on it;
 	// - If it is not ready, or becomes not ready after it's returned, gRPC will block
-	//   this call until a new picker is updated and will call pick on the new picker.
+	//   until UpdateBalancerState() is called and will call pick on the new picker.
 	//
 	// If the returned error is not nil:
 	// - If the error is ErrNoSubConnAvailable, gRPC will block until UpdateBalancerState()

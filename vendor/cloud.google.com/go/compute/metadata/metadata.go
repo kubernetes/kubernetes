@@ -1,4 +1,4 @@
-// Copyright 2014 Google Inc. All Rights Reserved.
+// Copyright 2014 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,8 +34,6 @@ import (
 
 	"golang.org/x/net/context"
 	"golang.org/x/net/context/ctxhttp"
-
-	"cloud.google.com/go/internal"
 )
 
 const (
@@ -48,6 +46,8 @@ const (
 	// This is variable name is not defined by any spec, as far as
 	// I know; it was made up for the Go package.
 	metadataHostEnv = "GCE_METADATA_HOST"
+
+	userAgent = "gcloud-golang/0.1"
 )
 
 type cachedValue struct {
@@ -64,27 +64,23 @@ var (
 )
 
 var (
-	metaClient = &http.Client{
-		Transport: &internal.Transport{
-			Base: &http.Transport{
-				Dial: (&net.Dialer{
-					Timeout:   2 * time.Second,
-					KeepAlive: 30 * time.Second,
-				}).Dial,
-				ResponseHeaderTimeout: 2 * time.Second,
-			},
+	defaultClient = &Client{hc: &http.Client{
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout:   2 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			ResponseHeaderTimeout: 2 * time.Second,
 		},
-	}
-	subscribeClient = &http.Client{
-		Transport: &internal.Transport{
-			Base: &http.Transport{
-				Dial: (&net.Dialer{
-					Timeout:   2 * time.Second,
-					KeepAlive: 30 * time.Second,
-				}).Dial,
-			},
+	}}
+	subscribeClient = &Client{hc: &http.Client{
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout:   2 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
 		},
-	}
+	}}
 )
 
 // NotDefinedError is returned when requested metadata is not defined.
@@ -99,73 +95,16 @@ func (suffix NotDefinedError) Error() string {
 	return fmt.Sprintf("metadata: GCE metadata %q not defined", string(suffix))
 }
 
-// Get returns a value from the metadata service.
-// The suffix is appended to "http://${GCE_METADATA_HOST}/computeMetadata/v1/".
-//
-// If the GCE_METADATA_HOST environment variable is not defined, a default of
-// 169.254.169.254 will be used instead.
-//
-// If the requested metadata is not defined, the returned error will
-// be of type NotDefinedError.
-func Get(suffix string) (string, error) {
-	val, _, err := getETag(metaClient, suffix)
-	return val, err
-}
-
-// getETag returns a value from the metadata service as well as the associated
-// ETag using the provided client. This func is otherwise equivalent to Get.
-func getETag(client *http.Client, suffix string) (value, etag string, err error) {
-	// Using a fixed IP makes it very difficult to spoof the metadata service in
-	// a container, which is an important use-case for local testing of cloud
-	// deployments. To enable spoofing of the metadata service, the environment
-	// variable GCE_METADATA_HOST is first inspected to decide where metadata
-	// requests shall go.
-	host := os.Getenv(metadataHostEnv)
-	if host == "" {
-		// Using 169.254.169.254 instead of "metadata" here because Go
-		// binaries built with the "netgo" tag and without cgo won't
-		// know the search suffix for "metadata" is
-		// ".google.internal", and this IP address is documented as
-		// being stable anyway.
-		host = metadataIP
-	}
-	url := "http://" + host + "/computeMetadata/v1/" + suffix
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Metadata-Flavor", "Google")
-	res, err := client.Do(req)
-	if err != nil {
-		return "", "", err
-	}
-	defer res.Body.Close()
-	if res.StatusCode == http.StatusNotFound {
-		return "", "", NotDefinedError(suffix)
-	}
-	if res.StatusCode != 200 {
-		return "", "", fmt.Errorf("status code %d trying to fetch %s", res.StatusCode, url)
-	}
-	all, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", "", err
-	}
-	return string(all), res.Header.Get("Etag"), nil
-}
-
-func getTrimmed(suffix string) (s string, err error) {
-	s, err = Get(suffix)
-	s = strings.TrimSpace(s)
-	return
-}
-
-func (c *cachedValue) get() (v string, err error) {
+func (c *cachedValue) get(cl *Client) (v string, err error) {
 	defer c.mu.Unlock()
 	c.mu.Lock()
 	if c.v != "" {
 		return c.v, nil
 	}
 	if c.trim {
-		v, err = getTrimmed(c.k)
+		v, err = cl.getTrimmed(c.k)
 	} else {
-		v, err = Get(c.k)
+		v, err = cl.Get(c.k)
 	}
 	if err == nil {
 		c.v = v
@@ -202,7 +141,9 @@ func testOnGCE() bool {
 	// Try two strategies in parallel.
 	// See https://github.com/GoogleCloudPlatform/google-cloud-go/issues/194
 	go func() {
-		res, err := ctxhttp.Get(ctx, metaClient, "http://"+metadataIP)
+		req, _ := http.NewRequest("GET", "http://"+metadataIP, nil)
+		req.Header.Set("User-Agent", userAgent)
+		res, err := ctxhttp.Do(ctx, defaultClient.hc, req)
 		if err != nil {
 			resc <- false
 			return
@@ -267,6 +208,255 @@ func systemInfoSuggestsGCE() bool {
 	return name == "Google" || name == "Google Compute Engine"
 }
 
+// Subscribe calls Client.Subscribe on a client designed for subscribing (one with no
+// ResponseHeaderTimeout).
+func Subscribe(suffix string, fn func(v string, ok bool) error) error {
+	return subscribeClient.Subscribe(suffix, fn)
+}
+
+// Get calls Client.Get on the default client.
+func Get(suffix string) (string, error) { return defaultClient.Get(suffix) }
+
+// ProjectID returns the current instance's project ID string.
+func ProjectID() (string, error) { return defaultClient.ProjectID() }
+
+// NumericProjectID returns the current instance's numeric project ID.
+func NumericProjectID() (string, error) { return defaultClient.NumericProjectID() }
+
+// InternalIP returns the instance's primary internal IP address.
+func InternalIP() (string, error) { return defaultClient.InternalIP() }
+
+// ExternalIP returns the instance's primary external (public) IP address.
+func ExternalIP() (string, error) { return defaultClient.ExternalIP() }
+
+// Hostname returns the instance's hostname. This will be of the form
+// "<instanceID>.c.<projID>.internal".
+func Hostname() (string, error) { return defaultClient.Hostname() }
+
+// InstanceTags returns the list of user-defined instance tags,
+// assigned when initially creating a GCE instance.
+func InstanceTags() ([]string, error) { return defaultClient.InstanceTags() }
+
+// InstanceID returns the current VM's numeric instance ID.
+func InstanceID() (string, error) { return defaultClient.InstanceID() }
+
+// InstanceName returns the current VM's instance ID string.
+func InstanceName() (string, error) { return defaultClient.InstanceName() }
+
+// Zone returns the current VM's zone, such as "us-central1-b".
+func Zone() (string, error) { return defaultClient.Zone() }
+
+// InstanceAttributes calls Client.InstanceAttributes on the default client.
+func InstanceAttributes() ([]string, error) { return defaultClient.InstanceAttributes() }
+
+// ProjectAttributes calls Client.ProjectAttributes on the default client.
+func ProjectAttributes() ([]string, error) { return defaultClient.ProjectAttributes() }
+
+// InstanceAttributeValue calls Client.InstanceAttributeValue on the default client.
+func InstanceAttributeValue(attr string) (string, error) {
+	return defaultClient.InstanceAttributeValue(attr)
+}
+
+// ProjectAttributeValue calls Client.ProjectAttributeValue on the default client.
+func ProjectAttributeValue(attr string) (string, error) {
+	return defaultClient.ProjectAttributeValue(attr)
+}
+
+// Scopes calls Client.Scopes on the default client.
+func Scopes(serviceAccount string) ([]string, error) { return defaultClient.Scopes(serviceAccount) }
+
+func strsContains(ss []string, s string) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+// A Client provides metadata.
+type Client struct {
+	hc *http.Client
+}
+
+// NewClient returns a Client that can be used to fetch metadata. All HTTP requests
+// will use the given http.Client instead of the default client.
+func NewClient(c *http.Client) *Client {
+	return &Client{hc: c}
+}
+
+// getETag returns a value from the metadata service as well as the associated ETag.
+// This func is otherwise equivalent to Get.
+func (c *Client) getETag(suffix string) (value, etag string, err error) {
+	// Using a fixed IP makes it very difficult to spoof the metadata service in
+	// a container, which is an important use-case for local testing of cloud
+	// deployments. To enable spoofing of the metadata service, the environment
+	// variable GCE_METADATA_HOST is first inspected to decide where metadata
+	// requests shall go.
+	host := os.Getenv(metadataHostEnv)
+	if host == "" {
+		// Using 169.254.169.254 instead of "metadata" here because Go
+		// binaries built with the "netgo" tag and without cgo won't
+		// know the search suffix for "metadata" is
+		// ".google.internal", and this IP address is documented as
+		// being stable anyway.
+		host = metadataIP
+	}
+	url := "http://" + host + "/computeMetadata/v1/" + suffix
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Metadata-Flavor", "Google")
+	req.Header.Set("User-Agent", userAgent)
+	res, err := c.hc.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusNotFound {
+		return "", "", NotDefinedError(suffix)
+	}
+	if res.StatusCode != 200 {
+		return "", "", fmt.Errorf("status code %d trying to fetch %s", res.StatusCode, url)
+	}
+	all, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", "", err
+	}
+	return string(all), res.Header.Get("Etag"), nil
+}
+
+// Get returns a value from the metadata service.
+// The suffix is appended to "http://${GCE_METADATA_HOST}/computeMetadata/v1/".
+//
+// If the GCE_METADATA_HOST environment variable is not defined, a default of
+// 169.254.169.254 will be used instead.
+//
+// If the requested metadata is not defined, the returned error will
+// be of type NotDefinedError.
+func (c *Client) Get(suffix string) (string, error) {
+	val, _, err := c.getETag(suffix)
+	return val, err
+}
+
+func (c *Client) getTrimmed(suffix string) (s string, err error) {
+	s, err = c.Get(suffix)
+	s = strings.TrimSpace(s)
+	return
+}
+
+func (c *Client) lines(suffix string) ([]string, error) {
+	j, err := c.Get(suffix)
+	if err != nil {
+		return nil, err
+	}
+	s := strings.Split(strings.TrimSpace(j), "\n")
+	for i := range s {
+		s[i] = strings.TrimSpace(s[i])
+	}
+	return s, nil
+}
+
+// ProjectID returns the current instance's project ID string.
+func (c *Client) ProjectID() (string, error) { return projID.get(c) }
+
+// NumericProjectID returns the current instance's numeric project ID.
+func (c *Client) NumericProjectID() (string, error) { return projNum.get(c) }
+
+// InstanceID returns the current VM's numeric instance ID.
+func (c *Client) InstanceID() (string, error) { return instID.get(c) }
+
+// InternalIP returns the instance's primary internal IP address.
+func (c *Client) InternalIP() (string, error) {
+	return c.getTrimmed("instance/network-interfaces/0/ip")
+}
+
+// ExternalIP returns the instance's primary external (public) IP address.
+func (c *Client) ExternalIP() (string, error) {
+	return c.getTrimmed("instance/network-interfaces/0/access-configs/0/external-ip")
+}
+
+// Hostname returns the instance's hostname. This will be of the form
+// "<instanceID>.c.<projID>.internal".
+func (c *Client) Hostname() (string, error) {
+	return c.getTrimmed("instance/hostname")
+}
+
+// InstanceTags returns the list of user-defined instance tags,
+// assigned when initially creating a GCE instance.
+func (c *Client) InstanceTags() ([]string, error) {
+	var s []string
+	j, err := c.Get("instance/tags")
+	if err != nil {
+		return nil, err
+	}
+	if err := json.NewDecoder(strings.NewReader(j)).Decode(&s); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// InstanceName returns the current VM's instance ID string.
+func (c *Client) InstanceName() (string, error) {
+	host, err := c.Hostname()
+	if err != nil {
+		return "", err
+	}
+	return strings.Split(host, ".")[0], nil
+}
+
+// Zone returns the current VM's zone, such as "us-central1-b".
+func (c *Client) Zone() (string, error) {
+	zone, err := c.getTrimmed("instance/zone")
+	// zone is of the form "projects/<projNum>/zones/<zoneName>".
+	if err != nil {
+		return "", err
+	}
+	return zone[strings.LastIndex(zone, "/")+1:], nil
+}
+
+// InstanceAttributes returns the list of user-defined attributes,
+// assigned when initially creating a GCE VM instance. The value of an
+// attribute can be obtained with InstanceAttributeValue.
+func (c *Client) InstanceAttributes() ([]string, error) { return c.lines("instance/attributes/") }
+
+// ProjectAttributes returns the list of user-defined attributes
+// applying to the project as a whole, not just this VM.  The value of
+// an attribute can be obtained with ProjectAttributeValue.
+func (c *Client) ProjectAttributes() ([]string, error) { return c.lines("project/attributes/") }
+
+// InstanceAttributeValue returns the value of the provided VM
+// instance attribute.
+//
+// If the requested attribute is not defined, the returned error will
+// be of type NotDefinedError.
+//
+// InstanceAttributeValue may return ("", nil) if the attribute was
+// defined to be the empty string.
+func (c *Client) InstanceAttributeValue(attr string) (string, error) {
+	return c.Get("instance/attributes/" + attr)
+}
+
+// ProjectAttributeValue returns the value of the provided
+// project attribute.
+//
+// If the requested attribute is not defined, the returned error will
+// be of type NotDefinedError.
+//
+// ProjectAttributeValue may return ("", nil) if the attribute was
+// defined to be the empty string.
+func (c *Client) ProjectAttributeValue(attr string) (string, error) {
+	return c.Get("project/attributes/" + attr)
+}
+
+// Scopes returns the service account scopes for the given account.
+// The account may be empty or the string "default" to use the instance's
+// main account.
+func (c *Client) Scopes(serviceAccount string) ([]string, error) {
+	if serviceAccount == "" {
+		serviceAccount = "default"
+	}
+	return c.lines("instance/service-accounts/" + serviceAccount + "/scopes")
+}
+
 // Subscribe subscribes to a value from the metadata service.
 // The suffix is appended to "http://${GCE_METADATA_HOST}/computeMetadata/v1/".
 // The suffix may contain query parameters.
@@ -276,11 +466,11 @@ func systemInfoSuggestsGCE() bool {
 // and ok false. Subscribe blocks until fn returns a non-nil error or the value
 // is deleted. Subscribe returns the error value returned from the last call to
 // fn, which may be nil when ok == false.
-func Subscribe(suffix string, fn func(v string, ok bool) error) error {
+func (c *Client) Subscribe(suffix string, fn func(v string, ok bool) error) error {
 	const failedSubscribeSleep = time.Second * 5
 
 	// First check to see if the metadata value exists at all.
-	val, lastETag, err := getETag(subscribeClient, suffix)
+	val, lastETag, err := c.getETag(suffix)
 	if err != nil {
 		return err
 	}
@@ -296,7 +486,7 @@ func Subscribe(suffix string, fn func(v string, ok bool) error) error {
 		suffix += "?wait_for_change=true&last_etag="
 	}
 	for {
-		val, etag, err := getETag(subscribeClient, suffix+url.QueryEscape(lastETag))
+		val, etag, err := c.getETag(suffix + url.QueryEscape(lastETag))
 		if err != nil {
 			if _, deleted := err.(NotDefinedError); !deleted {
 				time.Sleep(failedSubscribeSleep)
@@ -310,129 +500,4 @@ func Subscribe(suffix string, fn func(v string, ok bool) error) error {
 			return err
 		}
 	}
-}
-
-// ProjectID returns the current instance's project ID string.
-func ProjectID() (string, error) { return projID.get() }
-
-// NumericProjectID returns the current instance's numeric project ID.
-func NumericProjectID() (string, error) { return projNum.get() }
-
-// InternalIP returns the instance's primary internal IP address.
-func InternalIP() (string, error) {
-	return getTrimmed("instance/network-interfaces/0/ip")
-}
-
-// ExternalIP returns the instance's primary external (public) IP address.
-func ExternalIP() (string, error) {
-	return getTrimmed("instance/network-interfaces/0/access-configs/0/external-ip")
-}
-
-// Hostname returns the instance's hostname. This will be of the form
-// "<instanceID>.c.<projID>.internal".
-func Hostname() (string, error) {
-	return getTrimmed("instance/hostname")
-}
-
-// InstanceTags returns the list of user-defined instance tags,
-// assigned when initially creating a GCE instance.
-func InstanceTags() ([]string, error) {
-	var s []string
-	j, err := Get("instance/tags")
-	if err != nil {
-		return nil, err
-	}
-	if err := json.NewDecoder(strings.NewReader(j)).Decode(&s); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-// InstanceID returns the current VM's numeric instance ID.
-func InstanceID() (string, error) {
-	return instID.get()
-}
-
-// InstanceName returns the current VM's instance ID string.
-func InstanceName() (string, error) {
-	host, err := Hostname()
-	if err != nil {
-		return "", err
-	}
-	return strings.Split(host, ".")[0], nil
-}
-
-// Zone returns the current VM's zone, such as "us-central1-b".
-func Zone() (string, error) {
-	zone, err := getTrimmed("instance/zone")
-	// zone is of the form "projects/<projNum>/zones/<zoneName>".
-	if err != nil {
-		return "", err
-	}
-	return zone[strings.LastIndex(zone, "/")+1:], nil
-}
-
-// InstanceAttributes returns the list of user-defined attributes,
-// assigned when initially creating a GCE VM instance. The value of an
-// attribute can be obtained with InstanceAttributeValue.
-func InstanceAttributes() ([]string, error) { return lines("instance/attributes/") }
-
-// ProjectAttributes returns the list of user-defined attributes
-// applying to the project as a whole, not just this VM.  The value of
-// an attribute can be obtained with ProjectAttributeValue.
-func ProjectAttributes() ([]string, error) { return lines("project/attributes/") }
-
-func lines(suffix string) ([]string, error) {
-	j, err := Get(suffix)
-	if err != nil {
-		return nil, err
-	}
-	s := strings.Split(strings.TrimSpace(j), "\n")
-	for i := range s {
-		s[i] = strings.TrimSpace(s[i])
-	}
-	return s, nil
-}
-
-// InstanceAttributeValue returns the value of the provided VM
-// instance attribute.
-//
-// If the requested attribute is not defined, the returned error will
-// be of type NotDefinedError.
-//
-// InstanceAttributeValue may return ("", nil) if the attribute was
-// defined to be the empty string.
-func InstanceAttributeValue(attr string) (string, error) {
-	return Get("instance/attributes/" + attr)
-}
-
-// ProjectAttributeValue returns the value of the provided
-// project attribute.
-//
-// If the requested attribute is not defined, the returned error will
-// be of type NotDefinedError.
-//
-// ProjectAttributeValue may return ("", nil) if the attribute was
-// defined to be the empty string.
-func ProjectAttributeValue(attr string) (string, error) {
-	return Get("project/attributes/" + attr)
-}
-
-// Scopes returns the service account scopes for the given account.
-// The account may be empty or the string "default" to use the instance's
-// main account.
-func Scopes(serviceAccount string) ([]string, error) {
-	if serviceAccount == "" {
-		serviceAccount = "default"
-	}
-	return lines("instance/service-accounts/" + serviceAccount + "/scopes")
-}
-
-func strsContains(ss []string, s string) bool {
-	for _, v := range ss {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }

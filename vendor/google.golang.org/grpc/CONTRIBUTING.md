@@ -7,7 +7,7 @@ If you are new to github, please start by reading [Pull Request howto](https://h
 ## Legal requirements
 
 In order to protect both you and ourselves, you will need to sign the
-[Contributor License Agreement](https://cla.developers.google.com/clas).
+[Contributor License Agreement](https://identity.linuxfoundation.org/projects/cncf).
 
 ## Guidelines for Pull Requests
 How to get your contributions merged smoothly and quickly.

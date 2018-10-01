@@ -5,6 +5,8 @@ go_library(
     srcs = [
         "bdp_estimator.go",
         "control.go",
+        "go16.go",
+        "go17.go",
         "handler_server.go",
         "http2_client.go",
         "http2_server.go",

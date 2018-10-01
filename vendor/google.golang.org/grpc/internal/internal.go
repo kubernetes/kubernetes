@@ -19,13 +19,6 @@
 // the godoc of the top-level grpc package.
 package internal
 
-// TestingCloseConns closes all existing transports but keeps
-// grpcServer.lis accepting new connections.
-//
-// The provided grpcServer must be of type *grpc.Server. It is untyped
-// for circular dependency reasons.
-var TestingCloseConns func(grpcServer interface{})
-
 // TestingUseHandlerImpl enables the http.Handler-based server implementation.
 // It must be called before Serve and requires TLS credentials.
 //

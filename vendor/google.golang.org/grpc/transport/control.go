@@ -20,9 +20,9 @@ package transport
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"golang.org/x/net/http2"
@@ -49,7 +49,7 @@ const (
 	// defaultLocalSendQuota sets is default value for number of data
 	// bytes that each stream can schedule before some of it being
 	// flushed out.
-	defaultLocalSendQuota = 64 * 1024
+	defaultLocalSendQuota = 128 * 1024
 )
 
 // The following defines various control items which could flow through
@@ -89,11 +89,15 @@ type windowUpdate struct {
 func (*windowUpdate) item() {}
 
 type settings struct {
-	ack bool
-	ss  []http2.Setting
+	ss []http2.Setting
 }
 
 func (*settings) item() {}
+
+type settingsAck struct {
+}
+
+func (*settingsAck) item() {}
 
 type resetStream struct {
 	streamID uint32
@@ -112,6 +116,7 @@ type goAway struct {
 func (*goAway) item() {}
 
 type flushIO struct {
+	closeTr bool
 }
 
 func (*flushIO) item() {}
@@ -126,9 +131,8 @@ func (*ping) item() {}
 // quotaPool is a pool which accumulates the quota and sends it to acquire()
 // when it is available.
 type quotaPool struct {
-	c chan int
-
 	mu      sync.Mutex
+	c       chan struct{}
 	version uint32
 	quota   int
 }
@@ -136,12 +140,8 @@ type quotaPool struct {
 // newQuotaPool creates a quotaPool which has quota q available to consume.
 func newQuotaPool(q int) *quotaPool {
 	qb := &quotaPool{
-		c: make(chan int, 1),
-	}
-	if q > 0 {
-		qb.c <- q
-	} else {
-		qb.quota = q
+		quota: q,
+		c:     make(chan struct{}, 1),
 	}
 	return qb
 }
@@ -155,58 +155,81 @@ func (qb *quotaPool) add(v int) {
 }
 
 func (qb *quotaPool) lockedAdd(v int) {
-	select {
-	case n := <-qb.c:
-		qb.quota += n
-	default:
+	var wakeUp bool
+	if qb.quota <= 0 {
+		wakeUp = true // Wake up potential waiters.
 	}
 	qb.quota += v
-	if qb.quota <= 0 {
-		return
-	}
-	// After the pool has been created, this is the only place that sends on
-	// the channel. Since mu is held at this point and any quota that was sent
-	// on the channel has been retrieved, we know that this code will always
-	// place any positive quota value on the channel.
-	select {
-	case qb.c <- qb.quota:
-		qb.quota = 0
-	default:
+	if wakeUp && qb.quota > 0 {
+		select {
+		case qb.c <- struct{}{}:
+		default:
+		}
 	}
 }
 
 func (qb *quotaPool) addAndUpdate(v int) {
 	qb.mu.Lock()
-	defer qb.mu.Unlock()
 	qb.lockedAdd(v)
-	// Update the version only after having added to the quota
-	// so that if acquireWithVesrion sees the new vesrion it is
-	// guaranteed to have seen the updated quota.
-	// Also, still keep this inside of the lock, so that when
-	// compareAndExecute is processing, this function doesn't
-	// get executed partially (quota gets updated but the version
-	// doesn't).
-	atomic.AddUint32(&(qb.version), 1)
+	qb.version++
+	qb.mu.Unlock()
 }
 
-func (qb *quotaPool) acquireWithVersion() (<-chan int, uint32) {
-	return qb.c, atomic.LoadUint32(&(qb.version))
+func (qb *quotaPool) get(v int, wc waiters) (int, uint32, error) {
+	qb.mu.Lock()
+	if qb.quota > 0 {
+		if v > qb.quota {
+			v = qb.quota
+		}
+		qb.quota -= v
+		ver := qb.version
+		qb.mu.Unlock()
+		return v, ver, nil
+	}
+	qb.mu.Unlock()
+	for {
+		select {
+		case <-wc.ctx.Done():
+			return 0, 0, ContextErr(wc.ctx.Err())
+		case <-wc.tctx.Done():
+			return 0, 0, ErrConnClosing
+		case <-wc.done:
+			return 0, 0, io.EOF
+		case <-wc.goAway:
+			return 0, 0, errStreamDrain
+		case <-qb.c:
+			qb.mu.Lock()
+			if qb.quota > 0 {
+				if v > qb.quota {
+					v = qb.quota
+				}
+				qb.quota -= v
+				ver := qb.version
+				if qb.quota > 0 {
+					select {
+					case qb.c <- struct{}{}:
+					default:
+					}
+				}
+				qb.mu.Unlock()
+				return v, ver, nil
+
+			}
+			qb.mu.Unlock()
+		}
+	}
 }
 
 func (qb *quotaPool) compareAndExecute(version uint32, success, failure func()) bool {
 	qb.mu.Lock()
-	defer qb.mu.Unlock()
-	if version == atomic.LoadUint32(&(qb.version)) {
+	if version == qb.version {
 		success()
+		qb.mu.Unlock()
 		return true
 	}
 	failure()
+	qb.mu.Unlock()
 	return false
-}
-
-// acquire returns the channel on which available quota amounts are sent.
-func (qb *quotaPool) acquire() <-chan int {
-	return qb.c
 }
 
 // inFlow deals with inbound flow control

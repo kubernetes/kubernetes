@@ -1,20 +1,24 @@
 language: go
 
 go:
+  - 1.6.x
   - 1.7.x
   - 1.8.x
   - 1.9.x
+  - 1.10.x
 
 matrix:
   include:
-  - go: 1.9.x
-    env: ARCH=386
+  - go: 1.10.x
+    env: RUN386=1
 
 go_import_path: google.golang.org/grpc
 
 before_install:
-  - if [[ "$TRAVIS_GO_VERSION" = 1.9* && "$ARCH" != "386" ]]; then ./vet.sh -install || exit 1; fi
+  - if [[ "$TRAVIS_GO_VERSION" = 1.10* && "$GOARCH" != "386" ]]; then ./vet.sh -install || exit 1; fi
 
 script:
-  - if [[ "$TRAVIS_GO_VERSION" = 1.9* && "$ARCH" != "386" ]]; then ./vet.sh || exit 1; fi
-  - make test testrace
+  - if [[ -n "$RUN386" ]]; then export GOARCH=386; fi
+  - if [[ "$TRAVIS_GO_VERSION" = 1.10* && "$GOARCH" != "386" ]]; then ./vet.sh || exit 1; fi
+  - make test || exit 1
+  - if [[ "$GOARCH" != "386" ]]; then make testrace; fi

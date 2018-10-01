@@ -1,0 +1,11 @@
+sudo: false
+language: go
+go:
+  - 1.6
+  - 1.7
+script:
+  - gofmt -l .
+  - go tool vet .
+  - go test -coverprofile=coverage.txt -covermode=atomic
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

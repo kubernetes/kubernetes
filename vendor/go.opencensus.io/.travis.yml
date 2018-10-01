@@ -1,0 +1,27 @@
+language: go
+
+go:
+  # 1.8 is tested by AppVeyor
+  - 1.11.x
+
+go_import_path: go.opencensus.io
+
+# Don't email me the results of the test runs.
+notifications:
+  email: false
+
+before_script:
+  - GO_FILES=$(find . -iname '*.go' | grep -v /vendor/)  # All the .go files, excluding vendor/ if any
+  - PKGS=$(go list ./... | grep -v /vendor/)             # All the import paths, excluding vendor/ if any
+  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh # Install latest dep release
+  - go get github.com/rakyll/embedmd
+
+script:
+  - embedmd -d README.md              # Ensure embedded code is up-to-date
+  - go build ./...                    # Ensure dependency updates don't break build
+  - if [ -n "$(gofmt -s -l $GO_FILES)" ]; then echo "gofmt the following files:"; gofmt -s -l $GO_FILES; exit 1; fi
+  - go vet ./...
+  - go test -v -race $PKGS            # Run all the tests with the race detector enabled
+  - GOARCH=386 go test -v $PKGS       # Run all tests against a 386 architecture
+  - 'if [[ $TRAVIS_GO_VERSION = 1.8* ]]; then ! golint ./... | grep -vE "(_mock|_string|\.pb)\.go:"; fi'
+  - go run internal/check/version.go

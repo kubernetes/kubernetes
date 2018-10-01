@@ -25,14 +25,12 @@ import (
 
 // DefaultBackoffConfig uses values specified for backoff in
 // https://github.com/grpc/grpc/blob/master/doc/connection-backoff.md.
-var (
-	DefaultBackoffConfig = BackoffConfig{
-		MaxDelay:  120 * time.Second,
-		baseDelay: 1.0 * time.Second,
-		factor:    1.6,
-		jitter:    0.2,
-	}
-)
+var DefaultBackoffConfig = BackoffConfig{
+	MaxDelay:  120 * time.Second,
+	baseDelay: 1.0 * time.Second,
+	factor:    1.6,
+	jitter:    0.2,
+}
 
 // backoffStrategy defines the methodology for backing off after a grpc
 // connection failure.
