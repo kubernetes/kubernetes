@@ -17,12 +17,18 @@ limitations under the License.
 package csi
 
 import (
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	csipb "github.com/container-storage-interface/spec/lib/go/csi/v0"
+	"google.golang.org/grpc"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +40,7 @@ import (
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi/fake"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
@@ -505,4 +512,123 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 			t.Errorf("Unexpected spec name %s", spec.Name())
 		}
 	}
+}
+
+func TestRegisterPlugin(t *testing.T) {
+	testcases := map[string]struct {
+		// setup
+		sockPath            string
+		nodeGetInfoResponse *csipb.NodeGetInfoResponse
+		nodeGetInfoErr      error
+		addNodeInfoErr      error
+		// expectations
+		expectedRegisterPluginErrMsg string
+		expectedNimAddCalls          int
+		expectedNimRemoveCalls       int
+		expectedDriverEntry          bool
+	}{
+		"happy path": {
+			sockPath:            "/tmp/some.csi.sock",
+			nodeGetInfoResponse: &csipb.NodeGetInfoResponse{NodeId: "some node id"},
+			expectedNimAddCalls: 1,
+			expectedDriverEntry: true,
+		},
+		"when node server returns an error": {
+			sockPath:                     "/tmp/some.csi.sock",
+			nodeGetInfoErr:               errors.New("some random node get info error"),
+			expectedNimRemoveCalls:       1,
+			expectedRegisterPluginErrMsg: "some random node get info error",
+			expectedDriverEntry:          false,
+		},
+		"when node info manager returns an error": {
+			sockPath:                     "/tmp/some.csi.sock",
+			nodeGetInfoResponse:          &csipb.NodeGetInfoResponse{NodeId: "some node id"},
+			addNodeInfoErr:               errors.New("some random node info add error"),
+			expectedNimAddCalls:          1,
+			expectedNimRemoveCalls:       1,
+			expectedRegisterPluginErrMsg: "some random node info add error",
+			expectedDriverEntry:          false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			registrationHandler := &RegistrationHandler{}
+
+			nodeServer := &fake.FakeNodeServer{}
+			nodeServer.NodeGetInfoReturns(tc.nodeGetInfoResponse, tc.nodeGetInfoErr)
+
+			nodeInfoManager := &fake.FakeNodeInfoManager{}
+			nodeInfoManager.AddNodeInfoReturns(tc.addNodeInfoErr)
+
+			driverStarter, driverStopper := newCsiDriverServer(t, tc.sockPath, nodeServer)
+			go driverStarter()
+			defer driverStopper()
+
+			// TODO: globals!
+			csiDrivers = csiDriversStore{
+				driversMap: map[string]csiDriver{},
+			}
+			nim = nodeInfoManager
+
+			err := registrationHandler.RegisterPlugin("some driver name", tc.sockPath)
+			if expectedErrMsg := tc.expectedRegisterPluginErrMsg; expectedErrMsg == "" {
+				if err != nil {
+					t.Errorf("Expected RegisterPlugin not to return an error, got: %v", err)
+				}
+			} else {
+				if !strings.Contains(err.Error(), expectedErrMsg) {
+					t.Errorf("Expected RegisterPlugin to return an error containing '%s', got: '%#v'", expectedErrMsg, err)
+				}
+			}
+
+			if a, e := nodeInfoManager.AddNodeInfoCallCount(), tc.expectedNimAddCalls; e != a {
+				t.Errorf("Expected nim.AddNodeInfo to be called %d times, got called %d times", e, a)
+			}
+			if a, e := nodeInfoManager.RemoveNodeInfoCallCount(), tc.expectedNimRemoveCalls; e != a {
+				t.Errorf("Expected nim.RemoveNodeInfo to be called %d times, got called %d times", e, a)
+			}
+
+			// TODO: globals!
+			driversEntry, foundDriver := csiDrivers.driversMap["some driver name"]
+			if foundDriver != tc.expectedDriverEntry {
+				if foundDriver {
+					t.Errorf("Expected to find the driver registered")
+				} else {
+					t.Errorf("Expected not to find the driver registered, but found: %#v", driversEntry)
+				}
+			}
+		})
+	}
+}
+
+func newCsiDriverServer(t *testing.T, sockPath string, nodeServer csipb.NodeServer) (func(), func()) {
+	t.Helper()
+
+	listener, err := net.Listen("unix", sockPath)
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	csipb.RegisterNodeServer(grpcServer, nodeServer)
+
+	starter := func() {
+		if err := grpcServer.Serve(listener); err != nil {
+			nestedErr := ""
+			if opErr, ok := err.(*net.OpError); ok {
+				nestedErr = fmt.Sprintf(" (nested Error: %#v)", opErr.Err)
+			}
+			t.Logf("Error on Serve(): %#v"+nestedErr, err)
+		}
+	}
+
+	stopper := func() {
+		// TODO(hoegaarden): How can we get rid of that stupid sleep without making
+		//                   grpcServer.Serve() return an error?
+		time.Sleep(time.Millisecond)
+		grpcServer.GracefulStop()
+	}
+
+	return starter, stopper
 }
