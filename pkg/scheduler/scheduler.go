@@ -138,7 +138,6 @@ func New(client clientset.Interface,
 	for _, opt := range opts {
 		opt(&options)
 	}
-
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  options.schedulerName,
@@ -193,8 +192,11 @@ func New(client clientset.Interface,
 	config.Recorder = recorder
 	config.DisablePreemption = options.disablePreemption
 	config.StopEverything = stopCh
+
 	// Create the scheduler.
 	sched := NewFromConfig(config)
+
+	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, replicationControllerInformer, replicaSetInformer, statefulSetInformer, serviceInformer, pdbInformer, storageClassInformer)
 	return sched, nil
 }
 

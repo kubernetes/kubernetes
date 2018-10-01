@@ -189,6 +189,22 @@ func initTestSchedulerWithOptions(
 	// set DisablePreemption option
 	context.schedulerConfig.DisablePreemption = disablePreemption
 
+	context.scheduler = scheduler.NewFromConfig(context.schedulerConfig)
+
+	scheduler.AddAllEventHandlers(context.scheduler,
+		v1.DefaultSchedulerName,
+		context.informerFactory.Core().V1().Nodes(),
+		podInformer,
+		context.informerFactory.Core().V1().PersistentVolumes(),
+		context.informerFactory.Core().V1().PersistentVolumeClaims(),
+		context.informerFactory.Core().V1().ReplicationControllers(),
+		context.informerFactory.Apps().V1().ReplicaSets(),
+		context.informerFactory.Apps().V1().StatefulSets(),
+		context.informerFactory.Core().V1().Services(),
+		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		context.informerFactory.Storage().V1().StorageClasses(),
+	)
+
 	// set setPodInformer if provided.
 	if setPodInformer {
 		go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
@@ -212,7 +228,6 @@ func initTestSchedulerWithOptions(
 	context.informerFactory.Start(context.schedulerConfig.StopEverything)
 	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
 
-	context.scheduler = scheduler.NewFromConfig(context.schedulerConfig)
 	context.scheduler.Run()
 	return context
 }

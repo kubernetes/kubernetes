@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -633,7 +634,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, recorder record.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
-		nil,
+		internalqueue.NewSchedulingQueue(nil),
 		predicateMap,
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
@@ -645,7 +646,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		false,
-		api.DefaultPercentageOfNodesToScore)
+		api.DefaultPercentageOfNodesToScore,
+	)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
 
@@ -684,7 +686,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulerintern
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache schedulerinternalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
 	algo := core.NewGenericScheduler(
 		scache,
-		nil,
+		internalqueue.NewSchedulingQueue(nil),
 		predicateMap,
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
@@ -696,7 +698,8 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 		false,
 		false,
-		api.DefaultPercentageOfNodesToScore)
+		api.DefaultPercentageOfNodesToScore,
+	)
 	bindingChan := make(chan *v1.Binding, 2)
 
 	sched := NewFromConfig(&factory.Config{
