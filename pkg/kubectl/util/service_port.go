@@ -23,19 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// Lookup containerPort number by its named port name
-func lookupContainerPortNumberByName(pod v1.Pod, name string) (int32, error) {
-	for _, ctr := range pod.Spec.Containers {
-		for _, ctrportspec := range ctr.Ports {
-			if ctrportspec.Name == name {
-				return ctrportspec.ContainerPort, nil
-			}
-		}
-	}
-
-	return int32(-1), fmt.Errorf("Pod '%s' does not have a named port '%s'", pod.Name, name)
-}
-
 // Lookup containerPort number from Service port number
 // It implements the handling of resolving container named port, as well as ignoring targetPort when clusterIP=None
 // It returns an error when a named port can't find a match (with -1 returned), or when the service does not
@@ -56,8 +43,19 @@ func LookupContainerPortNumberByServicePort(svc v1.Service, pod v1.Pod, port int
 				return int32(svcportspec.TargetPort.IntValue()), nil
 			}
 		} else {
-			return lookupContainerPortNumberByName(pod, svcportspec.TargetPort.String())
+			return LookupContainerPortNumberByName(pod, svcportspec.TargetPort.String())
 		}
 	}
 	return port, fmt.Errorf("Service %s does not have a service port %d", svc.Name, port)
+}
+
+// LookupServicePortNumberByName find service port number by its named port name
+func LookupServicePortNumberByName(svc v1.Service, name string) (int32, error) {
+	for _, svcportspec := range svc.Spec.Ports {
+		if svcportspec.Name == name {
+			return svcportspec.Port, nil
+		}
+	}
+
+	return int32(-1), fmt.Errorf("Service '%s' does not have a named port '%s'", svc.Name, name)
 }

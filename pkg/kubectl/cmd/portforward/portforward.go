@@ -138,6 +138,17 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 	return fw.ForwardPorts()
 }
 
+// splitPort splits port string which is in form of [LOCAL PORT]:REMOTE PORT
+// and returns local and remote ports separately
+func splitPort(port string) (local, remote string) {
+	parts := strings.Split(port, ":")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+
+	return parts[0], parts[0]
+}
+
 // Translates service port to target port
 // It rewrites ports as needed if the Service port declares targetPort.
 // It returns an error when a named targetPort can't find a match in the pod, or the Service did not declare
@@ -145,29 +156,61 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod corev1.Pod) ([]string, error) {
 	var translated []string
 	for _, port := range ports {
-		// port is in the form of [LOCAL PORT]:REMOTE PORT
-		parts := strings.Split(port, ":")
-		input := parts[0]
-		if len(parts) == 2 {
-			input = parts[1]
-		}
-		portnum, err := strconv.Atoi(input)
+		localPort, remotePort := splitPort(port)
+
+		portnum, err := strconv.Atoi(remotePort)
 		if err != nil {
-			return ports, err
+			svcPort, err := util.LookupServicePortNumberByName(svc, remotePort)
+			if err != nil {
+				return nil, err
+			}
+			portnum = int(svcPort)
+
+			if localPort == remotePort {
+				localPort = strconv.Itoa(portnum)
+			}
 		}
 		containerPort, err := util.LookupContainerPortNumberByServicePort(svc, pod, int32(portnum))
 		if err != nil {
 			// can't resolve a named port, or Service did not declare this port, return an error
 			return nil, err
+		}
+
+		if int32(portnum) != containerPort {
+			translated = append(translated, fmt.Sprintf("%s:%d", localPort, containerPort))
 		} else {
-			if int32(portnum) != containerPort {
-				translated = append(translated, fmt.Sprintf("%s:%d", parts[0], containerPort))
-			} else {
-				translated = append(translated, port)
-			}
+			translated = append(translated, port)
 		}
 	}
 	return translated, nil
+}
+
+// convertPodNamedPortToNumber converts named ports into port numbers
+// It returns an error when a named port can't be found in the pod containers
+func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, error) {
+	var converted []string
+	for _, port := range ports {
+		localPort, remotePort := splitPort(port)
+
+		containerPortStr := remotePort
+		_, err := strconv.Atoi(remotePort)
+		if err != nil {
+			containerPort, err := util.LookupContainerPortNumberByName(pod, remotePort)
+			if err != nil {
+				return nil, err
+			}
+
+			containerPortStr = strconv.Itoa(int(containerPort))
+		}
+
+		if localPort != remotePort {
+			converted = append(converted, fmt.Sprintf("%s:%s", localPort, containerPortStr))
+		} else {
+			converted = append(converted, containerPortStr)
+		}
+	}
+
+	return converted, nil
 }
 
 // Complete completes all the required options for port-forward cmd.
@@ -215,7 +258,10 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 			return err
 		}
 	default:
-		o.Ports = args[1:]
+		o.Ports, err = convertPodNamedPortToNumber(args[1:], *forwardablePod)
+		if err != nil {
+			return err
+		}
 	}
 
 	clientset, err := f.KubernetesClientSet()
