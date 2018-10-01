@@ -822,8 +822,16 @@ func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWr
 }
 
 func printEmptyDirVolumeSource(emptyDir *corev1.EmptyDirVolumeSource, w PrefixWriter) {
+	var sizeLimit string
+	if emptyDir.SizeLimit != nil && emptyDir.SizeLimit.Cmp(resource.Quantity{}) > 0 {
+		sizeLimit = fmt.Sprintf("%v", emptyDir.SizeLimit)
+	} else {
+		sizeLimit = "<unset>"
+	}
 	w.Write(LEVEL_2, "Type:\tEmptyDir (a temporary directory that shares a pod's lifetime)\n"+
-		"    Medium:\t%v\n", emptyDir.Medium)
+		"    Medium:\t%v\n"+
+		"    SizeLimit:\t%v\n",
+		emptyDir.Medium, sizeLimit)
 }
 
 func printGCEPersistentDiskVolumeSource(gce *corev1.GCEPersistentDiskVolumeSource, w PrefixWriter) {
