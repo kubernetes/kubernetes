@@ -70,7 +70,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 			cluster. kubeadm CLI v1.8.0+ automatically creates this ConfigMap with the config used with 'kubeadm init', but if you
 			initialized your cluster using kubeadm v1.7.x or lower, you must use the 'config upload' command to create this
 			ConfigMap. This is required so that 'kubeadm upgrade' can configure your upgraded cluster correctly.
-		`), metav1.NamespaceSystem, constants.InitConfigurationConfigMap),
+		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		// Without this callback, if a user runs just the "upload"
 		// command without a subcommand, or with an invalid subcommand,
 		// cobra will print usage information, but still exit cleanly.
@@ -284,7 +284,7 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located.
 
 			The configuration is located in the %q namespace in the %q ConfigMap.
-		`), metav1.NamespaceSystem, constants.InitConfigurationConfigMap),
+		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			glog.V(1).Infoln("[config] retrieving ClientSet from file")
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
@@ -309,7 +309,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 			same config file before upgrading to v1.8 using 'kubeadm upgrade'.
 
 			The configuration is located in the %q namespace in the %q ConfigMap.
-		`), metav1.NamespaceSystem, constants.InitConfigurationConfigMap),
+		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
 				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
@@ -348,7 +348,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 			same flags before upgrading to v1.8 using 'kubeadm upgrade'.
 
 			The configuration is located in the %q namespace in the %q ConfigMap.
-		`), metav1.NamespaceSystem, constants.InitConfigurationConfigMap),
+		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
 			glog.V(1).Infoln("[config] creating new FeatureGates")
@@ -374,7 +374,7 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 func RunConfigView(out io.Writer, client clientset.Interface) error {
 
 	glog.V(1).Infoln("[config] getting the cluster configuration")
-	cfgConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
+	cfgConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
