@@ -99,9 +99,13 @@ func ValidateDiscovery(c *kubeadm.JoinConfiguration) field.ErrorList {
 	}
 	if len(c.DiscoveryFile) != 0 {
 		allErrs = append(allErrs, ValidateDiscoveryFile(c.DiscoveryFile, field.NewPath("discoveryFile"))...)
+		if len(c.TLSBootstrapToken) != 0 {
+			allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, field.NewPath("tlsBootstrapToken"))...)
+		}
+	} else {
+		allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, field.NewPath("tlsBootstrapToken"))...)
 	}
 	allErrs = append(allErrs, ValidateArgSelection(c, field.NewPath("discovery"))...)
-	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, field.NewPath("tlsBootstrapToken"))...)
 	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServer(c.DiscoveryTokenAPIServers, field.NewPath("discoveryTokenAPIServers"))...)
 
 	return allErrs
