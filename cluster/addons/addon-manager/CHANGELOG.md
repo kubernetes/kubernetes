@@ -1,3 +1,6 @@
+### Version 8.8  (Mon October 1 2018 Zihong Zheng <zihongz@google.com>)
+ - Update to use debian-base:0.3.2.
+
 ### Version 8.7  (Tue September 4 2018 Zihong Zheng <zihongz@google.com>)
  - Support extra `--prune-whitelist` resources in kube-addon-manager.
  - Update kubectl to v1.10.7.
