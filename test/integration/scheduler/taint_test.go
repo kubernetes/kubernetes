@@ -99,6 +99,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 
 	// Start NodeLifecycleController for taint.
 	nc, err := nodelifecycle.NewNodeLifecycleController(
+		informers.Coordination().V1beta1().Leases(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Extensions().V1beta1().DaemonSets(),
