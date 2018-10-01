@@ -148,7 +148,9 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		blockDeviceMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mountOptions:       util.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -288,6 +290,7 @@ type cinderVolumeMounter struct {
 	fsType             string
 	readOnly           bool
 	blockDeviceMounter *mount.SafeFormatAndMount
+	mountOptions       []string
 }
 
 // cinderPersistentDisk volumes are disk resources provided by C3
@@ -358,8 +361,9 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	mountOptions := util.JoinMountOptions(options, b.mountOptions)
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, options)
+	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, mountOptions)
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		glog.V(4).Infof("Mount failed: %v", err)
