@@ -241,6 +241,56 @@ func TestPlugin(t *testing.T) {
 	}
 }
 
+func TestMountOptions(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("gcepdTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pvA",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
+			},
+			ClaimRef: &v1.ObjectReference{
+				Name: "claimA",
+			},
+			MountOptions: []string{"_netdev"},
+		},
+	}
+
+	fakeManager := &fakePDManager{}
+	fakeMounter := &mount.FakeMounter{}
+
+	mounter, err := plug.(*gcePersistentDiskPlugin).newMounterInternal(volume.NewSpecFromPersistentVolume(pv, false), types.UID("poduid"), fakeManager, fakeMounter)
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	if err := mounter.SetUp(nil); err != nil {
+		t.Errorf("Expected success, got: %v", err)
+	}
+	mountOptions := fakeMounter.MountPoints[0].Opts
+	expectedMountOptions := []string{"_netdev", "bind"}
+	if !reflect.DeepEqual(mountOptions, expectedMountOptions) {
+		t.Errorf("Expected mount options to be %v got %v", expectedMountOptions, mountOptions)
+	}
+}
+
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
