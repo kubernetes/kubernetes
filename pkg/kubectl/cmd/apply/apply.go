@@ -389,12 +389,13 @@ func (o *ApplyOptions) Run() error {
 					return cmdutil.AddSourceToErr("creating", info.Source, err)
 				}
 				info.Refresh(obj, true)
-				metadata, err := meta.Accessor(info.Object)
-				if err != nil {
-					return err
-				}
-				visitedUids.Insert(string(metadata.GetUID()))
 			}
+
+			metadata, err := meta.Accessor(info.Object)
+			if err != nil {
+				return err
+			}
+			visitedUids.Insert(string(metadata.GetUID()))
 
 			count++
 
@@ -410,12 +411,13 @@ func (o *ApplyOptions) Run() error {
 			return printer.PrintObj(info.Object, o.Out)
 		}
 
-		if !o.DryRun {
-			metadata, err := meta.Accessor(info.Object)
-			if err != nil {
-				return err
-			}
+		metadata, err := meta.Accessor(info.Object)
+		if err != nil {
+			return err
+		}
+		visitedUids.Insert(string(metadata.GetUID()))
 
+		if !o.DryRun {
 			annotationMap := metadata.GetAnnotations()
 			if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
@@ -442,8 +444,6 @@ func (o *ApplyOptions) Run() error {
 			}
 
 			info.Refresh(patchedObject, true)
-
-			visitedUids.Insert(string(metadata.GetUID()))
 
 			if string(patchBytes) == "{}" && !printObject {
 				count++
