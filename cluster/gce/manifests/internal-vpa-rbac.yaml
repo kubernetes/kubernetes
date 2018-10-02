@@ -42,7 +42,7 @@ rules:
   - update
   - patch
 - apiGroups:
-  - "poc.autoscaling.k8s.io"
+  - "autoscaling.k8s.io"
   resources:
   - verticalpodautoscalers
   verbs:
@@ -59,7 +59,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
 - apiGroups:
-  - "poc.autoscaling.k8s.io"
+  - "autoscaling.k8s.io"
   resources:
   - verticalpodautoscalercheckpoints
   verbs:
@@ -269,7 +269,7 @@ rules:
   - get
   - list
 - apiGroups:
-  - "poc.autoscaling.k8s.io"
+  - "autoscaling.k8s.io"
   resources:
   - verticalpodautoscalers
   verbs:
