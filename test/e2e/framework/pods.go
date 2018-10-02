@@ -244,6 +244,28 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	return ev, err
 }
 
+// WaitForErrorEvent waits for an error event for that pod.
+func (c *PodClient) WaitForErrorEvent(pod *v1.Pod) (*v1.Event, error) {
+	var ev *v1.Event
+	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
+		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(legacyscheme.Scheme, pod)
+		if err != nil {
+			return false, fmt.Errorf("error in listing events: %s", err)
+		}
+		for _, e := range evnts.Items {
+			switch e.Reason {
+			case events.KillingContainer, events.FailedToCreateContainer, sysctl.UnsupportedReason, sysctl.ForbiddenReason:
+				ev = &e
+				return true, nil
+			default:
+				// ignore all other errors
+			}
+		}
+		return false, nil
+	})
+	return ev, err
+}
+
 // MatchContainerOutput gets output of a container and match expected regexp in the output.
 func (c *PodClient) MatchContainerOutput(name string, containerName string, expectedRegexp string) error {
 	f := c.f

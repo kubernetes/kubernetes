@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -371,7 +370,7 @@ func testSubPath(input *subPathTestInput) {
 		// Set volume source to read only
 		input.pod.Spec.Volumes[0].VolumeSource = *input.roVol
 		// Pod should fail
-		testPodFailSubpathError(input.f, input.pod, "")
+		testPodFailSubpathError(input.f, input.pod, "subPath")
 	})
 
 	// TODO: add a test case for the same disk with two partitions
@@ -586,21 +585,13 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
-	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
-	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
 
-	By("Checking for subpath error event")
-	selector := fields.Set{
-		"involvedObject.kind":      "Pod",
-		"involvedObject.name":      pod.Name,
-		"involvedObject.namespace": f.Namespace.Name,
-		"reason":                   "Failed",
-	}.AsSelector().String()
-	options := metav1.ListOptions{FieldSelector: selector}
-	events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
-	Expect(err).NotTo(HaveOccurred(), "while getting pod events")
-	Expect(len(events.Items)).NotTo(Equal(0), "no events found")
-	Expect(events.Items[0].Message).To(ContainSubstring(errorMsg), fmt.Sprintf("%q error not found", errorMsg))
+	By(fmt.Sprintf("Waiting for pod %s to fail to start with an error event", pod.Name))
+	podClient := f.PodClient()
+	event, err := podClient.WaitForErrorEvent(pod)
+	Expect(err).NotTo(HaveOccurred(), "while waiting for pod error event")
+	Expect(event).NotTo(BeNil())
+	Expect(event.Message).To(ContainSubstring(errorMsg), fmt.Sprintf("%q error not found", errorMsg))
 }
 
 // Tests that the existing subpath mount is detected when a container restarts
