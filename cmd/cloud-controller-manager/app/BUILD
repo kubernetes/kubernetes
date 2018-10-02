@@ -15,6 +15,7 @@ go_library(
         "//pkg/controller/service:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/flag:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
