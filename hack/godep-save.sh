@@ -81,6 +81,17 @@ for repo in $(ls staging/src/k8s.io); do
   fi
 done
 
+for file in "README" "LICENSE" "glog.go" "glog_file.go"
+do
+  if [[ -L "vendor/github.com/golang/glog/$file" ]]; then
+    kube::log::status "using forked $file"
+  else
+    kube::log::status "creating symbolic link to forked $file"
+      rm -f "vendor/github.com/golang/glog/$file" || true
+      ln -s "../../../../third_party/forked/glog/$file" "vendor/github.com/golang/glog/$file"
+  fi
+done
+
 # Workaround broken symlink in docker repo because godep copies the link, but
 # not the target
 rm -rf vendor/github.com/docker/docker/project/
