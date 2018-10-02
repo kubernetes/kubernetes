@@ -324,6 +324,12 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 				}
 
 			}
+			addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsUncertain(
+				v1.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+			if addVolumeNodeErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return volumeToAttach.GenerateError("AttachVolume.MarkVolumeAsUncertain failed", addVolumeNodeErr)
+			}
 			// On failure, return error. Caller will log and retry.
 			return volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
 		}
