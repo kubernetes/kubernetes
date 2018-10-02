@@ -293,6 +293,13 @@ func (fAPC *fakeAzurePIPClient) List(resourceGroupName string) (result network.P
 	return result, nil
 }
 
+func (fAPC *fakeAzurePIPClient) setFakeStore(store map[string]map[string]network.PublicIPAddress) {
+	fAPC.mutex.Lock()
+	defer fAPC.mutex.Unlock()
+
+	fAPC.FakeStore = store
+}
+
 type fakeAzureInterfacesClient struct {
 	mutex     *sync.Mutex
 	FakeStore map[string]map[string]network.Interface
@@ -347,7 +354,24 @@ func (fIC *fakeAzureInterfacesClient) Get(resourceGroupName string, networkInter
 }
 
 func (fIC *fakeAzureInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, expand string) (result network.Interface, err error) {
-	return result, nil
+	fIC.mutex.Lock()
+	defer fIC.mutex.Unlock()
+	if _, ok := fIC.FakeStore[resourceGroupName]; ok {
+		if entity, ok := fIC.FakeStore[resourceGroupName][networkInterfaceName]; ok {
+			return entity, nil
+		}
+	}
+	return result, autorest.DetailedError{
+		StatusCode: http.StatusNotFound,
+		Message:    "Not such Interface",
+	}
+}
+
+func (fIC *fakeAzureInterfacesClient) setFakeStore(store map[string]map[string]network.Interface) {
+	fIC.mutex.Lock()
+	defer fIC.mutex.Unlock()
+
+	fIC.FakeStore = store
 }
 
 type fakeAzureVirtualMachinesClient struct {
