@@ -34,10 +34,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -56,7 +57,7 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
-var busyboxImage = "busybox"
+var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.

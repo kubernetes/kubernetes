@@ -63,7 +63,7 @@ var (
 		`+cmdutil.AlphaDisclaimer), kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, kubeadmconstants.GetStaticPodDirectory()))
 )
 
-// NewCmdControlplane return main command for Controlplane phase
+// NewCmdControlplane returns main command for Controlplane phase
 func NewCmdControlplane() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "controlplane",
@@ -143,8 +143,8 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 		cmd.Flags().StringVar(&cfg.KubernetesVersion, "kubernetes-version", cfg.KubernetesVersion, `Choose a specific Kubernetes version for the control plane`)
 
 		if properties.use == "all" || properties.use == "apiserver" {
-			cmd.Flags().StringVar(&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress, "The IP address of the API server is accessible on")
-			cmd.Flags().Int32Var(&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort, "The port the API server is accessible on")
+			cmd.Flags().StringVar(&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress, "The IP address of the API server is accessible on")
+			cmd.Flags().Int32Var(&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort, "The port the API server is accessible on")
 			cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "The range of IP address used for service VIPs")
 			cmd.Flags().StringVar(&featureGatesString, "feature-gates", featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 				"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
@@ -187,6 +187,8 @@ func runCmdControlPlane(cmdFunc func(outDir string, cfg *kubeadmapi.InitConfigur
 
 		// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
+		kubeadmutil.CheckErr(err)
+		err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
 		kubeadmutil.CheckErr(err)
 
 		if err := features.ValidateVersion(features.InitFeatureGates, internalcfg.FeatureGates, internalcfg.KubernetesVersion); err != nil {

@@ -32,10 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
@@ -430,7 +430,7 @@ func kubeletConfigCWDPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get current working directory: %v", err)
 	}
-	// DO NOT name this file "kubelet" - you will overwrite the the kubelet binary and be very confused :)
+	// DO NOT name this file "kubelet" - you will overwrite the kubelet binary and be very confused :)
 	return filepath.Join(cwd, "kubelet-config"), nil
 }
 

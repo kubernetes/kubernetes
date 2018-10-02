@@ -362,6 +362,56 @@ func TestPlugin(t *testing.T) {
 	}
 }
 
+func TestInvalidPathSecret(t *testing.T) {
+	var (
+		testPodUID     = types.UID("test_pod_uid")
+		testVolumeName = "test_volume_name"
+		testNamespace  = "test_secret_namespace"
+		testName       = "test_secret_name"
+
+		volumeSpec    = volumeSpec(testVolumeName, testName, 0644)
+		secret        = secret(testNamespace, testName)
+		client        = fake.NewSimpleClientset(&secret)
+		pluginMgr     = volume.VolumePluginMgr{}
+		rootDir, host = newTestHost(t, client)
+	)
+	volumeSpec.Secret.Items = []v1.KeyToPath{
+		{Key: "missing", Path: "missing"},
+	}
+
+	defer os.RemoveAll(rootDir)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
+
+	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
+	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
+	}
+
+	volumePath := mounter.GetPath()
+	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name")) {
+		t.Errorf("Got unexpected path: %s", volumePath)
+	}
+
+	err = mounter.SetUp(nil)
+	if err == nil {
+		t.Errorf("Expected error while setting up secret")
+	}
+
+	_, err = os.Stat(volumePath)
+	if err == nil {
+		t.Errorf("Expected path %s to not exist", volumePath)
+	}
+}
+
 // Test the case where the plugin's ready file exists, but the volume dir is not a
 // mountpoint, which is the state the system will be in after reboot.  The dir
 // should be mounter and the secret data written to it.

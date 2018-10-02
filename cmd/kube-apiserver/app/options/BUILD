@@ -25,8 +25,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver/scheme:go_default_library",
-        "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
 

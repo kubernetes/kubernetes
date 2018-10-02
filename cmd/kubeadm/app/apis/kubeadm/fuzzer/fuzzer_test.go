@@ -16,10 +16,15 @@ limitations under the License.
 
 package fuzzer
 
+// TODO: Fuzzing rouudtrip tests are currently disabled in the v1.12 cycle due to the
+// v1alpha2 -> v1alpha3 migration. As the ComponentConfigs were embedded in the structs
+// earlier now have moved out it's not possible to do a lossless roundtrip "the normal way"
+// When we support v1alpha3 and higher only, we can reenable this
+
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 )
 

@@ -117,7 +117,7 @@ run_kubectl_old_print_tests() {
 __EOF__
 
   # Post-Condition: assertion object exists
-  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{$id_field}}:{{end}}" 'foos.company.com:'
+  kube::test::get_object_assert customresourcedefinitions "{{range.items}}{{if eq $id_field \\\"foos.company.com\\\"}}{{$id_field}}:{{end}}{{end}}" 'foos.company.com:'
 
   # Test that we can list this new CustomResource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" ''

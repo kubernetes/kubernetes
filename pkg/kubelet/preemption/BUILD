@@ -13,7 +13,6 @@ go_library(
     deps = [
         "//pkg/api/v1/resource:go_default_library",
         "//pkg/apis/core/v1/helper/qos:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/eviction:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
@@ -22,7 +21,6 @@ go_library(
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
@@ -47,10 +45,12 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/scheduling:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
     ],
 )

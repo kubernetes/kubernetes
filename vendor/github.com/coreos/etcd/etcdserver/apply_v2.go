@@ -105,10 +105,12 @@ func (a *applierV2store) Sync(r *pb.Request) Response {
 	return Response{}
 }
 
-// applyV2Request interprets r as a call to store.X and returns a Response interpreted
-// from store.Event
+// applyV2Request interprets r as a call to v2store.X
+// and returns a Response interpreted from v2store.Event
 func (s *EtcdServer) applyV2Request(r *pb.Request) Response {
+	defer warnOfExpensiveRequest(time.Now(), r, nil, nil)
 	toTTLOptions(r)
+
 	switch r.Method {
 	case "POST":
 		return s.applyV2.Post(r)

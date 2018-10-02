@@ -40,6 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -526,7 +527,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 		if numContainers > 1 {
 			containers[i].Name = fmt.Sprintf("mycontainer%v", i+1)
 		}
-		containers[i].Image = "busybox"
+		containers[i].Image = imageutils.GetE2EImage(imageutils.BusyBox)
 		containers[i].Command = []string{"sleep", "6000"}
 		containers[i].VolumeMounts = make([]v1.VolumeMount, len(diskNames))
 		for k := range diskNames {

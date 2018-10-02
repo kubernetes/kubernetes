@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"math"
+
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,6 +111,12 @@ func SetDefaults_Deployment(obj *extensionsv1beta1.Deployment) {
 			maxSurge := intstr.FromInt(1)
 			strategy.RollingUpdate.MaxSurge = &maxSurge
 		}
+	}
+	// Set extensionsv1beta1.DeploymentSpec.ProgressDeadlineSeconds to MaxInt,
+	// which has the same meaning as unset.
+	if obj.Spec.ProgressDeadlineSeconds == nil {
+		obj.Spec.ProgressDeadlineSeconds = new(int32)
+		*obj.Spec.ProgressDeadlineSeconds = math.MaxInt32
 	}
 }
 

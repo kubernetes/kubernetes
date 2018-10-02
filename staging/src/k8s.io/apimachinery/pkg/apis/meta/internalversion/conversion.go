@@ -17,11 +17,8 @@ limitations under the License.
 package internalversion
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func Convert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, out *metav1.ListOptions, s conversion.Scope) error {
@@ -54,24 +51,4 @@ func Convert_v1_ListOptions_To_internalversion_ListOptions(in *metav1.ListOption
 	out.Limit = in.Limit
 	out.Continue = in.Continue
 	return nil
-}
-
-func Convert_map_to_v1_LabelSelector(in *map[string]string, out *metav1.LabelSelector, s conversion.Scope) error {
-	if in == nil {
-		return nil
-	}
-	out = new(metav1.LabelSelector)
-	for labelKey, labelValue := range *in {
-		metav1.AddLabelToSelector(out, labelKey, labelValue)
-	}
-	return nil
-}
-
-func Convert_v1_LabelSelector_to_map(in *metav1.LabelSelector, out *map[string]string, s conversion.Scope) error {
-	var err error
-	*out, err = metav1.LabelSelectorAsMap(in)
-	if err != nil {
-		err = field.Invalid(field.NewPath("labelSelector"), *in, fmt.Sprintf("cannot convert to old selector: %v", err))
-	}
-	return err
 }

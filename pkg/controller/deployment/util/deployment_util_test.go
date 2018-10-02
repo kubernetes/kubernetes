@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -150,6 +151,7 @@ func randomUID() types.UID {
 func generateDeployment(image string) apps.Deployment {
 	podLabels := map[string]string{"name": image}
 	terminationSec := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	return apps.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        image,
@@ -175,6 +177,7 @@ func generateDeployment(image string) apps.Deployment {
 					TerminationGracePeriodSeconds: &terminationSec,
 					RestartPolicy:                 v1.RestartPolicyAlways,
 					SecurityContext:               &v1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
 				},
 			},
 		},
@@ -617,52 +620,83 @@ func TestGetReplicaCountForReplicaSets(t *testing.T) {
 
 func TestResolveFenceposts(t *testing.T) {
 	tests := []struct {
-		maxSurge          string
-		maxUnavailable    string
+		maxSurge          *string
+		maxUnavailable    *string
 		desired           int32
 		expectSurge       int32
 		expectUnavailable int32
 		expectError       bool
 	}{
 		{
-			maxSurge:          "0%",
-			maxUnavailable:    "0%",
+			maxSurge:          newString("0%"),
+			maxUnavailable:    newString("0%"),
 			desired:           0,
 			expectSurge:       0,
 			expectUnavailable: 1,
 			expectError:       false,
 		},
 		{
-			maxSurge:          "39%",
-			maxUnavailable:    "39%",
+			maxSurge:          newString("39%"),
+			maxUnavailable:    newString("39%"),
 			desired:           10,
 			expectSurge:       4,
 			expectUnavailable: 3,
 			expectError:       false,
 		},
 		{
-			maxSurge:          "oops",
-			maxUnavailable:    "39%",
+			maxSurge:          newString("oops"),
+			maxUnavailable:    newString("39%"),
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
 			expectError:       true,
 		},
 		{
-			maxSurge:          "55%",
-			maxUnavailable:    "urg",
+			maxSurge:          newString("55%"),
+			maxUnavailable:    newString("urg"),
 			desired:           10,
 			expectSurge:       0,
 			expectUnavailable: 0,
 			expectError:       true,
 		},
+		{
+			maxSurge:          nil,
+			maxUnavailable:    newString("39%"),
+			desired:           10,
+			expectSurge:       0,
+			expectUnavailable: 3,
+			expectError:       false,
+		},
+		{
+			maxSurge:          newString("39%"),
+			maxUnavailable:    nil,
+			desired:           10,
+			expectSurge:       4,
+			expectUnavailable: 0,
+			expectError:       false,
+		},
+		{
+			maxSurge:          nil,
+			maxUnavailable:    nil,
+			desired:           10,
+			expectSurge:       0,
+			expectUnavailable: 1,
+			expectError:       false,
+		},
 	}
 
 	for num, test := range tests {
-		t.Run("maxSurge="+test.maxSurge, func(t *testing.T) {
-			maxSurge := intstr.FromString(test.maxSurge)
-			maxUnavail := intstr.FromString(test.maxUnavailable)
-			surge, unavail, err := ResolveFenceposts(&maxSurge, &maxUnavail, test.desired)
+		t.Run(fmt.Sprintf("%d", num), func(t *testing.T) {
+			var maxSurge, maxUnavail *intstr.IntOrString
+			if test.maxSurge != nil {
+				surge := intstr.FromString(*test.maxSurge)
+				maxSurge = &surge
+			}
+			if test.maxUnavailable != nil {
+				unavail := intstr.FromString(*test.maxUnavailable)
+				maxUnavail = &unavail
+			}
+			surge, unavail, err := ResolveFenceposts(maxSurge, maxUnavail, test.desired)
 			if err != nil && !test.expectError {
 				t.Errorf("unexpected error %v", err)
 			}
@@ -674,6 +708,10 @@ func TestResolveFenceposts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newString(s string) *string {
+	return &s
 }
 
 func TestNewRSNewReplicas(t *testing.T) {
@@ -1068,8 +1106,9 @@ func TestDeploymentProgressing(t *testing.T) {
 
 func TestDeploymentTimedOut(t *testing.T) {
 	var (
-		null *int32
-		ten  = int32(10)
+		null     *int32
+		ten      = int32(10)
+		infinite = int32(math.MaxInt32)
 	)
 
 	timeFn := func(min, sec int) time.Time {
@@ -1102,9 +1141,16 @@ func TestDeploymentTimedOut(t *testing.T) {
 		expected bool
 	}{
 		{
-			name: "no progressDeadlineSeconds specified - no timeout",
+			name: "nil progressDeadlineSeconds specified - no timeout",
 
 			d:        deployment(apps.DeploymentProgressing, v1.ConditionTrue, "", null, timeFn(1, 9)),
+			nowFn:    func() time.Time { return timeFn(1, 20) },
+			expected: false,
+		},
+		{
+			name: "infinite progressDeadlineSeconds specified - no timeout",
+
+			d:        deployment(apps.DeploymentProgressing, v1.ConditionTrue, "", &infinite, timeFn(1, 9)),
 			nowFn:    func() time.Time { return timeFn(1, 20) },
 			expected: false,
 		},

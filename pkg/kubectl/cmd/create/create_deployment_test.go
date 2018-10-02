@@ -24,13 +24,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func Test_generatorFromName(t *testing.T) {
@@ -92,7 +92,7 @@ func TestCreateDeployment(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
+	ns := scheme.Codecs
 	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -122,7 +122,7 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
-	ns := legacyscheme.Codecs
+	ns := scheme.Codecs
 	fakeDiscovery := "{\"kind\":\"APIResourceList\",\"apiVersion\":\"v1\",\"groupVersion\":\"apps/v1\",\"resources\":[{\"name\":\"deployments\",\"singularName\":\"\",\"namespaced\":true,\"kind\":\"Deployment\",\"verbs\":[\"create\",\"delete\",\"deletecollection\",\"get\",\"list\",\"patch\",\"update\",\"watch\"],\"shortNames\":[\"deploy\"],\"categories\":[\"all\"]}]}"
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -140,7 +140,7 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	cmd.Flags().Set("output", "name")
 	options := &DeploymentOpts{
 		CreateSubcommandOptions: &CreateSubcommandOptions{
-			PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+			PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 			DryRun:     true,
 			IOStreams:  ioStreams,
 		},

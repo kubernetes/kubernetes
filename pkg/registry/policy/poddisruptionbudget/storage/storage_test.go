@@ -78,7 +78,7 @@ func TestStatusUpdate(t *testing.T) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/poddisruptionbudgets/" + metav1.NamespaceDefault + "/foo"
 	validPodDisruptionBudget := validNewPodDisruptionBudget()
-	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {
+	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

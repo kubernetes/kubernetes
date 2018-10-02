@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -18,6 +12,7 @@ go_library(
         "services.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/master",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/admission/install:go_default_library",
         "//pkg/apis/admissionregistration/install:go_default_library",
@@ -27,7 +22,6 @@ go_library(
         "//pkg/apis/autoscaling/install:go_default_library",
         "//pkg/apis/batch/install:go_default_library",
         "//pkg/apis/certificates/install:go_default_library",
-        "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/coordination/install:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
@@ -41,6 +35,8 @@ go_library(
         "//pkg/apis/settings/install:go_default_library",
         "//pkg/apis/storage/install:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
@@ -82,6 +78,7 @@ go_library(
         "//staging/src/k8s.io/api/authorization/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta1:go_default_library",
+        "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",
@@ -113,6 +110,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend/factory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -197,4 +195,5 @@ filegroup(
         "//pkg/master/tunneler:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

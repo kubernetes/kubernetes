@@ -33,7 +33,8 @@
 		{
 			"SelectorRegexp": "k8s[.]io/utils",
 			"AllowedPrefixes": [
-				"k8s.io/utils/exec"
+				"k8s.io/utils/exec",
+				"k8s.io/utils/pointer"
 			]
 		},
 		{
@@ -111,7 +112,7 @@
 				"k8s.io/kubernetes/pkg/master/reconcilers",
 				"k8s.io/kubernetes/pkg/printers",
 				"k8s.io/kubernetes/pkg/printers/internalversion",
-				"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig",
+				"k8s.io/kubernetes/pkg/proxy/apis/config",
 				"k8s.io/kubernetes/pkg/registry/core/endpoint",
 				"k8s.io/kubernetes/pkg/registry/core/service/allocator",
 				"k8s.io/kubernetes/pkg/registry/core/service/ipallocator",
@@ -135,11 +136,9 @@
 				"k8s.io/kubernetes/pkg/util/normalizer",
 				"k8s.io/kubernetes/pkg/util/nsenter",
 				"k8s.io/kubernetes/pkg/util/parsers",
-				"k8s.io/kubernetes/pkg/util/pointer",
 				"k8s.io/kubernetes/pkg/util/procfs",
 				"k8s.io/kubernetes/pkg/util/slice",
 				"k8s.io/kubernetes/pkg/util/taints",
-				"k8s.io/kubernetes/pkg/util/version",
 				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/version",
 				"k8s.io/kubernetes/pkg/volume",

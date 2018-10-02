@@ -22,11 +22,40 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
 )
 
 type mockOsIOHandler struct{}
+
+func (handler *mockOsIOHandler) ReadFile(filename string) ([]byte, error) {
+	portPattern := regexp.MustCompile("^/sys/class/iscsi_host/(host\\d)/device/session\\d/connection\\d:0/iscsi_connection/connection\\d:0/(?:persistent_)?port$")
+	if portPattern.MatchString(filename) {
+		return []byte("3260"), nil
+	}
+	addressPattern := regexp.MustCompile("^/sys/class/iscsi_host/(host\\d)/device/session\\d/connection\\d:0/iscsi_connection/connection\\d:0/(?:persistent_)?address$")
+	matches := addressPattern.FindStringSubmatch(filename)
+	if nil != matches {
+		switch matches[1] {
+		case "host2":
+			return []byte("10.0.0.1"), nil
+		case "host3":
+			return []byte("10.0.0.2"), nil
+		}
+	}
+	targetNamePattern := regexp.MustCompile("^/sys/class/iscsi_host/(host\\d)/device/session\\d/iscsi_session/session\\d/targetname$")
+	matches = targetNamePattern.FindStringSubmatch(filename)
+	if nil != matches {
+		switch matches[1] {
+		case "host2":
+			return []byte("target1"), nil
+		case "host3":
+			return []byte("target2"), nil
+		}
+	}
+	return nil, errors.New("Not Implemented for Mock")
+}
 
 func (handler *mockOsIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 	switch dirname {
@@ -46,14 +75,81 @@ func (handler *mockOsIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
 			name: "dm-1",
 		}
 		return []os.FileInfo{f1, f2}, nil
+	case "/sys/class/iscsi_host":
+		f1 := &fakeFileInfo{
+			name: "host2",
+		}
+		f2 := &fakeFileInfo{
+			name: "host3",
+		}
+		f3 := &fakeFileInfo{
+			name: "ignore",
+		}
+		return []os.FileInfo{f1, f2, f3}, nil
+	case "/sys/class/iscsi_host/host2/device":
+		f1 := &fakeFileInfo{
+			name: "session1",
+		}
+		f2 := &fakeFileInfo{
+			name: "ignore",
+		}
+		return []os.FileInfo{f1, f2}, nil
+	case "/sys/class/iscsi_host/host3/device":
+		f1 := &fakeFileInfo{
+			name: "session2",
+		}
+		f2 := &fakeFileInfo{
+			name: "ignore",
+		}
+		return []os.FileInfo{f1, f2}, nil
+	case "/sys/class/iscsi_host/host2/device/session1":
+		f1 := &fakeFileInfo{
+			name: "connection1:0",
+		}
+		f2 := &fakeFileInfo{
+			name: "ignore",
+		}
+		return []os.FileInfo{f1, f2}, nil
+	case "/sys/class/iscsi_host/host3/device/session2":
+		f1 := &fakeFileInfo{
+			name: "connection2:0",
+		}
+		f2 := &fakeFileInfo{
+			name: "ignore",
+		}
+		return []os.FileInfo{f1, f2}, nil
+	case "/sys/class/iscsi_host/host2/device/session1/target2:0:0/2:0:0:1/block":
+		f1 := &fakeFileInfo{
+			name: "sda",
+		}
+		return []os.FileInfo{f1}, nil
+	case "/sys/class/iscsi_host/host2/device/session1/target2:0:0/2:0:0:2/block":
+		f1 := &fakeFileInfo{
+			name: "sdc",
+		}
+		return []os.FileInfo{f1}, nil
+	case "/sys/class/iscsi_host/host3/device/session2/target3:0:0/3:0:0:1/block":
+		f1 := &fakeFileInfo{
+			name: "sdb",
+		}
+		return []os.FileInfo{f1}, nil
+	case "/sys/class/iscsi_host/host3/device/session2/target3:0:0/3:0:0:2/block":
+		f1 := &fakeFileInfo{
+			name: "sdd",
+		}
+		return []os.FileInfo{f1}, nil
 	}
-	return nil, nil
+	return nil, errors.New("Not Implemented for Mock")
 }
 
 func (handler *mockOsIOHandler) Lstat(name string) (os.FileInfo, error) {
 	links := map[string]string{
 		"/sys/block/dm-1/slaves/sda": "sda",
 		"/dev/sda":                   "sda",
+		"/sys/class/iscsi_host/host2/device/session1/target2:0:0/2:0:0:1": "2:0:0:1",
+		"/sys/class/iscsi_host/host2/device/session1/target2:0:0/2:0:0:2": "2:0:0:2",
+		"/sys/class/iscsi_host/host3/device/session2/target3:0:0/3:0:0:1": "3:0:0:1",
+		"/sys/class/iscsi_host/host3/device/session2/target3:0:0/3:0:0:2": "3:0:0:2",
 	}
 	if dev, ok := links[name]; ok {
 		return &fakeFileInfo{name: dev}, nil
@@ -156,5 +252,39 @@ func TestFindSlaveDevicesOnMultipath(t *testing.T) {
 	dev := mockDeviceUtil.FindSlaveDevicesOnMultipath("/dev/sdc")
 	if len(dev) != 0 {
 		t.Fatalf("mpio device not found '' expected got [%s]", dev)
+	}
+}
+
+func TestGetISCSIPortalHostMapForTarget(t *testing.T) {
+	mockDeviceUtil := NewDeviceHandler(&mockOsIOHandler{})
+	portalHostMap, err := mockDeviceUtil.GetISCSIPortalHostMapForTarget("target1")
+	if nil != err {
+		t.Fatalf("error getting scsi hosts for target: %v", err)
+	}
+	if nil == portalHostMap {
+		t.Fatal("no portal host map returned")
+	}
+	if 1 != len(portalHostMap) {
+		t.Fatalf("wrong number of map entries in portal host map: %d", len(portalHostMap))
+	}
+	if 2 != portalHostMap["10.0.0.1:3260"] {
+		t.Fatalf("incorrect entry in portal host map: %v", portalHostMap)
+	}
+}
+
+func TestFindDevicesForISCSILun(t *testing.T) {
+	mockDeviceUtil := NewDeviceHandler(&mockOsIOHandler{})
+	devices, err := mockDeviceUtil.FindDevicesForISCSILun("target1", 1)
+	if nil != err {
+		t.Fatalf("error getting devices for lun: %v", err)
+	}
+	if nil == devices {
+		t.Fatal("no devices returned")
+	}
+	if 1 != len(devices) {
+		t.Fatalf("wrong number of devices: %d", len(devices))
+	}
+	if "sda" != devices[0] {
+		t.Fatalf("incorrect device %v", devices)
 	}
 }

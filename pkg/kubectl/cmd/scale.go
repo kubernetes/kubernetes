@@ -26,15 +26,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/client-go/kubernetes"
+	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/scalejob"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -84,7 +84,7 @@ type ScaleOptions struct {
 	enforceNamespace             bool
 	args                         []string
 	shortOutput                  bool
-	clientSet                    internalclientset.Interface
+	clientSet                    kubernetes.Interface
 	scaler                       kubectl.Scaler
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	parent                       string
@@ -156,7 +156,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	o.builder = f.NewBuilder()
 	o.args = args
 	o.shortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
-	o.clientSet, err = f.ClientSet()
+	o.clientSet, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -244,7 +244,7 @@ func (o *ScaleOptions) RunScale() error {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			if _, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
+			if _, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, nil); err != nil {
 				glog.V(4).Infof("error recording reason: %v", err)
 			}
 		}

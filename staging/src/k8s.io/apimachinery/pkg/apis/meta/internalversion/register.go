@@ -64,8 +64,8 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		metav1.Convert_string_To_fields_Selector,
 		metav1.Convert_fields_Selector_To_string,
 
-		Convert_map_to_v1_LabelSelector,
-		Convert_v1_LabelSelector_to_map,
+		metav1.Convert_Map_string_To_string_To_v1_LabelSelector,
+		metav1.Convert_v1_LabelSelector_To_Map_string_To_string,
 
 		Convert_internalversion_ListOptions_To_v1_ListOptions,
 		Convert_v1_ListOptions_To_internalversion_ListOptions,

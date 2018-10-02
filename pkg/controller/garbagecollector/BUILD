@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "dump.go",
         "errors.go",
         "garbagecollector.go",
         "graph.go",
@@ -44,12 +45,19 @@ go_library(
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/golang/groupcache/lru:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph/encoding:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph/encoding/dot:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph/simple:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["garbagecollector_test.go"],
+    srcs = [
+        "dump_test.go",
+        "garbagecollector_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
@@ -70,7 +78,10 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph:go_default_library",
+        "//vendor/gonum.org/v1/gonum/graph/simple:go_default_library",
     ],
 )
 

@@ -23,31 +23,30 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1.Node, *v1.Node) {
-	var taintedNode *v1.Node
+func generateNodeAndTaintedNode(oldTaints []corev1.Taint, newTaints []corev1.Taint) (*corev1.Node, *corev1.Node) {
+	var taintedNode *corev1.Node
 
 	// Create a node.
-	node := &v1.Node{
+	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "node-name",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 		},
-		Spec: v1.NodeSpec{
+		Spec: corev1.NodeSpec{
 			Taints: oldTaints,
 		},
-		Status: v1.NodeStatus{},
+		Status: corev1.NodeStatus{},
 	}
 
 	// A copy of the same node, but tainted.
@@ -57,7 +56,7 @@ func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1
 	return node, taintedNode
 }
 
-func equalTaints(taintsA, taintsB []v1.Taint) bool {
+func equalTaints(taintsA, taintsB []corev1.Taint) bool {
 	if len(taintsA) != len(taintsB) {
 		return false
 	}
@@ -80,8 +79,8 @@ func equalTaints(taintsA, taintsB []v1.Taint) bool {
 func TestTaint(t *testing.T) {
 	tests := []struct {
 		description string
-		oldTaints   []v1.Taint
-		newTaints   []v1.Taint
+		oldTaints   []corev1.Taint
+		newTaints   []corev1.Taint
 		args        []string
 		expectFatal bool
 		expectTaint bool
@@ -89,7 +88,7 @@ func TestTaint(t *testing.T) {
 		// success cases
 		{
 			description: "taints a node with effect NoSchedule",
-			newTaints: []v1.Taint{{
+			newTaints: []corev1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
@@ -100,7 +99,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "taints a node with effect PreferNoSchedule",
-			newTaints: []v1.Taint{{
+			newTaints: []corev1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "PreferNoSchedule",
@@ -111,12 +110,12 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "update an existing taint on the node, change the value from bar to barz",
-			oldTaints: []v1.Taint{{
+			oldTaints: []corev1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			newTaints: []v1.Taint{{
+			newTaints: []corev1.Taint{{
 				Key:    "foo",
 				Value:  "barz",
 				Effect: "NoSchedule",
@@ -127,7 +126,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "taints a node with two taints",
-			newTaints: []v1.Taint{{
+			newTaints: []corev1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -142,7 +141,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "node has two taints with the same key but different effect, remove one of them by indicating exact key and effect",
-			oldTaints: []v1.Taint{{
+			oldTaints: []corev1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -151,7 +150,7 @@ func TestTaint(t *testing.T) {
 				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints: []v1.Taint{{
+			newTaints: []corev1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
@@ -162,7 +161,7 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "node has two taints with the same key but different effect, remove all of them with wildcard",
-			oldTaints: []v1.Taint{{
+			oldTaints: []corev1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -171,14 +170,14 @@ func TestTaint(t *testing.T) {
 				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints:   []v1.Taint{},
+			newTaints:   []corev1.Taint{},
 			args:        []string{"node", "node-name", "dedicated-"},
 			expectFatal: false,
 			expectTaint: true,
 		},
 		{
 			description: "node has two taints, update one of them and remove the other",
-			oldTaints: []v1.Taint{{
+			oldTaints: []corev1.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
@@ -187,7 +186,7 @@ func TestTaint(t *testing.T) {
 				Value:  "bar",
 				Effect: "PreferNoSchedule",
 			}},
-			newTaints: []v1.Taint{{
+			newTaints: []corev1.Taint{{
 				Key:    "foo",
 				Value:  "barz",
 				Effect: "PreferNoSchedule",
@@ -218,12 +217,12 @@ func TestTaint(t *testing.T) {
 		},
 		{
 			description: "can't update existing taint on the node, since 'overwrite' flag is not set",
-			oldTaints: []v1.Taint{{
+			oldTaints: []corev1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			newTaints: []v1.Taint{{
+			newTaints: []corev1.Taint{{
 				Key:    "foo",
 				Value:  "bar",
 				Effect: "NoSchedule",
@@ -237,16 +236,17 @@ func TestTaint(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
-			new_node := &v1.Node{}
+			new_node := &corev1.Node{}
 			tainted := false
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
+				GroupVersion:         corev1.SchemeGroupVersion,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
 					switch {
@@ -267,7 +267,7 @@ func TestTaint(t *testing.T) {
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
-						appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &v1.Node{})
+						appliedPatch, err := strategicpatch.StrategicMergePatch(oldJSON, data, &corev1.Node{})
 						if err != nil {
 							t.Fatalf("%s: unexpected error: %v", test.description, err)
 						}
@@ -308,7 +308,10 @@ func TestTaint(t *testing.T) {
 			func() {
 				defer func() {
 					// Recover from the panic below.
-					_ = recover()
+					if r := recover(); r != nil {
+						t.Logf("Recovered: %v", r)
+					}
+
 					// Restore cmdutil behavior
 					cmdutil.DefaultBehaviorOnFatal()
 				}()

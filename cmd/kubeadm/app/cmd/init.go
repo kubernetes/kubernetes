@@ -41,7 +41,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
@@ -93,13 +92,6 @@ var (
 		This error is likely caused by:
 			- The kubelet is not running
 			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-			- No internet connection is available so the kubelet cannot pull or find the following control plane images:
-				- {{ .APIServerImage }}
-				- {{ .ControllerManagerImage }}
-				- {{ .SchedulerImage }}
-{{ .EtcdImage }}
-				- You can check or miligate this in beforehand with "kubeadm config images pull" to make sure the images
-				  are downloaded locally and cached.
 
 		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
 			- 'systemctl status kubelet'
@@ -120,7 +112,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	kubeadmscheme.Scheme.Default(externalcfg)
 
 	var cfgPath string
-	var skipPreFlight bool
 	var skipTokenPrint bool
 	var dryRun bool
 	var featureGatesString string
@@ -141,7 +132,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
 			err = validation.ValidateMixedArguments(cmd.Flags())
@@ -157,7 +148,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), externalcfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
 	bto.AddTokenFlag(cmd.PersistentFlags())
 	bto.AddTTLFlag(cmd.PersistentFlags())
 
@@ -167,11 +158,11 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
 func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
-		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
+		&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. Specify '0.0.0.0' to use the address of the default network interface.",
 	)
 	flagSet.Int32Var(
-		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
+		&cfg.APIEndpoint.BindPort, "apiserver-bind-port", cfg.APIEndpoint.BindPort,
 		"Port for the API Server to bind to.",
 	)
 	flagSet.StringVar(
@@ -211,7 +202,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.InitConfi
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipTokenPrint, dryRun *bool, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
@@ -220,12 +211,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
 		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
 	)
-	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
-	flagSet.BoolVar(
-		skipPreFlight, "skip-preflight-checks", *skipPreFlight,
-		"Skip preflight checks which normally run before modifying the system.",
-	)
-	flagSet.MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
 	// Note: All flags that are not bound to the cfg object should be whitelisted in cmd/kubeadm/app/apis/kubeadm/validation/validation.go
 	flagSet.BoolVar(
 		skipTokenPrint, "skip-token-print", *skipTokenPrint,
@@ -244,6 +229,9 @@ func NewInit(cfgPath string, externalcfg *kubeadmapiv1alpha3.InitConfiguration, 
 	// Either use the config file if specified, or convert the defaults in the external to an internal cfg representation
 	cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, externalcfg)
 	if err != nil {
+		return nil, err
+	}
+	if err := configutil.VerifyAPIServerBindAddress(cfg.APIEndpoint.AdvertiseAddress); err != nil {
 		return nil, err
 	}
 
@@ -398,16 +386,7 @@ func (i *Init) Run(out io.Writer) error {
 
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
-			"Error":                  fmt.Sprintf("%v", err),
-			"APIServerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeAPIServer, i.cfg),
-			"ControllerManagerImage": images.GetKubeControlPlaneImage(kubeadmconstants.KubeControllerManager, i.cfg),
-			"SchedulerImage":         images.GetKubeControlPlaneImage(kubeadmconstants.KubeScheduler, i.cfg),
-		}
-		// Set .EtcdImage conditionally
-		if i.cfg.Etcd.Local != nil {
-			ctx["EtcdImage"] = fmt.Sprintf("				- %s", images.GetEtcdImage(i.cfg))
-		} else {
-			ctx["EtcdImage"] = ""
+			"Error": fmt.Sprintf("%v", err),
 		}
 
 		kubeletFailTempl.Execute(out, ctx)
@@ -623,8 +602,7 @@ func waitForKubeletAndFunc(waiter apiclient.Waiter, f func() error) error {
 
 	go func(errC chan error, waiter apiclient.Waiter) {
 		// This goroutine can only make kubeadm init fail. If this check succeeds, it won't do anything special
-		// TODO: Make 10248 a constant somewhere
-		if err := waiter.WaitForHealthyKubelet(40*time.Second, "http://localhost:10248/healthz"); err != nil {
+		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
 			errC <- err
 		}
 	}(errorChan, waiter)

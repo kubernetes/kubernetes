@@ -37,6 +37,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:all-srcs",
+        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -167,6 +167,127 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 	})
 
+	It("should create metrics for total time taken in volume operations in P/V Controller", func() {
+		var err error
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).ToNot(Equal(nil))
+
+		claims := []*v1.PersistentVolumeClaim{pvc}
+		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForPodRunningInNamespace(c, pod)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+
+		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+		if err != nil {
+			framework.Skipf("Could not get controller-manager metrics - skipping")
+		}
+
+		metricKey := "volume_operation_total_seconds_count"
+		dimensions := []string{"operation_name", "plugin_name"}
+		valid := hasValidMetrics(metrics.Metrics(controllerMetrics), metricKey, dimensions...)
+		Expect(valid).To(BeTrue(), "Invalid metric in P/V Controller metrics: %q", metricKey)
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+	})
+
+	It("should create volume metrics in Volume Manager", func() {
+		var err error
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).ToNot(Equal(nil))
+
+		claims := []*v1.PersistentVolumeClaim{pvc}
+		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForPodRunningInNamespace(c, pod)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+
+		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		kubeMetrics, err := metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Metrics should have dimensions plugin_name and state available
+		totalVolumesKey := "volume_manager_total_volumes"
+		dimensions := []string{"state", "plugin_name"}
+		valid := hasValidMetrics(metrics.Metrics(kubeMetrics), totalVolumesKey, dimensions...)
+		Expect(valid).To(BeTrue(), "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+	})
+
+	It("should create metrics for total number of volumes in A/D Controller", func() {
+		var err error
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).ToNot(Equal(nil))
+
+		claims := []*v1.PersistentVolumeClaim{pvc}
+		pod := framework.MakePod(ns, nil, claims, false, "")
+
+		// Get metrics
+		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+		if err != nil {
+			framework.Skipf("Could not get controller-manager metrics - skipping")
+		}
+
+		// Create pod
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+		err = framework.WaitForPodRunningInNamespace(c, pod)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Get updated metrics
+		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+		if err != nil {
+			framework.Skipf("Could not get controller-manager metrics - skipping")
+		}
+
+		// Forced detach metric should be present
+		forceDetachKey := "attachdetach_controller_forced_detaches"
+		_, ok := updatedControllerMetrics[forceDetachKey]
+		Expect(ok).To(BeTrue(), "Key %q not found in A/D Controller metrics", forceDetachKey)
+
+		// Wait and validate
+		totalVolumesKey := "attachdetach_controller_total_volumes"
+		states := []string{"actual_state_of_world", "desired_state_of_world"}
+		dimensions := []string{"state", "plugin_name"}
+		waitForADControllerStatesMetrics(metricsGrabber, totalVolumesKey, dimensions, states)
+
+		// Total number of volumes in both ActualStateofWorld and DesiredStateOfWorld
+		// states should be higher or equal than it used to be
+		oldStates := getStatesMetrics(totalVolumesKey, metrics.Metrics(controllerMetrics))
+		updatedStates := getStatesMetrics(totalVolumesKey, metrics.Metrics(updatedControllerMetrics))
+		for _, stateName := range states {
+			if _, ok := oldStates[stateName]; !ok {
+				continue
+			}
+			for pluginName, numVolumes := range updatedStates[stateName] {
+				oldNumVolumes := oldStates[stateName][pluginName]
+				Expect(numVolumes).To(BeNumerically(">=", oldNumVolumes),
+					"Wrong number of volumes in state %q, plugin %q: wanted >=%d, got %d",
+					stateName, pluginName, oldNumVolumes, numVolumes)
+			}
+		}
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+	})
+
 	// Test for pv controller metrics, concretely: bound/unbound pv/pvc count.
 	Describe("PVController", func() {
 		const (
@@ -453,4 +574,62 @@ func calculateRelativeValues(originValues, updatedValues map[string]int64) map[s
 		}
 	}
 	return relativeValues
+}
+
+func hasValidMetrics(metrics metrics.Metrics, metricKey string, dimensions ...string) bool {
+	var errCount int
+	framework.Logf("Looking for sample in metric %q", metricKey)
+	samples, ok := metrics[metricKey]
+	if !ok {
+		framework.Logf("Key %q was not found in metrics", metricKey)
+		return false
+	}
+	for _, sample := range samples {
+		framework.Logf("Found sample %q", sample.String())
+		for _, d := range dimensions {
+			if _, ok := sample.Metric[model.LabelName(d)]; !ok {
+				framework.Logf("Error getting dimension %q for metric %q, sample %q", d, metricKey, sample.String())
+				errCount++
+			}
+		}
+	}
+	return errCount == 0
+}
+
+func getStatesMetrics(metricKey string, givenMetrics metrics.Metrics) map[string]map[string]int64 {
+	states := make(map[string]map[string]int64)
+	for _, sample := range givenMetrics[metricKey] {
+		framework.Logf("Found sample %q", sample.String())
+		state := string(sample.Metric["state"])
+		pluginName := string(sample.Metric["plugin_name"])
+		states[state] = map[string]int64{pluginName: int64(sample.Value)}
+	}
+	return states
+}
+
+func waitForADControllerStatesMetrics(metricsGrabber *metrics.MetricsGrabber, metricName string, dimensions []string, stateNames []string) {
+	backoff := wait.Backoff{
+		Duration: 10 * time.Second,
+		Factor:   1.2,
+		Steps:    21,
+	}
+	verifyMetricFunc := func() (bool, error) {
+		updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
+		if err != nil {
+			framework.Skipf("Could not get controller-manager metrics - skipping")
+			return false, err
+		}
+		if !hasValidMetrics(metrics.Metrics(updatedMetrics), metricName, dimensions...) {
+			return false, fmt.Errorf("could not get valid metrics for %q", metricName)
+		}
+		states := getStatesMetrics(metricName, metrics.Metrics(updatedMetrics))
+		for _, name := range stateNames {
+			if _, ok := states[name]; !ok {
+				return false, fmt.Errorf("could not get state %q from A/D Controller metrics", name)
+			}
+		}
+		return true, nil
+	}
+	waitErr := wait.ExponentialBackoff(backoff, verifyMetricFunc)
+	Expect(waitErr).NotTo(HaveOccurred(), "Timeout error fetching A/D controller metrics : %v", waitErr)
 }

@@ -35,13 +35,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_PriorityClass_To_scheduling_PriorityClass,
-		Convert_scheduling_PriorityClass_To_v1beta1_PriorityClass,
-		Convert_v1beta1_PriorityClassList_To_scheduling_PriorityClassList,
-		Convert_scheduling_PriorityClassList_To_v1beta1_PriorityClassList,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.PriorityClass)(nil), (*scheduling.PriorityClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PriorityClass_To_scheduling_PriorityClass(a.(*v1beta1.PriorityClass), b.(*scheduling.PriorityClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PriorityClass)(nil), (*v1beta1.PriorityClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PriorityClass_To_v1beta1_PriorityClass(a.(*scheduling.PriorityClass), b.(*v1beta1.PriorityClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.PriorityClassList)(nil), (*scheduling.PriorityClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PriorityClassList_To_scheduling_PriorityClassList(a.(*v1beta1.PriorityClassList), b.(*scheduling.PriorityClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PriorityClassList)(nil), (*v1beta1.PriorityClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PriorityClassList_To_v1beta1_PriorityClassList(a.(*scheduling.PriorityClassList), b.(*v1beta1.PriorityClassList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_PriorityClass_To_scheduling_PriorityClass(in *v1beta1.PriorityClass, out *scheduling.PriorityClass, s conversion.Scope) error {

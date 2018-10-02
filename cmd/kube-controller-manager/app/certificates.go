@@ -26,6 +26,8 @@ import (
 
 	"github.com/golang/glog"
 
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
@@ -33,12 +35,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 )
 
-func startCSRSigningController(ctx ControllerContext) (bool, error) {
+func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
-		return false, nil
+		return nil, false, nil
 	}
 	if ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == "" {
-		return false, nil
+		return nil, false, nil
 	}
 
 	// Deprecation warning for old defaults.
@@ -72,7 +74,7 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 		// setting up the signing controller. This isn't
 		// actually a problem since the signer is not a
 		// required controller.
-		return false, nil
+		return nil, false, nil
 	default:
 		// Note that '!filesExist && !usesDefaults' is obviously
 		// operator error. We don't handle this case here and instead
@@ -89,16 +91,16 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 		ctx.ComponentConfig.CSRSigningController.ClusterSigningDuration.Duration,
 	)
 	if err != nil {
-		return false, fmt.Errorf("failed to start certificate controller: %v", err)
+		return nil, false, fmt.Errorf("failed to start certificate controller: %v", err)
 	}
 	go signer.Run(1, ctx.Stop)
 
-	return true, nil
+	return nil, true, nil
 }
 
-func startCSRApprovingController(ctx ControllerContext) (bool, error) {
+func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"}] {
-		return false, nil
+		return nil, false, nil
 	}
 
 	approver := approver.NewCSRApprovingController(
@@ -107,14 +109,14 @@ func startCSRApprovingController(ctx ControllerContext) (bool, error) {
 	)
 	go approver.Run(1, ctx.Stop)
 
-	return true, nil
+	return nil, true, nil
 }
 
-func startCSRCleanerController(ctx ControllerContext) (bool, error) {
+func startCSRCleanerController(ctx ControllerContext) (http.Handler, bool, error) {
 	cleaner := cleaner.NewCSRCleanerController(
 		ctx.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1beta1().CertificateSigningRequests(),
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 	)
 	go cleaner.Run(1, ctx.Stop)
-	return true, nil
+	return nil, true, nil
 }

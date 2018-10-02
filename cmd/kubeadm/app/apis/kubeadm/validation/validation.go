@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -41,16 +42,24 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// ValidateInitConfiguration validates master configuration and collects all encountered errors
+// ValidateInitConfiguration validates an InitConfiguration object and collects all encountered errors
 func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
+	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
+	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
+	return allErrs
+}
+
+// ValidateClusterConfiguration validates an ClusterConfiguration object and collects all encountered errors
+func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
-	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
-	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
-	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
+	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
 	return allErrs
@@ -61,6 +70,7 @@ func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(c)...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
@@ -89,9 +99,13 @@ func ValidateDiscovery(c *kubeadm.JoinConfiguration) field.ErrorList {
 	}
 	if len(c.DiscoveryFile) != 0 {
 		allErrs = append(allErrs, ValidateDiscoveryFile(c.DiscoveryFile, field.NewPath("discoveryFile"))...)
+		if len(c.TLSBootstrapToken) != 0 {
+			allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, field.NewPath("tlsBootstrapToken"))...)
+		}
+	} else {
+		allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, field.NewPath("tlsBootstrapToken"))...)
 	}
 	allErrs = append(allErrs, ValidateArgSelection(c, field.NewPath("discovery"))...)
-	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, field.NewPath("tlsBootstrapToken"))...)
 	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServer(c.DiscoveryTokenAPIServers, field.NewPath("discoveryTokenAPIServers"))...)
 
 	return allErrs
@@ -304,6 +318,24 @@ func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePort validates port numbers
+func ValidatePort(port int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if _, err := kubeadmutil.ParsePort(strconv.Itoa(int(port))); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, port, "port number is not valid"))
+	}
+	return allErrs
+}
+
+// ValidateHostPort validates host[:port] endpoints
+func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if _, _, err := kubeadmutil.ParseHostPort(endpoint); endpoint != "" && err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, "endpoint is not valid"))
+	}
+	return allErrs
+}
+
 // ValidateIPNetFromString validates network portion of ip address
 func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -348,7 +380,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
-		if f.Name == "config" || f.Name == "ignore-preflight-errors" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" || f.Name == "v" {
+		if f.Name == "config" || f.Name == "ignore-preflight-errors" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" || f.Name == "v" || f.Name == "rootfs" {
 			// "--skip-*" flags or other whitelisted flags can be set with --config
 			return
 		}
@@ -378,28 +410,20 @@ func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) fie
 }
 
 // ValidateAPIEndpoint validates API server's endpoint
-func ValidateAPIEndpoint(c *kubeadm.API, fldPath *field.Path) field.ErrorList {
+func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	endpoint, err := kubeadmutil.GetMasterEndpoint(c)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, err.Error()))
-	}
+	allErrs = append(allErrs, ValidateIPFromString(c.AdvertiseAddress, fldPath.Child("advertiseAddress"))...)
+	allErrs = append(allErrs, ValidatePort(c.BindPort, fldPath.Child("bindPort"))...)
 	return allErrs
 }
 
 // ValidateIgnorePreflightErrors validates duplicates in ignore-preflight-errors flag.
-func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflightChecks bool) (sets.String, error) {
+func ValidateIgnorePreflightErrors(ignorePreflightErrors []string) (sets.String, error) {
 	ignoreErrors := sets.NewString()
 	allErrs := field.ErrorList{}
 
 	for _, item := range ignorePreflightErrors {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
-	}
-
-	// TODO: remove once deprecated flag --skip-preflight-checks is removed.
-	if skipPreflightChecks {
-		ignoreErrors.Insert("all")
 	}
 
 	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {

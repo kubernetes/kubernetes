@@ -1,8 +1,11 @@
 approvers:
 - mikedanese
+- janetkuo
 reviewers:
 - janetkuo
 - lukaszo
 - mikedanese
 - tnozicka
 - k82cn
+labels:
+- sig/apps

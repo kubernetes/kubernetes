@@ -31,6 +31,8 @@ type flexVolumeAttacher struct {
 
 var _ volume.Attacher = &flexVolumeAttacher{}
 
+var _ volume.DeviceMounter = &flexVolumeAttacher{}
+
 // Attach is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
 

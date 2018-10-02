@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 
 	"github.com/golang/glog"
@@ -114,7 +115,7 @@ type PrometheusCollector struct {
 // ContainerLabelsFunc specifies which base labels will be attached to all
 // exported metrics. If left to nil, the DefaultContainerLabels function
 // will be used instead.
-func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCollector {
+func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetrics container.MetricSet) *PrometheusCollector {
 	if f == nil {
 		f = DefaultContainerLabels
 	}
@@ -134,7 +135,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{value: float64(time.Now().Unix())}}
 				},
-			}, {
+			},
+		},
+	}
+	if includedMetrics.Has(container.CpuUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:      "container_cpu_user_seconds_total",
 				help:      "Cumulative user cpu time consumed in seconds.",
 				valueType: prometheus.CounterValue,
@@ -197,7 +203,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{value: float64(s.Cpu.CFS.ThrottledTime) / float64(time.Second)}}
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.ProcessSchedulerMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:      "container_cpu_schedstat_run_seconds_total",
 				help:      "Time duration the processes of the container have run on the CPU.",
 				valueType: prometheus.CounterValue,
@@ -218,7 +229,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{value: float64(s.Cpu.Schedstat.RunPeriods)}}
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.CpuLoadMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:      "container_cpu_load_average_10s",
 				help:      "Value of container cpu load average over the last 10 seconds.",
 				valueType: prometheus.GaugeValue,
@@ -226,6 +242,40 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					return metricValues{{value: float64(s.Cpu.LoadAverage)}}
 				},
 			}, {
+				name:        "container_tasks_state",
+				help:        "Number of tasks in given state",
+				extraLabels: []string{"state"},
+				valueType:   prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:  float64(s.TaskStats.NrSleeping),
+							labels: []string{"sleeping"},
+						},
+						{
+							value:  float64(s.TaskStats.NrRunning),
+							labels: []string{"running"},
+						},
+						{
+							value:  float64(s.TaskStats.NrStopped),
+							labels: []string{"stopped"},
+						},
+						{
+							value:  float64(s.TaskStats.NrUninterruptible),
+							labels: []string{"uninterruptible"},
+						},
+						{
+							value:  float64(s.TaskStats.NrIoWait),
+							labels: []string{"iowaiting"},
+						},
+					}
+				},
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.MemoryUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:      "container_memory_cache",
 				help:      "Number of bytes of page cache memory.",
 				valueType: prometheus.GaugeValue,
@@ -238,6 +288,13 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType: prometheus.GaugeValue,
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{value: float64(s.Memory.RSS)}}
+				},
+			}, {
+				name:      "container_memory_mapped_file",
+				help:      "Size of memory mapped files in bytes.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Memory.MappedFile)}}
 				},
 			}, {
 				name:      "container_memory_swap",
@@ -300,7 +357,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 						},
 					}
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.AcceleratorUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:        "container_accelerator_memory_total_bytes",
 				help:        "Total accelerator memory.",
 				valueType:   prometheus.GaugeValue,
@@ -345,7 +407,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					}
 					return values
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.DiskUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:        "container_fs_inodes_free",
 				help:        "Number of available Inodes",
 				valueType:   prometheus.GaugeValue,
@@ -385,7 +452,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 						return float64(fs.Usage)
 					})
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.DiskIOMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:        "container_fs_reads_bytes_total",
 				help:        "Cumulative count of bytes read",
 				valueType:   prometheus.CounterValue,
@@ -547,7 +619,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 						return float64(fs.WeightedIoTime) / float64(time.Second)
 					})
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.NetworkUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:        "container_network_receive_bytes_total",
 				help:        "Cumulative count of bytes received",
 				valueType:   prometheus.CounterValue,
@@ -667,7 +744,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					}
 					return values
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.NetworkTcpUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:        "container_network_tcp_usage_total",
 				help:        "tcp connection usage statistic for container",
 				valueType:   prometheus.GaugeValue,
@@ -720,7 +802,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 						},
 					}
 				},
-			}, {
+			},
+		}...)
+	}
+	if includedMetrics.Has(container.NetworkUdpUsageMetrics) {
+		c.containerMetrics = append(c.containerMetrics, []containerMetric{
+			{
 				name:        "container_network_udp_usage_total",
 				help:        "udp connection usage statistic for container",
 				valueType:   prometheus.GaugeValue,
@@ -745,37 +832,8 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 						},
 					}
 				},
-			}, {
-				name:        "container_tasks_state",
-				help:        "Number of tasks in given state",
-				extraLabels: []string{"state"},
-				valueType:   prometheus.GaugeValue,
-				getValues: func(s *info.ContainerStats) metricValues {
-					return metricValues{
-						{
-							value:  float64(s.TaskStats.NrSleeping),
-							labels: []string{"sleeping"},
-						},
-						{
-							value:  float64(s.TaskStats.NrRunning),
-							labels: []string{"running"},
-						},
-						{
-							value:  float64(s.TaskStats.NrStopped),
-							labels: []string{"stopped"},
-						},
-						{
-							value:  float64(s.TaskStats.NrUninterruptible),
-							labels: []string{"uninterruptible"},
-						},
-						{
-							value:  float64(s.TaskStats.NrIoWait),
-							labels: []string{"iowaiting"},
-						},
-					}
-				},
 			},
-		},
+		}...)
 	}
 
 	return c
@@ -842,6 +900,19 @@ func DefaultContainerLabels(container *info.ContainerInfo) map[string]string {
 	return set
 }
 
+// BaseContainerLabels implements ContainerLabelsFunc. It only exports the
+// container name, first alias, and image name.
+func BaseContainerLabels(container *info.ContainerInfo) map[string]string {
+	set := map[string]string{LabelID: container.Name}
+	if len(container.Aliases) > 0 {
+		set[LabelName] = container.Aliases[0]
+	}
+	if image := container.Spec.Image; len(image) > 0 {
+		set[LabelImage] = image
+	}
+	return set
+}
+
 func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
@@ -889,6 +960,9 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 		}
 
 		// Now for the actual metrics
+		if len(container.Stats) == 0 {
+			continue
+		}
 		stats := container.Stats[0]
 		for _, cm := range c.containerMetrics {
 			if cm.condition != nil && !cm.condition(container.Spec) {

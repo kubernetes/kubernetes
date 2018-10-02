@@ -346,6 +346,22 @@ var testCases = []struct {
 		},
 		delCombinedOutputLog: []string{"ipset", "del", "SIX", "80"},
 	},
+	{ // case 7
+		entry: &Entry{
+			IP:       "192.168.1.2",
+			Port:     80,
+			Protocol: ProtocolSCTP,
+			SetType:  HashIPPort,
+		},
+		set: &IPSet{
+			Name: "SETTE",
+		},
+		addCombinedOutputLog: [][]string{
+			{"ipset", "add", "SETTE", "192.168.1.2,sctp:80"},
+			{"ipset", "add", "SETTE", "192.168.1.2,sctp:80", "-exist"},
+		},
+		delCombinedOutputLog: []string{"ipset", "del", "SETTE", "192.168.1.2,sctp:80"},
+	},
 }
 
 func TestAddEntry(t *testing.T) {
@@ -755,6 +771,10 @@ func Test_validateFamily(t *testing.T) {
 			family: "",
 			valid:  false,
 		},
+		{ // case[8]
+			family: "sctp",
+			valid:  false,
+		},
 	}
 	for i := range testCases {
 		valid := validateHashFamily(testCases[i].family)
@@ -803,6 +823,10 @@ func Test_validateProtocol(t *testing.T) {
 		{ // case[7]
 			protocol: "",
 			valid:    false,
+		},
+		{ // case[8]
+			protocol: ProtocolSCTP,
+			valid:    true,
 		},
 	}
 	for i := range testCases {
@@ -901,6 +925,150 @@ func TestValidateIPSet(t *testing.T) {
 		if valid != testCases[i].valid {
 			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
 		}
+	}
+}
+
+func Test_setIPSetDefaults(t *testing.T) {
+	testCases := []struct {
+		name   string
+		set    *IPSet
+		expect *IPSet
+	}{
+		{
+			name: "test all the IPSet fields not present",
+			set: &IPSet{
+				Name: "test1",
+			},
+			expect: &IPSet{
+				Name:       "test1",
+				SetType:    HashIPPort,
+				HashFamily: ProtocolFamilyIPV4,
+				HashSize:   1024,
+				MaxElem:    65536,
+				PortRange:  DefaultPortRange,
+			},
+		},
+		{
+			name: "test all the IPSet fields present",
+			set: &IPSet{
+				Name:       "test2",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    2048,
+				PortRange:  DefaultPortRange,
+			},
+			expect: &IPSet{
+				Name:       "test2",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    2048,
+				PortRange:  DefaultPortRange,
+			},
+		},
+		{
+			name: "test part of the IPSet fields present",
+			set: &IPSet{
+				Name:       "test3",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+			},
+			expect: &IPSet{
+				Name:       "test3",
+				SetType:    BitmapPort,
+				HashFamily: ProtocolFamilyIPV6,
+				HashSize:   65535,
+				MaxElem:    65536,
+				PortRange:  DefaultPortRange,
+			},
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			test.set.setIPSetDefaults()
+			if !reflect.DeepEqual(test.set, test.expect) {
+				t.Errorf("expected ipset struct: %v, got ipset struct: %v", test.expect, test.set)
+			}
+		})
+	}
+}
+
+func Test_checkIPandProtocol(t *testing.T) {
+	testset := &IPSet{
+		Name:       "test1",
+		SetType:    HashIPPort,
+		HashFamily: ProtocolFamilyIPV4,
+		HashSize:   1024,
+		MaxElem:    65536,
+		PortRange:  DefaultPortRange,
+	}
+
+	testCases := []struct {
+		name  string
+		entry *Entry
+		valid bool
+	}{
+		{
+			name: "valid IP with ProtocolTCP",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolTCP,
+				Port:     8080,
+			},
+			valid: true,
+		},
+		{
+			name: "valid IP with ProtocolUDP",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolUDP,
+				Port:     8080,
+			},
+			valid: true,
+		},
+		{
+			name: "valid IP with nil Protocol",
+			entry: &Entry{
+				SetType: HashIPPort,
+				IP:      "1.2.3.4",
+				Port:    8080,
+			},
+			valid: true,
+		},
+		{
+			name: "valid IP with invalid Protocol",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: "invalidProtocol",
+				Port:     8080,
+			},
+			valid: false,
+		},
+		{
+			name: "invalid IP with ProtocolTCP",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.423",
+				Protocol: ProtocolTCP,
+				Port:     8080,
+			},
+			valid: false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.entry.checkIPandProtocol(testset)
+			if result != test.valid {
+				t.Errorf("expected valid: %v, got valid: %v", test.valid, result)
+			}
+		})
 	}
 }
 
@@ -1257,16 +1425,16 @@ func TestValidateEntry(t *testing.T) {
 		},
 		{ // case[19]
 			entry: &Entry{
-				SetType: HashIPPortIP,
-				IP:      "10.20.30.40",
-				Protocol: "SCTP	",
-				Port: 8090,
-				IP2:  "10.20.30.41",
+				SetType:  HashIPPortIP,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolSCTP,
+				Port:     8090,
+				IP2:      "10.20.30.41",
 			},
 			set: &IPSet{
-				Name: "unsupported-protocol",
+				Name: "sctp",
 			},
-			valid: false,
+			valid: true,
 		},
 		{ // case[20]
 			entry: &Entry{
@@ -1406,5 +1574,74 @@ func TestValidateEntry(t *testing.T) {
 		if valid != testCases[i].valid {
 			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].entry)
 		}
+	}
+}
+
+func TestEntryString(t *testing.T) {
+	testCases := []struct {
+		name   string
+		entry  *Entry
+		expect string
+	}{
+		{
+			name: "test when SetType is HashIPPort",
+			entry: &Entry{
+				SetType:  HashIPPort,
+				IP:       "1.2.3.4",
+				Protocol: ProtocolTCP,
+				Port:     8080,
+			},
+			expect: "1.2.3.4,tcp:8080",
+		},
+		{
+			name: "test when SetType is HashIPPortIP",
+			entry: &Entry{
+				SetType:  HashIPPortIP,
+				IP:       "1.2.3.8",
+				Protocol: ProtocolUDP,
+				Port:     8081,
+				IP2:      "1.2.3.8",
+			},
+			expect: "1.2.3.8,udp:8081,1.2.3.8",
+		},
+		{
+			name: "test when SetType is HashIPPortNet",
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "192.168.1.2",
+				Protocol: ProtocolUDP,
+				Port:     80,
+				Net:      "10.0.1.0/24",
+			},
+			expect: "192.168.1.2,udp:80,10.0.1.0/24",
+		},
+		{
+			name: "test when SetType is BitmapPort",
+			entry: &Entry{
+				SetType: BitmapPort,
+				Port:    80,
+			},
+			expect: "80",
+		},
+		{
+			name: "test when SetType is unknown",
+			entry: &Entry{
+				SetType:  "unknown",
+				IP:       "192.168.1.2",
+				Protocol: ProtocolUDP,
+				Port:     80,
+				Net:      "10.0.1.0/24",
+			},
+			expect: "",
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result := test.entry.String()
+			if result != test.expect {
+				t.Errorf("Unexpected mismatch, expected: %s, got: %s", test.expect, result)
+			}
+		})
 	}
 }

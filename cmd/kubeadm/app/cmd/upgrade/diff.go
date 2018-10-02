@@ -25,6 +25,7 @@ import (
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 type diffFlags struct {

@@ -46,7 +46,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	})
 
 	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
-		// CPU tests via deployments
+		// CPU tests via ReplicaSets
 		It(titleUp, func() {
 			scaleUp("rs", common.KindReplicaSet, false, rc, f)
 		})

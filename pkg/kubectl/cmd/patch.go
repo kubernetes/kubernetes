@@ -33,11 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -193,6 +193,7 @@ func (o *PatchOptions) RunPatch() error {
 	r := o.builder.
 		Unstructured().
 		ContinueOnError().
+		LocalParam(o.Local).
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(false, o.args...).
@@ -208,16 +209,18 @@ func (o *PatchOptions) RunPatch() error {
 		if err != nil {
 			return err
 		}
+		count++
 		name, namespace := info.Name, info.Namespace
-		mapping := info.ResourceMapping()
-		client, err := o.unstructuredClientForMapping(mapping)
-		if err != nil {
-			return err
-		}
 
 		if !o.Local && !o.dryRun {
+			mapping := info.ResourceMapping()
+			client, err := o.unstructuredClientForMapping(mapping)
+			if err != nil {
+				return err
+			}
+
 			helper := resource.NewHelper(client, mapping)
-			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
+			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				return err
 			}
@@ -228,41 +231,26 @@ func (o *PatchOptions) RunPatch() error {
 			if mergePatch, err := o.Recorder.MakeRecordMergePatch(patchedObj); err != nil {
 				glog.V(4).Infof("error recording current command: %v", err)
 			} else if len(mergePatch) > 0 {
-				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch); err != nil {
+				if recordedObj, err := helper.Patch(info.Namespace, info.Name, types.MergePatchType, mergePatch, nil); err != nil {
 					glog.V(4).Infof("error recording reason: %v", err)
 				} else {
 					patchedObj = recordedObj
 				}
-			}
-			count++
-
-			// After computing whether we changed data, refresh the resource info with the resulting object
-			if err := info.Refresh(patchedObj, true); err != nil {
-				return err
 			}
 
 			printer, err := o.ToPrinter(patchOperation(didPatch))
 			if err != nil {
 				return err
 			}
-			printer.PrintObj(info.Object, o.Out)
-
-			// if object was not successfully patched, exit with error code 1
-			if !didPatch {
-				return cmdutil.ErrExit
-			}
-
-			return nil
+			return printer.PrintObj(patchedObj, o.Out)
 		}
-
-		count++
 
 		originalObjJS, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
 		if err != nil {
 			return err
 		}
 
-		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, mapping.GroupVersionKind, scheme.Scheme)
+		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, info.Object.GetObjectKind().GroupVersionKind(), scheme.Scheme)
 		if err != nil {
 			return err
 		}
@@ -273,22 +261,11 @@ func (o *PatchOptions) RunPatch() error {
 		}
 
 		didPatch := !reflect.DeepEqual(info.Object, targetObj)
-
-		// TODO: if we ever want to go generic, this allows a clean -o yaml without trying to print columns or anything
-		// rawExtension := &runtime.Unknown{
-		//	Raw: originalPatchedObjJS,
-		// }
-		if didPatch {
-			if err := info.Refresh(targetObj, true); err != nil {
-				return err
-			}
-		}
-
 		printer, err := o.ToPrinter(patchOperation(didPatch))
 		if err != nil {
 			return err
 		}
-		return printer.PrintObj(info.Object, o.Out)
+		return printer.PrintObj(targetObj, o.Out)
 	})
 	if err != nil {
 		return err
@@ -337,5 +314,5 @@ func patchOperation(didPatch bool) string {
 	if didPatch {
 		return "patched"
 	}
-	return "not patched"
+	return "patched (no change)"
 }

@@ -25,20 +25,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -99,13 +98,13 @@ type RollingUpdateOptions struct {
 	EnforceNamespace bool
 
 	ScaleClient scaleclient.ScalesGetter
-	ClientSet   internalclientset.Interface
+	ClientSet   kubernetes.Interface
 	Builder     *resource.Builder
 
 	ShouldValidate bool
 	Validator      func(bool) (validation.Schema, error)
 
-	FindNewName func(*api.ReplicationController) string
+	FindNewName func(*corev1.ReplicationController) string
 
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
@@ -204,7 +203,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	o.ShouldValidate = cmdutil.GetFlagBool(cmd, "validate")
 
 	o.Validator = f.Validator
-	o.FindNewName = func(obj *api.ReplicationController) string {
+	o.FindNewName = func(obj *corev1.ReplicationController) string {
 		return findNewName(args, obj)
 	}
 
@@ -219,7 +218,7 @@ func (o *RollingUpdateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 		return err
 	}
 
-	o.ClientSet, err = f.ClientSet()
+	o.ClientSet, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
@@ -247,9 +246,9 @@ func (o *RollingUpdateOptions) Run() error {
 		filename = o.FilenameOptions.Filenames[0]
 	}
 
-	coreClient := o.ClientSet.Core()
+	coreClient := o.ClientSet.CoreV1()
 
-	var newRc *api.ReplicationController
+	var newRc *corev1.ReplicationController
 	// fetch rc
 	oldRc, err := coreClient.ReplicationControllers(o.Namespace).Get(o.OldName, metav1.GetOptions{})
 	if err != nil {
@@ -291,7 +290,7 @@ func (o *RollingUpdateOptions) Run() error {
 			return fmt.Errorf("please make sure %s exists and is not empty", filename)
 		}
 
-		uncastVersionedObj, err := legacyscheme.Scheme.ConvertToVersion(infos[0].Object, v1.SchemeGroupVersion)
+		uncastVersionedObj, err := scheme.Scheme.ConvertToVersion(infos[0].Object, corev1.SchemeGroupVersion)
 		if err != nil {
 			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
 			return fmt.Errorf("%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
@@ -299,12 +298,7 @@ func (o *RollingUpdateOptions) Run() error {
 		switch t := uncastVersionedObj.(type) {
 		case *v1.ReplicationController:
 			replicasDefaulted = t.Spec.Replicas == nil
-
-			// previous code ignored the error.  Seem like it's very unlikely to fail, so ok for now.
-			uncastObj, err := legacyscheme.Scheme.ConvertToVersion(uncastVersionedObj, api.SchemeGroupVersion)
-			if err == nil {
-				newRc, _ = uncastObj.(*api.ReplicationController)
-			}
+			newRc = t
 		}
 		if newRc == nil {
 			glog.V(4).Infof("Object %T is not a ReplicationController", infos[0].Object)
@@ -316,7 +310,7 @@ func (o *RollingUpdateOptions) Run() error {
 	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
 	// same-image updates.
 	if len(o.Image) != 0 {
-		codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+		codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
 		newName := o.FindNewName(oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
 			return err
@@ -339,7 +333,7 @@ func (o *RollingUpdateOptions) Run() error {
 				if len(o.PullPolicy) == 0 {
 					return fmt.Errorf("--image-pull-policy (Always|Never|IfNotPresent) must be provided when --image is the same as existing container image")
 				}
-				config.PullPolicy = api.PullPolicy(o.PullPolicy)
+				config.PullPolicy = corev1.PullPolicy(o.PullPolicy)
 			}
 			newRc, err = kubectl.CreateNewControllerFromCurrentController(coreClient, codec, config)
 			if err != nil {
@@ -394,7 +388,8 @@ func (o *RollingUpdateOptions) Run() error {
 	}
 	// TODO: handle scales during rolling update
 	if replicasDefaulted {
-		newRc.Spec.Replicas = oldRc.Spec.Replicas
+		t := *oldRc.Spec.Replicas
+		newRc.Spec.Replicas = &t
 	}
 
 	if o.DryRun {
@@ -463,7 +458,7 @@ func (o *RollingUpdateOptions) Run() error {
 	return printer.PrintObj(cmdutil.AsDefaultVersionedOrOriginal(newRc, nil), o.Out)
 }
 
-func findNewName(args []string, oldRc *api.ReplicationController) string {
+func findNewName(args []string, oldRc *corev1.ReplicationController) string {
 	if len(args) >= 2 {
 		return args[1]
 	}

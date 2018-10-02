@@ -14,7 +14,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
@@ -42,7 +42,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

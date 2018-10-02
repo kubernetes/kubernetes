@@ -39,6 +39,7 @@ filegroup(
         "//pkg/apis/autoscaling/install:all-srcs",
         "//pkg/apis/autoscaling/v1:all-srcs",
         "//pkg/apis/autoscaling/v2beta1:all-srcs",
+        "//pkg/apis/autoscaling/v2beta2:all-srcs",
         "//pkg/apis/autoscaling/validation:all-srcs",
     ],
     tags = ["automanaged"],

@@ -22,8 +22,8 @@ import (
 	"path"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 func TestSetupOutputWriterNoOp(t *testing.T) {

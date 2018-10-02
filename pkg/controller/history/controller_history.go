@@ -248,10 +248,18 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 	// Continue to attempt to create the revision updating the name with a new hash on each iteration
 	for {
 		hash := HashControllerRevision(revision, collisionCount)
-		// Update the revisions name and labels
+		// Update the revisions name
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
-		created, err := rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Create(clone)
+		ns := parent.GetNamespace()
+		created, err := rh.client.AppsV1().ControllerRevisions(ns).Create(clone)
 		if errors.IsAlreadyExists(err) {
+			exists, err := rh.client.AppsV1().ControllerRevisions(ns).Get(clone.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			if bytes.Equal(exists.Data.Raw, clone.Data.Raw) {
+				return exists, nil
+			}
 			*collisionCount++
 			continue
 		}

@@ -39,10 +39,10 @@ import (
 
 	"github.com/emicklei/go-restful"
 
+	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	fuzzer "k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -412,7 +412,7 @@ func (obj *SimpleStream) DeepCopyObject() runtime.Object {
 	panic("SimpleStream does not support DeepCopy")
 }
 
-func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
+func (s *SimpleStream) InputStream(_ context.Context, version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
 	s.accept = accept
 	return s, false, s.contentType, s.err
@@ -565,15 +565,6 @@ func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string
 		return s.emptyConnectOptions, true, s.takesPath
 	}
 	return s.emptyConnectOptions, false, ""
-}
-
-type LegacyRESTStorage struct {
-	*SimpleRESTStorage
-}
-
-func (storage LegacyRESTStorage) Delete(ctx context.Context, id string) (runtime.Object, error) {
-	obj, _, err := storage.SimpleRESTStorage.Delete(ctx, id, nil)
-	return obj, err
 }
 
 type MetadataRESTStorage struct {
@@ -3676,10 +3667,12 @@ func TestWriteJSONDecodeError(t *testing.T) {
 		responsewriters.WriteObjectNegotiated(codecs, newGroupVersion, w, req, http.StatusOK, &UnregisteredAPIObject{"Undecodable"})
 	}))
 	defer server.Close()
-	// We send a 200 status code before we encode the object, so we expect OK, but there will
-	// still be an error object.  This seems ok, the alternative is to validate the object before
-	// encoding, but this really should never happen, so it's wasted compute for every API request.
-	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusOK)
+	// Decode error response behavior is dictated by
+	// apiserver/pkg/endpoints/handlers/responsewriters/status.go::ErrorToAPIStatus().
+	// Unless specific metav1.Status() parameters are implemented for the particular error in question, such that
+	// the status code is defined, metav1 errors where error.status == metav1.StatusFailure
+	// will throw a '500 Internal Server Error'. Non-metav1 type errors will always throw a '500 Internal Server Error'.
+	status := expectApiStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}

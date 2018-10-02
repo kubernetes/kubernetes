@@ -24,7 +24,6 @@ package k8s.io.apiextensions_apiserver.pkg.apis.apiextensions.v1beta1;
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -41,14 +40,17 @@ message CustomResourceColumnDefinition {
   // format is an optional OpenAPI type definition for this column. The 'name' format is applied
   // to the primary identifier column to assist in clients identifying column is the resource name.
   // See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.
+  // +optional
   optional string format = 3;
 
   // description is a human readable description of this column.
+  // +optional
   optional string description = 4;
 
   // priority is an integer defining the relative importance of this column compared to others. Lower
   // numbers are considered higher priority. Columns that may be omitted in limited space scenarios
   // should be given a higher priority.
+  // +optional
   optional int32 priority = 5;
 
   // JSONPath is a simple JSON path, i.e. with array notation.
@@ -64,6 +66,7 @@ message CustomResourceDefinition {
   optional CustomResourceDefinitionSpec spec = 2;
 
   // Status indicates the actual state of the CustomResourceDefinition
+  // +optional
   optional CustomResourceDefinitionStatus status = 3;
 }
 
@@ -104,15 +107,18 @@ message CustomResourceDefinitionNames {
   optional string plural = 1;
 
   // Singular is the singular name of the resource.  It must be all lowercase  Defaults to lowercased <kind>
+  // +optional
   optional string singular = 2;
 
   // ShortNames are short names for the resource.  It must be all lowercase.
+  // +optional
   repeated string shortNames = 3;
 
   // Kind is the serialized kind of the resource.  It is normally CamelCase and singular.
   optional string kind = 4;
 
   // ListKind is the serialized kind of the list for this resource.  Defaults to <kind>List.
+  // +optional
   optional string listKind = 5;
 
   // Categories is a list of grouped resources custom resources belong to (e.g. 'all')
@@ -157,9 +163,11 @@ message CustomResourceDefinitionSpec {
   // by GA > beta > alpha (where GA is a version with no suffix such as beta or alpha), and then by comparing
   // major version, then minor version. An example sorted list of versions:
   // v10, v2, v1, v11beta2, v10beta3, v3beta1, v12alpha1, v11alpha2, foo1, foo10.
+  // +optional
   repeated CustomResourceDefinitionVersion versions = 7;
 
   // AdditionalPrinterColumns are additional columns shown e.g. in kubectl next to the name. Defaults to a created-at column.
+  // +optional
   repeated CustomResourceColumnDefinition additionalPrinterColumns = 8;
 }
 
@@ -229,15 +237,18 @@ message CustomResourceSubresourceStatus {
 // CustomResourceSubresources defines the status and scale subresources for CustomResources.
 message CustomResourceSubresources {
   // Status denotes the status subresource for CustomResources
+  // +optional
   optional CustomResourceSubresourceStatus status = 1;
 
   // Scale denotes the scale subresource for CustomResources
+  // +optional
   optional CustomResourceSubresourceScale scale = 2;
 }
 
 // CustomResourceValidation is a list of validation methods for CustomResources.
 message CustomResourceValidation {
   // OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.
+  // +optional
   optional JSONSchemaProps openAPIV3Schema = 1;
 }
 

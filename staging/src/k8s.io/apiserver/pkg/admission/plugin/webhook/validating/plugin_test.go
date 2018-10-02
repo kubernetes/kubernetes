@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/admission/v1beta1"
@@ -48,12 +49,7 @@ func TestValidate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	for _, tt := range webhooktesting.NewTestCases(serverURL) {
-		// TODO: re-enable all tests
-		if !strings.Contains(tt.Name, "no match") {
-			continue
-		}
-
+	for _, tt := range webhooktesting.NewNonMutatingTestCases(serverURL) {
 		wh, err := NewValidatingAdmissionWebhook(nil)
 		if err != nil {
 			t.Errorf("%s: failed to create validating webhook: %v", tt.Name, err)
@@ -77,7 +73,8 @@ func TestValidate(t *testing.T) {
 			continue
 		}
 
-		err = wh.Validate(webhooktesting.NewAttribute(ns, nil))
+		attr := webhooktesting.NewAttribute(ns, nil, tt.IsDryRun)
+		err = wh.Validate(attr)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}
@@ -89,6 +86,16 @@ func TestValidate(t *testing.T) {
 		}
 		if _, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
 			t.Errorf("%s: expected a StatusError, got %T", tt.Name, err)
+		}
+		fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)
+		if !ok {
+			t.Errorf("Unexpected error, failed to convert attr to webhooktesting.FakeAttributes")
+			continue
+		}
+		if len(tt.ExpectAnnotations) == 0 {
+			assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+		} else {
+			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
 		}
 	}
 }
@@ -135,7 +142,7 @@ func TestValidateCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Validate(webhooktesting.NewAttribute(ns, nil))
+		err = wh.Validate(webhooktesting.NewAttribute(ns, nil, false))
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

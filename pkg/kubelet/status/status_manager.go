@@ -336,6 +336,9 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		return false
 	}
 
+	// Set ContainersReadyCondition.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, v1.ContainersReady)
+
 	// Set ReadyCondition.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.PodReady)
 

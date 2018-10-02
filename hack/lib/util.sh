@@ -18,6 +18,20 @@ kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
 
+# arguments: target, item1, item2, item3, ...
+# returns 0 if target is in the given items, 1 otherwise.
+kube::util::array_contains() {
+  local search="$1"
+  local element
+  shift
+  for element; do
+    if [[ "${element}" == "${search}" ]]; then
+      return 0
+     fi
+  done
+  return 1
+}
+
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
@@ -540,6 +554,7 @@ function kube::util::test_openssl_installed {
       echo "Failed to run openssl. Please ensure openssl is installed"
       exit 1
     fi
+
     OPENSSL_BIN=$(command -v openssl)
 }
 
@@ -787,6 +802,8 @@ if [[ -z "${color_start-}" ]]; then
   declare -r color_red="${color_start}0;31m"
   declare -r color_yellow="${color_start}0;33m"
   declare -r color_green="${color_start}0;32m"
+  declare -r color_blue="${color_start}1;34m"
+  declare -r color_cyan="${color_start}1;36m"
   declare -r color_norm="${color_start}0m"
 fi
 

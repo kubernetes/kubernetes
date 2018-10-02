@@ -24,19 +24,18 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/golang/glog"
 )
@@ -51,14 +50,14 @@ func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
 	select {}
 }
-func (*FakeProxier) OnServiceAdd(service *api.Service)                        {}
-func (*FakeProxier) OnServiceUpdate(oldService, service *api.Service)         {}
-func (*FakeProxier) OnServiceDelete(service *api.Service)                     {}
-func (*FakeProxier) OnServiceSynced()                                         {}
-func (*FakeProxier) OnEndpointsAdd(endpoints *api.Endpoints)                  {}
-func (*FakeProxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {}
-func (*FakeProxier) OnEndpointsDelete(endpoints *api.Endpoints)               {}
-func (*FakeProxier) OnEndpointsSynced()                                       {}
+func (*FakeProxier) OnServiceAdd(service *v1.Service)                        {}
+func (*FakeProxier) OnServiceUpdate(oldService, service *v1.Service)         {}
+func (*FakeProxier) OnServiceDelete(service *v1.Service)                     {}
+func (*FakeProxier) OnServiceSynced()                                        {}
+func (*FakeProxier) OnEndpointsAdd(endpoints *v1.Endpoints)                  {}
+func (*FakeProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {}
+func (*FakeProxier) OnEndpointsDelete(endpoints *v1.Endpoints)               {}
+func (*FakeProxier) OnEndpointsSynced()                                      {}
 
 func NewHollowProxyOrDie(
 	nodeName string,
@@ -142,12 +141,12 @@ func (hp *HollowProxy) Run() {
 
 func getNodeIP(client clientset.Interface, hostname string) net.IP {
 	var nodeIP net.IP
-	node, err := client.Core().Nodes().Get(hostname, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
 	if err != nil {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil
 	}
-	nodeIP, err = utilnode.InternalGetNodeHostIP(node)
+	nodeIP, err = utilnode.GetNodeHostIP(node)
 	if err != nil {
 		glog.Warningf("Failed to retrieve node IP: %v", err)
 		return nil

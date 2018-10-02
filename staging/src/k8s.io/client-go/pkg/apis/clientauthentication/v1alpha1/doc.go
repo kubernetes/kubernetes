@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen=TypeMeta
 
 // +groupName=client.authentication.k8s.io
+
 package v1alpha1 // import "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"

@@ -57,17 +57,29 @@ func HumanDuration(d time.Duration) string {
 	}
 	minutes := int(d / time.Minute)
 	if minutes < 10 {
-		return fmt.Sprintf("%dm%ds", minutes, int(d/time.Second)%60)
+		s := int(d/time.Second) % 60
+		if s == 0 {
+			return fmt.Sprintf("%dm", minutes)
+		}
+		return fmt.Sprintf("%dm%ds", minutes, s)
 	} else if minutes < 60*3 {
 		return fmt.Sprintf("%dm", minutes)
 	}
 	hours := int(d / time.Hour)
 	if hours < 8 {
-		return fmt.Sprintf("%dh%dm", hours, int(d/time.Minute)%60)
+		m := int(d/time.Minute) % 60
+		if m == 0 {
+			return fmt.Sprintf("%dh", hours)
+		}
+		return fmt.Sprintf("%dh%dm", hours, m)
 	} else if hours < 48 {
 		return fmt.Sprintf("%dh", hours)
 	} else if hours < 24*8 {
-		return fmt.Sprintf("%dd%dh", hours/24, hours%24)
+		h := hours % 24
+		if h == 0 {
+			return fmt.Sprintf("%dd", hours/24)
+		}
+		return fmt.Sprintf("%dd%dh", hours/24, h)
 	} else if hours < 24*365*2 {
 		return fmt.Sprintf("%dd", hours/24)
 	} else if hours < 24*365*8 {

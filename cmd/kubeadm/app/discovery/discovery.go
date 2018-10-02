@@ -36,11 +36,15 @@ const TokenUser = "tls-bootstrap-token-user"
 func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// TODO: Print summary info about the CA certificate, along with the checksum signature
 	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
-	clusterinfo, err := GetValidatedClusterInfoObject(cfg)
+	config, err := DiscoverValidatedKubeConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't validate the identity of the API Server: %v", err)
 	}
 
+	if len(cfg.TLSBootstrapToken) == 0 {
+		return config, nil
+	}
+	clusterinfo := kubeconfigutil.GetClusterFromKubeConfig(config)
 	return kubeconfigutil.CreateWithToken(
 		clusterinfo.Server,
 		cfg.ClusterName,
@@ -50,16 +54,16 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	), nil
 }
 
-// GetValidatedClusterInfoObject returns a validated Cluster object that specifies where the cluster is and the CA cert to trust
-func GetValidatedClusterInfoObject(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Cluster, error) {
+// DiscoverValidatedKubeConfig returns a validated Config object that specifies where the cluster is and the CA cert to trust
+func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	switch {
 	case len(cfg.DiscoveryFile) != 0:
 		if isHTTPSURL(cfg.DiscoveryFile) {
-			return https.RetrieveValidatedClusterInfo(cfg.DiscoveryFile, cfg.ClusterName)
+			return https.RetrieveValidatedConfigInfo(cfg.DiscoveryFile, cfg.ClusterName)
 		}
-		return file.RetrieveValidatedClusterInfo(cfg.DiscoveryFile, cfg.ClusterName)
+		return file.RetrieveValidatedConfigInfo(cfg.DiscoveryFile, cfg.ClusterName)
 	case len(cfg.DiscoveryToken) != 0:
-		return token.RetrieveValidatedClusterInfo(cfg)
+		return token.RetrieveValidatedConfigInfo(cfg)
 	default:
 		return nil, fmt.Errorf("couldn't find a valid discovery configuration")
 	}

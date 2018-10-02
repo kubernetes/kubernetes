@@ -41,9 +41,10 @@ func NewLoadBalancerLoadBalancingRulesClientWithBaseURI(baseURI string, subscrip
 }
 
 // Get gets the specified load balancer load balancing rule.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// loadBalancingRuleName is the name of the load balancing rule.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// loadBalancingRuleName - the name of the load balancing rule.
 func (client LoadBalancerLoadBalancingRulesClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, loadBalancingRuleName string) (result LoadBalancingRule, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, loadBalancingRuleName)
 	if err != nil {
@@ -109,8 +110,9 @@ func (client LoadBalancerLoadBalancingRulesClient) GetResponder(resp *http.Respo
 }
 
 // List gets all the load balancing rules in a load balancer.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
 func (client LoadBalancerLoadBalancingRulesClient) List(ctx context.Context, resourceGroupName string, loadBalancerName string) (result LoadBalancerLoadBalancingRuleListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName, loadBalancerName)

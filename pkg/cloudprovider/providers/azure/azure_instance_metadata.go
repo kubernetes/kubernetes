@@ -59,6 +59,13 @@ type InstanceMetadata struct {
 	baseURL string
 }
 
+// ComputeMetadata represents compute information
+type ComputeMetadata struct {
+	Name   string `json:"name,omitempty"`
+	Zone   string `json:"zone,omitempty"`
+	VMSize string `json:"vmSize,omitempty"`
+}
+
 // NewInstanceMetadata creates an instance of the InstanceMetadata accessor object.
 func NewInstanceMetadata() *InstanceMetadata {
 	return &InstanceMetadata{
@@ -100,7 +107,7 @@ func (i *InstanceMetadata) queryMetadataBytes(path, format string) ([]byte, erro
 
 	q := req.URL.Query()
 	q.Add("format", format)
-	q.Add("api-version", "2017-04-02")
+	q.Add("api-version", "2017-12-01")
 	req.URL.RawQuery = q.Encode()
 
 	resp, err := client.Do(req)

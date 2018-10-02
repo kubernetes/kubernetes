@@ -18,6 +18,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,6 +51,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+
 	// Do some initialization to decode the query parameters correctly.
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -80,7 +82,7 @@ type fakeKubelet struct {
 	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
 	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
 
-	containerLogsFunc func(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
+	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	hostnameFunc      func() string
 	resyncInterval    time.Duration
 	loopEntryTime     time.Time
@@ -128,8 +130,8 @@ func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	fk.logFunc(w, req)
 }
 
-func (fk *fakeKubelet) GetKubeletContainerLogs(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
-	return fk.containerLogsFunc(podFullName, containerName, logOptions, stdout, stderr)
+func (fk *fakeKubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+	return fk.containerLogsFunc(ctx, podFullName, containerName, logOptions, stdout, stderr)
 }
 
 func (fk *fakeKubelet) GetHostname() string {
@@ -983,7 +985,7 @@ func setPodByNameFunc(fw *serverTestFramework, namespace, pod, container string)
 }
 
 func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodName, expectedContainerName string, expectedLogOptions *v1.PodLogOptions, output string) {
-	fw.fakeKubelet.containerLogsFunc = func(podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+	fw.fakeKubelet.containerLogsFunc = func(_ context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
 		if podFullName != expectedPodName {
 			t.Errorf("expected %s, got %s", expectedPodName, podFullName)
 		}
@@ -1165,7 +1167,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true)
+	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1331,7 +1333,7 @@ func testExecAttach(t *testing.T, verb string) {
 					return http.ErrUseLastResponse
 				}
 			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
+				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 
@@ -1428,7 +1430,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1535,7 +1537,7 @@ func TestServePortForward(t *testing.T) {
 					return http.ErrUseLastResponse
 				}
 			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
+				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 

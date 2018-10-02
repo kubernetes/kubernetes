@@ -34,7 +34,7 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
+	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes, addConversionFuncs)
 	localSchemeBuilder = &SchemeBuilder
 	AddToScheme        = localSchemeBuilder.AddToScheme
 )
@@ -43,6 +43,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&MetricValue{},
 		&MetricValueList{},
+		&MetricListOptions{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

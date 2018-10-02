@@ -137,7 +137,8 @@ type ContainerView struct {
 	types map[string]bool
 }
 
-func (v *ContainerView) DestroyView(c *types.DestroyView) soap.HasFault {
+func (v *ContainerView) DestroyView(ctx *Context, c *types.DestroyView) soap.HasFault {
+	ctx.Session.Remove(c.This)
 	return destroyView(c.This)
 }
 
@@ -191,4 +192,84 @@ func (v *ContainerView) add(root mo.Reference, seen map[types.ManagedObjectRefer
 			v.add(Map.Get(child), seen)
 		}
 	})
+}
+
+func (m *ViewManager) CreateListView(ctx *Context, req *types.CreateListView) soap.HasFault {
+	body := new(methods.CreateListViewBody)
+	list := new(ListView)
+
+	if err := list.add(req.Obj); err != nil {
+		body.Fault_ = Fault("", err)
+		return body
+	}
+
+	ctx.Session.Put(list)
+
+	body.Res = &types.CreateListViewResponse{
+		Returnval: list.Self,
+	}
+
+	return body
+}
+
+type ListView struct {
+	mo.ListView
+}
+
+func (v *ListView) update() {
+	Map.Update(v, []types.PropertyChange{{Name: "view", Val: v.View}})
+}
+
+func (v *ListView) add(refs []types.ManagedObjectReference) *types.ManagedObjectNotFound {
+	for _, ref := range refs {
+		obj := Map.Get(ref)
+		if obj == nil {
+			return &types.ManagedObjectNotFound{Obj: ref}
+		}
+		v.View = append(v.View, ref)
+	}
+	return nil
+}
+
+func (v *ListView) DestroyView(ctx *Context, c *types.DestroyView) soap.HasFault {
+	ctx.Session.Remove(c.This)
+	return destroyView(c.This)
+}
+
+func (v *ListView) ModifyListView(req *types.ModifyListView) soap.HasFault {
+	body := new(methods.ModifyListViewBody)
+
+	for _, ref := range req.Remove {
+		RemoveReference(&v.View, ref)
+	}
+
+	if err := v.add(req.Add); err != nil {
+		body.Fault_ = Fault("", err)
+		return body
+	}
+
+	body.Res = new(types.ModifyListViewResponse)
+
+	if len(req.Remove) != 0 || len(req.Add) != 0 {
+		v.update()
+	}
+
+	return body
+}
+
+func (v *ListView) ResetListView(req *types.ResetListView) soap.HasFault {
+	body := new(methods.ResetListViewBody)
+
+	v.View = nil
+
+	if err := v.add(req.Obj); err != nil {
+		body.Fault_ = Fault("", err)
+		return body
+	}
+
+	body.Res = new(types.ResetListViewResponse)
+
+	v.update()
+
+	return body
 }

@@ -17,14 +17,18 @@ limitations under the License.
 package azure_dd
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -35,7 +39,7 @@ type DiskController interface {
 	CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error)
 	DeleteBlobDisk(diskUri string) error
 
-	CreateManagedDisk(diskName string, storageAccountType storage.SkuName, resourceGroup string, sizeGB int, tags map[string]string) (string, error)
+	CreateManagedDisk(options *azure.ManagedDiskOptions) (string, error)
 	DeleteManagedDisk(diskURI string) error
 
 	// Attaches the disk to the host machine.
@@ -58,6 +62,15 @@ type DiskController interface {
 
 	// Expand the disk to new size
 	ResizeDisk(diskURI string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error)
+
+	// GetAzureDiskLabels gets availability zone labels for Azuredisk.
+	GetAzureDiskLabels(diskURI string) (map[string]string, error)
+
+	// GetActiveZones returns all the zones in which k8s nodes are currently running.
+	GetActiveZones() (sets.String, error)
+
+	// GetLocation returns the location in which k8s cluster is currently running.
+	GetLocation() string
 }
 
 type azureDataDiskPlugin struct {
@@ -71,9 +84,14 @@ var _ volume.ProvisionableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.AttachableVolumePlugin = &azureDataDiskPlugin{}
 var _ volume.VolumePluginWithAttachLimits = &azureDataDiskPlugin{}
 var _ volume.ExpandableVolumePlugin = &azureDataDiskPlugin{}
+var _ volume.DeviceMountableVolumePlugin = &azureDataDiskPlugin{}
+
+// store vm size list in current region
+var vmSizeList *[]compute.VirtualMachineSize
 
 const (
 	azureDataDiskPluginName = "kubernetes.io/azure-disk"
+	defaultAzureVolumeLimit = 16
 )
 
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -117,24 +135,64 @@ func (plugin *azureDataDiskPlugin) SupportsBulkVolumeVerification() bool {
 
 func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
-		util.AzureVolumeLimitKey: 16,
+		util.AzureVolumeLimitKey: defaultAzureVolumeLimit,
 	}
 
-	cloud := plugin.host.GetCloudProvider()
-
-	// if we can't fetch cloudprovider we return an error
-	// hoping external CCM or admin can set it. Returning
-	// default values from here will mean, no one can
-	// override them.
-	if cloud == nil {
-		return nil, fmt.Errorf("No cloudprovider present")
+	az, err := getCloud(plugin.host)
+	if err != nil {
+		// if we can't fetch cloudprovider we return an error
+		// hoping external CCM or admin can set it. Returning
+		// default values from here will mean, no one can
+		// override them.
+		glog.Errorf("failed to get azure cloud in GetVolumeLimits, plugin.host: %s", plugin.host.GetHostName())
+		return volumeLimits, nil
 	}
 
-	if cloud.ProviderName() != azure.CloudProviderName {
-		return nil, fmt.Errorf("Expected Azure cloudprovider, got %s", cloud.ProviderName())
+	instances, ok := az.Instances()
+	if !ok {
+		glog.Warningf("Failed to get instances from cloud provider")
+		return volumeLimits, nil
+	}
+
+	instanceType, err := instances.InstanceType(context.TODO(), plugin.host.GetNodeName())
+	if err != nil {
+		glog.Errorf("Failed to get instance type from Azure cloud provider, nodeName: %s", plugin.host.GetNodeName())
+		return volumeLimits, nil
+	}
+
+	if vmSizeList == nil {
+		result, err := az.VirtualMachineSizesClient.List(context.TODO(), az.Location)
+		if err != nil || result.Value == nil {
+			glog.Errorf("failed to list vm sizes in GetVolumeLimits, plugin.host: %s, location: %s", plugin.host.GetHostName(), az.Location)
+			return volumeLimits, nil
+		}
+		vmSizeList = result.Value
+	}
+
+	volumeLimits = map[string]int64{
+		util.AzureVolumeLimitKey: getMaxDataDiskCount(instanceType, vmSizeList),
 	}
 
 	return volumeLimits, nil
+}
+
+func getMaxDataDiskCount(instanceType string, sizeList *[]compute.VirtualMachineSize) int64 {
+	if sizeList == nil {
+		return defaultAzureVolumeLimit
+	}
+
+	vmsize := strings.ToUpper(instanceType)
+	for _, size := range *sizeList {
+		if size.Name == nil || size.MaxDataDiskCount == nil {
+			glog.Errorf("failed to get vm size in getMaxDataDiskCount")
+			continue
+		}
+		if strings.ToUpper(*size.Name) == vmsize {
+			glog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %s", *size.Name, *size.MaxDataDiskCount)
+			return int64(*size.MaxDataDiskCount)
+		}
+	}
+	return defaultAzureVolumeLimit
 }
 
 func (plugin *azureDataDiskPlugin) VolumeLimitKey(spec *volume.Spec) string {
@@ -267,4 +325,12 @@ func (plugin *azureDataDiskPlugin) ConstructVolumeSpec(volumeName, mountPath str
 func (plugin *azureDataDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	m := plugin.host.GetMounter(plugin.GetPluginName())
 	return m.GetMountRefs(deviceMountPath)
+}
+
+func (plugin *azureDataDiskPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
+func (plugin *azureDataDiskPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }

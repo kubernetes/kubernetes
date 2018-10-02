@@ -40,6 +40,8 @@ var flagConfigFile = pflag.String("azure-container-registry-config", "",
 
 const dummyRegistryEmail = "name@contoso.com"
 
+var containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
+
 // init registers the various means by which credentials may
 // be resolved on Azure.
 func init() {
@@ -176,31 +178,33 @@ func (a *acrProvider) Provide() credentialprovider.DockerConfig {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	glog.V(4).Infof("listing registries")
-	result, err := a.registryClient.List(ctx)
-	if err != nil {
-		glog.Errorf("Failed to list registries: %v", err)
-		return cfg
-	}
+	if a.config.UseManagedIdentityExtension {
+		glog.V(4).Infof("listing registries")
+		result, err := a.registryClient.List(ctx)
+		if err != nil {
+			glog.Errorf("Failed to list registries: %v", err)
+			return cfg
+		}
 
-	for ix := range result {
-		loginServer := getLoginServer(result[ix])
-		var cred *credentialprovider.DockerConfigEntry
-
-		if a.config.UseManagedIdentityExtension {
-			cred, err = getACRDockerEntryFromARMToken(a, loginServer)
+		for ix := range result {
+			loginServer := getLoginServer(result[ix])
+			glog.V(2).Infof("loginServer: %s", loginServer)
+			cred, err := getACRDockerEntryFromARMToken(a, loginServer)
 			if err != nil {
 				continue
 			}
-		} else {
-			cred = &credentialprovider.DockerConfigEntry{
+			cfg[loginServer] = *cred
+		}
+	} else {
+		// Add our entry for each of the supported container registry URLs
+		for _, url := range containerRegistryUrls {
+			cred := &credentialprovider.DockerConfigEntry{
 				Username: a.config.AADClientID,
 				Password: a.config.AADClientSecret,
 				Email:    dummyRegistryEmail,
 			}
+			cfg[url] = *cred
 		}
-
-		cfg[loginServer] = *cred
 	}
 	return cfg
 }

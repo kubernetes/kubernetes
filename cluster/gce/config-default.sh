@@ -37,6 +37,14 @@ MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
+
+# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
+# To avoid situation during cluster upgrade when there are two instances
+# of fluentd running on a node, kubelet need to mark node on which
+# fluentd is not running as a manifest pod with appropriate label.
+# TODO(piosz): remove this in 1.8
+NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
+
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
 # Format of this variable will be "#,scsi/nvme,block/fs" you can specify multiple
 # configurations by separating them by a semi-colon ex. "2,scsi,fs;1,nvme,block"
@@ -51,6 +59,7 @@ PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-} # default value calculated below
 CREATE_CUSTOM_NETWORK=${CREATE_CUSTOM_NETWORK:-false}
+MIG_WAIT_UNTIL_STABLE_TIMEOUT=${MIG_WAIT_UNTIL_STABLE_TIMEOUT:-1800}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
@@ -162,15 +171,14 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
-# To avoid situation during cluster upgrade when there are two instances
-# of fluentd running on a node, kubelet need to mark node on which
-# fluentd is not running as a manifest pod with appropriate label.
-# TODO(piosz): remove this in 1.8
-NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
-
 # NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
+
+if [[ "${PREEMPTIBLE_MASTER}" == "true" ]]; then
+    NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
+elif [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
+    NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-preemptible=true"
+fi
 
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
@@ -181,11 +189,13 @@ fi
 # Optional: Enable netd.
 ENABLE_NETD="${KUBE_ENABLE_NETD:-false}"
 CUSTOM_NETD_YAML="${KUBE_CUSTOM_NETD_YAML:-}"
+CUSTOM_CALICO_NODE_DAEMONSET_YAML="${KUBE_CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}"
+CUSTOM_TYPHA_DEPLOYMENT_YAML="${KUBE_CUSTOM_TYPHA_DEPLOYMENT_YAML:-}"
 
 # To avoid running netd on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${ENABLE_NETD:-} == "true" ]]; then
-	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}beta.kubernetes.io/kube-netd-ready=true"
+	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}cloud.google.com/gke-netd-ready=true"
 fi
 
 # Enable metadata concealment by firewalling pod traffic to the metadata server
@@ -193,6 +203,7 @@ fi
 #
 # TODO(#8867) Enable by default.
 ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-false}" # true, false
+METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # true, false
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
@@ -214,7 +225,7 @@ resources:
     - aesgcm:
         keys:
         - name: key1
-          secret: $(dd if=/dev/random bs=32 count=1 status=none | base64 | tr -d '\r\n')
+          secret: $(dd if=/dev/urandom iflag=fullblock bs=32 count=1 2>/dev/null | base64 | tr -d '\r\n')
 EOM
 )
 fi
@@ -245,7 +256,7 @@ FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
     FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
-        NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
+        NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
 fi
 
@@ -283,9 +294,6 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   AUTOSCALER_ENABLE_SCALE_DOWN="${KUBE_AUTOSCALER_ENABLE_SCALE_DOWN:-true}"
   AUTOSCALER_EXPANDER_CONFIG="${KUBE_AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
 fi
-
-# Optional: Enable Rescheduler
-ENABLE_RESCHEDULER="${KUBE_ENABLE_RESCHEDULER:-true}"
 
 # Optional: Enable allocation of pod IPs using IP aliases.
 #
@@ -389,10 +397,6 @@ METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
-if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
-  echo "Warning: Basic audit logging is deprecated and will be removed. Please use advanced auditing instead."
-fi
-
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"
 fi
@@ -401,6 +405,8 @@ if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
 fi
 
 # Fluentd requirements
+# YAML exists to trigger a configuration refresh when changes are made.
+FLUENTD_GCP_YAML_VERSION="v3.1.0"
 FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.2-1.5.30-1-k8s}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
@@ -412,11 +418,14 @@ HEAPSTER_GCP_MEMORY_PER_NODE="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
 HEAPSTER_GCP_BASE_CPU="${HEAPSTER_GCP_BASE_CPU:-80m}"
 HEAPSTER_GCP_CPU_PER_NODE="${HEAPSTER_GCP_CPU_PER_NODE:-0.5}"
 
+# Optional: custom system banner for dashboard addon
+CUSTOM_KUBE_DASHBOARD_BANNER="${CUSTOM_KUBE_DASHBOARD_BANNER:-}"
+
 # Default Stackdriver resources version exported by Fluentd-gcp addon
 LOGGING_STACKDRIVER_RESOURCE_TYPES="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
 
 # Adding to PROVIDER_VARS, since this is GCP-specific.
-PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_VERSION FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST HEAPSTER_GCP_BASE_MEMORY HEAPSTER_GCP_MEMORY_PER_NODE HEAPSTER_GCP_BASE_CPU HEAPSTER_GCP_CPU_PER_NODE CUSTOM_KUBE_DASHBOARD_BANNER LOGGING_STACKDRIVER_RESOURCE_TYPES"
+PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_YAML_VERSION FLUENTD_GCP_VERSION FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST HEAPSTER_GCP_BASE_MEMORY HEAPSTER_GCP_MEMORY_PER_NODE HEAPSTER_GCP_BASE_CPU HEAPSTER_GCP_CPU_PER_NODE CUSTOM_KUBE_DASHBOARD_BANNER LOGGING_STACKDRIVER_RESOURCE_TYPES"
 
 # Fluentd configuration for node-journal
 ENABLE_NODE_JOURNAL="${ENABLE_NODE_JOURNAL:-false}"
@@ -450,4 +459,12 @@ if [[ "${ENABLE_TOKENREQUEST:-}" == "true" ]]; then
   FEATURE_GATES="${FEATURE_GATES},TokenRequest=true"
   SERVICEACCOUNT_ISSUER="https://kubernetes.io/${CLUSTER_NAME}"
   SERVICEACCOUNT_API_AUDIENCES="https://kubernetes.default.svc"
+fi
+
+# Optional: Enable Node termination Handler for Preemptible and GPU VMs.
+# https://github.com/GoogleCloudPlatform/k8s-node-termination-handler
+ENABLE_NODE_TERMINATION_HANDLER="${ENABLE_NODE_TERMINATION_HANDLER:-false}"
+# Override default Node Termination Handler Image
+if [[ "${NODE_TERMINATION_HANDLER_IMAGE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} NODE_TERMINATION_HANDLER_IMAGE"
 fi

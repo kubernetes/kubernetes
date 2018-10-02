@@ -27,7 +27,6 @@ import (
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
@@ -51,7 +50,6 @@ type AuthorizationConfig struct {
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
 
-	InformerFactory          informers.SharedInformerFactory
 	VersionedInformerFactory versionedinformers.SharedInformerFactory
 }
 
@@ -74,9 +72,9 @@ func (config AuthorizationConfig) New() (authorizer.Authorizer, authorizer.RuleR
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
 				graph,
-				config.InformerFactory.Core().InternalVersion().Nodes(),
-				config.InformerFactory.Core().InternalVersion().Pods(),
-				config.InformerFactory.Core().InternalVersion().PersistentVolumes(),
+				config.VersionedInformerFactory.Core().V1().Nodes(),
+				config.VersionedInformerFactory.Core().V1().Pods(),
+				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1beta1().VolumeAttachments(),
 			)
 			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())

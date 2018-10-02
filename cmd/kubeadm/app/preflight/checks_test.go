@@ -191,40 +191,46 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}{
 		{name: "Test valid advertised address",
 			cfg: &kubeadmapi.InitConfiguration{
-				API: kubeadmapi.API{AdvertiseAddress: "foo"},
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "foo"},
 			},
 			expected: false,
 		},
 		{
 			name: "Test CA file exists if specfied",
 			cfg: &kubeadmapi.InitConfiguration{
-				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CAFile: "/foo"}},
+				},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Cert file exists if specfied",
 			cfg: &kubeadmapi.InitConfiguration{
-				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				},
 			},
 			expected: false,
 		},
 		{
 			name: "Test Key file exists if specfied",
 			cfg: &kubeadmapi.InitConfiguration{
-				Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{External: &kubeadmapi.ExternalEtcd{CertFile: "/foo"}},
+				},
 			},
 			expected: false,
 		},
 		{
 			cfg: &kubeadmapi.InitConfiguration{
-				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
 		},
 	}
-
 	for _, rt := range tests {
+		// TODO: Make RunInitMasterChecks accept a ClusterConfiguration object instead of InitConfiguration
 		actual := RunInitMasterChecks(exec.New(), rt.cfg, sets.NewString())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
@@ -633,13 +639,13 @@ func TestKubeletVersionCheck(t *testing.T) {
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v1.11.2", "", false, false},               // check minimally supported version when there is no information about control plane
-		{"v1.8.3", "v1.8.8", true, false},           // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v1.10.0", "v1.10.5", false, false},        // kubelet within same major.minor as control plane
-		{"v1.10.5", "v1.10.1", false, false},        // kubelet is newer, but still within same major.minor as control plane
-		{"v1.10.0", "v1.11.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
-		{"v1.11.0-alpha.1", "v1.10.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v1.11.0", "v1.10.5", true, false},         // kubelet is newer (release) than control plane, should fail.
+		{"v1.12.2", "", false, false},               // check minimally supported version when there is no information about control plane
+		{"v1.9.3", "v1.9.8", true, false},           // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
+		{"v1.11.0", "v1.11.5", false, false},        // kubelet within same major.minor as control plane
+		{"v1.11.5", "v1.11.1", false, false},        // kubelet is newer, but still within same major.minor as control plane
+		{"v1.11.0", "v1.12.1", false, false},        // kubelet is lower than control plane, but newer than minimally supported
+		{"v1.12.0-alpha.1", "v1.11.1", true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v1.12.0", "v1.11.5", true, false},         // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {
@@ -702,18 +708,31 @@ func TestSetHasItemOrAll(t *testing.T) {
 func TestImagePullCheck(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
 		RunScript: []fakeexec.FakeRunAction{
-			func() ([]byte, []byte, error) { return nil, nil, nil }, // Test case 1
+			// Test case 1: img1 and img2 exist, img3 doesn't exist
 			func() ([]byte, []byte, error) { return nil, nil, nil },
 			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} }, // Test case 2
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
-			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+
+			// Test case 2: images don't exist
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+		},
+		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			// Test case1: pull only img3
+			func() ([]byte, error) { return nil, nil },
+			// Test case 2: fail to pull image2 and image3
+			func() ([]byte, error) { return nil, nil },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, error) { return []byte("error"), &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 
 	fexec := fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
@@ -746,7 +765,7 @@ func TestImagePullCheck(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("did not expect any warnings but got %q", warnings)
 	}
-	if len(errors) != 1 {
-		t.Fatalf("expected 1 errors but got %d: %q", len(errors), errors)
+	if len(errors) != 2 {
+		t.Fatalf("expected 2 errors but got %d: %q", len(errors), errors)
 	}
 }

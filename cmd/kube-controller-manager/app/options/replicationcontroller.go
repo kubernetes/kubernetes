@@ -19,7 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // ReplicationControllerOptions holds the ReplicationController options.
@@ -37,7 +37,7 @@ func (o *ReplicationControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up ReplicationController config with options.
-func (o *ReplicationControllerOptions) ApplyTo(cfg *componentconfig.ReplicationControllerConfiguration) error {
+func (o *ReplicationControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.ReplicationControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

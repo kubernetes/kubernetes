@@ -192,6 +192,9 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
 	}
+	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
+	}
 
 	if hook.NamespaceSelector != nil {
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
@@ -289,6 +292,13 @@ func validateWebhookService(fldPath *field.Path, svc *admissionregistration.Serv
 var supportedFailurePolicies = sets.NewString(
 	string(admissionregistration.Ignore),
 	string(admissionregistration.Fail),
+)
+
+var supportedSideEffectClasses = sets.NewString(
+	string(admissionregistration.SideEffectClassUnknown),
+	string(admissionregistration.SideEffectClassNone),
+	string(admissionregistration.SideEffectClassSome),
+	string(admissionregistration.SideEffectClassNoneOnDryRun),
 )
 
 var supportedOperations = sets.NewString(

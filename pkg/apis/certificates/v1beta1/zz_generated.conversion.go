@@ -35,19 +35,58 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest,
-		Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest,
-		Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition,
-		Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition,
-		Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList,
-		Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList,
-		Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec,
-		Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec,
-		Convert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus,
-		Convert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequest)(nil), (*certificates.CertificateSigningRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(a.(*v1beta1.CertificateSigningRequest), b.(*certificates.CertificateSigningRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequest)(nil), (*v1beta1.CertificateSigningRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(a.(*certificates.CertificateSigningRequest), b.(*v1beta1.CertificateSigningRequest), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestCondition)(nil), (*certificates.CertificateSigningRequestCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition(a.(*v1beta1.CertificateSigningRequestCondition), b.(*certificates.CertificateSigningRequestCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestCondition)(nil), (*v1beta1.CertificateSigningRequestCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestCondition_To_v1beta1_CertificateSigningRequestCondition(a.(*certificates.CertificateSigningRequestCondition), b.(*v1beta1.CertificateSigningRequestCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestList)(nil), (*certificates.CertificateSigningRequestList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(a.(*v1beta1.CertificateSigningRequestList), b.(*certificates.CertificateSigningRequestList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestList)(nil), (*v1beta1.CertificateSigningRequestList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(a.(*certificates.CertificateSigningRequestList), b.(*v1beta1.CertificateSigningRequestList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestSpec)(nil), (*certificates.CertificateSigningRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestSpec_To_certificates_CertificateSigningRequestSpec(a.(*v1beta1.CertificateSigningRequestSpec), b.(*certificates.CertificateSigningRequestSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestSpec)(nil), (*v1beta1.CertificateSigningRequestSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(a.(*certificates.CertificateSigningRequestSpec), b.(*v1beta1.CertificateSigningRequestSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CertificateSigningRequestStatus)(nil), (*certificates.CertificateSigningRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus(a.(*v1beta1.CertificateSigningRequestStatus), b.(*certificates.CertificateSigningRequestStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*certificates.CertificateSigningRequestStatus)(nil), (*v1beta1.CertificateSigningRequestStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_certificates_CertificateSigningRequestStatus_To_v1beta1_CertificateSigningRequestStatus(a.(*certificates.CertificateSigningRequestStatus), b.(*v1beta1.CertificateSigningRequestStatus), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *v1beta1.CertificateSigningRequest, out *certificates.CertificateSigningRequest, s conversion.Scope) error {

@@ -68,10 +68,6 @@ const (
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
 )
 
-var (
-	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
-)
-
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
@@ -178,7 +174,7 @@ func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String,
 		return set, nil
 	}
 	for i := range services {
-		key, err := keyFunc(services[i])
+		key, err := controller.KeyFunc(services[i])
 		if err != nil {
 			return nil, err
 		}
@@ -334,7 +330,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (e *EndpointController) enqueueService(obj interface{}) {
-	key, err := keyFunc(obj)
+	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
@@ -476,9 +472,9 @@ func (e *EndpointController) syncService(key string) error {
 				totalReadyEps = totalReadyEps + readyEps
 				totalNotReadyEps = totalNotReadyEps + notReadyEps
 			}
-			subsets = endpoints.RepackSubsets(subsets)
 		}
 	}
+	subsets = endpoints.RepackSubsets(subsets)
 
 	// See if there's actually an update here.
 	currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
@@ -552,7 +548,7 @@ func (e *EndpointController) checkLeftoverEndpoints() {
 			// as leader-election only have endpoints without service
 			continue
 		}
-		key, err := keyFunc(ep)
+		key, err := controller.KeyFunc(ep)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("Unable to get key for endpoint %#v", ep))
 			continue

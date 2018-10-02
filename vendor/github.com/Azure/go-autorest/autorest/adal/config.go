@@ -26,10 +26,10 @@ const (
 // OAuthConfig represents the endpoints needed
 // in OAuth operations
 type OAuthConfig struct {
-	AuthorityEndpoint  url.URL
-	AuthorizeEndpoint  url.URL
-	TokenEndpoint      url.URL
-	DeviceCodeEndpoint url.URL
+	AuthorityEndpoint  url.URL `json:"authorityEndpoint"`
+	AuthorizeEndpoint  url.URL `json:"authorizeEndpoint"`
+	TokenEndpoint      url.URL `json:"tokenEndpoint"`
+	DeviceCodeEndpoint url.URL `json:"deviceCodeEndpoint"`
 }
 
 // IsZero returns true if the OAuthConfig object is zero-initialized.

@@ -91,7 +91,7 @@ func (q *Queue) Create(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusCreated})
 }
 
@@ -111,7 +111,7 @@ func (q *Queue) Delete(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
@@ -120,7 +120,7 @@ func (q *Queue) Exists() (bool, error) {
 	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), url.Values{"comp": {"metadata"}})
 	resp, err := q.qsc.client.exec(http.MethodGet, uri, q.qsc.client.getStandardHeaders(), nil, q.qsc.auth)
 	if resp != nil {
-		defer readAndCloseBody(resp.Body)
+		defer drainRespBody(resp)
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
 			return resp.StatusCode == http.StatusOK, nil
 		}
@@ -148,7 +148,7 @@ func (q *Queue) SetMetadata(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
@@ -175,7 +175,7 @@ func (q *Queue) GetMetadata(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 
 	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return err
@@ -314,7 +314,7 @@ func (q *Queue) ClearMessages(options *QueueServiceOptions) error {
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
@@ -341,7 +341,7 @@ func (q *Queue) SetPermissions(permissions QueuePermissions, options *SetQueuePe
 	if err != nil {
 		return err
 	}
-	defer readAndCloseBody(resp.Body)
+	defer drainRespBody(resp)
 	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 

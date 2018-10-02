@@ -21,8 +21,8 @@ import (
 	rt "runtime"
 	"testing"
 
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"

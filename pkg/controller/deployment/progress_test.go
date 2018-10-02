@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -67,6 +68,7 @@ func newRSWithAvailable(name string, specReplicas, statusReplicas, availableRepl
 
 func TestRequeueStuckDeployment(t *testing.T) {
 	pds := int32(60)
+	infinite := int32(math.MaxInt32)
 	failed := []apps.DeploymentCondition{
 		{
 			Type:   apps.DeploymentProgressing,
@@ -90,8 +92,14 @@ func TestRequeueStuckDeployment(t *testing.T) {
 		expected time.Duration
 	}{
 		{
-			name:     "no progressDeadlineSeconds specified",
+			name:     "nil progressDeadlineSeconds specified",
 			d:        currentDeployment(nil, 4, 3, 3, 2, nil),
+			status:   newDeploymentStatus(3, 3, 2),
+			expected: time.Duration(-1),
+		},
+		{
+			name:     "infinite progressDeadlineSeconds specified",
+			d:        currentDeployment(&infinite, 4, 3, 3, 2, nil),
 			status:   newDeploymentStatus(3, 3, 2),
 			expected: time.Duration(-1),
 		},
@@ -330,7 +338,7 @@ func TestSyncRolloutStatus(t *testing.T) {
 			newCond := util.GetDeploymentCondition(test.d.Status, test.conditionType)
 			switch {
 			case newCond == nil:
-				if test.d.Spec.ProgressDeadlineSeconds != nil {
+				if test.d.Spec.ProgressDeadlineSeconds != nil && *test.d.Spec.ProgressDeadlineSeconds != math.MaxInt32 {
 					t.Errorf("%s: expected deployment condition: %s", test.name, test.conditionType)
 				}
 			case newCond.Status != test.conditionStatus || newCond.Reason != test.conditionReason:

@@ -27,6 +27,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,10 +47,10 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/features"
@@ -67,6 +68,9 @@ const (
 
 	// StatusUpdateRetries limits the number of retries if sending a status update to API server fails.
 	StatusUpdateRetries = 1
+
+	// BackoffGCInterval is the time that has to pass before next iteration of backoff GC is run
+	BackoffGCInterval = 1 * time.Minute
 )
 
 // Reasons for DaemonSet events
@@ -131,10 +135,19 @@ type DaemonSetsController struct {
 	// is DaemonSet set that want to run pods but can't schedule in latest syncup cycle.
 	suspendedDaemonPodsMutex sync.Mutex
 	suspendedDaemonPods      map[string]sets.String
+
+	failedPodsBackoff *flowcontrol.Backoff
 }
 
 // NewDaemonSetsController creates a new DaemonSetsController
-func NewDaemonSetsController(daemonSetInformer appsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) (*DaemonSetsController, error) {
+func NewDaemonSetsController(
+	daemonSetInformer appsinformers.DaemonSetInformer,
+	historyInformer appsinformers.ControllerRevisionInformer,
+	podInformer coreinformers.PodInformer,
+	nodeInformer coreinformers.NodeInformer,
+	kubeClient clientset.Interface,
+	failedPodsBackoff *flowcontrol.Backoff,
+) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -212,6 +225,9 @@ func NewDaemonSetsController(daemonSetInformer appsinformers.DaemonSetInformer, 
 	dsc.syncHandler = dsc.syncDaemonSet
 	dsc.enqueueDaemonSet = dsc.enqueue
 	dsc.enqueueDaemonSetRateLimited = dsc.enqueueRateLimited
+
+	dsc.failedPodsBackoff = failedPodsBackoff
+
 	return dsc, nil
 }
 
@@ -260,6 +276,8 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(dsc.runWorker, time.Second, stopCh)
 	}
+
+	go wait.Until(dsc.failedPodsBackoff.GC, BackoffGCInterval, stopCh)
 
 	<-stopCh
 }
@@ -717,14 +735,19 @@ func nodeInSameCondition(old []v1.NodeCondition, cur []v1.NodeCondition) bool {
 	return len(c1map) == 0
 }
 
+func shouldIgnoreNodeUpdate(oldNode, curNode v1.Node) bool {
+	if !nodeInSameCondition(oldNode.Status.Conditions, curNode.Status.Conditions) {
+		return false
+	}
+	oldNode.ResourceVersion = curNode.ResourceVersion
+	oldNode.Status.Conditions = curNode.Status.Conditions
+	return apiequality.Semantic.DeepEqual(oldNode, curNode)
+}
+
 func (dsc *DaemonSetsController) updateNode(old, cur interface{}) {
 	oldNode := old.(*v1.Node)
 	curNode := cur.(*v1.Node)
-
-	if reflect.DeepEqual(oldNode.Labels, curNode.Labels) &&
-		reflect.DeepEqual(oldNode.Spec.Taints, curNode.Spec.Taints) &&
-		nodeInSameCondition(oldNode.Status.Conditions, curNode.Status.Conditions) {
-		// If node labels, taints and condition didn't change, we can ignore this update.
+	if shouldIgnoreNodeUpdate(*oldNode, *curNode) {
 		return
 	}
 
@@ -847,6 +870,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 
 	daemonPods, exists := nodeToDaemonPods[node.Name]
 	dsKey, _ := cache.MetaNamespaceKeyFunc(ds)
+
 	dsc.removeSuspendedDaemonPods(node.Name, dsKey)
 
 	switch {
@@ -865,12 +889,29 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 				continue
 			}
 			if pod.Status.Phase == v1.PodFailed {
+				failedPodsObserved++
+
+				// This is a critical place where DS is often fighting with kubelet that rejects pods.
+				// We need to avoid hot looping and backoff.
+				backoffKey := failedPodsBackoffKey(ds, node.Name)
+
+				now := dsc.failedPodsBackoff.Clock.Now()
+				inBackoff := dsc.failedPodsBackoff.IsInBackOffSinceUpdate(backoffKey, now)
+				if inBackoff {
+					delay := dsc.failedPodsBackoff.Get(backoffKey)
+					glog.V(4).Infof("Deleting failed pod %s/%s on node %s has been limited by backoff - %v remaining",
+						pod.Namespace, pod.Name, node.Name, delay)
+					dsc.enqueueDaemonSetAfter(ds, delay)
+					continue
+				}
+
+				dsc.failedPodsBackoff.Next(backoffKey, now)
+
 				msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
 				glog.V(2).Infof(msg)
 				// Emit an event so that it's discoverable to users.
 				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
 				podsToDelete = append(podsToDelete, pod.Name)
-				failedPodsObserved++
 			} else {
 				daemonPodsRunning = append(daemonPodsRunning, pod)
 			}
@@ -970,7 +1011,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 	if err != nil {
 		generation = nil
 	}
-	template := util.CreatePodTemplate(ds.Spec.Template, generation, hash)
+	template := util.CreatePodTemplate(ds.Namespace, ds.Spec.Template, generation, hash)
 	// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
 	// and double with each successful iteration in a kind of "slow start".
 	// This handles attempts to start large numbers of pods that would
@@ -997,7 +1038,6 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 					// should be no conflicting node affinity with the target node.
 					podTemplate.Spec.Affinity = util.ReplaceDaemonSetPodNodeNameNodeAffinity(
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
-					podTemplate.Spec.Tolerations = util.AppendNoScheduleTolerationIfNotExist(podTemplate.Spec.Tolerations)
 
 					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
 						ds, metav1.NewControllerRef(ds, controllerKind))
@@ -1247,51 +1287,6 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 }
 
 func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *apps.DaemonSet) ([]algorithm.PredicateFailureReason, *schedulercache.NodeInfo, error) {
-	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
-	// Add infinite toleration for taint notReady:NoExecute here
-	// to survive taint-based eviction enforced by NodeController
-	// when node turns not ready.
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeNotReady,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoExecute,
-	})
-
-	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
-	// Add infinite toleration for taint unreachable:NoExecute here
-	// to survive taint-based eviction enforced by NodeController
-	// when node turns unreachable.
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeUnreachable,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoExecute,
-	})
-
-	// According to TaintNodesByCondition, all DaemonSet pods should tolerate
-	// MemoryPressure and DisPressure taints, and the critical pods should tolerate
-	// OutOfDisk taint additional.
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeDiskPressure,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoSchedule,
-	})
-
-	v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-		Key:      algorithm.TaintNodeMemoryPressure,
-		Operator: v1.TolerationOpExists,
-		Effect:   v1.TaintEffectNoSchedule,
-	})
-
-	// TODO(#48843) OutOfDisk taints will be removed in 1.10
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(newPod) {
-		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
-			Key:      algorithm.TaintNodeOutOfDisk,
-			Operator: v1.TolerationOpExists,
-			Effect:   v1.TaintEffectNoSchedule,
-		})
-	}
-
 	objects, err := dsc.podNodeIndex.ByIndex("nodeName", node.Name)
 	if err != nil {
 		return nil, nil, err
@@ -1421,14 +1416,19 @@ func NewPod(ds *apps.DaemonSet, nodeName string) *v1.Pod {
 	newPod := &v1.Pod{Spec: ds.Spec.Template.Spec, ObjectMeta: ds.Spec.Template.ObjectMeta}
 	newPod.Namespace = ds.Namespace
 	newPod.Spec.NodeName = nodeName
+
+	// Added default tolerations for DaemonSet pods.
+	util.AddOrUpdateDaemonPodTolerations(&newPod.Spec, kubelettypes.IsCriticalPod(newPod))
+
 	return newPod
 }
 
-// nodeSelectionPredicates runs a set of predicates that select candidate nodes for the DaemonSet;
+// checkNodeFitness runs a set of predicates that select candidate nodes for the DaemonSet;
 // the predicates include:
 //   - PodFitsHost: checks pod's NodeName against node
 //   - PodMatchNodeSelector: checks pod's NodeSelector and NodeAffinity against node
-func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+//   - PodToleratesNodeTaints: exclude tainted node unless pod has specific toleration
+func checkNodeFitness(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 	fit, reasons, err := predicates.PodFitsHost(pod, meta, nodeInfo)
 	if err != nil {
@@ -1445,6 +1445,14 @@ func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, node
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
 	}
+
+	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
 	return len(predicateFails) == 0, predicateFails, nil
 }
 
@@ -1453,9 +1461,9 @@ func nodeSelectionPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, node
 func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 
-	// If ScheduleDaemonSetPods is enabled, only check nodeSelector and nodeAffinity.
+	// If ScheduleDaemonSetPods is enabled, only check nodeSelector, nodeAffinity and toleration/taint match.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-		fit, reasons, err := nodeSelectionPredicates(pod, nil, nodeInfo)
+		fit, reasons, err := checkNodeFitness(pod, nil, nodeInfo)
 		if err != nil {
 			return false, predicateFails, err
 		}
@@ -1466,8 +1474,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
-	critical := utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(pod)
+	critical := kubelettypes.IsCriticalPod(pod)
 
 	fit, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	if err != nil {
@@ -1491,19 +1498,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
-}
-
-// byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []*apps.DaemonSet
-
-func (o byCreationTimestamp) Len() int      { return len(o) }
-func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 type podByCreationTimestampAndPhase []*v1.Pod
@@ -1534,4 +1528,8 @@ func isControlledByDaemonSet(p *v1.Pod, uuid types.UID) bool {
 		}
 	}
 	return false
+}
+
+func failedPodsBackoffKey(ds *apps.DaemonSet, nodeName string) string {
+	return fmt.Sprintf("%s/%d/%s", ds.UID, ds.Status.ObservedGeneration, nodeName)
 }

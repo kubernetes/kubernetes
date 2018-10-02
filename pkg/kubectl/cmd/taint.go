@@ -30,12 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -164,7 +163,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 	o.builder = f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace()
 	if o.selector != "" {
@@ -246,11 +245,7 @@ func (o TaintOptions) RunTaint() error {
 			return err
 		}
 
-		obj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, v1.SchemeGroupVersion)
-		if err != nil {
-			glog.V(1).Info(err)
-			return fmt.Errorf("object was not a node.v1.: %T", info.Object)
-		}
+		obj := info.Object
 		name, namespace := info.Name, info.Namespace
 		oldData, err := json.Marshal(obj)
 		if err != nil {
@@ -279,7 +274,7 @@ func (o TaintOptions) RunTaint() error {
 
 		var outputObj runtime.Object
 		if createdPatch {
-			outputObj, err = helper.Patch(namespace, name, types.StrategicMergePatchType, patchBytes)
+			outputObj, err = helper.Patch(namespace, name, types.StrategicMergePatchType, patchBytes, nil)
 		} else {
 			outputObj, err = helper.Replace(namespace, name, false, obj)
 		}

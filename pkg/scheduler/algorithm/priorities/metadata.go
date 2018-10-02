@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
@@ -66,7 +65,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
 		affinity:                pod.Spec.Affinity,
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
-		controllerRef:           priorityutil.GetControllerRef(pod),
+		controllerRef:           metav1.GetControllerOf(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		totalNumNodes:           len(nodeNameToInfo),
 	}

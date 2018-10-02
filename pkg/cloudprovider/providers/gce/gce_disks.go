@@ -746,9 +746,8 @@ func (gce *GCECloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, 
 		return oldSize, err
 	}
 
-	requestBytes := newSize.Value()
 	// GCE resizes in chunks of GiBs
-	requestGIB := volumeutil.RoundUpSize(requestBytes, volumeutil.GIB)
+	requestGIB := volumeutil.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
 
 	// If disk is already of size equal or greater than requested size, we simply return

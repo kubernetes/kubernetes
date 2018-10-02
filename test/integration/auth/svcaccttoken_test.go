@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -36,7 +37,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
-	externalclientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -82,7 +82,11 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			serviceaccount.NewValidator(aud, serviceaccountgetter.NewGetterFromClient(gcs)),
 		),
 	)
-	masterConfig.ExtraConfig.ServiceAccountIssuer = serviceaccount.JWTTokenGenerator(iss, sk)
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	masterConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
 	masterConfig.ExtraConfig.ServiceAccountAPIAudiences = aud
 	masterConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
 
@@ -158,7 +162,10 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
-		doTokenReview(t, cs, treq, false)
+		info := doTokenReview(t, cs, treq, false)
+		if info.Extra != nil {
+			t.Fatalf("expected Extra to be nil but got: %#v", info.Extra)
+		}
 		delSvcAcct()
 		doTokenReview(t, cs, treq, true)
 	})
@@ -211,7 +218,16 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		checkPayload(t, treq.Status.Token, `"myns"`, "kubernetes.io", "namespace")
 		checkPayload(t, treq.Status.Token, `"test-svcacct"`, "kubernetes.io", "serviceaccount", "name")
 
-		doTokenReview(t, cs, treq, false)
+		info := doTokenReview(t, cs, treq, false)
+		if len(info.Extra) != 2 {
+			t.Fatalf("expected Extra have length of 2 but was length %d: %#v", len(info.Extra), info.Extra)
+		}
+		if expected := map[string]authenticationv1.ExtraValue{
+			"authentication.kubernetes.io/pod-name": {pod.ObjectMeta.Name},
+			"authentication.kubernetes.io/pod-uid":  {string(pod.ObjectMeta.UID)},
+		}; !reflect.DeepEqual(info.Extra, expected) {
+			t.Fatalf("unexpected Extra:\ngot:\t%#v\nwant:\t%#v", info.Extra, expected)
+		}
 		delPod()
 		doTokenReview(t, cs, treq, true)
 	})
@@ -536,7 +552,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	})
 }
 
-func doTokenReview(t *testing.T, cs externalclientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) {
+func doTokenReview(t *testing.T, cs clientset.Interface, treq *authenticationv1.TokenRequest, expectErr bool) authenticationv1.UserInfo {
 	t.Helper()
 	trev, err := cs.AuthenticationV1().TokenReviews().Create(&authenticationv1.TokenReview{
 		Spec: authenticationv1.TokenReviewSpec{
@@ -556,6 +572,7 @@ func doTokenReview(t *testing.T, cs externalclientset.Interface, treq *authentic
 	if !trev.Status.Authenticated && !expectErr {
 		t.Fatal("expected token to be authenticated but it wasn't")
 	}
+	return trev.Status.User
 }
 
 func checkPayload(t *testing.T, tok string, want string, parts ...string) {

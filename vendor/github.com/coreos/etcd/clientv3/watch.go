@@ -769,10 +769,13 @@ func (w *watchGrpcStream) joinSubstreams() {
 	}
 }
 
+var maxBackoff = 100 * time.Millisecond
+
 // openWatchClient retries opening a watch client until success or halt.
 // manually retry in case "ws==nil && err==nil"
 // TODO: remove FailFast=false
 func (w *watchGrpcStream) openWatchClient() (ws pb.Watch_WatchClient, err error) {
+	backoff := time.Millisecond
 	for {
 		select {
 		case <-w.ctx.Done():
@@ -787,6 +790,17 @@ func (w *watchGrpcStream) openWatchClient() (ws pb.Watch_WatchClient, err error)
 		}
 		if isHaltErr(w.ctx, err) {
 			return nil, v3rpc.Error(err)
+		}
+		if isUnavailableErr(w.ctx, err) {
+			// retry, but backoff
+			if backoff < maxBackoff {
+				// 25% backoff factor
+				backoff = backoff + backoff/4
+				if backoff > maxBackoff {
+					backoff = maxBackoff
+				}
+			}
+			time.Sleep(backoff)
 		}
 	}
 	return ws, nil

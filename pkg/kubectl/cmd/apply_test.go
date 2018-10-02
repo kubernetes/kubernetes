@@ -32,24 +32,22 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -147,9 +145,9 @@ func readReplicationController(t *testing.T, filenameRC string) (string, []byte)
 	return metaAccessor.GetName(), rcBytes
 }
 
-func readReplicationControllerFromFile(t *testing.T, filename string) *api.ReplicationController {
+func readReplicationControllerFromFile(t *testing.T, filename string) *corev1.ReplicationController {
 	data := readBytesFromFile(t, filename)
-	rc := api.ReplicationController{}
+	rc := corev1.ReplicationController{}
 	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &rc); err != nil {
 		t.Fatal(err)
 	}
@@ -166,9 +164,9 @@ func readUnstructuredFromFile(t *testing.T, filename string) *unstructured.Unstr
 	return &unst
 }
 
-func readServiceFromFile(t *testing.T, filename string) *api.Service {
+func readServiceFromFile(t *testing.T, filename string) *corev1.Service {
 	data := readBytesFromFile(t, filename)
-	svc := api.Service{}
+	svc := corev1.Service{}
 	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &svc); err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +203,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	if currentAnnotations == nil {
 		currentAnnotations = make(map[string]string)
 	}
-	currentAnnotations[api.LastAppliedConfigAnnotation] = string(original)
+	currentAnnotations[corev1.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
 	current, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, currentObj)
 	if err != nil {
@@ -245,7 +243,7 @@ func validatePatchApplication(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[corev1.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 
@@ -395,7 +393,7 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -409,9 +407,9 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(test.respBytes))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == "/namespaces/test/replicationcontrollers/no-match" && m == "GET":
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
 					case p == "/api/v1/namespaces/test" && m == "GET":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
@@ -854,11 +852,12 @@ const (
 
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)
-	obj := &extensions.Deployment{}
-	if err := runtime.DecodeInto(testapi.Extensions.Codec(), raw, obj); err != nil {
+	obj := &extensionsv1beta1.Deployment{}
+	codec := scheme.Codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion)
+	if err := runtime.DecodeInto(codec, raw, obj); err != nil {
 		t.Fatal(err)
 	}
-	objJSON, err := runtime.Encode(testapi.Extensions.Codec(), obj)
+	objJSON, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -896,7 +895,7 @@ func TestApplyNULLPreservation(t *testing.T) {
 							t.Fatal(err)
 						}
 						annotationMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-						if _, ok := annotationMap[api.LastAppliedConfigAnnotation]; !ok {
+						if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; !ok {
 							t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 						}
 						strategy := walkMapPath(t, patchMap, []string{"spec", "strategy"})
@@ -1122,7 +1121,7 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -1136,13 +1135,13 @@ func TestRunApplySetLastApplied(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(noAnnotationRC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == noExistPath && m == "GET":
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &api.Pod{})}, nil
+						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
 					case p == pathRC && m == "PATCH":
 						checkPatchString(t, req)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
 					case p == "/api/v1/namespaces/test" && m == "GET":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
+						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.Namespace{})}, nil
 					default:
 						t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 						return nil, nil
@@ -1184,7 +1183,7 @@ func checkPatchString(t *testing.T, req *http.Request) {
 	}
 
 	annotationsMap := walkMapPath(t, patchMap, []string{"metadata", "annotations"})
-	if _, ok := annotationsMap[api.LastAppliedConfigAnnotation]; !ok {
+	if _, ok := annotationsMap[corev1.LastAppliedConfigAnnotation]; !ok {
 		t.Fatalf("patch does not contain annotation:\n%s\n", patch)
 	}
 
@@ -1231,7 +1230,7 @@ func TestForceApply(t *testing.T) {
 						var bodyRC io.ReadCloser
 						if isScaledDownToZero {
 							rcObj := readReplicationControllerFromFile(t, filenameRC)
-							rcObj.Spec.Replicas = 0
+							rcObj.Spec.Replicas = int32ptr(0)
 							rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
 							if err != nil {
 								t.Fatal(err)

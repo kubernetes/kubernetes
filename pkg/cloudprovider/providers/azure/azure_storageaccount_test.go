@@ -64,7 +64,7 @@ func TestGetStorageAccessKeys(t *testing.T) {
 		expectedKey := test.expectedKey
 		fake.Keys = test.results
 		fake.Err = test.err
-		key, err := cloud.getStorageAccesskey("acct")
+		key, err := cloud.getStorageAccesskey("acct", "rg")
 		if test.expectErr && err == nil {
 			t.Errorf("Unexpected non-error")
 			continue

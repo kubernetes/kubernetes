@@ -42,10 +42,10 @@ func NewVirtualNetworkGatewayConnectionsClientWithBaseURI(baseURI string, subscr
 }
 
 // CreateOrUpdate creates or updates a virtual network gateway connection in the specified resource group.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkGatewayConnectionName is the name of the
-// virtual network gateway connection. parameters is parameters supplied to the create or update virtual network
-// gateway connection operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkGatewayConnectionName - the name of the virtual network gateway connection.
+// parameters - parameters supplied to the create or update virtual network gateway connection operation.
 func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, virtualNetworkGatewayConnectionName string, parameters VirtualNetworkGatewayConnection) (result VirtualNetworkGatewayConnectionsCreateOrUpdateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
@@ -89,7 +89,7 @@ func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdatePreparer(ctx 
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/connections/{virtualNetworkGatewayConnectionName}", pathParameters),
@@ -101,15 +101,17 @@ func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdatePreparer(ctx 
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdateSender(req *http.Request) (future VirtualNetworkGatewayConnectionsCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -127,9 +129,9 @@ func (client VirtualNetworkGatewayConnectionsClient) CreateOrUpdateResponder(res
 }
 
 // Delete deletes the specified virtual network Gateway connection.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkGatewayConnectionName is the name of the
-// virtual network gateway connection.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkGatewayConnectionName - the name of the virtual network gateway connection.
 func (client VirtualNetworkGatewayConnectionsClient) Delete(ctx context.Context, resourceGroupName string, virtualNetworkGatewayConnectionName string) (result VirtualNetworkGatewayConnectionsDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, virtualNetworkGatewayConnectionName)
 	if err != nil {
@@ -170,15 +172,17 @@ func (client VirtualNetworkGatewayConnectionsClient) DeletePreparer(ctx context.
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewayConnectionsClient) DeleteSender(req *http.Request) (future VirtualNetworkGatewayConnectionsDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -195,9 +199,9 @@ func (client VirtualNetworkGatewayConnectionsClient) DeleteResponder(resp *http.
 }
 
 // Get gets the specified virtual network gateway connection by resource group.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkGatewayConnectionName is the name of the
-// virtual network gateway connection.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkGatewayConnectionName - the name of the virtual network gateway connection.
 func (client VirtualNetworkGatewayConnectionsClient) Get(ctx context.Context, resourceGroupName string, virtualNetworkGatewayConnectionName string) (result VirtualNetworkGatewayConnection, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, virtualNetworkGatewayConnectionName)
 	if err != nil {
@@ -263,9 +267,9 @@ func (client VirtualNetworkGatewayConnectionsClient) GetResponder(resp *http.Res
 
 // GetSharedKey the Get VirtualNetworkGatewayConnectionSharedKey operation retrieves information about the specified
 // virtual network gateway connection shared key through Network resource provider.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkGatewayConnectionName is the virtual network
-// gateway connection shared key name.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkGatewayConnectionName - the virtual network gateway connection shared key name.
 func (client VirtualNetworkGatewayConnectionsClient) GetSharedKey(ctx context.Context, resourceGroupName string, virtualNetworkGatewayConnectionName string) (result ConnectionSharedKey, err error) {
 	req, err := client.GetSharedKeyPreparer(ctx, resourceGroupName, virtualNetworkGatewayConnectionName)
 	if err != nil {
@@ -331,8 +335,8 @@ func (client VirtualNetworkGatewayConnectionsClient) GetSharedKeyResponder(resp 
 
 // List the List VirtualNetworkGatewayConnections operation retrieves all the virtual network gateways connections
 // created.
-//
-// resourceGroupName is the name of the resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
 func (client VirtualNetworkGatewayConnectionsClient) List(ctx context.Context, resourceGroupName string) (result VirtualNetworkGatewayConnectionListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
@@ -426,15 +430,16 @@ func (client VirtualNetworkGatewayConnectionsClient) ListComplete(ctx context.Co
 // ResetSharedKey the VirtualNetworkGatewayConnectionResetSharedKey operation resets the virtual network gateway
 // connection shared key for passed virtual network gateway connection in the specified resource group through Network
 // resource provider.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkGatewayConnectionName is the virtual network
-// gateway connection reset shared key Name. parameters is parameters supplied to the begin reset virtual network
-// gateway connection shared key operation through network resource provider.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkGatewayConnectionName - the virtual network gateway connection reset shared key Name.
+// parameters - parameters supplied to the begin reset virtual network gateway connection shared key operation
+// through network resource provider.
 func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKey(ctx context.Context, resourceGroupName string, virtualNetworkGatewayConnectionName string, parameters ConnectionResetSharedKey) (result VirtualNetworkGatewayConnectionsResetSharedKeyFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
 			Constraints: []validation.Constraint{{Target: "parameters.KeyLength", Name: validation.Null, Rule: true,
-				Chain: []validation.Constraint{{Target: "parameters.KeyLength", Name: validation.InclusiveMaximum, Rule: 128, Chain: nil},
+				Chain: []validation.Constraint{{Target: "parameters.KeyLength", Name: validation.InclusiveMaximum, Rule: int64(128), Chain: nil},
 					{Target: "parameters.KeyLength", Name: validation.InclusiveMinimum, Rule: 1, Chain: nil},
 				}}}}}); err != nil {
 		return result, validation.NewError("network.VirtualNetworkGatewayConnectionsClient", "ResetSharedKey", err.Error())
@@ -469,7 +474,7 @@ func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKeyPreparer(ctx 
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/connections/{virtualNetworkGatewayConnectionName}/sharedkey/reset", pathParameters),
@@ -481,15 +486,17 @@ func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKeyPreparer(ctx 
 // ResetSharedKeySender sends the ResetSharedKey request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKeySender(req *http.Request) (future VirtualNetworkGatewayConnectionsResetSharedKeyFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -509,10 +516,11 @@ func (client VirtualNetworkGatewayConnectionsClient) ResetSharedKeyResponder(res
 // SetSharedKey the Put VirtualNetworkGatewayConnectionSharedKey operation sets the virtual network gateway connection
 // shared key for passed virtual network gateway connection in the specified resource group through Network resource
 // provider.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkGatewayConnectionName is the virtual network
-// gateway connection name. parameters is parameters supplied to the Begin Set Virtual Network Gateway connection
-// Shared key operation throughNetwork resource provider.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkGatewayConnectionName - the virtual network gateway connection name.
+// parameters - parameters supplied to the Begin Set Virtual Network Gateway connection Shared key operation
+// throughNetwork resource provider.
 func (client VirtualNetworkGatewayConnectionsClient) SetSharedKey(ctx context.Context, resourceGroupName string, virtualNetworkGatewayConnectionName string, parameters ConnectionSharedKey) (result VirtualNetworkGatewayConnectionsSetSharedKeyFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: parameters,
@@ -549,7 +557,7 @@ func (client VirtualNetworkGatewayConnectionsClient) SetSharedKeyPreparer(ctx co
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/connections/{virtualNetworkGatewayConnectionName}/sharedkey", pathParameters),
@@ -561,15 +569,17 @@ func (client VirtualNetworkGatewayConnectionsClient) SetSharedKeyPreparer(ctx co
 // SetSharedKeySender sends the SetSharedKey request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewayConnectionsClient) SetSharedKeySender(req *http.Request) (future VirtualNetworkGatewayConnectionsSetSharedKeyFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -587,10 +597,10 @@ func (client VirtualNetworkGatewayConnectionsClient) SetSharedKeyResponder(resp 
 }
 
 // UpdateTags updates a virtual network gateway connection tags.
-//
-// resourceGroupName is the name of the resource group. virtualNetworkGatewayConnectionName is the name of the
-// virtual network gateway connection. parameters is parameters supplied to update virtual network gateway
-// connection tags.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkGatewayConnectionName - the name of the virtual network gateway connection.
+// parameters - parameters supplied to update virtual network gateway connection tags.
 func (client VirtualNetworkGatewayConnectionsClient) UpdateTags(ctx context.Context, resourceGroupName string, virtualNetworkGatewayConnectionName string, parameters TagsObject) (result VirtualNetworkGatewayConnectionsUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, virtualNetworkGatewayConnectionName, parameters)
 	if err != nil {
@@ -621,7 +631,7 @@ func (client VirtualNetworkGatewayConnectionsClient) UpdateTagsPreparer(ctx cont
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/connections/{virtualNetworkGatewayConnectionName}", pathParameters),
@@ -633,15 +643,17 @@ func (client VirtualNetworkGatewayConnectionsClient) UpdateTagsPreparer(ctx cont
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualNetworkGatewayConnectionsClient) UpdateTagsSender(req *http.Request) (future VirtualNetworkGatewayConnectionsUpdateTagsFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

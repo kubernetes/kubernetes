@@ -32,7 +32,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -114,7 +114,10 @@ func newProxyServer(
 	}
 
 	// Create event recorder
-	hostname := utilnode.GetHostname(config.HostnameOverride)
+	hostname, err := utilnode.GetHostname(config.HostnameOverride)
+	if err != nil {
+		return nil, err
+	}
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
 

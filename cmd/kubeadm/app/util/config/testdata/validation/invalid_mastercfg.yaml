@@ -1,16 +1,7 @@
-apiVersion: kubeadm.k8s.io/v1alpha2
-kind: MasterConfiguration
-api:
-  bindPort: 0
-bootstrapTokens:
-- token: s7bu.6tw6wn
-certificatesDir: relativepath
-clusterName: kubernetes
-imageRepository: my-company.com
-kubernetesVersion: v1.10.2
+apiVersion: kubeadm.k8s.io/v1alpha3
+kind: ClusterConfiguration
 networking:
-  dnsDomain: cluster.GLOBAL
-  serviceSubnet: 10.196.1000.0/100
-nodeRegistration:
-  criSocket: relativepath
-  name: MASTER
+  dnsDomain: INVALID-DOMAIN-!!!!
+  podSubnet: ""
+  serviceSubnet: 10.96.0.0/12
+unifiedControlPlaneImage: ""

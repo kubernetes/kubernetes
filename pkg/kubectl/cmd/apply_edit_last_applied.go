@@ -19,10 +19,10 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var (
@@ -76,10 +76,10 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 
 	// bind flag structs
 	o.RecordFlags.AddFlags(cmd)
+	o.PrintFlags.AddFlags(cmd)
 
 	usage := "to use to edit the resource"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "Output format. One of: yaml|json.")
 	cmd.Flags().BoolVar(&o.WindowsLineEndings, "windows-line-endings", o.WindowsLineEndings,
 		"Defaults to the line ending native to your platform.")
 	cmdutil.AddIncludeUninitializedFlag(cmd)

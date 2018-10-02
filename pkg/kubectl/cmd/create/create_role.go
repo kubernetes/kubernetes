@@ -28,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientgorbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -131,7 +131,7 @@ type CreateRoleOptions struct {
 
 func NewCreateRoleOptions(ioStreams genericclioptions.IOStreams) *CreateRoleOptions {
 	return &CreateRoleOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		IOStreams: ioStreams,
 	}
@@ -203,6 +203,11 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 			resource.Group = parts[1]
 		}
 		resource.Resource = parts[0]
+
+		if resource.Resource == "*" && len(parts) == 1 && len(sections) == 1 {
+			o.Resources = []ResourceOptions{*resource}
+			break
+		}
 
 		o.Resources = append(o.Resources, *resource)
 	}
@@ -278,6 +283,9 @@ func (o *CreateRoleOptions) validateResource() error {
 	for _, r := range o.Resources {
 		if len(r.Resource) == 0 {
 			return fmt.Errorf("resource must be specified if apiGroup/subresource specified")
+		}
+		if r.Resource == "*" {
+			return nil
 		}
 
 		resource := schema.GroupVersionResource{Resource: r.Resource, Group: r.Group}

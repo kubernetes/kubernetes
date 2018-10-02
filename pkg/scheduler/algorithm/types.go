@@ -17,9 +17,9 @@ limitations under the License.
 package algorithm
 
 import (
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
@@ -120,7 +120,13 @@ type ControllerLister interface {
 // ReplicaSetLister interface represents anything that can produce a list of ReplicaSet; the list is consumed by a scheduler.
 type ReplicaSetLister interface {
 	// Gets the replicasets for the given pod
-	GetPodReplicaSets(*v1.Pod) ([]*extensions.ReplicaSet, error)
+	GetPodReplicaSets(*v1.Pod) ([]*apps.ReplicaSet, error)
+}
+
+// PDBLister interface represents anything that can list PodDisruptionBudget objects.
+type PDBLister interface {
+	// List() returns a list of PodDisruptionBudgets matching the selector.
+	List(labels.Selector) ([]*policyv1beta1.PodDisruptionBudget, error)
 }
 
 var _ ControllerLister = &EmptyControllerLister{}
@@ -144,7 +150,7 @@ var _ ReplicaSetLister = &EmptyReplicaSetLister{}
 type EmptyReplicaSetLister struct{}
 
 // GetPodReplicaSets returns nil
-func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*extensions.ReplicaSet, err error) {
+func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.ReplicaSet, err error) {
 	return nil, nil
 }
 

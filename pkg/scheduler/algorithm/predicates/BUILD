@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "csi_volume_predicate.go",
         "error.go",
         "metadata.go",
         "predicates.go",
@@ -46,6 +47,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "csi_volume_predicate_test.go",
         "max_attachable_volume_predicate_test.go",
         "metadata_test.go",
         "predicates_test.go",

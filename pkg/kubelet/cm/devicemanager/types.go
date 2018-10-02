@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
@@ -31,11 +31,6 @@ import (
 type Manager interface {
 	// Start starts device plugin registration service.
 	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady) error
-
-	// Devices is the map of devices that have registered themselves
-	// against the manager.
-	// The map key is the ResourceName of the device plugins.
-	Devices() map[string][]pluginapi.Device
 
 	// Allocate configures and assigns devices to pods. The pods are provided
 	// through the pod admission attributes in the attrs argument. From the
@@ -58,6 +53,7 @@ type Manager interface {
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
 	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
+	GetWatcherHandler() watcher.PluginHandler
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
@@ -79,22 +75,14 @@ const (
 	errFailedToDialDevicePlugin = "failed to dial device plugin:"
 	// errUnsupportedVersion is the error raised when the device plugin uses an API version not
 	// supported by the Kubelet registry
-	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported versions are %q"
-	// errDevicePluginAlreadyExists is the error raised when a device plugin with the
-	// same Resource Name tries to register itself
-	errDevicePluginAlreadyExists = "another device plugin already registered this Resource Name"
+	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
 	// errInvalidResourceName is the error raised when a device plugin is registering
 	// itself with an invalid ResourceName
 	errInvalidResourceName = "the ResourceName %q is invalid"
-	// errEmptyResourceName is the error raised when the resource name field is empty
-	errEmptyResourceName = "invalid Empty ResourceName"
 	// errEndpointStopped indicates that the endpoint has been stopped
 	errEndpointStopped = "endpoint %v has been stopped"
-
 	// errBadSocket is the error raised when the registry socket path is not absolute
 	errBadSocket = "bad socketPath, must be an absolute path:"
-	// errRemoveSocket is the error raised when the registry could not remove the existing socket
-	errRemoveSocket = "failed to remove socket while starting device plugin registry, with error"
 	// errListenSocket is the error raised when the registry could not listen on the socket
 	errListenSocket = "failed to listen to socket while starting device plugin registry, with error"
 	// errListAndWatch is the error raised when ListAndWatch ended unsuccessfully

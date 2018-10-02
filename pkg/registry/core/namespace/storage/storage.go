@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
@@ -190,6 +191,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 				}
 				return existingNamespace, nil
 			}),
+			dryrun.IsDryRun(options.DryRun),
 		)
 
 		if err != nil {

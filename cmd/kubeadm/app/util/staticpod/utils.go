@@ -67,6 +67,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 			Containers:        []v1.Container{container},
 			PriorityClassName: "system-cluster-critical",
 			HostNetwork:       true,
+			DNSPolicy:         v1.DNSClusterFirstWithHostNet,
 			Volumes:           VolumeMapToSlice(volumes),
 		},
 	}
@@ -230,8 +231,8 @@ func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) st
 		// the node's IP. The only option then is to use localhost.
 		if features.Enabled(cfg.FeatureGates, features.SelfHosting) {
 			return "127.0.0.1"
-		} else if cfg.API.AdvertiseAddress != "" {
-			return cfg.API.AdvertiseAddress
+		} else if cfg.APIEndpoint.AdvertiseAddress != "" {
+			return cfg.APIEndpoint.AdvertiseAddress
 		}
 	case componentName == kubeadmconstants.KubeControllerManager:
 		if addr, exists := cfg.ControllerManagerExtraArgs[kubeControllerManagerAddressArg]; exists {

@@ -28,17 +28,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -79,7 +80,7 @@ var (
 
 func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
 	return &CreateOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -209,7 +210,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	if o.EditBeforeCreate {
-		return RunEditOnCreate(f, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions)
+		return RunEditOnCreate(f, o.PrintFlags, o.RecordFlags, o.IOStreams, cmd, &o.FilenameOptions)
 	}
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
@@ -240,7 +241,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
@@ -298,13 +299,13 @@ func (o *CreateOptions) raw(f cmdutil.Factory) error {
 	return nil
 }
 
-func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFlags, ioStreams genericclioptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions) error {
+func RunEditOnCreate(f cmdutil.Factory, printFlags *genericclioptions.PrintFlags, recordFlags *genericclioptions.RecordFlags, ioStreams genericclioptions.IOStreams, cmd *cobra.Command, options *resource.FilenameOptions) error {
 	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
 	editOptions.FilenameOptions = *options
 	editOptions.ValidateOptions = cmdutil.ValidateOptions{
 		EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
 	}
-	editOptions.Output = cmdutil.GetFlagString(cmd, "output")
+	editOptions.PrintFlags = printFlags
 	editOptions.ApplyAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	editOptions.RecordFlags = recordFlags
 
@@ -317,7 +318,7 @@ func RunEditOnCreate(f cmdutil.Factory, recordFlags *genericclioptions.RecordFla
 
 // createAndRefresh creates an object from input info and refreshes info with that object
 func createAndRefresh(info *resource.Info) error {
-	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object, nil)
 	if err != nil {
 		return err
 	}
@@ -327,8 +328,13 @@ func createAndRefresh(info *resource.Info) error {
 
 // NameFromCommandArgs is a utility function for commands that assume the first argument is a resource name
 func NameFromCommandArgs(cmd *cobra.Command, args []string) (string, error) {
-	if len(args) != 1 {
-		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", len(args))
+	argsLen := cmd.ArgsLenAtDash()
+	// ArgsLenAtDash returns -1 when -- was not specified
+	if argsLen == -1 {
+		argsLen = len(args)
+	}
+	if argsLen != 1 {
+		return "", cmdutil.UsageErrorf(cmd, "exactly one NAME is required, got %d", argsLen)
 	}
 	return args[0], nil
 }
@@ -358,7 +364,7 @@ type CreateSubcommandOptions struct {
 
 func NewCreateSubcommandOptions(ioStreams genericclioptions.IOStreams) *CreateSubcommandOptions {
 	return &CreateSubcommandOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(legacyscheme.Scheme),
+		PrintFlags: genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }
@@ -412,7 +418,7 @@ func (o *CreateSubcommandOptions) Run() error {
 	}
 	if !o.DryRun {
 		// create subcommands have compiled knowledge of things they create, so type them directly
-		gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj)
+		gvks, _, err := scheme.Scheme.ObjectKinds(obj)
 		if err != nil {
 			return err
 		}
@@ -422,19 +428,19 @@ func (o *CreateSubcommandOptions) Run() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 
 		asUnstructured := &unstructured.Unstructured{}
 
-		if err := legacyscheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
+		if err := scheme.Scheme.Convert(obj, asUnstructured, nil); err != nil {
 			return err
 		}
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			o.Namespace = ""
 		}
-		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured)
+		actualObject, err := o.DynamicClient.Resource(mapping.Resource).Namespace(o.Namespace).Create(asUnstructured, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}

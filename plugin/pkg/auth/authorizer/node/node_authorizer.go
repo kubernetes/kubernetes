@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
@@ -66,12 +68,14 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 }
 
 var (
-	configMapResource = api.Resource("configmaps")
-	secretResource    = api.Resource("secrets")
-	pvcResource       = api.Resource("persistentvolumeclaims")
-	pvResource        = api.Resource("persistentvolumes")
-	vaResource        = storageapi.Resource("volumeattachments")
-	svcAcctResource   = api.Resource("serviceaccounts")
+	configMapResource   = api.Resource("configmaps")
+	secretResource      = api.Resource("secrets")
+	pvcResource         = api.Resource("persistentvolumeclaims")
+	pvResource          = api.Resource("persistentvolumes")
+	vaResource          = storageapi.Resource("volumeattachments")
+	svcAcctResource     = api.Resource("serviceaccounts")
+	leaseResource       = coordapi.Resource("leases")
+	csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos")
 )
 
 func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -113,7 +117,18 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
 			}
 			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
+		case leaseResource:
+			if r.features.Enabled(features.NodeLease) {
+				return r.authorizeLease(nodeName, attrs)
+			}
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.NodeLease), nil
+		case csiNodeInfoResource:
+			if r.features.Enabled(features.KubeletPluginsWatcher) && r.features.Enabled(features.CSINodeInfo) {
+				return r.authorizeCSINodeInfo(nodeName, attrs)
+			}
+			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo), nil
 		}
+
 	}
 
 	// Access to other resources is not subdivided, so just evaluate against the statically defined node rules
@@ -212,6 +227,65 @@ func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vert
 		glog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
+	return authorizer.DecisionAllow, "", nil
+}
+
+// authorizeLease authorizes node requests to coordination.k8s.io/leases.
+func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	// allowed verbs: get, create, update, patch, delete
+	verb := attrs.GetVerb()
+	if verb != "get" &&
+		verb != "create" &&
+		verb != "update" &&
+		verb != "patch" &&
+		verb != "delete" {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a node lease", nil
+	}
+
+	// the request must be against the system namespace reserved for node leases
+	if attrs.GetNamespace() != api.NamespaceNodeLease {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("can only access leases in the %q system namespace", api.NamespaceNodeLease), nil
+	}
+
+	// the request must come from a node with the same name as the lease
+	// note we skip this check for create, since the authorizer doesn't know the name on create
+	// the noderestriction admission plugin is capable of performing this check at create time
+	if verb != "create" && attrs.GetName() != nodeName {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only access node lease with the same name as the requesting node", nil
+	}
+
+	return authorizer.DecisionAllow, "", nil
+}
+
+// authorizeCSINodeInfo authorizes node requests to CSINodeInfo csi.storage.k8s.io/csinodeinfos
+func (r *NodeAuthorizer) authorizeCSINodeInfo(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	// allowed verbs: get, create, update, patch, delete
+	verb := attrs.GetVerb()
+	if verb != "get" &&
+		verb != "create" &&
+		verb != "update" &&
+		verb != "patch" &&
+		verb != "delete" {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINodeInfo", nil
+	}
+
+	if len(attrs.GetSubresource()) > 0 {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "cannot authorize CSINodeInfo subresources", nil
+	}
+
+	// the request must come from a node with the same name as the CSINodeInfo
+	// note we skip this check for create, since the authorizer doesn't know the name on create
+	// the noderestriction admission plugin is capable of performing this check at create time
+	if verb != "create" && attrs.GetName() != nodeName {
+		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only access CSINodeInfo with the same name as the requesting node", nil
+	}
+
 	return authorizer.DecisionAllow, "", nil
 }
 

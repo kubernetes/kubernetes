@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -42,7 +43,6 @@ import (
 
 // NewCmdReset returns the "kubeadm reset" command
 func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
-	var skipPreFlight bool
 	var certsDir string
 	var criSocketPath string
 	var ignorePreflightErrors []string
@@ -52,7 +52,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors, skipPreFlight)
+			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
 			r, err := NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
@@ -61,15 +61,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringSliceVar(
-		&ignorePreflightErrors, "ignore-preflight-errors", ignorePreflightErrors,
-		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
-	)
-	cmd.PersistentFlags().BoolVar(
-		&skipPreFlight, "skip-preflight-checks", false,
-		"Skip preflight checks which normally run before modifying the system.",
-	)
-	cmd.PersistentFlags().MarkDeprecated("skip-preflight-checks", "it is now equivalent to --ignore-preflight-errors=all")
+	options.AddIgnorePreflightErrorsFlag(cmd.PersistentFlags(), &ignorePreflightErrors)
 
 	cmd.PersistentFlags().StringVar(
 		&certsDir, "cert-dir", kubeadmapiv1alpha3.DefaultCertificatesDir,
@@ -138,21 +130,21 @@ func (r *Reset) Run(out io.Writer) error {
 		}
 	}
 
-	// Try to unmount mounted directories under /var/lib/kubelet in order to be able to remove the /var/lib/kubelet directory later
-	fmt.Printf("[reset] unmounting mounted directories in %q\n", "/var/lib/kubelet")
-	umountDirsCmd := "awk '$2 ~ path {print $2}' path=/var/lib/kubelet /proc/mounts | xargs -r umount"
+	// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
+	fmt.Printf("[reset] unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s /proc/mounts | xargs -r umount", kubeadmconstants.KubeletRunDirectory)
 
 	glog.V(1).Infof("[reset] executing command %q", umountDirsCmd)
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
-		glog.Errorf("[reset] failed to unmount mounted directories in /var/lib/kubelet: %s\n", string(umountOutputBytes))
+		glog.Errorf("[reset] failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
 	}
 
 	glog.V(1).Info("[reset] removing kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.criSocketPath); err != nil {
 		glog.Errorf("[reset] failed to remove containers: %+v", err)
 	}
-	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}
+	dirsToClean := []string{kubeadmconstants.KubeletRunDirectory, "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is their own responsibility to reset etcd

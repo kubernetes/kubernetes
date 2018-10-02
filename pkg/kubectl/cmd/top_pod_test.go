@@ -32,12 +32,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	apiversion "k8s.io/apimachinery/pkg/version"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
@@ -132,6 +133,14 @@ func TestTopPod(t *testing.T) {
 			namespaces:   []string{testNS},
 			containers:   true,
 		},
+		{
+			name:         "no-headers set",
+			flags:        map[string]string{"containers": "true", "no-headers": "true"},
+			args:         []string{"pod1"},
+			expectedPath: topPathPrefix + "/namespaces/" + testNS + "/pods/pod1",
+			namespaces:   []string{testNS},
+			containers:   true,
+		},
 	}
 	initTestErrorHandler(t)
 	for _, testCase := range testCases {
@@ -167,7 +176,7 @@ func TestTopPod(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
-			ns := legacyscheme.Codecs
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
@@ -220,6 +229,9 @@ func TestTopPod(t *testing.T) {
 				if strings.Contains(result, name) {
 					t.Errorf("%s: unexpected metrics for %s: \n%s", testCase.name, name, result)
 				}
+			}
+			if cmdutil.GetFlagBool(cmd, "no-headers") && strings.Contains(result, "MEMORY") {
+				t.Errorf("%s: unexpected headers with no-headers option set: \n%s", testCase.name, result)
 			}
 		})
 	}
@@ -311,7 +323,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
-			ns := legacyscheme.Codecs
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,
@@ -509,7 +521,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
-			ns := legacyscheme.Codecs
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: ns,

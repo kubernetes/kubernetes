@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
@@ -182,71 +181,6 @@ func testComparePods(actual, cached, queued, missing, redundant []string, t *tes
 	}
 
 	m, r := compare.ComparePods(pods, queuedPods, nodeInfo)
-
-	if !reflect.DeepEqual(m, missing) {
-		t.Errorf("missing expected to be %s; got %s", missing, m)
-	}
-
-	if !reflect.DeepEqual(r, redundant) {
-		t.Errorf("redundant expected to be %s; got %s", redundant, r)
-	}
-}
-
-func TestComparePdbs(t *testing.T) {
-	tests := []struct {
-		name      string
-		actual    []string
-		cached    []string
-		missing   []string
-		redundant []string
-	}{
-		{
-			name:      "redundant cache value",
-			actual:    []string{"foo", "bar"},
-			cached:    []string{"bar", "foo", "foobar"},
-			missing:   []string{},
-			redundant: []string{"foobar"},
-		},
-		{
-			name:      "missing cache value",
-			actual:    []string{"foo", "bar", "foobar"},
-			cached:    []string{"bar", "foo"},
-			missing:   []string{"foobar"},
-			redundant: []string{},
-		},
-		{
-			name:      "correct cache",
-			actual:    []string{"foo", "bar", "foobar"},
-			cached:    []string{"bar", "foobar", "foo"},
-			missing:   []string{},
-			redundant: []string{},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			testComparePdbs(test.actual, test.cached, test.missing, test.redundant, t)
-		})
-	}
-}
-
-func testComparePdbs(actual, cached, missing, redundant []string, t *testing.T) {
-	compare := compareStrategy{}
-	pdbs := []*policy.PodDisruptionBudget{}
-	for _, uid := range actual {
-		pdb := &policy.PodDisruptionBudget{}
-		pdb.UID = types.UID(uid)
-		pdbs = append(pdbs, pdb)
-	}
-
-	cache := make(map[string]*policy.PodDisruptionBudget)
-	for _, uid := range cached {
-		pdb := &policy.PodDisruptionBudget{}
-		pdb.UID = types.UID(uid)
-		cache[uid] = pdb
-	}
-
-	m, r := compare.ComparePdbs(pdbs, cache)
 
 	if !reflect.DeepEqual(m, missing) {
 		t.Errorf("missing expected to be %s; got %s", missing, m)

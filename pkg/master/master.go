@@ -35,6 +35,7 @@ import (
 	authorizationapiv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingapiv1 "k8s.io/api/autoscaling/v1"
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
+	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
@@ -66,6 +67,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -167,6 +169,9 @@ type ExtraConfig struct {
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountAPIAudiences  []string
 	ServiceAccountMaxExpiration time.Duration
+
+	VersionedInformers informers.SharedInformerFactory
+	InternalInformers  internalinformers.SharedInformerFactory
 }
 
 type Config struct {
@@ -248,9 +253,9 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (cfg *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
+func (cfg *Config) Complete() CompletedConfig {
 	c := completedConfig{
-		cfg.GenericConfig.Complete(informers),
+		cfg.GenericConfig.Complete(cfg.ExtraConfig.VersionedInformers),
 		&cfg.ExtraConfig,
 	}
 
@@ -367,6 +372,12 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
+	m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-informers", func(context genericapiserver.PostStartHookContext) error {
+		if c.ExtraConfig.InternalInformers != nil {
+			c.ExtraConfig.InternalInformers.Start(context.StopCh)
+		}
+		return nil
+	})
 
 	return m, nil
 }
@@ -477,6 +488,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		authorizationapiv1beta1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		autoscalingapiv2beta1.SchemeGroupVersion,
+		autoscalingapiv2beta2.SchemeGroupVersion,
 		batchapiv1.SchemeGroupVersion,
 		batchapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1beta1.SchemeGroupVersion,

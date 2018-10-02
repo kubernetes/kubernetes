@@ -19,6 +19,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -26,26 +27,20 @@ import (
 	"reflect"
 	stdstrings "strings"
 	"testing"
-	"time"
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
-
-// This init should be removed after switching this command and its tests to user external types.
-func init() {
-	utilruntime.Must(api.AddToScheme(scheme.Scheme))
-}
 
 func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
@@ -70,50 +65,55 @@ func defaultClientConfig() *restclient.Config {
 	}
 }
 
-func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
-	pods := &api.PodList{
+func testData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {
+	pods := &corev1.PodList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
-		Items: []api.Pod{
+		Items: []corev1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec:       apitesting.DeepEqualSafePodSpec(),
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec:       apitesting.DeepEqualSafePodSpec(),
+				Spec:       apitesting.V1DeepEqualSafePodSpec(),
 			},
 		},
 	}
-	svc := &api.ServiceList{
+	svc := &corev1.ServiceList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "16",
 		},
-		Items: []api.Service{
+		Items: []corev1.Service{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					SessionAffinity: "None",
-					Type:            api.ServiceTypeClusterIP,
+					Type:            corev1.ServiceTypeClusterIP,
 				},
 			},
 		},
 	}
-	rc := &api.ReplicationControllerList{
+	rc := &corev1.ReplicationControllerList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "17",
 		},
-		Items: []api.ReplicationController{
+		Items: []corev1.ReplicationController{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
-				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+				Spec: corev1.ReplicationControllerSpec{
+					Replicas: int32ptr(1),
 				},
 			},
 		},
 	}
 	return pods, svc, rc
+}
+
+func int32ptr(val int) *int32 {
+	t := int32(val)
+	return &t
 }
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
@@ -130,98 +130,6 @@ func bytesBody(bodyBytes []byte) io.ReadCloser {
 
 func stringBody(body string) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
-}
-
-func newAllPhasePodList() *api.PodList {
-	nodeName := "kubernetes-node-abcd"
-	return &api.PodList{
-		Items: []api.Pod{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test1",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-				},
-				Spec: api.PodSpec{
-					Containers: make([]api.Container, 2),
-					NodeName:   nodeName,
-				},
-				Status: api.PodStatus{
-					Phase: api.PodPending,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{RestartCount: 3},
-					},
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test2",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-				},
-				Spec: api.PodSpec{
-					Containers: make([]api.Container, 2),
-					NodeName:   nodeName,
-				},
-				Status: api.PodStatus{
-					Phase: api.PodRunning,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{RestartCount: 3},
-					},
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test3",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-				},
-				Spec: api.PodSpec{
-					Containers: make([]api.Container, 2),
-					NodeName:   nodeName,
-				},
-				Status: api.PodStatus{
-					Phase: api.PodSucceeded,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{RestartCount: 3},
-					},
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test4",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-				},
-				Spec: api.PodSpec{
-					Containers: make([]api.Container, 2),
-					NodeName:   nodeName,
-				},
-				Status: api.PodStatus{
-					Phase: api.PodFailed,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{RestartCount: 3},
-					},
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test5",
-					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
-				},
-				Spec: api.PodSpec{
-					Containers: make([]api.Container, 2),
-					NodeName:   nodeName,
-				},
-				Status: api.PodStatus{
-					Phase: api.PodUnknown,
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{RestartCount: 3},
-					},
-				},
-			}},
-	}
 }
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -306,4 +214,107 @@ func Test_deprecatedAlias(t *testing.T) {
 	if !correctCommandCalled {
 		t.Errorf("original function doesn't appear to have been called by alias")
 	}
+}
+
+func TestKubectlCommandHandlesPlugins(t *testing.T) {
+	tests := []struct {
+		name             string
+		args             []string
+		expectPlugin     string
+		expectPluginArgs []string
+		expectError      string
+	}{
+		{
+			name:             "test that normal commands are able to be executed, when no plugin overshadows them",
+			args:             []string{"kubectl", "get", "foo"},
+			expectPlugin:     "",
+			expectPluginArgs: []string{},
+		},
+		{
+			name:             "test that a plugin executable is found based on command args",
+			args:             []string{"kubectl", "foo", "--bar"},
+			expectPlugin:     "testdata/plugin/kubectl-foo",
+			expectPluginArgs: []string{"foo", "--bar"},
+		},
+		{
+			name: "test that a plugin does not execute over an existing command by the same name",
+			args: []string{"kubectl", "version"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pluginsHandler := &testPluginHandler{
+				pluginsDirectory: "testdata/plugin",
+			}
+			_, in, out, errOut := genericclioptions.NewTestIOStreams()
+
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				errOut.Write([]byte(str))
+			})
+
+			root := NewDefaultKubectlCommandWithArgs(pluginsHandler, test.args, in, out, errOut)
+			if err := root.Execute(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if pluginsHandler.err != nil && pluginsHandler.err.Error() != test.expectError {
+				t.Fatalf("unexpected error: expected %q to occur, but got %q", test.expectError, pluginsHandler.err)
+			}
+
+			if pluginsHandler.executedPlugin != test.expectPlugin {
+				t.Fatalf("unexpected plugin execution: expedcted %q, got %q", test.expectPlugin, pluginsHandler.executedPlugin)
+			}
+
+			if len(pluginsHandler.withArgs) != len(test.expectPluginArgs) {
+				t.Fatalf("unexpected plugin execution args: expedcted %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
+			}
+		})
+	}
+}
+
+type testPluginHandler struct {
+	pluginsDirectory string
+
+	// execution results
+	executedPlugin string
+	withArgs       []string
+	withEnv        []string
+
+	err error
+}
+
+func (h *testPluginHandler) Lookup(filename string) (string, error) {
+	dir, err := os.Stat(h.pluginsDirectory)
+	if err != nil {
+		h.err = err
+		return "", err
+	}
+
+	if !dir.IsDir() {
+		h.err = fmt.Errorf("expected %q to be a directory", h.pluginsDirectory)
+		return "", h.err
+	}
+
+	plugins, err := ioutil.ReadDir(h.pluginsDirectory)
+	if err != nil {
+		h.err = err
+		return "", err
+	}
+
+	for _, p := range plugins {
+		if p.Name() == filename {
+			return fmt.Sprintf("%s/%s", h.pluginsDirectory, p.Name()), nil
+		}
+	}
+
+	h.err = fmt.Errorf("unable to find a plugin executable %q", filename)
+	return "", h.err
+}
+
+func (h *testPluginHandler) Execute(executablePath string, cmdArgs, env []string) error {
+	h.executedPlugin = executablePath
+	h.withArgs = cmdArgs
+	h.withEnv = env
+	return nil
 }

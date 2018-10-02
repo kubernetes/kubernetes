@@ -34,13 +34,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_ExternalMetricValue_To_external_metrics_ExternalMetricValue,
-		Convert_external_metrics_ExternalMetricValue_To_v1beta1_ExternalMetricValue,
-		Convert_v1beta1_ExternalMetricValueList_To_external_metrics_ExternalMetricValueList,
-		Convert_external_metrics_ExternalMetricValueList_To_v1beta1_ExternalMetricValueList,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*ExternalMetricValue)(nil), (*externalmetrics.ExternalMetricValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ExternalMetricValue_To_external_metrics_ExternalMetricValue(a.(*ExternalMetricValue), b.(*externalmetrics.ExternalMetricValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*externalmetrics.ExternalMetricValue)(nil), (*ExternalMetricValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_external_metrics_ExternalMetricValue_To_v1beta1_ExternalMetricValue(a.(*externalmetrics.ExternalMetricValue), b.(*ExternalMetricValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ExternalMetricValueList)(nil), (*externalmetrics.ExternalMetricValueList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ExternalMetricValueList_To_external_metrics_ExternalMetricValueList(a.(*ExternalMetricValueList), b.(*externalmetrics.ExternalMetricValueList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*externalmetrics.ExternalMetricValueList)(nil), (*ExternalMetricValueList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_external_metrics_ExternalMetricValueList_To_v1beta1_ExternalMetricValueList(a.(*externalmetrics.ExternalMetricValueList), b.(*ExternalMetricValueList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_ExternalMetricValue_To_external_metrics_ExternalMetricValue(in *ExternalMetricValue, out *externalmetrics.ExternalMetricValue, s conversion.Scope) error {

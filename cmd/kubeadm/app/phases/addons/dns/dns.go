@@ -19,7 +19,6 @@ package dns
 import (
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/mholt/caddy/caddyfile"
@@ -97,9 +96,8 @@ func kubeDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface)
 	}
 
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment,
-		struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
+		struct{ ImageRepository, Version, DNSBindAddr, DNSProbeAddr, DNSDomain, MasterTaintKey string }{
 			ImageRepository: cfg.ImageRepository,
-			Arch:            runtime.GOARCH,
 			Version:         kubeadmconstants.KubeDNSVersion,
 			DNSBindAddr:     dnsBindAddr,
 			DNSProbeAddr:    dnsProbeAddr,
@@ -310,6 +308,7 @@ func translateStubDomainOfKubeDNSToProxyCoreDNS(dataField string, kubeDNSConfigM
 			pStanza["body"] = [][]string{
 				{"errors"},
 				{"cache", "30"},
+				{"loop"},
 				append([]string{"proxy", "."}, proxyIP...),
 			}
 			proxyStanza = append(proxyStanza, pStanza)

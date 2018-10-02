@@ -30,6 +30,15 @@ docs/admin/kubeadm_alpha_phase_certs_etcd-peer.md
 docs/admin/kubeadm_alpha_phase_certs_etcd-server.md
 docs/admin/kubeadm_alpha_phase_certs_front-proxy-ca.md
 docs/admin/kubeadm_alpha_phase_certs_front-proxy-client.md
+docs/admin/kubeadm_alpha_phase_certs_renew.md
+docs/admin/kubeadm_alpha_phase_certs_renew_all.md
+docs/admin/kubeadm_alpha_phase_certs_renew_apiserver-etcd-client.md
+docs/admin/kubeadm_alpha_phase_certs_renew_apiserver-kubelet-client.md
+docs/admin/kubeadm_alpha_phase_certs_renew_apiserver.md
+docs/admin/kubeadm_alpha_phase_certs_renew_etcd-healthcheck-client.md
+docs/admin/kubeadm_alpha_phase_certs_renew_etcd-peer.md
+docs/admin/kubeadm_alpha_phase_certs_renew_etcd-server.md
+docs/admin/kubeadm_alpha_phase_certs_renew_front-proxy-client.md
 docs/admin/kubeadm_alpha_phase_certs_sa.md
 docs/admin/kubeadm_alpha_phase_controlplane.md
 docs/admin/kubeadm_alpha_phase_controlplane_all.md
@@ -47,6 +56,7 @@ docs/admin/kubeadm_alpha_phase_kubeconfig_scheduler.md
 docs/admin/kubeadm_alpha_phase_kubeconfig_user.md
 docs/admin/kubeadm_alpha_phase_kubelet.md
 docs/admin/kubeadm_alpha_phase_kubelet_config.md
+docs/admin/kubeadm_alpha_phase_kubelet_config_annotate-cri.md
 docs/admin/kubeadm_alpha_phase_kubelet_config_download.md
 docs/admin/kubeadm_alpha_phase_kubelet_config_enable-dynamic.md
 docs/admin/kubeadm_alpha_phase_kubelet_config_upload.md
@@ -83,6 +93,7 @@ docs/admin/kubeadm_upgrade_apply.md
 docs/admin/kubeadm_upgrade_diff.md
 docs/admin/kubeadm_upgrade_node.md
 docs/admin/kubeadm_upgrade_node_config.md
+docs/admin/kubeadm_upgrade_node_experimental-control-plane.md
 docs/admin/kubeadm_upgrade_plan.md
 docs/admin/kubeadm_version.md
 docs/admin/kubelet.md
@@ -113,6 +124,15 @@ docs/man/man1/kubeadm-alpha-phase-certs-etcd-peer.1
 docs/man/man1/kubeadm-alpha-phase-certs-etcd-server.1
 docs/man/man1/kubeadm-alpha-phase-certs-front-proxy-ca.1
 docs/man/man1/kubeadm-alpha-phase-certs-front-proxy-client.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-all.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-apiserver-etcd-client.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-apiserver-kubelet-client.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-apiserver.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-etcd-healthcheck-client.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-etcd-peer.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-etcd-server.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew-front-proxy-client.1
+docs/man/man1/kubeadm-alpha-phase-certs-renew.1
 docs/man/man1/kubeadm-alpha-phase-certs-sa.1
 docs/man/man1/kubeadm-alpha-phase-certs.1
 docs/man/man1/kubeadm-alpha-phase-controlplane-all.1
@@ -129,6 +149,7 @@ docs/man/man1/kubeadm-alpha-phase-kubeconfig-kubelet.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-scheduler.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig-user.1
 docs/man/man1/kubeadm-alpha-phase-kubeconfig.1
+docs/man/man1/kubeadm-alpha-phase-kubelet-config-annotate-cri.1
 docs/man/man1/kubeadm-alpha-phase-kubelet-config-download.1
 docs/man/man1/kubeadm-alpha-phase-kubelet-config-enable-dynamic.1
 docs/man/man1/kubeadm-alpha-phase-kubelet-config-upload.1
@@ -167,12 +188,12 @@ docs/man/man1/kubeadm-token.1
 docs/man/man1/kubeadm-upgrade-apply.1
 docs/man/man1/kubeadm-upgrade-diff.1
 docs/man/man1/kubeadm-upgrade-node-config.1
+docs/man/man1/kubeadm-upgrade-node-experimental-control-plane.1
 docs/man/man1/kubeadm-upgrade-node.1
 docs/man/man1/kubeadm-upgrade-plan.1
 docs/man/man1/kubeadm-upgrade.1
 docs/man/man1/kubeadm-version.1
 docs/man/man1/kubeadm.1
-docs/man/man1/kubectl-alpha-diff.1
 docs/man/man1/kubectl-alpha.1
 docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-resources.1
@@ -233,6 +254,7 @@ docs/man/man1/kubectl-create-serviceaccount.1
 docs/man/man1/kubectl-create.1
 docs/man/man1/kubectl-delete.1
 docs/man/man1/kubectl-describe.1
+docs/man/man1/kubectl-diff.1
 docs/man/man1/kubectl-drain.1
 docs/man/man1/kubectl-edit.1
 docs/man/man1/kubectl-exec.1
@@ -243,6 +265,7 @@ docs/man/man1/kubectl-label.1
 docs/man/man1/kubectl-logs.1
 docs/man/man1/kubectl-options.1
 docs/man/man1/kubectl-patch.1
+docs/man/man1/kubectl-plugin-list.1
 docs/man/man1/kubectl-plugin.1
 docs/man/man1/kubectl-port-forward.1
 docs/man/man1/kubectl-proxy.1
@@ -274,8 +297,6 @@ docs/man/man1/kubectl-wait.1
 docs/man/man1/kubectl.1
 docs/man/man1/kubelet.1
 docs/user-guide/kubectl/kubectl.md
-docs/user-guide/kubectl/kubectl_alpha.md
-docs/user-guide/kubectl/kubectl_alpha_diff.md
 docs/user-guide/kubectl/kubectl_annotate.md
 docs/user-guide/kubectl/kubectl_api-resources.md
 docs/user-guide/kubectl/kubectl_api-versions.md
@@ -335,6 +356,7 @@ docs/user-guide/kubectl/kubectl_create_service_nodeport.md
 docs/user-guide/kubectl/kubectl_create_serviceaccount.md
 docs/user-guide/kubectl/kubectl_delete.md
 docs/user-guide/kubectl/kubectl_describe.md
+docs/user-guide/kubectl/kubectl_diff.md
 docs/user-guide/kubectl/kubectl_drain.md
 docs/user-guide/kubectl/kubectl_edit.md
 docs/user-guide/kubectl/kubectl_exec.md
@@ -346,6 +368,7 @@ docs/user-guide/kubectl/kubectl_logs.md
 docs/user-guide/kubectl/kubectl_options.md
 docs/user-guide/kubectl/kubectl_patch.md
 docs/user-guide/kubectl/kubectl_plugin.md
+docs/user-guide/kubectl/kubectl_plugin_list.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
 docs/user-guide/kubectl/kubectl_replace.md
@@ -390,6 +413,7 @@ docs/yaml/kubectl/kubectl_cp.yaml
 docs/yaml/kubectl/kubectl_create.yaml
 docs/yaml/kubectl/kubectl_delete.yaml
 docs/yaml/kubectl/kubectl_describe.yaml
+docs/yaml/kubectl/kubectl_diff.yaml
 docs/yaml/kubectl/kubectl_drain.yaml
 docs/yaml/kubectl/kubectl_edit.yaml
 docs/yaml/kubectl/kubectl_exec.yaml

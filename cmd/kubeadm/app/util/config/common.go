@@ -19,17 +19,19 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"strings"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	netutil "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // AnyConfigFileAndDefaultsToInternal reads either a InitConfiguration or JoinConfiguration and unmarshals it
@@ -54,11 +56,13 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 	return nil, fmt.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)
 }
 
-// MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration, some extra logic is run
+// MarshalKubeadmConfigObject marshals an Object registered in the kubeadm scheme. If the object is a InitConfiguration or ClusterConfiguration, some extra logic is run
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	switch internalcfg := obj.(type) {
 	case *kubeadmapi.InitConfiguration:
 		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
+	case *kubeadmapi.ClusterConfiguration:
+		return MarshalClusterConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
 	default:
 		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
@@ -75,11 +79,11 @@ func DetectUnsupportedVersion(b []byte) error {
 	// tell them how to upgrade. The support matrix will look something like this now and in the future:
 	// v1.10 and earlier: v1alpha1
 	// v1.11: v1alpha1 read-only, writes only v1alpha2 config
-	// v1.12: v1alpha2 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1
-	// v1.13 and v1.14: v1beta1 read-only, writes only v1 config. Warns if the user tries to use v1alpha1 or v1alpha2.
-	// v1.15: v1 is the only supported format.
+	// v1.12: v1alpha2 read-only, writes only v1alpha3 config. Warns if the user tries to use v1alpha1
+	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Warns if the user tries to use v1alpha1 or v1alpha2
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
+		"kubeadm.k8s.io/v1alpha2": "v1.12",
 	}
 	// If we find an old API version in this gvk list, error out and tell the user why this doesn't work
 	knownKinds := map[string]bool{}
@@ -90,7 +94,7 @@ func DetectUnsupportedVersion(b []byte) error {
 		knownKinds[gvk.Kind] = true
 	}
 	// InitConfiguration, MasterConfiguration and NodeConfiguration are mutually exclusive, error if more than one are specified
-	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.MasterConfigurationKind, constants.JoinConfigurationKind, constants.NodeConfigurationKind}
+	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.JoinConfigurationKind}
 	foundOne := false
 	for _, kind := range mutuallyExclusive {
 		if knownKinds[kind] {
@@ -108,7 +112,7 @@ func DetectUnsupportedVersion(b []byte) error {
 // NormalizeKubernetesVersion resolves version labels, sets alternative
 // image registry if requested for CI builds, and validates minimal
 // version that kubeadm SetInitDynamicDefaultssupports.
-func NormalizeKubernetesVersion(cfg *kubeadmapi.InitConfiguration) error {
+func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
 	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
 		cfg.CIImageRepository = constants.DefaultCIImageRepository
@@ -141,4 +145,35 @@ func LowercaseSANs(sans []string) {
 			sans[i] = lowercase
 		}
 	}
+}
+
+// VerifyAPIServerBindAddress can be used to verify if a bind address for the API Server is 0.0.0.0,
+// in which case this address is not valid and should not be used.
+func VerifyAPIServerBindAddress(address string) error {
+	ip := net.ParseIP(address)
+	if ip == nil {
+		return fmt.Errorf("cannot parse IP address: %s", address)
+	}
+	if !ip.IsGlobalUnicast() {
+		return fmt.Errorf("cannot use %q as the bind address for the API Server", address)
+	}
+	return nil
+}
+
+// ChooseAPIServerBindAddress is a wrapper for netutil.ChooseBindAddress that also handles
+// the case where no default routes were found and an IP for the API server could not be obatained.
+func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
+	ip, err := netutil.ChooseBindAddress(bindAddress)
+	if err != nil {
+		if netutil.IsNoRoutesError(err) {
+			glog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
+			defaultIP := net.ParseIP(constants.DefaultAPIServerBindAddress)
+			if defaultIP == nil {
+				return nil, fmt.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)
+			}
+			return defaultIP, nil
+		}
+		return nil, err
+	}
+	return ip, nil
 }

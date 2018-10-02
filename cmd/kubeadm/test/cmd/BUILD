@@ -23,14 +23,16 @@ go_test(
         "version_test.go",
     ],
     args = ["--kubeadm-path=$(location //cmd/kubeadm:kubeadm)"],
-    data = ["//cmd/kubeadm"],
+    data = ["//cmd/kubeadm"] + glob(["testdata/**"]),
     embed = [":go_default_library"],
-    rundir = ".",
     tags = [
         "integration",
         "skip",
     ],
-    deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
+    deps = [
+        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/github.com/renstrom/dedent:go_default_library",
+    ],
 )
 
 filegroup(

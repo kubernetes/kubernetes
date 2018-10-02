@@ -50,7 +50,7 @@ var _ volume.VolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
-	p.volumeMtx = keymutex.NewKeyMutex()
+	p.volumeMtx = keymutex.NewHashed(0)
 	return nil
 }
 

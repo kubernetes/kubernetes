@@ -40,8 +40,8 @@ func NewAvailableEndpointServicesClientWithBaseURI(baseURI string, subscriptionI
 }
 
 // List list what values of endpoint services are available for use.
-//
-// location is the location to check available endpoint services.
+// Parameters:
+// location - the location to check available endpoint services.
 func (client AvailableEndpointServicesClient) List(ctx context.Context, location string) (result EndpointServicesListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, location)

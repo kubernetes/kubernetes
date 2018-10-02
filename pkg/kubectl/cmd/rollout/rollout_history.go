@@ -21,12 +21,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -82,6 +81,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Example: history_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 		ValidArgs: validArgs,
@@ -119,7 +119,7 @@ func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, 
 
 func (o *RolloutHistoryOptions) Validate() error {
 	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-		return fmt.Errorf("Required resource not specified.")
+		return fmt.Errorf("required resource not specified")
 	}
 	if o.Revision < 0 {
 		return fmt.Errorf("revision must be a positive integer: %v", o.Revision)
@@ -131,7 +131,7 @@ func (o *RolloutHistoryOptions) Validate() error {
 func (o *RolloutHistoryOptions) Run() error {
 
 	r := o.Builder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).

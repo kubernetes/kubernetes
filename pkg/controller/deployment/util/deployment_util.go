@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/util/integer"
-	internalextensions "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -575,29 +575,6 @@ func ListReplicaSets(deployment *apps.Deployment, getRSList RsListFunc) ([]*apps
 	return owned, nil
 }
 
-// ListReplicaSetsInternal is ListReplicaSets for internalextensions.
-// TODO: Remove the duplicate when call sites are updated to ListReplicaSets.
-func ListReplicaSetsInternal(deployment *internalextensions.Deployment, getRSList func(string, metav1.ListOptions) ([]*internalextensions.ReplicaSet, error)) ([]*internalextensions.ReplicaSet, error) {
-	namespace := deployment.Namespace
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	all, err := getRSList(namespace, options)
-	if err != nil {
-		return nil, err
-	}
-	// Only include those whose ControllerRef matches the Deployment.
-	filtered := make([]*internalextensions.ReplicaSet, 0, len(all))
-	for _, rs := range all {
-		if metav1.IsControlledBy(rs, deployment) {
-			filtered = append(filtered, rs)
-		}
-	}
-	return filtered, nil
-}
-
 // ListPods returns a list of pods the given deployment targets.
 // This needs a list of ReplicaSets for the Deployment,
 // which can be found with ListReplicaSets().
@@ -773,7 +750,7 @@ var nowFn = func() time.Time { return time.Now() }
 // is older than progressDeadlineSeconds or a Progressing condition with a TimedOutReason reason already
 // exists.
 func DeploymentTimedOut(deployment *apps.Deployment, newStatus *apps.DeploymentStatus) bool {
-	if deployment.Spec.ProgressDeadlineSeconds == nil {
+	if !HasProgressDeadline(deployment) {
 		return false
 	}
 
@@ -876,19 +853,6 @@ func WaitForObservedDeployment(getDeploymentFunc func() (*apps.Deployment, error
 	})
 }
 
-// TODO: remove the duplicate
-// WaitForObservedInternalDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
-// Returns error if polling timesout.
-func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
-	return wait.Poll(interval, timeout, func() (bool, error) {
-		deployment, err := getDeploymentFunc()
-		if err != nil {
-			return false, err
-		}
-		return deployment.Status.ObservedGeneration >= desiredGeneration, nil
-	})
-}
-
 // ResolveFenceposts resolves both maxSurge and maxUnavailable. This needs to happen in one
 // step. For example:
 //
@@ -899,11 +863,11 @@ func WaitForObservedDeploymentInternal(getDeploymentFunc func() (*internalextens
 // 2 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1), then new(+1), then old(-1)
 // 1 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1)
 func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired int32) (int32, int32, error) {
-	surge, err := intstrutil.GetValueFromIntOrPercent(maxSurge, int(desired), true)
+	surge, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(maxSurge, intstrutil.FromInt(0)), int(desired), true)
 	if err != nil {
 		return 0, 0, err
 	}
-	unavailable, err := intstrutil.GetValueFromIntOrPercent(maxUnavailable, int(desired), false)
+	unavailable, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(maxUnavailable, intstrutil.FromInt(0)), int(desired), false)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -917,4 +881,8 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	}
 
 	return int32(surge), int32(unavailable), nil
+}
+
+func HasProgressDeadline(d *apps.Deployment) bool {
+	return d.Spec.ProgressDeadlineSeconds != nil && *d.Spec.ProgressDeadlineSeconds != math.MaxInt32
 }

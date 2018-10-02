@@ -25,7 +25,9 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -36,17 +38,143 @@ const (
 	endpoint = "unix:///@kms-socket.sock"
 )
 
-// Normal encryption and decryption operation.
-func TestGRPCService(t *testing.T) {
-	// Start a test gRPC server.
-	server, err := startTestKMSProvider()
+// TestKMSPluginLateStart tests the scenario where kms-plugin pod/container starts after kube-apiserver pod/container.
+// Since the Dial to kms-plugin is non-blocking we expect the construction of gRPC service to succeed even when
+// kms-plugin is not yet up - dialing happens in the background.
+func TestKMSPluginLateStart(t *testing.T) {
+	callTimeout := 3 * time.Second
+
+	service, err := NewGRPCService(endpoint, callTimeout)
+	if err != nil {
+		t.Fatalf("failed to create envelope service, error: %v", err)
+	}
+	defer destroyService(service)
+
+	time.Sleep(callTimeout / 2)
+	f, err := startFakeKMSProvider(kmsapiVersion)
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %v", err)
 	}
-	defer stopTestKMSProvider(server)
+	defer f.server.Stop()
+
+	data := []byte("test data")
+	_, err = service.Encrypt(data)
+	if err != nil {
+		t.Fatalf("failed when execute encrypt, error: %v", err)
+	}
+}
+
+// TestIntermittentConnectionLoss tests the scenario where the connection with kms-plugin is intermittently lost.
+func TestIntermittentConnectionLoss(t *testing.T) {
+	var (
+		wg1      sync.WaitGroup
+		wg2      sync.WaitGroup
+		timeout  = 30 * time.Second
+		blackOut = 1 * time.Second
+		data     = []byte("test data")
+	)
+	// Start KMS Plugin
+	f, err := startFakeKMSProvider(kmsapiVersion)
+	if err != nil {
+		t.Fatalf("failed to start test KMS provider server, error: %v", err)
+	}
+
+	//  connect to kms plugin
+	service, err := NewGRPCService(endpoint, timeout)
+	if err != nil {
+		t.Fatalf("failed to create envelope service, error: %v", err)
+	}
+	defer destroyService(service)
+
+	_, err = service.Encrypt(data)
+	if err != nil {
+		t.Fatalf("failed when execute encrypt, error: %v", err)
+	}
+	t.Log("Connected to KMSPlugin")
+
+	// Stop KMS Plugin - simulating connection loss
+	f.server.Stop()
+	t.Log("KMS Plugin is stopped")
+
+	wg1.Add(1)
+	wg2.Add(1)
+	go func() {
+		defer wg2.Done()
+		// Call service to encrypt data.
+		t.Log("Sending encrypt request")
+		wg1.Done()
+		_, err := service.Encrypt(data)
+		if err != nil {
+			t.Fatalf("failed when executing encrypt, error: %v", err)
+		}
+	}()
+
+	wg1.Wait()
+	time.Sleep(blackOut)
+	// Start KMS Plugin
+	f, err = startFakeKMSProvider(kmsapiVersion)
+	if err != nil {
+		t.Fatalf("failed to start test KMS provider server, error: %v", err)
+	}
+	defer f.server.Stop()
+	t.Log("Restarted KMS Plugin")
+
+	wg2.Wait()
+}
+
+func TestUnsupportedVersion(t *testing.T) {
+	ver := "invalid"
+	data := []byte("test data")
+	wantErr := fmt.Errorf(versionErrorf, ver, kmsapiVersion)
+
+	f, err := startFakeKMSProvider(ver)
+	if err != nil {
+		t.Fatalf("failed to start test KMS provider server, error: %ver", err)
+	}
+	defer f.server.Stop()
+
+	s, err := NewGRPCService(endpoint, 1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer destroyService(s)
+
+	// Encrypt
+	_, err = s.Encrypt(data)
+	if err == nil || err.Error() != wantErr.Error() {
+		t.Errorf("got err: %ver, want: %ver", err, wantErr)
+	}
+
+	destroyService(s)
+
+	s, err = NewGRPCService(endpoint, 1*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer destroyService(s)
+
+	// Decrypt
+	_, err = s.Decrypt(data)
+	if err == nil || err.Error() != wantErr.Error() {
+		t.Errorf("got err: %ver, want: %ver", err, wantErr)
+	}
+}
+
+func TestConcurrentAccess(t *testing.T) {
+
+}
+
+// Normal encryption and decryption operation.
+func TestGRPCService(t *testing.T) {
+	// Start a test gRPC server.
+	f, err := startFakeKMSProvider(kmsapiVersion)
+	if err != nil {
+		t.Fatalf("failed to start test KMS provider server, error: %v", err)
+	}
+	defer f.server.Stop()
 
 	// Create the gRPC client service.
-	service, err := NewGRPCService(endpoint)
+	service, err := NewGRPCService(endpoint, 1*time.Second)
 	if err != nil {
 		t.Fatalf("failed to create envelope service, error: %v", err)
 	}
@@ -70,19 +198,65 @@ func TestGRPCService(t *testing.T) {
 	}
 }
 
+// Normal encryption and decryption operation by multiple go-routines.
+func TestGRPCServiceConcurrentAccess(t *testing.T) {
+	// Start a test gRPC server.
+	f, err := startFakeKMSProvider(kmsapiVersion)
+	if err != nil {
+		t.Fatalf("failed to start test KMS provider server, error: %v", err)
+	}
+	defer f.server.Stop()
+
+	// Create the gRPC client service.
+	service, err := NewGRPCService(endpoint, 1*time.Second)
+	if err != nil {
+		t.Fatalf("failed to create envelope service, error: %v", err)
+	}
+	defer destroyService(service)
+
+	var wg sync.WaitGroup
+	n := 1000
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			// Call service to encrypt data.
+			data := []byte("test data")
+			cipher, err := service.Encrypt(data)
+			if err != nil {
+				t.Errorf("failed when execute encrypt, error: %v", err)
+			}
+
+			// Call service to decrypt data.
+			result, err := service.Decrypt(cipher)
+			if err != nil {
+				t.Errorf("failed when execute decrypt, error: %v", err)
+			}
+
+			if !reflect.DeepEqual(data, result) {
+				t.Errorf("expect: %v, but: %v", data, result)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
 func destroyService(service Service) {
-	s := service.(*gRPCService)
-	s.connection.Close()
+	if service != nil {
+		s := service.(*gRPCService)
+		s.connection.Close()
+	}
 }
 
 // Test all those invalid configuration for KMS provider.
 func TestInvalidConfiguration(t *testing.T) {
 	// Start a test gRPC server.
-	server, err := startTestKMSProvider()
+	f, err := startFakeKMSProvider(kmsapiVersion)
 	if err != nil {
 		t.Fatalf("failed to start test KMS provider server, error: %v", err)
 	}
-	defer stopTestKMSProvider(server)
+	defer f.server.Stop()
 
 	invalidConfigs := []struct {
 		name       string
@@ -91,16 +265,12 @@ func TestInvalidConfiguration(t *testing.T) {
 	}{
 		{"emptyConfiguration", kmsapiVersion, ""},
 		{"invalidScheme", kmsapiVersion, "tcp://localhost:6060"},
-		{"unavailableEndpoint", kmsapiVersion, unixProtocol + ":///kms-socket.nonexist"},
-		{"invalidAPIVersion", "invalidVersion", endpoint},
 	}
 
 	for _, testCase := range invalidConfigs {
 		t.Run(testCase.name, func(t *testing.T) {
-			setAPIVersion(testCase.apiVersion)
-			defer setAPIVersion(kmsapiVersion)
-
-			_, err := NewGRPCService(testCase.endpoint)
+			f.apiVersion = testCase.apiVersion
+			_, err := NewGRPCService(testCase.endpoint, 1*time.Second)
 			if err == nil {
 				t.Fatalf("should fail to create envelope service for %s.", testCase.name)
 			}
@@ -109,7 +279,7 @@ func TestInvalidConfiguration(t *testing.T) {
 }
 
 // Start the gRPC server that listens on unix socket.
-func startTestKMSProvider() (*grpc.Server, error) {
+func startFakeKMSProvider(version string) (*fakeKMSPlugin, error) {
 	sockFile, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse endpoint:%q, error %v", endpoint, err)
@@ -119,31 +289,25 @@ func startTestKMSProvider() (*grpc.Server, error) {
 		return nil, fmt.Errorf("failed to listen on the unix socket, error: %v", err)
 	}
 
-	server := grpc.NewServer()
-	kmsapi.RegisterKeyManagementServiceServer(server, &base64Server{})
-	go server.Serve(listener)
-	return server, nil
-}
-
-func stopTestKMSProvider(server *grpc.Server) {
-	server.Stop()
+	s := grpc.NewServer()
+	f := &fakeKMSPlugin{apiVersion: version, server: s}
+	kmsapi.RegisterKeyManagementServiceServer(s, f)
+	go s.Serve(listener)
+	return f, nil
 }
 
 // Fake gRPC sever for remote KMS provider.
 // Use base64 to simulate encrypt and decrypt.
-type base64Server struct{}
-
-var testProviderAPIVersion = kmsapiVersion
-
-func setAPIVersion(apiVersion string) {
-	testProviderAPIVersion = apiVersion
+type fakeKMSPlugin struct {
+	apiVersion string
+	server     *grpc.Server
 }
 
-func (s *base64Server) Version(ctx context.Context, request *kmsapi.VersionRequest) (*kmsapi.VersionResponse, error) {
-	return &kmsapi.VersionResponse{Version: testProviderAPIVersion, RuntimeName: "testKMS", RuntimeVersion: "0.0.1"}, nil
+func (s *fakeKMSPlugin) Version(ctx context.Context, request *kmsapi.VersionRequest) (*kmsapi.VersionResponse, error) {
+	return &kmsapi.VersionResponse{Version: s.apiVersion, RuntimeName: "testKMS", RuntimeVersion: "0.0.1"}, nil
 }
 
-func (s *base64Server) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
+func (s *fakeKMSPlugin) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
 	buf := make([]byte, base64.StdEncoding.DecodedLen(len(request.Cipher)))
 	n, err := base64.StdEncoding.Decode(buf, request.Cipher)
 	if err != nil {
@@ -153,7 +317,7 @@ func (s *base64Server) Decrypt(ctx context.Context, request *kmsapi.DecryptReque
 	return &kmsapi.DecryptResponse{Plain: buf[:n]}, nil
 }
 
-func (s *base64Server) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
+func (s *fakeKMSPlugin) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(request.Plain)))
 	base64.StdEncoding.Encode(buf, request.Plain)
 	return &kmsapi.EncryptResponse{Cipher: buf}, nil

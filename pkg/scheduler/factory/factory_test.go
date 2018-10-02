@@ -41,7 +41,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
-	"k8s.io/kubernetes/pkg/scheduler/core"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -49,6 +49,7 @@ import (
 const (
 	enableEquivalenceCache = true
 	disablePodPreemption   = false
+	bindTimeoutSeconds     = 600
 )
 
 func TestCreate(t *testing.T) {
@@ -295,7 +296,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	defer server.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
-	queue := &core.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
+	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
 	errFunc := factory.MakeDefaultErrorFunc(podBackoff, queue)
 
@@ -540,7 +541,7 @@ func TestSkipPodUpdate(t *testing.T) {
 
 func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeight int32) scheduler.Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	return NewConfigFactory(
+	return NewConfigFactory(&ConfigFactoryArgs{
 		v1.DefaultSchedulerName,
 		client,
 		informerFactory.Core().V1().Nodes(),
@@ -548,15 +549,17 @@ func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeigh
 		informerFactory.Core().V1().PersistentVolumes(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Apps().V1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
 		hardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 		disablePodPreemption,
-	)
+		schedulerapi.DefaultPercentageOfNodesToScore,
+		bindTimeoutSeconds,
+	})
 }
 
 type fakeExtender struct {

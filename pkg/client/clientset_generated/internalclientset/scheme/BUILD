@@ -10,7 +10,6 @@ go_library(
     srcs = [
         "doc.go",
         "register.go",
-        "register_custom.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme",
     deps = [
@@ -21,7 +20,6 @@ go_library(
         "//pkg/apis/autoscaling/install:go_default_library",
         "//pkg/apis/batch/install:go_default_library",
         "//pkg/apis/certificates/install:go_default_library",
-        "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/coordination/install:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/events/install:go_default_library",

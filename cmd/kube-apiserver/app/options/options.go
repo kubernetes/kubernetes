@@ -25,6 +25,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -33,8 +34,6 @@ import (
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
-
-	"github.com/spf13/pflag"
 )
 
 // ServerRunOptions runs a kubernetes api server.
@@ -42,7 +41,7 @@ type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
 	Etcd                    *genericoptions.EtcdOptions
 	SecureServing           *genericoptions.SecureServingOptionsWithLoopback
-	InsecureServing         *kubeoptions.InsecureServingOptions
+	InsecureServing         *genericoptions.DeprecatedInsecureServingOptionsWithLoopback
 	Audit                   *genericoptions.AuditOptions
 	Features                *genericoptions.FeatureOptions
 	Admission               *kubeoptions.AdmissionOptions
@@ -122,26 +121,26 @@ func NewServerRunOptions() *ServerRunOptions {
 	return &s
 }
 
-// AddFlags adds flags for a specific APIServer to the specified FlagSet
-func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
+// Flags returns flags for a specific APIServer by section name
+func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	// Add the generic flags.
-	s.GenericServerRunOptions.AddUniversalFlags(fs)
-	s.Etcd.AddFlags(fs)
-	s.SecureServing.AddFlags(fs)
-	s.InsecureServing.AddFlags(fs)
-	s.InsecureServing.AddDeprecatedFlags(fs)
-	s.Audit.AddFlags(fs)
-	s.Features.AddFlags(fs)
-	s.Authentication.AddFlags(fs)
-	s.Authorization.AddFlags(fs)
-	s.CloudProvider.AddFlags(fs)
-	s.StorageSerialization.AddFlags(fs)
-	s.APIEnablement.AddFlags(fs)
-	s.Admission.AddFlags(fs)
+	s.GenericServerRunOptions.AddUniversalFlags(fss.FlagSet("generic"))
+	s.Etcd.AddFlags(fss.FlagSet("etcd"))
+	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
+	s.InsecureServing.AddFlags(fss.FlagSet("insecure serving"))
+	s.InsecureServing.AddUnqualifiedFlags(fss.FlagSet("insecure serving")) // TODO: remove it until kops stops using `--address`
+	s.Audit.AddFlags(fss.FlagSet("auditing"))
+	s.Features.AddFlags(fss.FlagSet("features"))
+	s.Authentication.AddFlags(fss.FlagSet("authentication"))
+	s.Authorization.AddFlags(fss.FlagSet("authorization"))
+	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
+	s.StorageSerialization.AddFlags(fss.FlagSet("storage"))
+	s.APIEnablement.AddFlags(fss.FlagSet("api enablement"))
+	s.Admission.AddFlags(fss.FlagSet("admission"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-
+	fs := fss.FlagSet("misc")
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL,
 		"Amount of time to retain events.")
 
@@ -231,8 +230,10 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"api-server and calling out to webhook admission plugins.")
 
 	fs.BoolVar(&s.EnableAggregatorRouting, "enable-aggregator-routing", s.EnableAggregatorRouting,
-		"Turns on aggregator routing requests to endoints IP rather than cluster IP.")
+		"Turns on aggregator routing requests to endpoints IP rather than cluster IP.")
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
+
+	return fss
 }

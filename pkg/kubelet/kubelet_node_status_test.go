@@ -42,16 +42,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -85,7 +89,7 @@ func makeExpectedImageList(imageList []kubecontainer.Image, maxImages int) []v1.
 	var expectedImageList []v1.ContainerImage
 	for _, kubeImage := range imageList {
 		apiImage := v1.ContainerImage{
-			Names:     kubeImage.RepoTags[0:maxNamesPerImageInNodeStatus],
+			Names:     kubeImage.RepoTags[0:nodestatus.MaxNamesPerImageInNodeStatus],
 			SizeBytes: kubeImage.Size,
 		}
 
@@ -100,9 +104,9 @@ func makeExpectedImageList(imageList []kubecontainer.Image, maxImages int) []v1.
 
 func generateImageTags() []string {
 	var tagList []string
-	// Generate > maxNamesPerImageInNodeStatus tags so that the test can verify
-	// that kubelet report up to maxNamesPerImageInNodeStatus tags.
-	count := rand.IntnRange(maxNamesPerImageInNodeStatus+1, maxImageTagsForTest+1)
+	// Generate > MaxNamesPerImageInNodeStatus tags so that the test can verify
+	// that kubelet report up to MaxNamesPerImageInNodeStatus tags.
+	count := rand.IntnRange(nodestatus.MaxNamesPerImageInNodeStatus+1, maxImageTagsForTest+1)
 	for ; count > 0; count-- {
 		tagList = append(tagList, "k8s.gcr.io:v"+strconv.Itoa(count))
 	}
@@ -126,6 +130,18 @@ func applyNodeStatusPatch(originalNode *v1.Node, patch []byte) (*v1.Node, error)
 	return updatedNode, nil
 }
 
+func notImplemented(action core.Action) (bool, runtime.Object, error) {
+	return true, nil, fmt.Errorf("no reaction implemented for %s", action)
+}
+
+func addNotImplatedReaction(kubeClient *fake.Clientset) {
+	if kubeClient == nil {
+		return
+	}
+
+	kubeClient.AddReactor("*", "*", notImplemented)
+}
+
 type localCM struct {
 	cm.ContainerManager
 	allocatableReservation v1.ResourceList
@@ -138,160 +154,6 @@ func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 
 func (lcm *localCM) GetCapacity() v1.ResourceList {
 	return lcm.capacity
-}
-
-func TestNodeStatusWithCloudProviderNodeIP(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubelet.kubeClient = nil // ensure only the heartbeat client is used
-	kubelet.hostname = testKubeletHostname
-
-	cases := []struct {
-		name              string
-		nodeIP            net.IP
-		nodeAddresses     []v1.NodeAddress
-		expectedAddresses []v1.NodeAddress
-		shouldError       bool
-	}{
-		{
-			name:   "A single InternalIP",
-			nodeIP: net.ParseIP("10.1.1.1"),
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			shouldError: false,
-		},
-		{
-			name:   "NodeIP is external",
-			nodeIP: net.ParseIP("55.55.55.55"),
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			shouldError: false,
-		},
-		{
-			// Accommodating #45201 and #49202
-			name:   "InternalIP and ExternalIP are the same",
-			nodeIP: net.ParseIP("55.55.55.55"),
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			shouldError: false,
-		},
-		{
-			name:   "An Internal/ExternalIP, an Internal/ExternalDNS",
-			nodeIP: net.ParseIP("10.1.1.1"),
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeInternalDNS, Address: "ip-10-1-1-1.us-west-2.compute.internal"},
-				{Type: v1.NodeExternalDNS, Address: "ec2-55-55-55-55.us-west-2.compute.amazonaws.com"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeInternalDNS, Address: "ip-10-1-1-1.us-west-2.compute.internal"},
-				{Type: v1.NodeExternalDNS, Address: "ec2-55-55-55-55.us-west-2.compute.amazonaws.com"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			shouldError: false,
-		},
-		{
-			name:   "An Internal with multiple internal IPs",
-			nodeIP: net.ParseIP("10.1.1.1"),
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeInternalIP, Address: "10.2.2.2"},
-				{Type: v1.NodeInternalIP, Address: "10.3.3.3"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			expectedAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			shouldError: false,
-		},
-		{
-			name:   "An InternalIP that isn't valid: should error",
-			nodeIP: net.ParseIP("10.2.2.2"),
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: v1.NodeExternalIP, Address: "55.55.55.55"},
-				{Type: v1.NodeHostName, Address: testKubeletHostname},
-			},
-			expectedAddresses: nil,
-			shouldError:       true,
-		},
-	}
-	for _, testCase := range cases {
-		// testCase setup
-		existingNode := v1.Node{
-			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
-			Spec:       v1.NodeSpec{},
-		}
-
-		kubelet.nodeIP = testCase.nodeIP
-
-		fakeCloud := &fakecloud.FakeCloud{
-			Addresses: testCase.nodeAddresses,
-			Err:       nil,
-		}
-		kubelet.cloud = fakeCloud
-		kubelet.cloudResourceSyncManager = NewCloudResourceSyncManager(kubelet.cloud, kubelet.nodeName, kubelet.nodeStatusUpdateFrequency)
-		stopCh := make(chan struct{})
-		go kubelet.cloudResourceSyncManager.Run(stopCh)
-		kubelet.nodeIPValidator = func(nodeIP net.IP) error {
-			return nil
-		}
-
-		// execute method
-		err := kubelet.setNodeAddress(&existingNode)
-		close(stopCh)
-		if err != nil && !testCase.shouldError {
-			t.Errorf("Unexpected error for test %s: %q", testCase.name, err)
-			continue
-		} else if err != nil && testCase.shouldError {
-			// expected an error
-			continue
-		}
-
-		// Sort both sets for consistent equality
-		sortNodeAddresses(testCase.expectedAddresses)
-		sortNodeAddresses(existingNode.Status.Addresses)
-
-		assert.True(
-			t,
-			apiequality.Semantic.DeepEqual(
-				testCase.expectedAddresses,
-				existingNode.Status.Addresses,
-			),
-			fmt.Sprintf("Test %s failed %%s", testCase.name),
-			diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses),
-		)
-	}
 }
 
 // sortableNodeAddress is a type for sorting []v1.NodeAddress
@@ -350,6 +212,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 				},
 			}
+			// Since this test retroactively overrides the stub container manager,
+			// we have to regenerate default status setters.
+			kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+
 			kubeClient := testKubelet.fakeKubeClient
 			existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 			kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
@@ -483,6 +349,9 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 		},
 	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{
@@ -701,7 +570,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
-	kubelet.heartbeatClient, err = v1core.NewForConfig(config)
+	kubelet.heartbeatClient, err = clientset.NewForConfig(config)
 	kubelet.onRepeatedHeartbeatFailure = func() {
 		atomic.AddInt64(&failureCallbacks, 1)
 	}
@@ -749,6 +618,9 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(20E9, resource.BinarySI),
 		},
 	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	clock := testKubelet.fakeClock
 	kubeClient := testKubelet.fakeKubeClient
@@ -979,9 +851,9 @@ func TestRegisterWithApiServer(t *testing.T) {
 			},
 		}, nil
 	})
-	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
-	})
+
+	addNotImplatedReaction(kubeClient)
+
 	machineInfo := &cadvisorapi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -1108,10 +980,6 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		},
 	}
 
-	notImplemented := func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
-	}
-
 	for _, tc := range cases {
 		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled is a don't-care for this test */)
 		defer testKubelet.Cleanup()
@@ -1134,9 +1002,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 		kubeClient.AddReactor("delete", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, tc.deleteError
 		})
-		kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-			return notImplemented(action)
-		})
+		addNotImplatedReaction(kubeClient)
 
 		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
@@ -1190,6 +1056,10 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 			v1.ResourceEphemeralStorage: *resource.NewQuantity(3000, resource.BinarySI),
 		},
 	}
+	// Since this test retroactively overrides the stub container manager,
+	// we have to regenerate default status setters.
+	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
+
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{existingNode}}).ReactionChain
@@ -1642,84 +1512,52 @@ func TestValidateNodeIPParam(t *testing.T) {
 	}
 }
 
-func TestSetVolumeLimits(t *testing.T) {
-	testKubelet := newTestKubeletWithoutFakeVolumePlugin(t, false /* controllerAttachDetachEnabled */)
+func TestRegisterWithApiServerWithTaint(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.kubeClient = nil // ensure only the heartbeat client is used
-	kubelet.hostname = testKubeletHostname
+	kubeClient := testKubelet.fakeKubeClient
 
-	var testcases = []struct {
-		name              string
-		cloudProviderName string
-		expectedVolumeKey string
-		expectedLimit     int64
-	}{
-		{
-			name:              "For default GCE cloudprovider",
-			cloudProviderName: "gce",
-			expectedVolumeKey: util.GCEVolumeLimitKey,
-			expectedLimit:     16,
-		},
-		{
-			name:              "For default AWS Cloudprovider",
-			cloudProviderName: "aws",
-			expectedVolumeKey: util.EBSVolumeLimitKey,
-			expectedLimit:     39,
-		},
-		{
-			name:              "for default Azure cloudprovider",
-			cloudProviderName: "azure",
-			expectedVolumeKey: util.AzureVolumeLimitKey,
-			expectedLimit:     16,
-		},
-		{
-			name:              "when no cloudprovider is present",
-			cloudProviderName: "",
-			expectedVolumeKey: util.AzureVolumeLimitKey,
-			expectedLimit:     -1,
-		},
+	machineInfo := &cadvisorapi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
 	}
-	for _, test := range testcases {
-		node := &v1.Node{
-			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
-			Spec:       v1.NodeSpec{},
+	kubelet.machineInfo = machineInfo
+
+	var gotNode runtime.Object
+	kubeClient.AddReactor("create", "nodes", func(action core.Action) (bool, runtime.Object, error) {
+		createAction := action.(core.CreateAction)
+		gotNode = createAction.GetObject()
+		return true, gotNode, nil
+	})
+
+	addNotImplatedReaction(kubeClient)
+
+	// Make node to be unschedulable.
+	kubelet.registerSchedulable = false
+
+	forEachFeatureGate(t, []utilfeature.Feature{features.TaintNodesByCondition}, func(t *testing.T) {
+		// Reset kubelet status for each test.
+		kubelet.registrationCompleted = false
+
+		// Register node to apiserver.
+		kubelet.registerWithAPIServer()
+
+		// Check the unschedulable taint.
+		got := gotNode.(*v1.Node)
+		unschedulableTaint := &v1.Taint{
+			Key:    algorithm.TaintNodeUnschedulable,
+			Effect: v1.TaintEffectNoSchedule,
 		}
 
-		if test.cloudProviderName != "" {
-			fakeCloud := &fakecloud.FakeCloud{
-				Provider: test.cloudProviderName,
-				Err:      nil,
-			}
-			kubelet.cloud = fakeCloud
-		} else {
-			kubelet.cloud = nil
-		}
+		require.Equal(t,
+			utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
+			taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
+			"test unschedulable taint for TaintNodesByCondition")
 
-		kubelet.setVolumeLimits(node)
-		nodeLimits := []v1.ResourceList{}
-		nodeLimits = append(nodeLimits, node.Status.Allocatable)
-		nodeLimits = append(nodeLimits, node.Status.Capacity)
-		for _, volumeLimits := range nodeLimits {
-			if test.expectedLimit == -1 {
-				_, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
-				if ok {
-					t.Errorf("Expected no volume limit found for %s", test.expectedVolumeKey)
-				}
-			} else {
-				fl, ok := volumeLimits[v1.ResourceName(test.expectedVolumeKey)]
-
-				if !ok {
-					t.Errorf("Expected to found volume limit for %s found none", test.expectedVolumeKey)
-				}
-				foundLimit, _ := fl.AsInt64()
-				expectedValue := resource.NewQuantity(test.expectedLimit, resource.DecimalSI)
-				if expectedValue.Cmp(fl) != 0 {
-					t.Errorf("Expected volume limit for %s to be %v found %v", test.expectedVolumeKey, test.expectedLimit, foundLimit)
-				}
-			}
-
-		}
-
-	}
+		return
+	})
 }

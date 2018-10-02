@@ -32,6 +32,7 @@ import (
 	core "k8s.io/kubernetes/pkg/apis/core"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	networking "k8s.io/kubernetes/pkg/apis/networking"
 	policy "k8s.io/kubernetes/pkg/apis/policy"
 )
 
@@ -41,109 +42,648 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume,
-		Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume,
-		Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath,
-		Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath,
-		Convert_v1beta1_CustomMetricCurrentStatus_To_extensions_CustomMetricCurrentStatus,
-		Convert_extensions_CustomMetricCurrentStatus_To_v1beta1_CustomMetricCurrentStatus,
-		Convert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCurrentStatusList,
-		Convert_extensions_CustomMetricCurrentStatusList_To_v1beta1_CustomMetricCurrentStatusList,
-		Convert_v1beta1_CustomMetricTarget_To_extensions_CustomMetricTarget,
-		Convert_extensions_CustomMetricTarget_To_v1beta1_CustomMetricTarget,
-		Convert_v1beta1_CustomMetricTargetList_To_extensions_CustomMetricTargetList,
-		Convert_extensions_CustomMetricTargetList_To_v1beta1_CustomMetricTargetList,
-		Convert_v1beta1_DaemonSet_To_extensions_DaemonSet,
-		Convert_extensions_DaemonSet_To_v1beta1_DaemonSet,
-		Convert_v1beta1_DaemonSetCondition_To_extensions_DaemonSetCondition,
-		Convert_extensions_DaemonSetCondition_To_v1beta1_DaemonSetCondition,
-		Convert_v1beta1_DaemonSetList_To_extensions_DaemonSetList,
-		Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList,
-		Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec,
-		Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec,
-		Convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus,
-		Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus,
-		Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
-		Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy,
-		Convert_v1beta1_Deployment_To_extensions_Deployment,
-		Convert_extensions_Deployment_To_v1beta1_Deployment,
-		Convert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition,
-		Convert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition,
-		Convert_v1beta1_DeploymentList_To_extensions_DeploymentList,
-		Convert_extensions_DeploymentList_To_v1beta1_DeploymentList,
-		Convert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback,
-		Convert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback,
-		Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec,
-		Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec,
-		Convert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus,
-		Convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus,
-		Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy,
-		Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy,
-		Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions,
-		Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions,
-		Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath,
-		Convert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath,
-		Convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue,
-		Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue,
-		Convert_v1beta1_HostPortRange_To_policy_HostPortRange,
-		Convert_policy_HostPortRange_To_v1beta1_HostPortRange,
-		Convert_v1beta1_IDRange_To_policy_IDRange,
-		Convert_policy_IDRange_To_v1beta1_IDRange,
-		Convert_v1beta1_Ingress_To_extensions_Ingress,
-		Convert_extensions_Ingress_To_v1beta1_Ingress,
-		Convert_v1beta1_IngressBackend_To_extensions_IngressBackend,
-		Convert_extensions_IngressBackend_To_v1beta1_IngressBackend,
-		Convert_v1beta1_IngressList_To_extensions_IngressList,
-		Convert_extensions_IngressList_To_v1beta1_IngressList,
-		Convert_v1beta1_IngressRule_To_extensions_IngressRule,
-		Convert_extensions_IngressRule_To_v1beta1_IngressRule,
-		Convert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue,
-		Convert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue,
-		Convert_v1beta1_IngressSpec_To_extensions_IngressSpec,
-		Convert_extensions_IngressSpec_To_v1beta1_IngressSpec,
-		Convert_v1beta1_IngressStatus_To_extensions_IngressStatus,
-		Convert_extensions_IngressStatus_To_v1beta1_IngressStatus,
-		Convert_v1beta1_IngressTLS_To_extensions_IngressTLS,
-		Convert_extensions_IngressTLS_To_v1beta1_IngressTLS,
-		Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy,
-		Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy,
-		Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList,
-		Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList,
-		Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec,
-		Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
-		Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet,
-		Convert_extensions_ReplicaSet_To_v1beta1_ReplicaSet,
-		Convert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition,
-		Convert_extensions_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition,
-		Convert_v1beta1_ReplicaSetList_To_extensions_ReplicaSetList,
-		Convert_extensions_ReplicaSetList_To_v1beta1_ReplicaSetList,
-		Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
-		Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec,
-		Convert_v1beta1_ReplicaSetStatus_To_extensions_ReplicaSetStatus,
-		Convert_extensions_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus,
-		Convert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy,
-		Convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy,
-		Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig,
-		Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig,
-		Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
-		Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet,
-		Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
-		Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment,
-		Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions,
-		Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions,
-		Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions,
-		Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions,
-		Convert_v1beta1_Scale_To_autoscaling_Scale,
-		Convert_autoscaling_Scale_To_v1beta1_Scale,
-		Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec,
-		Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec,
-		Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus,
-		Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus,
-		Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions,
-		Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.AllowedFlexVolume)(nil), (*policy.AllowedFlexVolume)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(a.(*v1beta1.AllowedFlexVolume), b.(*policy.AllowedFlexVolume), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.AllowedFlexVolume)(nil), (*v1beta1.AllowedFlexVolume)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_AllowedFlexVolume_To_v1beta1_AllowedFlexVolume(a.(*policy.AllowedFlexVolume), b.(*v1beta1.AllowedFlexVolume), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.AllowedHostPath)(nil), (*policy.AllowedHostPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_AllowedHostPath_To_policy_AllowedHostPath(a.(*v1beta1.AllowedHostPath), b.(*policy.AllowedHostPath), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.AllowedHostPath)(nil), (*v1beta1.AllowedHostPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_AllowedHostPath_To_v1beta1_AllowedHostPath(a.(*policy.AllowedHostPath), b.(*v1beta1.AllowedHostPath), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CustomMetricCurrentStatus)(nil), (*extensions.CustomMetricCurrentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CustomMetricCurrentStatus_To_extensions_CustomMetricCurrentStatus(a.(*v1beta1.CustomMetricCurrentStatus), b.(*extensions.CustomMetricCurrentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.CustomMetricCurrentStatus)(nil), (*v1beta1.CustomMetricCurrentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_CustomMetricCurrentStatus_To_v1beta1_CustomMetricCurrentStatus(a.(*extensions.CustomMetricCurrentStatus), b.(*v1beta1.CustomMetricCurrentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CustomMetricCurrentStatusList)(nil), (*extensions.CustomMetricCurrentStatusList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CustomMetricCurrentStatusList_To_extensions_CustomMetricCurrentStatusList(a.(*v1beta1.CustomMetricCurrentStatusList), b.(*extensions.CustomMetricCurrentStatusList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.CustomMetricCurrentStatusList)(nil), (*v1beta1.CustomMetricCurrentStatusList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_CustomMetricCurrentStatusList_To_v1beta1_CustomMetricCurrentStatusList(a.(*extensions.CustomMetricCurrentStatusList), b.(*v1beta1.CustomMetricCurrentStatusList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CustomMetricTarget)(nil), (*extensions.CustomMetricTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CustomMetricTarget_To_extensions_CustomMetricTarget(a.(*v1beta1.CustomMetricTarget), b.(*extensions.CustomMetricTarget), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.CustomMetricTarget)(nil), (*v1beta1.CustomMetricTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_CustomMetricTarget_To_v1beta1_CustomMetricTarget(a.(*extensions.CustomMetricTarget), b.(*v1beta1.CustomMetricTarget), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.CustomMetricTargetList)(nil), (*extensions.CustomMetricTargetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_CustomMetricTargetList_To_extensions_CustomMetricTargetList(a.(*v1beta1.CustomMetricTargetList), b.(*extensions.CustomMetricTargetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.CustomMetricTargetList)(nil), (*v1beta1.CustomMetricTargetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_CustomMetricTargetList_To_v1beta1_CustomMetricTargetList(a.(*extensions.CustomMetricTargetList), b.(*v1beta1.CustomMetricTargetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSet)(nil), (*extensions.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSet_To_extensions_DaemonSet(a.(*v1beta1.DaemonSet), b.(*extensions.DaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSet)(nil), (*v1beta1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSet_To_v1beta1_DaemonSet(a.(*extensions.DaemonSet), b.(*v1beta1.DaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetCondition)(nil), (*extensions.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetCondition_To_extensions_DaemonSetCondition(a.(*v1beta1.DaemonSetCondition), b.(*extensions.DaemonSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetCondition)(nil), (*v1beta1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetCondition_To_v1beta1_DaemonSetCondition(a.(*extensions.DaemonSetCondition), b.(*v1beta1.DaemonSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetList)(nil), (*extensions.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetList_To_extensions_DaemonSetList(a.(*v1beta1.DaemonSetList), b.(*extensions.DaemonSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetList)(nil), (*v1beta1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetList_To_v1beta1_DaemonSetList(a.(*extensions.DaemonSetList), b.(*v1beta1.DaemonSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetSpec)(nil), (*extensions.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetSpec_To_extensions_DaemonSetSpec(a.(*v1beta1.DaemonSetSpec), b.(*extensions.DaemonSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetSpec)(nil), (*v1beta1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetSpec_To_v1beta1_DaemonSetSpec(a.(*extensions.DaemonSetSpec), b.(*v1beta1.DaemonSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetStatus)(nil), (*extensions.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetStatus_To_extensions_DaemonSetStatus(a.(*v1beta1.DaemonSetStatus), b.(*extensions.DaemonSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetStatus)(nil), (*v1beta1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetStatus_To_v1beta1_DaemonSetStatus(a.(*extensions.DaemonSetStatus), b.(*v1beta1.DaemonSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DaemonSetUpdateStrategy)(nil), (*extensions.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(a.(*v1beta1.DaemonSetUpdateStrategy), b.(*extensions.DaemonSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetUpdateStrategy)(nil), (*v1beta1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetUpdateStrategy_To_v1beta1_DaemonSetUpdateStrategy(a.(*extensions.DaemonSetUpdateStrategy), b.(*v1beta1.DaemonSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Deployment)(nil), (*extensions.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Deployment_To_extensions_Deployment(a.(*v1beta1.Deployment), b.(*extensions.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.Deployment)(nil), (*v1beta1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_Deployment_To_v1beta1_Deployment(a.(*extensions.Deployment), b.(*v1beta1.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentCondition)(nil), (*extensions.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(a.(*v1beta1.DeploymentCondition), b.(*extensions.DeploymentCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentCondition)(nil), (*v1beta1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentCondition_To_v1beta1_DeploymentCondition(a.(*extensions.DeploymentCondition), b.(*v1beta1.DeploymentCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentList)(nil), (*extensions.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentList_To_extensions_DeploymentList(a.(*v1beta1.DeploymentList), b.(*extensions.DeploymentList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentList)(nil), (*v1beta1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentList_To_v1beta1_DeploymentList(a.(*extensions.DeploymentList), b.(*v1beta1.DeploymentList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentRollback)(nil), (*extensions.DeploymentRollback)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentRollback_To_extensions_DeploymentRollback(a.(*v1beta1.DeploymentRollback), b.(*extensions.DeploymentRollback), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentRollback)(nil), (*v1beta1.DeploymentRollback)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentRollback_To_v1beta1_DeploymentRollback(a.(*extensions.DeploymentRollback), b.(*v1beta1.DeploymentRollback), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentSpec)(nil), (*extensions.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(a.(*v1beta1.DeploymentSpec), b.(*extensions.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentSpec)(nil), (*v1beta1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(a.(*extensions.DeploymentSpec), b.(*v1beta1.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentStatus)(nil), (*extensions.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentStatus_To_extensions_DeploymentStatus(a.(*v1beta1.DeploymentStatus), b.(*extensions.DeploymentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentStatus)(nil), (*v1beta1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentStatus_To_v1beta1_DeploymentStatus(a.(*extensions.DeploymentStatus), b.(*v1beta1.DeploymentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DeploymentStrategy)(nil), (*extensions.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(a.(*v1beta1.DeploymentStrategy), b.(*extensions.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentStrategy)(nil), (*v1beta1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(a.(*extensions.DeploymentStrategy), b.(*v1beta1.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.FSGroupStrategyOptions)(nil), (*policy.FSGroupStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_FSGroupStrategyOptions_To_policy_FSGroupStrategyOptions(a.(*v1beta1.FSGroupStrategyOptions), b.(*policy.FSGroupStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.FSGroupStrategyOptions)(nil), (*v1beta1.FSGroupStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(a.(*policy.FSGroupStrategyOptions), b.(*v1beta1.FSGroupStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.HTTPIngressPath)(nil), (*extensions.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_HTTPIngressPath_To_extensions_HTTPIngressPath(a.(*v1beta1.HTTPIngressPath), b.(*extensions.HTTPIngressPath), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.HTTPIngressPath)(nil), (*v1beta1.HTTPIngressPath)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_HTTPIngressPath_To_v1beta1_HTTPIngressPath(a.(*extensions.HTTPIngressPath), b.(*v1beta1.HTTPIngressPath), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.HTTPIngressRuleValue)(nil), (*extensions.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_HTTPIngressRuleValue_To_extensions_HTTPIngressRuleValue(a.(*v1beta1.HTTPIngressRuleValue), b.(*extensions.HTTPIngressRuleValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.HTTPIngressRuleValue)(nil), (*v1beta1.HTTPIngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_HTTPIngressRuleValue_To_v1beta1_HTTPIngressRuleValue(a.(*extensions.HTTPIngressRuleValue), b.(*v1beta1.HTTPIngressRuleValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.HostPortRange)(nil), (*policy.HostPortRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_HostPortRange_To_policy_HostPortRange(a.(*v1beta1.HostPortRange), b.(*policy.HostPortRange), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.HostPortRange)(nil), (*v1beta1.HostPortRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_HostPortRange_To_v1beta1_HostPortRange(a.(*policy.HostPortRange), b.(*v1beta1.HostPortRange), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IDRange)(nil), (*policy.IDRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IDRange_To_policy_IDRange(a.(*v1beta1.IDRange), b.(*policy.IDRange), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.IDRange)(nil), (*v1beta1.IDRange)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_IDRange_To_v1beta1_IDRange(a.(*policy.IDRange), b.(*v1beta1.IDRange), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Ingress)(nil), (*extensions.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Ingress_To_extensions_Ingress(a.(*v1beta1.Ingress), b.(*extensions.Ingress), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.Ingress)(nil), (*v1beta1.Ingress)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_Ingress_To_v1beta1_Ingress(a.(*extensions.Ingress), b.(*v1beta1.Ingress), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressBackend)(nil), (*extensions.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressBackend_To_extensions_IngressBackend(a.(*v1beta1.IngressBackend), b.(*extensions.IngressBackend), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.IngressBackend)(nil), (*v1beta1.IngressBackend)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_IngressBackend_To_v1beta1_IngressBackend(a.(*extensions.IngressBackend), b.(*v1beta1.IngressBackend), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressList)(nil), (*extensions.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressList_To_extensions_IngressList(a.(*v1beta1.IngressList), b.(*extensions.IngressList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.IngressList)(nil), (*v1beta1.IngressList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_IngressList_To_v1beta1_IngressList(a.(*extensions.IngressList), b.(*v1beta1.IngressList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressRule)(nil), (*extensions.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressRule_To_extensions_IngressRule(a.(*v1beta1.IngressRule), b.(*extensions.IngressRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.IngressRule)(nil), (*v1beta1.IngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_IngressRule_To_v1beta1_IngressRule(a.(*extensions.IngressRule), b.(*v1beta1.IngressRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressRuleValue)(nil), (*extensions.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressRuleValue_To_extensions_IngressRuleValue(a.(*v1beta1.IngressRuleValue), b.(*extensions.IngressRuleValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.IngressRuleValue)(nil), (*v1beta1.IngressRuleValue)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_IngressRuleValue_To_v1beta1_IngressRuleValue(a.(*extensions.IngressRuleValue), b.(*v1beta1.IngressRuleValue), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressSpec)(nil), (*extensions.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressSpec_To_extensions_IngressSpec(a.(*v1beta1.IngressSpec), b.(*extensions.IngressSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.IngressSpec)(nil), (*v1beta1.IngressSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_IngressSpec_To_v1beta1_IngressSpec(a.(*extensions.IngressSpec), b.(*v1beta1.IngressSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressStatus)(nil), (*extensions.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressStatus_To_extensions_IngressStatus(a.(*v1beta1.IngressStatus), b.(*extensions.IngressStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.IngressStatus)(nil), (*v1beta1.IngressStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_IngressStatus_To_v1beta1_IngressStatus(a.(*extensions.IngressStatus), b.(*v1beta1.IngressStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.IngressTLS)(nil), (*extensions.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IngressTLS_To_extensions_IngressTLS(a.(*v1beta1.IngressTLS), b.(*extensions.IngressTLS), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.IngressTLS)(nil), (*v1beta1.IngressTLS)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_IngressTLS_To_v1beta1_IngressTLS(a.(*extensions.IngressTLS), b.(*v1beta1.IngressTLS), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.PodSecurityPolicy)(nil), (*policy.PodSecurityPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(a.(*v1beta1.PodSecurityPolicy), b.(*policy.PodSecurityPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.PodSecurityPolicy)(nil), (*v1beta1.PodSecurityPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(a.(*policy.PodSecurityPolicy), b.(*v1beta1.PodSecurityPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.PodSecurityPolicyList)(nil), (*policy.PodSecurityPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(a.(*v1beta1.PodSecurityPolicyList), b.(*policy.PodSecurityPolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.PodSecurityPolicyList)(nil), (*v1beta1.PodSecurityPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(a.(*policy.PodSecurityPolicyList), b.(*v1beta1.PodSecurityPolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.PodSecurityPolicySpec)(nil), (*policy.PodSecurityPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(a.(*v1beta1.PodSecurityPolicySpec), b.(*policy.PodSecurityPolicySpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.PodSecurityPolicySpec)(nil), (*v1beta1.PodSecurityPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(a.(*policy.PodSecurityPolicySpec), b.(*v1beta1.PodSecurityPolicySpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSet)(nil), (*extensions.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(a.(*v1beta1.ReplicaSet), b.(*extensions.ReplicaSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSet)(nil), (*v1beta1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSet_To_v1beta1_ReplicaSet(a.(*extensions.ReplicaSet), b.(*v1beta1.ReplicaSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetCondition)(nil), (*extensions.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(a.(*v1beta1.ReplicaSetCondition), b.(*extensions.ReplicaSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetCondition)(nil), (*v1beta1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetCondition_To_v1beta1_ReplicaSetCondition(a.(*extensions.ReplicaSetCondition), b.(*v1beta1.ReplicaSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetList)(nil), (*extensions.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetList_To_extensions_ReplicaSetList(a.(*v1beta1.ReplicaSetList), b.(*extensions.ReplicaSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetList)(nil), (*v1beta1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetList_To_v1beta1_ReplicaSetList(a.(*extensions.ReplicaSetList), b.(*v1beta1.ReplicaSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetSpec)(nil), (*extensions.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(a.(*v1beta1.ReplicaSetSpec), b.(*extensions.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetSpec)(nil), (*v1beta1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(a.(*extensions.ReplicaSetSpec), b.(*v1beta1.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicaSetStatus)(nil), (*extensions.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(a.(*v1beta1.ReplicaSetStatus), b.(*extensions.ReplicaSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetStatus)(nil), (*v1beta1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetStatus_To_v1beta1_ReplicaSetStatus(a.(*extensions.ReplicaSetStatus), b.(*v1beta1.ReplicaSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ReplicationControllerDummy)(nil), (*extensions.ReplicationControllerDummy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicationControllerDummy_To_extensions_ReplicationControllerDummy(a.(*v1beta1.ReplicationControllerDummy), b.(*extensions.ReplicationControllerDummy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicationControllerDummy)(nil), (*v1beta1.ReplicationControllerDummy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicationControllerDummy_To_v1beta1_ReplicationControllerDummy(a.(*extensions.ReplicationControllerDummy), b.(*v1beta1.ReplicationControllerDummy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.RollbackConfig)(nil), (*extensions.RollbackConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollbackConfig_To_extensions_RollbackConfig(a.(*v1beta1.RollbackConfig), b.(*extensions.RollbackConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.RollbackConfig)(nil), (*v1beta1.RollbackConfig)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollbackConfig_To_v1beta1_RollbackConfig(a.(*extensions.RollbackConfig), b.(*v1beta1.RollbackConfig), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.RollingUpdateDaemonSet)(nil), (*extensions.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(a.(*v1beta1.RollingUpdateDaemonSet), b.(*extensions.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.RollingUpdateDaemonSet)(nil), (*v1beta1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(a.(*extensions.RollingUpdateDaemonSet), b.(*v1beta1.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.RollingUpdateDeployment)(nil), (*extensions.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(a.(*v1beta1.RollingUpdateDeployment), b.(*extensions.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.RollingUpdateDeployment)(nil), (*v1beta1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(a.(*extensions.RollingUpdateDeployment), b.(*v1beta1.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.RunAsUserStrategyOptions)(nil), (*policy.RunAsUserStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RunAsUserStrategyOptions_To_policy_RunAsUserStrategyOptions(a.(*v1beta1.RunAsUserStrategyOptions), b.(*policy.RunAsUserStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.RunAsUserStrategyOptions)(nil), (*v1beta1.RunAsUserStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_RunAsUserStrategyOptions_To_v1beta1_RunAsUserStrategyOptions(a.(*policy.RunAsUserStrategyOptions), b.(*v1beta1.RunAsUserStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.SELinuxStrategyOptions)(nil), (*policy.SELinuxStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_SELinuxStrategyOptions_To_policy_SELinuxStrategyOptions(a.(*v1beta1.SELinuxStrategyOptions), b.(*policy.SELinuxStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.SELinuxStrategyOptions)(nil), (*v1beta1.SELinuxStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(a.(*policy.SELinuxStrategyOptions), b.(*v1beta1.SELinuxStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.Scale)(nil), (*autoscaling.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Scale_To_autoscaling_Scale(a.(*v1beta1.Scale), b.(*autoscaling.Scale), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*autoscaling.Scale)(nil), (*v1beta1.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_Scale_To_v1beta1_Scale(a.(*autoscaling.Scale), b.(*v1beta1.Scale), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ScaleSpec)(nil), (*autoscaling.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ScaleSpec_To_autoscaling_ScaleSpec(a.(*v1beta1.ScaleSpec), b.(*autoscaling.ScaleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*autoscaling.ScaleSpec)(nil), (*v1beta1.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(a.(*autoscaling.ScaleSpec), b.(*v1beta1.ScaleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(a.(*v1beta1.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*autoscaling.ScaleStatus)(nil), (*v1beta1.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(a.(*autoscaling.ScaleStatus), b.(*v1beta1.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.SupplementalGroupsStrategyOptions)(nil), (*policy.SupplementalGroupsStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_SupplementalGroupsStrategyOptions_To_policy_SupplementalGroupsStrategyOptions(a.(*v1beta1.SupplementalGroupsStrategyOptions), b.(*policy.SupplementalGroupsStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*policy.SupplementalGroupsStrategyOptions)(nil), (*v1beta1.SupplementalGroupsStrategyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_policy_SupplementalGroupsStrategyOptions_To_v1beta1_SupplementalGroupsStrategyOptions(a.(*policy.SupplementalGroupsStrategyOptions), b.(*v1beta1.SupplementalGroupsStrategyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.ScaleStatus)(nil), (*v1beta1.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ScaleStatus_To_v1beta1_ScaleStatus(a.(*autoscaling.ScaleStatus), b.(*v1beta1.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.DeploymentSpec)(nil), (*v1beta1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(a.(*extensions.DeploymentSpec), b.(*v1beta1.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.DeploymentStrategy)(nil), (*v1beta1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(a.(*extensions.DeploymentStrategy), b.(*v1beta1.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.ReplicaSetSpec)(nil), (*v1beta1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(a.(*extensions.ReplicaSetSpec), b.(*v1beta1.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.RollingUpdateDaemonSet)(nil), (*v1beta1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(a.(*extensions.RollingUpdateDaemonSet), b.(*v1beta1.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.RollingUpdateDeployment)(nil), (*v1beta1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(a.(*extensions.RollingUpdateDeployment), b.(*v1beta1.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.IPBlock)(nil), (*v1beta1.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_IPBlock_To_v1beta1_IPBlock(a.(*networking.IPBlock), b.(*v1beta1.IPBlock), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.NetworkPolicyEgressRule)(nil), (*v1beta1.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(a.(*networking.NetworkPolicyEgressRule), b.(*v1beta1.NetworkPolicyEgressRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.NetworkPolicyIngressRule)(nil), (*v1beta1.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(a.(*networking.NetworkPolicyIngressRule), b.(*v1beta1.NetworkPolicyIngressRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.NetworkPolicyList)(nil), (*v1beta1.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(a.(*networking.NetworkPolicyList), b.(*v1beta1.NetworkPolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.NetworkPolicyPeer)(nil), (*v1beta1.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(a.(*networking.NetworkPolicyPeer), b.(*v1beta1.NetworkPolicyPeer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.NetworkPolicyPort)(nil), (*v1beta1.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(a.(*networking.NetworkPolicyPort), b.(*v1beta1.NetworkPolicyPort), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.NetworkPolicySpec)(nil), (*v1beta1.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(a.(*networking.NetworkPolicySpec), b.(*v1beta1.NetworkPolicySpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*networking.NetworkPolicy)(nil), (*v1beta1.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(a.(*networking.NetworkPolicy), b.(*v1beta1.NetworkPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.DeploymentSpec)(nil), (*extensions.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(a.(*v1beta1.DeploymentSpec), b.(*extensions.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.DeploymentStrategy)(nil), (*extensions.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(a.(*v1beta1.DeploymentStrategy), b.(*extensions.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.IPBlock)(nil), (*networking.IPBlock)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_IPBlock_To_networking_IPBlock(a.(*v1beta1.IPBlock), b.(*networking.IPBlock), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NetworkPolicyEgressRule)(nil), (*networking.NetworkPolicyEgressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(a.(*v1beta1.NetworkPolicyEgressRule), b.(*networking.NetworkPolicyEgressRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NetworkPolicyIngressRule)(nil), (*networking.NetworkPolicyIngressRule)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyIngressRule_To_networking_NetworkPolicyIngressRule(a.(*v1beta1.NetworkPolicyIngressRule), b.(*networking.NetworkPolicyIngressRule), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NetworkPolicyList)(nil), (*networking.NetworkPolicyList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(a.(*v1beta1.NetworkPolicyList), b.(*networking.NetworkPolicyList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NetworkPolicyPeer)(nil), (*networking.NetworkPolicyPeer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(a.(*v1beta1.NetworkPolicyPeer), b.(*networking.NetworkPolicyPeer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NetworkPolicyPort)(nil), (*networking.NetworkPolicyPort)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(a.(*v1beta1.NetworkPolicyPort), b.(*networking.NetworkPolicyPort), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NetworkPolicySpec)(nil), (*networking.NetworkPolicySpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(a.(*v1beta1.NetworkPolicySpec), b.(*networking.NetworkPolicySpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.NetworkPolicy)(nil), (*networking.NetworkPolicy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(a.(*v1beta1.NetworkPolicy), b.(*networking.NetworkPolicy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.ReplicaSetSpec)(nil), (*extensions.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(a.(*v1beta1.ReplicaSetSpec), b.(*extensions.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.RollingUpdateDaemonSet)(nil), (*extensions.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(a.(*v1beta1.RollingUpdateDaemonSet), b.(*extensions.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.RollingUpdateDeployment)(nil), (*extensions.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(a.(*v1beta1.RollingUpdateDeployment), b.(*extensions.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.ScaleStatus)(nil), (*autoscaling.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_ScaleStatus_To_autoscaling_ScaleStatus(a.(*v1beta1.ScaleStatus), b.(*autoscaling.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1beta1_AllowedFlexVolume_To_policy_AllowedFlexVolume(in *v1beta1.AllowedFlexVolume, out *policy.AllowedFlexVolume, s conversion.Scope) error {
@@ -1125,6 +1665,7 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(i
 	out.AllowedFlexVolumes = *(*[]policy.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.ForbiddenSysctls = *(*[]string)(unsafe.Pointer(&in.ForbiddenSysctls))
+	out.AllowedProcMountTypes = *(*[]core.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
 	return nil
 }
 
@@ -1164,6 +1705,7 @@ func autoConvert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(i
 	out.AllowedFlexVolumes = *(*[]v1beta1.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.ForbiddenSysctls = *(*[]string)(unsafe.Pointer(&in.ForbiddenSysctls))
+	out.AllowedProcMountTypes = *(*[]v1.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
 	return nil
 }
 

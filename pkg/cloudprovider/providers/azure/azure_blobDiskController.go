@@ -32,6 +32,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 	"github.com/rubiojr/go-vhd/vhd"
+
 	kwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/volume"
 )
@@ -79,7 +80,7 @@ func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error
 // If no storage account is given, search all the storage accounts associated with the resource group and pick one that
 // fits storage type and location.
 func (c *BlobDiskController) CreateVolume(blobName, accountName, accountType, location string, requestGB int) (string, string, int, error) {
-	account, key, err := c.common.cloud.ensureStorageAccount(accountName, accountType, location, dedicatedDiskAccountNamePrefix)
+	account, key, err := c.common.cloud.ensureStorageAccount(accountName, accountType, c.common.resourceGroup, location, dedicatedDiskAccountNamePrefix)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
@@ -107,7 +108,7 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse vhd URI %v", err)
 	}
-	key, err := c.common.cloud.getStorageAccesskey(accountName)
+	key, err := c.common.cloud.getStorageAccesskey(accountName, c.common.resourceGroup)
 	if err != nil {
 		return fmt.Errorf("no key for storage account %s, err %v", accountName, err)
 	}
@@ -488,7 +489,9 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 		glog.V(2).Infof("azureDisk - Creating storage account %s type %s", storageAccountName, string(storageAccountType))
 
 		cp := storage.AccountCreateParameters{
-			Sku:      &storage.Sku{Name: storageAccountType},
+			Sku: &storage.Sku{Name: storageAccountType},
+			// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
+			Kind:     storage.StorageV2,
 			Tags:     map[string]*string{"created-by": to.StringPtr("azure-dd")},
 			Location: &location}
 		ctx, cancel := getContextWithCancel()

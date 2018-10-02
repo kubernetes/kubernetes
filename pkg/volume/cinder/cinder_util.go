@@ -162,16 +162,19 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 }
 
 // CreateVolume uses the cloud provider entrypoint for creating a volume
-func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
+func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
 	cloud, err := c.plugin.getCloudProvider()
 	if err != nil {
 		return "", 0, nil, "", err
 	}
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGB := int(volutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	volSizeGiB, err := volutil.RoundUpToGiBInt(capacity)
+	if err != nil {
+		return "", 0, nil, "", err
+	}
+
 	name := volutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 255) // Cinder volume name can have up to 255 characters
 	vtype := ""
 	availability := ""
@@ -204,11 +207,15 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
 		if len(zones) > 0 {
-			availability = volutil.ChooseZoneForVolume(zones, c.options.PVC.Name)
+			availability, err = volutil.SelectZoneForVolume(false, false, "", nil, zones, node, allowedTopologies, c.options.PVC.Name)
+			if err != nil {
+				glog.V(2).Infof("error selecting zone for volume: %v", err)
+				return "", 0, nil, "", err
+			}
 		}
 	}
 
-	volumeID, volumeAZ, volumeRegion, IgnoreVolumeAZ, err := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
+	volumeID, volumeAZ, volumeRegion, IgnoreVolumeAZ, err := cloud.CreateVolume(name, volSizeGiB, vtype, availability, c.options.CloudTags)
 	if err != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", err)
 		return "", 0, nil, "", err
@@ -218,10 +225,14 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
-		volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
-		volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
+		if volumeAZ != "" {
+			volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+		}
+		if volumeRegion != "" {
+			volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
+		}
 	}
-	return volumeID, volSizeGB, volumeLabels, fstype, nil
+	return volumeID, volSizeGiB, volumeLabels, fstype, nil
 }
 
 func probeAttachedVolume() error {

@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
       - name: logexporter-test
-        image: k8s.gcr.io/logexporter:v0.1.1
+        image: gcr.io/k8s-testimages/logexporter:v0.1.3
         env:
         - name: NODE_NAME
           valueFrom:

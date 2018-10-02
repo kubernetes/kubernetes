@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1_test
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -33,12 +34,13 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
@@ -46,6 +48,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			SchedulerName:                 api.DefaultSchedulerName,
+			EnableServiceLinks:            &enableServiceLinks,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
@@ -58,6 +61,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			SchedulerName:                 api.DefaultSchedulerName,
+			EnableServiceLinks:            &enableServiceLinks,
 		},
 	}
 	tests := []struct {
@@ -163,6 +167,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 	defaultIntOrString := intstr.FromInt(1)
 	differentIntOrString := intstr.FromInt(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
@@ -170,6 +175,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			SchedulerName:                 api.DefaultSchedulerName,
+			EnableServiceLinks:            &enableServiceLinks,
 		},
 	}
 	tests := []struct {
@@ -188,7 +194,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
@@ -213,7 +220,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
@@ -237,7 +245,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
@@ -256,7 +265,8 @@ func TestSetDefaultDeployment(t *testing.T) {
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},

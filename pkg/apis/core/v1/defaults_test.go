@@ -29,7 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 
 	// enforce that all types are installed
 	_ "k8s.io/kubernetes/pkg/api/testapi"
@@ -1368,5 +1368,13 @@ func TestSetDefaultHostPathVolumeSource(t *testing.T) {
 
 	if defaultType == nil || *defaultType != expectedType {
 		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
+	}
+}
+
+func TestSetDefaultEnableServiceLinks(t *testing.T) {
+	pod := &v1.Pod{}
+	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
+	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != v1.DefaultEnableServiceLinks {
+		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
 	}
 }

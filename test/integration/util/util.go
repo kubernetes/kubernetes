@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -97,21 +98,22 @@ func createSchedulerConfigurator(
 	// Enable EnableEquivalenceClassCache for all integration tests.
 	utilfeature.DefaultFeatureGate.Set("EnableEquivalenceClassCache=true")
 
-	return factory.NewConfigFactory(
-		v1.DefaultSchedulerName,
-		clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
-		false,
-	)
+	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+		SchedulerName:                  v1.DefaultSchedulerName,
+		Client:                         clientSet,
+		NodeInformer:                   informerFactory.Core().V1().Nodes(),
+		PodInformer:                    informerFactory.Core().V1().Pods(),
+		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
+		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
+		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
+		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
+		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
+		ServiceInformer:                informerFactory.Core().V1().Services(),
+		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
+		DisablePreemption:              false,
+		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+	})
 }

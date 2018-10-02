@@ -81,7 +81,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		if !ValidNamespace(ctx, objectMeta) {
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
-	} else {
+	} else if len(objectMeta.GetNamespace()) > 0 {
 		objectMeta.SetNamespace(metav1.NamespaceNone)
 	}
 	objectMeta.SetDeletionTimestamp(nil)
@@ -98,7 +98,9 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	}
 
 	// ClusterName is ignored and should not be saved
-	objectMeta.SetClusterName("")
+	if len(objectMeta.GetClusterName()) > 0 {
+		objectMeta.SetClusterName("")
+	}
 
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
@@ -170,6 +172,7 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {

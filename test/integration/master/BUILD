@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     size = "large",
     srcs = [
+        "audit_test.go",
         "crd_test.go",
         "kms_transformation_test.go",
         "kube_apiserver_test.go",
@@ -37,7 +38,11 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/group:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/bearertoken:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
@@ -58,6 +63,8 @@ go_test(
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//test/utils:go_default_library",
+        "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [

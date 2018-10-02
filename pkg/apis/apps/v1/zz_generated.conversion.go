@@ -40,65 +40,408 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_ControllerRevision_To_apps_ControllerRevision,
-		Convert_apps_ControllerRevision_To_v1_ControllerRevision,
-		Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList,
-		Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList,
-		Convert_v1_DaemonSet_To_extensions_DaemonSet,
-		Convert_extensions_DaemonSet_To_v1_DaemonSet,
-		Convert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition,
-		Convert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition,
-		Convert_v1_DaemonSetList_To_extensions_DaemonSetList,
-		Convert_extensions_DaemonSetList_To_v1_DaemonSetList,
-		Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec,
-		Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec,
-		Convert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus,
-		Convert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus,
-		Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
-		Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy,
-		Convert_v1_Deployment_To_extensions_Deployment,
-		Convert_extensions_Deployment_To_v1_Deployment,
-		Convert_v1_DeploymentCondition_To_extensions_DeploymentCondition,
-		Convert_extensions_DeploymentCondition_To_v1_DeploymentCondition,
-		Convert_v1_DeploymentList_To_extensions_DeploymentList,
-		Convert_extensions_DeploymentList_To_v1_DeploymentList,
-		Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec,
-		Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec,
-		Convert_v1_DeploymentStatus_To_extensions_DeploymentStatus,
-		Convert_extensions_DeploymentStatus_To_v1_DeploymentStatus,
-		Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy,
-		Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy,
-		Convert_v1_ReplicaSet_To_extensions_ReplicaSet,
-		Convert_extensions_ReplicaSet_To_v1_ReplicaSet,
-		Convert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition,
-		Convert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition,
-		Convert_v1_ReplicaSetList_To_extensions_ReplicaSetList,
-		Convert_extensions_ReplicaSetList_To_v1_ReplicaSetList,
-		Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
-		Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec,
-		Convert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus,
-		Convert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus,
-		Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet,
-		Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet,
-		Convert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment,
-		Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment,
-		Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy,
-		Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy,
-		Convert_v1_StatefulSet_To_apps_StatefulSet,
-		Convert_apps_StatefulSet_To_v1_StatefulSet,
-		Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition,
-		Convert_apps_StatefulSetCondition_To_v1_StatefulSetCondition,
-		Convert_v1_StatefulSetList_To_apps_StatefulSetList,
-		Convert_apps_StatefulSetList_To_v1_StatefulSetList,
-		Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec,
-		Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec,
-		Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus,
-		Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus,
-		Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy,
-		Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1.ControllerRevision)(nil), (*apps.ControllerRevision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ControllerRevision_To_apps_ControllerRevision(a.(*v1.ControllerRevision), b.(*apps.ControllerRevision), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.ControllerRevision)(nil), (*v1.ControllerRevision)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ControllerRevision_To_v1_ControllerRevision(a.(*apps.ControllerRevision), b.(*v1.ControllerRevision), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ControllerRevisionList)(nil), (*apps.ControllerRevisionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(a.(*v1.ControllerRevisionList), b.(*apps.ControllerRevisionList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.ControllerRevisionList)(nil), (*v1.ControllerRevisionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(a.(*apps.ControllerRevisionList), b.(*v1.ControllerRevisionList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSet)(nil), (*extensions.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSet_To_extensions_DaemonSet(a.(*v1.DaemonSet), b.(*extensions.DaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSet_To_v1_DaemonSet(a.(*extensions.DaemonSet), b.(*v1.DaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetCondition)(nil), (*extensions.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetCondition_To_extensions_DaemonSetCondition(a.(*v1.DaemonSetCondition), b.(*extensions.DaemonSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetCondition)(nil), (*v1.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetCondition_To_v1_DaemonSetCondition(a.(*extensions.DaemonSetCondition), b.(*v1.DaemonSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetList)(nil), (*extensions.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetList_To_extensions_DaemonSetList(a.(*v1.DaemonSetList), b.(*extensions.DaemonSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetList)(nil), (*v1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetList_To_v1_DaemonSetList(a.(*extensions.DaemonSetList), b.(*v1.DaemonSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetSpec)(nil), (*extensions.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*extensions.DaemonSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*extensions.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetStatus)(nil), (*extensions.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetStatus_To_extensions_DaemonSetStatus(a.(*v1.DaemonSetStatus), b.(*extensions.DaemonSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetStatus)(nil), (*v1.DaemonSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetStatus_To_v1_DaemonSetStatus(a.(*extensions.DaemonSetStatus), b.(*v1.DaemonSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetUpdateStrategy)(nil), (*extensions.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(a.(*v1.DaemonSetUpdateStrategy), b.(*extensions.DaemonSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DaemonSetUpdateStrategy)(nil), (*v1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*extensions.DaemonSetUpdateStrategy), b.(*v1.DaemonSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.Deployment)(nil), (*extensions.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Deployment_To_extensions_Deployment(a.(*v1.Deployment), b.(*extensions.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_Deployment_To_v1_Deployment(a.(*extensions.Deployment), b.(*v1.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentCondition)(nil), (*extensions.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentCondition_To_extensions_DeploymentCondition(a.(*v1.DeploymentCondition), b.(*extensions.DeploymentCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentCondition)(nil), (*v1.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentCondition_To_v1_DeploymentCondition(a.(*extensions.DeploymentCondition), b.(*v1.DeploymentCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentList)(nil), (*extensions.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentList_To_extensions_DeploymentList(a.(*v1.DeploymentList), b.(*extensions.DeploymentList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentList)(nil), (*v1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentList_To_v1_DeploymentList(a.(*extensions.DeploymentList), b.(*v1.DeploymentList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentSpec)(nil), (*extensions.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*extensions.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(a.(*extensions.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStatus)(nil), (*extensions.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStatus_To_extensions_DeploymentStatus(a.(*v1.DeploymentStatus), b.(*extensions.DeploymentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentStatus)(nil), (*v1.DeploymentStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentStatus_To_v1_DeploymentStatus(a.(*extensions.DeploymentStatus), b.(*v1.DeploymentStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.DeploymentStrategy)(nil), (*extensions.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(a.(*v1.DeploymentStrategy), b.(*extensions.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.DeploymentStrategy)(nil), (*v1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*extensions.DeploymentStrategy), b.(*v1.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSet)(nil), (*extensions.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSet_To_extensions_ReplicaSet(a.(*v1.ReplicaSet), b.(*extensions.ReplicaSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSet)(nil), (*v1.ReplicaSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSet_To_v1_ReplicaSet(a.(*extensions.ReplicaSet), b.(*v1.ReplicaSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetCondition)(nil), (*extensions.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetCondition_To_extensions_ReplicaSetCondition(a.(*v1.ReplicaSetCondition), b.(*extensions.ReplicaSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetCondition)(nil), (*v1.ReplicaSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetCondition_To_v1_ReplicaSetCondition(a.(*extensions.ReplicaSetCondition), b.(*v1.ReplicaSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetList)(nil), (*extensions.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetList_To_extensions_ReplicaSetList(a.(*v1.ReplicaSetList), b.(*extensions.ReplicaSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetList)(nil), (*v1.ReplicaSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetList_To_v1_ReplicaSetList(a.(*extensions.ReplicaSetList), b.(*v1.ReplicaSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetSpec)(nil), (*extensions.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(a.(*v1.ReplicaSetSpec), b.(*extensions.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetSpec)(nil), (*v1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*extensions.ReplicaSetSpec), b.(*v1.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ReplicaSetStatus)(nil), (*extensions.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetStatus_To_extensions_ReplicaSetStatus(a.(*v1.ReplicaSetStatus), b.(*extensions.ReplicaSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.ReplicaSetStatus)(nil), (*v1.ReplicaSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetStatus_To_v1_ReplicaSetStatus(a.(*extensions.ReplicaSetStatus), b.(*v1.ReplicaSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDaemonSet)(nil), (*extensions.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(a.(*v1.RollingUpdateDaemonSet), b.(*extensions.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.RollingUpdateDaemonSet)(nil), (*v1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*extensions.RollingUpdateDaemonSet), b.(*v1.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateDeployment)(nil), (*extensions.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(a.(*v1.RollingUpdateDeployment), b.(*extensions.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*extensions.RollingUpdateDeployment)(nil), (*v1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*extensions.RollingUpdateDeployment), b.(*v1.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.RollingUpdateStatefulSetStrategy)(nil), (*apps.RollingUpdateStatefulSetStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateStatefulSetStrategy_To_apps_RollingUpdateStatefulSetStrategy(a.(*v1.RollingUpdateStatefulSetStrategy), b.(*apps.RollingUpdateStatefulSetStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.RollingUpdateStatefulSetStrategy)(nil), (*v1.RollingUpdateStatefulSetStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_RollingUpdateStatefulSetStrategy_To_v1_RollingUpdateStatefulSetStrategy(a.(*apps.RollingUpdateStatefulSetStrategy), b.(*v1.RollingUpdateStatefulSetStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StatefulSet)(nil), (*apps.StatefulSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSet_To_apps_StatefulSet(a.(*v1.StatefulSet), b.(*apps.StatefulSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSet)(nil), (*v1.StatefulSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSet_To_v1_StatefulSet(a.(*apps.StatefulSet), b.(*v1.StatefulSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetCondition)(nil), (*apps.StatefulSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetCondition_To_apps_StatefulSetCondition(a.(*v1.StatefulSetCondition), b.(*apps.StatefulSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetCondition)(nil), (*v1.StatefulSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetCondition_To_v1_StatefulSetCondition(a.(*apps.StatefulSetCondition), b.(*v1.StatefulSetCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetList)(nil), (*apps.StatefulSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetList_To_apps_StatefulSetList(a.(*v1.StatefulSetList), b.(*apps.StatefulSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetList)(nil), (*v1.StatefulSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetList_To_v1_StatefulSetList(a.(*apps.StatefulSetList), b.(*v1.StatefulSetList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetSpec)(nil), (*apps.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(a.(*v1.StatefulSetSpec), b.(*apps.StatefulSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetSpec)(nil), (*v1.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*v1.StatefulSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetStatus)(nil), (*apps.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(a.(*v1.StatefulSetStatus), b.(*apps.StatefulSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetStatus)(nil), (*v1.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(a.(*apps.StatefulSetStatus), b.(*v1.StatefulSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StatefulSetUpdateStrategy)(nil), (*apps.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(a.(*v1.StatefulSetUpdateStrategy), b.(*apps.StatefulSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apps.StatefulSetUpdateStrategy)(nil), (*v1.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(a.(*apps.StatefulSetUpdateStrategy), b.(*v1.StatefulSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.StatefulSetSpec)(nil), (*v1.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(a.(*apps.StatefulSetSpec), b.(*v1.StatefulSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.StatefulSetStatus)(nil), (*v1.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetStatus_To_v1_StatefulSetStatus(a.(*apps.StatefulSetStatus), b.(*v1.StatefulSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apps.StatefulSetUpdateStrategy)(nil), (*v1.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(a.(*apps.StatefulSetUpdateStrategy), b.(*v1.StatefulSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*extensions.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.DaemonSetUpdateStrategy)(nil), (*v1.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy(a.(*extensions.DaemonSetUpdateStrategy), b.(*v1.DaemonSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DaemonSet_To_v1_DaemonSet(a.(*extensions.DaemonSet), b.(*v1.DaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentSpec_To_v1_DeploymentSpec(a.(*extensions.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.DeploymentStrategy)(nil), (*v1.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_DeploymentStrategy_To_v1_DeploymentStrategy(a.(*extensions.DeploymentStrategy), b.(*v1.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_Deployment_To_v1_Deployment(a.(*extensions.Deployment), b.(*v1.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.ReplicaSetSpec)(nil), (*v1.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(a.(*extensions.ReplicaSetSpec), b.(*v1.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.RollingUpdateDaemonSet)(nil), (*v1.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDaemonSet_To_v1_RollingUpdateDaemonSet(a.(*extensions.RollingUpdateDaemonSet), b.(*v1.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*extensions.RollingUpdateDeployment)(nil), (*v1.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_extensions_RollingUpdateDeployment_To_v1_RollingUpdateDeployment(a.(*extensions.RollingUpdateDeployment), b.(*v1.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.DaemonSetSpec)(nil), (*extensions.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*extensions.DaemonSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.DaemonSetUpdateStrategy)(nil), (*extensions.DaemonSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(a.(*v1.DaemonSetUpdateStrategy), b.(*extensions.DaemonSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.DaemonSet)(nil), (*extensions.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DaemonSet_To_extensions_DaemonSet(a.(*v1.DaemonSet), b.(*extensions.DaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.DeploymentSpec)(nil), (*extensions.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentSpec_To_extensions_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*extensions.DeploymentSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.DeploymentStrategy)(nil), (*extensions.DeploymentStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_DeploymentStrategy_To_extensions_DeploymentStrategy(a.(*v1.DeploymentStrategy), b.(*extensions.DeploymentStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.Deployment)(nil), (*extensions.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Deployment_To_extensions_Deployment(a.(*v1.Deployment), b.(*extensions.Deployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ReplicaSetSpec)(nil), (*extensions.ReplicaSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(a.(*v1.ReplicaSetSpec), b.(*extensions.ReplicaSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.RollingUpdateDaemonSet)(nil), (*extensions.RollingUpdateDaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(a.(*v1.RollingUpdateDaemonSet), b.(*extensions.RollingUpdateDaemonSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.RollingUpdateDeployment)(nil), (*extensions.RollingUpdateDeployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployment(a.(*v1.RollingUpdateDeployment), b.(*extensions.RollingUpdateDeployment), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.StatefulSetSpec)(nil), (*apps.StatefulSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(a.(*v1.StatefulSetSpec), b.(*apps.StatefulSetSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.StatefulSetStatus)(nil), (*apps.StatefulSetStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetStatus_To_apps_StatefulSetStatus(a.(*v1.StatefulSetStatus), b.(*apps.StatefulSetStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.StatefulSetUpdateStrategy)(nil), (*apps.StatefulSetUpdateStrategy)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(a.(*v1.StatefulSetUpdateStrategy), b.(*apps.StatefulSetUpdateStrategy), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_ControllerRevision_To_apps_ControllerRevision(in *v1.ControllerRevision, out *apps.ControllerRevision, s conversion.Scope) error {

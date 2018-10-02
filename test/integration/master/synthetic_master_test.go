@@ -175,7 +175,7 @@ func TestStatus(t *testing.T) {
 			statusCode:   http.StatusForbidden,
 			reqPath:      "/apis",
 			reason:       "Forbidden",
-			message:      `forbidden: User "" cannot get path "/apis": Everything is forbidden.`,
+			message:      `forbidden: User "" cannot get path "/apis"`,
 		},
 		{
 			name:         "401",
@@ -862,7 +862,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 							Reason: "bar",
 						},
 					}
-				case i%4 == 1:
+				case i%4 == 2:
 					lastCount = 0
 					n.Status.Conditions = nil
 				}

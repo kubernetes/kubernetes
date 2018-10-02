@@ -62,7 +62,6 @@ go_test(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/extensions:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -70,5 +69,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

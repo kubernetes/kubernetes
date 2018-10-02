@@ -24,13 +24,10 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -1065,6 +1062,9 @@ func TestNodeOperators(t *testing.T) {
 		if !found {
 			t.Errorf("Failed to find node %v in schedulercache.", node.Name)
 		}
+		if cache.nodeTree.NumNodes != 1 || cache.nodeTree.Next() != node.Name {
+			t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)
+		}
 
 		// Generations are globally unique. We check in our unit tests that they are incremented correctly.
 		expected.generation = got.generation
@@ -1100,11 +1100,20 @@ func TestNodeOperators(t *testing.T) {
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Failed to update node in schedulercache:\n got: %+v \nexpected: %+v", got, expected)
 		}
+		// Check nodeTree after update
+		if cache.nodeTree.NumNodes != 1 || cache.nodeTree.Next() != node.Name {
+			t.Errorf("unexpected cache.nodeTree after updating node: %v", node.Name)
+		}
 
 		// Case 4: the node can not be removed if pods is not empty.
 		cache.RemoveNode(node)
 		if _, found := cache.nodes[node.Name]; !found {
 			t.Errorf("The node %v should not be removed if pods is not empty.", node.Name)
+		}
+		// Check nodeTree after remove. The node should be removed from the nodeTree even if there are
+		// still pods on it.
+		if cache.nodeTree.NumNodes != 0 || cache.nodeTree.Next() != "" {
+			t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
 		}
 	}
 }
@@ -1218,132 +1227,4 @@ func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) 
 		}
 	}
 	return cache
-}
-
-func makePDB(name, namespace string, uid types.UID, labels map[string]string, minAvailable int) *v1beta1.PodDisruptionBudget {
-	intstrMin := intstr.FromInt(minAvailable)
-	pdb := &v1beta1.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-			Labels:    labels,
-			UID:       uid,
-		},
-		Spec: v1beta1.PodDisruptionBudgetSpec{
-			MinAvailable: &intstrMin,
-			Selector:     &metav1.LabelSelector{MatchLabels: labels},
-		},
-	}
-
-	return pdb
-}
-
-// TestPDBOperations tests that a PDB will be add/updated/deleted correctly.
-func TestPDBOperations(t *testing.T) {
-	ttl := 10 * time.Second
-	testPDBs := []*v1beta1.PodDisruptionBudget{
-		makePDB("pdb0", "ns1", "uid0", map[string]string{"tkey1": "tval1"}, 3),
-		makePDB("pdb1", "ns1", "uid1", map[string]string{"tkey1": "tval1", "tkey2": "tval2"}, 1),
-		makePDB("pdb2", "ns3", "uid2", map[string]string{"tkey3": "tval3", "tkey2": "tval2"}, 10),
-	}
-	updatedPDBs := []*v1beta1.PodDisruptionBudget{
-		makePDB("pdb0", "ns1", "uid0", map[string]string{"tkey4": "tval4"}, 8),
-		makePDB("pdb1", "ns1", "uid1", map[string]string{"tkey1": "tval1"}, 1),
-		makePDB("pdb2", "ns3", "uid2", map[string]string{"tkey3": "tval3", "tkey1": "tval1", "tkey2": "tval2"}, 10),
-	}
-	tests := []struct {
-		pdbsToAdd    []*v1beta1.PodDisruptionBudget
-		pdbsToUpdate []*v1beta1.PodDisruptionBudget
-		pdbsToDelete []*v1beta1.PodDisruptionBudget
-		expectedPDBs []*v1beta1.PodDisruptionBudget // Expected PDBs after all operations
-	}{
-		{
-			pdbsToAdd:    []*v1beta1.PodDisruptionBudget{testPDBs[0]},
-			pdbsToUpdate: []*v1beta1.PodDisruptionBudget{testPDBs[0], testPDBs[1], testPDBs[0]},
-			expectedPDBs: []*v1beta1.PodDisruptionBudget{testPDBs[0], testPDBs[1]}, // both will be in the cache as they have different names
-		},
-		{
-			pdbsToAdd:    []*v1beta1.PodDisruptionBudget{testPDBs[0]},
-			pdbsToUpdate: []*v1beta1.PodDisruptionBudget{testPDBs[0], updatedPDBs[0]},
-			expectedPDBs: []*v1beta1.PodDisruptionBudget{updatedPDBs[0]},
-		},
-		{
-			pdbsToAdd:    []*v1beta1.PodDisruptionBudget{testPDBs[0], testPDBs[2]},
-			pdbsToUpdate: []*v1beta1.PodDisruptionBudget{testPDBs[0], updatedPDBs[0]},
-			pdbsToDelete: []*v1beta1.PodDisruptionBudget{testPDBs[0]},
-			expectedPDBs: []*v1beta1.PodDisruptionBudget{testPDBs[2]},
-		},
-	}
-
-	for _, test := range tests {
-		cache := newSchedulerCache(ttl, time.Second, nil)
-		for _, pdbToAdd := range test.pdbsToAdd {
-			if err := cache.AddPDB(pdbToAdd); err != nil {
-				t.Fatalf("AddPDB failed: %v", err)
-			}
-		}
-
-		for i := range test.pdbsToUpdate {
-			if i == 0 {
-				continue
-			}
-			if err := cache.UpdatePDB(test.pdbsToUpdate[i-1], test.pdbsToUpdate[i]); err != nil {
-				t.Fatalf("UpdatePDB failed: %v", err)
-			}
-		}
-
-		for _, pdb := range test.pdbsToDelete {
-			if err := cache.RemovePDB(pdb); err != nil {
-				t.Fatalf("RemovePDB failed: %v", err)
-			}
-		}
-
-		cachedPDBs, err := cache.ListPDBs(labels.Everything())
-		if err != nil {
-			t.Fatalf("ListPDBs failed: %v", err)
-		}
-		if len(cachedPDBs) != len(test.expectedPDBs) {
-			t.Errorf("Expected %d PDBs, got %d", len(test.expectedPDBs), len(cachedPDBs))
-		}
-		for _, pdb := range test.expectedPDBs {
-			found := false
-			// find it among the cached ones
-			for _, cpdb := range cachedPDBs {
-				if pdb.UID == cpdb.UID {
-					found = true
-					if !reflect.DeepEqual(pdb, cpdb) {
-						t.Errorf("%v is not equal to %v", pdb, cpdb)
-					}
-					break
-				}
-			}
-			if !found {
-				t.Errorf("PDB with uid '%v' was not found in the cache.", pdb.UID)
-			}
-
-		}
-	}
-}
-
-func TestIsUpToDate(t *testing.T) {
-	cache := New(time.Duration(0), wait.NeverStop)
-	if err := cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n1"}}); err != nil {
-		t.Errorf("Could not add node: %v", err)
-	}
-	s := cache.Snapshot()
-	node := s.Nodes["n1"]
-	if !cache.IsUpToDate(node) {
-		t.Errorf("Node incorrectly marked as stale")
-	}
-	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", UID: "p1"}, Spec: v1.PodSpec{NodeName: "n1"}}
-	if err := cache.AddPod(pod); err != nil {
-		t.Errorf("Could not add pod: %v", err)
-	}
-	if cache.IsUpToDate(node) {
-		t.Errorf("Node incorrectly marked as up to date")
-	}
-	badNode := &NodeInfo{node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n2"}}}
-	if cache.IsUpToDate(badNode) {
-		t.Errorf("Nonexistant node incorrectly marked as up to date")
-	}
 }

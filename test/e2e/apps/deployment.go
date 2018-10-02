@@ -38,9 +38,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutil "k8s.io/kubernetes/test/utils"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -70,16 +70,35 @@ var _ = SIGDescribe("Deployment", func() {
 	It("deployment reaping should cascade to its replica sets and pods", func() {
 		testDeleteDeployment(f)
 	})
-	It("RollingUpdateDeployment should delete old pods and create new ones", func() {
+	/*
+	  Testname: Deployment RollingUpdate
+	  Description: A conformant Kubernetes distribution MUST support the Deployment with RollingUpdate strategy.
+	*/
+	framework.ConformanceIt("RollingUpdateDeployment should delete old pods and create new ones", func() {
 		testRollingUpdateDeployment(f)
 	})
-	It("RecreateDeployment should delete old pods and create new ones", func() {
+	/*
+	  Testname: Deployment Recreate
+	  Description: A conformant Kubernetes distribution MUST support the Deployment with Recreate strategy.
+	*/
+	framework.ConformanceIt("RecreateDeployment should delete old pods and create new ones", func() {
 		testRecreateDeployment(f)
 	})
-	It("deployment should delete old replica sets", func() {
+	/*
+	  Testname: Deployment RevisionHistoryLimit
+	  Description: A conformant Kubernetes distribution MUST clean up Deployment's ReplicaSets based on
+	  the Deployment's `.spec.revisionHistoryLimit`.
+	*/
+	framework.ConformanceIt("deployment should delete old replica sets", func() {
 		testDeploymentCleanUpPolicy(f)
 	})
-	It("deployment should support rollover", func() {
+	/*
+	  Testname: Deployment Rollover
+	  Description: A conformant Kubernetes distribution MUST support Deployment rollover,
+	    i.e. allow arbitrary number of changes to desired state during rolling update
+	    before the rollout finishes.
+	*/
+	framework.ConformanceIt("deployment should support rollover", func() {
 		testRolloverDeployment(f)
 	})
 	It("deployment should support rollback", func() {
@@ -91,7 +110,13 @@ var _ = SIGDescribe("Deployment", func() {
 	It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
 		testDeploymentsControllerRef(f)
 	})
-	It("deployment should support proportional scaling", func() {
+	/*
+	  Testname: Deployment Proportional Scaling
+	  Description: A conformant Kubernetes distribution MUST support Deployment
+	    proportional scaling, i.e. proportionally scale a Deployment's ReplicaSets
+	    when a Deployment is scaled.
+	*/
+	framework.ConformanceIt("deployment should support proportional scaling", func() {
 		testProportionalScalingDeployment(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues

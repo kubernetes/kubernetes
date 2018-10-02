@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	fakedynamic "k8s.io/client-go/dynamic/fake"
@@ -42,13 +44,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
@@ -363,26 +362,6 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.PolicyV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 
-	return clientset, nil
-}
-
-func (f *TestFactory) ClientSet() (internalclientset.Interface, error) {
-	// Swap the HTTP client out of the REST client with the fake
-	// version.
-	fakeClient := f.Client.(*fake.RESTClient)
-	clientset := internalclientset.NewForConfigOrDie(f.ClientConfigVal)
-	clientset.Core().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Authentication().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Authorization().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Autoscaling().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Batch().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Certificates().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Extensions().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Rbac().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Storage().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Apps().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.Policy().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.DiscoveryClient.RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	return clientset, nil
 }
 

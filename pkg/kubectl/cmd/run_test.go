@@ -29,60 +29,55 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
-
-// This init should be removed after switching this command and its tests to user external types.
-func init() {
-	utilruntime.Must(api.AddToScheme(scheme.Scheme))
-}
 
 func TestGetRestartPolicy(t *testing.T) {
 	tests := []struct {
 		input       string
 		interactive bool
-		expected    api.RestartPolicy
+		expected    corev1.RestartPolicy
 		expectErr   bool
 	}{
 		{
 			input:    "",
-			expected: api.RestartPolicyAlways,
+			expected: corev1.RestartPolicyAlways,
 		},
 		{
 			input:       "",
 			interactive: true,
-			expected:    api.RestartPolicyOnFailure,
+			expected:    corev1.RestartPolicyOnFailure,
 		},
 		{
-			input:       string(api.RestartPolicyAlways),
+			input:       string(corev1.RestartPolicyAlways),
 			interactive: true,
-			expected:    api.RestartPolicyAlways,
+			expected:    corev1.RestartPolicyAlways,
 		},
 		{
-			input:       string(api.RestartPolicyNever),
+			input:       string(corev1.RestartPolicyNever),
 			interactive: true,
-			expected:    api.RestartPolicyNever,
+			expected:    corev1.RestartPolicyNever,
 		},
 		{
-			input:    string(api.RestartPolicyAlways),
-			expected: api.RestartPolicyAlways,
+			input:    string(corev1.RestartPolicyAlways),
+			expected: corev1.RestartPolicyAlways,
 		},
 		{
-			input:    string(api.RestartPolicyNever),
-			expected: api.RestartPolicyNever,
+			input:    string(corev1.RestartPolicyNever),
+			expected: corev1.RestartPolicyNever,
 		},
 		{
 			input:     "foo",
@@ -234,7 +229,6 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 }
 
 func TestGenerateService(t *testing.T) {
-
 	tests := []struct {
 		port             string
 		args             []string
@@ -516,6 +510,10 @@ func TestRunValidations(t *testing.T) {
 			tf.ClientConfigVal = defaultClientConfig()
 
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
+			cmdutil.BehaviorOnFatal(func(str string, code int) {
+				bufErr.Write([]byte(str))
+			})
+
 			cmd := NewCmdRun(tf, streams)
 			for flagName, flagValue := range test.flags {
 				cmd.Flags().Set(flagName, flagValue)

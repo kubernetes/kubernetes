@@ -20,13 +20,13 @@ import (
 	"errors"
 	"testing"
 
+	batch "k8s.io/api/batch/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 	testcore "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	batchclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion"
 )
 
 type errorJobs struct {

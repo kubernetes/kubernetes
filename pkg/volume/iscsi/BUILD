@@ -18,6 +18,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/iscsi",
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/util/keymutex:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",

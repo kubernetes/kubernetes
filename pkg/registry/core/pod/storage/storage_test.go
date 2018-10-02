@@ -34,6 +34,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -60,6 +61,7 @@ func newStorage(t *testing.T) (*REST, *BindingREST, *StatusREST, *etcdtesting.Et
 
 func validNewPod() *api.Pod {
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
@@ -81,8 +83,9 @@ func validNewPod() *api.Pod {
 					SecurityContext:          securitycontext.ValidInternalSecurityContextWithContainerDefaults(),
 				},
 			},
-			SecurityContext: &api.PodSecurityContext{},
-			SchedulerName:   api.DefaultSchedulerName,
+			SecurityContext:    &api.PodSecurityContext{},
+			SchedulerName:      api.DefaultSchedulerName,
+			EnableServiceLinks: &enableServiceLinks,
 		},
 	}
 }
@@ -170,7 +173,7 @@ func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdT
 		ResourcePrefix:          "pods",
 	}
 	storage := NewStorage(restOptions, nil, nil, nil)
-	storage.Pod.Store.Storage = FailDeletionStorage{storage.Pod.Store.Storage, called}
+	storage.Pod.Store.Storage = genericregistry.DryRunnableStorage{Storage: FailDeletionStorage{storage.Pod.Store.Storage.Storage, called}}
 	return storage.Pod, server
 }
 
@@ -340,7 +343,7 @@ func TestResourceLocation(t *testing.T) {
 	for _, tc := range testCases {
 		storage, _, _, server := newStorage(t)
 		key, _ := storage.KeyFunc(ctx, tc.pod.Name)
-		if err := storage.Storage.Create(ctx, key, &tc.pod, nil, 0); err != nil {
+		if err := storage.Storage.Create(ctx, key, &tc.pod, nil, 0, false); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
@@ -417,6 +420,7 @@ func TestConvertToTableList(t *testing.T) {
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "IP", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["podIP"]},
 		{Name: "Node", Type: "string", Priority: 1, Description: v1.PodSpec{}.SwaggerDoc()["nodeName"]},
+		{Name: "Nominated Node", Type: "string", Priority: 1, Description: v1.PodStatus{}.SwaggerDoc()["nominatedNodeName"]},
 	}
 
 	pod1 := &api.Pod{
@@ -435,6 +439,7 @@ func TestConvertToTableList(t *testing.T) {
 				{Name: "ctr1", State: api.ContainerState{Running: &api.ContainerStateRunning{}}, RestartCount: 10, Ready: true},
 				{Name: "ctr2", State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}, RestartCount: 0},
 			},
+			NominatedNodeName: "nominated-node",
 		},
 	}
 
@@ -452,7 +457,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
+					{Cells: []interface{}{"", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>"}, Object: runtime.RawExtension{Object: &api.Pod{}}},
 				},
 			},
 		},
@@ -461,7 +466,7 @@ func TestConvertToTableList(t *testing.T) {
 			out: &metav1beta1.Table{
 				ColumnDefinitions: columns,
 				Rows: []metav1beta1.TableRow{
-					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "1y", "10.1.2.3", "test-node"}, Object: runtime.RawExtension{Object: pod1}},
+					{Cells: []interface{}{"foo", "1/2", "Pending", int64(10), "370d", "10.1.2.3", "test-node", "nominated-node"}, Object: runtime.RawExtension{Object: pod1}},
 				},
 			},
 		},
@@ -823,12 +828,13 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			SecurityContext: &api.PodSecurityContext{},
 			SchedulerName:   api.DefaultSchedulerName,
 		},
-	}, nil, 1)
+	}, nil, 1, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	podIn := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -852,6 +858,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			TerminationGracePeriodSeconds: &grace,
 			SecurityContext:               &api.PodSecurityContext{},
 			SchedulerName:                 api.DefaultSchedulerName,
+			EnableServiceLinks:            &enableServiceLinks,
 		},
 	}
 	_, _, err = storage.Update(ctx, podIn.Name, rest.DefaultUpdatedObjectInfo(&podIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
@@ -895,7 +902,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			SchedulerName:   api.DefaultSchedulerName,
 		},
 	}
-	err := storage.Storage.Create(ctx, key, &podStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, &podStart, nil, 0, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -929,9 +936,11 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	expected := podStart
 	expected.ResourceVersion = "2"
 	grace := int64(30)
+	enableServiceLinks := v1.DefaultEnableServiceLinks
 	expected.Spec.TerminationGracePeriodSeconds = &grace
 	expected.Spec.RestartPolicy = api.RestartPolicyAlways
 	expected.Spec.DNSPolicy = api.DNSClusterFirst
+	expected.Spec.EnableServiceLinks = &enableServiceLinks
 	expected.Spec.Containers[0].ImagePullPolicy = api.PullIfNotPresent
 	expected.Spec.Containers[0].TerminationMessagePath = api.TerminationMessagePathDefault
 	expected.Spec.Containers[0].TerminationMessagePolicy = api.TerminationMessageReadFile

@@ -27,11 +27,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"bytes"
@@ -70,7 +70,7 @@ type CopyOptions struct {
 	Namespace string
 
 	ClientConfig *restclient.Config
-	Clientset    internalclientset.Interface
+	Clientset    kubernetes.Interface
 
 	genericclioptions.IOStreams
 }
@@ -144,7 +144,7 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.Clientset, err = f.ClientSet()
+	o.Clientset, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}

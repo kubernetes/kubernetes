@@ -40,9 +40,10 @@ func NewLoadBalancersClientWithBaseURI(baseURI string, subscriptionID string) Lo
 }
 
 // CreateOrUpdate creates or updates a load balancer.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// parameters is parameters supplied to the create or update load balancer operation.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// parameters - parameters supplied to the create or update load balancer operation.
 func (client LoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters LoadBalancer) (result LoadBalancersCreateOrUpdateFuture, err error) {
 	req, err := client.CreateOrUpdatePreparer(ctx, resourceGroupName, loadBalancerName, parameters)
 	if err != nil {
@@ -73,7 +74,7 @@ func (client LoadBalancersClient) CreateOrUpdatePreparer(ctx context.Context, re
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/loadBalancers/{loadBalancerName}", pathParameters),
@@ -85,15 +86,17 @@ func (client LoadBalancersClient) CreateOrUpdatePreparer(ctx context.Context, re
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client LoadBalancersClient) CreateOrUpdateSender(req *http.Request) (future LoadBalancersCreateOrUpdateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -111,8 +114,9 @@ func (client LoadBalancersClient) CreateOrUpdateResponder(resp *http.Response) (
 }
 
 // Delete deletes the specified load balancer.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
 func (client LoadBalancersClient) Delete(ctx context.Context, resourceGroupName string, loadBalancerName string) (result LoadBalancersDeleteFuture, err error) {
 	req, err := client.DeletePreparer(ctx, resourceGroupName, loadBalancerName)
 	if err != nil {
@@ -153,15 +157,17 @@ func (client LoadBalancersClient) DeletePreparer(ctx context.Context, resourceGr
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client LoadBalancersClient) DeleteSender(req *http.Request) (future LoadBalancersDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -178,9 +184,10 @@ func (client LoadBalancersClient) DeleteResponder(resp *http.Response) (result a
 }
 
 // Get gets the specified load balancer.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer. expand
-// is expands referenced resources.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// expand - expands referenced resources.
 func (client LoadBalancersClient) Get(ctx context.Context, resourceGroupName string, loadBalancerName string, expand string) (result LoadBalancer, err error) {
 	req, err := client.GetPreparer(ctx, resourceGroupName, loadBalancerName, expand)
 	if err != nil {
@@ -248,8 +255,8 @@ func (client LoadBalancersClient) GetResponder(resp *http.Response) (result Load
 }
 
 // List gets all the load balancers in a resource group.
-//
-// resourceGroupName is the name of the resource group.
+// Parameters:
+// resourceGroupName - the name of the resource group.
 func (client LoadBalancersClient) List(ctx context.Context, resourceGroupName string) (result LoadBalancerListResultPage, err error) {
 	result.fn = client.listNextResults
 	req, err := client.ListPreparer(ctx, resourceGroupName)
@@ -431,9 +438,10 @@ func (client LoadBalancersClient) ListAllComplete(ctx context.Context) (result L
 }
 
 // UpdateTags updates a load balancer tags.
-//
-// resourceGroupName is the name of the resource group. loadBalancerName is the name of the load balancer.
-// parameters is parameters supplied to update load balancer tags.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// loadBalancerName - the name of the load balancer.
+// parameters - parameters supplied to update load balancer tags.
 func (client LoadBalancersClient) UpdateTags(ctx context.Context, resourceGroupName string, loadBalancerName string, parameters TagsObject) (result LoadBalancersUpdateTagsFuture, err error) {
 	req, err := client.UpdateTagsPreparer(ctx, resourceGroupName, loadBalancerName, parameters)
 	if err != nil {
@@ -464,7 +472,7 @@ func (client LoadBalancersClient) UpdateTagsPreparer(ctx context.Context, resour
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/loadBalancers/{loadBalancerName}", pathParameters),
@@ -476,15 +484,17 @@ func (client LoadBalancersClient) UpdateTagsPreparer(ctx context.Context, resour
 // UpdateTagsSender sends the UpdateTags request. The method will close the
 // http.Response Body if it receives an error.
 func (client LoadBalancersClient) UpdateTagsSender(req *http.Request) (future LoadBalancersUpdateTagsFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 

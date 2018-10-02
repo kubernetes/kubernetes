@@ -23,10 +23,16 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// InitConfiguration contains a list of elements which make up master's
-// configuration object.
+// InitConfiguration contains a list of elements that is specific "kubeadm init"-only runtime
+// information.
 type InitConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// ClusterConfiguration holds the cluster-wide information, and embeds that struct (which can be (un)marshalled separately as well)
+	// When InitConfiguration is marshalled to bytes in the external version, this information IS NOT preserved (which can be seen from
+	// the `json:"-"` tag. This is due to that when InitConfiguration is (un)marshalled, it turns into two YAML documents, one for the
+	// InitConfiguration and ClusterConfiguration. Hence, the information must not be duplicated, and is therefore omitted here.
+	ClusterConfiguration `json:"-"`
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
 	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
@@ -39,19 +45,37 @@ type InitConfiguration struct {
 	// NodeRegistration holds fields that relate to registering the new master node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 
-	// Cluster-wide configuration
-	// TODO: Move these fields under some kind of ClusterConfiguration or similar struct that describes
-	// one cluster. Eventually we want this kind of spec to align well with the Cluster API spec.
+	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
+	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
+}
 
-	// API holds configuration for the k8s apiserver.
-	API API `json:"api"`
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
+type ClusterConfiguration struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// Etcd holds configuration for etcd.
 	Etcd Etcd `json:"etcd"`
+
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking `json:"networking"`
 
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string `json:"kubernetesVersion"`
+
+	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
+	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
+	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
+	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
+	// the BindPort is used.
+	// Possible usages are:
+	// e.g. In an cluster with more than one control plane instances, this field should be
+	// assigned the address of the external load balancer in front of the
+	// control plane instances.
+	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
+	// could be used for assigning a stable DNS to the control plane.
+	ControlPlaneEndpoint string `json:"controlPlaneEndpoint"`
 
 	// APIServerExtraArgs is a set of extra flags to pass to the API Server or override
 	// default ones in form of <flagname>=<value>.
@@ -98,22 +122,23 @@ type InitConfiguration struct {
 	ClusterName string `json:"clusterName,omitempty"`
 }
 
-// API struct contains elements of API server address.
-type API struct {
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
+// ConfigMap in the cluster, and then updated by kubeadm when additional control plane instance joins or leaves the cluster.
+type ClusterStatus struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// APIEndpoints currently available in the cluster, one for each control plane/api server instance.
+	// The key of the map is the IP of the host's default interface
+	APIEndpoints map[string]APIEndpoint `json:"apiEndpoints"`
+}
+
+// APIEndpoint struct contains elements of API server instance deployed on a node.
+type APIEndpoint struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
 	AdvertiseAddress string `json:"advertiseAddress"`
-	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
-	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.
-	// In case the ControlPlaneEndpoint is not specified, the AdvertiseAddress + BindPort
-	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
-	// the BindPort is used.
-	// Possible usages are:
-	// e.g. In an cluster with more than one control plane instances, this field should be
-	// assigned the address of the external load balancer in front of the
-	// control plane instances.
-	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
-	// could be used for assigning a stable DNS to the control plane.
-	ControlPlaneEndpoint string `json:"controlPlaneEndpoint"`
+
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
 	BindPort int32 `json:"bindPort"`
@@ -209,9 +234,7 @@ type LocalEtcd struct {
 
 // ExternalEtcd describes an external etcd cluster
 type ExternalEtcd struct {
-
-	// Endpoints of etcd members. Useful for using external etcd.
-	// If not provided, kubeadm will run etcd in a static pod.
+	// Endpoints of etcd members. Required for ExternalEtcd.
 	Endpoints []string `json:"endpoints"`
 	// CAFile is an SSL Certificate Authority file used to secure etcd communication.
 	CAFile string `json:"caFile"`
@@ -270,6 +293,13 @@ type JoinConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
+
+	// ControlPlane flag specifies that the joining node should host an additional
+	// control plane instance.
+	ControlPlane bool `json:"controlPlane,omitempty"`
+
+	// APIEndpoint represents the endpoint of the instance of the API server eventually to be deployed on this node.
+	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`

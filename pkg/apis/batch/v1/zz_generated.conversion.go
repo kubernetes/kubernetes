@@ -39,19 +39,68 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_Job_To_batch_Job,
-		Convert_batch_Job_To_v1_Job,
-		Convert_v1_JobCondition_To_batch_JobCondition,
-		Convert_batch_JobCondition_To_v1_JobCondition,
-		Convert_v1_JobList_To_batch_JobList,
-		Convert_batch_JobList_To_v1_JobList,
-		Convert_v1_JobSpec_To_batch_JobSpec,
-		Convert_batch_JobSpec_To_v1_JobSpec,
-		Convert_v1_JobStatus_To_batch_JobStatus,
-		Convert_batch_JobStatus_To_v1_JobStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1.Job)(nil), (*batch.Job)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Job_To_batch_Job(a.(*v1.Job), b.(*batch.Job), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.Job)(nil), (*v1.Job)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_Job_To_v1_Job(a.(*batch.Job), b.(*v1.Job), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.JobCondition)(nil), (*batch.JobCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobCondition_To_batch_JobCondition(a.(*v1.JobCondition), b.(*batch.JobCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobCondition)(nil), (*v1.JobCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobCondition_To_v1_JobCondition(a.(*batch.JobCondition), b.(*v1.JobCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.JobList)(nil), (*batch.JobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobList_To_batch_JobList(a.(*v1.JobList), b.(*batch.JobList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobList)(nil), (*v1.JobList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobList_To_v1_JobList(a.(*batch.JobList), b.(*v1.JobList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.JobSpec)(nil), (*batch.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobSpec_To_batch_JobSpec(a.(*v1.JobSpec), b.(*batch.JobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobSpec)(nil), (*v1.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobSpec_To_v1_JobSpec(a.(*batch.JobSpec), b.(*v1.JobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.JobStatus)(nil), (*batch.JobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobStatus_To_batch_JobStatus(a.(*v1.JobStatus), b.(*batch.JobStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*batch.JobStatus)(nil), (*v1.JobStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobStatus_To_v1_JobStatus(a.(*batch.JobStatus), b.(*v1.JobStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*batch.JobSpec)(nil), (*v1.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_batch_JobSpec_To_v1_JobSpec(a.(*batch.JobSpec), b.(*v1.JobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.JobSpec)(nil), (*batch.JobSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_JobSpec_To_batch_JobSpec(a.(*v1.JobSpec), b.(*batch.JobSpec), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_Job_To_batch_Job(in *v1.Job, out *batch.Job, s conversion.Scope) error {
@@ -168,6 +217,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec,
 	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
+	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
 	return nil
 }
 
@@ -181,6 +231,7 @@ func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec,
 	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
+	out.TTLSecondsAfterFinished = (*int32)(unsafe.Pointer(in.TTLSecondsAfterFinished))
 	return nil
 }
 

@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	tabwriterMinWidth = 10
+	tabwriterMinWidth = 6
 	tabwriterWidth    = 4
 	tabwriterPadding  = 3
 	tabwriterPadChar  = ' '

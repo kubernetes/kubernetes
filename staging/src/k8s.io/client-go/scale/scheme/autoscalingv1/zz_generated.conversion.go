@@ -33,15 +33,48 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_Scale_To_scheme_Scale,
-		Convert_scheme_Scale_To_v1_Scale,
-		Convert_v1_ScaleSpec_To_scheme_ScaleSpec,
-		Convert_scheme_ScaleSpec_To_v1_ScaleSpec,
-		Convert_v1_ScaleStatus_To_scheme_ScaleStatus,
-		Convert_scheme_ScaleStatus_To_v1_ScaleStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1.Scale)(nil), (*scheme.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_Scale_To_scheme_Scale(a.(*v1.Scale), b.(*scheme.Scale), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheme.Scale)(nil), (*v1.Scale)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_Scale_To_v1_Scale(a.(*scheme.Scale), b.(*v1.Scale), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ScaleSpec)(nil), (*scheme.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ScaleSpec_To_scheme_ScaleSpec(a.(*v1.ScaleSpec), b.(*scheme.ScaleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheme.ScaleSpec)(nil), (*v1.ScaleSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_ScaleSpec_To_v1_ScaleSpec(a.(*scheme.ScaleSpec), b.(*v1.ScaleSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.ScaleStatus)(nil), (*scheme.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ScaleStatus_To_scheme_ScaleStatus(a.(*v1.ScaleStatus), b.(*scheme.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheme.ScaleStatus)(nil), (*v1.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_ScaleStatus_To_v1_ScaleStatus(a.(*scheme.ScaleStatus), b.(*v1.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*scheme.ScaleStatus)(nil), (*v1.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheme_ScaleStatus_To_v1_ScaleStatus(a.(*scheme.ScaleStatus), b.(*v1.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ScaleStatus)(nil), (*scheme.ScaleStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ScaleStatus_To_scheme_ScaleStatus(a.(*v1.ScaleStatus), b.(*scheme.ScaleStatus), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_Scale_To_scheme_Scale(in *v1.Scale, out *scheme.Scale, s conversion.Scope) error {

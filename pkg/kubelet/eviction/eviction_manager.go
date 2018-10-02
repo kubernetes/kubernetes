@@ -131,7 +131,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 	// Admit Critical pods even under resource pressure since they are required for system stability.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(attrs.Pod) {
+	if kubelettypes.IsCriticalPod(attrs.Pod) {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 	// the node has memory pressure, admit if not best-effort
@@ -544,8 +544,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
+	if kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
 		glog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
 		return false
 	}

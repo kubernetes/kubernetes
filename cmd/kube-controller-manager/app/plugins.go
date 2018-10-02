@@ -23,16 +23,14 @@ import (
 
 	"fmt"
 
-	// Cloud providers
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
-	"k8s.io/utils/exec"
-
-	// Volume plugins
 	"github.com/golang/glog"
+
+	// Cloud providers
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/aws_ebs"
+	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cinder"
@@ -56,7 +54,9 @@ import (
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/exec"
 )
 
 // ProbeAttachableVolumePlugins collects all volume plugins for the attach/
@@ -66,7 +66,7 @@ import (
 func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
@@ -87,15 +87,15 @@ func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for the attach/detach controller.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(config componentconfig.VolumeConfiguration) volume.DynamicPluginProber {
+func GetDynamicPluginProber(config kubectrlmgrconfig.VolumeConfiguration) volume.DynamicPluginProber {
 	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
 }
 
 // ProbeExpandableVolumePlugins returns volume plugins which are expandable
-func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeExpandableVolumePlugins(config kubectrlmgrconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
@@ -114,7 +114,7 @@ func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []
 // ProbeControllerVolumePlugins collects all persistent volume plugins into an
 // easy to use list. Only volume plugins that implement any of
 // provisioner/recycler/deleter interface should be returned.
-func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config kubectrlmgrconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -158,7 +158,7 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)

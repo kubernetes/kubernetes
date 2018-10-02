@@ -27,12 +27,19 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/pkg/util/node"
 )
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
 func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
-	cfg.NodeRegistration.Name = node.GetHostname(cfg.NodeRegistration.Name)
+
+	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, cfg.ControlPlane); err != nil {
+		return err
+	}
+
+	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+		return err
+	}
+
 	return nil
 }
 

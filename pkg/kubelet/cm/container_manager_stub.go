@@ -27,6 +27,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
 
@@ -74,6 +75,10 @@ func (cm *containerManagerStub) GetCapacity() v1.ResourceList {
 			resource.BinarySI),
 	}
 	return c
+}
+
+func (cm *containerManagerStub) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return nil
 }
 
 func (cm *containerManagerStub) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {

@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 )
 
 // NodeLifecycleControllerOptions holds the NodeLifecycleController options.
@@ -56,7 +56,7 @@ func (o *NodeLifecycleControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up NodeLifecycleController config with options.
-func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *componentconfig.NodeLifecycleControllerConfiguration) error {
+func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.NodeLifecycleControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

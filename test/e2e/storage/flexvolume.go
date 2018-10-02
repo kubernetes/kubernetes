@@ -27,10 +27,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -47,6 +47,7 @@ const (
 	gciVolumePluginDir        = "/home/kubernetes/flexvolume"
 	gciVolumePluginDirLegacy  = "/etc/srv/kubernetes/kubelet-plugins/volume/exec"
 	gciVolumePluginDirVersion = "1.10.0"
+	detachTimeout             = 10 * time.Second
 )
 
 // testFlexVolume tests that a client pod using a given flexvolume driver
@@ -203,8 +204,8 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "local")
-		framework.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci")
-		framework.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci")
+		framework.SkipUnlessMasterOSDistroIs("debian", "ubuntu", "gci", "custom")
+		framework.SkipUnlessNodeOSDistroIs("debian", "ubuntu", "gci", "custom")
 		framework.SkipUnlessSSHKeyPresent()
 
 		cs = f.ClientSet
@@ -252,6 +253,9 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
 			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
 		}
+
+		// Detach might occur after pod deletion. Wait before deleting driver.
+		time.Sleep(detachTimeout)
 
 		By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
 		uninstallFlex(cs, &node, "k8s", driverInstallAs)

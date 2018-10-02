@@ -37,13 +37,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_StorageClass_To_storage_StorageClass,
-		Convert_storage_StorageClass_To_v1_StorageClass,
-		Convert_v1_StorageClassList_To_storage_StorageClassList,
-		Convert_storage_StorageClassList_To_v1_StorageClassList,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1.StorageClass)(nil), (*storage.StorageClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StorageClass_To_storage_StorageClass(a.(*v1.StorageClass), b.(*storage.StorageClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.StorageClass)(nil), (*v1.StorageClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_StorageClass_To_v1_StorageClass(a.(*storage.StorageClass), b.(*v1.StorageClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.StorageClassList)(nil), (*storage.StorageClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_StorageClassList_To_storage_StorageClassList(a.(*v1.StorageClassList), b.(*storage.StorageClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*storage.StorageClassList)(nil), (*v1.StorageClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_storage_StorageClassList_To_v1_StorageClassList(a.(*storage.StorageClassList), b.(*v1.StorageClassList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_StorageClass_To_storage_StorageClass(in *v1.StorageClass, out *storage.StorageClass, s conversion.Scope) error {

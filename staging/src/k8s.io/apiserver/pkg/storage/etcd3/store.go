@@ -233,7 +233,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		if err != nil {
 			return err
 		}
-		if err := checkPreconditions(key, preconditions, origState.obj); err != nil {
+		if err := preconditions.Check(key, origState.obj); err != nil {
 			return err
 		}
 		txnResp, err := s.client.KV.Txn(ctx).If(
@@ -294,7 +294,7 @@ func (s *store) GuaranteedUpdate(
 
 	transformContext := authenticatedDataString(key)
 	for {
-		if err := checkPreconditions(key, preconditions, origState.obj); err != nil {
+		if err := preconditions.Check(key, origState.obj); err != nil {
 			return err
 		}
 
@@ -508,10 +508,11 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithLimit(pred.Limit))
 	}
 
-	var returnedRV int64
+	var returnedRV, continueRV int64
+	var continueKey string
 	switch {
 	case s.pagingEnabled && len(pred.Continue) > 0:
-		continueKey, continueRV, err := decodeContinue(pred.Continue, keyPrefix)
+		continueKey, continueRV, err = decodeContinue(pred.Continue, keyPrefix)
 		if err != nil {
 			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
@@ -524,9 +525,13 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		options = append(options, clientv3.WithRange(rangeEnd))
 		key = continueKey
 
-		options = append(options, clientv3.WithRev(continueRV))
-		returnedRV = continueRV
-
+		// If continueRV > 0, the LIST request needs a specific resource version.
+		// continueRV==0 is invalid.
+		// If continueRV < 0, the request is for the latest resource version.
+		if continueRV > 0 {
+			options = append(options, clientv3.WithRev(continueRV))
+			returnedRV = continueRV
+		}
 	case s.pagingEnabled && pred.Limit > 0:
 		if len(resourceVersion) > 0 {
 			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
@@ -563,7 +568,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	for {
 		getResp, err := s.client.KV.Get(ctx, key, options...)
 		if err != nil {
-			return interpretListError(err, len(pred.Continue) > 0)
+			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
 		hasMore = getResp.More
 
@@ -787,21 +792,6 @@ func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.Selec
 	versioner.UpdateObject(obj, rev)
 	if matched, err := pred.Matches(obj); err == nil && matched {
 		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-	}
-	return nil
-}
-
-func checkPreconditions(key string, preconditions *storage.Preconditions, out runtime.Object) error {
-	if preconditions == nil {
-		return nil
-	}
-	objMeta, err := meta.Accessor(out)
-	if err != nil {
-		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
-	}
-	if preconditions.UID != nil && *preconditions.UID != objMeta.GetUID() {
-		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *preconditions.UID, objMeta.GetUID())
-		return storage.NewInvalidObjError(key, errMsg)
 	}
 	return nil
 }

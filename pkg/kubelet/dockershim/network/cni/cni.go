@@ -26,7 +26,7 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -50,6 +50,7 @@ type cniNetworkPlugin struct {
 	nsenterPath string
 	confDir     string
 	binDirs     []string
+	podCidr     string
 }
 
 type cniNetwork struct {
@@ -81,6 +82,11 @@ type cniBandwidthEntry struct {
 	// EgressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If egressBurst is set, egressRate must also be set
 	// NOTE: it's not used for now and default to 0.
 	EgressBurst int `json:"egressBurst,omitempty"`
+}
+
+// cniIpRange maps to the standard CNI ip range Capability
+type cniIpRange struct {
+	Subnet string `json:"subnet"`
 }
 
 func SplitDirs(dirs string) []string {
@@ -152,6 +158,8 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 			continue
 		}
 
+		glog.V(4).Infof("Using CNI configuration file %s", confFile)
+
 		network := &cniNetwork{
 			name:          confList.Name,
 			NetworkConfig: confList,
@@ -199,7 +207,41 @@ func (plugin *cniNetworkPlugin) checkInitialized() error {
 	if plugin.getDefaultNetwork() == nil {
 		return errors.New("cni config uninitialized")
 	}
+
+	// If the CNI configuration has the ipRanges capability, we need a PodCIDR assigned
+	for _, p := range plugin.getDefaultNetwork().NetworkConfig.Plugins {
+		if p.Network.Capabilities["ipRanges"] {
+			if plugin.podCidr == "" {
+				return errors.New("no PodCIDR set")
+			}
+			break
+		}
+	}
 	return nil
+}
+
+// Event handles any change events. The only event ever sent is the PodCIDR change.
+// No network plugins support changing an already-set PodCIDR
+func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{}) {
+	if name != network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE {
+		return
+	}
+
+	plugin.Lock()
+	defer plugin.Unlock()
+
+	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
+	if !ok {
+		glog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
+		return
+	}
+
+	if plugin.podCidr != "" {
+		glog.Warningf("Ignoring subsequent pod CIDR update to %s", podCIDR)
+		return
+	}
+
+	plugin.podCidr = podCIDR
 }
 
 func (plugin *cniNetworkPlugin) Name() string {
@@ -345,6 +387,9 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 		}
 		rt.CapabilityArgs["bandwidth"] = bandwidthParam
 	}
+
+	// Set the PodCIDR
+	rt.CapabilityArgs["ipRanges"] = [][]cniIpRange{{{Subnet: plugin.podCidr}}}
 
 	return rt, nil
 }

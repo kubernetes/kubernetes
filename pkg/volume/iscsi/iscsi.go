@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -36,11 +37,12 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&iscsiPlugin{nil}}
+	return []volume.VolumePlugin{&iscsiPlugin{}}
 }
 
 type iscsiPlugin struct {
-	host volume.VolumeHost
+	host        volume.VolumeHost
+	targetLocks keymutex.KeyMutex
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
@@ -53,6 +55,7 @@ const (
 
 func (plugin *iscsiPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
+	plugin.targetLocks = keymutex.NewHashed(0)
 	return nil
 }
 
@@ -176,8 +179,9 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedNameForDisk(iscsiPluginName), volName)),
 		},
-		mounter: mounter,
-		exec:    exec,
+		mounter:    mounter,
+		exec:       exec,
+		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
 	}, nil
 }
 
@@ -281,7 +285,7 @@ func (iscsi *iscsiDisk) GetPath() string {
 }
 
 func (iscsi *iscsiDisk) iscsiGlobalMapPath(spec *volume.Spec) (string, error) {
-	mounter, err := volumeSpecToMounter(spec, iscsi.plugin.host, nil /* pod */)
+	mounter, err := volumeSpecToMounter(spec, iscsi.plugin.host, iscsi.plugin.targetLocks, nil /* pod */)
 	if err != nil {
 		glog.Warningf("failed to get iscsi mounter: %v", err)
 		return "", err
@@ -337,8 +341,9 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 type iscsiDiskUnmounter struct {
 	*iscsiDisk
-	mounter mount.Interface
-	exec    mount.Exec
+	mounter    mount.Interface
+	exec       mount.Exec
+	deviceUtil ioutil.DeviceUtil
 }
 
 var _ volume.Unmounter = &iscsiDiskUnmounter{}

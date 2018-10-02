@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 )
@@ -39,7 +38,7 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 		controllerRef = priorityMeta.controllerRef
 	} else {
 		// We couldn't parse metadata - fallback to the podspec.
-		controllerRef = priorityutil.GetControllerRef(pod)
+		controllerRef = metav1.GetControllerOf(pod)
 	}
 
 	if controllerRef != nil {

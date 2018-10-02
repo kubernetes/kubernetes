@@ -39,6 +39,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/cloudprovider:go_default_library",
+        "//pkg/cloudprovider/providers/fake:go_default_library",
+        "//pkg/cloudprovider/providers/vsphere:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

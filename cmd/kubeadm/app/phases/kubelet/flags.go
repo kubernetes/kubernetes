@@ -46,6 +46,10 @@ type kubeletFlagsOpts struct {
 // WriteKubeletDynamicEnvFile writes a environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
 func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir string) error {
+	hostName, err := nodeutil.GetHostname("")
+	if err != nil {
+		return err
+	}
 
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              nodeRegOpts,
@@ -53,7 +57,7 @@ func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions,
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
 		execer:          utilsexec.New(),
 		pidOfFunc:       procfs.PidOf,
-		defaultHostname: nodeutil.GetHostname(""),
+		defaultHostname: hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeRegOpts.KubeletExtraArgs)

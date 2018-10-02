@@ -35,6 +35,7 @@ This package is interoperable with NaCl: https://nacl.cr.yp.to/secretbox.html.
 package secretbox
 
 import (
+	"golang.org/x/crypto/internal/subtle"
 	"golang.org/x/crypto/poly1305"
 	"golang.org/x/crypto/salsa20/salsa"
 )
@@ -87,6 +88,9 @@ func Seal(out, message []byte, nonce *[24]byte, key *[32]byte) []byte {
 	copy(poly1305Key[:], firstBlock[:])
 
 	ret, out := sliceForAppend(out, len(message)+poly1305.TagSize)
+	if subtle.AnyOverlap(out, message) {
+		panic("nacl: invalid buffer overlap")
+	}
 
 	// We XOR up to 32 bytes of message with the keystream generated from
 	// the first block.
@@ -118,7 +122,7 @@ func Seal(out, message []byte, nonce *[24]byte, key *[32]byte) []byte {
 // Open authenticates and decrypts a box produced by Seal and appends the
 // message to out, which must not overlap box. The output will be Overhead
 // bytes smaller than box.
-func Open(out []byte, box []byte, nonce *[24]byte, key *[32]byte) ([]byte, bool) {
+func Open(out, box []byte, nonce *[24]byte, key *[32]byte) ([]byte, bool) {
 	if len(box) < Overhead {
 		return nil, false
 	}
@@ -143,6 +147,9 @@ func Open(out []byte, box []byte, nonce *[24]byte, key *[32]byte) ([]byte, bool)
 	}
 
 	ret, out := sliceForAppend(out, len(box)-Overhead)
+	if subtle.AnyOverlap(out, box) {
+		panic("nacl: invalid buffer overlap")
+	}
 
 	// We XOR up to 32 bytes of box with the keystream generated from
 	// the first block.

@@ -11,7 +11,6 @@ go_library(
     srcs = [
         "fake_cache.go",
         "fake_lister.go",
-        "pods_to_cache.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/testing",
@@ -21,9 +20,8 @@ go_library(
         "//pkg/apis/core/install:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
-        "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",

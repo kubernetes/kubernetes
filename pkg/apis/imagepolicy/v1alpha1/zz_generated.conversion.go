@@ -35,17 +35,48 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_ImageReview_To_imagepolicy_ImageReview,
-		Convert_imagepolicy_ImageReview_To_v1alpha1_ImageReview,
-		Convert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContainerSpec,
-		Convert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContainerSpec,
-		Convert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec,
-		Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec,
-		Convert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus,
-		Convert_imagepolicy_ImageReviewStatus_To_v1alpha1_ImageReviewStatus,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.ImageReview)(nil), (*imagepolicy.ImageReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ImageReview_To_imagepolicy_ImageReview(a.(*v1alpha1.ImageReview), b.(*imagepolicy.ImageReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*imagepolicy.ImageReview)(nil), (*v1alpha1.ImageReview)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_imagepolicy_ImageReview_To_v1alpha1_ImageReview(a.(*imagepolicy.ImageReview), b.(*v1alpha1.ImageReview), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.ImageReviewContainerSpec)(nil), (*imagepolicy.ImageReviewContainerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ImageReviewContainerSpec_To_imagepolicy_ImageReviewContainerSpec(a.(*v1alpha1.ImageReviewContainerSpec), b.(*imagepolicy.ImageReviewContainerSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*imagepolicy.ImageReviewContainerSpec)(nil), (*v1alpha1.ImageReviewContainerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_imagepolicy_ImageReviewContainerSpec_To_v1alpha1_ImageReviewContainerSpec(a.(*imagepolicy.ImageReviewContainerSpec), b.(*v1alpha1.ImageReviewContainerSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.ImageReviewSpec)(nil), (*imagepolicy.ImageReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ImageReviewSpec_To_imagepolicy_ImageReviewSpec(a.(*v1alpha1.ImageReviewSpec), b.(*imagepolicy.ImageReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*imagepolicy.ImageReviewSpec)(nil), (*v1alpha1.ImageReviewSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(a.(*imagepolicy.ImageReviewSpec), b.(*v1alpha1.ImageReviewSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.ImageReviewStatus)(nil), (*imagepolicy.ImageReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(a.(*v1alpha1.ImageReviewStatus), b.(*imagepolicy.ImageReviewStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*imagepolicy.ImageReviewStatus)(nil), (*v1alpha1.ImageReviewStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_imagepolicy_ImageReviewStatus_To_v1alpha1_ImageReviewStatus(a.(*imagepolicy.ImageReviewStatus), b.(*v1alpha1.ImageReviewStatus), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_ImageReview_To_imagepolicy_ImageReview(in *v1alpha1.ImageReview, out *imagepolicy.ImageReview, s conversion.Scope) error {
@@ -127,6 +158,7 @@ func Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(in *imagepo
 func autoConvert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *v1alpha1.ImageReviewStatus, out *imagepolicy.ImageReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 
@@ -138,6 +170,7 @@ func Convert_v1alpha1_ImageReviewStatus_To_imagepolicy_ImageReviewStatus(in *v1a
 func autoConvert_imagepolicy_ImageReviewStatus_To_v1alpha1_ImageReviewStatus(in *imagepolicy.ImageReviewStatus, out *v1alpha1.ImageReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
+	out.AuditAnnotations = *(*map[string]string)(unsafe.Pointer(&in.AuditAnnotations))
 	return nil
 }
 

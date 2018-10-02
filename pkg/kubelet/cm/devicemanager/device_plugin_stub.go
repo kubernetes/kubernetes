@@ -28,12 +28,15 @@ import (
 	"google.golang.org/grpc"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
+	watcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1alpha1"
 )
 
 // Stub implementation for DevicePlugin.
 type Stub struct {
-	devs   []*pluginapi.Device
-	socket string
+	devs                  []*pluginapi.Device
+	socket                string
+	resourceName          string
+	preStartContainerFlag bool
 
 	stop   chan interface{}
 	wg     sync.WaitGroup
@@ -43,6 +46,10 @@ type Stub struct {
 
 	// allocFunc is used for handling allocation request
 	allocFunc stubAllocFunc
+
+	registrationStatus chan watcherapi.RegistrationStatus // for testing
+	endpoint           string                             // for testing
+
 }
 
 // stubAllocFunc is the function called when receive an allocation request from Kubelet
@@ -55,10 +62,12 @@ func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.De
 }
 
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
-func NewDevicePluginStub(devs []*pluginapi.Device, socket string) *Stub {
+func NewDevicePluginStub(devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool) *Stub {
 	return &Stub{
-		devs:   devs,
-		socket: socket,
+		devs:                  devs,
+		socket:                socket,
+		resourceName:          name,
+		preStartContainerFlag: preStartContainerFlag,
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
@@ -88,6 +97,7 @@ func (m *Stub) Start() error {
 	m.wg.Add(1)
 	m.server = grpc.NewServer([]grpc.ServerOption{}...)
 	pluginapi.RegisterDevicePluginServer(m.server, m)
+	watcherapi.RegisterRegistrationServer(m.server, m)
 
 	go func() {
 		defer m.wg.Done()
@@ -118,8 +128,36 @@ func (m *Stub) Stop() error {
 	return m.cleanup()
 }
 
+// GetInfo is the RPC which return pluginInfo
+func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
+	log.Println("GetInfo")
+	return &watcherapi.PluginInfo{
+		Type:              watcherapi.DevicePlugin,
+		Name:              m.resourceName,
+		Endpoint:          m.endpoint,
+		SupportedVersions: []string{pluginapi.Version}}, nil
+}
+
+// NotifyRegistrationStatus receives the registration notification from watcher
+func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.RegistrationStatus) (*watcherapi.RegistrationStatusResponse, error) {
+	if m.registrationStatus != nil {
+		m.registrationStatus <- *status
+	}
+	if !status.PluginRegistered {
+		log.Println("Registration failed: ", status.Error)
+	}
+	return &watcherapi.RegistrationStatusResponse{}, nil
+}
+
 // Register registers the device plugin for the given resourceName with Kubelet.
-func (m *Stub) Register(kubeletEndpoint, resourceName string, preStartContainerFlag bool) error {
+func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir string) error {
+	if pluginSockDir != "" {
+		if _, err := os.Stat(pluginSockDir + "DEPRECATION"); err == nil {
+			log.Println("Deprecation file found. Skip registration.")
+			return nil
+		}
+	}
+	log.Println("Deprecation file not found. Invoke registration")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -127,16 +165,16 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, preStartContainerF
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}))
-	defer conn.Close()
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	client := pluginapi.NewRegistrationClient(conn)
 	reqt := &pluginapi.RegisterRequest{
 		Version:      pluginapi.Version,
 		Endpoint:     path.Base(m.socket),
 		ResourceName: resourceName,
-		Options:      &pluginapi.DevicePluginOptions{PreStartRequired: preStartContainerFlag},
+		Options:      &pluginapi.DevicePluginOptions{PreStartRequired: m.preStartContainerFlag},
 	}
 
 	_, err = client.Register(context.Background(), reqt)
@@ -148,7 +186,7 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, preStartContainerF
 
 // GetDevicePluginOptions returns DevicePluginOptions settings for the device plugin.
 func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
-	return &pluginapi.DevicePluginOptions{}, nil
+	return &pluginapi.DevicePluginOptions{PreStartRequired: m.preStartContainerFlag}, nil
 }
 
 // PreStartContainer resets the devices received

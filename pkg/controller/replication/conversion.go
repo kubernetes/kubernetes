@@ -277,7 +277,7 @@ func convertCall(fn func(*v1.ReplicationController) (*v1.ReplicationController, 
 
 func convertRCtoRS(rc *v1.ReplicationController, out *apps.ReplicaSet) (*apps.ReplicaSet, error) {
 	var rsInternal extensions.ReplicaSet
-	if err := apiv1.Convert_v1_ReplicationController_to_extensions_ReplicaSet(rc, &rsInternal, nil); err != nil {
+	if err := apiv1.Convert_v1_ReplicationController_To_extensions_ReplicaSet(rc, &rsInternal, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicationController %v/%v to ReplicaSet: %v", rc.Namespace, rc.Name, err)
 	}
 	if out == nil {
@@ -295,7 +295,7 @@ func convertRStoRC(rs *apps.ReplicaSet) (*v1.ReplicationController, error) {
 		return nil, fmt.Errorf("can't convert ReplicaSet (converting to ReplicationController %v/%v) from extensions/v1beta1 to internal: %v", rs.Namespace, rs.Name, err)
 	}
 	var rc v1.ReplicationController
-	if err := apiv1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(&rsInternal, &rc, nil); err != nil {
+	if err := apiv1.Convert_extensions_ReplicaSet_To_v1_ReplicationController(&rsInternal, &rc, nil); err != nil {
 		return nil, fmt.Errorf("can't convert ReplicaSet to ReplicationController %v/%v: %v", rs.Namespace, rs.Name, err)
 	}
 	return &rc, nil

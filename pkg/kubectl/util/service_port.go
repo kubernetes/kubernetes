@@ -19,12 +19,12 @@ package util
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Lookup containerPort number by its named port name
-func LookupContainerPortNumberByName(pod api.Pod, name string) (int32, error) {
+func lookupContainerPortNumberByName(pod v1.Pod, name string) (int32, error) {
 	for _, ctr := range pod.Spec.Containers {
 		for _, ctrportspec := range ctr.Ports {
 			if ctrportspec.Name == name {
@@ -40,12 +40,12 @@ func LookupContainerPortNumberByName(pod api.Pod, name string) (int32, error) {
 // It implements the handling of resolving container named port, as well as ignoring targetPort when clusterIP=None
 // It returns an error when a named port can't find a match (with -1 returned), or when the service does not
 // declare such port (with the input port number returned).
-func LookupContainerPortNumberByServicePort(svc api.Service, pod api.Pod, port int32) (int32, error) {
+func LookupContainerPortNumberByServicePort(svc v1.Service, pod v1.Pod, port int32) (int32, error) {
 	for _, svcportspec := range svc.Spec.Ports {
 		if svcportspec.Port != port {
 			continue
 		}
-		if svc.Spec.ClusterIP == api.ClusterIPNone {
+		if svc.Spec.ClusterIP == v1.ClusterIPNone {
 			return port, nil
 		}
 		if svcportspec.TargetPort.Type == intstr.Int {
@@ -56,7 +56,7 @@ func LookupContainerPortNumberByServicePort(svc api.Service, pod api.Pod, port i
 				return int32(svcportspec.TargetPort.IntValue()), nil
 			}
 		} else {
-			return LookupContainerPortNumberByName(pod, svcportspec.TargetPort.String())
+			return lookupContainerPortNumberByName(pod, svcportspec.TargetPort.String())
 		}
 	}
 	return port, fmt.Errorf("Service %s does not have a service port %d", svc.Name, port)

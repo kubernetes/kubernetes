@@ -17,101 +17,123 @@ limitations under the License.
 package fuzzer
 
 import (
-	"time"
-
 	fuzz "github.com/google/gofuzz"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 // Funcs returns the fuzzer functions for the kubeadm apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
-			obj.KubernetesVersion = "v10"
-			obj.API.BindPort = 20
-			obj.API.AdvertiseAddress = "foo"
-			obj.Networking.ServiceSubnet = "10.96.0.0/12"
-			obj.Networking.DNSDomain = "cluster.local"
-			obj.CertificatesDir = "foo"
-			obj.APIServerCertSANs = []string{"foo"}
-			obj.BootstrapTokens = []kubeadm.BootstrapToken{
-				{
-					Token: &kubeadm.BootstrapTokenString{
-						ID:     "abcdef",
-						Secret: "abcdef0123456789",
-					},
-					TTL:    &metav1.Duration{Duration: 1 * time.Hour},
-					Usages: []string{"foo"},
-					Groups: []string{"foo"},
-				},
-			}
-			obj.ImageRepository = "foo"
-			obj.CIImageRepository = ""
-			obj.UnifiedControlPlaneImage = "foo"
-			obj.FeatureGates = map[string]bool{"foo": true}
-			obj.ClusterName = "foo"
-			obj.APIServerExtraArgs = map[string]string{"foo": "foo"}
-			obj.APIServerExtraVolumes = []kubeadm.HostPathMount{{
-				Name:      "foo",
-				HostPath:  "foo",
-				MountPath: "foo",
-				Writable:  false,
-			}}
-			obj.Etcd.Local = &kubeadm.LocalEtcd{
-				Image:          "foo",
-				DataDir:        "foo",
-				ServerCertSANs: []string{"foo"},
-				PeerCertSANs:   []string{"foo"},
-				ExtraArgs:      map[string]string{"foo": "foo"},
-			}
-			obj.NodeRegistration = kubeadm.NodeRegistrationOptions{
-				CRISocket: "foo",
-				Name:      "foo",
-				Taints:    []v1.Taint{},
-			}
-			obj.AuditPolicyConfiguration = kubeadm.AuditPolicyConfiguration{
-				Path:      "foo",
-				LogDir:    "/foo",
-				LogMaxAge: utilpointer.Int32Ptr(0),
-			}
-			// Set the Kubelet ComponentConfig to an empty, defaulted struct
-			extkubeletconfig := &kubeletconfigv1beta1.KubeletConfiguration{}
-			obj.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
-			componentconfigs.Scheme.Default(extkubeletconfig)
-			componentconfigs.Scheme.Convert(extkubeletconfig, obj.ComponentConfigs.Kubelet, nil)
-			componentconfigs.DefaultKubeletConfiguration(obj)
-			// Set the KubeProxy ComponentConfig to an empty, defaulted struct
-			extkubeproxyconfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
-			obj.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
-			componentconfigs.Scheme.Default(extkubeproxyconfig)
-			componentconfigs.Scheme.Convert(extkubeproxyconfig, obj.ComponentConfigs.KubeProxy, nil)
-			componentconfigs.DefaultKubeProxyConfiguration(obj)
+		fuzzInitConfiguration,
+		fuzzClusterConfiguration,
+		fuzzAuditPolicyConfiguration,
+		fuzzComponentConfigs,
+		fuzzNodeRegistration,
+		fuzzLocalEtcd,
+		fuzzNetworking,
+		fuzzJoinConfiguration,
+	}
+}
+
+func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+
+	// Since ClusterConfiguration never get serialized in the external variant of InitConfiguration,
+	// it is necessary to apply external api defaults here to get the round trip internal->external->internal working.
+	// More specifically:
+	// internal with manually applied defaults -> external object : loosing ClusterConfiguration) -> internal object with automatically applied defaults
+	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{
+		AuditPolicyConfiguration: kubeadm.AuditPolicyConfiguration{
+			LogDir:    constants.StaticPodAuditPolicyLogDir,
+			LogMaxAge: &v1alpha3.DefaultAuditPolicyLogMaxAge,
 		},
-		func(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
-			obj.CACertPath = "foo"
-			obj.DiscoveryFile = "foo"
-			obj.DiscoveryToken = "foo"
-			obj.DiscoveryTokenAPIServers = []string{"foo"}
-			obj.DiscoveryTimeout = &metav1.Duration{Duration: 1}
-			obj.TLSBootstrapToken = "foo"
-			obj.Token = "foo"
-			obj.ClusterName = "foo"
-			obj.NodeRegistration = kubeadm.NodeRegistrationOptions{
-				CRISocket: "foo",
-				Name:      "foo",
-			}
+		CertificatesDir: v1alpha3.DefaultCertificatesDir,
+		ClusterName:     v1alpha3.DefaultClusterName,
+		Etcd: kubeadm.Etcd{
+			Local: &kubeadm.LocalEtcd{
+				DataDir: v1alpha3.DefaultEtcdDataDir,
+			},
+		},
+		ImageRepository:   v1alpha3.DefaultImageRepository,
+		KubernetesVersion: v1alpha3.DefaultKubernetesVersion,
+		Networking: kubeadm.Networking{
+			ServiceSubnet: v1alpha3.DefaultServicesSubnet,
+			DNSDomain:     v1alpha3.DefaultServiceDNSDomain,
 		},
 	}
+	// Adds the default bootstrap token to get the round working
+	obj.BootstrapTokens = []kubeadm.BootstrapToken{
+		{
+			// Description
+			// Expires
+			Groups: []string{"foo"},
+			// Token
+			TTL:    &metav1.Duration{Duration: 1234},
+			Usages: []string{"foo"},
+		},
+	}
+}
+
+func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.CRISocket = "foo"
+}
+
+func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.CertificatesDir = "foo"
+	obj.CIImageRepository = "" //This fields doesn't exists in public API >> using default to get the roundtrip test pass
+	obj.ClusterName = "bar"
+	obj.ImageRepository = "baz"
+	obj.KubernetesVersion = "qux"
+}
+
+func fuzzAuditPolicyConfiguration(obj *kubeadm.AuditPolicyConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.LogDir = "foo"
+	obj.LogMaxAge = new(int32)
+}
+
+func fuzzComponentConfigs(obj *kubeadm.ComponentConfigs, c fuzz.Continue) {
+	// This is intentionally empty because component config does not exists in the public api
+	// (empty mean all ComponentConfigs fields nil, and this is necessary for getting roundtrip passing)
+}
+
+func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.DataDir = "foo"
+}
+
+func fuzzNetworking(obj *kubeadm.Networking, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.DNSDomain = "foo"
+	obj.ServiceSubnet = "bar"
+}
+
+func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.CACertPath = "foo"
+	obj.ClusterName = "bar"
+	obj.DiscoveryTimeout = &metav1.Duration{Duration: 1234}
+	obj.DiscoveryToken = "baz"
+	obj.TLSBootstrapToken = "qux"
 }

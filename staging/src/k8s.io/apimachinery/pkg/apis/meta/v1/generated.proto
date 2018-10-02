@@ -23,7 +23,6 @@ package k8s.io.apimachinery.pkg.apis.meta.v1;
 
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -129,8 +128,9 @@ message APIVersions {
 message CreateOptions {
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will
-  // result in a BadRequest response and no further processing of
-  // the request.
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 1;
 
@@ -173,8 +173,9 @@ message DeleteOptions {
 
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will
-  // result in a BadRequest response and no further processing of
-  // the request.
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 5;
 }
@@ -360,9 +361,10 @@ message ListMeta {
   // continue may be set if the user set a limit on the number of items returned, and indicates that
   // the server has more data available. The value is opaque and may be used to issue another request
   // to the endpoint that served this list to retrieve the next set of available objects. Continuing a
-  // list may not be possible if the server configuration has changed or more than a few minutes have
-  // passed. The resourceVersion field returned when using this continue value will be identical to
-  // the value in the first response.
+  // consistent list may not be possible if the server configuration has changed or more than a few
+  // minutes have passed. The resourceVersion field returned when using this continue value will be
+  // identical to the value in the first response, unless you have received this token from an error
+  // message.
   optional string continue = 3;
 }
 
@@ -419,14 +421,20 @@ message ListOptions {
   // result was calculated is returned.
   optional int64 limit = 7;
 
-  // The continue option should be set when retrieving more results from the server. Since this value
-  // is server defined, clients may only use the continue value from a previous query result with
-  // identical query parameters (except for the value of continue) and the server may reject a continue
-  // value it does not recognize. If the specified continue value is no longer valid whether due to
-  // expiration (generally five to fifteen minutes) or a configuration change on the server the server
-  // will respond with a 410 ResourceExpired error indicating the client must restart their list without
-  // the continue field. This field is not supported when watch is true. Clients may start a watch from
-  // the last resourceVersion value returned by the server and not miss any modifications.
+  // The continue option should be set when retrieving more results from the server. Since this value is
+  // server defined, clients may only use the continue value from a previous query result with identical
+  // query parameters (except for the value of continue) and the server may reject a continue value it
+  // does not recognize. If the specified continue value is no longer valid whether due to expiration
+  // (generally five to fifteen minutes) or a configuration change on the server, the server will
+  // respond with a 410 ResourceExpired error together with a continue token. If the client needs a
+  // consistent list, it must restart their list without the continue field. Otherwise, the client may
+  // send another list request with the token received with the 410 error, the server will respond with
+  // a list starting from the next key, but from the latest snapshot, which is inconsistent from the
+  // previous list results - objects that are created, modified, or deleted after the first list request
+  // will be included in the response, as long as their keys are after the "next key".
+  // 
+  // This field is not supported when watch is true. Clients may start a watch from the last
+  // resourceVersion value returned by the server and not miss any modifications.
   optional string continue = 8;
 }
 
@@ -836,8 +844,9 @@ message TypeMeta {
 message UpdateOptions {
   // When present, indicates that modifications should not be
   // persisted. An invalid or unrecognized dryRun directive will
-  // result in a BadRequest response and no further processing of
-  // the request.
+  // result in an error response and no further processing of the
+  // request. Valid values are:
+  // - All: all dry run stages will be processed
   // +optional
   repeated string dryRun = 1;
 }

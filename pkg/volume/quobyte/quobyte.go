@@ -306,7 +306,7 @@ type quobyteVolumeDeleter struct {
 
 func (plugin *quobytePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Quobyte == nil {
-		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.Quobyte is nil")
+		return nil, fmt.Errorf("spec.PersistentVolume.Spec.Quobyte is nil")
 	}
 
 	return plugin.newDeleterInternal(spec)

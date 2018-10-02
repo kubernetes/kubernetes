@@ -23,7 +23,6 @@ go_library(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
@@ -41,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
@@ -49,10 +49,12 @@ go_library(
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

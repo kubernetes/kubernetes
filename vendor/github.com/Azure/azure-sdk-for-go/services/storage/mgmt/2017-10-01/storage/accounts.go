@@ -41,9 +41,9 @@ func NewAccountsClientWithBaseURI(baseURI string, subscriptionID string) Account
 }
 
 // CheckNameAvailability checks that the storage account name is valid and is not already in use.
-//
-// accountName is the name of the storage account within the specified resource group. Storage account names must
-// be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// Parameters:
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
 func (client AccountsClient) CheckNameAvailability(ctx context.Context, accountName AccountCheckNameAvailabilityParameters) (result CheckNameAvailabilityResult, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: accountName,
@@ -85,7 +85,7 @@ func (client AccountsClient) CheckNameAvailabilityPreparer(ctx context.Context, 
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/providers/Microsoft.Storage/checkNameAvailability", pathParameters),
@@ -118,11 +118,12 @@ func (client AccountsClient) CheckNameAvailabilityResponder(resp *http.Response)
 // and a subsequent create request is issued with different properties, the account properties will be updated. If an
 // account is already created and a subsequent create or update request is issued with the exact same set of
 // properties, the request will succeed.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only. parameters is
-// the parameters to provide for the created account.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// parameters - the parameters to provide for the created account.
 func (client AccountsClient) Create(ctx context.Context, resourceGroupName string, accountName string, parameters AccountCreateParameters) (result AccountsCreateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -173,7 +174,7 @@ func (client AccountsClient) CreatePreparer(ctx context.Context, resourceGroupNa
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}", pathParameters),
@@ -185,15 +186,17 @@ func (client AccountsClient) CreatePreparer(ctx context.Context, resourceGroupNa
 // CreateSender sends the Create request. The method will close the
 // http.Response Body if it receives an error.
 func (client AccountsClient) CreateSender(req *http.Request) (future AccountsCreateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -211,10 +214,11 @@ func (client AccountsClient) CreateResponder(resp *http.Response) (result Accoun
 }
 
 // Delete deletes a storage account in Microsoft Azure.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
 func (client AccountsClient) Delete(ctx context.Context, resourceGroupName string, accountName string) (result autorest.Response, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -290,10 +294,11 @@ func (client AccountsClient) DeleteResponder(resp *http.Response) (result autore
 
 // GetProperties returns the properties for the specified storage account including but not limited to name, SKU name,
 // location, and account status. The ListKeys operation should be used to retrieve storage keys.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
 func (client AccountsClient) GetProperties(ctx context.Context, resourceGroupName string, accountName string) (result Account, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -432,11 +437,12 @@ func (client AccountsClient) ListResponder(resp *http.Response) (result AccountL
 }
 
 // ListAccountSAS list SAS credentials of a storage account.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only. parameters is
-// the parameters to provide to list SAS credentials for the storage account.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// parameters - the parameters to provide to list SAS credentials for the storage account.
 func (client AccountsClient) ListAccountSAS(ctx context.Context, resourceGroupName string, accountName string, parameters AccountSasParameters) (result ListAccountSasResponse, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -486,7 +492,7 @@ func (client AccountsClient) ListAccountSASPreparer(ctx context.Context, resourc
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}/ListAccountSas", pathParameters),
@@ -517,8 +523,8 @@ func (client AccountsClient) ListAccountSASResponder(resp *http.Response) (resul
 
 // ListByResourceGroup lists all the storage accounts available under the given resource group. Note that storage keys
 // are not returned; use the ListKeys operation for this.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
 // insensitive.
 func (client AccountsClient) ListByResourceGroup(ctx context.Context, resourceGroupName string) (result AccountListResult, err error) {
 	if err := validation.Validate([]validation.Validation{
@@ -591,10 +597,11 @@ func (client AccountsClient) ListByResourceGroupResponder(resp *http.Response) (
 }
 
 // ListKeys lists the access keys for the specified storage account.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
 func (client AccountsClient) ListKeys(ctx context.Context, resourceGroupName string, accountName string) (result AccountListKeysResult, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -670,11 +677,12 @@ func (client AccountsClient) ListKeysResponder(resp *http.Response) (result Acco
 }
 
 // ListServiceSAS list service SAS credentials of a specific resource.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only. parameters is
-// the parameters to provide to list service SAS credentials.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// parameters - the parameters to provide to list service SAS credentials.
 func (client AccountsClient) ListServiceSAS(ctx context.Context, resourceGroupName string, accountName string, parameters ServiceSasParameters) (result ListServiceSasResponse, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -726,7 +734,7 @@ func (client AccountsClient) ListServiceSASPreparer(ctx context.Context, resourc
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}/ListServiceSas", pathParameters),
@@ -756,11 +764,12 @@ func (client AccountsClient) ListServiceSASResponder(resp *http.Response) (resul
 }
 
 // RegenerateKey regenerates one of the access keys for the specified storage account.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only. regenerateKey
-// is specifies name of the key which should be regenerated -- key1 or key2.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// regenerateKey - specifies name of the key which should be regenerated -- key1 or key2.
 func (client AccountsClient) RegenerateKey(ctx context.Context, resourceGroupName string, accountName string, regenerateKey AccountRegenerateKeyParameters) (result AccountListKeysResult, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -810,7 +819,7 @@ func (client AccountsClient) RegenerateKeyPreparer(ctx context.Context, resource
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPost(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}/regenerateKey", pathParameters),
@@ -845,11 +854,12 @@ func (client AccountsClient) RegenerateKeyResponder(resp *http.Response) (result
 // must be cleared/unregistered before a new value can be set. The update of multiple properties is supported. This
 // call does not change the storage keys for the account. If you want to change the storage account keys, use the
 // regenerate keys operation. The location and name of the storage account cannot be changed after creation.
-//
-// resourceGroupName is the name of the resource group within the user's subscription. The name is case
-// insensitive. accountName is the name of the storage account within the specified resource group. Storage account
-// names must be between 3 and 24 characters in length and use numbers and lower-case letters only. parameters is
-// the parameters to provide for the updated account.
+// Parameters:
+// resourceGroupName - the name of the resource group within the user's subscription. The name is case
+// insensitive.
+// accountName - the name of the storage account within the specified resource group. Storage account names
+// must be between 3 and 24 characters in length and use numbers and lower-case letters only.
+// parameters - the parameters to provide for the updated account.
 func (client AccountsClient) Update(ctx context.Context, resourceGroupName string, accountName string, parameters AccountUpdateParameters) (result Account, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -897,7 +907,7 @@ func (client AccountsClient) UpdatePreparer(ctx context.Context, resourceGroupNa
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPatch(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{accountName}", pathParameters),

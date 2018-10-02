@@ -22,7 +22,9 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -46,17 +48,14 @@ var (
 
 // NewCmdMarkMaster returns the Cobra command for running the mark-master phase
 func NewCmdMarkMaster() *cobra.Command {
-
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by mark master, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
-	var cfgPath, kubeConfigFile string
+	var cfgPath string
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
+
 	cmd := &cobra.Command{
 		Use:     "mark-master",
 		Short:   "Mark a node as master",
@@ -68,11 +67,17 @@ func NewCmdMarkMaster() *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
-			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+			err = SetKubernetesVersion(client, cfg)
+			kubeadmutil.CheckErr(err)
+
+			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
+			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 
 			err = markmasterphase.MarkMaster(client, internalcfg.NodeRegistration.Name, internalcfg.NodeRegistration.Taints)
@@ -80,7 +85,7 @@ func NewCmdMarkMaster() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
+	options.AddKubeConfigFlag(cmd.Flags(), &kubeConfigFile)
 	cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file. WARNING: Usage of a configuration file is experimental")
 	cmd.Flags().StringVar(&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name, `The node name to which label and taints should apply`)
 

@@ -44,3 +44,7 @@ func (b *Backend) ProcessEvents(ev ...*auditinternal.Event) {
 		b.OnRequest(ev)
 	}
 }
+
+func (b *Backend) String() string {
+	return ""
+}

@@ -41,6 +41,11 @@ type Attributes interface {
 	GetSubresource() string
 	// GetOperation is the operation being performed
 	GetOperation() Operation
+	// IsDryRun indicates that modifications will definitely not be persisted for this request. This is to prevent
+	// admission controllers with side effects and a method of reconciliation from being overwhelmed.
+	// However, a value of false for this does not mean that the modification will be persisted, because it
+	// could still be rejected by a subsequent validation step.
+	IsDryRun() bool
 	// GetObject is the object from the incoming request prior to default values being applied
 	GetObject() runtime.Object
 	// GetOldObject is the existing object. Only populated for UPDATE requests.

@@ -197,7 +197,7 @@ $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
 $(DEEPCOPY_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/deepcopy-gen)
-	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/deepcopy-gen
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/deepcopy-gen
 	touch $@
 
 
@@ -291,7 +291,7 @@ $(DEFAULTER_FILES): $(DEFAULTER_GEN)
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
 $(DEFAULTER_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/defaulter-gen)
-	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/defaulter-gen
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/defaulter-gen
 	touch $@
 
 
@@ -388,7 +388,7 @@ $(CONVERSION_FILES): $(CONVERSION_GEN)
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(CONVERSION_GEN): $(k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/conversion-gen)
-	hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/code-generator/cmd/conversion-gen
 	touch $@
 
 
@@ -404,8 +404,8 @@ OPENAPI_FILENAME := $(OPENAPI_BASENAME).go
 OPENAPI_OUTPUT_PKG := pkg/generated/openapi
 BOILERPLATE_FILENAME := vendor/k8s.io/code-generator/hack/boilerplate.go.txt
 REPORT_FILENAME := $(OUT_DIR)/violations.report
-KNOWN_VIOLATION_FILENAME := hack/testdata/api-rules/violation_exceptions.list
-API_RULE_CHECK_FAILURE_MESSAGE := "Error: API rules check failed. Reported violations \"$(REPORT_FILENAME)\" differ from known violations \"$(KNOWN_VIOLATION_FILENAME)\". Please fix API source file if new violation is detected, or update known violations \"$(KNOWN_VIOLATION_FILENAME)\" if existing violation is being fixed. Please refer to hack/testdata/api-rules/README.md and https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules for more information about the API rules being enforced."
+KNOWN_VIOLATION_FILENAME := api/api-rules/violation_exceptions.list
+API_RULE_CHECK_FAILURE_MESSAGE := "Error: API rules check failed. Reported violations \"$(REPORT_FILENAME)\" differ from known violations \"$(KNOWN_VIOLATION_FILENAME)\". Please fix API source file if new violation is detected, or update known violations \"$(KNOWN_VIOLATION_FILENAME)\" if existing violation is being fixed. Please refer to api/api-rules/README.md and https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators/rules for more information about the API rules being enforced."
 
 # The tool used to generate open apis.
 OPENAPI_GEN := $(BIN_DIR)/openapi-gen
@@ -465,7 +465,7 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(KNOWN_VIOLATION_FILENAME)
 # newer than the binary, and try to "rebuild" it over and over.  So we touch
 # it, and make is happy.
 $(OPENAPI_GEN): $(k8s.io/kubernetes/vendor/k8s.io/kube-openapi/cmd/openapi-gen)
-	hack/make-rules/build.sh ./vendor/k8s.io/kube-openapi/cmd/openapi-gen
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/k8s.io/kube-openapi/cmd/openapi-gen
 	touch $@
 
 
@@ -494,5 +494,5 @@ gen_bindata: $(BINDATA_GEN) FORCE
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
 $(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata/go-bindata)
-	hack/make-rules/build.sh ./vendor/github.com/jteeuwen/go-bindata/go-bindata
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/jteeuwen/go-bindata/go-bindata
 	touch $@

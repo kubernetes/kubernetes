@@ -27,6 +27,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -595,7 +596,7 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
 	glog.V(2).Infof("Controller %v deleting pod %v/%v", accessor.GetName(), namespace, podID)
-	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil {
+	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil && !apierrors.IsNotFound(err) {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
 	} else {

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -86,7 +87,8 @@ var (
 
 // NewCmdBootstrapToken returns the Cobra command for running the mark-master phase
 func NewCmdBootstrapToken() *cobra.Command {
-	var kubeConfigFile string
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
+
 	cmd := &cobra.Command{
 		Use:     "bootstrap-token",
 		Short:   "Manage kubeadm-specific bootstrap token functions",
@@ -94,9 +96,10 @@ func NewCmdBootstrapToken() *cobra.Command {
 		Aliases: []string{"bootstraptoken"},
 	}
 
-	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use when talking to the cluster")
+	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
 	// Add subcommands
+	kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 	cmd.AddCommand(NewSubCmdBootstrapTokenAll(&kubeConfigFile))
 	cmd.AddCommand(NewSubCmdBootstrapToken(&kubeConfigFile))
 	cmd.AddCommand(NewSubCmdClusterInfo(&kubeConfigFile))
@@ -107,11 +110,7 @@ func NewCmdBootstrapToken() *cobra.Command {
 
 // NewSubCmdBootstrapTokenAll returns the Cobra command for running the token all sub-phase
 func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -174,11 +173,7 @@ func NewSubCmdBootstrapTokenAll(kubeConfigFile *string) *cobra.Command {
 
 // NewSubCmdBootstrapToken returns the Cobra command for running the create token phase
 func NewSubCmdBootstrapToken(kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -307,6 +302,12 @@ func addGenericFlags(flagSet *pflag.FlagSet, cfgPath *string, skipTokenPrint *bo
 }
 
 func createBootstrapToken(kubeConfigFile string, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha3.InitConfiguration, skipTokenPrint bool) error {
+	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+	err := SetKubernetesVersion(client, cfg)
+	if err != nil {
+		return err
+	}
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)

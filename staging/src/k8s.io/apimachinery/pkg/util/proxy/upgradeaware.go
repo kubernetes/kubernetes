@@ -27,7 +27,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -69,6 +68,8 @@ type UpgradeAwareHandler struct {
 	// InterceptRedirects determines whether the proxy should sniff backend responses for redirects,
 	// following them as necessary.
 	InterceptRedirects bool
+	// RequireSameHostRedirects only allows redirects to the same host. It is only used if InterceptRedirects=true.
+	RequireSameHostRedirects bool
 	// UseRequestLocation will use the incoming request URL when talking to the backend server.
 	UseRequestLocation bool
 	// FlushInterval controls how often the standard HTTP proxy will flush content from the upstream.
@@ -257,7 +258,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 	utilnet.AppendForwardedForHeader(clone)
 	if h.InterceptRedirects {
 		glog.V(6).Infof("Connecting to backend proxy (intercepting redirects) %s\n  Headers: %v", &location, clone.Header)
-		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, &location, clone.Header, req.Body, utilnet.DialerFunc(h.DialForUpgrade))
+		backendConn, rawResponse, err = utilnet.ConnectWithRedirects(req.Method, &location, clone.Header, req.Body, utilnet.DialerFunc(h.DialForUpgrade), h.RequireSameHostRedirects)
 	} else {
 		glog.V(6).Infof("Connecting to backend proxy (direct dial) %s\n  Headers: %v", &location, clone.Header)
 		clone.URL = &location
@@ -294,9 +295,12 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		}
 	}
 
-	// Proxy the connection.
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	// Proxy the connection. This is bidirectional, so we need a goroutine
+	// to copy in each direction. Once one side of the connection exits, we
+	// exit the function which performs cleanup and in the process closes
+	// the other half of the connection in the defer.
+	writerComplete := make(chan struct{})
+	readerComplete := make(chan struct{})
 
 	go func() {
 		var writer io.WriteCloser
@@ -309,7 +313,7 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from client to backend: %v", err)
 		}
-		wg.Done()
+		close(writerComplete)
 	}()
 
 	go func() {
@@ -323,10 +327,17 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
 			glog.Errorf("Error proxying data from backend to client: %v", err)
 		}
-		wg.Done()
+		close(readerComplete)
 	}()
 
-	wg.Wait()
+	// Wait for one half the connection to exit. Once it does the defer will
+	// clean up the other half of the connection.
+	select {
+	case <-writerComplete:
+	case <-readerComplete:
+	}
+	glog.V(6).Infof("Disconnecting from backend proxy %s\n  Headers: %v", &location, clone.Header)
+
 	return true
 }
 

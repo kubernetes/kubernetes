@@ -23,6 +23,7 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -83,6 +84,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if s.SchedulerName == "" {
 				s.SchedulerName = core.DefaultSchedulerName
+			}
+			if s.EnableServiceLinks == nil {
+				enableServiceLinks := corev1.DefaultEnableServiceLinks
+				s.EnableServiceLinks = &enableServiceLinks
 			}
 		},
 		func(j *core.PodPhase, c fuzz.Continue) {
@@ -263,7 +268,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			*d = policies[c.Rand.Intn(len(policies))]
 		},
 		func(p *core.Protocol, c fuzz.Continue) {
-			protocols := []core.Protocol{core.ProtocolTCP, core.ProtocolUDP}
+			protocols := []core.Protocol{core.ProtocolTCP, core.ProtocolUDP, core.ProtocolSCTP}
 			*p = protocols[c.Rand.Intn(len(protocols))]
 		},
 		func(p *core.ServiceAffinity, c fuzz.Continue) {

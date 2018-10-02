@@ -393,15 +393,20 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		diskPressureCondition:   n.diskPressureCondition,
 		pidPressureCondition:    n.pidPressureCondition,
 		usedPorts:               make(util.HostPortInfo),
-		imageStates:             make(map[string]*ImageStateSummary),
+		imageStates:             n.imageStates,
 		generation:              n.generation,
 	}
 	if len(n.pods) > 0 {
 		clone.pods = append([]*v1.Pod(nil), n.pods...)
 	}
 	if len(n.usedPorts) > 0 {
-		for k, v := range n.usedPorts {
-			clone.usedPorts[k] = v
+		// util.HostPortInfo is a map-in-map struct
+		// make sure it's deep copied
+		for ip, portMap := range n.usedPorts {
+			clone.usedPorts[ip] = make(map[util.ProtocolPort]struct{})
+			for protocolPort, v := range portMap {
+				clone.usedPorts[ip][protocolPort] = v
+			}
 		}
 	}
 	if len(n.podsWithAffinity) > 0 {

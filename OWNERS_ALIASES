@@ -6,6 +6,7 @@ aliases:
     - timothysc
     - wojtek-t
     - aveshagarwal
+    - ravisantoshgudimetla
   sig-scheduling:
     - bsalamat
     - davidopp
@@ -16,6 +17,7 @@ aliases:
     - wojtek-t
     - aveshagarwal
     - ravisantoshgudimetla
+    - misterikkit
   sig-cli-maintainers:
     - adohe
     - brendandburns
@@ -42,6 +44,7 @@ aliases:
     - juanvallejo
     - mengqiy
     - rootfs
+    - seans3
     - shiywang
     - smarterclayton
     - soltysh
@@ -63,7 +66,6 @@ aliases:
     - dims
     - feiskyer
     - mtaufen
-    - ncdc
     - pmorie
     - resouer
     - sjenning
@@ -189,6 +191,7 @@ aliases:
     - m1093782566
     - tallclair
     - feiskyer
+    - mikedanese
   api-approvers:
     - erictune
     - lavalamp

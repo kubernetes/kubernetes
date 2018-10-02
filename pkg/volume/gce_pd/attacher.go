@@ -40,7 +40,11 @@ type gcePersistentDiskAttacher struct {
 
 var _ volume.Attacher = &gcePersistentDiskAttacher{}
 
+var _ volume.DeviceMounter = &gcePersistentDiskAttacher{}
+
 var _ volume.AttachableVolumePlugin = &gcePersistentDiskPlugin{}
+
+var _ volume.DeviceMountableVolumePlugin = &gcePersistentDiskPlugin{}
 
 func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
@@ -52,6 +56,10 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 		host:     plugin.host,
 		gceDisks: gceCloud,
 	}, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
 }
 
 func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
@@ -157,7 +165,7 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking GCE PD %q is attached.", pdName)
-			path, err := verifyDevicePath(devicePaths, sdBeforeSet)
+			path, err := verifyDevicePath(devicePaths, sdBeforeSet, pdName)
 			if err != nil {
 				// Log error, if any, and continue checking periodically. See issue #11321
 				glog.Errorf("Error verifying GCE PD (%q) is attached: %v", pdName, err)
@@ -226,6 +234,8 @@ type gcePersistentDiskDetacher struct {
 
 var _ volume.Detacher = &gcePersistentDiskDetacher{}
 
+var _ volume.DeviceUnmounter = &gcePersistentDiskDetacher{}
+
 func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
@@ -236,6 +246,10 @@ func (plugin *gcePersistentDiskPlugin) NewDetacher() (volume.Detacher, error) {
 		host:     plugin.host,
 		gceDisks: gceCloud,
 	}, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 // Detach checks with the GCE cloud provider if the specified volume is already

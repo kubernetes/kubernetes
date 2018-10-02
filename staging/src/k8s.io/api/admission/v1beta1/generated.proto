@@ -25,7 +25,6 @@ import "k8s.io/api/authentication/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -74,6 +73,11 @@ message AdmissionRequest {
   // OldObject is the existing object. Only populated for UPDATE requests.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.RawExtension oldObject = 10;
+
+  // DryRun indicates that modifications will definitely not be persisted for this request.
+  // Defaults to false.
+  // +optional
+  optional bool dryRun = 11;
 }
 
 // AdmissionResponse describes an admission response.
@@ -97,6 +101,13 @@ message AdmissionResponse {
   // The type of Patch. Currently we only allow "JSONPatch".
   // +optional
   optional string patchType = 5;
+
+  // AuditAnnotations is an unstructured key value map set by remote admission controller (e.g. error=image-blacklisted).
+  // MutatingAdmissionWebhook and ValidatingAdmissionWebhook admission controller will prefix the keys with
+  // admission webhook name (e.g. imagepolicy.example.com/error=image-blacklisted). AuditAnnotations will be provided by
+  // the admission webhook to add additional context to the audit log for this request.
+  // +optional
+  map<string, string> auditAnnotations = 6;
 }
 
 // AdmissionReview describes an admission review request/response.

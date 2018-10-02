@@ -24,7 +24,7 @@ import (
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -66,7 +66,7 @@ func NewHollowKubelet(
 	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
 		KubeClient:         client,
-		HeartbeatClient:    client.CoreV1(),
+		HeartbeatClient:    client,
 		DockerClientConfig: dockerClientConfig,
 		CAdvisorInterface:  cadvisorInterface,
 		Cloud:              nil,
@@ -87,7 +87,10 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	if err := kubeletapp.RunKubelet(hk.KubeletFlags, hk.KubeletConfiguration, hk.KubeletDeps, false); err != nil {
+	if err := kubeletapp.RunKubelet(&options.KubeletServer{
+		KubeletFlags:         *hk.KubeletFlags,
+		KubeletConfiguration: *hk.KubeletConfiguration,
+	}, hk.KubeletDeps, false); err != nil {
 		glog.Fatalf("Failed to run HollowKubelet: %v. Exiting.", err)
 	}
 	select {}

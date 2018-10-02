@@ -26,12 +26,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 type fakeNodeInterface struct {
@@ -288,11 +289,11 @@ nodePortAddresses:
 		}
 		expected := &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress: expBindAddr,
-			ClientConnection: kubeproxyconfig.ClientConnectionConfiguration{
+			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 				AcceptContentTypes: "abc",
 				Burst:              100,
 				ContentType:        "content-type",
-				KubeConfigFile:     "/path/to/kubeconfig",
+				Kubeconfig:         "/path/to/kubeconfig",
 				QPS:                7,
 			},
 			ClusterCIDR:      tc.clusterCIDR,

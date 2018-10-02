@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/Azure/go-autorest/autorest"
@@ -131,6 +131,11 @@ type DisksClient interface {
 	Get(ctx context.Context, resourceGroupName string, diskName string) (result compute.Disk, err error)
 }
 
+// VirtualMachineSizesClient defines needed functions for azure compute.VirtualMachineSizesClient
+type VirtualMachineSizesClient interface {
+	List(ctx context.Context, location string) (result compute.VirtualMachineSizeListResult, err error)
+}
+
 // azClientConfig contains all essential information to create an Azure client.
 type azClientConfig struct {
 	subscriptionID          string
@@ -185,7 +190,7 @@ func (az *azVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceG
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -277,7 +282,7 @@ func (az *azInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupN
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -356,7 +361,7 @@ func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGro
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -380,7 +385,7 @@ func (az *azLoadBalancersClient) Delete(ctx context.Context, resourceGroupName s
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -472,7 +477,7 @@ func (az *azPublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resourc
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -496,7 +501,7 @@ func (az *azPublicIPAddressesClient) Delete(ctx context.Context, resourceGroupNa
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -587,7 +592,7 @@ func (az *azSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -611,7 +616,7 @@ func (az *azSubnetsClient) Delete(ctx context.Context, resourceGroupName string,
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -702,7 +707,7 @@ func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGr
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -726,7 +731,7 @@ func (az *azSecurityGroupsClient) Delete(ctx context.Context, resourceGroupName 
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -817,7 +822,7 @@ func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, r
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -888,7 +893,7 @@ func (az *azVirtualMachineScaleSetsClient) UpdateInstances(ctx context.Context, 
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -996,7 +1001,7 @@ func (az *azVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourc
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -1041,7 +1046,7 @@ func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName 
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -1065,7 +1070,7 @@ func (az *azRoutesClient) Delete(ctx context.Context, resourceGroupName string, 
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -1110,7 +1115,7 @@ func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroup
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -1170,7 +1175,7 @@ func (az *azStorageAccountClient) Create(ctx context.Context, resourceGroupName 
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -1282,7 +1287,7 @@ func (az *azDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupName s
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -1306,7 +1311,7 @@ func (az *azDisksClient) Delete(ctx context.Context, resourceGroupName string, d
 		return future.Response(), err
 	}
 
-	err = future.WaitForCompletion(ctx, az.client.Client)
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
 	mc.Observe(err)
 	return future.Response(), err
 }
@@ -1324,6 +1329,44 @@ func (az *azDisksClient) Get(ctx context.Context, resourceGroupName string, disk
 
 	mc := newMetricContext("disks", "get", resourceGroupName, az.client.SubscriptionID)
 	result, err = az.client.Get(ctx, resourceGroupName, diskName)
+	mc.Observe(err)
+	return
+}
+
+// azVirtualMachineSizesClient implements VirtualMachineSizesClient.
+type azVirtualMachineSizesClient struct {
+	client            compute.VirtualMachineSizesClient
+	rateLimiterReader flowcontrol.RateLimiter
+	rateLimiterWriter flowcontrol.RateLimiter
+}
+
+func newAzVirtualMachineSizesClient(config *azClientConfig) *azVirtualMachineSizesClient {
+	VirtualMachineSizesClient := compute.NewVirtualMachineSizesClient(config.subscriptionID)
+	VirtualMachineSizesClient.BaseURI = config.resourceManagerEndpoint
+	VirtualMachineSizesClient.Authorizer = autorest.NewBearerAuthorizer(config.servicePrincipalToken)
+	VirtualMachineSizesClient.PollingDelay = 5 * time.Second
+	configureUserAgent(&VirtualMachineSizesClient.Client)
+
+	return &azVirtualMachineSizesClient{
+		rateLimiterReader: config.rateLimiterReader,
+		rateLimiterWriter: config.rateLimiterWriter,
+		client:            VirtualMachineSizesClient,
+	}
+}
+
+func (az *azVirtualMachineSizesClient) List(ctx context.Context, location string) (result compute.VirtualMachineSizeListResult, err error) {
+	if !az.rateLimiterReader.TryAccept() {
+		err = createRateLimitErr(false, "VMSizesList")
+		return
+	}
+
+	glog.V(10).Infof("azVirtualMachineSizesClient.List(%q): start", location)
+	defer func() {
+		glog.V(10).Infof("azVirtualMachineSizesClient.List(%q): end", location)
+	}()
+
+	mc := newMetricContext("vmsizes", "list", "", az.client.SubscriptionID)
+	result, err = az.client.List(ctx, location)
 	mc.Observe(err)
 	return
 }

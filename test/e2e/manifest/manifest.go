@@ -23,6 +23,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
+	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -141,4 +142,21 @@ func DaemonSetFromManifest(fileName, ns string) (*apps.DaemonSet, error) {
 	}
 	ds.Namespace = ns
 	return &ds, nil
+}
+
+// RoleFromManifest returns a Role from a manifest stored in fileName in the Namespace indicated by ns.
+func RoleFromManifest(fileName, ns string) (*rbac.Role, error) {
+	var role rbac.Role
+	data := generated.ReadOrDie(fileName)
+
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	err = runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &role)
+	if err != nil {
+		return nil, err
+	}
+	role.Namespace = ns
+	return &role, nil
 }

@@ -83,11 +83,8 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 				}
 			}
 		}
-		// find 'ro' option
-		if option == "ro" {
-			// reuse MountPoint.Opts field to mark mount as readonly
-			opts = append(opts, "ro")
-		}
+		// reuse MountPoint.Opts field to mark mount as readonly
+		opts = append(opts, option)
 	}
 
 	// If target is a symlink, get its absolute path
@@ -95,7 +92,6 @@ func (f *FakeMounter) Mount(source string, target string, fstype string, options
 	if err != nil {
 		absTarget = target
 	}
-
 	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: absTarget, Type: fstype, Opts: opts})
 	glog.V(5).Infof("Fake mounter: mounted %s to %s", source, absTarget)
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: absTarget, Source: source, FSType: fstype})
@@ -194,7 +190,7 @@ func (f *FakeMounter) GetFileType(pathname string) (FileType, error) {
 	if t, ok := f.Filesystem[pathname]; ok {
 		return t, nil
 	}
-	return FileType("fake"), nil
+	return FileType("Directory"), nil
 }
 
 func (f *FakeMounter) MakeDir(pathname string) error {

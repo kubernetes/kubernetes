@@ -32,13 +32,13 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	apiservice "k8s.io/kubernetes/pkg/api/service"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -86,11 +86,11 @@ type loadBalancerIngressInfo struct {
 type serviceInfo struct {
 	clusterIP                net.IP
 	port                     int
-	protocol                 api.Protocol
+	protocol                 v1.Protocol
 	nodePort                 int
 	targetPort               int
-	loadBalancerStatus       api.LoadBalancerStatus
-	sessionAffinityType      api.ServiceAffinity
+	loadBalancerStatus       v1.LoadBalancerStatus
+	sessionAffinityType      v1.ServiceAffinity
 	stickyMaxAgeSeconds      int
 	externalIPs              []*externalIPInfo
 	loadBalancerIngressIPs   []*loadBalancerIngressInfo
@@ -156,7 +156,7 @@ func (ep *endpointsInfo) Cleanup() {
 }
 
 // returns a new serviceInfo struct
-func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, service *api.Service) *serviceInfo {
+func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, service *v1.Service) *serviceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
@@ -164,7 +164,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 
 	// set default session sticky max age 180min=10800s
 	stickyMaxAgeSeconds := 10800
-	if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
@@ -243,7 +243,7 @@ func newEndpointsChangeMap(hostname string) endpointsChangeMap {
 	}
 }
 
-func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Endpoints) bool {
+func (ecm *endpointsChangeMap) update(namespacedName *types.NamespacedName, previous, current *v1.Endpoints) bool {
 	ecm.lock.Lock()
 	defer ecm.lock.Unlock()
 
@@ -266,7 +266,7 @@ func newServiceChangeMap() serviceChangeMap {
 	}
 }
 
-func (scm *serviceChangeMap) update(namespacedName *types.NamespacedName, previous, current *api.Service) bool {
+func (scm *serviceChangeMap) update(namespacedName *types.NamespacedName, previous, current *v1.Service) bool {
 	scm.lock.Lock()
 	defer scm.lock.Unlock()
 
@@ -309,7 +309,7 @@ func (sm *proxyServiceMap) unmerge(other proxyServiceMap, existingPorts, staleSe
 		info, exists := (*sm)[svcPortName]
 		if exists {
 			glog.V(1).Infof("Removing service port %q", svcPortName)
-			if info.protocol == api.ProtocolUDP {
+			if info.protocol == v1.ProtocolUDP {
 				staleServices.Insert(info.clusterIP.String())
 			}
 			info.cleanupAllPolicies(curEndpoints[svcPortName])
@@ -421,12 +421,15 @@ func (lp *localPort) String() string {
 	return fmt.Sprintf("%q (%s:%d/%s)", lp.desc, lp.ip, lp.port, lp.protocol)
 }
 
-func Enum(p api.Protocol) uint16 {
-	if p == api.ProtocolTCP {
+func Enum(p v1.Protocol) uint16 {
+	if p == v1.ProtocolTCP {
 		return 6
 	}
-	if p == api.ProtocolUDP {
+	if p == v1.ProtocolUDP {
 		return 17
+	}
+	if p == v1.ProtocolSCTP {
+		return 132
 	}
 	return 0
 }
@@ -697,21 +700,21 @@ func (proxier *Proxier) isInitialized() bool {
 	return atomic.LoadInt32(&proxier.initialized) > 0
 }
 
-func (proxier *Proxier) OnServiceAdd(service *api.Service) {
+func (proxier *Proxier) OnServiceAdd(service *v1.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if proxier.serviceChanges.update(&namespacedName, nil, service) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
 	}
 }
 
-func (proxier *Proxier) OnServiceUpdate(oldService, service *api.Service) {
+func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if proxier.serviceChanges.update(&namespacedName, oldService, service) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
 	}
 }
 
-func (proxier *Proxier) OnServiceDelete(service *api.Service) {
+func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	namespacedName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if proxier.serviceChanges.update(&namespacedName, service, nil) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
@@ -728,14 +731,14 @@ func (proxier *Proxier) OnServiceSynced() {
 	proxier.syncProxyRules()
 }
 
-func shouldSkipService(svcName types.NamespacedName, service *api.Service) bool {
+func shouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
 		glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
-	if service.Spec.Type == api.ServiceTypeExternalName {
+	if service.Spec.Type == v1.ServiceTypeExternalName {
 		glog.V(3).Infof("Skipping service %s due to Type=ExternalName", svcName)
 		return true
 	}
@@ -772,21 +775,21 @@ func (proxier *Proxier) updateServiceMap() (result updateServiceMapResult) {
 	return result
 }
 
-func (proxier *Proxier) OnEndpointsAdd(endpoints *api.Endpoints) {
+func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	if proxier.endpointsChanges.update(&namespacedName, nil, endpoints) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
 	}
 }
 
-func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints) {
+func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	if proxier.endpointsChanges.update(&namespacedName, oldEndpoints, endpoints) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
 	}
 }
 
-func (proxier *Proxier) OnEndpointsDelete(endpoints *api.Endpoints) {
+func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	namespacedName := types.NamespacedName{Namespace: endpoints.Namespace, Name: endpoints.Name}
 	if proxier.endpointsChanges.update(&namespacedName, endpoints, nil) && proxier.isInitialized() {
 		proxier.syncRunner.Run()
@@ -852,7 +855,7 @@ func getLocalIPs(endpointsMap proxyEndpointsMap) map[types.NamespacedName]sets.S
 // This function is used for incremental updated of endpointsMap.
 //
 // NOTE: endpoints object should NOT be modified.
-func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEndpointsMap {
+func endpointsToEndpointsMap(endpoints *v1.Endpoints, hostname string) proxyEndpointsMap {
 	if endpoints == nil {
 		return nil
 	}
@@ -897,7 +900,7 @@ func endpointsToEndpointsMap(endpoints *api.Endpoints, hostname string) proxyEnd
 // Translates single Service object to proxyServiceMap.
 //
 // NOTE: service object should NOT be modified.
-func serviceToServiceMap(service *api.Service) proxyServiceMap {
+func serviceToServiceMap(service *v1.Service) proxyServiceMap {
 	if service == nil {
 		return nil
 	}
@@ -941,7 +944,7 @@ func (proxier *Proxier) syncProxyRules() {
 	staleServices := serviceUpdateResult.staleServices
 	// merge stale services gathered from updateEndpointsMap
 	for svcPortName := range endpointUpdateResult.staleServiceNames {
-		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.protocol == api.ProtocolUDP {
+		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.protocol == v1.ProtocolUDP {
 			glog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.clusterIP.String())
 			staleServices.Insert(svcInfo.clusterIP.String())
 		}
@@ -1109,7 +1112,7 @@ func (proxier *Proxier) syncProxyRules() {
 		glog.Errorf("Error syncing healtcheck services: %v", err)
 	}
 	if err := proxier.healthChecker.SyncEndpoints(endpointUpdateResult.hcEndpoints); err != nil {
-		glog.Errorf("Error syncing healthcheck endoints: %v", err)
+		glog.Errorf("Error syncing healthcheck endpoints: %v", err)
 	}
 
 	// Finish housekeeping.

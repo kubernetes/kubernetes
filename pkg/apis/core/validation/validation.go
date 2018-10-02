@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -195,23 +196,23 @@ type ValidateNameFunc apimachineryvalidation.ValidateNameFunc
 // ValidatePodName can be used to check whether the given pod name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidatePodName = NameIsDNSSubdomain
+var ValidatePodName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateReplicationControllerName can be used to check whether the given replication
 // controller name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateReplicationControllerName = NameIsDNSSubdomain
+var ValidateReplicationControllerName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateServiceName = NameIsDNS1035Label
+var ValidateServiceName = apimachineryvalidation.NameIsDNS1035Label
 
 // ValidateNodeName can be used to check whether the given node name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateNodeName = NameIsDNSSubdomain
+var ValidateNodeName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateNamespaceName can be used to check whether the given namespace name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -221,18 +222,18 @@ var ValidateNamespaceName = apimachineryvalidation.ValidateNamespaceName
 // ValidateLimitRangeName can be used to check whether the given limit range name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateLimitRangeName = NameIsDNSSubdomain
+var ValidateLimitRangeName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateResourceQuotaName can be used to check whether the given
 // resource quota name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateResourceQuotaName = NameIsDNSSubdomain
+var ValidateResourceQuotaName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateSecretName can be used to check whether the given secret name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateSecretName = NameIsDNSSubdomain
+var ValidateSecretName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateServiceAccountName can be used to check whether the given service account name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -242,7 +243,7 @@ var ValidateServiceAccountName = apimachineryvalidation.ValidateServiceAccountNa
 // ValidateEndpointsName can be used to check whether the given endpoints name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateEndpointsName = NameIsDNSSubdomain
+var ValidateEndpointsName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateClusterName can be used to check whether the given cluster name is valid.
 var ValidateClusterName = apimachineryvalidation.ValidateClusterName
@@ -250,21 +251,21 @@ var ValidateClusterName = apimachineryvalidation.ValidateClusterName
 // ValidateClassName can be used to check whether the given class name is valid.
 // It is defined here to avoid import cycle between pkg/apis/storage/validation
 // (where it should be) and this file.
-var ValidateClassName = NameIsDNSSubdomain
+var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidatePiorityClassName can be used to check whether the given priority
 // class name is valid.
-var ValidatePriorityClassName = NameIsDNSSubdomain
+var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
-// TODO update all references to these functions to point to the apimachineryvalidation ones
-// NameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
-func NameIsDNSSubdomain(name string, prefix bool) []string {
-	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
-}
-
-// NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS 952 label.
-func NameIsDNS1035Label(name string, prefix bool) []string {
-	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
+// ValidateRuntimeClassName can be used to check whether the given RuntimeClass name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateRuntimeClassName(name string, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for _, msg := range apimachineryvalidation.NameIsDNSSubdomain(name, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath, name, msg))
+	}
+	return allErrs
 }
 
 // Validates that given value is not negative.
@@ -1022,7 +1023,7 @@ func validateProjectionSources(projection *core.ProjectedVolumeSource, projectio
 				}
 			}
 		}
-		if projPath := fldPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
+		if projPath := srcPath.Child("serviceAccountToken"); source.ServiceAccountToken != nil {
 			numSources++
 			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
 				allErrs = append(allErrs, field.Forbidden(projPath, "TokenRequestProjection feature is not enabled"))
@@ -1493,13 +1494,17 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 
 // ValidatePersistentVolumeName checks that a name is appropriate for a
 // PersistentVolumeName object.
-var ValidatePersistentVolumeName = NameIsDNSSubdomain
+var ValidatePersistentVolumeName = apimachineryvalidation.NameIsDNSSubdomain
 
 var supportedAccessModes = sets.NewString(string(core.ReadWriteOnce), string(core.ReadOnlyMany), string(core.ReadWriteMany))
 
 var supportedReclaimPolicy = sets.NewString(string(core.PersistentVolumeReclaimDelete), string(core.PersistentVolumeReclaimRecycle), string(core.PersistentVolumeReclaimRetain))
 
 var supportedVolumeModes = sets.NewString(string(core.PersistentVolumeBlock), string(core.PersistentVolumeFilesystem))
+
+var supportedDataSourceAPIGroupKinds = map[schema.GroupKind]bool{
+	{Group: "snapshot.storage.k8s.io", Kind: "VolumeSnapshot"}: true,
+}
 
 func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 	metaPath := field.NewPath("metadata")
@@ -1824,6 +1829,27 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	} else if spec.VolumeMode != nil && !supportedVolumeModes.Has(string(*spec.VolumeMode)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumeMode"), *spec.VolumeMode, supportedVolumeModes.List()))
 	}
+
+	if spec.DataSource != nil && !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("dataSource"), "VolumeSnapshotDataSource is disabled by feature-gate"))
+	} else if spec.DataSource != nil {
+		if len(spec.DataSource.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("dataSource", "name"), ""))
+		}
+
+		groupKind := schema.GroupKind{Group: "", Kind: spec.DataSource.Kind}
+		if spec.DataSource.APIGroup != nil {
+			groupKind.Group = string(*spec.DataSource.APIGroup)
+		}
+		groupKindList := make([]string, 0, len(supportedDataSourceAPIGroupKinds))
+		for grp := range supportedDataSourceAPIGroupKinds {
+			groupKindList = append(groupKindList, grp.String())
+		}
+		if !supportedDataSourceAPIGroupKinds[groupKind] {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("dataSource"), groupKind.String(), groupKindList))
+		}
+	}
+
 	return allErrs
 }
 
@@ -1918,7 +1944,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 	return allErrs
 }
 
-var supportedPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP))
+var supportedPortProtocols = sets.NewString(string(core.ProtocolTCP), string(core.ProtocolUDP), string(core.ProtocolSCTP))
 
 func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1951,6 +1977,8 @@ func validateContainerPorts(ports []core.ContainerPort, fldPath *field.Path) fie
 		}
 		if len(port.Protocol) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("protocol"), ""))
+		} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
+			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 		} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 		}
@@ -2913,6 +2941,20 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	// this was done to preserve backwards compatibility
 	specPath := field.NewPath("spec")
 
+	if pod.Spec.ServiceAccountName == "" {
+		for vi, volume := range pod.Spec.Volumes {
+			path := specPath.Child("volumes").Index(vi).Child("projected")
+			if volume.Projected != nil {
+				for si, source := range volume.Projected.Sources {
+					saPath := path.Child("sources").Index(si).Child("serviceAccountToken")
+					if source.ServiceAccountToken != nil {
+						allErrs = append(allErrs, field.Forbidden(saPath, "must not be specified when serviceAccountName is not set"))
+					}
+				}
+			}
+		}
+	}
+
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
 
@@ -2994,6 +3036,10 @@ func ValidatePodSpec(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("priorityClassName"), spec.PriorityClassName, msg))
 			}
 		}
+	}
+
+	if spec.RuntimeClassName != nil && utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		allErrs = append(allErrs, ValidateRuntimeClassName(*spec.RuntimeClassName, fldPath.Child("runtimeClassName"))...)
 	}
 
 	return allErrs
@@ -3087,30 +3133,55 @@ func ValidateNodeSelector(nodeSelector *core.NodeSelector, fldPath *field.Path) 
 	return allErrs
 }
 
-// validateTopologySelectorLabelRequirement tests that the specified TopologySelectorLabelRequirement fields has valid data
-func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequirement, fldPath *field.Path) field.ErrorList {
+// validateTopologySelectorLabelRequirement tests that the specified TopologySelectorLabelRequirement fields has valid data,
+// and constructs a set containing all of its Values.
+func validateTopologySelectorLabelRequirement(rq core.TopologySelectorLabelRequirement, fldPath *field.Path) (sets.String, field.ErrorList) {
 	allErrs := field.ErrorList{}
+	valueSet := make(sets.String)
+	valuesPath := fldPath.Child("values")
 	if len(rq.Values) == 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("values"), "must specify as least one value"))
+		allErrs = append(allErrs, field.Required(valuesPath, ""))
 	}
+
+	// Validate set property of Values field
+	for i, value := range rq.Values {
+		if valueSet.Has(value) {
+			allErrs = append(allErrs, field.Duplicate(valuesPath.Index(i), value))
+		}
+		valueSet.Insert(value)
+	}
+
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(rq.Key, fldPath.Child("key"))...)
 
-	return allErrs
+	return valueSet, allErrs
 }
 
-// ValidateTopologySelectorTerm tests that the specified topology selector term has valid data
-func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
+// ValidateTopologySelectorTerm tests that the specified topology selector term has valid data,
+// and constructs a map representing the term in raw form.
+func ValidateTopologySelectorTerm(term core.TopologySelectorTerm, fldPath *field.Path) (map[string]sets.String, field.ErrorList) {
 	allErrs := field.ErrorList{}
+	exprMap := make(map[string]sets.String)
+	exprPath := fldPath.Child("matchLabelExpressions")
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		// Allow empty MatchLabelExpressions, in case this field becomes optional in the future.
+
 		for i, req := range term.MatchLabelExpressions {
-			allErrs = append(allErrs, validateTopologySelectorLabelRequirement(req, fldPath.Child("matchLabelExpressions").Index(i))...)
+			idxPath := exprPath.Index(i)
+			valueSet, exprErrs := validateTopologySelectorLabelRequirement(req, idxPath)
+			allErrs = append(allErrs, exprErrs...)
+
+			// Validate no duplicate keys exist.
+			if _, exists := exprMap[req.Key]; exists {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("key"), req.Key))
+			}
+			exprMap[req.Key] = valueSet
 		}
 	} else if len(term.MatchLabelExpressions) != 0 {
-		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate DynamicProvisioningScheduling"))
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeScheduling"))
 	}
 
-	return allErrs
+	return exprMap, allErrs
 }
 
 // ValidateAvoidPodsInNodeAnnotations tests that the serialized AvoidPods in Node.Annotations has valid data
@@ -3708,8 +3779,10 @@ func ValidateService(service *core.Service) field.ErrorList {
 		includeProtocols := sets.NewString()
 		for i := range service.Spec.Ports {
 			portPath := portsPath.Index(i)
-			if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
-				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP ports"))
+			if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && service.Spec.Ports[i].Protocol == core.ProtocolSCTP {
+				allErrs = append(allErrs, field.NotSupported(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
+			} else if !supportedPortProtocols.Has(string(service.Spec.Ports[i].Protocol)) {
+				allErrs = append(allErrs, field.Invalid(portPath.Child("protocol"), service.Spec.Ports[i].Protocol, "cannot create an external load balancer with non-TCP/UDP/SCTP ports"))
 			} else {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
 			}
@@ -3807,6 +3880,8 @@ func validateServicePort(sp *core.ServicePort, requireName, isHeadlessService bo
 
 	if len(sp.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && sp.Protocol == core.ProtocolSCTP {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(sp.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), sp.Protocol, supportedPortProtocols.List()))
 	}
@@ -4654,7 +4729,7 @@ func ValidateSecretUpdate(newSecret, oldSecret *core.Secret) field.ErrorList {
 // ValidateConfigMapName can be used to check whether the given ConfigMap name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateConfigMapName = NameIsDNSSubdomain
+var ValidateConfigMapName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateConfigMap tests whether required fields in the ConfigMap are set.
 func ValidateConfigMap(cfg *core.ConfigMap) field.ErrorList {
@@ -5049,50 +5124,16 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 	return allErrs
 }
 
-// Construct lookup map of old subset IPs to NodeNames.
-func updateEpAddrToNodeNameMap(ipToNodeName map[string]string, addresses []core.EndpointAddress) {
-	for n := range addresses {
-		if addresses[n].NodeName == nil {
-			continue
-		}
-		ipToNodeName[addresses[n].IP] = *addresses[n].NodeName
-	}
-}
-
-// Build a map across all subsets of IP -> NodeName
-func buildEndpointAddressNodeNameMap(subsets []core.EndpointSubset) map[string]string {
-	ipToNodeName := make(map[string]string)
-	for i := range subsets {
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].Addresses)
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].NotReadyAddresses)
-	}
-	return ipToNodeName
-}
-
-func validateEpAddrNodeNameTransition(addr *core.EndpointAddress, ipToNodeName map[string]string, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
-	existingNodeName, found := ipToNodeName[addr.IP]
-	if !found {
-		return errList
-	}
-	if addr.NodeName == nil || *addr.NodeName == existingNodeName {
-		return errList
-	}
-	// NodeName entry found for this endpoint IP, but user is attempting to change NodeName
-	return append(errList, field.Forbidden(fldPath, fmt.Sprintf("Cannot change NodeName for %s to %s", addr.IP, *addr.NodeName)))
-}
-
 // ValidateEndpoints tests if required fields are set.
 func ValidateEndpoints(endpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(endpoints.Annotations, field.NewPath("annotations"))...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, []core.EndpointSubset{}, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))...)
 	return allErrs
 }
 
-func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
+func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	ipToNodeName := buildEndpointAddressNodeNameMap(oldSubsets)
 	for i := range subsets {
 		ss := &subsets[i]
 		idxPath := fldPath.Index(i)
@@ -5103,10 +5144,10 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
 		}
 		for addr := range ss.Addresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr))...)
 		}
 		for addr := range ss.NotReadyAddresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr))...)
 		}
 		for port := range ss.Ports {
 			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, idxPath.Child("ports").Index(port))...)
@@ -5116,7 +5157,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 	return allErrs
 }
 
-func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path, ipToNodeName map[string]string) field.ErrorList {
+func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsValidIP(address.IP) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
@@ -5129,10 +5170,6 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 		for _, msg := range ValidateNodeName(*address.NodeName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
 		}
-	}
-	allErrs = append(allErrs, validateEpAddrNodeNameTransition(address, ipToNodeName, fldPath.Child("nodeName"))...)
-	if len(allErrs) > 0 {
-		return allErrs
 	}
 	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
 	return allErrs
@@ -5176,6 +5213,8 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 	}
 	if len(port.Protocol) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("protocol"), ""))
+	} else if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && port.Protocol == core.ProtocolSCTP {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, []string{string(core.ProtocolTCP), string(core.ProtocolUDP)}))
 	} else if !supportedPortProtocols.Has(string(port.Protocol)) {
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("protocol"), port.Protocol, supportedPortProtocols.List()))
 	}
@@ -5183,9 +5222,11 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 }
 
 // ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
+// NodeName changes are allowed during update to accommodate the case where nodeIP or PodCIDR is reused.
+// An existing endpoint ip will have a different nodeName if this happens.
 func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, oldEndpoints.Subsets, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, field.NewPath("subsets"))...)
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(newEndpoints.Annotations, field.NewPath("annotations"))...)
 	return allErrs
 }

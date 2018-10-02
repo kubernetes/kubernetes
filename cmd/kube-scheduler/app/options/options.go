@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
+	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -40,19 +41,20 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
-	controlleroptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	componentconfigv1alpha1 "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
 // Options has all the params needed to run a Scheduler
 type Options struct {
 	// The default values. These are overridden if ConfigFile is set or by values in InsecureServing.
-	ComponentConfig componentconfig.KubeSchedulerConfiguration
+	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
 	SecureServing           *apiserveroptions.SecureServingOptions
 	CombinedInsecureServing *CombinedInsecureServingOptions
@@ -85,10 +87,10 @@ func NewOptions() (*Options, error) {
 		ComponentConfig: *cfg,
 		SecureServing:   nil, // TODO: enable with apiserveroptions.NewSecureServingOptions()
 		CombinedInsecureServing: &CombinedInsecureServingOptions{
-			Healthz: &controlleroptions.InsecureServingOptions{
+			Healthz: &apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
 			},
-			Metrics: &controlleroptions.InsecureServingOptions{
+			Metrics: &apiserveroptions.DeprecatedInsecureServingOptions{
 				BindNetwork: "tcp",
 			},
 			BindPort:    hport,
@@ -117,11 +119,11 @@ func splitHostIntPort(s string) (string, int, error) {
 	return host, portInt, err
 }
 
-func newDefaultComponentConfig() (*componentconfig.KubeSchedulerConfiguration, error) {
-	cfgv1alpha1 := componentconfigv1alpha1.KubeSchedulerConfiguration{}
-	configScheme.Default(&cfgv1alpha1)
-	cfg := componentconfig.KubeSchedulerConfiguration{}
-	if err := configScheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {
+func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+	cfgv1alpha1 := kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{}
+	kubeschedulerscheme.Scheme.Default(&cfgv1alpha1)
+	cfg := kubeschedulerconfig.KubeSchedulerConfiguration{}
+	if err := kubeschedulerscheme.Scheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
@@ -184,6 +186,9 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 func (o *Options) Validate() []error {
 	var errs []error
 
+	if err := validation.ValidateKubeSchedulerConfiguration(&o.ComponentConfig).ToAggregate(); err != nil {
+		errs = append(errs, err.Errors()...)
+	}
 	errs = append(errs, o.SecureServing.Validate()...)
 	errs = append(errs, o.CombinedInsecureServing.Validate()...)
 	errs = append(errs, o.Authentication.Validate()...)
@@ -200,7 +205,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		return nil, err
 	}
 
-	// prepare kube clients.
+	// Prepare kube clients.
 	client, leaderElectionClient, eventClient, err := createClients(c.ComponentConfig.ClientConnection, o.Master, c.ComponentConfig.LeaderElection.RenewDeadline.Duration)
 	if err != nil {
 		return nil, err
@@ -232,7 +237,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 
 // makeLeaderElectionConfig builds a leader election configuration. It will
 // create a new resource lock associated with the configuration.
-func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
+func makeLeaderElectionConfig(config kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration, client clientset.Interface, recorder record.EventRecorder) (*leaderelection.LeaderElectionConfig, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get hostname: %v", err)
@@ -262,15 +267,15 @@ func makeLeaderElectionConfig(config componentconfig.KubeSchedulerLeaderElection
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
-	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
+func createClients(config apimachineryconfig.ClientConnectionConfiguration, masterOverride string, timeout time.Duration) (clientset.Interface, clientset.Interface, v1core.EventsGetter, error) {
+	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
 		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
 	}
 
 	// This creates a client, first loading any specified kubeconfig
 	// file, and then overriding the Master flag, if non-empty.
 	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.KubeConfigFile},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
 	if err != nil {
 		return nil, nil, nil, err

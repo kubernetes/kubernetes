@@ -39,7 +39,7 @@ type WatchEvent struct {
 	Object runtime.RawExtension `json:"object" protobuf:"bytes,2,opt,name=object"`
 }
 
-func Convert_watch_Event_to_versioned_Event(in *watch.Event, out *WatchEvent, s conversion.Scope) error {
+func Convert_watch_Event_To_v1_WatchEvent(in *watch.Event, out *WatchEvent, s conversion.Scope) error {
 	out.Type = string(in.Type)
 	switch t := in.Object.(type) {
 	case *runtime.Unknown:
@@ -52,11 +52,11 @@ func Convert_watch_Event_to_versioned_Event(in *watch.Event, out *WatchEvent, s 
 	return nil
 }
 
-func Convert_versioned_InternalEvent_to_versioned_Event(in *InternalEvent, out *WatchEvent, s conversion.Scope) error {
-	return Convert_watch_Event_to_versioned_Event((*watch.Event)(in), out, s)
+func Convert_v1_InternalEvent_To_v1_WatchEvent(in *InternalEvent, out *WatchEvent, s conversion.Scope) error {
+	return Convert_watch_Event_To_v1_WatchEvent((*watch.Event)(in), out, s)
 }
 
-func Convert_versioned_Event_to_watch_Event(in *WatchEvent, out *watch.Event, s conversion.Scope) error {
+func Convert_v1_WatchEvent_To_watch_Event(in *WatchEvent, out *watch.Event, s conversion.Scope) error {
 	out.Type = watch.EventType(in.Type)
 	if in.Object.Object != nil {
 		out.Object = in.Object.Object
@@ -70,8 +70,8 @@ func Convert_versioned_Event_to_watch_Event(in *WatchEvent, out *watch.Event, s 
 	return nil
 }
 
-func Convert_versioned_Event_to_versioned_InternalEvent(in *WatchEvent, out *InternalEvent, s conversion.Scope) error {
-	return Convert_versioned_Event_to_watch_Event(in, (*watch.Event)(out), s)
+func Convert_v1_WatchEvent_To_v1_InternalEvent(in *WatchEvent, out *InternalEvent, s conversion.Scope) error {
+	return Convert_v1_WatchEvent_To_watch_Event(in, (*watch.Event)(out), s)
 }
 
 // InternalEvent makes watch.Event versioned

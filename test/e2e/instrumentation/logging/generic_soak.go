@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
@@ -69,11 +70,12 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 		wg.Add(scale)
 		for i := 0; i < scale; i++ {
 			go func() {
+				defer wg.Done()
+				defer GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
 				framework.Logf("Starting logging soak, wave = %v", wave)
 				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
 				framework.Logf("Completed logging soak, wave %v", i)
-				wg.Done()
 			}()
 			// Niceness.
 			time.Sleep(millisecondsBetweenWaves)
@@ -100,7 +102,7 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 			return v1.PodSpec{
 				Containers: []v1.Container{{
 					Name:  "logging-soak",
-					Image: "busybox",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Args: []string{
 						"/bin/sh",
 						"-c",

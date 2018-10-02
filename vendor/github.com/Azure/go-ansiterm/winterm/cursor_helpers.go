@@ -34,7 +34,7 @@ func (h *windowsAnsiEventHandler) setCursorPosition(position COORD, window SMALL
 	if err != nil {
 		return err
 	}
-	logger.Infof("Cursor position set: (%d, %d)", position.X, position.Y)
+	h.logf("Cursor position set: (%d, %d)", position.X, position.Y)
 	return err
 }
 

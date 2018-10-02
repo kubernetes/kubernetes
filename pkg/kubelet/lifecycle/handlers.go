@@ -230,3 +230,73 @@ func noNewPrivsRequired(pod *v1.Pod) bool {
 	}
 	return false
 }
+
+func NewProcMountAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
+	return &procMountAdmitHandler{
+		Runtime: runtime,
+	}
+}
+
+type procMountAdmitHandler struct {
+	kubecontainer.Runtime
+}
+
+func (a *procMountAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	// If the pod is already running or terminated, no need to recheck NoNewPrivs.
+	if attrs.Pod.Status.Phase != v1.PodPending {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// If the containers in a pod only need the default ProcMountType, admit it.
+	if procMountIsDefault(attrs.Pod) {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Always admit runtimes except docker.
+	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Make sure docker api version is valid.
+	// Merged in https://github.com/moby/moby/pull/36644
+	rversion, err := a.Runtime.APIVersion()
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "ProcMount",
+			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
+		}
+	}
+	v, err := rversion.Compare("1.38.0")
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "ProcMount",
+			Message: fmt.Sprintf("Cannot enforce ProcMount: %v", err),
+		}
+	}
+	// If the version is less than 1.38 it will return -1 above.
+	if v == -1 {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "ProcMount",
+			Message: fmt.Sprintf("Cannot enforce ProcMount: docker runtime API version %q must be greater than or equal to 1.38", rversion.String()),
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
+}
+
+func procMountIsDefault(pod *v1.Pod) bool {
+	// Iterate over pod containers and check if we are using the DefaultProcMountType
+	// for all containers.
+	for _, c := range pod.Spec.Containers {
+		if c.SecurityContext != nil {
+			if c.SecurityContext.ProcMount != nil && *c.SecurityContext.ProcMount != v1.DefaultProcMount {
+				return false
+			}
+		}
+	}
+
+	return true
+}

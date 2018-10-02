@@ -70,7 +70,7 @@ type Scheme struct {
 	defaulterFuncs map[reflect.Type]func(interface{})
 
 	// converter stores all registered conversion functions. It also has
-	// default coverting behavior.
+	// default converting behavior.
 	converter *conversion.Converter
 
 	// versionPriority is a map of groups to ordered lists of versions for those groups indicating the
@@ -159,7 +159,7 @@ func (s *Scheme) AddUnversionedTypes(version schema.GroupVersion, types ...Objec
 		gvk := version.WithKind(t.Name())
 		s.unversionedTypes[t] = gvk
 		if old, ok := s.unversionedKinds[gvk.Kind]; ok && t != old {
-			panic(fmt.Sprintf("%v.%v has already been registered as unversioned kind %q - kind name must be unique", old.PkgPath(), old.Name(), gvk))
+			panic(fmt.Sprintf("%v.%v has already been registered as unversioned kind %q - kind name must be unique in scheme %q", old.PkgPath(), old.Name(), gvk, s.schemeName))
 		}
 		s.unversionedKinds[gvk.Kind] = t
 	}
@@ -200,7 +200,7 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 	}
 
 	if oldT, found := s.gvkToType[gvk]; found && oldT != t {
-		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name()))
+		panic(fmt.Sprintf("Double registration of different types for %v: old=%v.%v, new=%v.%v in scheme %q", gvk, oldT.PkgPath(), oldT.Name(), t.PkgPath(), t.Name(), s.schemeName))
 	}
 
 	s.gvkToType[gvk] = t
@@ -296,14 +296,6 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 	return nil, NewNotRegisteredErrForKind(s.schemeName, kind)
 }
 
-// AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
-// (for two conversion types) to the converter. These functions are checked first during
-// a normal conversion, but are otherwise not called. Use AddConversionFuncs when registering
-// typed conversions.
-func (s *Scheme) AddGenericConversionFunc(fn conversion.GenericConversionFunc) {
-	s.converter.AddGenericConversionFunc(fn)
-}
-
 // Log sets a logger on the scheme. For test purposes only
 func (s *Scheme) Log(l conversion.DebugLogger) {
 	s.converter.Debug = l
@@ -355,15 +347,18 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return nil
 }
 
-// AddGeneratedConversionFuncs registers conversion functions that were
-// automatically generated.
-func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
-	for _, f := range conversionFuncs {
-		if err := s.converter.RegisterGeneratedConversionFunc(f); err != nil {
-			return err
-		}
-	}
-	return nil
+// AddConversionFunc registers a function that converts between a and b by passing objects of those
+// types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
+// any other guarantee.
+func (s *Scheme) AddConversionFunc(a, b interface{}, fn conversion.ConversionFunc) error {
+	return s.converter.RegisterUntypedConversionFunc(a, b, fn)
+}
+
+// AddGeneratedConversionFunc registers a function that converts between a and b by passing objects of those
+// types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
+// any other guarantee.
+func (s *Scheme) AddGeneratedConversionFunc(a, b interface{}, fn conversion.ConversionFunc) error {
+	return s.converter.RegisterGeneratedUntypedConversionFunc(a, b, fn)
 }
 
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
@@ -371,14 +366,6 @@ func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) err
 func (s *Scheme) AddFieldLabelConversionFunc(gvk schema.GroupVersionKind, conversionFunc FieldLabelConversionFunc) error {
 	s.fieldLabelConversionFuncs[gvk] = conversionFunc
 	return nil
-}
-
-// AddStructFieldConversion allows you to specify a mechanical copy for a moved
-// or renamed struct field without writing an entire conversion function. See
-// the comment in conversion.Converter.SetStructFieldCopy for parameter details.
-// Call as many times as needed, even on the same fields.
-func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
-	return s.converter.SetStructFieldCopy(srcFieldType, srcFieldName, destFieldType, destFieldName)
 }
 
 // RegisterInputDefaults sets the provided field mapping function and field matching

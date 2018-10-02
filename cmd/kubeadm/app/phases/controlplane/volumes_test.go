@@ -502,13 +502,13 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		ReadOnly:  true,
 	}
 	var tests = []struct {
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
 		vol      map[string]map[string]v1.Volume
 		volMount map[string]map[string]v1.VolumeMount
 	}{
 		{
 			// Should ignore files in /etc/ssl/certs
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd:            kubeadmapi.Etcd{},
 				FeatureGates:    map[string]bool{features.Auditing: true},
@@ -522,7 +522,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		},
 		{
 			// Should ignore files in /etc/ssl/certs and in CertificatesDir
-			cfg: &kubeadmapi.InitConfiguration{
+			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd: kubeadmapi.Etcd{
 					External: &kubeadmapi.ExternalEtcd{
@@ -549,7 +549,11 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 	defer func() { caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates"} }()
 
 	for _, rt := range tests {
-		mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
+		// TODO: Make getHostPathVolumesForTheControlPlane accept a ClusterConfiguration object instead of InitConfiguration
+		initcfg := &kubeadmapi.InitConfiguration{
+			ClusterConfiguration: *rt.cfg,
+		}
+		mounts := getHostPathVolumesForTheControlPlane(initcfg)
 
 		// Avoid unit test errors when the flexvolume is mounted
 		if _, ok := mounts.volumes[kubeadmconstants.KubeControllerManager][flexvolumeDirVolumeName]; ok {

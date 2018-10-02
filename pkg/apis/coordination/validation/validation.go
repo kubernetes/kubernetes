@@ -24,14 +24,16 @@ import (
 
 // ValidateLease validates a Lease.
 func ValidateLease(lease *coordination.Lease) field.ErrorList {
-	allErrs := validation.ValidateObjectMeta(&lease.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("objectMeta"))
+	allErrs := validation.ValidateObjectMeta(&lease.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateLeaseSpec(&lease.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidateLeaseUpdate validates an update of Lease object.
 func ValidateLeaseUpdate(lease, oldLease *coordination.Lease) field.ErrorList {
-	return ValidateLease(lease)
+	allErrs := validation.ValidateObjectMetaUpdate(&lease.ObjectMeta, &oldLease.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateLeaseSpec(&lease.Spec, field.NewPath("spec"))...)
+	return allErrs
 }
 
 // ValidateLeaseSpec validates spec of Lease.

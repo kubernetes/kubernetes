@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
@@ -38,8 +38,11 @@ const (
 func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
+	if protocol != v1.ProtocolTCP && protocol != v1.ProtocolUDP {
+		return nil, fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(protocol))
+	}
 	scheme := cloud.SchemeInternal
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	sharedBackend := shareBackendService(svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, sharedBackend, scheme, protocol, svc.Spec.SessionAffinity)
 	backendServiceLink := gce.getBackendServiceLink(backendServiceName)
@@ -210,14 +213,14 @@ func (gce *GCECloud) updateInternalLoadBalancer(clusterName, clusterID string, s
 	// Generate the backend service name
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	backendServiceName := makeBackendServiceName(loadBalancerName, clusterID, shareBackendService(svc), scheme, protocol, svc.Spec.SessionAffinity)
 	// Ensure the backend service has the proper backend/instance-group links
 	return gce.ensureInternalBackendServiceGroups(backendServiceName, igLinks)
 }
 
 func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string, svc *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	sharedBackend := shareBackendService(svc)

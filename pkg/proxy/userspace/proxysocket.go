@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
 )
 
@@ -45,7 +45,7 @@ type ProxySocket interface {
 	ListenPort() int
 }
 
-func newProxySocket(protocol api.Protocol, ip net.IP, port int) (ProxySocket, error) {
+func newProxySocket(protocol v1.Protocol, ip net.IP, port int) (ProxySocket, error) {
 	host := ""
 	if ip != nil {
 		host = ip.String()
@@ -68,6 +68,8 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (ProxySocket, er
 			return nil, err
 		}
 		return &udpProxySocket{UDPConn: conn, port: port}, nil
+	case "SCTP":
+		return nil, fmt.Errorf("SCTP is not supported for user space proxy")
 	}
 	return nil, fmt.Errorf("unknown protocol %q", protocol)
 }

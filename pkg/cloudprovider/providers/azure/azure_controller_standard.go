@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +30,12 @@ import (
 // the vhd must exist, can be identified by diskName, diskURI, and lun.
 func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
 	vm, err := as.getVirtualMachine(nodeName)
+	if err != nil {
+		return err
+	}
+
+	vmName := mapNodeNameToVMName(nodeName)
+	nodeResourceGroup, err := as.GetNodeResourceGroup(vmName)
 	if err != nil {
 		return err
 	}
@@ -67,17 +73,16 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			},
 		},
 	}
-	vmName := mapNodeNameToVMName(nodeName)
-	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk", as.resourceGroup, vmName)
+	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk", nodeResourceGroup, vmName)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	resp, err := as.VirtualMachinesClient.CreateOrUpdate(ctx, as.resourceGroup, vmName, newVM)
+	resp, err := as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM)
 	if as.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", as.resourceGroup, vmName)
-		retryErr := as.CreateOrUpdateVMWithRetry(vmName, newVM)
+		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", nodeResourceGroup, vmName)
+		retryErr := as.CreateOrUpdateVMWithRetry(nodeResourceGroup, vmName, newVM)
 		if retryErr != nil {
 			err = retryErr
-			glog.V(2).Infof("azureDisk - update(%s) abort backoff: vm(%s)", as.resourceGroup, vmName)
+			glog.V(2).Infof("azureDisk - update(%s) abort backoff: vm(%s)", nodeResourceGroup, vmName)
 		}
 	}
 	if err != nil {
@@ -106,6 +111,12 @@ func (as *availabilitySet) DetachDiskByName(diskName, diskURI string, nodeName t
 		return nil
 	}
 
+	vmName := mapNodeNameToVMName(nodeName)
+	nodeResourceGroup, err := as.GetNodeResourceGroup(vmName)
+	if err != nil {
+		return err
+	}
+
 	disks := *vm.StorageProfile.DataDisks
 	bFoundDisk := false
 	for i, disk := range disks {
@@ -132,17 +143,16 @@ func (as *availabilitySet) DetachDiskByName(diskName, diskURI string, nodeName t
 			},
 		},
 	}
-	vmName := mapNodeNameToVMName(nodeName)
-	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk", as.resourceGroup, vmName)
+	glog.V(2).Infof("azureDisk - update(%s): vm(%s) - detach disk", nodeResourceGroup, vmName)
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
-	resp, err := as.VirtualMachinesClient.CreateOrUpdate(ctx, as.resourceGroup, vmName, newVM)
+	resp, err := as.VirtualMachinesClient.CreateOrUpdate(ctx, nodeResourceGroup, vmName, newVM)
 	if as.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
-		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", as.resourceGroup, vmName)
-		retryErr := as.CreateOrUpdateVMWithRetry(vmName, newVM)
+		glog.V(2).Infof("azureDisk - update(%s) backing off: vm(%s)", nodeResourceGroup, vmName)
+		retryErr := as.CreateOrUpdateVMWithRetry(nodeResourceGroup, vmName, newVM)
 		if retryErr != nil {
 			err = retryErr
-			glog.V(2).Infof("azureDisk - update(%s) abort backoff: vm(%s)", as.ResourceGroup, vmName)
+			glog.V(2).Infof("azureDisk - update(%s) abort backoff: vm(%s)", nodeResourceGroup, vmName)
 		}
 	}
 	if err != nil {

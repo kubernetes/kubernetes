@@ -40,7 +40,11 @@ type NameFunc func(t reflect.Type) string
 
 var DefaultNameFunc = func(t reflect.Type) string { return t.Name() }
 
-type GenericConversionFunc func(a, b interface{}, scope Scope) (bool, error)
+// ConversionFunc converts the object a into the object b, reusing arrays or objects
+// or pointers if necessary. It should return an error if the object cannot be converted
+// or if some data is invalid. If you do not wish a and b to share fields or nested
+// objects, you must copy a before calling this function.
+type ConversionFunc func(a, b interface{}, scope Scope) error
 
 // Converter knows how to convert one type to another.
 type Converter struct {
@@ -48,11 +52,6 @@ type Converter struct {
 	// do the conversion.
 	conversionFuncs          ConversionFuncs
 	generatedConversionFuncs ConversionFuncs
-
-	// genericConversions are called during normal conversion to offer a "fast-path"
-	// that avoids all reflection. These methods are not called outside of the .Convert()
-	// method.
-	genericConversions []GenericConversionFunc
 
 	// Set of conversions that should be treated as a no-op
 	ignoredConversions map[typePair]struct{}
@@ -96,14 +95,6 @@ func NewConverter(nameFn NameFunc) *Converter {
 	}
 	c.RegisterConversionFunc(Convert_Slice_byte_To_Slice_byte)
 	return c
-}
-
-// AddGenericConversionFunc adds a function that accepts the ConversionFunc call pattern
-// (for two conversion types) to the converter. These functions are checked first during
-// a normal conversion, but are otherwise not called. Use AddConversionFuncs when registering
-// typed conversions.
-func (c *Converter) AddGenericConversionFunc(fn GenericConversionFunc) {
-	c.genericConversions = append(c.genericConversions, fn)
 }
 
 // WithConversions returns a Converter that is a copy of c but with the additional
@@ -161,11 +152,15 @@ type Scope interface {
 type FieldMappingFunc func(key string, sourceTag, destTag reflect.StructTag) (source string, dest string)
 
 func NewConversionFuncs() ConversionFuncs {
-	return ConversionFuncs{fns: make(map[typePair]reflect.Value)}
+	return ConversionFuncs{
+		fns:     make(map[typePair]reflect.Value),
+		untyped: make(map[typePair]ConversionFunc),
+	}
 }
 
 type ConversionFuncs struct {
-	fns map[typePair]reflect.Value
+	fns     map[typePair]reflect.Value
+	untyped map[typePair]ConversionFunc
 }
 
 // Add adds the provided conversion functions to the lookup table - they must have the signature
@@ -183,6 +178,21 @@ func (c ConversionFuncs) Add(fns ...interface{}) error {
 	return nil
 }
 
+// AddUntyped adds the provided conversion function to the lookup table for the types that are
+// supplied as a and b. a and b must be pointers or an error is returned. This method overwrites
+// previously defined functions.
+func (c ConversionFuncs) AddUntyped(a, b interface{}, fn ConversionFunc) error {
+	tA, tB := reflect.TypeOf(a), reflect.TypeOf(b)
+	if tA.Kind() != reflect.Ptr {
+		return fmt.Errorf("the type %T must be a pointer to register as an untyped conversion", a)
+	}
+	if tB.Kind() != reflect.Ptr {
+		return fmt.Errorf("the type %T must be a pointer to register as an untyped conversion", b)
+	}
+	c.untyped[typePair{tA, tB}] = fn
+	return nil
+}
+
 // Merge returns a new ConversionFuncs that contains all conversions from
 // both other and c, with other conversions taking precedence.
 func (c ConversionFuncs) Merge(other ConversionFuncs) ConversionFuncs {
@@ -192,6 +202,12 @@ func (c ConversionFuncs) Merge(other ConversionFuncs) ConversionFuncs {
 	}
 	for k, v := range other.fns {
 		merged.fns[k] = v
+	}
+	for k, v := range c.untyped {
+		merged.untyped[k] = v
+	}
+	for k, v := range other.untyped {
+		merged.untyped[k] = v
 	}
 	return merged
 }
@@ -355,14 +371,30 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 //                 // conversion logic...
 //                 return nil
 //          })
+// DEPRECATED: Will be removed in favor of RegisterUntypedConversionFunc
 func (c *Converter) RegisterConversionFunc(conversionFunc interface{}) error {
 	return c.conversionFuncs.Add(conversionFunc)
 }
 
 // Similar to RegisterConversionFunc, but registers conversion function that were
 // automatically generated.
+// DEPRECATED: Will be removed in favor of RegisterGeneratedUntypedConversionFunc
 func (c *Converter) RegisterGeneratedConversionFunc(conversionFunc interface{}) error {
 	return c.generatedConversionFuncs.Add(conversionFunc)
+}
+
+// RegisterUntypedConversionFunc registers a function that converts between a and b by passing objects of those
+// types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
+// any other guarantee.
+func (c *Converter) RegisterUntypedConversionFunc(a, b interface{}, fn ConversionFunc) error {
+	return c.conversionFuncs.AddUntyped(a, b, fn)
+}
+
+// RegisterGeneratedUntypedConversionFunc registers a function that converts between a and b by passing objects of those
+// types to the provided function. The function *must* accept objects of a and b - this machinery will not enforce
+// any other guarantee.
+func (c *Converter) RegisterGeneratedUntypedConversionFunc(a, b interface{}, fn ConversionFunc) error {
+	return c.generatedConversionFuncs.AddUntyped(a, b, fn)
 }
 
 // RegisterIgnoredConversion registers a "no-op" for conversion, where any requested
@@ -377,39 +409,6 @@ func (c *Converter) RegisterIgnoredConversion(from, to interface{}) error {
 		return fmt.Errorf("expected pointer arg for 'to' param 1, got: %v", typeTo)
 	}
 	c.ignoredConversions[typePair{typeFrom.Elem(), typeTo.Elem()}] = struct{}{}
-	return nil
-}
-
-// IsConversionIgnored returns true if the specified objects should be dropped during
-// conversion.
-func (c *Converter) IsConversionIgnored(inType, outType reflect.Type) bool {
-	_, found := c.ignoredConversions[typePair{inType, outType}]
-	return found
-}
-
-func (c *Converter) HasConversionFunc(inType, outType reflect.Type) bool {
-	_, found := c.conversionFuncs.fns[typePair{inType, outType}]
-	return found
-}
-
-func (c *Converter) ConversionFuncValue(inType, outType reflect.Type) (reflect.Value, bool) {
-	value, found := c.conversionFuncs.fns[typePair{inType, outType}]
-	return value, found
-}
-
-// SetStructFieldCopy registers a correspondence. Whenever a struct field is encountered
-// which has a type and name matching srcFieldType and srcFieldName, it wil be copied
-// into the field in the destination struct matching destFieldType & Name, if such a
-// field exists.
-// May be called multiple times, even for the same source field & type--all applicable
-// copies will be performed.
-func (c *Converter) SetStructFieldCopy(srcFieldType interface{}, srcFieldName string, destFieldType interface{}, destFieldName string) error {
-	st := reflect.TypeOf(srcFieldType)
-	dt := reflect.TypeOf(destFieldType)
-	srcKey := typeNamePair{st, srcFieldName}
-	destKey := typeNamePair{dt, destFieldName}
-	c.structFieldDests[srcKey] = append(c.structFieldDests[srcKey], destKey)
-	c.structFieldSources[destKey] = append(c.structFieldSources[destKey], srcKey)
 	return nil
 }
 
@@ -468,15 +467,6 @@ func (f FieldMatchingFlags) IsSet(flag FieldMatchingFlags) bool {
 // it is not used by Convert() other than storing it in the scope.
 // Not safe for objects with cyclic references!
 func (c *Converter) Convert(src, dest interface{}, flags FieldMatchingFlags, meta *Meta) error {
-	if len(c.genericConversions) > 0 {
-		// TODO: avoid scope allocation
-		s := &scope{converter: c, flags: flags, meta: meta}
-		for _, fn := range c.genericConversions {
-			if ok, err := fn(src, dest, s); ok {
-				return err
-			}
-		}
-	}
 	return c.doConversion(src, dest, flags, meta, c.convert)
 }
 
@@ -495,6 +485,21 @@ func (c *Converter) DefaultConvert(src, dest interface{}, flags FieldMatchingFla
 type conversionFunc func(sv, dv reflect.Value, scope *scope) error
 
 func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags, meta *Meta, f conversionFunc) error {
+	pair := typePair{reflect.TypeOf(src), reflect.TypeOf(dest)}
+	scope := &scope{
+		converter: c,
+		flags:     flags,
+		meta:      meta,
+	}
+	if fn, ok := c.conversionFuncs.untyped[pair]; ok {
+		return fn(src, dest, scope)
+	}
+	if fn, ok := c.generatedConversionFuncs.untyped[pair]; ok {
+		return fn(src, dest, scope)
+	}
+	// TODO: consider everything past this point deprecated - we want to support only point to point top level
+	// conversions
+
 	dv, err := EnforcePtr(dest)
 	if err != nil {
 		return err
@@ -506,15 +511,10 @@ func (c *Converter) doConversion(src, dest interface{}, flags FieldMatchingFlags
 	if err != nil {
 		return err
 	}
-	s := &scope{
-		converter: c,
-		flags:     flags,
-		meta:      meta,
-	}
 	// Leave something on the stack, so that calls to struct tag getters never fail.
-	s.srcStack.push(scopeStackElem{})
-	s.destStack.push(scopeStackElem{})
-	return f(sv, dv, s)
+	scope.srcStack.push(scopeStackElem{})
+	scope.destStack.push(scopeStackElem{})
+	return f(sv, dv, scope)
 }
 
 // callCustom calls 'custom' with sv & dv. custom must be a conversion function.

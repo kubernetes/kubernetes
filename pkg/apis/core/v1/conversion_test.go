@@ -26,9 +26,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,7 +38,7 @@ import (
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
+	utilpointer "k8s.io/utils/pointer"
 
 	// enforce that all types are installed
 	_ "k8s.io/kubernetes/pkg/api/testapi"
@@ -307,14 +307,14 @@ func TestReplicationControllerConversion(t *testing.T) {
 	for _, in := range inputs {
 		rs := &extensions.ReplicaSet{}
 		// Use in.DeepCopy() to avoid sharing pointers with `in`.
-		if err := corev1.Convert_v1_ReplicationController_to_extensions_ReplicaSet(in.DeepCopy(), rs, nil); err != nil {
+		if err := corev1.Convert_v1_ReplicationController_To_extensions_ReplicaSet(in.DeepCopy(), rs, nil); err != nil {
 			t.Errorf("can't convert RC to RS: %v", err)
 			continue
 		}
 		// Round-trip RS before converting back to RC.
 		rs = roundTripRS(t, rs)
 		out := &v1.ReplicationController{}
-		if err := corev1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(rs, out, nil); err != nil {
+		if err := corev1.Convert_extensions_ReplicaSet_To_v1_ReplicationController(rs, out, nil); err != nil {
 			t.Errorf("can't convert RS to RC: %v", err)
 			continue
 		}

@@ -17,11 +17,9 @@ go_library(
         "//cmd/kube-proxy/app:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/kubelet:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
@@ -34,7 +32,6 @@ go_library(
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
-        "//pkg/util/pointer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/volume/empty_dir:go_default_library",
         "//pkg/volume/secret:go_default_library",
@@ -53,6 +50,7 @@ go_library(
         "//test/utils:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )
 

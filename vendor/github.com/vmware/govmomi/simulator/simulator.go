@@ -390,7 +390,7 @@ func (s *Service) findDatastore(query url.Values) (*Datastore, error) {
 	ctx := context.Background()
 
 	finder := find.NewFinder(s.client, false)
-	dc, err := finder.DatacenterOrDefault(ctx, query.Get("dcName"))
+	dc, err := finder.DatacenterOrDefault(ctx, query.Get("dcPath"))
 	if err != nil {
 		return nil, err
 	}
