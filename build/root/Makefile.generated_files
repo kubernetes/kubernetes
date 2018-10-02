@@ -451,7 +451,7 @@ $(OPENAPI_OUTFILE): $(OPENAPI_GEN) $(KNOWN_VIOLATION_FILENAME)
 	    -h $(BOILERPLATE_FILENAME)                                                  \
 	    -r $(REPORT_FILENAME)                                                       \
 	    "$$@";                                                                      \
-	diff $(REPORT_FILENAME) $(KNOWN_VIOLATION_FILENAME) ||                          \
+	diff <(sort $(REPORT_FILENAME)) <(sort $(KNOWN_VIOLATION_FILENAME)) ||          \
 	(echo $(API_RULE_CHECK_FAILURE_MESSAGE); exit 1)
 
 
