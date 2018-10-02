@@ -202,11 +202,19 @@ type ContainerResourceGatherer struct {
 
 type ResourceGathererOptions struct {
 	InKubemark                  bool
-	MasterOnly                  bool
+	Nodes                       NodesSet
 	ResourceDataGatheringPeriod time.Duration
 	ProbeDuration               time.Duration
 	PrintVerboseLogs            bool
 }
+
+type NodesSet int
+
+const (
+	AllNodes          NodesSet = 0 // All containers on all nodes
+	MasterNodes       NodesSet = 1 // All containers on Master nodes only
+	MasterAndDNSNodes NodesSet = 2 // All containers on Master nodes and DNS containers on other nodes
+)
 
 func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*ContainerResourceGatherer, error) {
 	g := ContainerResourceGatherer{
@@ -237,12 +245,22 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				return nil, err
 			}
 		}
+		dnsNodes := make(map[string]bool)
 		for _, pod := range pods.Items {
+			if (options.Nodes == MasterNodes) && !system.IsMasterNode(pod.Spec.NodeName) {
+				continue
+			}
+			if (options.Nodes == MasterAndDNSNodes) && !system.IsMasterNode(pod.Spec.NodeName) && pod.Labels["k8s-app"] != "kube-dns" {
+				continue
+			}
 			for _, container := range pod.Status.InitContainerStatuses {
 				g.containerIDs = append(g.containerIDs, container.Name)
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				g.containerIDs = append(g.containerIDs, container.Name)
+			}
+			if options.Nodes == MasterAndDNSNodes {
+				dnsNodes[pod.Spec.NodeName] = true
 			}
 		}
 		nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -252,7 +270,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 		}
 
 		for _, node := range nodeList.Items {
-			if !options.MasterOnly || system.IsMasterNode(node.Name) {
+			if options.Nodes == AllNodes || system.IsMasterNode(node.Name) || dnsNodes[node.Name] {
 				g.workerWg.Add(1)
 				g.workers = append(g.workers, resourceGatherWorker{
 					c:                           c,
@@ -266,7 +284,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 					probeDuration:               options.ProbeDuration,
 					printVerboseLogs:            options.PrintVerboseLogs,
 				})
-				if options.MasterOnly {
+				if options.Nodes == MasterNodes {
 					break
 				}
 			}

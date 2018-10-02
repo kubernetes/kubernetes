@@ -146,7 +146,7 @@ func newNodeLifecycleControllerFromClient(
 	return &nodeLifecycleController{nc, nodeInformer, daemonSetInformer}, nil
 }
 
-func TestMonitorNodeStatusEvictPods(t *testing.T) {
+func TestMonitorNodeHealthEvictPods(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 	labels := map[string]string{
@@ -628,7 +628,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if item.timeToPass > 0 {
@@ -643,7 +643,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
@@ -787,7 +787,7 @@ func TestPodStatusChange(t *testing.T) {
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if item.timeToPass > 0 {
@@ -798,7 +798,7 @@ func TestPodStatusChange(t *testing.T) {
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		zones := testutil.GetZones(item.fakeNodeHandler)
@@ -827,7 +827,7 @@ func TestPodStatusChange(t *testing.T) {
 	}
 }
 
-func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
+func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	evictionTimeout := 10 * time.Minute
 	timeToPass := 60 * time.Minute
@@ -1318,7 +1318,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("%v: unexpected error: %v", item.description, err)
 		}
 
@@ -1336,7 +1336,7 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("%v: unexpected error: %v", item.description, err)
 		}
 		for zone, state := range item.expectedFollowingStates {
@@ -1449,7 +1449,7 @@ func TestCloudProviderNodeShutdown(t *testing.T) {
 			if err := nodeController.syncNodeStore(fnh); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if err := nodeController.monitorNodeStatus(); err != nil {
+			if err := nodeController.monitorNodeHealth(); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
@@ -1520,11 +1520,11 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
 		return false, nil
 	}
-	// monitorNodeStatus should allow this node to be immediately deleted
+	// monitorNodeHealth should allow this node to be immediately deleted
 	if err := nodeController.syncNodeStore(fnh); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := nodeController.monitorNodeStatus(); err != nil {
+	if err := nodeController.monitorNodeHealth(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	select {
@@ -1540,7 +1540,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 	}
 }
 
-func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
+func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
 		fakeNodeHandler      *testutil.FakeNodeHandler
@@ -1804,7 +1804,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if item.timeToPass > 0 {
@@ -1813,7 +1813,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 			if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if err := nodeController.monitorNodeStatus(); err != nil {
+			if err := nodeController.monitorNodeHealth(); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 		}
@@ -1829,7 +1829,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 }
 
-func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
+func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
 		fakeNodeHandler         *testutil.FakeNodeHandler
@@ -1951,7 +1951,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 		if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if err := nodeController.monitorNodeStatus(); err != nil {
+		if err := nodeController.monitorNodeHealth(); err != nil {
 			t.Errorf("Case[%d] unexpected error: %v", i, err)
 		}
 		if item.timeToPass > 0 {
@@ -1960,7 +1960,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 			if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if err := nodeController.monitorNodeStatus(); err != nil {
+			if err := nodeController.monitorNodeHealth(); err != nil {
 				t.Errorf("Case[%d] unexpected error: %v", i, err)
 			}
 		}
@@ -2071,7 +2071,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := nodeController.monitorNodeStatus(); err != nil {
+	if err := nodeController.monitorNodeHealth(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.doNoExecuteTaintingPass()
@@ -2109,7 +2109,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := nodeController.monitorNodeStatus(); err != nil {
+	if err := nodeController.monitorNodeHealth(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.doNoExecuteTaintingPass()
@@ -2421,7 +2421,7 @@ func TestNodeEventGeneration(t *testing.T) {
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := nodeController.monitorNodeStatus(); err != nil {
+	if err := nodeController.monitorNodeHealth(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(fakeRecorder.Events) != 2 {
