@@ -19,7 +19,7 @@ spec:
           image: quay.io/k8scsi/csi-provisioner:v0.2.0
           args:
             - "--v=5"
-            - "--provisioner=csi-gce-pd"
+            - "--provisioner=com.google.csi.gcepd"
             - "--csi-address=$(ADDRESS)"
           env:
             - name: ADDRESS
