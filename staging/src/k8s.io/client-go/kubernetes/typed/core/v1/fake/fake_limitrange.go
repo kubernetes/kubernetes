@@ -119,7 +119,7 @@ func (c *FakeLimitRanges) DeleteCollection(options *v1.DeleteOptions, listOption
 // Patch applies the patch and returns the patched limitRange.
 func (c *FakeLimitRanges) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.LimitRange, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, data, subresources...), &corev1.LimitRange{})
+		Invokes(testing.NewPatchSubresourceAction(limitrangesResource, c.ns, name, pt, data, subresources...), &corev1.LimitRange{})
 
 	if obj == nil {
 		return nil, err

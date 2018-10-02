@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
@@ -137,15 +139,30 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			if err != nil {
 				return true, nil, err
 			}
-			// Only supports strategic merge patch
-			// TODO: Add support for other Patch types
-			mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
-			if err != nil {
-				return true, nil, err
-			}
-
-			if err = json.Unmarshal(mergedByte, obj); err != nil {
-				return true, nil, err
+			// Only supports strategic merge patch and JSONPatch as coded.
+			switch action.GetPatchType() {
+			case types.JSONPatchType:
+				patch, err := jsonpatch.DecodePatch(action.GetPatch())
+				if err != nil {
+					return true, nil, err
+				}
+				modified, err := patch.Apply(old)
+				if err != nil {
+					return true, nil, err
+				}
+				if err = json.Unmarshal(modified, obj); err != nil {
+					return true, nil, err
+				}
+			case types.StrategicMergePatchType:
+				mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
+				if err != nil {
+					return true, nil, err
+				}
+				if err = json.Unmarshal(mergedByte, obj); err != nil {
+					return true, nil, err
+				}
+			default:
+				return true, nil, fmt.Errorf("PatchType is not supported")
 			}
 
 			if err = tracker.Update(gvr, obj, ns); err != nil {
