@@ -17,8 +17,6 @@ limitations under the License.
 package kubeadm
 
 import (
-	fuzz "github.com/google/gofuzz"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -142,12 +140,6 @@ type ComponentConfigs struct {
 	// KubeProxy holds the ComponentConfiguration for the kube-proxy
 	KubeProxy *kubeproxyconfig.KubeProxyConfiguration
 }
-
-// Fuzz is a dummy function here to get the roundtrip tests working in cmd/kubeadm/app/apis/kubeadm/fuzzer working.
-// This makes the fuzzer not go and randomize all fields in the ComponentConfigs struct, as that wouldn't work for
-// a roundtrip. A roundtrip to the v1alpha3 API obviously doesn't work as it's not stored there at all. With this,
-// the roundtrip is considered valid, as semi-static values are set and preserved during a roundtrip.
-func (cc ComponentConfigs) Fuzz(c fuzz.Continue) {}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
