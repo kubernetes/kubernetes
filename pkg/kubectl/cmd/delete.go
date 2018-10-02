@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"os"
+	"bufio"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -209,6 +211,19 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 	if o.GracePeriod == 0 && !o.ForceDeletion && !o.WaitForDeletion {
 		// With the explicit --wait flag we need extra validation for backward compatibility
 		return fmt.Errorf("--grace-period=0 must have either --force specified, or --wait to be set to true")
+	}
+
+	//  interactive session when --all is specified without --force.
+	if  o.DeleteAll && !o.ForceDeletion {
+		fmt.Fprintf(o.Out, "are you sure you want to delete all[Y/N]:")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSuffix(input, "\n")
+		if strings.EqualFold(input, "y") || strings.EqualFold(input, "ye")  || strings.EqualFold(input, "yes") {
+			fmt.Fprintf(o.Out, "deleting all\n")
+		} else {
+			return fmt.Errorf("none deleted")
+		}
 	}
 
 	switch {
