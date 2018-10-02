@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
-
 	"regexp"
+	"strconv"
+	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -207,6 +208,109 @@ func testDevicePlugin(f *framework.Framework, enablePluginWatcher bool, pluginSo
 			f.PodClient().DeleteSync(pod2.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 		})
 	})
+}
+
+// Serial because the test restarts Kubelet
+// Slow because this is a soak test
+var _ = framework.KubeDescribe("Device Plugin Soak [Feature:DevicePluginSoak] [Soak] [Slow] [Serial] [Disruptive]", func() {
+	f := framework.NewDefaultFramework("device-plugin-errors")
+
+	Context("DevicePlugin", func() {
+		By("Enabling support for Device Plugin")
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates[string(features.DevicePlugins)] = true
+		})
+
+		const (
+			// how many waves of device plugins
+			scale = 10
+			// how many milliseconds to wait before dumping the next wave of device plugins
+			millisecondsBetweenWaves = 500 * time.Millisecond
+			// ping to check device plugin health periodicity and continuously
+			pingPeriodInSeconds = 15 * time.Second
+			// timeout of the whole soak test
+			soakTimeout = 30 * time.Minute
+		)
+
+		description := fmt.Sprintf("Kubelet should survive after handling multi device plugins for a duration of %v, "+
+			"scaling up to %v device plugins per node.", soakTimeout, scale)
+
+		It(description, func() {
+			defer GinkgoRecover()
+			var wg sync.WaitGroup
+			wg.Add(scale)
+			for i := 0; i < scale; i++ {
+				go func() {
+					wave := fmt.Sprintf("wave-%v", strconv.Itoa(i))
+					framework.Logf("Starting device plugin soak test, wave = %v", wave)
+					setUpAndConsumeResourceWithSleepOf(f, pingPeriodInSeconds, wave, soakTimeout)
+					framework.Logf("Completed device plugin soak test, wave = %v", i)
+					wg.Done()
+				}()
+				// gab between waves
+				time.Sleep(millisecondsBetweenWaves)
+			}
+			framework.Logf("Waiting for all %v device plugin soak waves to complete", scale)
+			wg.Wait()
+		})
+	})
+})
+
+func setUpAndConsumeResourceWithSleepOf(f *framework.Framework, sleep time.Duration, wave string, timeout time.Duration) {
+	framework.Logf("Start stub device plugin")
+	// setup fake device to be consumed
+	// use wave as deviceID here
+	devs := []*pluginapi.Device{
+		{ID: wave, Health: pluginapi.Healthy},
+	}
+
+	socketPath := pluginapi.DevicePluginPath + "dp." + wave
+
+	dp1 := dm.NewDevicePluginStub(devs, socketPath)
+	dp1.SetAllocFunc(stubAllocFunc)
+	err := dp1.Start()
+	framework.ExpectNoError(err)
+
+	framework.Logf("Register resources")
+	resourceName := wave + ".com/resources"
+	err = dp1.Register(pluginapi.KubeletSocket, resourceName)
+	framework.ExpectNoError(err)
+
+	framework.Logf("Waiting for the resource exported by the stub device plugin to become available on the local node")
+	devsLen := int64(len(devs))
+	Eventually(func() int64 {
+		node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		return numberOfDevices(node, resourceName)
+	}, 30*time.Second, framework.Poll).Should(Equal(devsLen))
+
+	framework.Logf("Creating one pod on node with at least one fake-device")
+	reCmd := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^%v+$') && echo stub devices: $devs", wave)
+
+	// new timer for break out this soak test
+	t := time.NewTimer(timeout)
+	for {
+		select {
+		case <-t.C:
+			// break if soak timeout
+			framework.Logf("Soak timeout, break wave: %s", wave)
+			return
+		default:
+			// create pod to consume this resource periodicity
+			pod := f.PodClient().CreateSync(makeBusyboxPod(resourceName, reCmd))
+
+			deviceIDRE := fmt.Sprintf("stub devices: (%v+)", wave)
+			_, devId := parseLogFromNRuns(f, pod.Name, pod.Name, 0, deviceIDRE)
+
+			Expect(devId).To(Equal(wave))
+
+			// cleanup pod
+			f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+
+			// sleep to do the next iteration
+			time.Sleep(sleep)
+		}
+	}
 }
 
 // makeBusyboxPod returns a simple Pod spec with a busybox container
