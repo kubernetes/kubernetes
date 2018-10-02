@@ -114,7 +114,7 @@ const (
 	// Same as `PodStartTimeout` to wait for the pod to be started, but shorter.
 	// Use it case by case when we are sure pod start will not be delayed
 	// minutes by slow docker pulls or something else.
-	PodStartShortTimeout = 1 * time.Minute
+	PodStartShortTimeout = 2 * time.Minute
 
 	// How long to wait for a pod to be deleted
 	PodDeleteTimeout = 5 * time.Minute
