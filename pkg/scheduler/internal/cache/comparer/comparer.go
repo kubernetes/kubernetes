@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package factory
+package comparer
 
 import (
 	"sort"
@@ -29,31 +29,47 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
-type cacheComparer struct {
-	nodeLister corelisters.NodeLister
-	podLister  corelisters.PodLister
-	cache      schedulerinternalcache.Cache
-	podQueue   internalqueue.SchedulingQueue
-	compareStrategy
+// CacheComparer is an implementation of the Scheduler's cache comparer.
+type CacheComparer struct {
+	NodeLister corelisters.NodeLister
+	PodLister  corelisters.PodLister
+	Cache      schedulerinternalcache.Cache
+	PodQueue   internalqueue.SchedulingQueue
 }
 
-func (c *cacheComparer) Compare() error {
+// New creates a CacheComparer.
+func New(
+	nodeLister corelisters.NodeLister,
+	podLister corelisters.PodLister,
+	cache schedulerinternalcache.Cache,
+	podQueue internalqueue.SchedulingQueue,
+) *CacheComparer {
+	return &CacheComparer{
+		NodeLister: nodeLister,
+		PodLister:  podLister,
+		Cache:      cache,
+		PodQueue:   podQueue,
+	}
+}
+
+// Compare compares the nodes and pods of NodeLister with Cache.Snapshot.
+func (c *CacheComparer) Compare() error {
 	glog.V(3).Info("cache comparer started")
 	defer glog.V(3).Info("cache comparer finished")
 
-	nodes, err := c.nodeLister.List(labels.Everything())
+	nodes, err := c.NodeLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 
-	pods, err := c.podLister.List(labels.Everything())
+	pods, err := c.PodLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
 
-	snapshot := c.cache.Snapshot()
+	snapshot := c.Cache.Snapshot()
 
-	waitingPods := c.podQueue.WaitingPods()
+	waitingPods := c.PodQueue.WaitingPods()
 
 	if missed, redundant := c.CompareNodes(nodes, snapshot.Nodes); len(missed)+len(redundant) != 0 {
 		glog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
@@ -66,10 +82,8 @@ func (c *cacheComparer) Compare() error {
 	return nil
 }
 
-type compareStrategy struct {
-}
-
-func (c compareStrategy) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
+// CompareNodes compares actual nodes with cached nodes.
+func (c *CacheComparer) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
 	actual := []string{}
 	for _, node := range nodes {
 		actual = append(actual, node.Name)
@@ -83,7 +97,8 @@ func (c compareStrategy) CompareNodes(nodes []*v1.Node, nodeinfos map[string]*sc
 	return compareStrings(actual, cached)
 }
 
-func (c compareStrategy) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
+// ComparePods compares actual pods with cached pods.
+func (c *CacheComparer) ComparePods(pods, waitingPods []*v1.Pod, nodeinfos map[string]*schedulercache.NodeInfo) (missed, redundant []string) {
 	actual := []string{}
 	for _, pod := range pods {
 		actual = append(actual, string(pod.UID))
