@@ -21,7 +21,7 @@ package fuzzer
 // earlier now have moved out it's not possible to do a lossless roundtrip "the normal way"
 // When we support v1alpha3 and higher only, we can reenable this
 
-/*import (
+import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
@@ -30,4 +30,4 @@ package fuzzer
 
 func TestRoundTripTypes(t *testing.T) {
 	roundtrip.RoundTripTestForAPIGroup(t, scheme.AddToScheme, Funcs)
-}*/
+}
