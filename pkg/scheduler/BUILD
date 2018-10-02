@@ -44,6 +44,7 @@ go_test(
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
+        "//pkg/scheduler/internal/cache/fake:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

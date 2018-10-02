@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -200,7 +201,7 @@ func TestScheduler(t *testing.T) {
 			var gotBinding *v1.Binding
 			configurator := &FakeConfigurator{
 				Config: &Config{
-					SchedulerCache: &schedulertesting.FakeCache{
+					SchedulerCache: &fakecache.Cache{
 						ForgetFunc: func(pod *v1.Pod) {
 							gotForgetPod = pod
 						},

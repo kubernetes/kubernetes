@@ -70,6 +70,7 @@ go_test(
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/latest:go_default_library",
         "//pkg/scheduler/cache:go_default_library",
+        "//pkg/scheduler/internal/cache/fake:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/testing:go_default_library",
         "//pkg/scheduler/util:go_default_library",
