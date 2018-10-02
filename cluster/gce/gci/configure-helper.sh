@@ -663,6 +663,15 @@ EOF
 multizone = ${MULTIZONE}
 EOF
   fi
+# Multimaster indicates that the cluster is HA.
+# Currently the only HA clusters are regional.
+# If we introduce zonal multimaster this will need to be revisited.
+  if [[ -n "${MULTIMASTER:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+regional = ${MULTIMASTER}
+EOF
+  fi
   if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
     use_cloud_config="true"
     # split GCE_ALPHA_FEATURES into an array by comma.
