@@ -33,11 +33,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -60,12 +57,14 @@ func defaultClientConfig() *restclient.Config {
 		ContentConfig: restclient.ContentConfig{
 			NegotiatedSerializer: scheme.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &schema.GroupVersion{Version: "v1"},
+			GroupVersion:         &corev1.SchemeGroupVersion,
 		},
 	}
 }
 
 func testData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {
+	grace := int64(30)
+	enableServiceLinks := corev1.DefaultEnableServiceLinks
 	pods := &corev1.PodList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
@@ -73,11 +72,23 @@ func testData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationContro
 		Items: []corev1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec:       apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec:       apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 	}
@@ -118,10 +129,6 @@ func int32ptr(val int) *int32 {
 
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
-}
-
-func policyObjBody(obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Policy.Codec(), obj))))
 }
 
 func bytesBody(bodyBytes []byte) io.ReadCloser {
