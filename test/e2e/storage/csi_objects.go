@@ -47,10 +47,10 @@ import (
 )
 
 var csiImageVersions = map[string]string{
-	"hostpathplugin":   "canary", // TODO (verult) update tag once new hostpathplugin release is cut
-	"csi-attacher":     "v0.2.0",
-	"csi-provisioner":  "v0.2.1",
-	"driver-registrar": "v0.3.0",
+	"hostpathplugin":   "v0.4.0",
+	"csi-attacher":     "v0.4.0",
+	"csi-provisioner":  "v0.4.0",
+	"driver-registrar": "v0.4.0",
 }
 
 func csiContainerImage(image string) string {
