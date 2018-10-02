@@ -596,11 +596,8 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   "Failed",
 	}.AsSelector().String()
-	options := metav1.ListOptions{FieldSelector: selector}
-	events, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
-	Expect(err).NotTo(HaveOccurred(), "while getting pod events")
-	Expect(len(events.Items)).NotTo(Equal(0), "no events found")
-	Expect(events.Items[0].Message).To(ContainSubstring(errorMsg), fmt.Sprintf("%q error not found", errorMsg))
+	err = framework.WaitTimeoutForPodEvent(f.ClientSet, pod.Name, f.Namespace.Name, selector, errorMsg, framework.PodEventTimeout)
+	Expect(err).To(HaveOccurred(), "while waiting for failed event to occur")
 }
 
 // Tests that the existing subpath mount is detected when a container restarts
