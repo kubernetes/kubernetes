@@ -428,7 +428,7 @@ type VolumeOptions struct {
 	Encrypted bool
 	// fully qualified resource name to the key to use for encryption.
 	// example: arn:aws:kms:us-east-1:012345678910:key/abcd1234-a123-456a-a12b-a123b4cd56ef
-	KmsKeyId string
+	KmsKeyID string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -511,7 +511,7 @@ type Cloud struct {
 	// attached, to avoid a race condition where we assign a device mapping
 	// and then get a second request before we attach the volume
 	attachingMutex sync.Mutex
-	attaching      map[types.NodeName]map[mountDevice]awsVolumeID
+	attaching      map[types.NodeName]map[mountDevice]EBSVolumeID
 
 	// state of our device allocator for each node
 	deviceAllocators map[types.NodeName]DeviceAllocator
@@ -1110,7 +1110,7 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 		cfg:      &cfg,
 		region:   regionName,
 
-		attaching:        make(map[types.NodeName]map[mountDevice]awsVolumeID),
+		attaching:        make(map[types.NodeName]map[mountDevice]EBSVolumeID),
 		deviceAllocators: make(map[types.NodeName]DeviceAllocator),
 	}
 	awsCloud.instanceCache.cloud = awsCloud
@@ -1613,14 +1613,14 @@ func (i *awsInstance) describeInstance() (*ec2.Instance, error) {
 func (c *Cloud) getMountDevice(
 	i *awsInstance,
 	info *ec2.Instance,
-	volumeID awsVolumeID,
+	volumeID EBSVolumeID,
 	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
 	instanceType := i.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", i.awsID)
 	}
 
-	deviceMappings := map[mountDevice]awsVolumeID{}
+	deviceMappings := map[mountDevice]EBSVolumeID{}
 	for _, blockDevice := range info.BlockDeviceMappings {
 		name := aws.StringValue(blockDevice.DeviceName)
 		if strings.HasPrefix(name, "/dev/sd") {
@@ -1632,7 +1632,7 @@ func (c *Cloud) getMountDevice(
 		if len(name) < 1 || len(name) > 2 {
 			glog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
 		}
-		deviceMappings[mountDevice(name)] = awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
+		deviceMappings[mountDevice(name)] = EBSVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
 	}
 
 	// We lock to prevent concurrent mounts from conflicting
@@ -1675,12 +1675,12 @@ func (c *Cloud) getMountDevice(
 	chosen, err := deviceAllocator.GetNext(deviceMappings)
 	if err != nil {
 		glog.Warningf("Could not assign a mount device.  mappings=%v, error: %v", deviceMappings, err)
-		return "", false, fmt.Errorf("Too many EBS volumes attached to node %s.", i.nodeName)
+		return "", false, fmt.Errorf("too many EBS volumes attached to node %s", i.nodeName)
 	}
 
 	attaching := c.attaching[i.nodeName]
 	if attaching == nil {
-		attaching = make(map[mountDevice]awsVolumeID)
+		attaching = make(map[mountDevice]EBSVolumeID)
 		c.attaching[i.nodeName] = attaching
 	}
 	attaching[chosen] = volumeID
@@ -1691,7 +1691,7 @@ func (c *Cloud) getMountDevice(
 
 // endAttaching removes the entry from the "attachments in progress" map
 // It returns true if it was found (and removed), false otherwise
-func (c *Cloud) endAttaching(i *awsInstance, volumeID awsVolumeID, mountDevice mountDevice) bool {
+func (c *Cloud) endAttaching(i *awsInstance, volumeID EBSVolumeID, mountDevice mountDevice) bool {
 	c.attachingMutex.Lock()
 	defer c.attachingMutex.Unlock()
 
@@ -1718,7 +1718,7 @@ type awsDisk struct {
 	// Name in k8s
 	name KubernetesVolumeID
 	// id in AWS
-	awsID awsVolumeID
+	awsID EBSVolumeID
 }
 
 func newAWSDisk(aws *Cloud, name KubernetesVolumeID) (*awsDisk, error) {
@@ -1887,13 +1887,14 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			if describeErrorCount > volumeAttachmentStatusConsecutiveErrorLimit {
 				// report the error
 				return false, err
-			} else {
-				glog.Warningf("Ignoring error from describe volume for volume %q; will retry: %q", d.awsID, err)
-				return false, nil
 			}
-		} else {
-			describeErrorCount = 0
+
+			glog.Warningf("Ignoring error from describe volume for volume %q; will retry: %q", d.awsID, err)
+			return false, nil
 		}
+
+		describeErrorCount = 0
+
 		if len(info.Attachments) > 1 {
 			// Shouldn't happen; log so we know if it is
 			glog.Warningf("Found multiple attachments for volume %q: %v", d.awsID, info)
@@ -1981,7 +1982,7 @@ func wrapAttachError(err error, disk *awsDisk, instance string) error {
 				glog.Errorf("Error describing volume %q: %q", disk.awsID, err)
 			} else {
 				for _, a := range info.Attachments {
-					if disk.awsID != awsVolumeID(aws.StringValue(a.VolumeId)) {
+					if disk.awsID != EBSVolumeID(aws.StringValue(a.VolumeId)) {
 						glog.Warningf("Expected to get attachment info of volume %q but instead got info of %q", disk.awsID, aws.StringValue(a.VolumeId))
 					} else if aws.StringValue(a.State) == "attached" {
 						return fmt.Errorf("Error attaching EBS volume %q to instance %q: %q. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
@@ -2097,9 +2098,9 @@ func (c *Cloud) DetachDisk(diskName KubernetesVolumeID, nodeName types.NodeName)
 			// Someone deleted the volume being detached; complain, but do nothing else and return success
 			glog.Warningf("DetachDisk %s called for node %s but volume does not exist; assuming the volume is detached", diskName, nodeName)
 			return "", nil
-		} else {
-			return "", err
 		}
+
+		return "", err
 	}
 
 	if !attached && diskInfo.ec2Instance != nil {
@@ -2196,8 +2197,8 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	request.Size = aws.Int64(int64(volumeOptions.CapacityGB))
 	request.VolumeType = aws.String(createType)
 	request.Encrypted = aws.Bool(volumeOptions.Encrypted)
-	if len(volumeOptions.KmsKeyId) > 0 {
-		request.KmsKeyId = aws.String(volumeOptions.KmsKeyId)
+	if len(volumeOptions.KmsKeyID) > 0 {
+		request.KmsKeyId = aws.String(volumeOptions.KmsKeyID)
 		request.Encrypted = aws.Bool(true)
 	}
 	if iops > 0 {
@@ -2208,7 +2209,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 		return "", err
 	}
 
-	awsID := awsVolumeID(aws.StringValue(response.VolumeId))
+	awsID := EBSVolumeID(aws.StringValue(response.VolumeId))
 	if awsID == "" {
 		return "", fmt.Errorf("VolumeID was not returned by CreateVolume")
 	}
@@ -2230,7 +2231,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 	// Such volume lives for couple of seconds and then it's silently deleted
 	// by AWS. There is no other check to ensure that given KMS key is correct,
 	// because Kubernetes may have limited permissions to the key.
-	if len(volumeOptions.KmsKeyId) > 0 {
+	if len(volumeOptions.KmsKeyID) > 0 {
 		err := c.waitUntilVolumeAvailable(volumeName)
 		if err != nil {
 			if isAWSErrorVolumeNotFound(err) {
@@ -2313,9 +2314,9 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 		// Volume is attached somewhere else and we can not attach it here
 		if len(info.Attachments) > 0 {
 			attachment := info.Attachments[0]
-			instanceId := aws.StringValue(attachment.InstanceId)
-			attachedInstance, ierr := c.getInstanceByID(instanceId)
-			attachErr := fmt.Sprintf("%s since volume is currently attached to %q", opError, instanceId)
+			instanceID := aws.StringValue(attachment.InstanceId)
+			attachedInstance, ierr := c.getInstanceByID(instanceID)
+			attachErr := fmt.Sprintf("%s since volume is currently attached to %q", opError, instanceID)
 			if ierr != nil {
 				glog.Error(attachErr)
 				return false, errors.New(attachErr)
@@ -2334,6 +2335,7 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 	return true, nil
 }
 
+// GetLabelsForVolume gets the volume labels for a volume
 func (c *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
 	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
@@ -2399,14 +2401,16 @@ func (c *Cloud) DiskIsAttached(diskName KubernetesVolumeID, nodeName types.NodeN
 			// The disk doesn't exist, can't be attached
 			glog.Warningf("DiskIsAttached called for volume %s on node %s but the volume does not exist", diskName, nodeName)
 			return false, nil
-		} else {
-			return true, err
 		}
+
+		return true, err
 	}
 
 	return attached, nil
 }
 
+// DisksAreAttached returns a map of nodes and Kubernetes volume IDs indicating
+// if the volumes are attached to the node
 func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolumeID) (map[types.NodeName]map[KubernetesVolumeID]bool, error) {
 	attached := make(map[types.NodeName]map[KubernetesVolumeID]bool)
 
@@ -2455,7 +2459,7 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 			continue
 		}
 
-		idToDiskName := make(map[awsVolumeID]KubernetesVolumeID)
+		idToDiskName := make(map[EBSVolumeID]KubernetesVolumeID)
 		for _, diskName := range diskNames {
 			volumeID, err := diskName.MapToAWSVolumeID()
 			if err != nil {
@@ -2465,7 +2469,7 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 		}
 
 		for _, blockDevice := range awsInstance.BlockDeviceMappings {
-			volumeID := awsVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
+			volumeID := EBSVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
 			diskName, found := idToDiskName[volumeID]
 			if found {
 				// Disk is still attached to node
@@ -2477,6 +2481,8 @@ func (c *Cloud) DisksAreAttached(nodeDisks map[types.NodeName][]KubernetesVolume
 	return attached, nil
 }
 
+// ResizeDisk resizes an EBS volume in GiB increments, it will round up to the
+// next GiB if arguments are not provided in even GiB increments
 func (c *Cloud) ResizeDisk(
 	diskName KubernetesVolumeID,
 	oldSize resource.Quantity,

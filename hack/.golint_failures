@@ -89,7 +89,6 @@ pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
-pkg/cloudprovider/providers/aws
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/gce
 pkg/cloudprovider/providers/gce/cloud

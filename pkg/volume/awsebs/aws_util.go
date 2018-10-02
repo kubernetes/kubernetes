@@ -168,7 +168,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 				return nil, fmt.Errorf("invalid encrypted boolean value %q, must be true or false: %v", v, err)
 			}
 		case "kmskeyid":
-			volumeOptions.KmsKeyId = v
+			volumeOptions.KmsKeyID = v
 		case volume.VolumeParameterFSType:
 			// Do nothing but don't make this fail
 		default:
