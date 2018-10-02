@@ -44,7 +44,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -64,6 +63,7 @@ var (
 		}
 		return openapi.NewOpenAPIData(s)
 	}
+	codec = scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -104,11 +104,11 @@ const (
 func readConfigMapList(t *testing.T, filename string) []byte {
 	data := readBytesFromFile(t, filename)
 	cmList := corev1.ConfigMapList{}
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &cmList); err != nil {
+	if err := runtime.DecodeInto(codec, data, &cmList); err != nil {
 		t.Fatal(err)
 	}
 
-	cmListBytes, err := runtime.Encode(testapi.Default.Codec(), &cmList)
+	cmListBytes, err := runtime.Encode(codec, &cmList)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func readReplicationController(t *testing.T, filenameRC string) (string, []byte)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
+	rcBytes, err := runtime.Encode(codec, rcObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func readReplicationController(t *testing.T, filenameRC string) (string, []byte)
 func readReplicationControllerFromFile(t *testing.T, filename string) *corev1.ReplicationController {
 	data := readBytesFromFile(t, filename)
 	rc := corev1.ReplicationController{}
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &rc); err != nil {
+	if err := runtime.DecodeInto(codec, data, &rc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,7 +158,7 @@ func readReplicationControllerFromFile(t *testing.T, filename string) *corev1.Re
 func readUnstructuredFromFile(t *testing.T, filename string) *unstructured.Unstructured {
 	data := readBytesFromFile(t, filename)
 	unst := unstructured.Unstructured{}
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &unst); err != nil {
+	if err := runtime.DecodeInto(codec, data, &unst); err != nil {
 		t.Fatal(err)
 	}
 	return &unst
@@ -167,7 +167,7 @@ func readUnstructuredFromFile(t *testing.T, filename string) *unstructured.Unstr
 func readServiceFromFile(t *testing.T, filename string) *corev1.Service {
 	data := readBytesFromFile(t, filename)
 	svc := corev1.Service{}
-	if err := runtime.DecodeInto(testapi.Default.Codec(), data, &svc); err != nil {
+	if err := runtime.DecodeInto(codec, data, &svc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -189,7 +189,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	originalLabels := originalAccessor.GetLabels()
 	originalLabels["DELETE_ME"] = "DELETE_ME"
 	originalAccessor.SetLabels(originalLabels)
-	original, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, originalObj)
+	original, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: codec}, originalObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func annotateRuntimeObject(t *testing.T, originalObj, currentObj runtime.Object,
 	}
 	currentAnnotations[corev1.LastAppliedConfigAnnotation] = string(original)
 	currentAccessor.SetAnnotations(currentAnnotations)
-	current, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, currentObj)
+	current, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: codec}, currentObj)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestRunApplyPrintsValidObjectList(t *testing.T) {
 
 	// ensure that returned list can be unmarshaled back into a configmap list
 	cmList := corev1.List{}
-	if err := runtime.DecodeInto(testapi.Default.Codec(), buf.Bytes(), &cmList); err != nil {
+	if err := runtime.DecodeInto(codec, buf.Bytes(), &cmList); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -392,8 +392,6 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
-
-			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
@@ -853,7 +851,6 @@ const (
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)
 	obj := &extensionsv1beta1.Deployment{}
-	codec := scheme.Codecs.LegacyCodec(extensionsv1beta1.SchemeGroupVersion)
 	if err := runtime.DecodeInto(codec, raw, obj); err != nil {
 		t.Fatal(err)
 	}
@@ -1009,7 +1006,7 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 	initTestErrorHandler(t)
 
 	serversideObject := readUnstructuredFromFile(t, filenameWidgetServerside)
-	serversideData, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: testapi.Default.Codec()}, serversideObject)
+	serversideData, err := runtime.Encode(unstructured.JSONFallbackEncoder{Encoder: codec}, serversideObject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1121,8 +1118,6 @@ func TestRunApplySetLastApplied(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-
 			tf.UnstructuredClient = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},
 				NegotiatedSerializer: unstructuredSerializer,
@@ -1231,7 +1226,7 @@ func TestForceApply(t *testing.T) {
 						if isScaledDownToZero {
 							rcObj := readReplicationControllerFromFile(t, filenameRC)
 							rcObj.Spec.Replicas = int32ptr(0)
-							rcBytes, err := runtime.Encode(testapi.Default.Codec(), rcObj)
+							rcBytes, err := runtime.Encode(codec, rcObj)
 							if err != nil {
 								t.Fatal(err)
 							}
@@ -1250,7 +1245,7 @@ func TestForceApply(t *testing.T) {
 							},
 							Items: []unstructured.Unstructured{*rcObj},
 						}
-						listBytes, err := runtime.Encode(testapi.Default.Codec(), list)
+						listBytes, err := runtime.Encode(codec, list)
 						if err != nil {
 							t.Fatal(err)
 						}
