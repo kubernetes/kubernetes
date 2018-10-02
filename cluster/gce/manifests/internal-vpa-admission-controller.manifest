@@ -10,7 +10,6 @@
     },
     "spec": {
         "hostNetwork": true,
-	"serviceAccountName": "vpa-admission-controller",
         "containers": [
             {
                 "name": "vpa-admission-controller",
@@ -25,7 +24,8 @@
                 },
                 "command": [
                    "./run.sh",
-                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
+                    "--kubernetes=https://127.0.0.1:443",
+                    "--kubeconfig=/etc/srv/kubernetes/vpa-admission-controller/kubeconfig",
                     "--v=4",
                     "--logtostderr=true",
                     "--localhost-webhook-registration=true"
@@ -37,9 +37,9 @@
                         "mountPath": "/etc/tls-certs"
                     },
                     {
-                        "name": "logfile",
-                        "mountPath": "/var/log/vpa-admission-controller.log",
-                        "readOnly": false
+                        "name": "srvkube",
+                        "readOnly": true,
+                        "mountPath": "/etc/srv/kubernetes/vpa-admission-controller"
                     }
                 ],
                 "terminationMessagePath": "/dev/termination-log",
@@ -66,10 +66,9 @@
                 }
             },
             {
-                "name": "logfile",
+                "name": "srvkube",
                 "hostPath": {
-                    "path": "/var/log/vpa-admission-controller.log",
-                    "type": "FileOrCreate"
+                    "path": "/etc/srv/kubernetes/vpa-admission-controller"
                 }
             }
         ],

@@ -42,7 +42,9 @@ function start_vertical_pod_autoscaler {
     setup-addon-manifests "addons" "vertical-pod-autoscaler"
 
     for component in admission-controller recommender updater; do
-      prepare-log-file /var/log/vpa-${component}.log
+      token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+      append_or_replace_prefixed_line /etc/srv/kubernetes/known_tokens.csv "${token}," "vpa-${component},uid:vpa-${component}"
+      create-vpa-kubeconfig vpa-${component} ${token}
 
       # Prepare manifest
       local src_file="${manifests_dir}/internal-vpa-${component}.manifest"
@@ -84,6 +86,31 @@ EOF
   openssl x509 -req -in ${certs_dir}/server.csr -CA ${certs_dir}/caCert.pem -CAkey ${certs_dir}/caKey.pem -CAcreateserial -out ${certs_dir}/serverCert.pem -days 100000 -extensions v3_req -extfile ${certs_dir}/server.conf
 }
 
+function create-vpa-kubeconfig {
+  component_=$1
+  token_=$2
+  echo "Creating kubeconfig file for VPA component ${component_}"
+  mkdir -p /etc/srv/kubernetes/${component_}
+  cat <<EOF >/etc/srv/kubernetes/${component_}/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: ${component_}
+  user:
+    token: ${token_}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: ${component_}
+  name: ${component_}
+current-context: ${component_}
+EOF
+}
 
 function gke-internal-master-start {
   echo "Internal GKE configuration start"

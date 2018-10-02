@@ -10,7 +10,6 @@
     },
     "spec": {
         "hostNetwork": true,
-	"serviceAccountName": "vpa-recommender",
         "containers": [
             {
                 "name": "vpa-recommender",
@@ -25,16 +24,17 @@
                 },
                 "command": [
                    "./run.sh",
-                    "--kubernetes=http://127.0.0.1:8080?inClusterConfig=f",
+                    "--kubernetes=https://127.0.0.1:443",
+                    "--kubeconfig=/etc/srv/kubernetes/vpa-recommender/kubeconfig",
                     "--v=4",
                     "--logtostderr=true"
                 ],
                 "volumeMounts": [
                     {{cloud_config_mount}}
                     {
-                        "name": "logfile",
-                        "mountPath": "/var/log/vpa-recommender.log",
-                        "readOnly": false
+                        "name": "srvkube",
+                        "readOnly": true,
+                        "mountPath": "/etc/srv/kubernetes/vpa-recommender"
                     }
                 ],
                 "terminationMessagePath": "/dev/termination-log",
@@ -50,10 +50,9 @@
         "volumes": [
             {{cloud_config_volume}}
             {
-                "name": "logfile",
+                "name": "srvkube",
                 "hostPath": {
-                    "path": "/var/log/vpa-recommender.log",
-                    "type": "FileOrCreate"
+                    "path": "/etc/srv/kubernetes/vpa-recommender"
                 }
             }
         ],
