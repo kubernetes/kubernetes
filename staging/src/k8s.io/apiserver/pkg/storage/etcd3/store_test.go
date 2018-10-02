@@ -107,7 +107,7 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("expecting empty result on key: %s", key)
 	}
 
-	err = store.Create(ctx, key, obj, out, 0)
+	err = store.Create(ctx, key, obj, out, nil)
 	if err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
@@ -154,7 +154,8 @@ func TestCreateWithTTL(t *testing.T) {
 	key := "/somekey"
 
 	out := &example.Pod{}
-	if err := store.Create(ctx, key, input, out, 1); err != nil {
+	ttl := uint64(1)
+	if err := store.Create(ctx, key, input, out, &ttl); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
@@ -171,7 +172,7 @@ func TestCreateWithKeyExist(t *testing.T) {
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key, _ := testPropogateStore(ctx, t, store, obj)
 	out := &example.Pod{}
-	err := store.Create(ctx, key, obj, out, 0)
+	err := store.Create(ctx, key, obj, out, nil)
 	if err == nil || !storage.IsNodeExist(err) {
 		t.Errorf("expecting key exists error, but get: %s", err)
 	}
@@ -968,7 +969,7 @@ func TestTransformationFailure(t *testing.T) {
 	}}
 	for i, ps := range preset[:1] {
 		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[:1][i].storedObj, 0)
+		err := store.Create(ctx, ps.key, ps.obj, preset[:1][i].storedObj, nil)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
@@ -979,7 +980,7 @@ func TestTransformationFailure(t *testing.T) {
 	store.transformer = prefixTransformer{prefix: []byte("otherprefix!")}
 	for i, ps := range preset[1:] {
 		preset[1:][i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[1:][i].storedObj, 0)
+		err := store.Create(ctx, ps.key, ps.obj, preset[1:][i].storedObj, nil)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
@@ -1077,7 +1078,7 @@ func TestList(t *testing.T) {
 
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, nil)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
@@ -1382,7 +1383,7 @@ func TestListContinuation(t *testing.T) {
 
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, nil)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
@@ -1493,7 +1494,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 
 	for i, ps := range preset {
 		preset[i].storedObj = &example.Pod{}
-		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, 0)
+		err := store.Create(ctx, ps.key, ps.obj, preset[i].storedObj, nil)
 		if err != nil {
 			t.Fatalf("Set failed: %v", err)
 		}
@@ -1621,7 +1622,7 @@ func testPropogateStore(ctx context.Context, t *testing.T, store *store, obj *ex
 		t.Fatalf("Cleanup failed: %v", err)
 	}
 	setOutput := &example.Pod{}
-	if err := store.Create(ctx, key, obj, setOutput, 0); err != nil {
+	if err := store.Create(ctx, key, obj, setOutput, nil); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 	return key, setOutput

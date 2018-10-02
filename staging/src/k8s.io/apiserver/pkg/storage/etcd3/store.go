@@ -146,7 +146,7 @@ func (s *store) Get(ctx context.Context, key string, resourceVersion string, out
 }
 
 // Create implements storage.Interface.Create.
-func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl *uint64) error {
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
@@ -747,25 +747,34 @@ func (s *store) getStateFromObject(obj runtime.Object) (*objState, error) {
 	return state, nil
 }
 
-func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc, mustCheckData bool) (runtime.Object, uint64, error) {
+func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc, mustCheckData bool) (runtime.Object, *uint64, error) {
 	ret, ttlPtr, err := userUpdate(st.obj, st.meta)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
 
-	var ttl uint64
-	if ttlPtr != nil {
-		// if userUpdate asserts a TTL and we are using a cached object, it means that we passed a zero TTL
-		// to userUpdate as the existing object's TTL (because the cache does not know the TTL value).
-		// send a specific error in this case to signal that we need to get the actual object from etcd
-		// so we can extract the lease's current TTL.  this check assumes that userUpdate will only assert
-		// a non-nil TTL when the associated object actually needs a TTL (or wants to remove a TTL).
-		// registry.Store.Update has the "correct" behavior in this regard.
-		if mustCheckData {
-			return nil, 0, errIncompleteTTL
-		}
-		ttl = *ttlPtr
+	// if userUpdate asserts a TTL and we are using a cached object, it means that we passed a zero TTL
+	// to userUpdate as the existing object's TTL (because the cache does not know the TTL value).
+	// send a specific error in this case to signal that we need to get the actual object from etcd
+	// so we can extract the lease's current TTL.  this check assumes that userUpdate will only assert
+	// a non-nil TTL when the associated object actually needs a TTL (or wants to remove a TTL).
+	// registry.Store.Update has the "correct" behavior in this regard.
+	// see storage.Interface.GuaranteedUpdate for further details.
+	if assertsTTL := ttlPtr != nil; assertsTTL && mustCheckData {
+		return nil, nil, errIncompleteTTL
 	}
+
+	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
+		return nil, nil, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
+	}
+
+	return ret, ttlPtr, nil
+}
+
+// ttlOpts returns client options based on given ttlPtr.
+// ttlPtr: if ttlPtr is non-nil and *ttlPtr is non-zero, it will attach the key to a lease with ttl of roughly the same length
+// if *ttlPtr is the same as st.meta.TTL, reuse the lease specified in st.lease
+func (s *store) ttlOpts(ctx context.Context, ttlPtr *uint64, st *objState) ([]clientv3.OpOption, error) {
 	// when ttlPtr is nil it would be nice to be able to use the value stored in st.meta.TTL
 	// as the TTL.  but the only way for us to know if that value is correct when mustCheckData
 	// is true is to fetch the latest object.  since ttlPtr is almost always nil, we would lose
@@ -774,23 +783,12 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc, mustChe
 	// from the cache and thus would lead to inconsistent behavior (i.e. sometimes we keep the correct
 	// TTL for the object and other times we set the TTL to zero so the object does not expire).
 	// thus for the sake of consistency we assume a nil TTL to mean zero.
-
-	if err := s.versioner.PrepareObjectForStorage(ret); err != nil {
-		return nil, 0, fmt.Errorf("PrepareObjectForStorage failed: %v", err)
-	}
-
-	return ret, ttl, nil
-}
-
-// ttlOpts returns client options based on given ttl.
-// ttl: if ttl is non-zero, it will attach the key to a lease with ttl of roughly the same length
-// if ttl is the same as st.meta.TTL, reuse the lease specified in st.lease
-func (s *store) ttlOpts(ctx context.Context, ttl_ uint64, st *objState) ([]clientv3.OpOption, error) {
-	if ttl_ == 0 {
+	// see storage.Interface.GuaranteedUpdate for further details.
+	if ttlPtr == nil || *ttlPtr == 0 {
 		return nil, nil
 	}
 
-	ttl := int64(ttl_)
+	ttl := int64(*ttlPtr)
 
 	// we want to keep the same TTL as before, so reuse the same lease
 	if st != nil && ttl == st.meta.TTL && st.lease != clientv3.NoLease {

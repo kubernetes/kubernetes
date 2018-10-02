@@ -63,7 +63,7 @@ func TestDryRunCreateDoesntCreate(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, true)
+	err := s.Create(context.Background(), "key", obj, out, nil, true)
 	if err != nil {
 		t.Fatalf("Failed to create new dry-run object: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestDryRunCreateReturnsObject(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, true)
+	err := s.Create(context.Background(), "key", obj, out, nil, true)
 	if err != nil {
 		t.Fatalf("Failed to create new dry-run object: %v", err)
 	}
@@ -98,12 +98,12 @@ func TestDryRunCreateExistingObjectFails(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "key", obj, out, nil, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
 
-	err = s.Create(context.Background(), "key", obj, out, 0, true)
+	err = s.Create(context.Background(), "key", obj, out, nil, true)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyExists {
 		t.Errorf("Expected KeyExists error: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestDryRunUpdatePreconditions(t *testing.T) {
 
 	obj := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"uid": "my-uid"}}`)
 	out := UnstructuredOrDie(`{}`)
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "key", obj, out, nil, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestDryRunUpdateDoesntUpdate(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	created := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, created, 0, false)
+	err := s.Create(context.Background(), "key", obj, created, nil, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestDryRunUpdateReturnsObject(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "key", obj, out, nil, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -228,7 +228,7 @@ func TestDryRunDeleteDoesntDelete(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "key", obj, out, nil, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestDryRunDeleteReturnsObject(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod"}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "key", obj, out, nil, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestDryRunDeletePreconditions(t *testing.T) {
 	obj := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"uid": "my-uid"}}`)
 	out := UnstructuredOrDie(`{}`)
 
-	err := s.Create(context.Background(), "key", obj, out, 0, false)
+	err := s.Create(context.Background(), "key", obj, out, nil, false)
 	if err != nil {
 		t.Fatalf("Failed to create new object: %v", err)
 	}

@@ -279,7 +279,7 @@ func (c *Cacher) Versioner() storage.Versioner {
 }
 
 // Create implements storage.Interface.
-func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object, ttl *uint64) error {
 	return c.storage.Create(ctx, key, obj, out, ttl)
 }
 

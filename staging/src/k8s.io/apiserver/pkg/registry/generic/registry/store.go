@@ -346,13 +346,9 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		return nil, err
 	}
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	var ttl uint64
-	ttlPtr, err := e.calculateTTL(obj, 0, false)
+	ttl, err := e.calculateTTL(obj, 0, false)
 	if err != nil {
 		return nil, err
-	}
-	if ttlPtr != nil {
-		ttl = *ttlPtr
 	}
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {

@@ -33,7 +33,7 @@ func (s *DryRunnableStorage) Versioner() storage.Versioner {
 	return s.Storage.Versioner()
 }
 
-func (s *DryRunnableStorage) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64, dryRun bool) error {
+func (s *DryRunnableStorage) Create(ctx context.Context, key string, obj, out runtime.Object, ttl *uint64, dryRun bool) error {
 	if dryRun {
 		if err := s.Storage.Get(ctx, key, "", out, false); err == nil {
 			return storage.NewKeyExistsError(key, 0)

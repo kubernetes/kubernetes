@@ -107,7 +107,7 @@ func (h *etcdHelper) Versioner() storage.Versioner {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl *uint64) error {
 	trace := utiltrace.New("etcdHelper::Create " + getTypeName(obj))
 	defer trace.LogIfLong(250 * time.Millisecond)
 	if ctx == nil {
@@ -127,9 +127,14 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	}
 	trace.Step("Version checked")
 
+	var ttlDuration time.Duration
+	if ttl != nil {
+		ttlDuration = time.Duration(*ttl) * time.Second
+	}
+
 	startTime := time.Now()
 	opts := etcd.SetOptions{
-		TTL:       time.Duration(ttl) * time.Second,
+		TTL:       ttlDuration,
 		PrevExist: etcd.PrevNoExist,
 	}
 

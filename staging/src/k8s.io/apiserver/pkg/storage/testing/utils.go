@@ -26,8 +26,8 @@ import (
 )
 
 // CreateObj will create a single object using the storage interface
-func CreateObj(helper storage.Interface, name string, obj, out runtime.Object, ttl uint64) error {
-	return helper.Create(context.TODO(), name, obj, out, ttl)
+func CreateObj(helper storage.Interface, name string, obj, out runtime.Object) error {
+	return helper.Create(context.TODO(), name, obj, out, nil)
 }
 
 //CreateObjList will create a list from the array of objects
@@ -38,7 +38,7 @@ func CreateObjList(prefix string, helper storage.Interface, items []runtime.Obje
 		if err != nil {
 			return err
 		}
-		err = CreateObj(helper, path.Join(prefix, meta.GetName()), obj, obj, 0)
+		err = CreateObj(helper, path.Join(prefix, meta.GetName()), obj, obj)
 		if err != nil {
 			return err
 		}
