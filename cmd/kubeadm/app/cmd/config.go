@@ -98,8 +98,10 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 		Aliases: []string{"print-defaults"},
 		Short:   "Print the default values for a kubeadm configuration object.",
 		Long: fmt.Sprintf(dedent.Dedent(`
-			This command prints the default InitConfiguration object that is used for 'kubeadm init' and 'kubeadm upgrade',
+			This command prints objects such as the default InitConfiguration that is used for 'kubeadm init' and 'kubeadm upgrade',
 			and the default JoinConfiguration object that is used for 'kubeadm join'.
+
+			For documentation visit: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3
 
 			Note that sensitive values like the Bootstrap Token fields are replaced with silly values like %q in order to pass validation but
 			not perform the real computation for creating a token.
