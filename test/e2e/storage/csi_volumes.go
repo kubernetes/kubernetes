@@ -58,7 +58,7 @@ var csiTestDrivers = map[string]func(f *framework.Framework, config framework.Vo
 	"gcePD":    initCSIgcePD,
 }
 
-var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
+var _ = utils.SIGDescribe("CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (
@@ -88,15 +88,11 @@ var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
 		createCSICRDs(crdclient)
 	})
 
-	AfterEach(func() {
-		deleteCSICRDs(crdclient)
-	})
-
 	for driverName, initCSIDriver := range csiTestDrivers {
 		curDriverName := driverName
 		curInitCSIDriver := initCSIDriver
 
-		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s [Serial]", curDriverName), func() {
+		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s", curDriverName), func() {
 			var (
 				driver csiTestDriver
 			)
