@@ -21,6 +21,7 @@ go_library(
         "regional_pd.go",
         "subpath.go",
         "volume_expand.go",
+        "volume_limits.go",
         "volume_metrics.go",
         "volume_provisioning.go",
         "volumes.go",
@@ -29,6 +30,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
