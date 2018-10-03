@@ -1500,6 +1500,7 @@
 		},
 		{
 			"ImportPath": "github.com/docker/libnetwork/ipvs",
+			"Comment": "v0.8.0-dev.2-1265-ga9cd636e",
 			"Rev": "a9cd636e37898226332c439363e2ed0ea185ae92"
 		},
 		{
@@ -1541,7 +1542,7 @@
 		},
 		{
 			"ImportPath": "github.com/evanphx/json-patch",
-			"Comment": "v3.0.0-34-g36442db",
+			"Comment": "v4.0.0-3-g36442db",
 			"Rev": "36442dbdb585210f8d5a1b45e67aa323c197d5c4"
 		},
 		{
@@ -1994,43 +1995,43 @@
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/asn1",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/client",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/client/configpb",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/jsonclient",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/tls",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/x509",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/certificate-transparency-go/x509/pkix",
-			"Comment": "v1.0.10",
-			"Rev": "1bec4527572c443752ad4f2830bef88be0533236"
+			"Comment": "v1.0.21",
+			"Rev": "3629d6846518309d22c16fee15d1007262a459d2"
 		},
 		{
 			"ImportPath": "github.com/google/gofuzz",
