@@ -159,12 +159,12 @@ func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod co
 		if err != nil {
 			// can't resolve a named port, or Service did not declare this port, return an error
 			return nil, err
+		}
+
+		if int32(portnum) != containerPort {
+			translated = append(translated, fmt.Sprintf("%s:%d", parts[0], containerPort))
 		} else {
-			if int32(portnum) != containerPort {
-				translated = append(translated, fmt.Sprintf("%s:%d", parts[0], containerPort))
-			} else {
-				translated = append(translated, port)
-			}
+			translated = append(translated, port)
 		}
 	}
 	return translated, nil
