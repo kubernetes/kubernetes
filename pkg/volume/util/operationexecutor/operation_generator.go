@@ -1080,15 +1080,16 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		}
 
 		// The block volume is not referenced from Pods. Release file descriptor lock.
+		// This should be done before calling TearDownDevice, because some plugins that do local detach
+		// in TearDownDevice will fail in detaching device due to the refcnt on the loopback device.
 		glog.V(4).Infof("UnmapDevice: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
 		loopPath, err := og.blkUtil.GetLoopDevice(deviceToDetach.DevicePath)
 		if err != nil {
 			if err.Error() == volumepathhandler.ErrDeviceNotFound {
-				glog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock",
-					fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
+				glog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
 			} else {
-				glog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: GetLoopDevice failed to get loopback device",
-					fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
+				errInfo := "UnmapDevice.GetLoopDevice failed to get loopback device, " + fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)
+				return deviceToDetach.GenerateError(errInfo, err)
 			}
 		} else {
 			if len(loopPath) != 0 {
