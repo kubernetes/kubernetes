@@ -94,6 +94,18 @@ type FeatureGate interface {
 	DeepCopy() FeatureGate
 }
 
+// ReadOnly provides a read-only view of a `FeatureGate`.
+type ReadOnly interface {
+	// Enabled returns true if the key is enabled.
+	Enabled(key Feature) bool
+	// Add adds features to the featureGate.
+	KnownFeatures() []string
+	// DeepCopy returns a deep copy of the FeatureGate object, such that gates can be
+	// set on the copy without mutating the original. This is useful for validating
+	// config against potential feature gate changes before committing those changes.
+	DeepCopy() FeatureGate
+}
+
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
 type featureGate struct {
 	special map[Feature]func(map[Feature]FeatureSpec, map[Feature]bool, bool)
