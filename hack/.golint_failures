@@ -390,7 +390,6 @@ pkg/volume/configmap
 pkg/volume/csi/fake
 pkg/volume/empty_dir
 pkg/volume/fc
-pkg/volume/flexvolume
 pkg/volume/flocker
 pkg/volume/gce_pd
 pkg/volume/git_repo

@@ -46,6 +46,7 @@ type flexVolumeProber struct {
 	eventsMap      map[string]volume.ProbeOperation // the key is the driver directory path, the value is the coresponding operation
 }
 
+// GetDynamicPluginProber creates dynamic plugin prober
 func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
 	return &flexVolumeProber{
 		pluginDir: pluginDir,
