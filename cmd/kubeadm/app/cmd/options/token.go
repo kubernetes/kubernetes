@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )

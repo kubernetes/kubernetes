@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
