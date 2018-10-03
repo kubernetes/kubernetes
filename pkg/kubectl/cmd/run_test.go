@@ -28,17 +28,14 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -120,9 +117,9 @@ func TestGetEnv(t *testing.T) {
 
 func TestRunArgsFollowDashRules(t *testing.T) {
 	one := int32(1)
-	rc := &v1.ReplicationController{
+	rc := &corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
-		Spec: v1.ReplicationControllerSpec{
+		Spec: corev1.ReplicationControllerSpec{
 			Replicas: &one,
 		},
 	}
@@ -169,11 +166,11 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				GroupVersion:         corev1.SchemeGroupVersion,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					if req.URL.Path == "/namespaces/test/replicationcontrollers" {
@@ -230,16 +227,17 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 func TestGenerateService(t *testing.T) {
 	tests := []struct {
+		name             string
 		port             string
 		args             []string
 		serviceGenerator string
 		params           map[string]interface{}
 		expectErr        bool
-		name             string
-		service          api.Service
+		service          corev1.Service
 		expectPOST       bool
 	}{
 		{
+			name:             "basic",
 			port:             "80",
 			args:             []string{"foo"},
 			serviceGenerator: "service/v2",
@@ -247,13 +245,16 @@ func TestGenerateService(t *testing.T) {
 				"name": "foo",
 			},
 			expectErr: false,
-			name:      "basic",
-			service: api.Service{
+			service: corev1.Service{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Service",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
 							Protocol:   "TCP",
@@ -263,13 +264,12 @@ func TestGenerateService(t *testing.T) {
 					Selector: map[string]string{
 						"run": "foo",
 					},
-					Type:            api.ServiceTypeClusterIP,
-					SessionAffinity: api.ServiceAffinityNone,
 				},
 			},
 			expectPOST: true,
 		},
 		{
+			name:             "custom labels",
 			port:             "80",
 			args:             []string{"foo"},
 			serviceGenerator: "service/v2",
@@ -278,14 +278,17 @@ func TestGenerateService(t *testing.T) {
 				"labels": "app=bar",
 			},
 			expectErr: false,
-			name:      "custom labels",
-			service: api.Service{
+			service: corev1.Service{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Service",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "foo",
 					Labels: map[string]string{"app": "bar"},
 				},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
 							Port:       80,
 							Protocol:   "TCP",
@@ -295,8 +298,6 @@ func TestGenerateService(t *testing.T) {
 					Selector: map[string]string{
 						"app": "bar",
 					},
-					Type:            api.ServiceTypeClusterIP,
-					SessionAffinity: api.ServiceAffinityNone,
 				},
 			},
 			expectPOST: true,
@@ -307,6 +308,7 @@ func TestGenerateService(t *testing.T) {
 			expectPOST: false,
 		},
 		{
+			name:             "dry-run",
 			port:             "80",
 			args:             []string{"foo"},
 			serviceGenerator: "service/v2",
@@ -314,7 +316,6 @@ func TestGenerateService(t *testing.T) {
 				"name": "foo",
 			},
 			expectErr:  false,
-			name:       "dry-run",
 			expectPOST: false,
 		},
 	}
@@ -324,16 +325,16 @@ func TestGenerateService(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.ClientConfigVal = defaultClientConfig()
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				GroupVersion:         corev1.SchemeGroupVersion,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
-					case test.expectPOST && m == "POST" && p == "/namespaces/namespace/services":
+					case test.expectPOST && m == "POST" && p == "/namespaces/test/services":
 						sawPOST = true
 						body := objBody(codec, &test.service)
 						data, err := ioutil.ReadAll(req.Body)
@@ -341,14 +342,14 @@ func TestGenerateService(t *testing.T) {
 							t.Fatalf("unexpected error: %v", err)
 						}
 						defer req.Body.Close()
-						svc := &api.Service{}
+						svc := &corev1.Service{}
 						if err := runtime.DecodeInto(codec, data, svc); err != nil {
 							t.Fatalf("unexpected error: %v", err)
 						}
 						// Copy things that are defaulted by the system
 						test.service.Annotations = svc.Annotations
 
-						if !reflect.DeepEqual(&test.service, svc) {
+						if !apiequality.Semantic.DeepEqual(&test.service, svc) {
 							t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
 						}
 						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
@@ -396,7 +397,7 @@ func TestGenerateService(t *testing.T) {
 				test.params["port"] = test.port
 			}
 
-			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params, "namespace")
+			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params, "test")
 			if test.expectErr {
 				if err == nil {
 					t.Error("unexpected non-error")
