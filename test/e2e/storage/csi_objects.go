@@ -535,19 +535,15 @@ func createCSICRDs(c apiextensionsclient.Interface) {
 	}
 
 	for _, crd := range crds {
-		_, err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+		_, err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+		if err == nil {
+			continue
+		} else if !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to check for existing of CSI CRD %q: %v", crd.Name, err)
+		}
+		_, err = c.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 		framework.ExpectNoError(err, "Failed to create CSI CRD %q: %v", crd.Name, err)
 	}
-}
-
-func deleteCSICRDs(c apiextensionsclient.Interface) {
-	By("Deleting CSI CRDs")
-	csiDriverCRDName := csicrd.CSIDriverCRD().Name
-	csiNodeInfoCRDName := csicrd.CSINodeInfoCRD().Name
-	err := c.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(csiDriverCRDName, &metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "Failed to delete CSI CRD %q: %v", csiDriverCRDName, err)
-	err = c.ApiextensionsV1beta1().CustomResourceDefinitions().Delete(csiNodeInfoCRDName, &metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "Failed to delete CSI CRD %q: %v", csiNodeInfoCRDName, err)
 }
 
 func shredFile(filePath string) {

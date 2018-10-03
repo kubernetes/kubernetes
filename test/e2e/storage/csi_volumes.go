@@ -58,7 +58,7 @@ var csiTestDrivers = map[string]func(f *framework.Framework, config framework.Vo
 	"gcePD":    initCSIgcePD,
 }
 
-var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
+var _ = utils.SIGDescribe("CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (
@@ -88,15 +88,11 @@ var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
 		createCSICRDs(crdclient)
 	})
 
-	AfterEach(func() {
-		deleteCSICRDs(crdclient)
-	})
-
 	for driverName, initCSIDriver := range csiTestDrivers {
 		curDriverName := driverName
 		curInitCSIDriver := initCSIDriver
 
-		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s [Serial]", curDriverName), func() {
+		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s", curDriverName), func() {
 			var (
 				driver csiTestDriver
 			)
@@ -406,6 +402,8 @@ func (g *gcePDCSIDriver) createCSIDriver() {
 	g.nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false /* teardown */)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, false, /* teardown */
+		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
 	role := csiControllerRole(cs, config, false)
 	csiControllerRoleBinding(cs, config, false, role, g.controllerServiceAccount)
 	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
@@ -419,6 +417,8 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, true, /* teardown */
+		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
 	role := csiControllerRole(cs, config, true)
 	csiControllerRoleBinding(cs, config, true, role, g.controllerServiceAccount)
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
