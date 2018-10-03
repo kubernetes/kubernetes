@@ -23,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	"strconv"
 )
 
 var (
@@ -553,10 +553,18 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
 		return nil
 	}
-	if err := c.mounter.Unmount(mntPath); err != nil {
-		glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+
+	notMnt, err := c.mounter.IsLikelyNotMountPoint(mntPath)
+	if err != nil {
 		return err
 	}
+	if !notMnt {
+		if err := c.mounter.Unmount(mntPath); err != nil {
+			glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+			return err
+		}
+	}
+
 	// if device is no longer used, see if need to logout the target
 	device, prefix, err := extractDeviceAndPrefix(mntPath)
 	if err != nil {
