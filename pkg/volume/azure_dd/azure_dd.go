@@ -188,7 +188,7 @@ func getMaxDataDiskCount(instanceType string, sizeList *[]compute.VirtualMachine
 			continue
 		}
 		if strings.ToUpper(*size.Name) == vmsize {
-			glog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %s", *size.Name, *size.MaxDataDiskCount)
+			glog.V(2).Infof("got a matching size in getMaxDataDiskCount, Name: %s, MaxDataDiskCount: %d", *size.Name, *size.MaxDataDiskCount)
 			return int64(*size.MaxDataDiskCount)
 		}
 	}

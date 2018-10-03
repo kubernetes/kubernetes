@@ -170,7 +170,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 				volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
 			}
 			if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
-				glog.V(4).Info("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
+				glog.V(4).Infof("NodeSelectorRequirements for cloud labels %v conflict with existing NodeAffinity %v. Skipping addition of NodeSelectorRequirements for cloud labels.",
 					requirements, volume.Spec.NodeAffinity)
 			} else {
 				for _, req := range requirements {
