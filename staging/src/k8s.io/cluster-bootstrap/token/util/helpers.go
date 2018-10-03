@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/bootstrap/token/api"
+	"k8s.io/cluster-bootstrap/token/api"
 )
 
 // validBootstrapTokenChars defines the characters a bootstrap token can consist of
