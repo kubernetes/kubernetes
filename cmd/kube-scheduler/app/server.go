@@ -141,14 +141,24 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	// Build a scheduler config from the provided algorithm source.
-	schedulerConfig, err := NewSchedulerConfig(cc)
-	if err != nil {
-		return err
+	var storageClassInformer storageinformers.StorageClassInformer
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		storageClassInformer = c.InformerFactory.Storage().V1().StorageClasses()
 	}
 
 	// Create the scheduler.
-	sched := scheduler.NewFromConfig(schedulerConfig)
+	sched, err := scheduler.New(c.Client, c.InformerFactory.Core().V1().Nodes(), c.PodInformer,
+		c.InformerFactory.Core().V1().PersistentVolumes(), c.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		c.InformerFactory.Core().V1().ReplicationControllers(), c.InformerFactory.Apps().V1().ReplicaSets(),
+		c.InformerFactory.Apps().V1().StatefulSets(), c.InformerFactory.Core().V1().Services(),
+		c.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(), storageClassInformer, c.Recorder, c.ComponentConfig.AlgorithmSource,
+		scheduler.WithName(c.ComponentConfig.SchedulerName), scheduler.WithHardPodAffinitySymmetricWeight(c.ComponentConfig.HardPodAffinitySymmetricWeight),
+		scheduler.WithEquivalenceClassCacheEnabled(c.ComponentConfig.EnableContentionProfiling),
+		scheduler.WithPreemptionDisabled(c.ComponentConfig.DisablePreemption), scheduler.WithPercentageOfNodesToScore(c.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithBindTimeoutSeconds(*c.ComponentConfig.BindTimeoutSeconds))
+	if err != nil {
+		return err
+	}
 
 	// Prepare the event broadcaster.
 	if cc.Broadcaster != nil && cc.EventClient != nil {
@@ -284,7 +294,7 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 }
 
 // NewSchedulerConfig creates the scheduler configuration. This is exposed for use by tests.
-func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Config, error) {
+func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*factory.Config, error) {
 	var storageClassInformer storageinformers.StorageClassInformer
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		storageClassInformer = s.InformerFactory.Storage().V1().StorageClasses()
@@ -312,7 +322,7 @@ func NewSchedulerConfig(s schedulerserverconfig.CompletedConfig) (*scheduler.Con
 	})
 
 	source := s.ComponentConfig.AlgorithmSource
-	var config *scheduler.Config
+	var config *factory.Config
 	switch {
 	case source.Provider != nil:
 		// Create the config from a named algorithm provider.

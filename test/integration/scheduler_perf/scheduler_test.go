@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	testutils "k8s.io/kubernetes/test/utils"
 	"math"
 	"strconv"
@@ -105,7 +105,7 @@ type testConfig struct {
 	numNodes                  int
 	mutatedNodeTemplate       *v1.Node
 	mutatedPodTemplate        *v1.Pod
-	schedulerSupportFunctions scheduler.Configurator
+	schedulerSupportFunctions factory.Configurator
 	destroyFunc               func()
 }
 

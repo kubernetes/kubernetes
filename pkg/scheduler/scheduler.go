@@ -17,55 +17,46 @@ limitations under the License.
 package scheduler
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	appsinformers "k8s.io/client-go/informers/apps/v1"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"github.com/golang/glog"
 )
 
-// Binder knows how to write a binding.
-type Binder interface {
-	Bind(binding *v1.Binding) error
-}
-
-// PodConditionUpdater updates the condition of a pod based on the passed
-// PodCondition
-type PodConditionUpdater interface {
-	Update(pod *v1.Pod, podCondition *v1.PodCondition) error
-}
-
-// PodPreemptor has methods needed to delete a pod and to update
-// annotations of the preemptor pod.
-type PodPreemptor interface {
-	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
-	DeletePod(pod *v1.Pod) error
-	SetNominatedNodeName(pod *v1.Pod, nominatedNode string) error
-	RemoveNominatedNodeName(pod *v1.Pod) error
-}
+const (
+	// BindTimeoutSeconds defines the default bind timeout
+	BindTimeoutSeconds = 100
+)
 
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
-	config *Config
+	config *factory.Config
 }
 
 // StopEverything closes the scheduler config's StopEverything channel, to shut
@@ -79,81 +70,175 @@ func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
 	return sched.config.SchedulerCache
 }
 
-// Configurator defines I/O, caching, and other functionality needed to
-// construct a new scheduler. An implementation of this can be seen in
-// factory.go.
-type Configurator interface {
-	// Exposed for testing
-	GetHardPodAffinitySymmetricWeight() int32
-	// Exposed for testing
-	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error)
-
-	// Predicate related accessors to be exposed for use by k8s.io/autoscaler/cluster-autoscaler
-	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
-	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
-
-	// Needs to be exposed for things like integration tests where we want to make fake nodes.
-	GetNodeLister() corelisters.NodeLister
-	// Exposed for testing
-	GetClient() clientset.Interface
-	// Exposed for testing
-	GetScheduledPodLister() corelisters.PodLister
-
-	Create() (*Config, error)
-	CreateFromProvider(providerName string) (*Config, error)
-	CreateFromConfig(policy schedulerapi.Policy) (*Config, error)
-	CreateFromKeys(predicateKeys, priorityKeys sets.String, extenders []algorithm.SchedulerExtender) (*Config, error)
+type schedulerOptions struct {
+	schedulerName                  string
+	hardPodAffinitySymmetricWeight int32
+	enableEquivalenceClassCache    bool
+	disablePreemption              bool
+	percentageOfNodesToScore       int32
+	bindTimeoutSeconds             int64
 }
 
-// Config is an implementation of the Scheduler's configured input data.
-// TODO over time we should make this struct a hidden implementation detail of the scheduler.
-type Config struct {
-	// It is expected that changes made via SchedulerCache will be observed
-	// by NodeLister and Algorithm.
-	SchedulerCache schedulerinternalcache.Cache
-	// Ecache is used for optimistically invalid affected cache items after
-	// successfully binding a pod
-	Ecache     *equivalence.Cache
-	NodeLister algorithm.NodeLister
-	Algorithm  algorithm.ScheduleAlgorithm
-	GetBinder  func(pod *v1.Pod) Binder
-	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
-	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
-	// handler so that binding and setting PodCondition it is atomic.
-	PodConditionUpdater PodConditionUpdater
-	// PodPreemptor is used to evict pods and update pod annotations.
-	PodPreemptor PodPreemptor
+// Option configures a Scheduler
+type Option func(*schedulerOptions)
 
-	// NextPod should be a function that blocks until the next pod
-	// is available. We don't use a channel for this, because scheduling
-	// a pod may take some amount of time and we don't want pods to get
-	// stale while they sit in a channel.
-	NextPod func() *v1.Pod
+// WithName sets schedulerName for Scheduler, the default schedulerName is default-scheduler
+func WithName(schedulerName string) Option {
+	return func(o *schedulerOptions) {
+		o.schedulerName = schedulerName
+	}
+}
 
-	// WaitForCacheSync waits for scheduler cache to populate.
-	// It returns true if it was successful, false if the controller should shutdown.
-	WaitForCacheSync func() bool
+// WithHardPodAffinitySymmetricWeight sets hardPodAffinitySymmetricWeight for Scheduler, the default value is 1
+func WithHardPodAffinitySymmetricWeight(hardPodAffinitySymmetricWeight int32) Option {
+	return func(o *schedulerOptions) {
+		o.hardPodAffinitySymmetricWeight = hardPodAffinitySymmetricWeight
+	}
+}
 
-	// Error is called if there is an error. It is passed the pod in
-	// question, and the error
-	Error func(*v1.Pod, error)
+// WithEquivalenceClassCacheEnabled sets enableEquivalenceClassCache for Scheduler, the default value is false
+func WithEquivalenceClassCacheEnabled(enableEquivalenceClassCache bool) Option {
+	return func(o *schedulerOptions) {
+		o.enableEquivalenceClassCache = enableEquivalenceClassCache
+	}
+}
 
-	// Recorder is the EventRecorder to use
-	Recorder record.EventRecorder
+// WithPreemptionDisabled sets disablePreemption for Scheduler, the default value is false
+func WithPreemptionDisabled(disablePreemption bool) Option {
+	return func(o *schedulerOptions) {
+		o.disablePreemption = disablePreemption
+	}
+}
 
-	// Close this to shut down the scheduler.
-	StopEverything chan struct{}
+// WithPercentageOfNodesToScore sets percentageOfNodesToScore for Scheduler, the default value is 50
+func WithPercentageOfNodesToScore(percentageOfNodesToScore int32) Option {
+	return func(o *schedulerOptions) {
+		o.percentageOfNodesToScore = percentageOfNodesToScore
+	}
+}
 
-	// VolumeBinder handles PVC/PV binding for the pod.
-	VolumeBinder *volumebinder.VolumeBinder
+// WithBindTimeoutSeconds sets bindTimeoutSeconds for Scheduler, the default value is 100
+func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.bindTimeoutSeconds = bindTimeoutSeconds
+	}
+}
 
-	// Disable pod preemption or not.
-	DisablePreemption bool
+var defaultSchedulerOptions = schedulerOptions{
+	schedulerName:                  v1.DefaultSchedulerName,
+	hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+	enableEquivalenceClassCache:    false,
+	disablePreemption:              false,
+	percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+	bindTimeoutSeconds:             BindTimeoutSeconds,
+}
+
+// New returns a Scheduler
+// TODO：Once we have the nice constructor，we should modify cmd/kube-scheduler to use it.
+func New(client clientset.Interface,
+	nodeInformer coreinformers.NodeInformer,
+	podInformer coreinformers.PodInformer,
+	pvInformer coreinformers.PersistentVolumeInformer,
+	pvcInformer coreinformers.PersistentVolumeClaimInformer,
+	replicationControllerInformer coreinformers.ReplicationControllerInformer,
+	replicaSetInformer appsinformers.ReplicaSetInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
+	serviceInformer coreinformers.ServiceInformer,
+	pdbInformer policyinformers.PodDisruptionBudgetInformer,
+	storageClassInformer storageinformers.StorageClassInformer,
+	recorder record.EventRecorder,
+	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
+	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
+
+	options := defaultSchedulerOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	// Set up the configurator which can create schedulers from configs.
+	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+		SchedulerName:                  options.schedulerName,
+		Client:                         client,
+		NodeInformer:                   nodeInformer,
+		PodInformer:                    podInformer,
+		PvInformer:                     pvInformer,
+		PvcInformer:                    pvcInformer,
+		ReplicationControllerInformer:  replicationControllerInformer,
+		ReplicaSetInformer:             replicaSetInformer,
+		StatefulSetInformer:            statefulSetInformer,
+		ServiceInformer:                serviceInformer,
+		PdbInformer:                    pdbInformer,
+		StorageClassInformer:           storageClassInformer,
+		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
+		EnableEquivalenceClassCache:    options.enableEquivalenceClassCache,
+		DisablePreemption:              options.disablePreemption,
+		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
+		BindTimeoutSeconds:             options.bindTimeoutSeconds,
+	})
+	var config *factory.Config
+	source := schedulerAlgorithmSource
+	switch {
+	case source.Provider != nil:
+		// Create the config from a named algorithm provider.
+		sc, err := configurator.CreateFromProvider(*source.Provider)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
+		}
+		config = sc
+	case source.Policy != nil:
+		// Create the config from a user specified policy source.
+		policy := &schedulerapi.Policy{}
+		switch {
+		case source.Policy.File != nil:
+			// Use a policy serialized in a file.
+			policyFile := source.Policy.File.Path
+			_, err := os.Stat(policyFile)
+			if err != nil {
+				return nil, fmt.Errorf("missing policy config file %s", policyFile)
+			}
+			data, err := ioutil.ReadFile(policyFile)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't read policy config: %v", err)
+			}
+			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+			if err != nil {
+				return nil, fmt.Errorf("invalid policy: %v", err)
+			}
+		case source.Policy.ConfigMap != nil:
+			// Use a policy serialized in a config map value.
+			policyRef := source.Policy.ConfigMap
+			policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(policyRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
+			}
+			data, found := policyConfigMap.Data[kubeschedulerconfig.SchedulerPolicyConfigMapKey]
+			if !found {
+				return nil, fmt.Errorf("missing policy config map value at key %q", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
+			}
+			err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+			if err != nil {
+				return nil, fmt.Errorf("invalid policy: %v", err)
+			}
+		}
+		sc, err := configurator.CreateFromConfig(*policy)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
+		}
+		config = sc
+	default:
+		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
+	}
+	// Additional tweaks to the config produced by the configurator.
+	config.Recorder = recorder
+	config.DisablePreemption = options.disablePreemption
+	// Create the scheduler.
+	sched := NewFromConfig(config)
+	return sched, nil
 }
 
 // NewFromConfigurator returns a new scheduler that is created entirely by the Configurator.  Assumes Create() is implemented.
 // Supports intermediate Config mutation for now if you provide modifier functions which will run after Config is created.
-func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Scheduler, error) {
+func NewFromConfigurator(c factory.Configurator, modifiers ...func(c *factory.Config)) (*Scheduler, error) {
 	cfg, err := c.Create()
 	if err != nil {
 		return nil, err
@@ -171,7 +256,7 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 }
 
 // NewFromConfig returns a new scheduler using the provided Config.
-func NewFromConfig(config *Config) *Scheduler {
+func NewFromConfig(config *factory.Config) *Scheduler {
 	metrics.Register()
 	return &Scheduler{
 		config: config,
@@ -188,7 +273,7 @@ func (sched *Scheduler) Run() {
 }
 
 // Config returns scheduler's config pointer. It is exposed for testing purposes.
-func (sched *Scheduler) Config() *Config {
+func (sched *Scheduler) Config() *factory.Config {
 	return sched.config
 }
 
