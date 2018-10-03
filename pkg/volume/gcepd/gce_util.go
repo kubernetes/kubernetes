@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_pd
+package gcepd
 
 import (
 	"fmt"
@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	diskByIdPath         = "/dev/disk/by-id/"
+	diskByIDPath         = "/dev/disk/by-id/"
 	diskGooglePrefix     = "google-"
 	diskScsiGooglePrefix = "scsi-0Google_PersistentDisk_"
 	diskPartitionSuffix  = "-part"
@@ -61,14 +61,17 @@ const (
 var (
 	// errorSleepDuration is modified only in unit tests and should be constant
 	// otherwise.
-	errorSleepDuration time.Duration = 5 * time.Second
+	errorSleepDuration = 5 * time.Second
 
 	// regex to parse scsi_id output and extract the serial
 	scsiRegex = regexp.MustCompile(scsiPattern)
 )
 
+// GCEDiskUtil provides operation for GCE PD
 type GCEDiskUtil struct{}
 
+// DeleteVolume deletes a GCE PD
+// Returns: error
 func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 	cloud, err := getCloudProvider(d.gcePersistentDisk.plugin.host.GetCloudProvider())
 	if err != nil {
@@ -87,7 +90,7 @@ func (util *GCEDiskUtil) DeleteVolume(d *gcePersistentDiskDeleter) error {
 
 // CreateVolume creates a GCE PD.
 // Returns: gcePDName, volumeSizeGB, labels, fsType, error
-func (gceutil *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (string, int, map[string]string, string, error) {
+func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (string, int, map[string]string, string, error) {
 	cloud, err := getCloudProvider(c.gcePersistentDisk.plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", 0, nil, "", err
@@ -248,7 +251,7 @@ func getScsiSerial(devicePath, diskName string) (string, error) {
 		"--whitelisted",
 		fmt.Sprintf("--device=%v", devicePath)).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("scsi_id failed for device %q with %v.", devicePath, err)
+		return "", fmt.Errorf("scsi_id failed for device %q with %v", devicePath, err)
 	}
 
 	return parseScsiSerial(string(out))
@@ -265,10 +268,10 @@ func parseScsiSerial(output string) (string, error) {
 }
 
 // Returns list of all /dev/disk/by-id/* paths for given PD.
-func getDiskByIdPaths(pdName string, partition string) []string {
+func getDiskByIDPaths(pdName string, partition string) []string {
 	devicePaths := []string{
-		path.Join(diskByIdPath, diskGooglePrefix+pdName),
-		path.Join(diskByIdPath, diskScsiGooglePrefix+pdName),
+		path.Join(diskByIDPath, diskGooglePrefix+pdName),
+		path.Join(diskByIDPath, diskScsiGooglePrefix+pdName),
 	}
 
 	if partition != "" {
@@ -305,7 +308,7 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.GCECloud
 func udevadmChangeToNewDrives(sdBeforeSet sets.String) error {
 	sdAfter, err := filepath.Glob(diskSDPattern)
 	if err != nil {
-		return fmt.Errorf("Error filepath.Glob(\"%s\"): %v\r\n", diskSDPattern, err)
+		return fmt.Errorf("error filepath.Glob(\"%s\"): %v\r", diskSDPattern, err)
 	}
 
 	for _, sd := range sdAfter {
@@ -326,13 +329,13 @@ func udevadmChangeToDrive(drivePath string) error {
 	// Evaluate symlink, if any
 	drive, err := filepath.EvalSymlinks(drivePath)
 	if err != nil {
-		return fmt.Errorf("udevadmChangeToDrive: filepath.EvalSymlinks(%q) failed with %v.", drivePath, err)
+		return fmt.Errorf("udevadmChangeToDrive: filepath.EvalSymlinks(%q) failed with %v", drivePath, err)
 	}
 	glog.V(5).Infof("udevadmChangeToDrive: symlink path is %q", drive)
 
 	// Check to make sure input is "/dev/sd*"
 	if !strings.Contains(drive, diskSDPath) {
-		return fmt.Errorf("udevadmChangeToDrive: expected input in the form \"%s\" but drive is %q.", diskSDPattern, drive)
+		return fmt.Errorf("udevadmChangeToDrive: expected input in the form \"%s\" but drive is %q", diskSDPattern, drive)
 	}
 
 	// Call "udevadm trigger --action=change --property-match=DEVNAME=/dev/sd..."
@@ -342,7 +345,7 @@ func udevadmChangeToDrive(drivePath string) error {
 		"--action=change",
 		fmt.Sprintf("--property-match=DEVNAME=%s", drive)).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("udevadmChangeToDrive: udevadm trigger failed for drive %q with %v.", drive, err)
+		return fmt.Errorf("udevadmChangeToDrive: udevadm trigger failed for drive %q with %v", drive, err)
 	}
 	return nil
 }

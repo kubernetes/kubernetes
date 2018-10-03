@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package gce_pd contains the internal representation of GCE PersistentDisk
+// Package gcepd contains the internal representation of GCE PersistentDisk
 // volumes.
-package gce_pd // import "k8s.io/kubernetes/pkg/volume/gce_pd"
+package gcepd // import "k8s.io/kubernetes/pkg/volume/gcepd"
