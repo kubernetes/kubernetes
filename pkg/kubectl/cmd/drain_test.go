@@ -46,7 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -243,7 +242,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("replicationcontrollers", "rc"),
 		},
 		Spec: corev1.ReplicationControllerSpec{
 			Selector: labels,
@@ -256,7 +254,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -278,7 +275,6 @@ func TestDrain(t *testing.T) {
 			Name:              "ds",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          testapi.Default.SelfLink("daemonsets", "ds"),
 		},
 		Spec: extensionsv1beta1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -291,7 +287,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "extensions/v1beta1",
@@ -313,7 +308,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "extensions/v1beta1",
@@ -338,7 +332,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "extensions/v1beta1",
@@ -366,7 +359,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 		},
 		Spec: corev1.PodSpec{
 			NodeName: "node",
@@ -378,7 +370,6 @@ func TestDrain(t *testing.T) {
 			Name:              "job",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          testapi.Default.SelfLink("jobs", "job"),
 		},
 		Spec: batchv1.JobSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -391,7 +382,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -419,7 +409,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -450,7 +439,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("replicasets", "rs"),
 		},
 		Spec: extensionsv1beta1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
@@ -463,7 +451,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -763,13 +750,13 @@ func TestDrain(t *testing.T) {
 						case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
 							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.rcs[0])}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &extensionsv1beta1.DaemonSet{})}, nil
+							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &extensionsv1beta1.DaemonSet{})}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Batch.Codec(), &job)}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.replicaSets[0])}, nil
 						case m.isFor("GET", "/namespaces/default/pods/bar"):
 							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
 						case m.isFor("GET", "/pods"):
@@ -811,7 +798,7 @@ func TestDrain(t *testing.T) {
 							return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
 						case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
 							evicted = true
-							return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: policyObjBody(&policyv1beta1.Eviction{})}, nil
+							return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &policyv1beta1.Eviction{})}, nil
 						default:
 							t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 							return nil, nil
