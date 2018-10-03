@@ -275,6 +275,14 @@ function install-exec-auth-plugin {
   download-or-bust "${plugin_sha1}" "${plugin_url}"
   mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
   chmod a+x "${KUBE_BIN}/gke-exec-auth-plugin"
+
+  if [[ ! "${EXEC_AUTH_PLUGIN_LICENSE_URL:-}" ]]; then
+      return
+  fi
+  local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
+  echo "Downloading gke-exec-auth-plugin license"
+  download-or-bust "" "${license_url}"
+  mv "${KUBE_HOME}/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
 }
 
 function install-kube-manifests {
@@ -421,6 +429,7 @@ function install-kube-binary-config {
   install-crictl
 
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
+    # TODO(awly): include the binary and license in the OS image.
     install-exec-auth-plugin
   fi
 
