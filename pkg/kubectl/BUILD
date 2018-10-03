@@ -36,8 +36,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/testing:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
