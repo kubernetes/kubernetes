@@ -38,6 +38,7 @@ import (
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -104,6 +105,31 @@ var (
 			Once you have found the failing container, you can inspect its logs with:
 			- 'docker logs CONTAINERID'
 		`)))
+
+	shortDescription = "Run this command in order to set up the Kubernetes master."
+
+	longDescription = shortDescription + "\n" + dedent.Dedent(`
+		kubeadm init provides you with the optional workflow of executing the init phases separately.
+
+		To execute a certain phase you can call:
+			kubeadm init phase <phase-sub-command>
+
+		The default execution order of phases is the following:
+			* preflight
+			* kubelet (write config and restart the kubelet)
+			* certs
+			* kubeconfig
+			* controlplane
+			* etcd
+			* upload-config
+			* kubelet (create config map)
+			* mark-master
+			* bootstrap-token
+			* addons
+
+		For more information on phases have a look at:
+			kubeadm init phase --help
+	`)
 )
 
 // NewCmdInit returns "kubeadm init" command.
@@ -122,7 +148,8 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this command in order to set up the Kubernetes master.",
+		Short: shortDescription,
+		Long:  longDescription,
 		Run: func(cmd *cobra.Command, args []string) {
 
 			kubeadmscheme.Scheme.Default(externalcfg)
@@ -146,6 +173,8 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
+
+	cmd.AddCommand(phases.NewCmdPhase(out))
 
 	AddInitConfigFlags(cmd.PersistentFlags(), externalcfg, &featureGatesString)
 	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipTokenPrint, &dryRun, &ignorePreflightErrors)
