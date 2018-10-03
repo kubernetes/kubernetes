@@ -262,6 +262,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if err != nil {
 		return nil, err
 	}
+	versionedCreateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("CreateOptions"))
+	if err != nil {
+		return nil, err
+	}
+	versionedUpdateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("UpdateOptions"))
+	if err != nil {
+		return nil, err
+	}
 
 	var versionedDeleteOptions runtime.Object
 	var versionedDeleterObject interface{}
@@ -651,6 +659,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusCreated, "Created", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
+			if err := addObjectParams(ws, route, versionedUpdateOptions); err != nil {
+				return nil, err
+			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "PATCH": // Partially update a resource
@@ -673,6 +684,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusOK, "OK", producedObject).
 				Reads(metav1.Patch{}).
 				Writes(producedObject)
+			if err := addObjectParams(ws, route, versionedUpdateOptions); err != nil {
+				return nil, err
+			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "POST": // Create a resource.
@@ -700,6 +714,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusAccepted, "Accepted", producedObject).
 				Reads(defaultVersionedObject).
 				Writes(producedObject)
+			if err := addObjectParams(ws, route, versionedCreateOptions); err != nil {
+				return nil, err
+			}
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "DELETE": // Delete a resource.
