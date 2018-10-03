@@ -28,12 +28,12 @@ import (
 	"strings"
 	"testing"
 
-	apiapps "k8s.io/api/apps/v1"
-	apiautoscaling "k8s.io/api/autoscaling/v1"
-	apibatchv1 "k8s.io/api/batch/v1"
-	apibatchv1beta1 "k8s.io/api/batch/v1beta1"
-	api "k8s.io/api/core/v1"
-	apiextensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,7 +48,6 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -59,6 +58,9 @@ import (
 var openapiSchemaPath = filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")
 
 var unstructuredSerializer = resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer
+
+var grace = int64(30)
+var enableServiceLinks = corev1.DefaultEnableServiceLinks
 
 func defaultHeader() http.Header {
 	header := http.Header{}
@@ -72,7 +74,7 @@ func defaultClientConfig() *restclient.Config {
 		ContentConfig: restclient.ContentConfig{
 			NegotiatedSerializer: scheme.Codecs,
 			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &schema.GroupVersion{Group: "", Version: "v1"},
+			GroupVersion:         &corev1.SchemeGroupVersion,
 		},
 	}
 }
@@ -91,46 +93,58 @@ func initTestErrorHandler(t *testing.T) {
 	})
 }
 
-func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
-	pods := &api.PodList{
+func testData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {
+	pods := &corev1.PodList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
-		Items: []api.Pod{
+		Items: []corev1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec:       apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec:       apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 	}
-	svc := &api.ServiceList{
+	svc := &corev1.ServiceList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "16",
 		},
-		Items: []api.Service{
+		Items: []corev1.Service{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					SessionAffinity: "None",
-					Type:            api.ServiceTypeClusterIP,
+					Type:            corev1.ServiceTypeClusterIP,
 				},
 			},
 		},
 	}
 
 	one := int32(1)
-	rc := &api.ReplicationControllerList{
+	rc := &corev1.ReplicationControllerList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "17",
 		},
-		Items: []api.ReplicationController{
+		Items: []corev1.ReplicationController{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
-				Spec: api.ReplicationControllerSpec{
+				Spec: corev1.ReplicationControllerSpec{
 					Replicas: &one,
 				},
 			},
@@ -139,30 +153,30 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
-func testComponentStatusData() *api.ComponentStatusList {
-	good := api.ComponentStatus{
-		Conditions: []api.ComponentCondition{
-			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok"},
+func testComponentStatusData() *corev1.ComponentStatusList {
+	good := corev1.ComponentStatus{
+		Conditions: []corev1.ComponentCondition{
+			{Type: corev1.ComponentHealthy, Status: corev1.ConditionTrue, Message: "ok"},
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: "servergood"},
 	}
 
-	bad := api.ComponentStatus{
-		Conditions: []api.ComponentCondition{
-			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
+	bad := corev1.ComponentStatus{
+		Conditions: []corev1.ComponentCondition{
+			{Type: corev1.ComponentHealthy, Status: corev1.ConditionFalse, Message: "", Error: "bad status: 500"},
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: "serverbad"},
 	}
 
-	unknown := api.ComponentStatus{
-		Conditions: []api.ComponentCondition{
-			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
+	unknown := corev1.ComponentStatus{
+		Conditions: []corev1.ComponentCondition{
+			{Type: corev1.ComponentHealthy, Status: corev1.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: "serverunknown"},
 	}
 
-	return &api.ComponentStatusList{
-		Items: []api.ComponentStatus{good, bad, unknown},
+	return &corev1.ComponentStatusList{
+		Items: []corev1.ComponentStatus{good, bad, unknown},
 	}
 }
 
@@ -223,12 +237,12 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 func TestGetSchemaObject(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	codec := scheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"})
-	t.Logf("%v", string(runtime.EncodeOrDie(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})))
+	codec := scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
+	t.Logf("%v", string(runtime.EncodeOrDie(codec, &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})))
 
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
 	tf.ClientConfigVal = defaultClientConfig()
 
@@ -353,12 +367,8 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
-	}
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	tf.UnstructuredClient = &fake.RESTClient{
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
@@ -366,23 +376,23 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 			case p == "/namespaces/test/pods" && m == "GET":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationControllerList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.ReplicationControllerList{})}, nil
 			case p == "/namespaces/test/services" && m == "GET":
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svcs)}, nil
 			case p == "/namespaces/test/statefulsets" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &apiapps.StatefulSetList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &appsv1.StatefulSetList{})}, nil
 			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &apiautoscaling.HorizontalPodAutoscalerList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &autoscalingv1.HorizontalPodAutoscalerList{})}, nil
 			case p == "/namespaces/test/jobs" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &apibatchv1.JobList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &batchv1.JobList{})}, nil
 			case p == "/namespaces/test/cronjobs" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &apibatchv1beta1.CronJobList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &batchv1beta1.CronJobList{})}, nil
 			case p == "/namespaces/test/daemonsets" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &apiapps.DaemonSetList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &appsv1.DaemonSetList{})}, nil
 			case p == "/namespaces/test/deployments" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &apiextensionsv1beta1.DeploymentList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &extensionsv1beta1.DeploymentList{})}, nil
 			case p == "/namespaces/test/replicasets" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &apiextensionsv1beta1.ReplicaSetList{})}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &extensionsv1beta1.ReplicaSetList{})}, nil
 
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
@@ -436,14 +446,14 @@ foo    0/0              0          <unknown>   <none>
 func TestGetObjectIgnoreNotFound(t *testing.T) {
 	initTestErrorHandler(t)
 
-	ns := &api.NamespaceList{
+	ns := &corev1.NamespaceList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
 		},
-		Items: []api.Namespace{
+		Items: []corev1.Namespace{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "testns", Namespace: "test", ResourceVersion: "11"},
-				Spec:       api.NamespaceSpec{},
+				Spec:       corev1.NamespaceSpec{},
 			},
 		},
 	}
@@ -480,22 +490,40 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 }
 
 func TestGetSortedObjects(t *testing.T) {
-	pods := &api.PodList{
+	pods := &corev1.PodList{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "15",
 		},
-		Items: []api.Pod{
+		Items: []corev1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
-				Spec:       apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
-				Spec:       apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
-				Spec:       apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 	}
@@ -508,7 +536,7 @@ func TestGetSortedObjects(t *testing.T) {
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
-	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &corev1.SchemeGroupVersion}}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -530,17 +558,35 @@ c      0/0              0          <unknown>
 
 func sortTestData() []runtime.Object {
 	return []runtime.Object{
-		&api.Pod{
+		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
-			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+			Spec: corev1.PodSpec{
+				RestartPolicy:                 corev1.RestartPolicyAlways,
+				DNSPolicy:                     corev1.DNSClusterFirst,
+				TerminationGracePeriodSeconds: &grace,
+				SecurityContext:               &corev1.PodSecurityContext{},
+				EnableServiceLinks:            &enableServiceLinks,
+			},
 		},
-		&api.Pod{
+		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
-			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+			Spec: corev1.PodSpec{
+				RestartPolicy:                 corev1.RestartPolicyAlways,
+				DNSPolicy:                     corev1.DNSClusterFirst,
+				TerminationGracePeriodSeconds: &grace,
+				SecurityContext:               &corev1.PodSecurityContext{},
+				EnableServiceLinks:            &enableServiceLinks,
+			},
 		},
-		&api.Pod{
+		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
-			Spec:       apitesting.V1DeepEqualSafePodSpec(),
+			Spec: corev1.PodSpec{
+				RestartPolicy:                 corev1.RestartPolicyAlways,
+				DNSPolicy:                     corev1.DNSClusterFirst,
+				TerminationGracePeriodSeconds: &grace,
+				SecurityContext:               &corev1.PodSecurityContext{},
+				EnableServiceLinks:            &enableServiceLinks,
+			},
 		},
 	}
 }
@@ -552,25 +598,43 @@ func sortTestTableData() []runtime.Object {
 			Rows: []metav1beta1.TableRow{
 				{
 					Object: runtime.RawExtension{
-						Object: &api.Pod{
+						Object: &corev1.Pod{
 							ObjectMeta: metav1.ObjectMeta{Name: "c", Namespace: "test", ResourceVersion: "10"},
-							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+							Spec: corev1.PodSpec{
+								RestartPolicy:                 corev1.RestartPolicyAlways,
+								DNSPolicy:                     corev1.DNSClusterFirst,
+								TerminationGracePeriodSeconds: &grace,
+								SecurityContext:               &corev1.PodSecurityContext{},
+								EnableServiceLinks:            &enableServiceLinks,
+							},
 						},
 					},
 				},
 				{
 					Object: runtime.RawExtension{
-						Object: &api.Pod{
+						Object: &corev1.Pod{
 							ObjectMeta: metav1.ObjectMeta{Name: "b", Namespace: "test", ResourceVersion: "11"},
-							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+							Spec: corev1.PodSpec{
+								RestartPolicy:                 corev1.RestartPolicyAlways,
+								DNSPolicy:                     corev1.DNSClusterFirst,
+								TerminationGracePeriodSeconds: &grace,
+								SecurityContext:               &corev1.PodSecurityContext{},
+								EnableServiceLinks:            &enableServiceLinks,
+							},
 						},
 					},
 				},
 				{
 					Object: runtime.RawExtension{
-						Object: &api.Pod{
+						Object: &corev1.Pod{
 							ObjectMeta: metav1.ObjectMeta{Name: "a", Namespace: "test", ResourceVersion: "9"},
-							Spec:       apitesting.V1DeepEqualSafePodSpec(),
+							Spec: corev1.PodSpec{
+								RestartPolicy:                 corev1.RestartPolicyAlways,
+								DNSPolicy:                     corev1.DNSClusterFirst,
+								TerminationGracePeriodSeconds: &grace,
+								SecurityContext:               &corev1.PodSecurityContext{},
+								EnableServiceLinks:            &enableServiceLinks,
+							},
 						},
 					},
 				},
@@ -620,7 +684,7 @@ func TestRuntimeSorter(t *testing.T) {
 			objs:  sortTestData(),
 			op: func(sorter *RuntimeSorter, objs []runtime.Object, out io.Writer) error {
 				for _, o := range objs {
-					fmt.Fprintf(out, "%s,", o.(*api.Pod).Name)
+					fmt.Fprintf(out, "%s,", o.(*corev1.Pod).Name)
 				}
 				return nil
 			},
@@ -1040,7 +1104,7 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 
 func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	_, svc, _ := testData()
-	node := &api.Node{
+	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
@@ -1081,15 +1145,21 @@ node/foo   Unknown   <none>   <unknown>
 	}
 }
 
-func watchTestData() ([]api.Pod, []watch.Event) {
-	pods := []api.Pod{
+func watchTestData() ([]corev1.Pod, []watch.Event) {
+	pods := []corev1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            "bar",
 				Namespace:       "test",
 				ResourceVersion: "9",
 			},
-			Spec: apitesting.V1DeepEqualSafePodSpec(),
+			Spec: corev1.PodSpec{
+				RestartPolicy:                 corev1.RestartPolicyAlways,
+				DNSPolicy:                     corev1.DNSClusterFirst,
+				TerminationGracePeriodSeconds: &grace,
+				SecurityContext:               &corev1.PodSecurityContext{},
+				EnableServiceLinks:            &enableServiceLinks,
+			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1097,54 +1167,84 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 				Namespace:       "test",
 				ResourceVersion: "10",
 			},
-			Spec: apitesting.V1DeepEqualSafePodSpec(),
+			Spec: corev1.PodSpec{
+				RestartPolicy:                 corev1.RestartPolicyAlways,
+				DNSPolicy:                     corev1.DNSClusterFirst,
+				TerminationGracePeriodSeconds: &grace,
+				SecurityContext:               &corev1.PodSecurityContext{},
+				EnableServiceLinks:            &enableServiceLinks,
+			},
 		},
 	}
 	events := []watch.Event{
 		// current state events
 		{
 			Type: watch.Added,
-			Object: &api.Pod{
+			Object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "bar",
 					Namespace:       "test",
 					ResourceVersion: "9",
 				},
-				Spec: apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 		{
 			Type: watch.Added,
-			Object: &api.Pod{
+			Object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					Namespace:       "test",
 					ResourceVersion: "10",
 				},
-				Spec: apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 		// resource events
 		{
 			Type: watch.Modified,
-			Object: &api.Pod{
+			Object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					Namespace:       "test",
 					ResourceVersion: "11",
 				},
-				Spec: apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 		{
 			Type: watch.Deleted,
-			Object: &api.Pod{
+			Object: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "foo",
 					Namespace:       "test",
 					ResourceVersion: "12",
 				},
-				Spec: apitesting.V1DeepEqualSafePodSpec(),
+				Spec: corev1.PodSpec{
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					TerminationGracePeriodSeconds: &grace,
+					SecurityContext:               &corev1.PodSecurityContext{},
+					EnableServiceLinks:            &enableServiceLinks,
+				},
 			},
 		},
 	}
@@ -1158,7 +1258,7 @@ func TestWatchLabelSelector(t *testing.T) {
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	podList := &api.PodList{
+	podList := &corev1.PodList{
 		Items: pods,
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "10",
@@ -1209,7 +1309,7 @@ func TestWatchFieldSelector(t *testing.T) {
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	podList := &api.PodList{
+	podList := &corev1.PodList{
 		Items: pods,
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "10",
@@ -1389,7 +1489,7 @@ func TestWatchOnlyList(t *testing.T) {
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	podList := &api.PodList{
+	podList := &corev1.PodList{
 		Items: pods,
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: "10",
