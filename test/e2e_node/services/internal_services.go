@@ -17,9 +17,11 @@ limitations under the License.
 package services
 
 import (
-	"io/ioutil"
 	"os"
+	"testing"
 
+	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/golang/glog"
@@ -29,7 +31,8 @@ import (
 type e2eServices struct {
 	rmDirs []string
 	// statically linked e2e services
-	etcdServer   *EtcdServer
+	etcdServer   *etcdtesting.EtcdTestServer
+	etcdStorage  *storagebackend.Config
 	apiServer    *APIServer
 	nsController *NamespaceController
 }
@@ -40,9 +43,9 @@ func newE2EServices() *e2eServices {
 
 // run starts all e2e services and wait for the termination signal. Once receives the
 // termination signal, it will stop the e2e services gracefully.
-func (es *e2eServices) run() error {
-	defer es.stop()
-	if err := es.start(); err != nil {
+func (es *e2eServices) run(t *testing.T) error {
+	defer es.stop(t)
+	if err := es.start(t); err != nil {
 		return err
 	}
 	// Wait until receiving a termination signal.
@@ -51,13 +54,13 @@ func (es *e2eServices) run() error {
 }
 
 // start starts the tests embedded services or returns an error.
-func (es *e2eServices) start() error {
+func (es *e2eServices) start(t *testing.T) error {
 	glog.Info("Starting e2e services...")
-	err := es.startEtcd()
+	err := es.startEtcd(t)
 	if err != nil {
 		return err
 	}
-	err = es.startApiServer()
+	err = es.startApiServer(es.etcdStorage)
 	if err != nil {
 		return err
 	}
@@ -70,7 +73,7 @@ func (es *e2eServices) start() error {
 }
 
 // stop stops the embedded e2e services.
-func (es *e2eServices) stop() {
+func (es *e2eServices) stop(t *testing.T) {
 	glog.Info("Stopping e2e services...")
 	// TODO(random-liu): Use a loop to stop all services after introducing
 	// service interface.
@@ -90,9 +93,7 @@ func (es *e2eServices) stop() {
 
 	glog.Info("Stopping etcd")
 	if es.etcdServer != nil {
-		if err := es.etcdServer.Stop(); err != nil {
-			glog.Errorf("Failed to stop %q: %v", es.etcdServer.Name(), err)
-		}
+		es.etcdServer.Terminate(t)
 	}
 
 	for _, d := range es.rmDirs {
@@ -107,23 +108,18 @@ func (es *e2eServices) stop() {
 }
 
 // startEtcd starts the embedded etcd instance or returns an error.
-func (es *e2eServices) startEtcd() error {
+func (es *e2eServices) startEtcd(t *testing.T) error {
 	glog.Info("Starting etcd")
-	// Create data directory in current working space.
-	dataDir, err := ioutil.TempDir(".", "etcd")
-	if err != nil {
-		return err
-	}
-	// Mark the dataDir as directories to remove.
-	es.rmDirs = append(es.rmDirs, dataDir)
-	es.etcdServer = NewEtcd(dataDir)
-	return es.etcdServer.Start()
+	server, etcdStorage := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	es.etcdServer = server
+	es.etcdStorage = etcdStorage
+	return nil
 }
 
 // startApiServer starts the embedded API server or returns an error.
-func (es *e2eServices) startApiServer() error {
+func (es *e2eServices) startApiServer(etcdStorage *storagebackend.Config) error {
 	glog.Info("Starting API server")
-	es.apiServer = NewAPIServer()
+	es.apiServer = NewAPIServer(*etcdStorage)
 	return es.apiServer.Start()
 }
 
@@ -137,7 +133,6 @@ func (es *e2eServices) startNamespaceController() error {
 // getServicesHealthCheckURLs returns the health check urls for the internal services.
 func getServicesHealthCheckURLs() []string {
 	return []string{
-		getEtcdHealthCheckURL(),
 		getAPIServerHealthCheckURL(),
 	}
 }
