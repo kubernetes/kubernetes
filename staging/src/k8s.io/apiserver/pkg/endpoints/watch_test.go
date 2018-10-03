@@ -25,13 +25,16 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"golang.org/x/net/websocket"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,6 +46,8 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/client-go/dynamic"
+	restclient "k8s.io/client-go/rest"
 )
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event
@@ -559,6 +564,128 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 		defer close(t.done)
 		return true
 	}
+}
+
+func TestWatchHTTPErrors(t *testing.T) {
+	watcher := watch.NewFake()
+	timeoutCh := make(chan time.Time)
+	done := make(chan struct{})
+
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok || info.StreamSerializer == nil {
+		t.Fatal(info)
+	}
+	serializer := info.StreamSerializer
+
+	// Setup a new watchserver
+	watchServer := &handlers.WatchServer{
+		Watching: watcher,
+
+		MediaType:       "testcase/json",
+		Framer:          serializer.Framer,
+		Encoder:         newCodec,
+		EmbeddedEncoder: newCodec,
+
+		Fixup:          func(obj runtime.Object) {},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+	}
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		watchServer.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	// Setup a client
+	dest, _ := url.Parse(s.URL)
+	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
+	dest.RawQuery = "watch=true"
+
+	req, _ := http.NewRequest("GET", dest.String(), nil)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
+	watcher.Error(&errStatus)
+	watcher.Stop()
+
+	// Make sure we can actually watch an endpoint
+	decoder := json.NewDecoder(resp.Body)
+	var got watchJSON
+	err = decoder.Decode(&got)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if got.Type != watch.Error {
+		t.Fatalf("unexpected watch type: %#v", got)
+	}
+	status := &metav1.Status{}
+	if err := json.Unmarshal(got.Object, status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
+		t.Fatalf("error: %#v", status)
+	}
+}
+
+func TestWatchHTTPDynamicClientErrors(t *testing.T) {
+	watcher := watch.NewFake()
+	timeoutCh := make(chan time.Time)
+	done := make(chan struct{})
+
+	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok || info.StreamSerializer == nil {
+		t.Fatal(info)
+	}
+	serializer := info.StreamSerializer
+
+	// Setup a new watchserver
+	watchServer := &handlers.WatchServer{
+		Watching: watcher,
+
+		MediaType:       "testcase/json",
+		Framer:          serializer.Framer,
+		Encoder:         newCodec,
+		EmbeddedEncoder: newCodec,
+
+		Fixup:          func(obj runtime.Object) {},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+	}
+
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		watchServer.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	client := dynamic.NewForConfigOrDie(&restclient.Config{
+		Host:    s.URL,
+		APIPath: "/" + prefix,
+	}).Resource(newGroupVersion.WithResource("simple"))
+
+	w, err := client.Watch(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
+	watcher.Error(&errStatus)
+	watcher.Stop()
+
+	got := <-w.ResultChan()
+	if got.Type != watch.Error {
+		t.Fatalf("unexpected watch type: %#v", got)
+	}
+	obj, ok := got.Object.(*unstructured.Unstructured)
+	if !ok {
+		t.Fatalf("not the correct object type: %#v", got)
+	}
+
+	status := &metav1.Status{}
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), status); err != nil {
+		t.Fatal(err)
+	}
+	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
+		t.Fatalf("error: %#v", status)
+	}
+	t.Logf("status: %#v", status)
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {
