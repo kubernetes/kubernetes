@@ -357,7 +357,6 @@ pkg/registry/rbac/rolebinding
 pkg/registry/rbac/rolebinding/policybased
 pkg/registry/rbac/validation
 pkg/registry/registrytest
-pkg/registry/scheduling/priorityclass/storage
 pkg/registry/scheduling/rest
 pkg/registry/settings/podpreset/storage
 pkg/registry/settings/rest
