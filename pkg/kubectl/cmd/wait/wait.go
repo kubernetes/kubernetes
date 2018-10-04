@@ -174,10 +174,15 @@ func conditionFuncFor(condition string) (ConditionFunc, error) {
 	}
 	if strings.HasPrefix(condition, "condition=") {
 		conditionName := condition[len("condition="):]
+		conditionValue := "true"
+		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
+			conditionValue = conditionName[equalsIndex+1:]
+			conditionName = conditionName[0:equalsIndex]
+		}
+
 		return ConditionalWait{
-			conditionName: conditionName,
-			// TODO allow specifying a false
-			conditionStatus: "true",
+			conditionName:   conditionName,
+			conditionStatus: conditionValue,
 		}.IsConditionMet, nil
 	}
 
