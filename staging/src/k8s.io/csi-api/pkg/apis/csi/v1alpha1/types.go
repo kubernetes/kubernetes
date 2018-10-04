@@ -63,7 +63,7 @@ type CSIDriverSpec struct {
 	// If value is not specified, default is false -- meaning attach will not be
 	// called.
 	// +optional
-	AttachRequired *bool `json:"attachRequired"`
+	AttachRequired *bool `json:"attachRequired,omitempty"`
 
 	// If specified, podInfoRequiredOnMount indicates this CSI volume driver
 	// requires additional pod information (like podName, podUID, etc.) during
@@ -77,7 +77,7 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
 	// +optional
-	PodInfoOnMountVersion *string `json:"podInfoOnMountVersion"`
+	PodInfoOnMountVersion *string `json:"podInfoOnMountVersion,omitempty"`
 }
 
 // +genclient
