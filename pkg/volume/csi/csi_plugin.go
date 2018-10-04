@@ -97,11 +97,17 @@ func RegistrationCallback(pluginName string, endpoint string, versions []string,
 		endpoint = socketPath
 	}
 
-	// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
-	// all other CSI components will be able to get the actual socket of CSI drivers by its name.
-	csiDrivers.Lock()
-	defer csiDrivers.Unlock()
-	csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
+	func() {
+		// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
+		// all other CSI components will be able to get the actual socket of CSI drivers by its name.
+
+		// It's not necessary to lock the entire RegistrationCallback() function because only the CSI
+		// client depends on this driver map, and the CSI client does not depend on node information
+		// updated in the rest of the function.
+		csiDrivers.Lock()
+		defer csiDrivers.Unlock()
+		csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
+	}()
 
 	// Get node info from the driver.
 	csi := newCsiDriverClient(pluginName)
@@ -117,9 +123,11 @@ func RegistrationCallback(pluginName string, endpoint string, versions []string,
 	err = lm.AddLabels(pluginName, driverNodeID)
 	if err != nil {
 		// Unregister the driver and return error
-		csiDrivers.Lock()
-		defer csiDrivers.Unlock()
-		delete(csiDrivers.driversMap, pluginName)
+		func() {
+			csiDrivers.Lock()
+			defer csiDrivers.Unlock()
+			delete(csiDrivers.driversMap, pluginName)
+		}()
 		return err, nil
 	}
 
