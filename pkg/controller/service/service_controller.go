@@ -319,6 +319,10 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		service.Status.LoadBalancer = *newState
 
 		if err := s.persistUpdate(service); err != nil {
+			// TODO: This logic needs to be revisited. We might want to retry on all the errors, not just conflicts.
+			if errors.IsConflict(err) {
+				return fmt.Errorf("not persisting update to service '%s/%s' that has been changed since we received it: %v", service.Namespace, service.Name, err)
+			}
 			runtime.HandleError(fmt.Errorf("failed to persist service %q updated status to apiserver, even after retries. Giving up: %v", key, err))
 			return nil
 		}
@@ -347,8 +351,7 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 		// TODO: Try to resolve the conflict if the change was unrelated to load
 		// balancer status. For now, just pass it up the stack.
 		if errors.IsConflict(err) {
-			return fmt.Errorf("not persisting update to service '%s/%s' that has been changed since we received it: %v",
-				service.Namespace, service.Name, err)
+			return err
 		}
 		glog.Warningf("Failed to persist updated LoadBalancerStatus to service '%s/%s' after creating its load balancer: %v",
 			service.Namespace, service.Name, err)
