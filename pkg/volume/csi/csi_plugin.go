@@ -33,12 +33,9 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
-	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
-	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
@@ -62,10 +59,11 @@ const (
 )
 
 type csiPlugin struct {
-	host              volume.VolumeHost
-	blockEnabled      bool
-	csiDriverLister   csilister.CSIDriverLister
-	csiDriverInformer csiinformer.CSIDriverInformer
+	host         volume.VolumeHost
+	blockEnabled bool
+	csiClient    csiclientset.Interface
+	// csiDriverLister   csilister.CSIDriverLister
+	// csiDriverInformer csiinformer.CSIDriverInformer
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -160,18 +158,27 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		csiClient := host.GetCSIClient()
-		if csiClient == nil {
-			glog.Warning("The client for CSI Custom Resources is not available, skipping informer initialization")
-		} else {
-			// Start informer for CSIDrivers.
-			factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
-			p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
-			p.csiDriverLister = p.csiDriverInformer.Lister()
-			go factory.Start(wait.NeverStop)
+	// TODO: Start informer for CSIDrivers. In 1.12, CSIDriver CRD is not installed by default.
+	// If we start informer, we can't distinguish these cases:
+	// - CRD is not installed
+	// - CRD is installed, but the informer is not synced yet.
+	// informer.HasSynced() returns false in both cases.
+	/*
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+			csiClient := host.GetCSIClient()
+			if csiClient == nil {
+				glog.Warning("The client for CSI Custom Resources is not available, skipping informer initialization")
+			} else {
+				// Start informer for CSIDrivers.
+				factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
+				p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
+				p.csiDriverLister = p.csiDriverInformer.Lister()
+				go factory.Start(wait.NeverStop)
+			}
 		}
-	}
+	*/
+	p.csiClient = host.GetCSIClient()
+	glog.Infof("JSAF: csiclient: %+v", p.csiClient)
 
 	// Initializing csiDrivers map and label management channels
 	csiDrivers = csiDriversStore{driversMap: map[string]csiDriver{}}
@@ -521,10 +528,12 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return false, nil
 	}
-	if p.csiDriverLister == nil {
-		return false, errors.New("CSIDriver lister does not exist")
+
+	// TODO: use informer here
+	if p.csiClient == nil {
+		return false, errors.New("CSIDriver client does not exist")
 	}
-	csiDriver, err := p.csiDriverLister.Get(driver)
+	csiDriver, err := p.csiClient.Csi().CSIDrivers().Get(driver, meta.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			// Don't skip attach if CSIDriver does not exist

@@ -30,7 +30,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
@@ -927,13 +926,6 @@ func newTestWatchPlugin(t *testing.T, csiClient *fakecsi.Clientset) (*csiPlugin,
 	csiPlug, ok := plug.(*csiPlugin)
 	if !ok {
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		// Wait until the informer in CSI volume plugin has all CSIDrivers.
-		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
-			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
-		})
 	}
 
 	return csiPlug, fakeWatcher, tmpDir, fakeClient

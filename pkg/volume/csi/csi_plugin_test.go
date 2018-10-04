@@ -27,12 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -73,13 +71,6 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecs
 	csiPlug, ok := plug.(*csiPlugin)
 	if !ok {
 		t.Fatalf("cannot assert plugin to be type csiPlugin")
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		// Wait until the informer in CSI volume plugin has all CSIDrivers.
-		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
-			return csiPlug.csiDriverInformer.Informer().HasSynced(), nil
-		})
 	}
 
 	return csiPlug, tmpDir

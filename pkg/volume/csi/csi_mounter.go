@@ -27,6 +27,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -234,11 +235,11 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return nil, nil
 	}
-	if c.plugin.csiDriverLister == nil {
-		return nil, errors.New("CSIDriver lister does not exist")
+	// TODO: use informer
+	if c.plugin.csiClient == nil {
+		return nil, errors.New("CSIDriver client does not exist")
 	}
-
-	csiDriver, err := c.plugin.csiDriverLister.Get(c.driverName)
+	csiDriver, err := c.plugin.csiClient.Csi().CSIDrivers().Get(c.driverName, meta.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			glog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
