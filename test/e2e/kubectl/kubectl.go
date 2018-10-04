@@ -58,7 +58,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	uexec "k8s.io/utils/exec"
@@ -150,7 +150,7 @@ func substituteImageName(content string) string {
 }
 
 func readTestFileOrDie(file string) []byte {
-	return generated.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+	return testfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file), Fail)
 }
 
 func runKubectlRetryOrDie(args ...string) string {
@@ -292,8 +292,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 		var nautilus, kitten string
 		BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
-			kitten = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
+			nautilus = substituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"), Fail)))
+			kitten = substituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"), Fail)))
 		})
 		/*
 			Release : v1.9
@@ -357,7 +357,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"redis-master-deployment.yaml.in",
 				"redis-slave-deployment.yaml.in",
 			} {
-				contents := substituteImageName(string(generated.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
+				contents := substituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile), Fail)))
 				run(contents)
 			}
 		}
@@ -383,9 +383,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 	})
 
 	framework.KubeDescribe("Simple pod", func() {
-		podYaml := substituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
+		var podYaml string
 		BeforeEach(func() {
 			By(fmt.Sprintf("creating the pod from %v", podYaml))
+			podYaml = substituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
@@ -1037,10 +1038,11 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl label", func() {
-		podYaml := substituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
+		var podYaml string
 		var nsFlag string
 		BeforeEach(func() {
 			By("creating the pod")
+			podYaml = substituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(BeTrue())
@@ -1078,10 +1080,11 @@ metadata:
 
 	framework.KubeDescribe("Kubectl logs", func() {
 		var nsFlag string
-		rc := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+		var rc string
 		containerName := "redis-master"
 		BeforeEach(func() {
 			By("creating an rc")
+			rc = substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(rc, "create", "-f", "-", nsFlag)
 		})
