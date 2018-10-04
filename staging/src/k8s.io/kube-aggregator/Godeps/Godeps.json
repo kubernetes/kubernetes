@@ -39,10 +39,6 @@
 			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
-			"ImportPath": "github.com/coreos/etcd/client",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
-		},
-		{
 			"ImportPath": "github.com/coreos/etcd/clientv3",
 			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
@@ -59,14 +55,6 @@
 			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
 		{
-			"ImportPath": "github.com/coreos/etcd/pkg/pathutil",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
-		},
-		{
-			"ImportPath": "github.com/coreos/etcd/pkg/srv",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
-		},
-		{
 			"ImportPath": "github.com/coreos/etcd/pkg/tlsutil",
 			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
 		},
@@ -77,14 +65,6 @@
 		{
 			"ImportPath": "github.com/coreos/etcd/pkg/types",
 			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
-		},
-		{
-			"ImportPath": "github.com/coreos/etcd/version",
-			"Rev": "420a452267a7ce45b3fcbed04d54030d69964fc1"
-		},
-		{
-			"ImportPath": "github.com/coreos/go-semver/semver",
-			"Rev": "568e959cd89871e61434c1143528d9162da89ef2"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/daemon",
@@ -321,10 +301,6 @@
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
 			"Rev": "c679ae2cc0cb27ec3293fea7e254e47386f05d69"
-		},
-		{
-			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "ded73eae5db7e7a0ef6f55aace87a2873c5d2b74"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh/terminal",
@@ -1160,10 +1136,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/apiserver/pkg/storage/etcd/metrics",
-			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-		},
-		{
-			"ImportPath": "k8s.io/apiserver/pkg/storage/etcd/util",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
