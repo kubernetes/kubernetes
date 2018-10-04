@@ -1,15 +1,22 @@
 apiVersion: v1
-kind: ReplicationController
+kind: Deployment
 metadata:
   name: default-http-backend
+  labels:
+    app.kubernetes.io/name: default-http-backend
+    app.kubernetes.io/part-of: ingress-nginx
+  namespace: ingress-nginx
 spec:
   replicas: 1
   selector:
-    app: default-http-backend
+    matchLabels:
+      app.kubernetes.io/name: default-http-backend
+      app.kubernetes.io/part-of: ingress-nginx
   template:
     metadata:
       labels:
-        app: default-http-backend
+        app.kubernetes.io/name: default-http-backend
+        app.kubernetes.io/part-of: ingress-nginx
     spec:
       terminationGracePeriodSeconds: 60
       containers:
@@ -26,19 +33,27 @@ spec:
           initialDelaySeconds: 30
           timeoutSeconds: 5
         ports:
-        - containerPort: 8080
+          - containerPort: 8080
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: default-http-backend
-#  namespace: kube-system
+  namespace: ingress-nginx
   labels:
-    k8s-app: default-http-backend
+    app.kubernetes.io/name: default-http-backend
+    app.kubernetes.io/part-of: ingress-nginx
 spec:
   ports:
   - port: 80
-    protocol: TCP
-    targetPort: 80
+    targetPort: 8080
   selector:
-    app: default-http-backend
+    app.kubernetes.io/name: default-http-backend
+    app.kubernetes.io/part-of: ingress-nginx
