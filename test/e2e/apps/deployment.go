@@ -21,7 +21,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -38,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/util/prettyprinter"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutil "k8s.io/kubernetes/test/utils"
 	utilpointer "k8s.io/utils/pointer"
@@ -132,7 +132,7 @@ func failureTrap(c clientset.Interface, ns string) {
 	for i := range deployments.Items {
 		d := deployments.Items[i]
 
-		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
+		framework.Logf(prettyprinter.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
 		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c.AppsV1())
 		if err != nil {
 			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
@@ -156,7 +156,7 @@ func failureTrap(c clientset.Interface, ns string) {
 		return
 	}
 	for _, rs := range rss.Items {
-		framework.Logf(spew.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
+		framework.Logf(prettyprinter.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
 		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
@@ -164,7 +164,7 @@ func failureTrap(c clientset.Interface, ns string) {
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		podList, err := c.CoreV1().Pods(rs.Namespace).List(options)
 		for _, pod := range podList.Items {
-			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
+			framework.Logf(prettyprinter.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
 		}
 	}
 }
