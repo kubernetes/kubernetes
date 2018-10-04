@@ -31,22 +31,36 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	alwayspullimagesapi "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages/apis/alwayspullimages"
 )
 
-// PluginName indicates name of admission plugin.
-const PluginName = "AlwaysPullImages"
+const (
+	// PluginName indicates name of admission plugin.
+	PluginName = "AlwaysPullImages"
+
+	// AlwaysPullImageExcludeAnnotationKey represents the annotation key for a pod to exempt itself from the AlwaysPullImages admission controller
+	AlwaysPullImageExcludeAnnotationKey string = "alwayspullimages.admission.kubernetes.io/exclude"
+)
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewAlwaysPullImages(), nil
-	})
+	plugins.Register(PluginName,
+		func(config io.Reader) (admission.Interface, error) {
+			// load the configuration provided (if any)
+			configuration, err := LoadConfiguration(config)
+			if err != nil {
+				return nil, err
+			}
+
+			return NewAlwaysPullImages(configuration), nil
+		})
 }
 
 // AlwaysPullImages is an implementation of admission.Interface.
 // It looks at all new pods and overrides each container's image pull policy to Always.
 type AlwaysPullImages struct {
 	*admission.Handler
+	config *alwayspullimagesapi.Configuration
 }
 
 var _ admission.MutationInterface = &AlwaysPullImages{}
@@ -63,6 +77,11 @@ func (a *AlwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
 	}
 
+	// Ignore pod if exclusion annotation is present
+	if a.config.EnableExcludeAnnotation && shouldExclude(pod) {
+		return nil
+	}
+
 	for i := range pod.Spec.InitContainers {
 		pod.Spec.InitContainers[i].ImagePullPolicy = api.PullAlways
 	}
@@ -75,7 +94,7 @@ func (a *AlwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 }
 
 // Validate makes sure that all containers are set to always pull images
-func (*AlwaysPullImages) Validate(attributes admission.Attributes) (err error) {
+func (a *AlwaysPullImages) Validate(attributes admission.Attributes) (err error) {
 	if shouldIgnore(attributes) {
 		return nil
 	}
@@ -83,6 +102,11 @@ func (*AlwaysPullImages) Validate(attributes admission.Attributes) (err error) {
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
 		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+	}
+
+	// Ignore pod if exclusion annotation is present
+	if a.config.EnableExcludeAnnotation && shouldExclude(pod) {
+		return nil
 	}
 
 	for i := range pod.Spec.InitContainers {
@@ -116,9 +140,21 @@ func shouldIgnore(attributes admission.Attributes) bool {
 	return false
 }
 
+func shouldExclude(pod *api.Pod) bool {
+	// Exclude (opt-out) pods that have the AlwaysPullImageExcludeAnnotationKey set to true
+	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
+		if podAnnotations[AlwaysPullImageExcludeAnnotationKey] == "true" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NewAlwaysPullImages creates a new always pull images admission control handler
-func NewAlwaysPullImages() *AlwaysPullImages {
+func NewAlwaysPullImages(config *alwayspullimagesapi.Configuration) *AlwaysPullImages {
 	return &AlwaysPullImages{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
+		config:  config,
 	}
 }

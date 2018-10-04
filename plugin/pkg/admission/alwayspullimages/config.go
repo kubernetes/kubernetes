@@ -1,0 +1,62 @@
+/*
+Copyright 2018 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package alwayspullimages
+
+import (
+	"fmt"
+	"io"
+	"io/ioutil"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	alwayspullimagesapi "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages/apis/alwayspullimages"
+	"k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages/apis/alwayspullimages/install"
+)
+
+var (
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
+)
+
+func init() {
+	install.Install(scheme)
+}
+
+// LoadConfiguration loads the provided configuration.
+func LoadConfiguration(config io.Reader) (*alwayspullimagesapi.Configuration, error) {
+	// if no config is provided, return a default configuration
+	if config == nil {
+		return &alwayspullimagesapi.Configuration{}, nil
+	}
+
+	// we have a config so parse it.
+	data, err := ioutil.ReadAll(config)
+	if err != nil {
+		return nil, err
+	}
+	decoder := codecs.UniversalDecoder()
+	decodedObj, err := runtime.Decode(decoder, data)
+	if err != nil {
+		return nil, err
+	}
+	alwaysPullImagesConfiguration, ok := decodedObj.(*alwayspullimagesapi.Configuration)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type: %T", decodedObj)
+	}
+
+	return alwaysPullImagesConfiguration, nil
+}
