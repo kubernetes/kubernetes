@@ -81,6 +81,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_v1beta1_MetricListOptions_To_custom_metrics_MetricListOptions(in *MetricListOptions, out *custommetrics.MetricListOptions, s conversion.Scope) error {
 	out.LabelSelector = in.LabelSelector
 	out.MetricLabelSelector = in.MetricLabelSelector
+	out.FieldSelector = in.FieldSelector
 	return nil
 }
 
@@ -92,6 +93,7 @@ func Convert_v1beta1_MetricListOptions_To_custom_metrics_MetricListOptions(in *M
 func autoConvert_custom_metrics_MetricListOptions_To_v1beta1_MetricListOptions(in *custommetrics.MetricListOptions, out *MetricListOptions, s conversion.Scope) error {
 	out.LabelSelector = in.LabelSelector
 	out.MetricLabelSelector = in.MetricLabelSelector
+	out.FieldSelector = in.FieldSelector
 	return nil
 }
 
