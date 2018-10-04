@@ -28,6 +28,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kubernetes/pkg/util/prettyprinter"
 )
 
 // StringDiff diffs a and b and returns a human readable diff.
@@ -71,10 +72,9 @@ func ObjectDiff(a, b interface{}) string {
 // can't figure out why reflect.DeepEqual is returning false and nothing is
 // showing you differences. This will.
 func ObjectGoPrintDiff(a, b interface{}) string {
-	s := spew.ConfigState{DisableMethods: true}
 	return StringDiff(
-		s.Sprintf("%#v", a),
-		s.Sprintf("%#v", b),
+		prettyprinter.SprintfWithoutMethods("%#v", a),
+		prettyprinter.SprintfWithoutMethods("%#v", b),
 	)
 }
 
