@@ -12,6 +12,7 @@ Repositories currently staged here:
 - [`k8s.io/apiserver`](https://github.com/kubernetes/apiserver)
 - [`k8s.io/cli-runtime`](https://github.com/kubernetes/cli-runtime)
 - [`k8s.io/client-go`](https://github.com/kubernetes/client-go)
+- [`k8s.io/cluster-bootstrap`](https://github.com/kubernetes/cluster-bootstrap)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
 - [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
@@ -63,7 +64,7 @@ for creating the staging repository.
 4. Update [`hack/import-restrictions.yaml`](https://github.com/kubernetes/kubernetes/blob/master/hack/import-restrictions.yaml)
 to add the list of other staging repos that this new repo can import.
 
-5. Add all mandatory template files mentioned in
+5. Add all mandatory template files to the staging repo as mentioned in
 https://github.com/kubernetes/kubernetes-template-project.
 
 6. Make sure that the `.github/PULL_REQUEST_TEMPLATE.md` and
@@ -81,6 +82,8 @@ for an example.
 2. Setup branch protection and enable access to the `stage-bots` team
 by adding the repo in
 [`prow/config.yaml`](https://github.com/kubernetes/test-infra/blob/master/prow/config.yaml).
+See [#kubernetes/test-infra#9292](https://github.com/kubernetes/test-infra/pull/9292)
+for an example.
 
 3. Once the repository has been created in the Kubernetes org,
 update the publishing-bot to publish the staging repository by updating:
