@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -48,10 +48,10 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 
 	// First, check if the gvk list has InitConfiguration and in that case try to unmarshal it
 	if kubeadmutil.GroupVersionKindsHasInitConfiguration(gvks...) {
-		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
+		return ConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 	}
 	if kubeadmutil.GroupVersionKindsHasJoinConfiguration(gvks...) {
-		return NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1alpha3.JoinConfiguration{})
+		return NodeConfigFileAndDefaultsToInternalConfig(cfgPath, &kubeadmapiv1beta1.JoinConfiguration{})
 	}
 	return nil, fmt.Errorf("didn't recognize types with GroupVersionKind: %v", gvks)
 }
@@ -60,11 +60,11 @@ func AnyConfigFileAndDefaultsToInternal(cfgPath string) (runtime.Object, error) 
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	switch internalcfg := obj.(type) {
 	case *kubeadmapi.InitConfiguration:
-		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
+		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1beta1.SchemeGroupVersion)
 	case *kubeadmapi.ClusterConfiguration:
-		return MarshalClusterConfigurationToBytes(internalcfg, kubeadmapiv1alpha3.SchemeGroupVersion)
+		return MarshalClusterConfigurationToBytes(internalcfg, kubeadmapiv1beta1.SchemeGroupVersion)
 	default:
-		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1alpha3.SchemeGroupVersion, kubeadmscheme.Codecs)
+		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1beta1.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
 }
 
