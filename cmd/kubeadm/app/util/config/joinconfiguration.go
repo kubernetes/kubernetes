@@ -43,10 +43,9 @@ func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
 	return nil
 }
 
-// NodeConfigFileAndDefaultsToInternalConfig
-func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+// JoinConfigFileAndDefaultsToInternalConfig
+func JoinConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
 	internalcfg := &kubeadmapi.JoinConfiguration{}
-
 	if cfgPath != "" {
 		// Loads configuration from config file, if provided
 		// Nb. --config overrides command line flags, TODO: fix this

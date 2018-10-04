@@ -33,13 +33,13 @@ kind: InitConfiguration
 apiVersion: kubeadm.k8s.io/v1alpha1
 kind: NodeConfiguration
 `),
-	"Master_v1alpha2": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha2
-kind: MasterConfiguration
+	"Master_v1alpha3": []byte(`
+apiVersion: kubeadm.k8s.io/v1alpha3
+kind: InitConfiguration
 `),
-	"Node_v1alpha2": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha2
-kind: NodeConfiguration
+	"Node_v1alpha3": []byte(`
+apiVersion: kubeadm.k8s.io/v1alpha3
+kind: JoinConfiguration
 `),
 	"Init_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
