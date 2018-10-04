@@ -390,7 +390,8 @@ type podActions struct {
 	ContainersToKill map[kubecontainer.ContainerID]containerToKillInfo
 }
 
-// podSandboxChanged checks whether the spec of the pod is changed and returns
+// podSandboxChanged checks whether the spec of the pod is changed
+// or needs restart because of RestartPolicyAlwaysPod and returns
 // (changed, new attempt, original sandboxID if exist).
 func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, uint32, string) {
 	if len(podStatus.SandboxStatuses) == 0 {
@@ -426,6 +427,16 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network.Ip == "" {
 		glog.V(2).Infof("Sandbox for pod %q has no IP address.  Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+	}
+
+	// For RestartPolicyAlwaysPod, check if we still need to create pod sandbox because of some failed non-init-container(s).
+	if pod.Spec.RestartPolicy == v1.RestartPolicyAlwaysPod {
+		for _, container := range pod.Spec.Containers {
+			status := podStatus.FindContainerStatusByName(container.Name)
+			if status != nil && status.State != kubecontainer.ContainerStateRunning {
+				return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+			}
+		}
 	}
 
 	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id

@@ -2368,6 +2368,7 @@ type PodCondition struct {
 type RestartPolicy string
 
 const (
+	RestartPolicyAlwaysPod RestartPolicy = "AlwaysPod"
 	RestartPolicyAlways    RestartPolicy = "Always"
 	RestartPolicyOnFailure RestartPolicy = "OnFailure"
 	RestartPolicyNever     RestartPolicy = "Never"
