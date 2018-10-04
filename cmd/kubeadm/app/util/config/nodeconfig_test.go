@@ -24,17 +24,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
-	node_v1alpha3YAML = "testdata/conversion/node/v1alpha3.yaml"
-	//TODO node_v1beta1YAML   = "testdata/conversion/node/v1beta1.yaml" after introducing v1beta1
-	node_internalYAML = "testdata/conversion/node/internal.yaml"
-	//TODO node_incompleteYAML = "testdata/defaulting/node/incomplete.yaml" (using v1alpha3) after introducing v1beta1
-	node_defaultedYAML = "testdata/defaulting/node/defaulted.yaml"
-	node_invalidYAML   = "testdata/validation/invalid_nodecfg.yaml"
+	node_v1alpha3YAML   = "testdata/conversion/node/v1alpha3.yaml"
+	node_v1beta1YAML    = "testdata/conversion/node/v1beta1.yaml"
+	node_internalYAML   = "testdata/conversion/node/internal.yaml"
+	node_incompleteYAML = "testdata/defaulting/node/incomplete.yaml"
+	node_defaultedYAML  = "testdata/defaulting/node/defaulted.yaml"
+	node_invalidYAML    = "testdata/validation/invalid_nodecfg.yaml"
 )
 
 func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
@@ -51,17 +51,32 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 			out:          node_internalYAML,
 			groupVersion: kubeadm.SchemeGroupVersion,
 		},
-		// TODO: implement v1beta1 <-> internal after introducing v1beta1
-		// TODO: implement v1alpha3 -> internal -> v1beta1 after introducing v1beta1
-		{ // v1alpha3 -> internal -> v1alpha3
-			name:         "v1alpha3Tov1alpha3",
+		{ // v1beta1 -> internal
+			name:         "v1beta1ToInternal",
+			in:           node_v1beta1YAML,
+			out:          node_internalYAML,
+			groupVersion: kubeadm.SchemeGroupVersion,
+		},
+		{ // v1alpha3 -> internal -> v1beta1
+			name:         "v1alpha3Tov1beta1",
 			in:           node_v1alpha3YAML,
-			out:          node_v1alpha3YAML,
-			groupVersion: kubeadmapiv1alpha3.SchemeGroupVersion,
+			out:          node_v1beta1YAML,
+			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
+		},
+		{ // v1beta1 -> internal -> v1beta1
+			name:         "v1beta1Tov1beta1",
+			in:           node_v1beta1YAML,
+			out:          node_v1beta1YAML,
+			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using NodeConfigFileAndDefaultsToInternalConfig,
 		// and then marshals the internal object to the expected groupVersion
-		// TODO: implement v1alpha3 -> default -> validate -> v1beta1 -> v1alpha3 after introducing v1beta1
+		{ // v1beta1 -> default -> validate -> internal -> v1beta1
+			name:         "incompleteYAMLToDefaultedv1beta1",
+			in:           node_incompleteYAML,
+			out:          node_defaultedYAML,
+			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
+		},
 		{ // v1alpha3 -> validation should fail
 			name:        "invalidYAMLShouldFail",
 			in:          node_invalidYAML,
@@ -72,7 +87,7 @@ func TestNodeConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := NodeConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1alpha3.JoinConfiguration{})
+			internalcfg, err := NodeConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1beta1.JoinConfiguration{})
 			if err != nil {
 				if rt.expectedErr {
 					return

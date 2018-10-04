@@ -13,6 +13,6 @@ discoveryTokenUnsafeSkipCAVerification: true
 kind: JoinConfiguration
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
-  name: thegopher
+  name: master-1
 tlsBootstrapToken: abcdef.0123456789abcdef
 token: abcdef.0123456789abcdef
