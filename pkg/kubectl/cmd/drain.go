@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -69,7 +68,6 @@ type DrainOptions struct {
 	Selector           string
 	PodSelector        string
 	nodeInfos          []*resource.Info
-	typer              runtime.ObjectTyper
 
 	genericclioptions.IOStreams
 }

@@ -86,7 +86,7 @@ const rootfs = "/rootfs"
 func TestE2eNode(t *testing.T) {
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
-		services.RunE2EServices()
+		services.RunE2EServices(t)
 		return
 	}
 	if *runKubeletMode {
