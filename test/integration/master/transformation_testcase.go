@@ -33,11 +33,15 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -49,6 +53,11 @@ const (
 	testNamespace            = "secret-encryption-test"
 	testSecret               = "test-secret"
 	metricsPrefix            = "apiserver_storage_"
+)
+
+var (
+	scheme  = runtime.NewScheme()
+	decoder = serializer.NewCodecFactory(scheme).UniversalDecoder()
 )
 
 type unSealSecret func(cipherText []byte, ctx value.Context, config encryptionconfig.ProviderConfig) ([]byte, error)
@@ -65,6 +74,7 @@ type transformTest struct {
 }
 
 func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML string) (*transformTest, error) {
+	install.Install(scheme)
 	e := transformTest{
 		logger:            l,
 		transformerConfig: transformerConfigYAML,
@@ -160,6 +170,19 @@ func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
 		return nil, fmt.Errorf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
 	return etcdResponse.Kvs[0].Value, nil
+}
+
+func decodeSecret(rawSecret []byte) (*core.Secret, error) {
+	secret, err := runtime.Decode(decoder, rawSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode secret: %v", err)
+	}
+	s, ok := secret.(*core.Secret)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode secret: %v", secret)
+	}
+
+	return s, nil
 }
 
 func (e *transformTest) getEncryptionOptions() []string {
