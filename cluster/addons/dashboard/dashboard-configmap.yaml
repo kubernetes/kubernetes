@@ -7,3 +7,5 @@ metadata:
     addonmanager.kubernetes.io/mode: EnsureExists
   name: kubernetes-dashboard-settings
   namespace: kube-system
+data:
+  _global: ""
