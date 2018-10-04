@@ -118,98 +118,11 @@ var _ = Describe("[sig-storage] HostPath", func() {
 	})
 
 	It("should support existing directory subPath", func() {
-		framework.SkipUnlessSSHKeyPresent()
-
-		subPath := "sub-path"
-		fileName := "test-file"
-		retryDuration := 180
-
-		filePathInWriter := path.Join(volumePath, fileName)
-		filePathInReader := path.Join(volumePath, subPath, fileName)
-
-		source := &v1.HostPathVolumeSource{
-			Path: "/tmp",
-		}
-		pod := testPodWithHostVol(volumePath, source)
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		pod.Spec.NodeName = nodeList.Items[0].Name
-
-		// Create the subPath directory on the host
-		existing := path.Join(source.Path, subPath)
-		nodeIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
-		if err != nil {
-			nodeIP, err = framework.GetNodeInternalIP(&nodeList.Items[0])
-		}
-		framework.ExpectNoError(err)
-		result, err := framework.SSH(fmt.Sprintf("mkdir -p %s", existing), nodeIP, framework.TestContext.Provider)
-		framework.LogSSHResult(result)
-		framework.ExpectNoError(err)
-		if result.Code != 0 {
-			framework.Failf("mkdir returned non-zero")
-		}
-
-		// Write the file in the subPath from container 0
-		container := &pod.Spec.Containers[0]
-		container.VolumeMounts[0].SubPath = subPath
-		container.Args = []string{
-			fmt.Sprintf("--new_file_0644=%v", filePathInWriter),
-			fmt.Sprintf("--file_mode=%v", filePathInWriter),
-		}
-
-		// Read it from outside the subPath from container 1
-		pod.Spec.Containers[1].Args = []string{
-			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
-			fmt.Sprintf("--retry_time=%d", retryDuration),
-		}
-
-		f.TestContainerOutput("hostPath subPath", pod, 1, []string{
-			"content of file \"" + filePathInReader + "\": mount-tester new file",
-		})
+		testExistingSubPath(f, false)
 	})
 
-	// TODO consolidate common code of this test and above
 	It("should support existing single file subPath", func() {
-		framework.SkipUnlessSSHKeyPresent()
-
-		subPath := "sub-path-test-file"
-		retryDuration := 180
-
-		filePathInReader := path.Join(volumePath, subPath)
-
-		source := &v1.HostPathVolumeSource{
-			Path: "/tmp",
-		}
-		pod := testPodWithHostVol(volumePath, source)
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		pod.Spec.NodeName = nodeList.Items[0].Name
-
-		// Create the subPath file on the host
-		existing := path.Join(source.Path, subPath)
-		nodeIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
-		if err != nil {
-			nodeIP, err = framework.GetNodeInternalIP(&nodeList.Items[0])
-		}
-		framework.ExpectNoError(err)
-		result, err := framework.SSH(fmt.Sprintf("echo \"mount-tester new file\" > %s", existing), nodeIP, framework.TestContext.Provider)
-		framework.LogSSHResult(result)
-		framework.ExpectNoError(err)
-		if result.Code != 0 {
-			framework.Failf("echo returned non-zero")
-		}
-
-		// Mount the file to the subPath in container 0
-		container := &pod.Spec.Containers[0]
-		container.VolumeMounts[0].SubPath = subPath
-
-		// Read it from outside the subPath from container 1
-		pod.Spec.Containers[1].Args = []string{
-			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
-			fmt.Sprintf("--retry_time=%d", retryDuration),
-		}
-
-		f.TestContainerOutput("hostPath subPath", pod, 1, []string{
-			"content of file \"" + filePathInReader + "\": mount-tester new file",
-		})
+		testExistingSubPath(f, true)
 	})
 })
 
@@ -275,4 +188,68 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource) *v1.Pod {
 			Volumes:       mount(source),
 		},
 	}
+}
+
+func testExistingSubPath(f *framework.Framework, fileTest bool) {
+	framework.SkipUnlessSSHKeyPresent()
+
+	var subPath string
+	var command string
+	var filePathInReader string
+
+	retryDuration := 180
+
+	source := &v1.HostPathVolumeSource{
+		Path: "/tmp",
+	}
+	pod := testPodWithHostVol(volumePath, source)
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	pod.Spec.NodeName = nodeList.Items[0].Name
+
+	// Create the subPath directory on the host
+	nodeIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
+	if err != nil {
+		nodeIP, err = framework.GetNodeInternalIP(&nodeList.Items[0])
+	}
+	framework.ExpectNoError(err)
+	if fileTest {
+		subPath = "sub-path-test-file"
+		existing := path.Join(source.Path, subPath)
+		command = fmt.Sprintf("echo \"mount-tester new file\" > %s", existing)
+	} else {
+		subPath = "sub-path"
+		existing := path.Join(source.Path, subPath)
+		command = fmt.Sprintf("mkdir -p %s", existing)
+	}
+	result, err := framework.SSH(command, nodeIP, framework.TestContext.Provider)
+	framework.LogSSHResult(result)
+	framework.ExpectNoError(err)
+	if result.Code != 0 {
+		framework.Failf("mkdir returned non-zero")
+	}
+
+	// Write the file in the subPath from container 0
+	container := &pod.Spec.Containers[0]
+	container.VolumeMounts[0].SubPath = subPath
+	if fileTest {
+		filePathInReader = path.Join(volumePath, subPath)
+	} else {
+		fileName := "test-file"
+		filePathInReader = path.Join(volumePath, subPath, fileName)
+		filePathInWriter := path.Join(volumePath, fileName)
+		container.Args = []string{
+			fmt.Sprintf("--new_file_0644=%v", filePathInWriter),
+			fmt.Sprintf("--file_mode=%v", filePathInWriter),
+		}
+	}
+
+	// Read it from outside the subPath from container 1
+	pod.Spec.Containers[1].Args = []string{
+		fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
+		fmt.Sprintf("--retry_time=%d", retryDuration),
+	}
+
+	f.TestContainerOutput("hostPath subPath", pod, 1, []string{
+		"content of file \"" + filePathInReader + "\": mount-tester new file",
+	})
 }
