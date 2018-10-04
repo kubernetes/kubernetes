@@ -900,6 +900,10 @@ REQUIRE_METADATA_KUBELET_CONFIG_FILE: $(yaml-quote true)
 ENABLE_NETD: $(yaml-quote ${ENABLE_NETD:-false})
 CUSTOM_NETD_YAML: |
 $(echo "${CUSTOM_NETD_YAML:-}" | sed -e "s/'/''/g")
+CUSTOM_CALICO_NODE_DAEMONSET_YAML: |
+$(echo "${CUSTOM_CALICO_NODE_DAEMONSET_YAML:-}" | sed -e "s/'/''/g")
+CUSTOM_TYPHA_DEPLOYMENT_YAML: |
+$(echo "${CUSTOM_TYPHA_DEPLOYMENT_YAML:-}" | sed -e "s/'/''/g")
 EOF
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "gci" ]]  || \
