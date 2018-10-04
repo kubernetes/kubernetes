@@ -167,12 +167,12 @@ function reconcile_addons() {
   log INFO "== Reconciling with deprecated label =="
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}=true,${ADDON_MANAGER_LABEL}!=EnsureExists \
-    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
+    --prune=true ${prune_whitelist_flags} --recursive --force | grep -v configured
 
   log INFO "== Reconciling with addon-manager label =="
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}!=true,${ADDON_MANAGER_LABEL}=Reconcile \
-    --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
+    --prune=true ${prune_whitelist_flags} --recursive --force | grep -v configured
 
   log INFO "== Kubernetes addon reconcile completed at $(date -Is) =="
 }
