@@ -20,7 +20,7 @@ import (
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -71,12 +71,12 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	}
 
 	if externalkubeletcfg.StaticPodPath == "" {
-		externalkubeletcfg.StaticPodPath = kubeadmapiv1alpha3.DefaultManifestsDir
+		externalkubeletcfg.StaticPodPath = kubeadmapiv1beta1.DefaultManifestsDir
 	}
 	if externalkubeletcfg.ClusterDNS == nil {
 		dnsIP, err := constants.GetDNSIP(internalcfg.Networking.ServiceSubnet)
 		if err != nil {
-			externalkubeletcfg.ClusterDNS = []string{kubeadmapiv1alpha3.DefaultClusterDNSIP}
+			externalkubeletcfg.ClusterDNS = []string{kubeadmapiv1beta1.DefaultClusterDNSIP}
 		} else {
 			externalkubeletcfg.ClusterDNS = []string{dnsIP.String()}
 		}
@@ -88,7 +88,7 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	// Enforce security-related kubelet options
 
 	// Require all clients to the kubelet API to have client certs signed by the cluster CA
-	externalkubeletcfg.Authentication.X509.ClientCAFile = kubeadmapiv1alpha3.DefaultCACertPath
+	externalkubeletcfg.Authentication.X509.ClientCAFile = kubeadmapiv1beta1.DefaultCACertPath
 	externalkubeletcfg.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
 
 	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server

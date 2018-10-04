@@ -33,7 +33,7 @@ import (
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -125,9 +125,9 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 
 	ip := net.ParseIP(advertiseAddress)
 	if ip.To4() != nil {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv4
+		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta1.DefaultProxyBindAddressv4
 	} else {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1alpha3.DefaultProxyBindAddressv6
+		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta1.DefaultProxyBindAddressv6
 	}
 
 	// Resolve possible version labels and validate version string
@@ -158,7 +158,7 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 // Then the external, versioned configuration is defaulted and converted to the internal type.
 // Right thereafter, the configuration is defaulted again with dynamic values (like IP addresses of a machine, etc)
 // Lastly, the internal config is validated and returned.
-func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
+func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.InitConfiguration) (*kubeadmapi.InitConfiguration, error) {
 	internalcfg := &kubeadmapi.InitConfiguration{}
 
 	if cfgPath != "" {
@@ -254,7 +254,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 
 	// If InitConfiguration wasn't given, default it by creating an external struct instance, default it and convert into the internal type
 	if initcfg == nil {
-		extinitcfg := &kubeadmapiv1alpha3.InitConfiguration{}
+		extinitcfg := &kubeadmapiv1beta1.InitConfiguration{}
 		kubeadmscheme.Scheme.Default(extinitcfg)
 		// Set initcfg to an empty struct value the deserializer will populate
 		initcfg = &kubeadmapi.InitConfiguration{}
@@ -281,7 +281,7 @@ func BytesToInternalConfig(b []byte) (*kubeadmapi.InitConfiguration, error) {
 }
 
 func defaultedInternalConfig() *kubeadmapi.ClusterConfiguration {
-	externalcfg := &kubeadmapiv1alpha3.ClusterConfiguration{}
+	externalcfg := &kubeadmapiv1beta1.ClusterConfiguration{}
 	internalcfg := &kubeadmapi.ClusterConfiguration{}
 
 	kubeadmscheme.Scheme.Default(externalcfg)

@@ -37,7 +37,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
@@ -156,7 +156,7 @@ var (
 
 // NewCmdJoin returns "kubeadm join" command.
 func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.JoinConfiguration{}
+	cfg := &kubeadmapiv1beta1.JoinConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	var cfgPath string
@@ -181,7 +181,7 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 }
 
 // NewValidJoin validates the command line that are passed to the cobra command
-func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfiguration, args []string, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
+func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, args []string, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
 	cfg.DiscoveryTokenAPIServers = args
 
 	var err error
@@ -202,7 +202,7 @@ func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfigurati
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.JoinConfiguration, featureGatesString *string) {
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.DiscoveryFile, "discovery-file", "",
 		"A file or url from which to load cluster information.")
@@ -264,7 +264,7 @@ type Join struct {
 }
 
 // NewJoin instantiates Join struct with given arguments
-func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1alpha3.JoinConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
+func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
 
 	if defaultcfg.NodeRegistration.Name == "" {
 		glog.V(1).Infoln("[join] found NodeName empty; using OS hostname as NodeName")

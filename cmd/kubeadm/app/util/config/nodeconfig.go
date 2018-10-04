@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 )
 
@@ -44,7 +44,7 @@ func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
 }
 
 // NodeConfigFileAndDefaultsToInternalConfig
-func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
 	internalcfg := &kubeadmapi.JoinConfiguration{}
 
 	if cfgPath != "" {
