@@ -30,13 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 )
 
@@ -226,7 +225,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	}
 	// maxSurge is the maximum scaling increment and maxUnavailable are the maximum pods
 	// that can be unavailable during a rollout.
-	maxSurge, maxUnavailable, err := deploymentutil.ResolveFenceposts(&config.MaxSurge, &config.MaxUnavailable, desired)
+	maxSurge, maxUnavailable, err := resolveFenceposts(&config.MaxSurge, &config.MaxUnavailable, desired)
 	if err != nil {
 		return err
 	}
@@ -443,7 +442,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *corev1.ReplicationController, m
 			if v1Pod.DeletionTimestamp != nil {
 				continue
 			}
-			if !podutil.IsPodAvailable(&v1Pod, minReadySeconds, r.nowFn()) {
+			if !isPodAvailable(&v1Pod, minReadySeconds, r.nowFn()) {
 				continue
 			}
 			switch controller.Name {
@@ -846,4 +845,97 @@ func FindSourceController(r corev1client.ReplicationControllersGetter, namespace
 		}
 	}
 	return nil, fmt.Errorf("couldn't find a replication controller with source id == %s/%s", namespace, name)
+}
+
+// TODO: Clean this up after kubectl is moved out of core.
+// The following functions are copied code, in order to move kubectl out
+// of kubernetes core.
+
+// IsPodAvailable returns true if a pod is available; false otherwise.
+// Precondition for an available pod is that it must be ready. On top
+// of that, there are two cases when a pod can be considered available:
+// 1. minReadySeconds == 0, or
+// 2. LastTransitionTime (is set) + minReadySeconds < current time
+func isPodAvailable(pod *corev1.Pod, minReadySeconds int32, now metav1.Time) bool {
+	if !isPodReady(pod) {
+		return false
+	}
+
+	c := getPodReadyCondition(pod.Status)
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	if minReadySeconds == 0 || !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time) {
+		return true
+	}
+	return false
+}
+
+// IsPodReady returns true if a pod is ready; false otherwise.
+func isPodReady(pod *corev1.Pod) bool {
+	return isPodReadyConditionTrue(pod.Status)
+}
+
+// IsPodReadyConditionTrue returns true if a pod is ready; false otherwise.
+func isPodReadyConditionTrue(status corev1.PodStatus) bool {
+	condition := getPodReadyCondition(status)
+	return condition != nil && condition.Status == corev1.ConditionTrue
+}
+
+// GetPodReadyCondition extracts the pod ready condition from the given status and returns that.
+// Returns nil if the condition is not present.
+func getPodReadyCondition(status corev1.PodStatus) *corev1.PodCondition {
+	_, condition := getPodCondition(&status, corev1.PodReady)
+	return condition
+}
+
+// GetPodCondition extracts the provided condition from the given status and returns that.
+// Returns nil and -1 if the condition is not present, and the index of the located condition.
+func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) (int, *corev1.PodCondition) {
+	if status == nil {
+		return -1, nil
+	}
+	return getPodConditionFromList(status.Conditions, conditionType)
+}
+
+// GetPodConditionFromList extracts the provided condition from the given list of condition and
+// returns the index of the condition and the condition. Returns -1 and nil if the condition is not present.
+func getPodConditionFromList(conditions []corev1.PodCondition, conditionType corev1.PodConditionType) (int, *corev1.PodCondition) {
+	if conditions == nil {
+		return -1, nil
+	}
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return i, &conditions[i]
+		}
+	}
+	return -1, nil
+}
+
+// ResolveFenceposts resolves both maxSurge and maxUnavailable. This needs to happen in one
+// step. For example:
+//
+// 2 desired, max unavailable 1%, surge 0% - should scale old(-1), then new(+1), then old(-1), then new(+1)
+// 1 desired, max unavailable 1%, surge 0% - should scale old(-1), then new(+1)
+// 2 desired, max unavailable 25%, surge 1% - should scale new(+1), then old(-1), then new(+1), then old(-1)
+// 1 desired, max unavailable 25%, surge 1% - should scale new(+1), then old(-1)
+// 2 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1), then new(+1), then old(-1)
+// 1 desired, max unavailable 0%, surge 1% - should scale new(+1), then old(-1)
+func resolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired int32) (int32, int32, error) {
+	surge, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(maxSurge, intstrutil.FromInt(0)), int(desired), true)
+	if err != nil {
+		return 0, 0, err
+	}
+	unavailable, err := intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(maxUnavailable, intstrutil.FromInt(0)), int(desired), false)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	if surge == 0 && unavailable == 0 {
+		// Validation should never allow the user to explicitly use zero values for both maxSurge
+		// maxUnavailable. Due to rounding down maxUnavailable though, it may resolve to zero.
+		// If both fenceposts resolve to zero, then we should set maxUnavailable to 1 on the
+		// theory that surge might not work due to quota.
+		unavailable = 1
+	}
+
+	return int32(surge), int32(unavailable), nil
 }
