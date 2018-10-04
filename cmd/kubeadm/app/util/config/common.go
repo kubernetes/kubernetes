@@ -93,19 +93,18 @@ func DetectUnsupportedVersion(b []byte) error {
 		}
 		knownKinds[gvk.Kind] = true
 	}
-	// InitConfiguration, MasterConfiguration and NodeConfiguration are mutually exclusive, error if more than one are specified
+	// InitConfiguration, MasterConfiguration and NodeConfiguration may not apply together, warn if more than one is specified
 	mutuallyExclusive := []string{constants.InitConfigurationKind, constants.MasterConfigurationKind, constants.JoinConfigurationKind, constants.NodeConfigurationKind}
-	foundOne := false
+	mutuallyExclusiveCount := 0
 	for _, kind := range mutuallyExclusive {
 		if knownKinds[kind] {
-			if !foundOne {
-				foundOne = true
-				continue
-			}
-
-			return fmt.Errorf("invalid configuration: kinds %v are mutually exclusive", mutuallyExclusive)
+			mutuallyExclusiveCount++
 		}
 	}
+	if mutuallyExclusiveCount > 1 {
+		glog.Warningf("WARNING: Detected resource kinds that may not apply: %v", mutuallyExclusive)
+	}
+
 	return nil
 }
 

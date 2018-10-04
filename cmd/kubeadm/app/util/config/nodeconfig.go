@@ -19,6 +19,7 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/golang/glog"
 
@@ -27,6 +28,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
@@ -61,7 +63,23 @@ func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 			return nil, err
 		}
 
-		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, internalcfg); err != nil {
+		gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
+		if err != nil {
+			return nil, err
+		}
+
+		joinBytes := []byte{}
+		for gvk, bytes := range gvkmap {
+			if gvk.Kind == constants.JoinConfigurationKind || gvk.Kind == constants.NodeConfigurationKind {
+				joinBytes = bytes
+			}
+		}
+
+		if len(joinBytes) == 0 {
+			return nil, fmt.Errorf("no %s found in config file %q", constants.JoinConfigurationKind, cfgPath)
+		}
+
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), joinBytes, internalcfg); err != nil {
 			return nil, err
 		}
 	} else {

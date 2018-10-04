@@ -132,35 +132,37 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1alpha1"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
+		// CanMix* cases used to be MustNotMix*, however due to UX issues DetectUnsupportedVersion had to tolerate that.
+		// So the following tests actually verify, that previously conflicting configs can be mixed together with no error.
 		{
-			name:         "MustNotMixMasterNode",
+			name:         "CanMixMasterNode",
 			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixMasterJoin",
+			name:         "CanMixMasterJoin",
 			fileContents: bytes.Join([][]byte{files["Master_v1alpha2"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixJoinNode",
+			name:         "CanMixJoinNode",
 			fileContents: bytes.Join([][]byte{files["Join_v1alpha3"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixInitMaster",
+			name:         "CanMixInitMaster",
 			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Master_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixInitNode",
+			name:         "CanMixInitNode",
 			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Node_v1alpha2"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixInitJoin",
+			name:         "CanMixInitJoin",
 			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 	}
 
