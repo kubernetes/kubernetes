@@ -25,7 +25,7 @@ import (
 	"syscall"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,11 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	// kubectl should not be taking dependencies on logic in the controllers
@@ -105,18 +104,33 @@ type DeploymentRollbacker struct {
 }
 
 func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
-	d, ok := obj.(*extensions.Deployment)
-	if !ok {
-		return "", fmt.Errorf("passed object is not a Deployment: %#v", obj)
+	if toRevision < 0 {
+		return "", revisionNotFoundErr(toRevision)
 	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return "", fmt.Errorf("failed to create accessor for kind %v: %s", obj.GetObjectKind(), err.Error())
+	}
+	name := accessor.GetName()
+	namespace := accessor.GetNamespace()
+
+	// TODO: Fix this after kubectl has been removed from core. It is not possible to convert the runtime.Object
+	// to the external appsv1 Deployment without round-tripping through an internal version of Deployment. We're
+	// currently getting rid of all internal versions of resources. So we specifically request the appsv1 version
+	// here. This follows the same pattern as for DaemonSet and StatefulSet.
+	deployment, err := r.c.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve Deployment %s: %v", name, err)
+	}
+
 	if dryRun {
-		return simpleDryRun(d, r.c, toRevision)
+		return simpleDryRun(deployment, r.c, toRevision)
 	}
-	if d.Spec.Paused {
-		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", d.Name)
+	if deployment.Spec.Paused {
+		return "", fmt.Errorf("you cannot rollback a paused deployment; resume it first with 'kubectl rollout resume deployment/%s' and try again", name)
 	}
 	deploymentRollback := &extensionsv1beta1.DeploymentRollback{
-		Name:               d.Name,
+		Name:               name,
 		UpdatedAnnotations: updatedAnnotations,
 		RollbackTo: extensionsv1beta1.RollbackConfig{
 			Revision: toRevision,
@@ -125,16 +139,19 @@ func (r *DeploymentRollbacker) Rollback(obj runtime.Object, updatedAnnotations m
 	result := ""
 
 	// Get current events
-	events, err := r.c.CoreV1().Events(d.Namespace).List(metav1.ListOptions{})
+	events, err := r.c.CoreV1().Events(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return result, err
 	}
 	// Do the rollback
-	if err := r.c.ExtensionsV1beta1().Deployments(d.Namespace).Rollback(deploymentRollback); err != nil {
+	// TODO: This is DEPRECATED. It should be updated. DaemonSets and StatefulSets implement rollback by
+	// patching using history (ControllerRevision data). Deployments should probably also implement
+	// rollback using a patch.
+	if err := r.c.ExtensionsV1beta1().Deployments(namespace).Rollback(deploymentRollback); err != nil {
 		return result, err
 	}
 	// Watch for the changes of events
-	watch, err := r.c.CoreV1().Events(d.Namespace).Watch(metav1.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
+	watch, err := r.c.CoreV1().Events(namespace).Watch(metav1.ListOptions{Watch: true, ResourceVersion: events.ResourceVersion})
 	if err != nil {
 		return result, err
 	}
@@ -152,7 +169,7 @@ func watchRollbackEvent(w watch.Interface) string {
 			if !ok {
 				return ""
 			}
-			obj, ok := event.Object.(*api.Event)
+			obj, ok := event.Object.(*corev1.Event)
 			if !ok {
 				w.Stop()
 				return ""
@@ -170,7 +187,7 @@ func watchRollbackEvent(w watch.Interface) string {
 
 // isRollbackEvent checks if the input event is about rollback, and returns true and
 // related result string back if it is.
-func isRollbackEvent(e *api.Event) (bool, string) {
+func isRollbackEvent(e *corev1.Event) (bool, string) {
 	rollbackEventReasons := []string{deploymentutil.RollbackRevisionNotFound, deploymentutil.RollbackTemplateUnchanged, deploymentutil.RollbackDone}
 	for _, reason := range rollbackEventReasons {
 		if e.Reason == reason {
@@ -183,13 +200,9 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 	return false, ""
 }
 
-func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
-	externalDeployment := &appsv1.Deployment{}
-	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
-		return "", fmt.Errorf("failed to convert deployment, %v", err)
-	}
+func simpleDryRun(deployment *appsv1.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
 
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(externalDeployment, c.AppsV1())
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.AppsV1())
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", deployment.Name, err)
 	}
@@ -198,7 +211,7 @@ func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toR
 		allRSs = append(allRSs, newRS)
 	}
 
-	revisionToSpec := make(map[int64]*v1.PodTemplateSpec)
+	revisionToSpec := make(map[int64]*corev1.PodTemplateSpec)
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
@@ -382,7 +395,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	return rollbackSuccess, nil
 }
 
-var appsCodec = legacyscheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
+var appsCodec = scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
 
 // applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
 // is nil, the returned StatefulSet is valid.
@@ -459,7 +472,7 @@ func findHistory(toRevision int64, allHistory []*appsv1.ControllerRevision) *app
 }
 
 // printPodTemplate converts a given pod template into a human-readable string.
-func printPodTemplate(specTemplate *v1.PodTemplateSpec) (string, error) {
+func printPodTemplate(specTemplate *corev1.PodTemplateSpec) (string, error) {
 	content := bytes.NewBuffer([]byte{})
 	w := printersinternal.NewPrefixWriter(content)
 	internalTemplate := &api.PodTemplateSpec{}
