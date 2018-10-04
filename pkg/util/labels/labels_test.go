@@ -120,10 +120,11 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 	}
 
 	cases := []struct {
-		labels     map[string]string
-		labelKey   string
-		labelValue string
-		want       map[string]string
+		labels           map[string]string
+		labelKey         string
+		labelValue       string
+		matchExpressions []metav1.LabelSelectorRequirement
+		want             map[string]string
 	}{
 		{
 			labels: labels,
@@ -148,11 +149,20 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 				"foo4": "12",
 			},
 		},
+		{
+			labels:           nil,
+			labelKey:         "foo4",
+			labelValue:       "89",
+			matchExpressions: []metav1.LabelSelectorRequirement{{Key: "foo1", Operator: "in", Values: []string{"bar1"}}},
+			want: map[string]string{
+				"foo4": "89",
+			},
+		},
 	}
 
 	for _, tc := range cases {
-		ls_in := metav1.LabelSelector{MatchLabels: tc.labels}
-		ls_out := metav1.LabelSelector{MatchLabels: tc.want}
+		ls_in := metav1.LabelSelector{MatchLabels: tc.labels, MatchExpressions: tc.matchExpressions}
+		ls_out := metav1.LabelSelector{MatchLabels: tc.want, MatchExpressions: tc.matchExpressions}
 
 		got := CloneSelectorAndAddLabel(&ls_in, tc.labelKey, tc.labelValue)
 		if !reflect.DeepEqual(got, &ls_out) {
