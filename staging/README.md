@@ -12,6 +12,7 @@ Repositories currently staged here:
 - [`k8s.io/apiserver`](https://github.com/kubernetes/apiserver)
 - [`k8s.io/cli-runtime`](https://github.com/kubernetes/cli-runtime)
 - [`k8s.io/client-go`](https://github.com/kubernetes/client-go)
+- [`k8s.io/cluster-bootstrap`](https://github.com/kubernetes/cluster-bootstrap)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
 - [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
