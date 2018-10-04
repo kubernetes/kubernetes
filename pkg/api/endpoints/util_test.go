@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/util/prettyprinter"
 )
 
 func podRef(uid string) *api.ObjectReference {
@@ -458,7 +458,7 @@ func TestPackSubsets(t *testing.T) {
 	for _, tc := range testCases {
 		result := RepackSubsets(tc.given)
 		if !reflect.DeepEqual(result, SortSubsets(tc.expect)) {
-			t.Errorf("case %q: expected %s, got %s", tc.name, spew.Sprintf("%#v", SortSubsets(tc.expect)), spew.Sprintf("%#v", result))
+			t.Errorf("case %q: expected %s, got %s", tc.name, prettyprinter.Sprint(SortSubsets(tc.expect)), prettyprinter.Sprint(result))
 		}
 	}
 }

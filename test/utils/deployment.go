@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,13 +28,14 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/pkg/util/prettyprinter"
 )
 
 type LogfFn func(format string, args ...interface{})
 
 func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, logf LogfFn) {
 	if newRS != nil {
-		logf(spew.Sprintf("New ReplicaSet %q of Deployment %q:\n%+v", newRS.Name, deployment.Name, *newRS))
+		logf(prettyprinter.Sprintf("New ReplicaSet %q of Deployment %q:\n%+v", newRS.Name, deployment.Name, *newRS))
 	} else {
 		logf("New ReplicaSet of Deployment %q is nil.", deployment.Name)
 	}
@@ -44,7 +43,7 @@ func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.R
 		logf("All old ReplicaSets of Deployment %q:", deployment.Name)
 	}
 	for i := range allOldRSs {
-		logf(spew.Sprintf("%+v", *allOldRSs[i]))
+		logf(prettyprinter.Sprintf("%+v", *allOldRSs[i]))
 	}
 }
 
@@ -64,7 +63,7 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsL
 		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
 			availability = "available"
 		}
-		logf(spew.Sprintf("Pod %q is %s:\n%+v", pod.Name, availability, pod))
+		logf(prettyprinter.Sprintf("Pod %q is %s:\n%+v", pod.Name, availability, pod))
 	}
 }
 
