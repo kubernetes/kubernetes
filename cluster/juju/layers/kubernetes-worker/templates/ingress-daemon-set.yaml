@@ -1,12 +1,52 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nginx-configuration
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: tcp-services
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: udp-services
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: nginx-ingress-{{ juju_application }}-serviceaccount
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
   name: nginx-ingress-{{ juju_application }}-clusterrole
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
 rules:
   - apiGroups:
       - ""
@@ -59,6 +99,9 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
   name: nginx-ingress-{{ juju_application }}-role
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
 rules:
   - apiGroups:
       - ""
@@ -94,13 +137,14 @@ rules:
       - endpoints
     verbs:
       - get
-      - create
-      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
   name: nginx-ingress-role-nisa-{{ juju_application }}-binding
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -108,11 +152,15 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: nginx-ingress-{{ juju_application }}-serviceaccount
+    namespace: ingress-nginx
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
   name: nginx-ingress-clusterrole-nisa-{{ juju_application }}-binding
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -120,35 +168,38 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: nginx-ingress-{{ juju_application }}-serviceaccount
-    namespace: default
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nginx-load-balancer-{{ juju_application }}-conf
+    namespace: ingress-nginx
 ---
 apiVersion: {{ daemonset_api_version }}
 kind: DaemonSet
 metadata:
   name: nginx-ingress-{{ juju_application }}-controller
+  namespace: ingress-nginx
   labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
     juju-application: nginx-ingress-{{ juju_application }}
 spec:
   selector:
     matchLabels:
-      name: nginx-ingress-{{ juju_application }}
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/part-of: ingress-nginx
   template:
     metadata:
       labels:
-        name: nginx-ingress-{{ juju_application }}
+        app.kubernetes.io/name: ingress-nginx
+        app.kubernetes.io/part-of: ingress-nginx
+      annotations:
+        prometheus.io/port: "10254"
+        prometheus.io/scrape: "true"
     spec:
+      serviceAccountName: nginx-ingress-{{ juju_application }}-serviceaccount
       nodeSelector:
         juju-application: {{ juju_application }}
       terminationGracePeriodSeconds: 60
       # hostPort doesn't work with CNI, so we have to use hostNetwork instead
       # see https://github.com/kubernetes/kubernetes/issues/23920
       hostNetwork: true
-      serviceAccountName: nginx-ingress-{{ juju_application }}-serviceaccount
       containers:
       - image: {{ ingress_image }}
         name: nginx-ingress-{{ juju_application }}
@@ -159,6 +210,14 @@ spec:
             scheme: HTTP
           initialDelaySeconds: 30
           timeoutSeconds: 5
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+            add:
+              - NET_BIND_SERVICE
+          # www-data -> 33
+          runAsUser: 33
         # use downward API
         env:
           - name: POD_NAME
@@ -170,10 +229,35 @@ spec:
               fieldRef:
                 fieldPath: metadata.namespace
         ports:
-        - containerPort: 80
-        - containerPort: 443
+          - name: http
+            containerPort: 80
+          - name: https
+            containerPort: 443
         args:
         - /nginx-ingress-controller
         - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
-        - --configmap=$(POD_NAMESPACE)/nginx-load-balancer-conf
+        - --configmap=$(POD_NAMESPACE)/nginx-configuration
+        - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services
+        - --udp-services-configmap=$(POD_NAMESPACE)/udp-services
+        - --publish-service=$(POD_NAMESPACE)/ingress-nginx
+        - --annotations-prefix=nginx.ingress.kubernetes.io
         - --enable-ssl-chain-completion={{ ssl_chain_completion }}
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1

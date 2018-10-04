@@ -103,6 +103,14 @@ def upgrade_charm():
     if hookenv.config().get('ingress'):
         kubectl_success('delete', 'rc', 'nginx-ingress-controller')
 
+        # these moved into a different namespace for 1.12
+        kubectl_success('delete', 'rc', 'default-http-backend')
+        kubectl_success('delete', 'svc', 'default-http-backend')
+        kubectl_success('delete', 'serviceaccount', 'nginx-ingress-{}-serviceaccount')
+        kubectl_success('delete', 'clusterrolebinding', 'nginx-ingress-clusterrole-nisa-{}-binding')
+        kubectl_success('delete', 'configmap', 'nginx-load-balancer-{}-conf')
+        kubectl_success('delete', 'ds', 'nginx-ingress-{}-controller')
+
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
     if is_state('kubernetes-worker.gpu.enabled'):
