@@ -15,7 +15,7 @@ tar -C ./bin -xz -f {cni-plugins-amd64-v0.6.0.tgz}
 
 %install
 
-install -m 644 -d %{buildroot}%{_sysconfdir}/cni/net.d/
+install -m 755 -d %{buildroot}%{_sysconfdir}/cni/net.d/
 install -m 755 -d %{buildroot}/opt/cni
 mv bin/ %{buildroot}/opt/cni/
 

@@ -20,8 +20,8 @@ The node agent of Kubernetes, the container cluster manager.
 %install
 
 install -m 755 -d %{buildroot}%{_bindir}
-install -m 644 -d %{buildroot}%{_sysconfdir}/systemd/system/
-install -m 644 -d %{buildroot}%{_sysconfdir}/kubernetes/manifests/
+install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/
+install -m 755 -d %{buildroot}%{_sysconfdir}/kubernetes/manifests/
 install -p -m 755 -t %{buildroot}%{_bindir} {kubelet}
 install -p -m 644 -t %{buildroot}%{_sysconfdir}/systemd/system/ {kubelet.service}
 
