@@ -2373,6 +2373,47 @@ func TestGetWindowsPath(t *testing.T) {
 	}
 }
 
+func TestIsWindowsNamedPipe(t *testing.T) {
+	tests := []struct {
+		goos        string
+		path        string
+		isNamedPipe bool
+	}{
+		{
+			goos:        "linux",
+			path:        `/usr/bin`,
+			isNamedPipe: false,
+		},
+		{
+			goos:        "linux",
+			path:        `\\.\pipe\foo`,
+			isNamedPipe: false,
+		},
+		{
+			goos:        "windows",
+			path:        `C:\foo`,
+			isNamedPipe: false,
+		},
+		{
+			goos:        "windows",
+			path:        `\\.\invalid`,
+			isNamedPipe: false,
+		},
+		{
+			goos:        "windows",
+			path:        `\\.\pipe\valid_pipe`,
+			isNamedPipe: true,
+		},
+	}
+
+	for _, test := range tests {
+		result := IsWindowsNamedPipe(test.goos, test.path)
+		if result != test.isNamedPipe {
+			t.Errorf("IsWindowsNamedPipe(%v) returned (%v), expected (%v)", test.path, result, test.isNamedPipe)
+		}
+	}
+}
+
 func TestMakeAbsolutePath(t *testing.T) {
 	tests := []struct {
 		goos         string

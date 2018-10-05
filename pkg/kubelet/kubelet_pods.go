@@ -215,14 +215,15 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			}
 		}
 
-		// Docker Volume Mounts fail on Windows if it is not of the form C:/
+		// Docker Volume Mounts fail on Windows if it is not of the form C:/ nor a named pipe starting with \\.\pipe\
 		containerPath := mount.MountPath
 		if runtime.GOOS == "windows" {
-			if (strings.HasPrefix(hostPath, "/") || strings.HasPrefix(hostPath, "\\")) && !strings.Contains(hostPath, ":") {
+			if !volumeutil.IsWindowsNamedPipe(runtime.GOOS, hostPath) && (strings.HasPrefix(hostPath, "/") || strings.HasPrefix(hostPath, "\\")) && !strings.Contains(hostPath, ":") {
 				hostPath = "c:" + hostPath
 			}
 		}
-		if !filepath.IsAbs(containerPath) {
+		// IsAbs returns false for named pipes (\\.\pipe\...) in Windows. So check for it specifically and skip MakeAbsolutePath
+		if !volumeutil.IsWindowsNamedPipe(runtime.GOOS, containerPath) && !filepath.IsAbs(containerPath) {
 			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
 		}
 
