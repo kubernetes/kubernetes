@@ -54,34 +54,64 @@ func TestGetEtcdPodSpec(t *testing.T) {
 }
 
 func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
-
 	// Create temp folder for the test case
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
-	// Creates a Master Configuration
-	cfg := &kubeadmapi.InitConfiguration{
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "v1.7.0",
-			Etcd: kubeadmapi.Etcd{
-				Local: &kubeadmapi.LocalEtcd{
-					DataDir: "/var/lib/etcd",
-					Image:   "k8s.gcr.io/etcd",
+	var tests = []struct {
+		cfg           *kubeadmapi.InitConfiguration
+		expectedError bool
+	}{
+		{
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "v1.7.0",
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
+							DataDir: "/var/lib/etcd",
+							Image:   "k8s.gcr.io/etcd",
+						},
+					},
 				},
 			},
+			expectedError: false,
+		},
+		{
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: "v1.7.0",
+					Etcd: kubeadmapi.Etcd{
+						External: &kubeadmapi.ExternalEtcd{
+							Endpoints: []string{
+								"https://etcd-instance:2379",
+							},
+							CAFile:   "/etc/kubernetes/pki/etcd/ca.crt",
+							CertFile: "/etc/kubernetes/pki/etcd/apiserver-etcd-client.crt",
+							KeyFile:  "/etc/kubernetes/pki/etcd/apiserver-etcd-client.key",
+						},
+					},
+				},
+			},
+			expectedError: true,
 		},
 	}
 
-	// Execute createStaticPodFunction
-	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err := CreateLocalEtcdStaticPodManifestFile(manifestPath, cfg)
-	if err != nil {
-		t.Errorf("Error executing CreateEtcdStaticPodManifestFile: %v", err)
-	}
+	for _, test := range tests {
+		// Execute createStaticPodFunction
+		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
+		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, test.cfg)
 
-	// Assert expected files are there
-	testutil.AssertFilesCount(t, manifestPath, 1)
-	testutil.AssertFileExists(t, manifestPath, kubeadmconstants.Etcd+".yaml")
+		if !test.expectedError {
+			if err != nil {
+				t.Errorf("CreateLocalEtcdStaticPodManifestFile failed when not expected: %v", err)
+			}
+			// Assert expected files are there
+			testutil.AssertFilesCount(t, manifestPath, 1)
+			testutil.AssertFileExists(t, manifestPath, kubeadmconstants.Etcd+".yaml")
+		} else {
+			testutil.AssertError(t, err, "etcd static pod manifest cannot be generated for cluster using external etcd")
+		}
+	}
 }
 
 func TestGetEtcdCommand(t *testing.T) {

@@ -143,6 +143,17 @@ func AssertFileExists(t *testing.T, dirName string, fileNames ...string) {
 	}
 }
 
+// AssertError checks that the provided error matches the expected output
+func AssertError(t *testing.T, err error, expected string) {
+	if err == nil {
+		t.Errorf("no error was found, but '%s' was expected", expected)
+		return
+	}
+	if err.Error() != expected {
+		t.Errorf("error '%s' does not match expected error: '%s'", err.Error(), expected)
+	}
+}
+
 // GetDefaultInternalConfig returns a defaulted kubeadmapi.InitConfiguration
 func GetDefaultInternalConfig(t *testing.T) *kubeadmapi.InitConfiguration {
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{})
