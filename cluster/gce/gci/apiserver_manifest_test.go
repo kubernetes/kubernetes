@@ -105,12 +105,12 @@ func TestEncryptionProviderFlag(t *testing.T) {
 		wantFlag                 bool
 	}{
 		{
-			desc: "ENCRYPTION_PROVIDER_CONFIG is set",
+			desc:                     "ENCRYPTION_PROVIDER_CONFIG is set",
 			encryptionProviderConfig: base64.StdEncoding.EncodeToString([]byte("foo")),
 			wantFlag:                 true,
 		},
 		{
-			desc: "ENCRYPTION_PROVIDER_CONFIG is not set",
+			desc:                     "ENCRYPTION_PROVIDER_CONFIG is not set",
 			encryptionProviderConfig: "",
 			wantFlag:                 false,
 		},

@@ -38,10 +38,10 @@ import (
 
 func NewCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "certificate SUBCOMMAND",
+		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Modify certificate resources."),
-		Long:  "Modify certificate resources.",
+		Short:                 i18n.T("Modify certificate resources."),
+		Long:                  "Modify certificate resources.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
@@ -108,9 +108,9 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 		IOStreams:  ioStreams,
 	}
 	cmd := &cobra.Command{
-		Use: "approve (-f FILENAME | NAME)",
+		Use:                   "approve (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Approve a certificate signing request"),
+		Short:                 i18n.T("Approve a certificate signing request"),
 		Long: templates.LongDesc(`
 		Approve a certificate signing request.
 
@@ -165,9 +165,9 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		IOStreams:  ioStreams,
 	}
 	cmd := &cobra.Command{
-		Use: "deny (-f FILENAME | NAME)",
+		Use:                   "deny (-f FILENAME | NAME)",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Deny a certificate signing request"),
+		Short:                 i18n.T("Deny a certificate signing request"),
 		Long: templates.LongDesc(`
 		Deny a certificate signing request.
 

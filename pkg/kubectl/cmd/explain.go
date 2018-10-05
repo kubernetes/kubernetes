@@ -74,11 +74,11 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 	o := NewExplainOptions(parent, streams)
 
 	cmd := &cobra.Command{
-		Use: "explain RESOURCE",
+		Use:                   "explain RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Documentation of resources"),
-		Long:    explainLong + "\n\n" + cmdutil.SuggestApiResources(parent),
-		Example: explainExamples,
+		Short:                 i18n.T("Documentation of resources"),
+		Long:                  explainLong + "\n\n" + cmdutil.SuggestApiResources(parent),
+		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Validate(args))

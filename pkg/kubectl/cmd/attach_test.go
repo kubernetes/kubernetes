@@ -83,7 +83,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj: attachPod(),
+			obj:                   attachPod(),
 		},
 		{
 			name:                  "container in flag",
@@ -91,7 +91,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj: attachPod(),
+			obj:                   attachPod(),
 		},
 		{
 			name:                  "init container in flag",
@@ -99,7 +99,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "initfoo",
-			obj: attachPod(),
+			obj:                   attachPod(),
 		},
 		{
 			name:            "non-existing container",
@@ -115,7 +115,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"pods", "foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj: attachPod(),
+			obj:                   attachPod(),
 		},
 		{
 			name:                  "invalid get pod timeout value",
@@ -123,8 +123,8 @@ func TestPodAndContainerAttach(t *testing.T) {
 			args:                  []string{"pod/foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
-			obj:         attachPod(),
-			expectError: "must be higher than zero",
+			obj:                   attachPod(),
+			expectError:           "must be higher than zero",
 		},
 	}
 

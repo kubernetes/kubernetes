@@ -529,9 +529,9 @@ func TestGetRegionInURL(t *testing.T) {
 		"https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/subnetworks/a": "us-central1",
 		"https://www.googleapis.com/compute/v1/projects/my-project/regions/us-west2/subnetworks/b":    "us-west2",
 		"projects/my-project/regions/asia-central1/subnetworks/c":                                     "asia-central1",
-		"regions/europe-north2":                                                                       "europe-north2",
-		"my-url":                                                                                      "",
-		"":                                                                                            "",
+		"regions/europe-north2": "europe-north2",
+		"my-url":                "",
+		"":                      "",
 	}
 	for input, output := range cases {
 		result := getRegionInURL(input)

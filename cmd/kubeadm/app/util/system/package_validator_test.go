@@ -166,8 +166,8 @@ func TestValidatePackageVersion(t *testing.T) {
 	testKernelRelease := "test-kernel-release"
 	manager := testPackageManager{
 		packageVersions: map[string]string{
-			"foo": "1.0.0",
-			"bar": "2.1.0",
+			"foo":                      "1.0.0",
+			"bar":                      "2.1.0",
 			"bar-" + testKernelRelease: "3.0.0",
 		},
 	}

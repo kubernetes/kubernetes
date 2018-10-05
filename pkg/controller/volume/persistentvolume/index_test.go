@@ -1245,27 +1245,27 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 		enableStorageObjectInUseProtection bool
 	}{
 		"feature enabled - pv deletionTimeStamp not set": {
-			isExpectedMatch: true,
-			vol:             pv,
-			pvc:             pvc,
+			isExpectedMatch:                    true,
+			vol:                                pv,
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: true,
 		},
 		"feature enabled - pv deletionTimeStamp set": {
-			isExpectedMatch: false,
-			vol:             pvToDelete,
-			pvc:             pvc,
+			isExpectedMatch:                    false,
+			vol:                                pvToDelete,
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: true,
 		},
 		"feature disabled - pv deletionTimeStamp not set": {
-			isExpectedMatch: true,
-			vol:             pv,
-			pvc:             pvc,
+			isExpectedMatch:                    true,
+			vol:                                pv,
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: false,
 		},
 		"feature disabled - pv deletionTimeStamp set": {
-			isExpectedMatch: true,
-			vol:             pvToDelete,
-			pvc:             pvc,
+			isExpectedMatch:                    true,
+			vol:                                pvToDelete,
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: false,
 		},
 	}
@@ -1291,27 +1291,27 @@ func TestAlphaStorageObjectInUseProtectionFiltering(t *testing.T) {
 		enableStorageObjectInUseProtection bool
 	}{
 		"feature enabled - pv deletionTimeStamp not set": {
-			isExpectedMatch: true,
-			vol:             createTestVolOrderedIndex(pv),
-			pvc:             pvc,
+			isExpectedMatch:                    true,
+			vol:                                createTestVolOrderedIndex(pv),
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: true,
 		},
 		"feature enabled - pv deletionTimeStamp set": {
-			isExpectedMatch: false,
-			vol:             createTestVolOrderedIndex(pvToDelete),
-			pvc:             pvc,
+			isExpectedMatch:                    false,
+			vol:                                createTestVolOrderedIndex(pvToDelete),
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: true,
 		},
 		"feature disabled - pv deletionTimeStamp not set": {
-			isExpectedMatch: true,
-			vol:             createTestVolOrderedIndex(pv),
-			pvc:             pvc,
+			isExpectedMatch:                    true,
+			vol:                                createTestVolOrderedIndex(pv),
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: false,
 		},
 		"feature disabled - pv deletionTimeStamp set": {
-			isExpectedMatch: true,
-			vol:             createTestVolOrderedIndex(pvToDelete),
-			pvc:             pvc,
+			isExpectedMatch:                    true,
+			vol:                                createTestVolOrderedIndex(pvToDelete),
+			pvc:                                pvc,
 			enableStorageObjectInUseProtection: false,
 		},
 	}

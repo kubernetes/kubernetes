@@ -166,7 +166,7 @@ func TestGetClusterStatus(t *testing.T) {
 		expectedClusterEndpoints int
 	}{
 		{
-			name: "return empty ClusterStatus if cluster kubeadm-config doesn't exist (e.g init)",
+			name:                     "return empty ClusterStatus if cluster kubeadm-config doesn't exist (e.g init)",
 			expectedClusterEndpoints: 0,
 		},
 		{

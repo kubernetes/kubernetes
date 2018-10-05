@@ -51,7 +51,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericcliopti
 	}
 
 	cmd := &cobra.Command{
-		Use: "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
+		Use:                   "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pdb"},
 		Short:                 i18n.T("Create a pod disruption budget with the specified name."),
