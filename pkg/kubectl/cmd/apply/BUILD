@@ -36,6 +36,7 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:go_default_library",
+        "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -49,6 +50,7 @@ go_test(
     name = "go_default_test",
     srcs = ["apply_test.go"],
     data = [
+        "//api/openapi-spec:swagger-spec",
         "//test/fixtures",
     ],
     embed = [":go_default_library"],
@@ -71,6 +73,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
+        "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
