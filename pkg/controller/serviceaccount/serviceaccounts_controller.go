@@ -208,6 +208,9 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		case err != nil:
 			return err
 		}
+		// inherit Labels from namespace
+		sa.Labels = ns.Labels
+
 		// this is only safe because we never read it and we always write it
 		// TODO eliminate this once the fake client can handle creation without NS
 		sa.Namespace = ns.Name
