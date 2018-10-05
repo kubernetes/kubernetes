@@ -39,9 +39,8 @@ import (
 	"gopkg.in/gcfg.v1"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -287,7 +286,7 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (pc *PCCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (pc *PCCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
 
 // Instances returns an implementation of Instances for Photon Controller.
 func (pc *PCCloud) Instances() (cloudprovider.Instances, bool) {

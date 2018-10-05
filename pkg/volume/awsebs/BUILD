@@ -17,7 +17,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/awsebs",
     deps = [
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -31,6 +30,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
