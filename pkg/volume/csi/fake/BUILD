@@ -5,11 +5,15 @@ go_library(
     srcs = [
         "fake_client.go",
         "fake_closer.go",
+        "fake_node_info_manager.go",
+        "fake_node_server.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/volume/csi/fake",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/volume/csi/nodeinfomanager:go_default_library",
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
+        "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
     ],
 )
