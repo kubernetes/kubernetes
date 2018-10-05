@@ -362,7 +362,7 @@ var getSubresourceTemplate = `
 func (c *Fake$.type|publicPlural$) Get($.type|private$Name string, options $.GetOptions|raw$) (result *$.resultType|raw$, err error) {
 	obj, err := c.Fake.
 		$if .namespaced$Invokes($.NewGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, c.ns, "$.subresourcePath$", $.type|private$Name), &$.resultType|raw${})
-		$else$Invokes($.NewRootGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, $.type|private$Name), &$.resultType|raw${})$end$
+		$else$Invokes($.NewRootGetSubresourceAction|raw$($.type|allLowercasePlural$Resource, "$.subresourcePath$", $.type|private$Name), &$.resultType|raw${})$end$
 	if obj == nil {
 		return nil, err
 	}
