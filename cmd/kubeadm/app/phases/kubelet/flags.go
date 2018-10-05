@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -71,7 +71,7 @@ func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions,
 func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}
 
-	if opts.nodeRegOpts.CRISocket == kubeadmapiv1alpha3.DefaultCRISocket {
+	if opts.nodeRegOpts.CRISocket == kubeadmapiv1beta1.DefaultCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
 		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)

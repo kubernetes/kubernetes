@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -47,6 +47,14 @@ kind: InitConfiguration
 `),
 	"Join_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
+kind: JoinConfiguration
+`),
+	"Init_v1beta1": []byte(`
+apiVersion: kubeadm.k8s.io/v1beta1
+kind: InitConfiguration
+`),
+	"Join_v1beta1": []byte(`
+apiVersion: kubeadm.k8s.io/v1beta1
 kind: JoinConfiguration
 `),
 	"NoKind": []byte(`
@@ -100,13 +108,41 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 			fileContents: files["Join_v1alpha3"],
 		},
 		{
-			name:         "DuplicateInit",
+			name:         "Init_v1beta1",
+			fileContents: files["Init_v1beta1"],
+		},
+		{
+			name:         "Join_v1beta1",
+			fileContents: files["Join_v1beta1"],
+		},
+		{
+			name:         "DuplicateInit v1alpha3",
 			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Init_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
 		{
-			name:         "DuplicateJoin",
+			name:         "DuplicateInit v1beta1",
+			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Init_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "DuplicateInit v1beta1 and v1alpha3",
+			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Init_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "DuplicateJoin v1alpha3",
 			fileContents: bytes.Join([][]byte{files["Join_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "DuplicateJoin v1beta1",
+			fileContents: bytes.Join([][]byte{files["Join_v1beta1"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "DuplicateJoin v1beta1 and v1alpha3",
+			fileContents: bytes.Join([][]byte{files["Join_v1beta1"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
 		{
@@ -120,14 +156,31 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 			expectedErr:  true,
 		},
 		{
-			name:         "v1alpha1InMultiple",
-			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1alpha1"]}, []byte(constants.YAMLDocumentSeparator)),
+			name:         "Ignore other Kind",
+			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+		},
+		{
+			name:         "Ignore other Kind",
+			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
+		},
+		{
+			name:         "MustNotMixInitJoin v1alpha3",
+			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
-		// TODO: implement mustnotMix v1alpha3 v1beta1 after introducing v1beta1
 		{
-			name:         "MustNotMixInitJoin",
-			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+			name:         "MustNotMixInitJoin v1alpha3 - v1beta1",
+			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixInitJoin v1beta1 - v1alpha3",
+			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
+			expectedErr:  true,
+		},
+		{
+			name:         "MustNotMixInitJoin v1beta1",
+			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
 			expectedErr:  true,
 		},
 	}
@@ -171,8 +224,8 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1alpha3.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+			cfg := &kubeadmapiv1beta1.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 					APIServerCertSANs: test.in,
 				},
 			}

@@ -49,13 +49,13 @@ const (
 	waitForPodsWithLabel = "wait-for-pods-with-label"
 
 	testConfiguration = `
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 kind: InitConfiguration
 nodeRegistration:
   name: foo
   criSocket: ""
 ---
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterConfiguration
 api:
   advertiseAddress: 1.2.3.4

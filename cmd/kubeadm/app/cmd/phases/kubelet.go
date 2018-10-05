@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -195,7 +195,7 @@ func NewCmdKubeletConfig() *cobra.Command {
 
 // NewCmdKubeletConfigUpload calls cobra.Command for uploading dynamic kubelet configuration
 func NewCmdKubeletConfigUpload() *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 	var cfgPath string
 	kubeConfigFile := constants.GetAdminKubeConfigPath()
 
@@ -234,7 +234,7 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 
 // NewCmdKubeletAnnotateCRI calls cobra.Command for annotating the node with the given crisocket
 func NewCmdKubeletAnnotateCRI() *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 	var cfgPath string
 	kubeConfigFile := constants.GetAdminKubeConfigPath()
 
@@ -308,7 +308,7 @@ func getKubeletVersion(kubeletVersionStr string) (*version.Version, error) {
 
 // NewCmdKubeletConfigWriteToDisk calls cobra.Command for writing init kubelet configuration
 func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 	var cfgPath string
 	cmd := &cobra.Command{
 		Use:     "write-to-disk",

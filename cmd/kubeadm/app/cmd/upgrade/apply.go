@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -70,7 +70,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		applyPlanFlags:   apf,
 		imagePullTimeout: defaultImagePullTimeout,
 		etcdUpgrade:      true,
-		criSocket:        kubeadmapiv1alpha3.DefaultCRISocket,
+		criSocket:        kubeadmapiv1beta1.DefaultCRISocket,
 	}
 
 	cmd := &cobra.Command{
@@ -91,7 +91,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 			if flags.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
 				// Note that cfg isn't preserved here, it's just an one-off to populate flags.newK8sVersionStr based on --config
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {

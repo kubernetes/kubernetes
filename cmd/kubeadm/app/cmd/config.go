@@ -33,6 +33,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -50,8 +51,8 @@ import (
 
 var (
 	// sillyToken is only set statically to make kubeadm not randomize the token on every run
-	sillyToken = kubeadmapiv1alpha3.BootstrapToken{
-		Token: &kubeadmapiv1alpha3.BootstrapTokenString{
+	sillyToken = kubeadmapiv1beta1.BootstrapToken{
+		Token: &kubeadmapiv1beta1.BootstrapTokenString{
 			ID:     "abcdef",
 			Secret: "0123456789abcdef",
 		},
@@ -164,13 +165,13 @@ func getAllAPIObjectNames() []string {
 }
 
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
-	return configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.InitConfiguration{
+	return configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{
 		// TODO: Probably move to getDefaultedClusterConfig?
-		APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
+		APIEndpoint: kubeadmapiv1beta1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		},
-		BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{sillyToken},
+		BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{sillyToken},
 	})
 }
 
@@ -189,11 +190,11 @@ func getDefaultInitConfigBytes(kind string) ([]byte, error) {
 	if err != nil {
 		return []byte{}, err
 	}
-	return gvkmap[kubeadmapiv1alpha3.SchemeGroupVersion.WithKind(kind)], nil
+	return gvkmap[kubeadmapiv1beta1.SchemeGroupVersion.WithKind(kind)], nil
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha3.JoinConfiguration{
+	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.JoinConfiguration{
 		Token: sillyToken.Token.String(),
 		DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
 		DiscoveryTokenUnsafeSkipCAVerification: true, // TODO: DiscoveryTokenUnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
@@ -230,6 +231,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 			locally in the CLI tool without ever touching anything in the cluster.
 			In this version of kubeadm, the following API versions are supported:
 			- %s
+			- %s
 
 			Further, kubeadm can only write out config of version %q, but read both types.
 			So regardless of what version you pass to the --old-config parameter here, the API object will be
@@ -238,7 +240,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1alpha3.SchemeGroupVersion.String()),
+		`), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1beta1.SchemeGroupVersion.String(), kubeadmapiv1beta1.SchemeGroupVersion.String()),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(oldCfgPath) == 0 {
 				kubeadmutil.CheckErr(fmt.Errorf("The --old-config flag is mandatory"))
@@ -323,7 +325,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 			// The default configuration is empty; everything should come from the file on disk
 			glog.V(1).Infoln("[config] creating empty default configuration")
-			defaultcfg := &kubeadmapiv1alpha3.InitConfiguration{}
+			defaultcfg := &kubeadmapiv1beta1.InitConfiguration{}
 			// Upload the configuration using the file; don't care about the defaultcfg really
 			glog.V(1).Infof("[config] uploading configuration")
 			err = uploadConfiguration(client, cfgPath, defaultcfg)
@@ -336,7 +338,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
 	var featureGatesString string
@@ -386,7 +388,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 }
 
 // uploadConfiguration handles the uploading of the configuration internally
-func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1alpha3.InitConfiguration) error {
+func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1beta1.InitConfiguration) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
 	err := phaseutil.SetKubernetesVersion(client, defaultcfg)
@@ -420,7 +422,7 @@ func NewCmdConfigImages(out io.Writer) *cobra.Command {
 
 // NewCmdConfigImagesPull returns the `kubeadm config images pull` command
 func NewCmdConfigImagesPull() *cobra.Command {
-	externalcfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -472,7 +474,7 @@ func (ip *ImagesPull) PullAll() error {
 
 // NewCmdConfigImagesList returns the "kubeadm config images list" command
 func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
-	externalcfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -499,7 +501,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 }
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
-func NewImagesList(cfgPath string, cfg *kubeadmapiv1alpha3.InitConfiguration) (*ImagesList, error) {
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration) (*ImagesList, error) {
 	initcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
@@ -526,7 +528,7 @@ func (i *ImagesList) Run(out io.Writer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.InitConfiguration, cfgPath *string, featureGatesString *string) {
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, cfgPath *string, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.ClusterConfiguration.KubernetesVersion, "kubernetes-version", cfg.ClusterConfiguration.KubernetesVersion,
 		`Choose a specific Kubernetes version for the control plane.`,
@@ -537,7 +539,7 @@ func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.I
 }
 
 // AddImagesPullFlags adds flags related to the `kubeadm config images pull` command
-func AddImagesPullFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1alpha3.InitConfiguration) {
+func AddImagesPullFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration) {
 	flagSet.StringVar(&cfg.NodeRegistration.CRISocket, "cri-socket", cfg.NodeRegistration.CRISocket, "Specify the CRI socket to connect to.")
 	flagSet.StringVar(&cfg.NodeRegistration.CRISocket, "cri-socket-path", cfg.NodeRegistration.CRISocket, "Path to the CRI socket.")
 	flagSet.MarkDeprecated("cri-socket-path", "Please, use --cri-socket instead")
