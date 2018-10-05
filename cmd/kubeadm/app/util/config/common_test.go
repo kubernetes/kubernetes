@@ -163,25 +163,27 @@ func TestDetectUnsupportedVersion(t *testing.T) {
 			name:         "Ignore other Kind",
 			fileContents: bytes.Join([][]byte{files["Foo"], files["Master_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
 		},
+		// CanMixInitJoin cases used to be MustNotMixInitJoin, however due to UX issues DetectUnsupportedVersion had to tolerate that.
+		// So the following tests actually verify, that Init and Join can be mixed together with no error.
 		{
-			name:         "MustNotMixInitJoin v1alpha3",
+			name:         "CanMixInitJoin v1alpha3",
 			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixInitJoin v1alpha3 - v1beta1",
+			name:         "CanMixInitJoin v1alpha3 - v1beta1",
 			fileContents: bytes.Join([][]byte{files["Init_v1alpha3"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixInitJoin v1beta1 - v1alpha3",
+			name:         "CanMixInitJoin v1beta1 - v1alpha3",
 			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Join_v1alpha3"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 		{
-			name:         "MustNotMixInitJoin v1beta1",
+			name:         "CanMixInitJoin v1beta1",
 			fileContents: bytes.Join([][]byte{files["Init_v1beta1"], files["Join_v1beta1"]}, []byte(constants.YAMLDocumentSeparator)),
-			expectedErr:  true,
+			expectedErr:  false,
 		},
 	}
 
