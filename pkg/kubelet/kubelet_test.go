@@ -1571,7 +1571,7 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	// Pretend the pod is deleted from apiserver, but is still active on the node.
 	// The pod directory should not be removed.
 	pods = []*v1.Pod{}
-	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{runningPod, ""}}
+	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{Pod: runningPod, NetnsPath: ""}}
 	syncAndVerifyPodDir(t, testKubelet, pods, []*v1.Pod{apiPod}, true)
 
 	// The pod is deleted and also not active on the node. The pod directory
