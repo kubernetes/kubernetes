@@ -13,7 +13,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["record.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testdata/edit",
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/edit/testdata",
     visibility = ["//visibility:private"],
     deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],
 )

@@ -69,7 +69,6 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
-        "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
