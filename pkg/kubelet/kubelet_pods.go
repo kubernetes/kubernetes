@@ -1656,7 +1656,7 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(cgroupPods map[types.UID]cm.CgroupN
 	for _, pod := range activePods {
 		podSet.Insert(string(pod.UID))
 	}
-    for _, pod := range runningPods {
+	for _, pod := range runningPods {
 		podSet.Insert(string(pod.ID))
 	}
 	pcm := kl.containerManager.NewPodContainerManager()
