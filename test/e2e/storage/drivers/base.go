@@ -87,6 +87,9 @@ type DriverInfo struct {
 	IsFsGroupSupported bool        // Flag to represent whether it supports fsGroup
 	IsBlockSupported   bool        // Flag to represent whether it supports Block Volume
 
+	// Flags that will be safely default to false and will be false for most drivers
+	CanSkipAttach bool // Flag to represent whether it can skip attach
+
 	// Parameters below will be set inside test loop by using SetCommonDriverParameters.
 	// Drivers that implement TestDriver is required to set all the above parameters
 	// and return DriverInfo on GetDriverInfo() call.

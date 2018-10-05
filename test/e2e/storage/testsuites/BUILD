@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "base.go",
         "subpath.go",
+        "volume_attachment.go",
         "volume_io.go",
         "volumemode.go",
         "volumes.go",
@@ -22,6 +23,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/storage/drivers:go_default_library",
         "//test/e2e/storage/testpatterns:go_default_library",
