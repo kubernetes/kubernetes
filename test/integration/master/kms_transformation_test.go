@@ -147,15 +147,16 @@ func mustSetupTest(t *testing.T) (*base64Plugin, *transformTest) {
 	}
 
 	// Ensuring that the test secret has been cached - written to etcd and read back by cacher.
+	var restErr error
 	pollErr := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, err := test.restClient.CoreV1().Secrets(test.ns.Name).Get(test.secret.Name, metav1.GetOptions{ResourceVersion: "0"})
-		return err == nil, nil
+		_, restErr = test.restClient.CoreV1().Secrets(test.ns.Name).Get(test.secret.Name, metav1.GetOptions{ResourceVersion: "0"})
+		return restErr == nil, nil
 	})
 
 	if pollErr == wait.ErrWaitTimeout {
 		pluginMock.cleanUp()
 		test.cleanUp()
-		t.Fatalf("failed to retrieve secret from cache within the alloted time period: %d", wait.ForeverTestTimeout)
+		t.Fatalf("failed to retrieve secret from cache within the alloted time period: %d, error: %v", wait.ForeverTestTimeout, restErr)
 	}
 
 	return pluginMock, test

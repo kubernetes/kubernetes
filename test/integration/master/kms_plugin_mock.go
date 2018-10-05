@@ -94,12 +94,12 @@ func (s *base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptReque
 func (s *base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
 	glog.Infof("Received Encrypt Request for DEK: %x", request.Plain)
 	s.encryptRequest <- request
-	return base64Encode(request)
+	return base64Encode(request), nil
 }
 
 // base64Encode base64 encodes EncryptRequest, thus simulating transformation.
-func base64Encode(request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
-	return &kmsapi.EncryptResponse{Cipher: []byte(base64.StdEncoding.EncodeToString(request.Plain))}, nil
+func base64Encode(request *kmsapi.EncryptRequest) *kmsapi.EncryptResponse {
+	return &kmsapi.EncryptResponse{Cipher: []byte(base64.StdEncoding.EncodeToString(request.Plain))}
 }
 
 // base64Decode base64 decodes DecryptRequest, thus simulating transformation.
