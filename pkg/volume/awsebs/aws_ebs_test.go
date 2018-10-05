@@ -371,7 +371,7 @@ func TestMountOptions(t *testing.T) {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	mountOptions := fakeMounter.MountPoints[0].Opts
-	expectedMountOptions := []string{"bind", "_netdev"}
+	expectedMountOptions := []string{"_netdev", "bind"}
 	if !reflect.DeepEqual(mountOptions, expectedMountOptions) {
 		t.Errorf("Expected mount options to be %v got %v", expectedMountOptions, mountOptions)
 	}
