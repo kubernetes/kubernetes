@@ -18,7 +18,6 @@ package cache
 
 import (
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -97,18 +96,6 @@ type Cache interface {
 	// RemoveNode removes overall information about node.
 	RemoveNode(node *v1.Node) error
 
-	// AddPDB adds a PodDisruptionBudget object to the cache.
-	AddPDB(pdb *policy.PodDisruptionBudget) error
-
-	// UpdatePDB updates a PodDisruptionBudget object in the cache.
-	UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error
-
-	// RemovePDB removes a PodDisruptionBudget object from the cache.
-	RemovePDB(pdb *policy.PodDisruptionBudget) error
-
-	// List lists all cached PDBs matching the selector.
-	ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error)
-
 	// UpdateNodeNameToInfoMap updates the passed infoMap to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
@@ -123,9 +110,6 @@ type Cache interface {
 	// Snapshot takes a snapshot on current cache
 	Snapshot() *Snapshot
 
-	// IsUpToDate returns true if the given NodeInfo matches the current data in the cache.
-	IsUpToDate(n *NodeInfo) bool
-
 	// NodeTree returns a node tree structure
 	NodeTree() *NodeTree
 }
@@ -134,5 +118,4 @@ type Cache interface {
 type Snapshot struct {
 	AssumedPods map[string]bool
 	Nodes       map[string]*NodeInfo
-	Pdbs        map[string]*policy.PodDisruptionBudget
 }

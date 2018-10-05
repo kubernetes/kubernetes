@@ -37,7 +37,12 @@ var _ = framework.KubeDescribe("Container Runtime", func() {
 	Describe("blackbox test", func() {
 		Context("when starting a container that exits", func() {
 
-			It("should run with the expected status [NodeConformance]", func() {
+			/*
+				Release : v1.13
+				Testname: Container Runtime, Restart Policy, Pod Phases
+				Description: If the restart policy is set to ‘Always’, Pod MUST be restarted when terminated, If restart policy is ‘OnFailure’, Pod MUST be started only if it is terminated with non-zero exit code. If the restart policy is ‘Never’, Pod MUST never be restarted. All these three test cases MUST verify the restart counts accordingly.
+			*/
+			framework.ConformanceIt("should run with the expected status [NodeConformance]", func() {
 				restartCountVolumeName := "restart-count"
 				restartCountVolumePath := "/restart-count"
 				testContainer := v1.Container{
@@ -283,13 +288,13 @@ while true; do sleep 1; done
 				},
 				{
 					description: "should not be able to pull from private registry without secret",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
+					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
 					phase:       v1.PodPending,
 					waiting:     true,
 				},
 				{
 					description: "should be able to pull from private registry with secret",
-					image:       "gcr.io/authenticated-image-pulling/alpine:3.1",
+					image:       "gcr.io/authenticated-image-pulling/alpine:3.7",
 					secret:      true,
 					phase:       v1.PodRunning,
 					waiting:     false,

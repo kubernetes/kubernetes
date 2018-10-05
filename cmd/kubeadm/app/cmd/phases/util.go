@@ -23,7 +23,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -31,7 +31,7 @@ import (
 )
 
 // runCmdPhase creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runCmdPhase(cmdFunc func(outDir string, cfg *kubeadmapi.InitConfiguration) error, outDir, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration, defaultKubernetesVersion string) func(cmd *cobra.Command, args []string) {
+func runCmdPhase(cmdFunc func(outDir string, cfg *kubeadmapi.InitConfiguration) error, outDir, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration, defaultKubernetesVersion string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a closure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -66,7 +66,7 @@ func runCmdPhase(cmdFunc func(outDir string, cfg *kubeadmapi.InitConfiguration) 
 }
 
 // SetKubernetesVersion gets current Kubeadm version and sets it as Kubernetes version of master configuration if not set.
-func SetKubernetesVersion(client clientset.Interface, cfg *kubeadmapiv1alpha3.InitConfiguration) error {
+func SetKubernetesVersion(client clientset.Interface, cfg *kubeadmapiv1beta1.InitConfiguration) error {
 	if cfg.KubernetesVersion != "" {
 		return nil
 	}

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
@@ -218,7 +219,7 @@ func (o *ReplaceOptions) Run() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("replacing", info.Source, err)
 		}
 
@@ -309,7 +310,7 @@ func (o *ReplaceOptions) forceReplace() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.createAnnotation, info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 

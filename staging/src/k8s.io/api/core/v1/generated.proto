@@ -3126,6 +3126,11 @@ message PodSpec {
   // This is an alpha feature and may change in the future.
   // +optional
   optional string runtimeClassName = 29;
+
+  // EnableServiceLinks indicates whether information about services should be injected into pod's
+  // environment variables, matching the syntax of Docker links.
+  // +optional
+  optional bool enableServiceLinks = 30;
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual

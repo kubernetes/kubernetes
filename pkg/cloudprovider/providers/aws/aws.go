@@ -141,8 +141,13 @@ const ServiceAnnotationLoadBalancerConnectionIdleTimeout = "service.beta.kuberne
 const ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled = "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled"
 
 // ServiceAnnotationLoadBalancerExtraSecurityGroups is the annotation used
-// one the service to specify additional security groups to be added to ELB created
+// on the service to specify additional security groups to be added to ELB created
 const ServiceAnnotationLoadBalancerExtraSecurityGroups = "service.beta.kubernetes.io/aws-load-balancer-extra-security-groups"
+
+// ServiceAnnotationLoadBalancerSecurityGroups is the annotation used
+// on the service to specify the security groups to be added to ELB created. Differently from the annotation
+// "service.beta.kubernetes.io/aws-load-balancer-extra-security-groups", this replaces all other security groups previously assigned to the ELB.
+const ServiceAnnotationLoadBalancerSecurityGroups = "service.beta.kubernetes.io/aws-load-balancer-security-groups"
 
 // ServiceAnnotationLoadBalancerCertificate is the annotation used on the
 // service to request a secure listener. Value is a valid certificate ARN.
@@ -1014,10 +1019,6 @@ func updateConfigZone(cfg *CloudConfig, metadata EC2Metadata) error {
 	}
 
 	return nil
-}
-
-func getInstanceType(metadata EC2Metadata) (string, error) {
-	return metadata.GetMetadata("instance-type")
 }
 
 func getAvailabilityZone(metadata EC2Metadata) (string, error) {
@@ -1968,23 +1969,6 @@ func (c *Cloud) buildSelfAWSInstance() (*awsInstance, error) {
 		return nil, fmt.Errorf("error finding instance %s: %q", instanceID, err)
 	}
 	return newAWSInstance(c.ec2, instance), nil
-}
-
-// Gets the awsInstance with for the node with the specified nodeName, or the 'self' instance if nodeName == ""
-func (c *Cloud) getAwsInstance(nodeName types.NodeName) (*awsInstance, error) {
-	var awsInstance *awsInstance
-	if nodeName == "" {
-		awsInstance = c.selfAWSInstance
-	} else {
-		instance, err := c.getInstanceByNodeName(nodeName)
-		if err != nil {
-			return nil, err
-		}
-
-		awsInstance = newAWSInstance(c.ec2, instance)
-	}
-
-	return awsInstance, nil
 }
 
 // wrapAttachError wraps the error returned by an AttachVolume request with
@@ -3204,7 +3188,8 @@ func getPortSets(annotation string) (ports *portSets) {
 // attached to ELB created by a service. List always consist of at least
 // 1 member which is an SG created for this service or a SG from the Global config.
 // Extra groups can be specified via annotation, as can extra tags for any
-// new groups.
+// new groups. The annotation "ServiceAnnotationLoadBalancerSecurityGroups" allows for
+// setting the security groups specified.
 func (c *Cloud) buildELBSecurityGroupList(serviceName types.NamespacedName, loadBalancerName string, annotations map[string]string) ([]string, error) {
 	var err error
 	var securityGroupID string
@@ -3221,7 +3206,20 @@ func (c *Cloud) buildELBSecurityGroupList(serviceName types.NamespacedName, load
 			return nil, err
 		}
 	}
-	sgList := []string{securityGroupID}
+
+	sgList := []string{}
+
+	for _, extraSG := range strings.Split(annotations[ServiceAnnotationLoadBalancerSecurityGroups], ",") {
+		extraSG = strings.TrimSpace(extraSG)
+		if len(extraSG) > 0 {
+			sgList = append(sgList, extraSG)
+		}
+	}
+
+	// If no Security Groups have been specified with the ServiceAnnotationLoadBalancerSecurityGroups annotation, we add the default one.
+	if len(sgList) == 0 {
+		sgList = append(sgList, securityGroupID)
+	}
 
 	for _, extraSG := range strings.Split(annotations[ServiceAnnotationLoadBalancerExtraSecurityGroups], ",") {
 		extraSG = strings.TrimSpace(extraSG)
@@ -3332,7 +3330,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	// Determine if this is tagged as an Internal ELB
 	internalELB := false
 	internalAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerInternal]
-	if internalAnnotation != "" {
+	if internalAnnotation == "false" {
+		internalELB = false
+	} else if internalAnnotation != "" {
 		internalELB = true
 	}
 

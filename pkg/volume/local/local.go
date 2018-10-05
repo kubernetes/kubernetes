@@ -87,7 +87,7 @@ func (plugin *localVolumePlugin) RequiresRemount() bool {
 }
 
 func (plugin *localVolumePlugin) SupportsMountOption() bool {
-	return false
+	return true
 }
 
 func (plugin *localVolumePlugin) SupportsBulkVolumeVerification() bool {
@@ -130,7 +130,8 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ vo
 			globalPath:      globalLocalPath,
 			MetricsProvider: volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(pod.UID, stringsutil.EscapeQualifiedNameForDisk(localVolumePluginName), spec.Name())),
 		},
-		readOnly: readOnly,
+		mountOptions: util.MountOptionFromSpec(spec),
+		readOnly:     readOnly,
 	}, nil
 
 }
@@ -393,7 +394,8 @@ func (l *localVolume) GetPath() string {
 
 type localVolumeMounter struct {
 	*localVolume
-	readOnly bool
+	readOnly     bool
+	mountOptions []string
 }
 
 var _ volume.Mounter = &localVolumeMounter{}
@@ -476,10 +478,11 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if m.readOnly {
 		options = append(options, "ro")
 	}
+	mountOptions := util.JoinMountOptions(options, m.mountOptions)
 
 	glog.V(4).Infof("attempting to mount %s", dir)
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
-	err = m.mounter.Mount(globalPath, dir, "", options)
+	err = m.mounter.Mount(globalPath, dir, "", mountOptions)
 	if err != nil {
 		glog.Errorf("Mount of volume %s failed: %v", dir, err)
 		notMnt, mntErr := m.mounter.IsNotMountPoint(dir)

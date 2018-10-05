@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -36,7 +37,6 @@ import (
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/normalizer"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 var (

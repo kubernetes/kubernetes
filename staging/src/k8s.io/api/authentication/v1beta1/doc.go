@@ -17,4 +17,5 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +groupName=authentication.k8s.io
 // +k8s:openapi-gen=true
+
 package v1beta1 // import "k8s.io/api/authentication/v1beta1"

@@ -67,7 +67,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade/config", flags.cfgPath, false)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
 			fmt.Println("")
 			fmt.Println("[upgrade/config] Next steps:")
@@ -75,7 +75,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your master.\n")
 			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
 			fmt.Println("")
-			err = fmt.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.InitConfigurationConfigMap, metav1.NamespaceSystem)
+			err = fmt.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, fmt.Errorf("[upgrade/config] FATAL: %v", err)
 	}

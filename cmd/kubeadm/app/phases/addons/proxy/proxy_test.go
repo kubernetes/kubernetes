@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -173,13 +173,13 @@ func TestEnsureProxyAddon(t *testing.T) {
 		// Create a fake client and set up default test configuration
 		client := clientsetfake.NewSimpleClientset()
 		// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
-		masterConfig := &kubeadmapiv1alpha3.InitConfiguration{
-			APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{
+		masterConfig := &kubeadmapiv1beta1.InitConfiguration{
+			APIEndpoint: kubeadmapiv1beta1.APIEndpoint{
 				AdvertiseAddress: "1.2.3.4",
 				BindPort:         1234,
 			},
-			ClusterConfiguration: kubeadmapiv1alpha3.ClusterConfiguration{
-				Networking: kubeadmapiv1alpha3.Networking{
+			ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+				Networking: kubeadmapiv1beta1.Networking{
 					PodSubnet: "5.6.7.8/24",
 				},
 				ImageRepository:   "someRepo",

@@ -37,8 +37,8 @@ func TestDefaultFlags(t *testing.T) {
 
 	expected := &CloudControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
-			Port:            10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-			Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			MinResyncPeriod: metav1.Duration{Duration: 12 * time.Hour},
 			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 				ContentType: "application/vnd.kubernetes.protobuf",
@@ -85,7 +85,7 @@ func TestDefaultFlags(t *testing.T) {
 		}).WithLoopback(),
 		InsecureServing: (&apiserveroptions.DeprecatedInsecureServingOptions{
 			BindAddress: net.ParseIP("0.0.0.0"),
-			BindPort:    int(10253),
+			BindPort:    int(0),
 			BindNetwork: "tcp",
 		}).WithLoopback(),
 		Authentication: &apiserveroptions.DelegatingAuthenticationOptions{
@@ -155,8 +155,8 @@ func TestAddFlags(t *testing.T) {
 
 	expected := &CloudControllerManagerOptions{
 		Generic: &cmoptions.GenericControllerManagerConfigurationOptions{
-			Port:            10253,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
-			Address:         "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Port:            DefaultInsecureCloudControllerManagerPort, // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Address:         "0.0.0.0",                                 // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			MinResyncPeriod: metav1.Duration{Duration: 100 * time.Minute},
 			ClientConnection: apimachineryconfig.ClientConnectionConfiguration{
 				ContentType: "application/vnd.kubernetes.protobuf",

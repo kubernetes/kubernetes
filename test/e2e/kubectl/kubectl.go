@@ -58,7 +58,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/generated"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	uexec "k8s.io/utils/exec"
@@ -150,7 +150,7 @@ func substituteImageName(content string) string {
 }
 
 func readTestFileOrDie(file string) []byte {
-	return generated.ReadOrDie(path.Join(kubeCtlManifestPath, file))
+	return testfiles.ReadOrDie(path.Join(kubeCtlManifestPath, file), Fail)
 }
 
 func runKubectlRetryOrDie(args ...string) string {
@@ -292,8 +292,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 		var nautilus, kitten string
 		BeforeEach(func() {
 			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
-			nautilus = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
-			kitten = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
+			nautilus = substituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"), Fail)))
+			kitten = substituteImageName(string(testfiles.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"), Fail)))
 		})
 		/*
 			Release : v1.9
@@ -357,7 +357,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"redis-master-deployment.yaml.in",
 				"redis-slave-deployment.yaml.in",
 			} {
-				contents := substituteImageName(string(generated.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
+				contents := substituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile), Fail)))
 				run(contents)
 			}
 		}
@@ -383,9 +383,10 @@ var _ = SIGDescribe("Kubectl client", func() {
 	})
 
 	framework.KubeDescribe("Simple pod", func() {
-		podYaml := substituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
+		var podYaml string
 		BeforeEach(func() {
 			By(fmt.Sprintf("creating the pod from %v", podYaml))
+			podYaml = substituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(BeTrue())
 		})
@@ -458,7 +459,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				}
 
 				// Verify the proxy server logs saw the connection
-				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimRight(strings.TrimLeft(framework.TestContext.Host, "https://"), "/api"))
+				expectedProxyLog := fmt.Sprintf("Accepting CONNECT to %s", strings.TrimSuffix(strings.TrimPrefix(framework.TestContext.Host, "https://"), "/api"))
 
 				proxyLog := proxyLogs.String()
 				if !strings.Contains(proxyLog, expectedProxyLog) {
@@ -680,19 +681,19 @@ metadata:
 			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
 
 			By("getting pods with in-cluster configs")
-			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=7 2>&1")
+			execOutput := framework.RunHostCmdOrDie(ns, simplePodName, "/tmp/kubectl get pods --v=6 2>&1")
 			Expect(execOutput).To(MatchRegexp("nginx +1/1 +Running"))
 			Expect(execOutput).To(ContainSubstring("Using in-cluster namespace"))
 			Expect(execOutput).To(ContainSubstring("Using in-cluster configuration"))
 
 			By("creating an object containing a namespace with in-cluster config")
-			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=7 2>&1")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-with-namespace.yaml --v=6 2>&1")
 			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
 			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
 			Expect(err).To(ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/configmap-namespace/configmaps", inClusterHost, inClusterPort)))
 
 			By("creating an object not containing a namespace with in-cluster config")
-			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=7 2>&1")
+			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl create -f /tmp/invalid-configmap-without-namespace.yaml --v=6 2>&1")
 			Expect(err).To(ContainSubstring("Using in-cluster namespace"))
 			Expect(err).To(ContainSubstring("Using in-cluster configuration"))
 			Expect(err).To(ContainSubstring(fmt.Sprintf("POST https://%s:%s/api/v1/namespaces/%s/configmaps", inClusterHost, inClusterPort, f.Namespace.Name)))
@@ -799,11 +800,11 @@ metadata:
 			By("apply file doesn't have replicas")
 			framework.RunKubectlOrDieInput(deployment2Yaml, "apply", "set-last-applied", "-f", "-", nsFlag)
 
-			By("check last-applied has been updated, annotations doesn't replicas")
+			By("check last-applied has been updated, annotations doesn't have replicas")
 			output = framework.RunKubectlOrDieInput(deployment1Yaml, "apply", "view-last-applied", "-f", "-", nsFlag, "-o", "json")
 			requiredString = "\"replicas\": 2"
 			if strings.Contains(output, requiredString) {
-				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
+				framework.Failf("Presenting %s in kubectl view-last-applied", requiredString)
 			}
 
 			By("scale set replicas to 3")
@@ -1037,10 +1038,11 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl label", func() {
-		podYaml := substituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
+		var podYaml string
 		var nsFlag string
 		BeforeEach(func() {
 			By("creating the pod")
+			podYaml = substituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			Expect(framework.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(BeTrue())
@@ -1078,10 +1080,11 @@ metadata:
 
 	framework.KubeDescribe("Kubectl logs", func() {
 		var nsFlag string
-		rc := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+		var rc string
 		containerName := "redis-master"
 		BeforeEach(func() {
 			By("creating an rc")
+			rc = substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(rc, "create", "-f", "-", nsFlag)
 		})
@@ -1093,7 +1096,7 @@ metadata:
 			Release : v1.9
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
-			Starting a Pod should have a log line indicating the the server is running and ready to accept connections. 			   Also log command options MUST work as expected and described below.
+			Starting a Pod should have a log line indicating the server is running and ready to accept connections. 			   Also log command options MUST work as expected and described below.
 				‘kubectl log -tail=1’ should generate a output of one line, the last line in the log.
 				‘kubectl --limit-bytes=1’ should generate a single byte output.
 				‘kubectl --tail=1 --timestamp should genrate one line with timestamp in RFC3339 format
@@ -1188,7 +1191,7 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, version
-			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the the Client and the Server that the kubectl is configured to connect to.
+			Description: The command ‘kubectl version’ MUST return the major, minor versions,  GitCommit, etc of the Client and the Server that the kubectl is configured to connect to.
 		*/
 		framework.ConformanceIt("should check is all data is printed ", func() {
 			version := framework.RunKubectlOrDie("version")

@@ -18,7 +18,6 @@ package images
 
 import (
 	"fmt"
-	"runtime"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -29,11 +28,6 @@ import (
 // GetGenericImage generates and returns a platform agnostic image (backed by manifest list)
 func GetGenericImage(prefix, image, tag string) string {
 	return fmt.Sprintf("%s/%s:%s", prefix, image, tag)
-}
-
-// GetGenericArchImage generates and returns an image based on the current runtime arch
-func GetGenericArchImage(prefix, image, tag string) string {
-	return fmt.Sprintf("%s/%s-%s:%s", prefix, image, runtime.GOARCH, tag)
 }
 
 // GetKubeControlPlaneImage generates and returns the image for the core Kubernetes components or returns the unified control plane image if specified
@@ -68,7 +62,7 @@ func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs = append(imgs, GetKubeControlPlaneImage(constants.KubeProxy, cfg))
 
 	// pause, etcd and kube-dns are not available on the ci image repository so use the default image repository.
-	imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "pause", "3.1"))
+	imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "pause", constants.PauseVersion))
 
 	// if etcd is not external then add the image as it will be required
 	if cfg.Etcd.Local != nil {
@@ -79,9 +73,9 @@ func GetAllImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	if features.Enabled(cfg.FeatureGates, features.CoreDNS) {
 		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, constants.CoreDNS, constants.CoreDNSVersion))
 	} else {
-		imgs = append(imgs, GetGenericArchImage(cfg.ImageRepository, "k8s-dns-kube-dns", constants.KubeDNSVersion))
-		imgs = append(imgs, GetGenericArchImage(cfg.ImageRepository, "k8s-dns-sidecar", constants.KubeDNSVersion))
-		imgs = append(imgs, GetGenericArchImage(cfg.ImageRepository, "k8s-dns-dnsmasq-nanny", constants.KubeDNSVersion))
+		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "k8s-dns-kube-dns", constants.KubeDNSVersion))
+		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "k8s-dns-sidecar", constants.KubeDNSVersion))
+		imgs = append(imgs, GetGenericImage(cfg.ImageRepository, "k8s-dns-dnsmasq-nanny", constants.KubeDNSVersion))
 	}
 
 	return imgs

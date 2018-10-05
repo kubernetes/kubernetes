@@ -271,17 +271,11 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 	// Windows doesn't have loNetwork. It comes only with Linux
 	if plugin.loNetwork != nil {
 		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath, annotations); err != nil {
-			glog.Errorf("Error while adding to cni lo network: %s", err)
 			return err
 		}
 	}
 
 	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations)
-	if err != nil {
-		glog.Errorf("Error while adding to cni network: %s", err)
-		return err
-	}
-
 	return err
 }
 
@@ -299,6 +293,10 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
 }
 
+func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
+	return fmt.Sprintf("%s_%s/%s", namespace, name, id.ID)
+}
+
 func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations)
 	if err != nil {
@@ -306,11 +304,12 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 		return nil, err
 	}
 
+	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to add CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
+	glog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	res, err := cniNet.AddNetworkList(netConf, rt)
 	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
+		glog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return nil, err
 	}
 
@@ -324,6 +323,7 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 		glog.V(4).Infof("IP address for CNI network was set from plugin's output", netConf.Name, netConf.Plugins[0].Network.Type)
 		plugin.SetPodIPs(podSandboxID, curRes.IPs[0].Address.IP.To4().String())
 	}
+	glog.V(4).Infof("Added %s to network %s: %v", pdesc, netConf.Name, res)
 	return res, nil
 }
 
@@ -335,15 +335,17 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 		return err
 	}
 
+	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to del CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
+	glog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	err = cniNet.DelNetworkList(netConf, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
-		glog.Errorf("Error deleting network: %v", err)
+		glog.Errorf("Error deleting %s from network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return err
 	}
+	glog.V(4).Infof("Deleted %s from network %s/%s", pdesc, netConf.Plugins[0].Network.Type, netConf.Name)
 	return nil
 }
 
@@ -364,9 +366,6 @@ func (plugin *cniNetworkPlugin) GetPodIPs(podSandboxID kubecontainer.ContainerID
 }
 
 func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) (*libcni.RuntimeConf, error) {
-	glog.V(4).Infof("Got netns path %v", podNetnsPath)
-	glog.V(4).Infof("Using podns path %v", podNs)
-
 	rt := &libcni.RuntimeConf{
 		ContainerID: podSandboxID.ID,
 		NetNS:       podNetnsPath,

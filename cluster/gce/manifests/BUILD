@@ -18,7 +18,6 @@ filegroup(
         "etcd.manifest",
         "etcd-empty-dir-cleanup.yaml",
         "glbc.manifest",
-        "kms-plugin-container.manifest",
         "kube-addon-manager.yaml",
         "kube-apiserver.manifest",
         "kube-controller-manager.manifest",

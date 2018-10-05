@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -461,7 +460,7 @@ func (o *RunOptions) removeCreatedObjects(f cmdutil.Factory, createdObjects []*R
 			return err
 		}
 		r := f.NewBuilder().
-			WithScheme(legacyscheme.Scheme).
+			WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 			ContinueOnError().
 			NamespaceParam(namespace).DefaultNamespace().
 			ResourceNames(obj.Mapping.Resource.Resource+"."+obj.Mapping.Resource.Group, name).

@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/golang/glog"
-	policy "k8s.io/api/policy/v1beta1"
 )
 
 var (
@@ -60,7 +59,6 @@ type schedulerCache struct {
 	podStates map[string]*podState
 	nodes     map[string]*NodeInfo
 	nodeTree  *NodeTree
-	pdbs      map[string]*policy.PodDisruptionBudget
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
 }
@@ -106,7 +104,6 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		nodeTree:    newNodeTree(nil),
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
-		pdbs:        make(map[string]*policy.PodDisruptionBudget),
 		imageStates: make(map[string]*imageState),
 	}
 }
@@ -127,15 +124,9 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 		assumedPods[k] = v
 	}
 
-	pdbs := make(map[string]*policy.PodDisruptionBudget)
-	for k, v := range cache.pdbs {
-		pdbs[k] = v.DeepCopy()
-	}
-
 	return &Snapshot{
 		Nodes:       nodes,
 		AssumedPods: assumedPods,
-		Pdbs:        pdbs,
 	}
 }
 
@@ -520,46 +511,6 @@ func (cache *schedulerCache) removeNodeImageStates(node *v1.Node) {
 			}
 		}
 	}
-}
-
-func (cache *schedulerCache) AddPDB(pdb *policy.PodDisruptionBudget) error {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-
-	// Unconditionally update cache.
-	cache.pdbs[string(pdb.UID)] = pdb
-	return nil
-}
-
-func (cache *schedulerCache) UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error {
-	return cache.AddPDB(newPDB)
-}
-
-func (cache *schedulerCache) RemovePDB(pdb *policy.PodDisruptionBudget) error {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-
-	delete(cache.pdbs, string(pdb.UID))
-	return nil
-}
-
-func (cache *schedulerCache) ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error) {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-	var pdbs []*policy.PodDisruptionBudget
-	for _, pdb := range cache.pdbs {
-		if selector.Matches(labels.Set(pdb.Labels)) {
-			pdbs = append(pdbs, pdb)
-		}
-	}
-	return pdbs, nil
-}
-
-func (cache *schedulerCache) IsUpToDate(n *NodeInfo) bool {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-	node, ok := cache.nodes[n.Node().Name]
-	return ok && n.generation == node.generation
 }
 
 func (cache *schedulerCache) run() {

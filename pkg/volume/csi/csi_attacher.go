@@ -159,20 +159,12 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 		glog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
 		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
 	}
-	// if being deleted, fail fast
-	if attach.GetDeletionTimestamp() != nil {
-		glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachID))
-		return "", errors.New("volume attachment is being deleted")
+	successful, err := verifyAttachmentStatus(attach, volumeHandle)
+	if err != nil {
+		return "", err
 	}
-	// attachment OK
-	if attach.Status.Attached {
+	if successful {
 		return attachID, nil
-	}
-	// driver reports attach error
-	attachErr := attach.Status.AttachError
-	if attachErr != nil {
-		glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
-		return "", errors.New(attachErr.Message)
 	}
 
 	watcher, err := c.k8s.StorageV1beta1().VolumeAttachments().Watch(meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
@@ -194,20 +186,12 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 			switch event.Type {
 			case watch.Added, watch.Modified:
 				attach, _ := event.Object.(*storage.VolumeAttachment)
-				// if being deleted, fail fast
-				if attach.GetDeletionTimestamp() != nil {
-					glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachID))
-					return "", errors.New("volume attachment is being deleted")
+				successful, err := verifyAttachmentStatus(attach, volumeHandle)
+				if err != nil {
+					return "", err
 				}
-				// attachment OK
-				if attach.Status.Attached {
+				if successful {
 					return attachID, nil
-				}
-				// driver reports attach error
-				attachErr := attach.Status.AttachError
-				if attachErr != nil {
-					glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
-					return "", errors.New(attachErr.Message)
 				}
 			case watch.Deleted:
 				// if deleted, fail fast
@@ -224,6 +208,25 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 			return "", fmt.Errorf("attachment timeout for volume %v", volumeHandle)
 		}
 	}
+}
+
+func verifyAttachmentStatus(attachment *storage.VolumeAttachment, volumeHandle string) (bool, error) {
+	// if being deleted, fail fast
+	if attachment.GetDeletionTimestamp() != nil {
+		glog.Error(log("VolumeAttachment [%s] has deletion timestamp, will not continue to wait for attachment", attachment.Name))
+		return false, errors.New("volume attachment is being deleted")
+	}
+	// attachment OK
+	if attachment.Status.Attached {
+		return true, nil
+	}
+	// driver reports attach error
+	attachErr := attachment.Status.AttachError
+	if attachErr != nil {
+		glog.Error(log("attachment for %v failed: %v", volumeHandle, attachErr.Message))
+		return false, errors.New(attachErr.Message)
+	}
+	return false, nil
 }
 
 func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {

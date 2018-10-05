@@ -58,8 +58,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/quota/generic"
-	quotainstall "k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 

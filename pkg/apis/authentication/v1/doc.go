@@ -19,4 +19,5 @@ limitations under the License.
 // +groupName=authentication.k8s.io
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/authentication/v1
+
 package v1 // import "k8s.io/kubernetes/pkg/apis/authentication/v1"

@@ -269,7 +269,9 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if runtime.GOOS == "windows" {
 		mountOptions = []string{fmt.Sprintf("AZURE\\%s", accountName), accountKey}
 	} else {
-		os.MkdirAll(dir, 0700)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return err
+		}
 		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
 		options := []string{fmt.Sprintf("username=%s,password=%s", accountName, accountKey)}
 		if b.readOnly {

@@ -43,6 +43,7 @@ import (
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
@@ -102,6 +103,9 @@ the cloud specific control loops shipped with Kubernetes.`,
 
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error {
+	// To help debugging, immediately log version
+	glog.Infof("Version: %+v", version.Get())
+
 	cloud, err := cloudprovider.InitCloudProvider(c.ComponentConfig.KubeCloudShared.CloudProvider.Name, c.ComponentConfig.KubeCloudShared.CloudProvider.CloudConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)

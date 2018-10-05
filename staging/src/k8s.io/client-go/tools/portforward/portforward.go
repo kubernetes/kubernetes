@@ -340,3 +340,20 @@ func (pf *PortForwarder) Close() {
 		}
 	}
 }
+
+// GetPorts will return the ports that were forwarded; this can be used to
+// retrieve the locally-bound port in cases where the input was port 0. This
+// function will signal an error if the Ready channel is nil or if the
+// listeners are not ready yet; this function will succeed after the Ready
+// channel has been closed.
+func (pf *PortForwarder) GetPorts() ([]ForwardedPort, error) {
+	if pf.Ready == nil {
+		return nil, fmt.Errorf("no Ready channel provided")
+	}
+	select {
+	case <-pf.Ready:
+		return pf.ports, nil
+	default:
+		return nil, fmt.Errorf("listeners not ready")
+	}
+}

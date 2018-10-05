@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	bootstraputil "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"

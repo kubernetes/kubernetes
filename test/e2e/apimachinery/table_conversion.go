@@ -31,8 +31,8 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/pkg/printers"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )

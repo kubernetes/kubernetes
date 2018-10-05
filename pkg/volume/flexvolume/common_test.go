@@ -129,7 +129,7 @@ func fakePersistentVolumeSpec() *volume.Spec {
 	return volume.NewSpecFromPersistentVolume(vol, false)
 }
 
-func specJson(plugin *flexVolumeAttachablePlugin, spec *volume.Spec, extraOptions map[string]string) string {
+func specJSON(plugin *flexVolumeAttachablePlugin, spec *volume.Spec, extraOptions map[string]string) string {
 	o, err := NewOptionsForDriver(spec, plugin.host, extraOptions)
 	if err != nil {
 		panic("Failed to convert spec: " + err.Error())

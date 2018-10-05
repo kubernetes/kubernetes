@@ -213,11 +213,13 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 		{"no-flags", nil, "/healthz", false, true, nil, nil},
 		{"insecurely /healthz", []string{
 			"--secure-port=0",
+			"--port=10253",
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
 		}, "/healthz", true, false, nil, intPtr(http.StatusOK)},
 		{"insecurely /metrics", []string{
 			"--secure-port=0",
+			"--port=10253",
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
 		}, "/metrics", true, false, nil, intPtr(http.StatusOK)},
@@ -230,6 +232,7 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 			"--kubeconfig", kubeconfig,
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
+			"--port=10253",
 		}, "/metrics", true, false, intPtr(http.StatusForbidden), intPtr(http.StatusOK)},
 		{"authorization skipped for /healthz with authn/authz", []string{
 			"--port=0",
@@ -254,6 +257,7 @@ func testControllerManager(t *testing.T, tester controllerManagerTester, kubecon
 			"--leader-elect=false",
 		}, "/metrics", false, false, intPtr(http.StatusForbidden), nil},
 		{"not authorized /metrics with BROKEN authn/authz", []string{
+			"--port=10253",
 			"--authentication-kubeconfig", kubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,

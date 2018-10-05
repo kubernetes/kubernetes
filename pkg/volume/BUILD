@@ -69,7 +69,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/aws_ebs:all-srcs",
+        "//pkg/volume/awsebs:all-srcs",
         "//pkg/volume/azure_dd:all-srcs",
         "//pkg/volume/azure_file:all-srcs",
         "//pkg/volume/cephfs:all-srcs",
@@ -81,7 +81,7 @@ filegroup(
         "//pkg/volume/fc:all-srcs",
         "//pkg/volume/flexvolume:all-srcs",
         "//pkg/volume/flocker:all-srcs",
-        "//pkg/volume/gce_pd:all-srcs",
+        "//pkg/volume/gcepd:all-srcs",
         "//pkg/volume/git_repo:all-srcs",
         "//pkg/volume/glusterfs:all-srcs",
         "//pkg/volume/host_path:all-srcs",

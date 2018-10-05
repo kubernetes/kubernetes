@@ -61,7 +61,6 @@
 - baseImportPath: "./vendor/k8s.io/client-go/tools/"
   excludeTests: true
   ignoredSubTrees:
-  - "./vendor/k8s.io/client-go/tools/bootstrap/token/api"
   - "./vendor/k8s.io/client-go/tools/cache/testing"
   - "./vendor/k8s.io/client-go/tools/leaderelection/resourcelock"
   - "./vendor/k8s.io/client-go/tools/portforward"
@@ -147,3 +146,9 @@
   allowedImports:
   - k8s.io/api
   - k8s.io/apimachinery
+
+- baseImportPath: "./vendor/k8s.io/cluster-bootstrap/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/cluster-bootstrap

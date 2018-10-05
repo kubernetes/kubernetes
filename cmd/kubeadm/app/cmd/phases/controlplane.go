@@ -25,7 +25,7 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -79,7 +79,7 @@ func NewCmdControlplane() *cobra.Command {
 // getControlPlaneSubCommands returns sub commands for Controlplane phase
 func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 
 	// This is used for unit testing only...
 	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
@@ -169,7 +169,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 }
 
 // runCmdControlPlane creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runCmdControlPlane(cmdFunc func(outDir string, cfg *kubeadmapi.InitConfiguration) error, outDir, cfgPath *string, featureGatesString *string, cfg *kubeadmapiv1alpha3.InitConfiguration) func(cmd *cobra.Command, args []string) {
+func runCmdControlPlane(cmdFunc func(outDir string, cfg *kubeadmapi.InitConfiguration) error, outDir, cfgPath *string, featureGatesString *string, cfg *kubeadmapiv1beta1.InitConfiguration) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a closure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.

@@ -148,7 +148,9 @@ func (plugin *cinderPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 		},
 		fsType:             fsType,
 		readOnly:           readOnly,
-		blockDeviceMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		blockDeviceMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mountOptions:       util.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *cinderPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -276,7 +278,7 @@ type cdManager interface {
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(unmounter *cinderVolumeUnmounter) error
 	// Creates a volume
-	CreateVolume(provisioner *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error)
+	CreateVolume(provisioner *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *cinderVolumeDeleter) error
 }
@@ -288,6 +290,7 @@ type cinderVolumeMounter struct {
 	fsType             string
 	readOnly           bool
 	blockDeviceMounter *mount.SafeFormatAndMount
+	mountOptions       []string
 }
 
 // cinderPersistentDisk volumes are disk resources provided by C3
@@ -358,8 +361,9 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
+	mountOptions := util.JoinMountOptions(options, b.mountOptions)
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, options)
+	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, mountOptions)
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		glog.V(4).Infof("Mount failed: %v", err)
@@ -507,7 +511,7 @@ func (c *cinderVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopolo
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
-	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c)
+	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c, selectedNode, allowedTopologies)
 	if err != nil {
 		return nil, err
 	}
@@ -548,6 +552,21 @@ func (c *cinderVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopolo
 	}
 	if len(c.options.PVC.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		requirements := make([]v1.NodeSelectorRequirement, 0)
+		for k, v := range labels {
+			if v != "" {
+				requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+			}
+		}
+		if len(requirements) > 0 {
+			pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+			pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+			pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+			pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
+		}
 	}
 
 	return pv, nil

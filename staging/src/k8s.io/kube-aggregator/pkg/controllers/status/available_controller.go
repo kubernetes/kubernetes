@@ -88,7 +88,12 @@ func NewAvailableConditionController(
 		endpointsLister:  endpointsInformer.Lister(),
 		endpointsSynced:  endpointsInformer.Informer().HasSynced,
 		serviceResolver:  serviceResolver,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "AvailableConditionController"),
+		queue: workqueue.NewNamedRateLimitingQueue(
+			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
+			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
+			// the maximum disruption time to a minimum, but it does prevent hot loops.
+			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
+			"AvailableConditionController"),
 	}
 
 	// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status

@@ -56,6 +56,7 @@ type initializerOptions struct {
 	Initializers []string
 }
 
+// InitializationConfig specifies initialization config
 type InitializationConfig interface {
 	Run(stopCh <-chan struct{})
 	Initializers() (*v1alpha1.InitializerConfiguration, error)
