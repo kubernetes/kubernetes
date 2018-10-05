@@ -74,9 +74,9 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use: "wait resource.group/name [--for=delete|--for condition=available]",
+		Use:                   "wait resource.group/name [--for=delete|--for condition=available]",
 		DisableFlagsInUseLine: true,
-		Short: "Experimental: Wait for one condition on one or many resources",
+		Short:                 "Experimental: Wait for one condition on one or many resources",
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)

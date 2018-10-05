@@ -133,7 +133,7 @@ func TestCertificateData(t *testing.T) {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server: "https://localhost:8443",
+		Server:                   "https://localhost:8443",
 		CertificateAuthorityData: caData,
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{

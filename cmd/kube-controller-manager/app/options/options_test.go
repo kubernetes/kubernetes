@@ -139,8 +139,8 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		KubeCloudShared: &cmoptions.KubeCloudSharedOptions{
-			Port:    10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config		 +				AllocateNodeCIDRs:         true,
-			Address: "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
+			Port:                         10252,     // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config		 +				AllocateNodeCIDRs:         true,
+			Address:                      "0.0.0.0", // Note: InsecureServingOptions.ApplyTo will write the flag value back into the component config
 			UseServiceAccountCredentials: true,
 			RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
 			NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},

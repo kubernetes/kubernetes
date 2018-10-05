@@ -344,9 +344,9 @@ func TestProxyUpgrade(t *testing.T) {
 			APIService: &apiregistration.APIService{
 				Spec: apiregistration.APIServiceSpec{
 					InsecureSkipTLSVerify: true,
-					Group:   "mygroup",
-					Version: "v1",
-					Service: &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns"},
+					Group:                 "mygroup",
+					Version:               "v1",
+					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns"},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{

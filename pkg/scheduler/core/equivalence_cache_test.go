@@ -402,9 +402,9 @@ func TestLookupResult(t *testing.T) {
 		cache                             schedulercache.Cache
 	}{
 		{
-			name:     "test 1",
-			podName:  "testPod",
-			nodeName: "node1",
+			name:                              "test 1",
+			podName:                           "testPod",
+			nodeName:                          "node1",
 			equivalenceHashForUpdatePredicate: 123,
 			equivalenceHashForCalPredicate:    123,
 			predicateKey:                      "GeneralPredicates",
@@ -420,9 +420,9 @@ func TestLookupResult(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 		{
-			name:     "test 2",
-			podName:  "testPod",
-			nodeName: "node2",
+			name:                              "test 2",
+			podName:                           "testPod",
+			nodeName:                          "node2",
 			equivalenceHashForUpdatePredicate: 123,
 			equivalenceHashForCalPredicate:    123,
 			predicateKey:                      "GeneralPredicates",
@@ -437,9 +437,9 @@ func TestLookupResult(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 		{
-			name:     "test 3",
-			podName:  "testPod",
-			nodeName: "node3",
+			name:                              "test 3",
+			podName:                           "testPod",
+			nodeName:                          "node3",
 			equivalenceHashForUpdatePredicate: 123,
 			equivalenceHashForCalPredicate:    123,
 			predicateKey:                      "GeneralPredicates",
@@ -455,9 +455,9 @@ func TestLookupResult(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 		{
-			name:     "test 4",
-			podName:  "testPod",
-			nodeName: "node4",
+			name:                              "test 4",
+			podName:                           "testPod",
+			nodeName:                          "node4",
 			equivalenceHashForUpdatePredicate: 123,
 			equivalenceHashForCalPredicate:    456,
 			predicateKey:                      "GeneralPredicates",
@@ -653,8 +653,8 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 		cache                             schedulercache.Cache
 	}{
 		{
-			podName:  "testPod",
-			nodeName: "node1",
+			podName:                           "testPod",
+			nodeName:                          "node1",
 			equivalenceHashForUpdatePredicate: 123,
 			cachedItem: predicateItemType{
 				fit: false,
@@ -665,8 +665,8 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 		{
-			podName:  "testPod",
-			nodeName: "node2",
+			podName:                           "testPod",
+			nodeName:                          "node2",
 			equivalenceHashForUpdatePredicate: 456,
 			cachedItem: predicateItemType{
 				fit: false,
@@ -677,8 +677,8 @@ func TestInvalidateCachedPredicateItemOfAllNodes(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 		{
-			podName:  "testPod",
-			nodeName: "node3",
+			podName:                           "testPod",
+			nodeName:                          "node3",
 			equivalenceHashForUpdatePredicate: 123,
 			cachedItem: predicateItemType{
 				fit: true,
@@ -729,8 +729,8 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 		cache                             schedulercache.Cache
 	}{
 		{
-			podName:  "testPod",
-			nodeName: "node1",
+			podName:                           "testPod",
+			nodeName:                          "node1",
 			equivalenceHashForUpdatePredicate: 123,
 			cachedItem: predicateItemType{
 				fit:     false,
@@ -739,8 +739,8 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 		{
-			podName:  "testPod",
-			nodeName: "node2",
+			podName:                           "testPod",
+			nodeName:                          "node2",
 			equivalenceHashForUpdatePredicate: 456,
 			cachedItem: predicateItemType{
 				fit:     false,
@@ -749,8 +749,8 @@ func TestInvalidateAllCachedPredicateItemOfNode(t *testing.T) {
 			cache: &upToDateCache{},
 		},
 		{
-			podName:  "testPod",
-			nodeName: "node3",
+			podName:                           "testPod",
+			nodeName:                          "node3",
 			equivalenceHashForUpdatePredicate: 123,
 			cachedItem: predicateItemType{
 				fit: true,

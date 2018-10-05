@@ -59,11 +59,11 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
+		Use:                   "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
-		Short:   "Edit latest last-applied-configuration annotations of a resource/object",
-		Long:    applyEditLastAppliedLong,
-		Example: applyEditLastAppliedExample,
+		Short:                 "Edit latest last-applied-configuration annotations of a resource/object",
+		Long:                  applyEditLastAppliedLong,
+		Example:               applyEditLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)

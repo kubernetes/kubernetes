@@ -149,7 +149,7 @@ func (w *resourceGatherWorker) singleProbe() {
 		}
 		for k, v := range kubemarkData {
 			data[k] = &ContainerResourceUsage{
-				Name: v.Name,
+				Name:                    v.Name,
 				MemoryWorkingSetInBytes: v.MemoryWorkingSetInBytes,
 				CPUUsageInCores:         v.CPUUsageInCores,
 			}

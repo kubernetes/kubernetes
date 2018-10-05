@@ -73,8 +73,8 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		// Default cache size to 0 - if unset, its size will be set based on target
 		// memory usage.
 		DeserializationCacheSize: 0,
-		Codec:              codec,
-		CompactionInterval: DefaultCompactInterval,
-		Quorum:             true,
+		Codec:                    codec,
+		CompactionInterval:       DefaultCompactInterval,
+		Quorum:                   true,
 	}
 }

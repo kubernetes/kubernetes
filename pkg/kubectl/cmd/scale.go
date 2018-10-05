@@ -109,11 +109,11 @@ func NewCmdScale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
+		Use:                   "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
-		Long:    scaleLong,
-		Example: scaleExample,
+		Short:                 i18n.T("Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"),
+		Long:                  scaleLong,
+		Example:               scaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))

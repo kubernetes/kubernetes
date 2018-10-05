@@ -40,8 +40,8 @@ import (
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
-		Verb:       attribs.GetVerb(),
-		RequestURI: req.URL.RequestURI(),
+		Verb:                     attribs.GetVerb(),
+		RequestURI:               req.URL.RequestURI(),
 	}
 
 	ev.Level = level

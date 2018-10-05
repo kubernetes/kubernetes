@@ -53,7 +53,7 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 		printConfig:               false,
 		skipPreFlight:             false,
 		ignorePreflightErrorsSet:  sets.NewString(),
-		out: out,
+		out:                       out,
 	}
 
 	cmd := &cobra.Command{

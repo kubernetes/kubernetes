@@ -130,13 +130,13 @@ func NewCmdRollingUpdate(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	o := NewRollingUpdateOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
+		Use:                   "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
 		DisableFlagsInUseLine: true,
-		Short:      "Perform a rolling update. This command is deprecated, use rollout instead.",
-		Long:       rollingUpdateLong,
-		Example:    rollingUpdateExample,
-		Deprecated: `use "rollout" instead`,
-		Hidden:     true,
+		Short:                 "Perform a rolling update. This command is deprecated, use rollout instead.",
+		Long:                  rollingUpdateLong,
+		Example:               rollingUpdateExample,
+		Deprecated:            `use "rollout" instead`,
+		Hidden:                true,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd, args))

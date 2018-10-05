@@ -132,11 +132,11 @@ func NewCmdCreateRole(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) 
 	o := NewCreateRoleOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
+		Use:                   "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   roleLong,
-		Long:    roleLong,
-		Example: roleExample,
+		Short:                 roleLong,
+		Long:                  roleLong,
+		Example:               roleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

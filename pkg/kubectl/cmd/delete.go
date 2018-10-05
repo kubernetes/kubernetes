@@ -123,11 +123,11 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
 	cmd := &cobra.Command{
-		Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+		Use:                   "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
-		Long:    delete_long,
-		Example: delete_example,
+		Short:                 i18n.T("Delete resources by filenames, stdin, resources and names, or by resources and label selector"),
+		Long:                  delete_long,
+		Example:               delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			o := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(o.Complete(f, args, cmd))

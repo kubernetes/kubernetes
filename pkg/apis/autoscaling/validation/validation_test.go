@@ -109,7 +109,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					{
 						Type: autoscaling.ResourceMetricSourceType,
 						Resource: &autoscaling.ResourceMetricSource{
-							Name: api.ResourceCPU,
+							Name:                     api.ResourceCPU,
 							TargetAverageUtilization: utilpointer.Int32Ptr(70),
 						},
 					},
@@ -281,7 +281,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: utilpointer.Int32Ptr(70),
 							},
 						},
@@ -301,7 +301,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: utilpointer.Int32Ptr(70),
 							},
 						},
@@ -321,7 +321,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: utilpointer.Int32Ptr(70),
 							},
 						},
@@ -341,7 +341,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: utilpointer.Int32Ptr(70),
 							},
 						},
@@ -392,7 +392,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: utilpointer.Int32Ptr(70),
 								TargetAverageValue:       resource.NewMilliQuantity(300, resource.DecimalSI),
 							},
@@ -432,7 +432,7 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: utilpointer.Int32Ptr(-10),
 							},
 						},

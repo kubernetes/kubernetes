@@ -125,11 +125,11 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o := NewLabelOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
+		Use:                   "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update the labels on a resource"),
-		Long:    fmt.Sprintf(labelLong, validation.LabelValueMaxLength),
-		Example: labelExample,
+		Short:                 i18n.T("Update the labels on a resource"),
+		Long:                  fmt.Sprintf(labelLong, validation.LabelValueMaxLength),
+		Example:               labelExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

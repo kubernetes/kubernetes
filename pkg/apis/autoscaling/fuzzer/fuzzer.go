@@ -63,7 +63,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricSource{
-						Name: api.ResourceCPU,
+						Name:                     api.ResourceCPU,
 						TargetAverageUtilization: &targetUtilization,
 					},
 				},
@@ -90,7 +90,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				{
 					Type: autoscaling.ResourceMetricSourceType,
 					Resource: &autoscaling.ResourceMetricStatus{
-						Name: api.ResourceCPU,
+						Name:                      api.ResourceCPU,
 						CurrentAverageUtilization: &currentUtilization,
 					},
 				},

@@ -479,7 +479,7 @@ func TestWebhook(t *testing.T) {
 			want: v1beta1.SubjectAccessReview{
 				TypeMeta: expTypeMeta,
 				Spec: v1beta1.SubjectAccessReviewSpec{
-					User: "jane",
+					User:                  "jane",
 					NonResourceAttributes: &v1beta1.NonResourceAttributes{},
 				},
 			},

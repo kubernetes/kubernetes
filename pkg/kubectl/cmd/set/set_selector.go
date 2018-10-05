@@ -95,11 +95,11 @@ func NewCmdSelector(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o := NewSelectorOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
+		Use:                   "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Set the selector on a resource"),
-		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
-		Example: selectorExample,
+		Short:                 i18n.T("Set the selector on a resource"),
+		Long:                  fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
+		Example:               selectorExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

@@ -1821,7 +1821,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: &targetUtilizationVal,
 							},
 						},
@@ -1847,7 +1847,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: &targetUtilizationVal,
 							},
 						},
@@ -1860,7 +1860,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
-								Name: api.ResourceCPU,
+								Name:                      api.ResourceCPU,
 								CurrentAverageUtilization: &currentUtilizationVal,
 								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
 							},
@@ -1890,7 +1890,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: &targetUtilizationVal,
 							},
 						},
@@ -1917,7 +1917,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
-								Name: api.ResourceCPU,
+								Name:                      api.ResourceCPU,
 								CurrentAverageUtilization: &currentUtilizationVal,
 								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
 							},

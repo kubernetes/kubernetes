@@ -72,11 +72,11 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	validArgs := []string{"deployment"}
 
 	cmd := &cobra.Command{
-		Use: "pause RESOURCE",
+		Use:                   "pause RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark the provided resource as paused"),
-		Long:    pause_long,
-		Example: pause_example,
+		Short:                 i18n.T("Mark the provided resource as paused"),
+		Long:                  pause_long,
+		Example:               pause_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
 			err := o.CompletePause(f, cmd, args)

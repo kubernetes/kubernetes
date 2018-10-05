@@ -111,11 +111,11 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
-		Use: "diff -f FILENAME",
+		Use:                   "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Diff different versions of configurations"),
-		Long:    diffLong,
-		Example: diffExample,
+		Short:                 i18n.T("Diff different versions of configurations"),
+		Long:                  diffLong,
+		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			from, to, err := parseDiffArguments(args)
 			cmdutil.CheckErr(err)

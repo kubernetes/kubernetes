@@ -179,8 +179,8 @@ func getTestCases(hostname types.NodeName) []*testCase {
 						Effect:   "NoExecute",
 					}},
 					Containers: []v1.Container{{
-						Name:  "image",
-						Image: "test/image",
+						Name:                     "image",
+						Image:                    "test/image",
 						TerminationMessagePath:   "/dev/termination-log",
 						ImagePullPolicy:          "Always",
 						SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),

@@ -101,11 +101,11 @@ func NewCmdReplace(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := NewReplaceOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "replace -f FILENAME",
+		Use:                   "replace -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Replace a resource by filename or stdin"),
-		Long:    replaceLong,
-		Example: replaceExample,
+		Short:                 i18n.T("Replace a resource by filename or stdin"),
+		Long:                  replaceLong,
+		Example:               replaceExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))

@@ -48,7 +48,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 	}
 
 	cmd := &cobra.Command{
-		Use: "deployment NAME --image=image [--dry-run]",
+		Use:                   "deployment NAME --image=image [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
 		Short:                 i18n.T("Create a deployment with the specified name."),

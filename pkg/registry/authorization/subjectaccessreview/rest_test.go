@@ -60,7 +60,7 @@ func TestCreate(t *testing.T) {
 
 		"nonresource rejected": {
 			spec: authorizationapi.SubjectAccessReviewSpec{
-				User: "bob",
+				User:                  "bob",
 				NonResourceAttributes: &authorizationapi.NonResourceAttributes{Verb: "get", Path: "/mypath"},
 			},
 			decision: authorizer.DecisionNoOpinion,
@@ -81,7 +81,7 @@ func TestCreate(t *testing.T) {
 
 		"nonresource allowed": {
 			spec: authorizationapi.SubjectAccessReviewSpec{
-				User: "bob",
+				User:                  "bob",
 				NonResourceAttributes: &authorizationapi.NonResourceAttributes{Verb: "get", Path: "/mypath"},
 			},
 			decision: authorizer.DecisionAllow,

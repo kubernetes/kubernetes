@@ -67,11 +67,11 @@ func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess c
 	}
 
 	cmd := &cobra.Command{
-		Use: "get-contexts [(-o|--output=)name)]",
+		Use:                   "get-contexts [(-o|--output=)name)]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Describe one or many contexts"),
-		Long:    getContextsLong,
-		Example: getContextsExample,
+		Short:                 i18n.T("Describe one or many contexts"),
+		Long:                  getContextsLong,
+		Example:               getContextsExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			validOutputTypes := sets.NewString("", "json", "yaml", "wide", "name", "custom-columns", "custom-columns-file", "go-template", "go-template-file", "jsonpath", "jsonpath-file")
 			supportedOutputTypes := sets.NewString("", "name")

@@ -1288,7 +1288,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Image: "foo/bar",
+									Image:                  "foo/bar",
 									TerminationMessagePath: api.TerminationMessagePathDefault,
 									ImagePullPolicy:        api.PullIfNotPresent,
 								},
@@ -2511,7 +2511,7 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: &targetUtilizationVal,
 							},
 						},
@@ -2539,7 +2539,7 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: &targetUtilizationVal,
 							},
 						},
@@ -2552,7 +2552,7 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
-								Name: api.ResourceCPU,
+								Name:                      api.ResourceCPU,
 								CurrentAverageUtilization: &currentUtilizationVal,
 								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
 							},
@@ -2584,7 +2584,7 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
+								Name:                     api.ResourceCPU,
 								TargetAverageUtilization: &targetUtilizationVal,
 							},
 						},
@@ -2611,7 +2611,7 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
-								Name: api.ResourceCPU,
+								Name:                      api.ResourceCPU,
 								CurrentAverageUtilization: &currentUtilizationVal,
 								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
 							},

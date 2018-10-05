@@ -74,11 +74,11 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "undo (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "undo (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Undo a previous rollout"),
-		Long:    undo_long,
-		Example: undo_example,
+		Short:                 i18n.T("Undo a previous rollout"),
+		Long:                  undo_long,
+		Example:               undo_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
 			err := o.CompleteUndo(f, cmd, out, args)

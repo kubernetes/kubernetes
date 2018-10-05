@@ -93,7 +93,7 @@ func NewCmdServiceAccount(f cmdutil.Factory, streams genericclioptions.IOStreams
 	o := NewSetServiceAccountOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
+		Use:                   "serviceaccount (-f FILENAME | TYPE NAME) SERVICE_ACCOUNT",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"sa"},
 		Short:                 i18n.T("Update ServiceAccount of a resource"),

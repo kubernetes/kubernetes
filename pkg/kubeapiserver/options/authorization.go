@@ -40,7 +40,7 @@ type BuiltInAuthorizationOptions struct {
 
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 	return &BuiltInAuthorizationOptions{
-		Modes: []string{authzmodes.ModeAlwaysAllow},
+		Modes:                       []string{authzmodes.ModeAlwaysAllow},
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
 	}

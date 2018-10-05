@@ -1104,7 +1104,7 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 		{
 			Annotations: map[string]string{
 				ServiceAnnotationLoadBalancerAdditionalTags: "Key1=, Key2=Val2",
-				"anotherKey":                                "anotherValue",
+				"anotherKey": "anotherValue",
 			},
 			Tags: map[string]string{
 				"Key1": "",

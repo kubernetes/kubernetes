@@ -80,11 +80,11 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "status (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "status (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Show the status of the rollout"),
-		Long:    status_long,
-		Example: status_example,
+		Short:                 i18n.T("Show the status of the rollout"),
+		Long:                  status_long,
+		Example:               status_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate(cmd, args))

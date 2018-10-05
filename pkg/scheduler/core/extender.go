@@ -138,7 +138,7 @@ func (h *HTTPExtender) ProcessPreemption(
 		// If extender has cached node info, pass NodeNameToMetaVictims in args.
 		nodeNameToMetaVictims := convertToNodeNameToMetaVictims(nodeToVictims)
 		args = &schedulerapi.ExtenderPreemptionArgs{
-			Pod: pod,
+			Pod:                   pod,
 			NodeNameToMetaVictims: nodeNameToMetaVictims,
 		}
 	} else {

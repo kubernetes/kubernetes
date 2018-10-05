@@ -222,7 +222,7 @@ func TestGenerateService(t *testing.T) {
 				"protocol":                      "UDP",
 				"container-port":                "foobar",
 				"create-external-load-balancer": "true", // ignored when type is present
-				"type": string(v1.ServiceTypeNodePort),
+				"type":                          string(v1.ServiceTypeNodePort),
 			},
 			expected: v1.Service{
 				ObjectMeta: metav1.ObjectMeta{

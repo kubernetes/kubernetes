@@ -103,9 +103,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	bto := options.NewBootstrapTokenOptions()
 
 	createCmd := &cobra.Command{
-		Use: "create [token]",
+		Use:                   "create [token]",
 		DisableFlagsInUseLine: true,
-		Short: "Create bootstrap tokens on the server.",
+		Short:                 "Create bootstrap tokens on the server.",
 		Long: dedent.Dedent(`
 			This command will create a bootstrap token for you.
 			You can specify the usages for this token, the "time to live" and an optional human friendly description.
@@ -164,9 +164,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.AddCommand(listCmd)
 
 	deleteCmd := &cobra.Command{
-		Use: "delete [token-value]",
+		Use:                   "delete [token-value]",
 		DisableFlagsInUseLine: true,
-		Short: "Delete bootstrap tokens on the server.",
+		Short:                 "Delete bootstrap tokens on the server.",
 		Long: dedent.Dedent(`
 			This command will delete a given bootstrap token for you.
 

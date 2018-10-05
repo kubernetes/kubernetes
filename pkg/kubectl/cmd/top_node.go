@@ -99,11 +99,11 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	}
 
 	cmd := &cobra.Command{
-		Use: "node [NAME | -l label]",
+		Use:                   "node [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
-		Long:    topNodeLong,
-		Example: topNodeExample,
+		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
+		Long:                  topNodeLong,
+		Example:               topNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)

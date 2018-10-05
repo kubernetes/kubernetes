@@ -271,7 +271,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
       Find more information at:
             https://kubernetes.io/docs/reference/kubectl/overview/`),
-		Run: runHelp,
+		Run:                    runHelp,
 		BashCompletionFunction: bashCompletionFunc,
 	}
 

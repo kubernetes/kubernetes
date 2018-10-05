@@ -88,11 +88,11 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	}
 
 	cmd := &cobra.Command{
-		Use: "pod [NAME | -l label]",
+		Use:                   "pod [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
-		Long:    topPodLong,
-		Example: topPodExample,
+		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
+		Long:                  topPodLong,
+		Example:               topPodExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)

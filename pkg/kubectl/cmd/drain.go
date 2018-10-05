@@ -113,11 +113,11 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use: "cordon NODE",
+		Use:                   "cordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark node as unschedulable"),
-		Long:    cordon_long,
-		Example: cordon_example,
+		Short:                 i18n.T("Mark node as unschedulable"),
+		Long:                  cordon_long,
+		Example:               cordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
@@ -144,11 +144,11 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 	}
 
 	cmd := &cobra.Command{
-		Use: "uncordon NODE",
+		Use:                   "uncordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark node as schedulable"),
-		Long:    uncordon_long,
-		Example: uncordon_example,
+		Short:                 i18n.T("Mark node as schedulable"),
+		Long:                  uncordon_long,
+		Example:               uncordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(false))
@@ -207,11 +207,11 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	options := NewDrainOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "drain NODE",
+		Use:                   "drain NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Drain node in preparation for maintenance"),
-		Long:    drain_long,
-		Example: drain_example,
+		Short:                 i18n.T("Drain node in preparation for maintenance"),
+		Long:                  drain_long,
+		Example:               drain_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunDrain())

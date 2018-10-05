@@ -171,7 +171,7 @@ func TestProvisioner(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC:                           volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	creater, err := plug.NewProvisioner(options)

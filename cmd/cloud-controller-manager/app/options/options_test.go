@@ -84,8 +84,8 @@ func TestDefaultFlags(t *testing.T) {
 			BindPort:    int(10253),
 			BindNetwork: "tcp",
 		},
-		Kubeconfig: "",
-		Master:     "",
+		Kubeconfig:                "",
+		Master:                    "",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {
@@ -181,8 +181,8 @@ func TestAddFlags(t *testing.T) {
 			BindPort:    int(10000),
 			BindNetwork: "tcp",
 		},
-		Kubeconfig: "/kubeconfig",
-		Master:     "192.168.4.20",
+		Kubeconfig:                "/kubeconfig",
+		Master:                    "192.168.4.20",
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 	}
 	if !reflect.DeepEqual(expected, s) {

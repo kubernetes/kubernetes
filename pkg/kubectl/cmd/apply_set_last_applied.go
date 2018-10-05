@@ -91,11 +91,11 @@ func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastApp
 func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSetLastAppliedOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use: "set-last-applied -f FILENAME",
+		Use:                   "set-last-applied -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
-		Long:    applySetLastAppliedLong,
-		Example: applySetLastAppliedExample,
+		Short:                 i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
+		Long:                  applySetLastAppliedLong,
+		Example:               applySetLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Validate())

@@ -73,11 +73,11 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o := NewReconcileOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "reconcile -f FILENAME",
+		Use:                   "reconcile -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   "Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects",
-		Long:    reconcileLong,
-		Example: reconcileExample,
+		Short:                 "Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects",
+		Long:                  reconcileLong,
+		Example:               reconcileExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd, f, args))
 			cmdutil.CheckErr(o.Validate())
@@ -175,7 +175,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
 				Confirm:                !o.DryRun,
 				RemoveExtraPermissions: false,
-				Role: reconciliation.RoleRuleOwner{Role: t},
+				Role:                   reconciliation.RoleRuleOwner{Role: t},
 				Client: reconciliation.RoleModifier{
 					NamespaceClient: o.NamespaceClient.Namespaces(),
 					Client:          o.RBACClient,
@@ -191,7 +191,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
 				Confirm:                !o.DryRun,
 				RemoveExtraPermissions: false,
-				Role: reconciliation.ClusterRoleRuleOwner{ClusterRole: t},
+				Role:                   reconciliation.ClusterRoleRuleOwner{ClusterRole: t},
 				Client: reconciliation.ClusterRoleModifier{
 					Client: o.RBACClient.ClusterRoles(),
 				},

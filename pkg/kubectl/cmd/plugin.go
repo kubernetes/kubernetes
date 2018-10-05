@@ -50,10 +50,10 @@ func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	}
 
 	cmd := &cobra.Command{
-		Use: "plugin NAME",
+		Use:                   "plugin NAME",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Runs a command-line plugin"),
-		Long:  plugin_long,
+		Short:                 i18n.T("Runs a command-line plugin"),
+		Long:                  plugin_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(loadedPlugins) == 0 {
 				cmdutil.CheckErr(fmt.Errorf("no plugins installed."))

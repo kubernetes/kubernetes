@@ -127,9 +127,9 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	proxyREST.Connection = connectionInfoGetter
 
 	return &NodeStorage{
-		Node:   nodeREST,
-		Status: statusREST,
-		Proxy:  proxyREST,
+		Node:                  nodeREST,
+		Status:                statusREST,
+		Proxy:                 proxyREST,
 		KubeletConnectionInfo: connectionInfoGetter,
 	}, nil
 }

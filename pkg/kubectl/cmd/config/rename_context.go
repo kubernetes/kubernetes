@@ -61,11 +61,11 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 	options := &RenameContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: renameContextUse,
+		Use:                   renameContextUse,
 		DisableFlagsInUseLine: true,
-		Short:   renameContextShort,
-		Long:    renameContextLong,
-		Example: renameContextExample,
+		Short:                 renameContextShort,
+		Long:                  renameContextLong,
+		Example:               renameContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := options.Complete(cmd, args, out); err != nil {
 				cmdutil.CheckErr(err)

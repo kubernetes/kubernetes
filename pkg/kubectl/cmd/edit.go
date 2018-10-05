@@ -72,11 +72,11 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 	o.ValidateOptions = cmdutil.ValidateOptions{EnableValidation: true}
 
 	cmd := &cobra.Command{
-		Use: "edit (RESOURCE/NAME | -f FILENAME)",
+		Use:                   "edit (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Edit a resource on the server"),
-		Long:    editLong,
-		Example: fmt.Sprintf(editExample),
+		Short:                 i18n.T("Edit a resource on the server"),
+		Long:                  editLong,
+		Example:               fmt.Sprintf(editExample),
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)

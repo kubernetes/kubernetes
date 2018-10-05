@@ -76,9 +76,9 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use: "apply [version]",
+		Use:                   "apply [version]",
 		DisableFlagsInUseLine: true,
-		Short: "Upgrade your Kubernetes cluster to the specified version.",
+		Short:                 "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
 			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, flags.skipPreFlight)

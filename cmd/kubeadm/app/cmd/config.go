@@ -139,7 +139,7 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	}
 	if apiObject == nodeConfig {
 		internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1alpha2.NodeConfiguration{
-			Token: sillyToken.Token.String(),
+			Token:                                  sillyToken.Token.String(),
 			DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
 			DiscoveryTokenUnsafeSkipCAVerification: true,
 		})

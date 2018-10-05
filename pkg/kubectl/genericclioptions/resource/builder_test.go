@@ -1386,51 +1386,51 @@ func TestMultipleTypesRequested(t *testing.T) {
 		expectedMultipleTypes bool
 	}{
 		{
-			args: []string{""},
+			args:                  []string{""},
 			expectedMultipleTypes: false,
 		},
 		{
-			args: []string{"all"},
+			args:                  []string{"all"},
 			expectedMultipleTypes: true,
 		},
 		{
-			args: []string{"rc"},
+			args:                  []string{"rc"},
 			expectedMultipleTypes: false,
 		},
 		{
-			args: []string{"pod,all"},
+			args:                  []string{"pod,all"},
 			expectedMultipleTypes: true,
 		},
 		{
-			args: []string{"all,rc,pod"},
+			args:                  []string{"all,rc,pod"},
 			expectedMultipleTypes: true,
 		},
 		{
-			args: []string{"rc,pod,svc"},
+			args:                  []string{"rc,pod,svc"},
 			expectedMultipleTypes: true,
 		},
 		{
-			args: []string{"rc/foo"},
+			args:                  []string{"rc/foo"},
 			expectedMultipleTypes: false,
 		},
 		{
-			args: []string{"rc/foo", "rc/bar"},
+			args:                  []string{"rc/foo", "rc/bar"},
 			expectedMultipleTypes: false,
 		},
 		{
-			args: []string{"rc", "foo"},
+			args:                  []string{"rc", "foo"},
 			expectedMultipleTypes: false,
 		},
 		{
-			args: []string{"rc,pod,svc", "foo"},
+			args:                  []string{"rc,pod,svc", "foo"},
 			expectedMultipleTypes: true,
 		},
 		{
-			args: []string{"rc,secrets"},
+			args:                  []string{"rc,secrets"},
 			expectedMultipleTypes: true,
 		},
 		{
-			args: []string{"rc/foo", "rc/bar", "svc/svc"},
+			args:                  []string{"rc/foo", "rc/bar", "svc/svc"},
 			expectedMultipleTypes: true,
 		},
 	}

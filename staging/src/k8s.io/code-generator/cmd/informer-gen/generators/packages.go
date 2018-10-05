@@ -320,9 +320,9 @@ func versionPackage(basePackage string, groupPkgName string, gv clientgentypes.G
 				DefaultGen: generator.DefaultGen{
 					OptionalName: "interface",
 				},
-				outputPackage: packagePath,
-				imports:       generator.NewImportTracker(),
-				types:         typesToGenerate,
+				outputPackage:             packagePath,
+				imports:                   generator.NewImportTracker(),
+				types:                     typesToGenerate,
 				internalInterfacesPackage: packageForInternalInterfaces(basePackage),
 			})
 

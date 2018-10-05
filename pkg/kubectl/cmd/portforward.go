@@ -92,11 +92,11 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	cmd := &cobra.Command{
-		Use: "port-forward TYPE/NAME [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
+		Use:                   "port-forward TYPE/NAME [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Forward one or more local ports to a pod"),
-		Long:    portforwardLong,
-		Example: portforwardExample,
+		Short:                 i18n.T("Forward one or more local ports to a pod"),
+		Long:                  portforwardLong,
+		Example:               portforwardExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := opts.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)

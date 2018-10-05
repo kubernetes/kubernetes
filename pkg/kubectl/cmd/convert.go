@@ -65,11 +65,11 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	options := NewConvertOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "convert -f FILENAME",
+		Use:                   "convert -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Convert config files between different API versions"),
-		Long:    convert_long,
-		Example: convert_example,
+		Short:                 i18n.T("Convert config files between different API versions"),
+		Long:                  convert_long,
+		Example:               convert_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd))
 			cmdutil.CheckErr(options.RunConvert())

@@ -107,11 +107,11 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o := NewPatchOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "patch (-f FILENAME | TYPE NAME) -p PATCH",
+		Use:                   "patch (-f FILENAME | TYPE NAME) -p PATCH",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update field(s) of a resource using strategic merge patch"),
-		Long:    patchLong,
-		Example: patchExample,
+		Short:                 i18n.T("Update field(s) of a resource using strategic merge patch"),
+		Long:                  patchLong,
+		Example:               patchExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

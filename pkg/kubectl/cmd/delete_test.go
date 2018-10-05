@@ -41,9 +41,9 @@ var unstructuredSerializer = resource.UnstructuredPlusDefaultContentConfig().Neg
 
 func fakecmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
+		Use:                   "delete ([-f FILENAME] | TYPE [(NAME | -l label | --all)])",
 		DisableFlagsInUseLine: true,
-		Run: func(cmd *cobra.Command, args []string) {},
+		Run:                   func(cmd *cobra.Command, args []string) {},
 	}
 	return cmd
 }

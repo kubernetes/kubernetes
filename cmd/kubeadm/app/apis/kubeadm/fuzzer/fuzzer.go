@@ -128,8 +128,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					ResourceContainer: "foo",
 					UDPIdleTimeout:    metav1.Duration{Duration: 1},
 					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
-						MaxPerCore: utilpointer.Int32Ptr(2),
-						Min:        utilpointer.Int32Ptr(1),
+						MaxPerCore:            utilpointer.Int32Ptr(2),
+						Min:                   utilpointer.Int32Ptr(1),
 						TCPEstablishedTimeout: &metav1.Duration{Duration: 5},
 						TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5},
 					},
