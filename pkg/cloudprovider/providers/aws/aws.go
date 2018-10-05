@@ -3330,7 +3330,9 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	// Determine if this is tagged as an Internal ELB
 	internalELB := false
 	internalAnnotation := apiService.Annotations[ServiceAnnotationLoadBalancerInternal]
-	if internalAnnotation != "" {
+	if internalAnnotation == "false" {
+		internalELB = false
+	} else if internalAnnotation != "" {
 		internalELB = true
 	}
 

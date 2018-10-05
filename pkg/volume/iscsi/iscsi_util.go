@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 var (
@@ -676,31 +675,10 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
 		devicePath = mappedDevicePath
 	}
-	// Get loopback device which takes fd lock for devicePath before detaching a volume from node.
-	// TODO: This is a workaround for issue #54108
-	// Currently local attach plugins such as FC, iSCSI, RBD can't obtain devicePath during
-	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
-	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
-	// local attach plugins needs to remove loopback device during TearDownDevice().
-	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
-	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, devicePath)
-	if err != nil {
-		if err.Error() != volumepathhandler.ErrDeviceNotFound {
-			return fmt.Errorf("failed to get loopback for device: %v, err: %v", devicePath, err)
-		}
-		glog.Warningf("iscsi: loopback for device: %s not found", device)
-	}
 	// Detach a volume from kubelet node
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
 	if err != nil {
 		return fmt.Errorf("failed to finish detachISCSIDisk, err: %v", err)
-	}
-	if len(loop) != 0 {
-		// The volume was successfully detached from node. We can safely remove the loopback.
-		err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
-		if err != nil {
-			return fmt.Errorf("failed to remove loopback :%v, err: %v", loop, err)
-		}
 	}
 	return nil
 }
