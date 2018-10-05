@@ -89,7 +89,6 @@ pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
-pkg/cloudprovider
 pkg/cloudprovider/providers/aws
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/gce
@@ -663,6 +662,7 @@ staging/src/k8s.io/client-go/util/jsonpath
 staging/src/k8s.io/client-go/util/retry
 staging/src/k8s.io/client-go/util/testing
 staging/src/k8s.io/client-go/util/workqueue
+staging/src/k8s.io/cloud-provider
 staging/src/k8s.io/code-generator/cmd/client-gen/args
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/fake
 staging/src/k8s.io/code-generator/cmd/client-gen/generators/scheme

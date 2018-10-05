@@ -42,6 +42,8 @@ import (
 )
 
 // ControllerClientBuilder allows you to get clients and configs for controllers
+// Please note a copy also exists in staging/src/k8s.io/cloud-provider/cloud.go
+// TODO: Extract this into a separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
 	Config(name string) (*restclient.Config, error)
 	ConfigOrDie(name string) *restclient.Config
