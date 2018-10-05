@@ -18,6 +18,9 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["edit_test.go"],
+    data = [
+        "//pkg/kubectl/cmd/edit/testdata:all-srcs",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubectl/cmd/apply:go_default_library",

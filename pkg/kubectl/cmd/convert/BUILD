@@ -25,6 +25,9 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["convert_test.go"],
+    data = [
+        "//test/fixtures",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubectl/cmd/testing:go_default_library",

@@ -28,3 +28,9 @@ filegroup(
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
+
+filegroup(
+    name = "testdata",
+    data = glob(["testdata/**"]),
+    visibility = ["//visibility:public"],
+)
