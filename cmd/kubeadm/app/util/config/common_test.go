@@ -33,9 +33,9 @@ kind: InitConfiguration
 apiVersion: kubeadm.k8s.io/v1alpha1
 kind: NodeConfiguration
 `),
-	"Master_v1alpha3": []byte(`
-apiVersion: kubeadm.k8s.io/v1alpha3
-kind: InitConfiguration
+	"Master_v1alpha2": []byte(`
+apiVersion: kubeadm.k8s.io/v1alpha2
+kind: MasterConfiguration
 `),
 	"Node_v1alpha3": []byte(`
 apiVersion: kubeadm.k8s.io/v1alpha3
