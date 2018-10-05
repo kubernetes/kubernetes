@@ -36,6 +36,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -174,7 +175,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					if req.URL.Path == "/namespaces/test/replicationcontrollers" {
-						return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, rc)}, nil
+						return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, rc)}, nil
 					}
 					return &http.Response{
 						StatusCode: http.StatusOK,
@@ -196,7 +197,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 				return
 			}
 
-			deleteFlags := NewDeleteFlags("to use to replace the resource.")
+			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
@@ -328,7 +329,7 @@ func TestGenerateService(t *testing.T) {
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := scheme.Codecs
 
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         corev1.SchemeGroupVersion,
 				NegotiatedSerializer: ns,
@@ -336,7 +337,7 @@ func TestGenerateService(t *testing.T) {
 					switch p, m := req.URL.Path, req.Method; {
 					case test.expectPOST && m == "POST" && p == "/namespaces/test/services":
 						sawPOST = true
-						body := objBody(codec, &test.service)
+						body := cmdtesting.ObjBody(codec, &test.service)
 						data, err := ioutil.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)
@@ -352,7 +353,7 @@ func TestGenerateService(t *testing.T) {
 						if !apiequality.Semantic.DeepEqual(&test.service, svc) {
 							t.Errorf("expected:\n%v\nsaw:\n%v\n", &test.service, svc)
 						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -368,7 +369,7 @@ func TestGenerateService(t *testing.T) {
 			}
 
 			ioStreams, _, buff, _ := genericclioptions.NewTestIOStreams()
-			deleteFlags := NewDeleteFlags("to use to replace the resource.")
+			deleteFlags := delete.NewDeleteFlags("to use to replace the resource.")
 			opts := &RunOptions{
 				PrintFlags:    printFlags,
 				DeleteOptions: deleteFlags.ToOptions(nil, genericclioptions.NewTestIOStreamsDiscard()),
@@ -506,9 +507,9 @@ func TestRunValidations(t *testing.T) {
 			_, _, codec := cmdtesting.NewExternalScheme()
 			tf.Client = &fake.RESTClient{
 				NegotiatedSerializer: scheme.Codecs,
-				Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", ""))},
+				Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			streams, _, _, bufErr := genericclioptions.NewTestIOStreams()
 			cmdutil.BehaviorOnFatal(func(str string, code int) {

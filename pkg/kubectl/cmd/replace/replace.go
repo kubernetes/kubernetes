@@ -33,6 +33,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -67,10 +68,10 @@ var (
 
 type ReplaceOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
-	DeleteFlags *DeleteFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DeleteOptions *DeleteOptions
+	DeleteFlags   *delete.DeleteFlags
+	DeleteOptions *delete.DeleteOptions
 
 	PrintObj func(obj runtime.Object) error
 
@@ -92,7 +93,7 @@ type ReplaceOptions struct {
 func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
-		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
+		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
 
 		IOStreams: streams,
 	}

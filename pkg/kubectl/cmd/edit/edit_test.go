@@ -38,6 +38,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -102,13 +103,13 @@ func TestEdit(t *testing.T) {
 			}
 		}
 
-		inputFile := filepath.Join("testdata/edit", "testcase-"+name, step.Input)
+		inputFile := filepath.Join("testdata", "testcase-"+name, step.Input)
 		expectedInput, err := ioutil.ReadFile(inputFile)
 		if err != nil {
 			t.Fatalf("%s, step %d: %v", name, i, err)
 		}
 
-		outputFile := filepath.Join("testdata/edit", "testcase-"+name, step.Output)
+		outputFile := filepath.Join("testdata", "testcase-"+name, step.Output)
 		resultingOutput, err := ioutil.ReadFile(outputFile)
 		if err != nil {
 			t.Fatalf("%s, step %d: %v", name, i, err)
@@ -150,7 +151,7 @@ func TestEdit(t *testing.T) {
 					t.Logf("If the change in input is expected, rerun tests with %s=true to update input fixtures", updateEnvVar)
 				}
 			}
-			return &http.Response{StatusCode: step.ResponseStatusCode, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
+			return &http.Response{StatusCode: step.ResponseStatusCode, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(resultingOutput))}, nil
 		}
 	}
 
@@ -169,15 +170,15 @@ func TestEdit(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	os.Setenv("KUBE_EDITOR", "testdata/edit/test_editor.sh")
+	os.Setenv("KUBE_EDITOR", "testdata/test_editor.sh")
 	os.Setenv("KUBE_EDITOR_CALLBACK", server.URL+"/callback")
 
 	testcases := sets.NewString()
-	filepath.Walk("testdata/edit", func(path string, info os.FileInfo, err error) error {
+	filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if path == "testdata/edit" {
+		if path == "testdata" {
 			return nil
 		}
 		name := filepath.Base(path)
@@ -199,7 +200,7 @@ func TestEdit(t *testing.T) {
 			i = 0
 			name = testcaseName
 			testcase = EditTestCase{}
-			testcaseDir := filepath.Join("testdata", "edit", "testcase-"+name)
+			testcaseDir := filepath.Join("testdata", "testcase-"+name)
 			testcaseData, err := ioutil.ReadFile(filepath.Join(testcaseDir, "test.yaml"))
 			if err != nil {
 				t.Fatalf("%s: %v", name, err)
@@ -220,12 +221,12 @@ func TestEdit(t *testing.T) {
 				}
 				return &fake.RESTClient{
 					VersionedAPIPath:     versionedAPIPath,
-					NegotiatedSerializer: unstructuredSerializer,
+					NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 					Client:               fake.CreateHTTPClient(reqResp),
 				}, nil
 			}
 			tf.WithNamespace(testcase.Namespace)
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			ioStreams, _, buf, errBuf := genericclioptions.NewTestIOStreams()
 
 			var cmd *cobra.Command
@@ -236,7 +237,7 @@ func TestEdit(t *testing.T) {
 				cmd = create.NewCmdCreate(tf, ioStreams)
 				cmd.Flags().Set("edit", "true")
 			case "edit-last-applied":
-				cmd = NewCmdApplyEditLastApplied(tf, ioStreams)
+				cmd = apply.NewCmdApplyEditLastApplied(tf, ioStreams)
 			default:
 				t.Fatalf("%s: unexpected mode %s", name, testcase.Mode)
 			}

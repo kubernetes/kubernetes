@@ -30,6 +30,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -197,8 +198,8 @@ func (o *CopyOptions) Run(args []string) error {
 // pod. If the destination path does not exist or is _not_ a
 // directory, an error is returned with the exit code received.
 func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
-	options := &ExecOptions{
-		StreamOptions: StreamOptions{
+	options := &exec.ExecOptions{
+		StreamOptions: exec.StreamOptions{
 			IOStreams: genericclioptions.IOStreams{
 				Out:    bytes.NewBuffer([]byte{}),
 				ErrOut: bytes.NewBuffer([]byte{}),
@@ -209,7 +210,7 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 		},
 
 		Command:  []string{"test", "-d", dest.File},
-		Executor: &DefaultRemoteExecutor{},
+		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
 	return o.execute(options)
@@ -245,8 +246,8 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec) error {
 		cmdArr = append(cmdArr, "-C", destDir)
 	}
 
-	options := &ExecOptions{
-		StreamOptions: StreamOptions{
+	options := &exec.ExecOptions{
+		StreamOptions: exec.StreamOptions{
 			IOStreams: genericclioptions.IOStreams{
 				In:     reader,
 				Out:    o.Out,
@@ -259,7 +260,7 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec) error {
 		},
 
 		Command:  cmdArr,
-		Executor: &DefaultRemoteExecutor{},
+		Executor: &exec.DefaultRemoteExecutor{},
 	}
 	return o.execute(options)
 }
@@ -270,8 +271,8 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	}
 
 	reader, outStream := io.Pipe()
-	options := &ExecOptions{
-		StreamOptions: StreamOptions{
+	options := &exec.ExecOptions{
+		StreamOptions: exec.StreamOptions{
 			IOStreams: genericclioptions.IOStreams{
 				In:     nil,
 				Out:    outStream,
@@ -284,7 +285,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 
 		// TODO: Improve error messages by first testing if 'tar' is present in the container?
 		Command:  []string{"tar", "cf", "-", src.File},
-		Executor: &DefaultRemoteExecutor{},
+		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
 	go func() {
@@ -460,7 +461,7 @@ func getPrefix(file string) string {
 	return strings.TrimLeft(file, "/")
 }
 
-func (o *CopyOptions) execute(options *ExecOptions) error {
+func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 	if len(options.Namespace) == 0 {
 		options.Namespace = o.Namespace
 	}

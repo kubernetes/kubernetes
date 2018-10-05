@@ -72,10 +72,10 @@ var (
 		kubectl rolling-update frontend-v1 frontend-v2 --rollback`))
 )
 
-var (
-	updatePeriod, _ = time.ParseDuration("1m0s")
-	timeout, _      = time.ParseDuration("5m0s")
-	pollInterval, _ = time.ParseDuration("3s")
+const (
+	updatePeriod = 1 * time.Minute
+	timeout      = 5 * time.Minute
+	pollInterval = 3 * time.Second
 )
 
 type RollingUpdateOptions struct {

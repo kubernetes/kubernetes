@@ -31,6 +31,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -62,7 +63,7 @@ const (
 
 // AttachOptions declare the arguments accepted by the Exec command
 type AttachOptions struct {
-	StreamOptions
+	exec.StreamOptions
 
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
@@ -85,11 +86,11 @@ type AttachOptions struct {
 
 func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 	return &AttachOptions{
-		StreamOptions: StreamOptions{
+		StreamOptions: exec.StreamOptions{
 			IOStreams: streams,
 		},
 		Attach:     &DefaultRemoteAttach{},
-		AttachFunc: defaultAttachFunc,
+		AttachFunc: DefaultAttachFunc,
 	}
 }
 
@@ -119,7 +120,7 @@ type RemoteAttach interface {
 	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
 }
 
-func defaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
+func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 	return func() error {
 		restClient, err := restclient.RESTClientFor(o.Config)
 		if err != nil {
@@ -262,7 +263,7 @@ func (o *AttachOptions) Run() error {
 	}
 
 	// ensure we can recover the terminal while attached
-	t := o.setupTTY()
+	t := o.SetupTTY()
 
 	var sizeQueue remotecommand.TerminalSizeQueue
 	if t.Raw {

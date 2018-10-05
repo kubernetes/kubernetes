@@ -64,6 +64,10 @@ var (
 		kubectl scale --replicas=3 statefulset/web`))
 )
 
+const (
+	timeout = 5 * time.Minute
+)
+
 type ScaleOptions struct {
 	FilenameOptions resource.FilenameOptions
 	RecordFlags     *genericclioptions.RecordFlags

@@ -140,7 +140,7 @@ func TestPodAndContainer(t *testing.T) {
 				NegotiatedSerializer: ns,
 				Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			cmd := &cobra.Command{}
 			options := test.p
@@ -202,15 +202,15 @@ func TestExec(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
-						body := objBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						body := cmdtesting.ObjBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", test.name, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
 					}
 				}),
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			ex := &fakeRemoteExecutor{}
 			if test.execErr {
 				ex.execErr = fmt.Errorf("exec error")
@@ -280,7 +280,7 @@ func TestSetupTTY(t *testing.T) {
 		TTY:       true,
 	}
 
-	tty := o.setupTTY()
+	tty := o.SetupTTY()
 
 	if o.In != nil {
 		t.Errorf("don't attach stdin: o.In should be nil")
@@ -304,7 +304,7 @@ func TestSetupTTY(t *testing.T) {
 	o.In = &bytes.Buffer{}
 	o.TTY = false
 
-	tty = o.setupTTY()
+	tty = o.SetupTTY()
 
 	if o.In == nil {
 		t.Errorf("attach stdin, no TTY: o.In should not be nil")
@@ -328,7 +328,7 @@ func TestSetupTTY(t *testing.T) {
 	o.ErrOut = stderr
 	o.TTY = true
 
-	tty = o.setupTTY()
+	tty = o.SetupTTY()
 
 	if o.In == nil {
 		t.Errorf("attach stdin, TTY, not a terminal: o.In should not be nil")
@@ -363,7 +363,7 @@ func TestSetupTTY(t *testing.T) {
 		return true
 	}
 
-	tty = o.setupTTY()
+	tty = o.SetupTTY()
 
 	if o.In != overrideStdin {
 		t.Errorf("attach stdin, TTY, is a terminal: o.In should equal overrideStdin")

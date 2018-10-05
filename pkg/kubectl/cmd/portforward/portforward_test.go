@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -85,15 +86,15 @@ func testPortForward(t *testing.T, flags map[string]string, args []string) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
-						body := objBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						body := cmdtesting.ObjBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
 						return nil, nil
 					}
 				}),
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			ff := &fakePortForwarder{}
 			if test.pfErr {
 				ff.pfErr = fmt.Errorf("pf error")
@@ -352,5 +353,23 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 		if !reflect.DeepEqual(translated, tc.translated) {
 			t.Errorf("%v: expected %v; got %v", tc.name, tc.translated, translated)
 		}
+	}
+}
+
+func execPod() *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyAlways,
+			DNSPolicy:     corev1.DNSClusterFirst,
+			Containers: []corev1.Container{
+				{
+					Name: "bar",
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+		},
 	}
 }

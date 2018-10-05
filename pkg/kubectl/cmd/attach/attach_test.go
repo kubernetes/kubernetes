@@ -33,6 +33,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -87,7 +88,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 		},
 		{
 			name:                  "container in flag",
-			options:               &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}, GetPodTimeout: 10000000},
+			options:               &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "bar"}, GetPodTimeout: 10000000},
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "bar",
@@ -95,7 +96,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 		},
 		{
 			name:                  "init container in flag",
-			options:               &AttachOptions{StreamOptions: StreamOptions{ContainerName: "initfoo"}, GetPodTimeout: 30},
+			options:               &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "initfoo"}, GetPodTimeout: 30},
 			args:                  []string{"foo"},
 			expectedPodName:       "foo",
 			expectedContainerName: "initfoo",
@@ -103,7 +104,7 @@ func TestPodAndContainerAttach(t *testing.T) {
 		},
 		{
 			name:            "non-existing container",
-			options:         &AttachOptions{StreamOptions: StreamOptions{ContainerName: "wrong"}, GetPodTimeout: 10},
+			options:         &AttachOptions{StreamOptions: exec.StreamOptions{ContainerName: "wrong"}, GetPodTimeout: 10},
 			args:            []string{"foo"},
 			expectedPodName: "foo",
 			expectError:     "container not found",
@@ -238,11 +239,11 @@ func TestAttach(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
-						body := objBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						body := cmdtesting.ObjBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					case p == test.fetchPodPath && m == "GET":
-						body := objBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						body := cmdtesting.ObjBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", p, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -256,7 +257,7 @@ func TestAttach(t *testing.T) {
 				remoteAttach.err = fmt.Errorf("attach error")
 			}
 			options := &AttachOptions{
-				StreamOptions: StreamOptions{
+				StreamOptions: exec.StreamOptions{
 					ContainerName: test.container,
 					IOStreams:     genericclioptions.NewTestIOStreamsDiscard(),
 				},
@@ -340,11 +341,11 @@ func TestAttachWarnings(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == test.podPath && m == "GET":
-						body := objBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						body := cmdtesting.ObjBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					case p == test.fetchPodPath && m == "GET":
-						body := objBody(codec, test.pod)
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						body := cmdtesting.ObjBody(codec, test.pod)
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", p, req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -354,7 +355,7 @@ func TestAttachWarnings(t *testing.T) {
 			tf.ClientConfigVal = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: scheme.Codecs, GroupVersion: &schema.GroupVersion{Version: test.version}}}
 
 			options := &AttachOptions{
-				StreamOptions: StreamOptions{
+				StreamOptions: exec.StreamOptions{
 					Stdin:         test.stdin,
 					TTY:           test.tty,
 					ContainerName: test.container,

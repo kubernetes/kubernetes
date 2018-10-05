@@ -75,6 +75,10 @@ var (
 	logsUsageErrStr       = fmt.Sprintf("expected '%s'.\nPOD or TYPE/NAME is a required argument for the logs command", logsUsageStr)
 )
 
+const (
+	defaultPodLogsTimeout = 20 * time.Second
+)
+
 type LogsOptions struct {
 	Namespace     string
 	ResourceArg   string
@@ -126,7 +130,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Example:               logsExample,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
-				printDeprecationWarning(o.ErrOut, "logs", "log")
+				fmt.Fprintf(o.ErrOut, "%s is DEPRECATED and will be removed in a future version. Use %s instead.\n", "log", "logs")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {

@@ -452,7 +452,7 @@ func TestSetEnvRemote(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == input.path && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					case p == input.path && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
@@ -463,7 +463,7 @@ func TestSetEnvRemote(t *testing.T) {
 							return nil, err
 						}
 						assert.Contains(t, string(bytes), `"value":`+`"`+"prod"+`"`, fmt.Sprintf("env not updated for %#v", input.object))
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "image", req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -587,11 +587,11 @@ func TestSetEnvFromResource(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == "/namespaces/test/configmaps/testconfigmap" && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockConfigMap)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockConfigMap)}, nil
 					case p == "/namespaces/test/secrets/testsecret" && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockSecret)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockSecret)}, nil
 					case p == "/namespaces/test/deployments/nginx" && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockDeployment)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
 					case p == "/namespaces/test/deployments/nginx" && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
@@ -607,7 +607,7 @@ func TestSetEnvFromResource(t *testing.T) {
 						for _, exclude := range input.assertExcludes {
 							assert.NotContains(t, string(bytes), exclude)
 						}
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(mockDeployment)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %#v\n%#v", input.name, req.URL, req)
 						return nil, nil

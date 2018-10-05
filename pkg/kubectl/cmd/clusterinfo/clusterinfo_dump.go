@@ -38,6 +38,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
+const (
+	defaultPodLogsTimeout = 20 * time.Second
+	timeout               = 5 * time.Minute
+)
+
 type ClusterInfoDumpOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   printers.ResourcePrinterFunc

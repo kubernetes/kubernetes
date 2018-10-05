@@ -28,17 +28,48 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/annotate"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/apiresources"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/attach"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/autoscale"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/certificates"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/clusterinfo"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/completion"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/cp"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/describe"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/diff"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/drain"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/edit"
+	cmdexec "k8s.io/kubernetes/pkg/kubectl/cmd/exec"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/explain"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/expose"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/get"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/label"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/logs"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/options"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/patch"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/plugin"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/portforward"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/proxy"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/replace"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/rollingupdate"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/run"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/scale"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/taint"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/top"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/version"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
@@ -416,72 +447,72 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			Message: "Basic Commands (Beginner):",
 			Commands: []*cobra.Command{
 				create.NewCmdCreate(f, ioStreams),
-				NewCmdExposeService(f, ioStreams),
-				NewCmdRun(f, ioStreams),
+				expose.NewCmdExposeService(f, ioStreams),
+				run.NewCmdRun(f, ioStreams),
 				set.NewCmdSet(f, ioStreams),
-				deprecatedAlias("run-container", NewCmdRun(f, ioStreams)),
+				deprecatedAlias("run-container", run.NewCmdRun(f, ioStreams)),
 			},
 		},
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdExplain("kubectl", f, ioStreams),
+				explain.NewCmdExplain("kubectl", f, ioStreams),
 				get.NewCmdGet("kubectl", f, ioStreams),
-				NewCmdEdit(f, ioStreams),
-				NewCmdDelete(f, ioStreams),
+				edit.NewCmdEdit(f, ioStreams),
+				delete.NewCmdDelete(f, ioStreams),
 			},
 		},
 		{
 			Message: "Deploy Commands:",
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, ioStreams),
-				NewCmdRollingUpdate(f, ioStreams),
-				NewCmdScale(f, ioStreams),
-				NewCmdAutoscale(f, ioStreams),
+				rollingupdate.NewCmdRollingUpdate(f, ioStreams),
+				scale.NewCmdScale(f, ioStreams),
+				autoscale.NewCmdAutoscale(f, ioStreams),
 			},
 		},
 		{
 			Message: "Cluster Management Commands:",
 			Commands: []*cobra.Command{
-				NewCmdCertificate(f, ioStreams),
-				NewCmdClusterInfo(f, ioStreams),
-				NewCmdTop(f, ioStreams),
-				NewCmdCordon(f, ioStreams),
-				NewCmdUncordon(f, ioStreams),
-				NewCmdDrain(f, ioStreams),
-				NewCmdTaint(f, ioStreams),
+				certificates.NewCmdCertificate(f, ioStreams),
+				clusterinfo.NewCmdClusterInfo(f, ioStreams),
+				top.NewCmdTop(f, ioStreams),
+				drain.NewCmdCordon(f, ioStreams),
+				drain.NewCmdUncordon(f, ioStreams),
+				drain.NewCmdDrain(f, ioStreams),
+				taint.NewCmdTaint(f, ioStreams),
 			},
 		},
 		{
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
-				NewCmdDescribe("kubectl", f, ioStreams),
-				NewCmdLogs(f, ioStreams),
-				NewCmdAttach(f, ioStreams),
-				NewCmdExec(f, ioStreams),
-				NewCmdPortForward(f, ioStreams),
-				NewCmdProxy(f, ioStreams),
-				NewCmdCp(f, ioStreams),
+				describe.NewCmdDescribe("kubectl", f, ioStreams),
+				logs.NewCmdLogs(f, ioStreams),
+				attach.NewCmdAttach(f, ioStreams),
+				cmdexec.NewCmdExec(f, ioStreams),
+				portforward.NewCmdPortForward(f, ioStreams),
+				proxy.NewCmdProxy(f, ioStreams),
+				cp.NewCmdCp(f, ioStreams),
 				auth.NewCmdAuth(f, ioStreams),
 			},
 		},
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
-				NewCmdDiff(f, ioStreams),
-				NewCmdApply("kubectl", f, ioStreams),
-				NewCmdPatch(f, ioStreams),
-				NewCmdReplace(f, ioStreams),
+				diff.NewCmdDiff(f, ioStreams),
+				apply.NewCmdApply("kubectl", f, ioStreams),
+				patch.NewCmdPatch(f, ioStreams),
+				replace.NewCmdReplace(f, ioStreams),
 				wait.NewCmdWait(f, ioStreams),
-				NewCmdConvert(f, ioStreams),
+				convert.NewCmdConvert(f, ioStreams),
 			},
 		},
 		{
 			Message: "Settings Commands:",
 			Commands: []*cobra.Command{
-				NewCmdLabel(f, ioStreams),
-				NewCmdAnnotate("kubectl", f, ioStreams),
-				NewCmdCompletion(ioStreams.Out, ""),
+				label.NewCmdLabel(f, ioStreams),
+				annotate.NewCmdAnnotate("kubectl", f, ioStreams),
+				completion.NewCmdCompletion(ioStreams.Out, ""),
 			},
 		},
 	}
@@ -511,21 +542,17 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	cmds.AddCommand(alpha)
 	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
-	cmds.AddCommand(NewCmdPlugin(f, ioStreams))
-	cmds.AddCommand(NewCmdVersion(f, ioStreams))
-	cmds.AddCommand(NewCmdApiVersions(f, ioStreams))
-	cmds.AddCommand(NewCmdApiResources(f, ioStreams))
-	cmds.AddCommand(NewCmdOptions(ioStreams.Out))
+	cmds.AddCommand(plugin.NewCmdPlugin(f, ioStreams))
+	cmds.AddCommand(version.NewCmdVersion(f, ioStreams))
+	cmds.AddCommand(apiresources.NewCmdApiVersions(f, ioStreams))
+	cmds.AddCommand(apiresources.NewCmdApiResources(f, ioStreams))
+	cmds.AddCommand(options.NewCmdOptions(ioStreams.Out))
 
 	return cmds
 }
 
 func runHelp(cmd *cobra.Command, args []string) {
 	cmd.Help()
-}
-
-func printDeprecationWarning(errOut io.Writer, command, alias string) {
-	fmt.Fprintf(errOut, "%s is DEPRECATED and will be removed in a future version. Use %s instead.\n", alias, command)
 }
 
 // deprecatedAlias is intended to be used to create a "wrapper" command around
@@ -542,5 +569,3 @@ func deprecatedAlias(deprecatedVersion string, cmd *cobra.Command) *cobra.Comman
 	cmd.Hidden = true
 	return cmd
 }
-
-var metadataAccessor = meta.NewAccessor()

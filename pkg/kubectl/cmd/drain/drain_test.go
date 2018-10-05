@@ -161,9 +161,9 @@ func TestCordon(t *testing.T) {
 					m := &MyReq{req}
 					switch {
 					case m.isFor("GET", "/nodes/node"):
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 					case m.isFor("GET", "/nodes/bar"):
-						return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("nope")}, nil
+						return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("nope")}, nil
 					case m.isFor("PATCH", "/nodes/node"):
 						data, err := ioutil.ReadAll(req.Body)
 						if err != nil {
@@ -185,14 +185,14 @@ func TestCordon(t *testing.T) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, new_node.Spec.Unschedulable)
 						}
 						updated = true
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 						return nil, nil
 					}
 				}),
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 			ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 			cmd := test.cmd(tf, ioStreams)
@@ -719,7 +719,7 @@ func TestDrain(t *testing.T) {
 							apiVersions := metav1.APIVersions{
 								Versions: []string{"v1"},
 							}
-							return genResponseWithJsonEncodedBody(apiVersions)
+							return cmdtesting.GenResponseWithJsonEncodedBody(apiVersions)
 						case req.Method == "GET" && req.URL.Path == "/apis":
 							groupList := metav1.APIGroupList{
 								Groups: []metav1.APIGroup{
@@ -731,7 +731,7 @@ func TestDrain(t *testing.T) {
 									},
 								},
 							}
-							return genResponseWithJsonEncodedBody(groupList)
+							return cmdtesting.GenResponseWithJsonEncodedBody(groupList)
 						case req.Method == "GET" && req.URL.Path == "/api/v1":
 							resourceList := metav1.APIResourceList{
 								GroupVersion: "v1",
@@ -744,21 +744,21 @@ func TestDrain(t *testing.T) {
 									},
 								}
 							}
-							return genResponseWithJsonEncodedBody(resourceList)
+							return cmdtesting.GenResponseWithJsonEncodedBody(resourceList)
 						case m.isFor("GET", "/nodes/node"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.node)}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 						case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.rcs[0])}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.rcs[0])}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ds)}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &extensionsv1beta1.DaemonSet{})}, nil
+							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.DaemonSet{})}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &job)}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.replicaSets[0])}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.replicaSets[0])}, nil
 						case m.isFor("GET", "/namespaces/default/pods/bar"):
-							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
+							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Pod{})}, nil
 						case m.isFor("GET", "/pods"):
 							values, err := url.ParseQuery(req.URL.RawQuery)
 							if err != nil {
@@ -769,9 +769,9 @@ func TestDrain(t *testing.T) {
 							if !reflect.DeepEqual(get_params, values) {
 								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, get_params, values)
 							}
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.PodList{Items: test.pods})}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{Items: test.pods})}, nil
 						case m.isFor("GET", "/replicationcontrollers"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
 						case m.isFor("PATCH", "/nodes/node"):
 							data, err := ioutil.ReadAll(req.Body)
 							if err != nil {
@@ -792,20 +792,20 @@ func TestDrain(t *testing.T) {
 							if !reflect.DeepEqual(test.expected.Spec, new_node.Spec) {
 								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, new_node.Spec)
 							}
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, new_node)}, nil
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, new_node)}, nil
 						case m.isFor("DELETE", "/namespaces/default/pods/bar"):
 							deleted = true
-							return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
+							return &http.Response{StatusCode: 204, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
 						case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
 							evicted = true
-							return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &policyv1beta1.Eviction{})}, nil
+							return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &policyv1beta1.Eviction{})}, nil
 						default:
 							t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 							return nil, nil
 						}
 					}),
 				}
-				tf.ClientConfigVal = defaultClientConfig()
+				tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 				ioStreams, _, _, errBuf := genericclioptions.NewTestIOStreams()
 				cmd := NewCmdDrain(tf, ioStreams)

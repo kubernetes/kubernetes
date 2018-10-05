@@ -34,6 +34,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -259,16 +260,16 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 
 	// This is using the patcher from apply, to keep the same behavior.
 	// We plan on replacing this with server-side apply when it becomes available.
-	patcher := &patcher{
-		mapping:       obj.Info.Mapping,
-		helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
-		overwrite:     true,
-		backOff:       clockwork.NewRealClock(),
-		serverDryRun:  true,
-		openapiSchema: obj.OpenAPI,
+	patcher := &apply.Patcher{
+		Mapping:       obj.Info.Mapping,
+		Helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
+		Overwrite:     true,
+		BackOff:       clockwork.NewRealClock(),
+		ServerDryRun:  true,
+		OpenapiSchema: obj.OpenAPI,
 	}
 
-	_, result, err := patcher.patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
+	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
 	return result, err
 }
 

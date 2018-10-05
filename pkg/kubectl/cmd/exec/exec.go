@@ -212,7 +212,7 @@ func (p *ExecOptions) Validate() error {
 	return nil
 }
 
-func (o *StreamOptions) setupTTY() term.TTY {
+func (o *StreamOptions) SetupTTY() term.TTY {
 	t := term.TTY{
 		Parent: o.InterruptParent,
 		Out:    o.Out,
@@ -288,7 +288,7 @@ func (p *ExecOptions) Run() error {
 	}
 
 	// ensure we can recover the terminal while attached
-	t := p.setupTTY()
+	t := p.SetupTTY()
 
 	var sizeQueue remotecommand.TerminalSizeQueue
 	if t.Raw {
