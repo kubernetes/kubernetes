@@ -1,44 +1,49 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ingress-nginx
+  name: ingress-{{ juju_application }}-nginx
+  labels:
+    cdk-{{ juju_application }}-ingress: "true"
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: nginx-configuration
-  namespace: ingress-nginx
+  namespace: ingress-{{ juju_application }}-nginx
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
+    cdk-{{ juju_application }}-ingress: "true"
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: tcp-services
-  namespace: ingress-nginx
+  namespace: ingress-{{ juju_application }}-nginx
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
+    cdk-{{ juju_application }}-ingress: "true"
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: udp-services
-  namespace: ingress-nginx
+  namespace: ingress-{{ juju_application }}-nginx
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
-
+    cdk-{{ juju_application }}-ingress: "true"
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: nginx-ingress-{{ juju_application }}-serviceaccount
-  namespace: ingress-nginx
+  namespace: ingress-{{ juju_application }}-nginx
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
+    cdk-{{ juju_application }}-ingress: "true"
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
@@ -47,6 +52,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
+    cdk-{{ juju_application }}-ingress: "true"
 rules:
   - apiGroups:
       - ""
@@ -102,6 +108,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
+    cdk-{{ juju_application }}-ingress: "true"
 rules:
   - apiGroups:
       - ""
@@ -145,6 +152,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
+    cdk-{{ juju_application }}-ingress: "true"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -152,7 +160,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: nginx-ingress-{{ juju_application }}-serviceaccount
-    namespace: ingress-nginx
+    namespace: ingress-{{ juju_application }}-nginx
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
@@ -161,6 +169,7 @@ metadata:
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
+    cdk-{{ juju_application }}-ingress: "true"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -168,17 +177,18 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: nginx-ingress-{{ juju_application }}-serviceaccount
-    namespace: ingress-nginx
+    namespace: ingress-{{ juju_application }}-nginx
 ---
 apiVersion: {{ daemonset_api_version }}
 kind: DaemonSet
 metadata:
   name: nginx-ingress-{{ juju_application }}-controller
-  namespace: ingress-nginx
+  namespace: ingress-{{ juju_application }}-nginx
   labels:
     app.kubernetes.io/name: ingress-nginx
     app.kubernetes.io/part-of: ingress-nginx
     juju-application: nginx-ingress-{{ juju_application }}
+    cdk-{{ juju_application }}-ingress: "true"
 spec:
   selector:
     matchLabels:
