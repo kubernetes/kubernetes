@@ -372,7 +372,6 @@ pkg/util/removeall
 pkg/util/resourcecontainer
 pkg/util/rlimit
 pkg/util/selinux
-pkg/util/strings
 pkg/util/sysctl
 pkg/util/sysctl/testing
 pkg/util/system
