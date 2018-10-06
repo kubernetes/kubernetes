@@ -41,6 +41,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -95,7 +96,7 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache                    schedulercache.Cache
+	cache                    schedulerinternalcache.Cache
 	equivalenceCache         *equivalence.Cache
 	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]algorithm.FitPredicate
@@ -1139,7 +1140,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
-	cache schedulercache.Cache,
+	cache schedulerinternalcache.Cache,
 	eCache *equivalence.Cache,
 	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]algorithm.FitPredicate,

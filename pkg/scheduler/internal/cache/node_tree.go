@@ -59,6 +59,7 @@ func (na *nodeArray) next() (nodeName string, exhausted bool) {
 	return nodeName, false
 }
 
+// newNodeTree creates a NodeTree from nodes.
 func newNodeTree(nodes []*v1.Node) *NodeTree {
 	nt := &NodeTree{
 		tree:           make(map[string]*nodeArray),
