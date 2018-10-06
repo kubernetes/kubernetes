@@ -49,109 +49,17 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
-var openapiSchemaPath = filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")
+var (
+	openapiSchemaPath = filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json")
 
-var unstructuredSerializer = resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer
-
-var grace = int64(30)
-var enableServiceLinks = corev1.DefaultEnableServiceLinks
-
-func defaultHeader() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
-func defaultClientConfig() *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: scheme.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &corev1.SchemeGroupVersion,
-		},
-	}
-}
-
-func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
-}
-
-func stringBody(body string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
-}
-
-func initTestErrorHandler(t *testing.T) {
-	cmdutil.BehaviorOnFatal(func(str string, code int) {
-		t.Errorf("Error running command (exit code %d): %s", code, str)
-	})
-}
-
-func testData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {
-	pods := &corev1.PodList{
-		ListMeta: metav1.ListMeta{
-			ResourceVersion: "15",
-		},
-		Items: []corev1.Pod{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
-				Spec: corev1.PodSpec{
-					RestartPolicy:                 corev1.RestartPolicyAlways,
-					DNSPolicy:                     corev1.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-					SecurityContext:               &corev1.PodSecurityContext{},
-					EnableServiceLinks:            &enableServiceLinks,
-				},
-			},
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "test", ResourceVersion: "11"},
-				Spec: corev1.PodSpec{
-					RestartPolicy:                 corev1.RestartPolicyAlways,
-					DNSPolicy:                     corev1.DNSClusterFirst,
-					TerminationGracePeriodSeconds: &grace,
-					SecurityContext:               &corev1.PodSecurityContext{},
-					EnableServiceLinks:            &enableServiceLinks,
-				},
-			},
-		},
-	}
-	svc := &corev1.ServiceList{
-		ListMeta: metav1.ListMeta{
-			ResourceVersion: "16",
-		},
-		Items: []corev1.Service{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: corev1.ServiceSpec{
-					SessionAffinity: "None",
-					Type:            corev1.ServiceTypeClusterIP,
-				},
-			},
-		},
-	}
-
-	one := int32(1)
-	rc := &corev1.ReplicationControllerList{
-		ListMeta: metav1.ListMeta{
-			ResourceVersion: "17",
-		},
-		Items: []corev1.ReplicationController{
-			{
-				ObjectMeta: metav1.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
-				Spec: corev1.ReplicationControllerSpec{
-					Replicas: &one,
-				},
-			},
-		},
-	}
-	return pods, svc, rc
-}
+	grace              = int64(30)
+	enableServiceLinks = corev1.DefaultEnableServiceLinks
+)
 
 func testComponentStatusData() *corev1.ComponentStatusList {
 	good := corev1.ComponentStatus{
@@ -195,13 +103,13 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	}
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Resp: &http.Response{
-			StatusCode: 200, Header: defaultHeader(),
-			Body: objBody(codec, obj),
+			StatusCode: 200, Header: cmdtesting.DefaultHeader(),
+			Body: cmdtesting.ObjBody(codec, obj),
 		},
 	}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -241,10 +149,10 @@ func TestGetSchemaObject(t *testing.T) {
 	t.Logf("%v", string(runtime.EncodeOrDie(codec, &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})))
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -256,7 +164,7 @@ func TestGetSchemaObject(t *testing.T) {
 }
 
 func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
@@ -266,8 +174,8 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	// for Pod type.
 	tf.OpenAPISchemaFunc = testOpenAPISchemaData
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -312,15 +220,15 @@ func testOpenAPISchemaData() (openapi.Resources, error) {
 }
 
 func TestGetObjects(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -337,15 +245,15 @@ foo    0/0              0          <unknown>
 }
 
 func TestGetObjectsShowKind(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -363,36 +271,36 @@ pod/foo   0/0              0          <unknown>
 }
 
 func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
-	pods, svcs, _ := testData()
+	pods, svcs, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.ReplicationControllerList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{})}, nil
 			case p == "/namespaces/test/services" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svcs)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svcs)}, nil
 			case p == "/namespaces/test/statefulsets" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &appsv1.StatefulSetList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.StatefulSetList{})}, nil
 			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &autoscalingv1.HorizontalPodAutoscalerList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &autoscalingv1.HorizontalPodAutoscalerList{})}, nil
 			case p == "/namespaces/test/jobs" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &batchv1.JobList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &batchv1.JobList{})}, nil
 			case p == "/namespaces/test/cronjobs" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &batchv1beta1.CronJobList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &batchv1beta1.CronJobList{})}, nil
 			case p == "/namespaces/test/daemonsets" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &appsv1.DaemonSetList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSetList{})}, nil
 			case p == "/namespaces/test/deployments" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &extensionsv1beta1.DeploymentList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.DeploymentList{})}, nil
 			case p == "/namespaces/test/replicasets" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &extensionsv1beta1.ReplicaSetList{})}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &extensionsv1beta1.ReplicaSetList{})}, nil
 
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
@@ -418,15 +326,15 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 }
 
 func TestGetObjectsShowLabels(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -444,7 +352,7 @@ foo    0/0              0          <unknown>   <none>
 }
 
 func TestGetObjectIgnoreNotFound(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 
 	ns := &corev1.NamespaceList{
 		ListMeta: metav1.ListMeta{
@@ -463,13 +371,13 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods/nonexistentpod" && m == "GET":
-				return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: stringBody("")}, nil
+				return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("")}, nil
 			case p == "/api/v1/namespaces/test" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ns.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ns.Items[0])}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -533,8 +441,8 @@ func TestGetSortedObjects(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &corev1.SchemeGroupVersion}}
 
@@ -737,15 +645,15 @@ func TestRuntimeSorter(t *testing.T) {
 }
 
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -763,15 +671,15 @@ foo    0/0              0          <unknown>
 }
 
 func TestGetListObjects(t *testing.T) {
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -796,8 +704,8 @@ func TestGetListComponentStatus(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, statuses)},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, statuses)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -816,7 +724,7 @@ serverunknown   Unhealthy             fizzbuzz error
 }
 
 func TestGetMixedGenericObjects(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 
 	// ensure that a runtime.Object without
 	// an ObjectMeta field is handled properly
@@ -836,18 +744,18 @@ func TestGetMixedGenericObjects(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, structuredObj)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, structuredObj)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -878,20 +786,20 @@ func TestGetMixedGenericObjects(t *testing.T) {
 }
 
 func TestGetMultipleTypeObjects(t *testing.T) {
-	pods, svc, _ := testData()
+	pods, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case "/namespaces/test/services":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -916,27 +824,27 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 }
 
 func TestGetMultipleTypeObjectsAsList(t *testing.T) {
-	pods, svc, _ := testData()
+	pods, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case "/namespaces/test/services":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
 			}
 		}),
 	}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
@@ -1017,23 +925,23 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 }
 
 func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
-	pods, svc, _ := testData()
+	pods, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case "/namespaces/test/services":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1060,23 +968,23 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 }
 
 func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
-	pods, svc, _ := testData()
+	pods, svc, _ := cmdtesting.TestData()
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 			case "/namespaces/test/services":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, svc)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -1103,7 +1011,7 @@ service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 }
 
 func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
-	_, svc, _ := testData()
+	_, svc, _ := cmdtesting.TestData()
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
@@ -1115,13 +1023,13 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/nodes/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, node)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, node)}, nil
 			case "/namespaces/test/services/bar":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1265,7 +1173,7 @@ func TestWatchLabelSelector(t *testing.T) {
 		},
 	}
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
@@ -1273,9 +1181,9 @@ func TestWatchLabelSelector(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1316,7 +1224,7 @@ func TestWatchFieldSelector(t *testing.T) {
 		},
 	}
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -1324,9 +1232,9 @@ func TestWatchFieldSelector(t *testing.T) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -1361,14 +1269,14 @@ func TestWatchResource(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1404,14 +1312,14 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/replicationcontrollers/cassandra":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
 			case "/namespaces/test/replicationcontrollers":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=cassandra" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1448,14 +1356,14 @@ func TestWatchOnlyResource(t *testing.T) {
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods/foo":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods[1])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[1:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
 				}
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1496,14 +1404,14 @@ func TestWatchOnlyList(t *testing.T) {
 		},
 	}
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
 				}
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
