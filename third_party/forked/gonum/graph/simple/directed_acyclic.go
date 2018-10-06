@@ -29,12 +29,9 @@ func (g *DirectedAcyclicGraph) From(n graph.Node) []graph.Node {
 		return nil
 	}
 
-	fid := n.ID()
 	nodes := make([]graph.Node, 0, g.UndirectedGraph.edges[n.ID()].Len())
-	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
-		if edge.From().ID() == fid {
-			nodes = append(nodes, g.UndirectedGraph.nodes[edge.To().ID()])
-		}
+	g.UndirectedGraph.edges[n.ID()].VisitEdgesFromSelf(func(toNodeID int, edge graph.Edge) {
+		nodes = append(nodes, g.UndirectedGraph.nodes[toNodeID])
 	})
 	return nodes
 }
@@ -43,12 +40,9 @@ func (g *DirectedAcyclicGraph) VisitFrom(n graph.Node, visitor func(neighbor gra
 	if !g.Has(n) {
 		return
 	}
-	fid := n.ID()
-	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
-		if edge.From().ID() == fid {
-			if !visitor(g.UndirectedGraph.nodes[edge.To().ID()]) {
-				return
-			}
+	g.UndirectedGraph.edges[n.ID()].VisitEdgesFromSelf(func(toNodeID int, edge graph.Edge) {
+		if !visitor(g.UndirectedGraph.nodes[toNodeID]) {
+			return
 		}
 	})
 }
@@ -58,12 +52,9 @@ func (g *DirectedAcyclicGraph) To(n graph.Node) []graph.Node {
 		return nil
 	}
 
-	tid := n.ID()
 	nodes := make([]graph.Node, 0, g.UndirectedGraph.edges[n.ID()].Len())
-	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
-		if edge.To().ID() == tid {
-			nodes = append(nodes, g.UndirectedGraph.nodes[edge.From().ID()])
-		}
+	g.UndirectedGraph.edges[n.ID()].VisitEdgesToSelf(func(fromNodeID int, edge graph.Edge) {
+		nodes = append(nodes, g.UndirectedGraph.nodes[fromNodeID])
 	})
 	return nodes
 }
@@ -72,12 +63,9 @@ func (g *DirectedAcyclicGraph) VisitTo(n graph.Node, visitor func(neighbor graph
 	if !g.Has(n) {
 		return
 	}
-	tid := n.ID()
-	g.UndirectedGraph.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
-		if edge.To().ID() == tid {
-			if !visitor(g.UndirectedGraph.nodes[edge.From().ID()]) {
-				return
-			}
+	g.UndirectedGraph.edges[n.ID()].VisitEdgesToSelf(func(fromNodeID int, edge graph.Edge) {
+		if !visitor(g.UndirectedGraph.nodes[fromNodeID]) {
+			return
 		}
 	})
 }

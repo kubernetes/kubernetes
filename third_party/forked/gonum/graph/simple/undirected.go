@@ -66,7 +66,7 @@ func (g *UndirectedGraph) AddNode(n graph.Node) {
 		panic(fmt.Sprintf("simple: node ID collision: %d", n.ID()))
 	}
 	g.nodes[n.ID()] = n
-	g.edges[n.ID()] = &sliceEdgeHolder{self: n.ID()}
+	g.edges[n.ID()] = &splitDirectionEdgeHolder{self: n.ID()}
 
 	g.freeIDs.Remove(n.ID())
 	g.usedIDs.Insert(n.ID())
@@ -80,7 +80,7 @@ func (g *UndirectedGraph) RemoveNode(n graph.Node) {
 	}
 	delete(g.nodes, n.ID())
 
-	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
+	g.edges[n.ID()].VisitEdges(func(neighbor int, edge graph.Edge) {
 		g.edges[neighbor] = g.edges[neighbor].Delete(n.ID())
 	})
 	delete(g.edges, n.ID())
@@ -159,7 +159,7 @@ func (g *UndirectedGraph) Edges() []graph.Edge {
 
 	seen := make(map[[2]int]struct{})
 	for _, u := range g.edges {
-		u.Visit(func(neighbor int, e graph.Edge) {
+		u.VisitEdges(func(neighbor int, e graph.Edge) {
 			uid := e.From().ID()
 			vid := e.To().ID()
 			if _, ok := seen[[2]int{uid, vid}]; ok {
@@ -182,7 +182,7 @@ func (g *UndirectedGraph) From(n graph.Node) []graph.Node {
 
 	nodes := make([]graph.Node, g.edges[n.ID()].Len())
 	i := 0
-	g.edges[n.ID()].Visit(func(neighbor int, edge graph.Edge) {
+	g.edges[n.ID()].VisitEdges(func(neighbor int, edge graph.Edge) {
 		nodes[i] = g.nodes[neighbor]
 		i++
 	})
