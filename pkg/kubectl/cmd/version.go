@@ -76,7 +76,8 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	}
 	cmd.Flags().BoolVar(&o.ClientOnly, "client", o.ClientOnly, "Client version only (no server required).")
 	cmd.Flags().BoolVar(&o.Short, "short", o.Short, "Print just the version number.")
-	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'yaml' or 'json'.")
+	cmd.Flags().MarkDeprecated("short", "please use --output=short instead.")
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'short', 'yaml' or 'json'.")
 	return cmd
 }
 
@@ -90,8 +91,8 @@ func (o *VersionOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 }
 
 func (o *VersionOptions) Validate() error {
-	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {
-		return errors.New(`--output must be 'yaml' or 'json'`)
+	if o.Output != "" && o.Output != "yaml" && o.Output != "json" && o.Output != "short" {
+		return errors.New(`--output must be 'short', yaml' or 'json'`)
 	}
 
 	return nil
@@ -114,18 +115,27 @@ func (o *VersionOptions) Run() error {
 		versionInfo.ServerVersion = serverVersion
 	}
 
+	//Make the output act like before, when we use deprecated flag `--short`.
+	//Error out when output format do not match flag `--short`.
+	if o.Short {
+		if o.Output == "yaml" || o.Output == "json" {
+			return errors.New(`--output yaml and json can not work with --short together`)
+		}
+		if o.Output == "" {
+			o.Output = "short"
+		}
+	}
+
 	switch o.Output {
 	case "":
-		if o.Short {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", clientVersion.GitVersion)
-			if serverVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", serverVersion.GitVersion)
-			}
-		} else {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
-			if serverVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
-			}
+		fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
+		if serverVersion != nil {
+			fmt.Fprintf(o.Out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
+		}
+	case "short":
+		fmt.Fprintf(o.Out, "Client Version: %s\n", clientVersion.GitVersion)
+		if serverVersion != nil {
+			fmt.Fprintf(o.Out, "Server Version: %s\n", serverVersion.GitVersion)
 		}
 	case "yaml":
 		marshalled, err := yaml.Marshal(&versionInfo)
@@ -139,10 +149,6 @@ func (o *VersionOptions) Run() error {
 			return err
 		}
 		fmt.Fprintln(o.Out, string(marshalled))
-	default:
-		// There is a bug in the program if we hit this case.
-		// However, we follow a policy of never panicking.
-		return fmt.Errorf("VersionOptions were not validated: --output=%q should have been rejected", o.Output)
 	}
 
 	return serverErr
