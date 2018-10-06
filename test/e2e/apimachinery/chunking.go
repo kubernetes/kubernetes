@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -44,7 +45,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
 		By("creating a large number of resources")
-		workqueue.Parallelize(20, numberOfTotalResources, func(i int) {
+		workqueue.ParallelizeUntil(context.TODO(), 20, numberOfTotalResources, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
 				_, err := client.Create(&v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{

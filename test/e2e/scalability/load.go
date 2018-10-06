@@ -17,6 +17,7 @@ limitations under the License.
 package scalability
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -37,11 +38,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -52,9 +56,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/restmapper"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -240,7 +241,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					defer GinkgoRecover()
 					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
-				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
+				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
 				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					serviceCleanupPhase := testPhaseDurations.StartPhase(800, "services deletion")
@@ -250,7 +251,7 @@ var _ = SIGDescribe("Load capacity", func() {
 						defer GinkgoRecover()
 						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
-					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
+					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
 					framework.Logf("Services deleted")
 				}(services)
 			} else {
