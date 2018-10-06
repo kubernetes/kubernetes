@@ -525,3 +525,11 @@ func ScopedResourceSelectorRequirementsAsSelector(ssr v1.ScopedResourceSelectorR
 	selector = selector.Add(*r)
 	return selector, nil
 }
+
+func GetEnableServiceLinks(ps *v1.PodSpec) bool {
+	if ps != nil && ps.EnableServiceLinks != nil {
+		return *ps.EnableServiceLinks
+	} else {
+		return true
+	}
+}

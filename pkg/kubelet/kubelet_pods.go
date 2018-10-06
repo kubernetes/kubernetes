@@ -550,7 +550,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, *pod.Spec.EnableServiceLinks)
+	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, v1helper.GetEnableServiceLinks(&pod.Spec))
 	if err != nil {
 		return result, err
 	}

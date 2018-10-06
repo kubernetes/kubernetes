@@ -537,3 +537,11 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 
 	return false
 }
+
+func GetEnableServiceLinks(ps *core.PodSpec) bool {
+	if ps != nil && ps.EnableServiceLinks != nil {
+		return *ps.EnableServiceLinks
+	} else {
+		return true
+	}
+}
