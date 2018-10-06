@@ -262,8 +262,8 @@ func (f *Framework) BeforeEach() {
 		}
 
 		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
-			InKubemark: ProviderIs("kubemark"),
-			Nodes:      nodeMode,
+			InKubemark:                  ProviderIs("kubemark"),
+			Nodes:                       nodeMode,
 			ResourceDataGatheringPeriod: 60 * time.Second,
 			ProbeDuration:               15 * time.Second,
 			PrintVerboseLogs:            false,

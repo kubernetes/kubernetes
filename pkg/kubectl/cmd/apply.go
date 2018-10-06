@@ -146,11 +146,11 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	o.cmdBaseName = baseName
 
 	cmd := &cobra.Command{
-		Use: "apply -f FILENAME",
+		Use:                   "apply -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Apply a configuration to a resource by filename or stdin"),
-		Long:    applyLong,
-		Example: applyExample,
+		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
+		Long:                  applyLong,
+		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(validateArgs(cmd, args))

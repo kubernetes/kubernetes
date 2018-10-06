@@ -86,11 +86,11 @@ func NewCmdCanI(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd := &cobra.Command{
-		Use: "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
+		Use:                   "can-i VERB [TYPE | TYPE/NAME | NONRESOURCEURL]",
 		DisableFlagsInUseLine: true,
-		Short:   "Check whether an action is allowed",
-		Long:    canILong,
-		Example: canIExample,
+		Short:                 "Check whether an action is allowed",
+		Long:                  canILong,
+		Example:               canIExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate())

@@ -177,8 +177,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "1",
-							Image: "foo",
+							Name:                     "1",
+							Image:                    "foo",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -249,8 +249,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "1",
-							Image: "foo",
+							Name:                     "1",
+							Image:                    "foo",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "Always",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,
@@ -278,8 +278,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						EnableServiceLinks:            &enableServiceLinks,
 
 						Containers: []v1.Container{{
-							Name:  "2",
-							Image: "bar:bartag",
+							Name:                     "2",
+							Image:                    "bar:bartag",
 							TerminationMessagePath:   "/dev/termination-log",
 							ImagePullPolicy:          "IfNotPresent",
 							TerminationMessagePolicy: v1.TerminationMessageReadFile,

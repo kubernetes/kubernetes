@@ -96,11 +96,11 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAttachOptions(streams)
 	cmd := &cobra.Command{
-		Use: "attach (POD | TYPE/NAME) -c CONTAINER",
+		Use:                   "attach (POD | TYPE/NAME) -c CONTAINER",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Attach to a running container"),
-		Long:    "Attach to a process that is already running inside an existing container.",
-		Example: attachExample,
+		Short:                 i18n.T("Attach to a running container"),
+		Long:                  "Attach to a process that is already running inside an existing container.",
+		Example:               attachExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

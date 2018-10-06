@@ -74,11 +74,11 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
-		Use: "history (TYPE NAME | TYPE/NAME) [flags]",
+		Use:                   "history (TYPE NAME | TYPE/NAME) [flags]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("View rollout history"),
-		Long:    history_long,
-		Example: history_example,
+		Short:                 i18n.T("View rollout history"),
+		Long:                  history_long,
+		Example:               history_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

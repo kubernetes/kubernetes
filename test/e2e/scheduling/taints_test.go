@@ -52,9 +52,9 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 	if !hasToleration {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      podName,
-				Namespace: ns,
-				Labels:    map[string]string{"name": podName},
+				Name:                       podName,
+				Namespace:                  ns,
+				Labels:                     map[string]string{"name": podName},
 				DeletionGracePeriodSeconds: &grace,
 			},
 			Spec: v1.PodSpec{
@@ -70,9 +70,9 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 		if tolerationSeconds <= 0 {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      podName,
-					Namespace: ns,
-					Labels:    map[string]string{"name": podName},
+					Name:                       podName,
+					Namespace:                  ns,
+					Labels:                     map[string]string{"name": podName},
 					DeletionGracePeriodSeconds: &grace,
 					// default - tolerate forever
 				},
@@ -90,9 +90,9 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 			ts := int64(tolerationSeconds)
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      podName,
-					Namespace: ns,
-					Labels:    map[string]string{"name": podName},
+					Name:                       podName,
+					Namespace:                  ns,
+					Labels:                     map[string]string{"name": podName},
 					DeletionGracePeriodSeconds: &grace,
 				},
 				Spec: v1.PodSpec{
