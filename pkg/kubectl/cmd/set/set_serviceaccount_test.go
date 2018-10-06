@@ -17,7 +17,6 @@ limitations under the License.
 package set
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -327,7 +326,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case p == input.path && m == http.MethodGet:
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					case p == input.path && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
@@ -338,7 +337,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 							return nil, err
 						}
 						assert.Contains(t, string(bytes), `"serviceAccountName":`+`"`+serviceAccount+`"`, fmt.Sprintf("serviceaccount not updated for %#v", input.object))
-						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(input.object)}, nil
 					default:
 						t.Errorf("%s: unexpected request: %s %#v\n%#v", "serviceaccount", req.Method, req.URL, req)
 						return nil, fmt.Errorf("unexpected request")
@@ -403,15 +402,5 @@ func TestServiceAccountValidation(t *testing.T) {
 }
 
 func objBody(obj runtime.Object) io.ReadCloser {
-	return bytesBody([]byte(runtime.EncodeOrDie(scheme.DefaultJSONEncoder(), obj)))
-}
-
-func defaultHeader() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
-func bytesBody(bodyBytes []byte) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
+	return cmdtesting.BytesBody([]byte(runtime.EncodeOrDie(scheme.DefaultJSONEncoder(), obj)))
 }

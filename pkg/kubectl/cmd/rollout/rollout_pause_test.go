@@ -53,7 +53,7 @@ func TestRolloutPause(t *testing.T) {
 					responseDeployment := &extensionsv1beta1.Deployment{}
 					responseDeployment.Name = deploymentName
 					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
-					return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: body}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -112,10 +112,4 @@ func (c *RolloutPauseRESTClient) Patch(pt types.PatchType) *restclient.Request {
 		serializers.Framer = info.StreamSerializer.Framer
 	}
 	return restclient.NewRequest(c, "PATCH", &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
-}
-
-func defaultHeader() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
 }
