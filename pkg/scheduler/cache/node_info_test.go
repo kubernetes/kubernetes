@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 func TestNewResource(t *testing.T) {
@@ -303,8 +302,8 @@ func TestNewNodeInfo(t *testing.T) {
 		TransientInfo:       NewTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
-		usedPorts: util.HostPortInfo{
-			"127.0.0.1": map[util.ProtocolPort]struct{}{
+		usedPorts: HostPortInfo{
+			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
 				{Protocol: "TCP", Port: 8080}: {},
 			},
@@ -392,8 +391,8 @@ func TestNodeInfoClone(t *testing.T) {
 				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
@@ -462,8 +461,8 @@ func TestNodeInfoClone(t *testing.T) {
 				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
@@ -621,8 +620,8 @@ func TestNodeInfoAddPod(t *testing.T) {
 		TransientInfo:       NewTransientSchedulerInfo(),
 		allocatableResource: &Resource{},
 		generation:          2,
-		usedPorts: util.HostPortInfo{
-			"127.0.0.1": map[util.ProtocolPort]struct{}{
+		usedPorts: HostPortInfo{
+			"127.0.0.1": map[ProtocolPort]struct{}{
 				{Protocol: "TCP", Port: 80}:   {},
 				{Protocol: "TCP", Port: 8080}: {},
 			},
@@ -740,8 +739,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          2,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 80}:   {},
 						{Protocol: "TCP", Port: 8080}: {},
 					},
@@ -857,8 +856,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 				TransientInfo:       NewTransientSchedulerInfo(),
 				allocatableResource: &Resource{},
 				generation:          3,
-				usedPorts: util.HostPortInfo{
-					"127.0.0.1": map[util.ProtocolPort]struct{}{
+				usedPorts: HostPortInfo{
+					"127.0.0.1": map[ProtocolPort]struct{}{
 						{Protocol: "TCP", Port: 8080}: {},
 					},
 				},

@@ -32,8 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
-	"k8s.io/kubernetes/pkg/scheduler/util"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 func deepEqualWithoutGeneration(t *testing.T, testcase int, actual, expected *schedulercache.NodeInfo) {
@@ -67,8 +65,8 @@ func (b *hostPortInfoBuilder) add(protocol, ip string, port int32) *hostPortInfo
 	return b
 }
 
-func (b *hostPortInfoBuilder) build() schedutil.HostPortInfo {
-	res := make(schedutil.HostPortInfo)
+func (b *hostPortInfoBuilder) build() schedulercache.HostPortInfo {
+	res := make(schedulercache.HostPortInfo)
 	for _, param := range b.inputs {
 		res.Add(param.ip, param.protocol, param.port)
 	}
@@ -78,7 +76,7 @@ func (b *hostPortInfoBuilder) build() schedutil.HostPortInfo {
 func newNodeInfo(requestedResource *schedulercache.Resource,
 	nonzeroRequest *schedulercache.Resource,
 	pods []*v1.Pod,
-	usedPorts util.HostPortInfo,
+	usedPorts schedulercache.HostPortInfo,
 	imageStates map[string]*schedulercache.ImageStateSummary,
 ) *schedulercache.NodeInfo {
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
@@ -747,7 +745,7 @@ func TestEphemeralStorageResource(t *testing.T) {
 					Memory:   priorityutil.DefaultMemoryRequest,
 				},
 				[]*v1.Pod{podE},
-				schedutil.HostPortInfo{},
+				schedulercache.HostPortInfo{},
 				make(map[string]*schedulercache.ImageStateSummary),
 			),
 		},
