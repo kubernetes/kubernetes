@@ -57,9 +57,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -111,7 +111,7 @@ type configFactory struct {
 
 	scheduledPodsHasSynced cache.InformerSynced
 
-	schedulerCache schedulercache.Cache
+	schedulerCache schedulerinternalcache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
 	// processed by this scheduler, based on pods's "spec.schedulerName".
@@ -166,7 +166,7 @@ type ConfigFactoryArgs struct {
 // return the interface.
 func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	stopEverything := make(chan struct{})
-	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
+	schedulerCache := schedulerinternalcache.New(30*time.Second, stopEverything)
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister

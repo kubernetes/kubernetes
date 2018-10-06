@@ -71,6 +71,7 @@
 				"k8s.io/kubernetes/pkg/scheduler/algorithm",
 				"k8s.io/kubernetes/pkg/scheduler/api",
 				"k8s.io/kubernetes/pkg/scheduler/cache",
+				"k8s.io/kubernetes/pkg/scheduler/internal/cache",
 				"k8s.io/kubernetes/pkg/scheduler/util",
 				"k8s.io/kubernetes/pkg/security/apparmor",
 				"k8s.io/kubernetes/pkg/serviceaccount",

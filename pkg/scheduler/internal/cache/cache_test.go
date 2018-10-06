@@ -31,13 +31,18 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-func deepEqualWithoutGeneration(t *testing.T, testcase int, actual, expected *NodeInfo) {
+func deepEqualWithoutGeneration(t *testing.T, testcase int, actual, expected *schedulercache.NodeInfo) {
 	// Ignore generation field.
 	if actual != nil {
-		actual.generation = 0
+		actual.SetGeneration(0)
+	}
+	if expected != nil {
+		expected.SetGeneration(0)
 	}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Errorf("#%d: node info get=%s, want=%s", testcase, actual, expected)
@@ -70,6 +75,21 @@ func (b *hostPortInfoBuilder) build() schedutil.HostPortInfo {
 	return res
 }
 
+func newNodeInfo(requestedResource *schedulercache.Resource,
+	nonzeroRequest *schedulercache.Resource,
+	pods []*v1.Pod,
+	usedPorts util.HostPortInfo,
+	imageStates map[string]*schedulercache.ImageStateSummary,
+) *schedulercache.NodeInfo {
+	nodeInfo := schedulercache.NewNodeInfo(pods...)
+	nodeInfo.SetRequestedResource(requestedResource)
+	nodeInfo.SetNonZeroRequest(nonzeroRequest)
+	nodeInfo.SetUsedPorts(usedPorts)
+	nodeInfo.SetImageStates(imageStates)
+
+	return nodeInfo
+}
+
 // TestAssumePodScheduled tests that after a pod is assumed, its information is aggregated
 // on node level.
 func TestAssumePodScheduled(t *testing.T) {
@@ -89,111 +109,99 @@ func TestAssumePodScheduled(t *testing.T) {
 	tests := []struct {
 		pods []*v1.Pod
 
-		wNodeInfo *NodeInfo
+		wNodeInfo *schedulercache.NodeInfo
 	}{{
 		pods: []*v1.Pod{testPods[0]},
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[0]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}, {
 		pods: []*v1.Pod{testPods[1], testPods[2]},
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[1], testPods[2]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[1], testPods[2]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}, { // test non-zero request
 		pods: []*v1.Pod{testPods[3]},
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 0,
 				Memory:   0,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: priorityutil.DefaultMilliCPURequest,
 				Memory:   priorityutil.DefaultMemoryRequest,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[3]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[3]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}, {
 		pods: []*v1.Pod{testPods[4]},
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU:        100,
 				Memory:          500,
 				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 3},
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[4]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[4]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}, {
 		pods: []*v1.Pod{testPods[4], testPods[5]},
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU:        300,
 				Memory:          1524,
 				ScalarResources: map[v1.ResourceName]int64{"example.com/foo": 8},
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 300,
 				Memory:   1524,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[4], testPods[5]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[4], testPods[5]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}, {
 		pods: []*v1.Pod{testPods[6]},
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[6]},
-			usedPorts:           newHostPortInfoBuilder().build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[6]},
+			newHostPortInfoBuilder().build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	},
 	}
 
@@ -246,7 +254,7 @@ func TestExpirePod(t *testing.T) {
 		pods        []*testExpirePodStruct
 		cleanupTime time.Time
 
-		wNodeInfo *NodeInfo
+		wNodeInfo *schedulercache.NodeInfo
 	}{{ // assumed pod would expires
 		pods: []*testExpirePodStruct{
 			{pod: testPods[0], assumedTime: now},
@@ -259,21 +267,19 @@ func TestExpirePod(t *testing.T) {
 			{pod: testPods[1], assumedTime: now.Add(3 * ttl / 2)},
 		},
 		cleanupTime: now.Add(2 * ttl),
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[1]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}}
 
 	for i, tt := range tests {
@@ -308,25 +314,23 @@ func TestAddPodWillConfirm(t *testing.T) {
 		podsToAssume []*v1.Pod
 		podsToAdd    []*v1.Pod
 
-		wNodeInfo *NodeInfo
+		wNodeInfo *schedulercache.NodeInfo
 	}{{ // two pod were assumed at same time. But first one is called Add() and gets confirmed.
 		podsToAssume: []*v1.Pod{testPods[0], testPods[1]},
 		podsToAdd:    []*v1.Pod{testPods[0]},
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{testPods[0]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}}
 
 	for i, tt := range tests {
@@ -402,28 +406,26 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 		podsToAdd    []*v1.Pod
 		podsToUpdate [][]*v1.Pod
 
-		wNodeInfo map[string]*NodeInfo
+		wNodeInfo map[string]*schedulercache.NodeInfo
 	}{{
 		podsToAssume: []*v1.Pod{assumedPod.DeepCopy()},
 		podsToAdd:    []*v1.Pod{addedPod.DeepCopy()},
 		podsToUpdate: [][]*v1.Pod{{addedPod.DeepCopy(), updatedPod.DeepCopy()}},
-		wNodeInfo: map[string]*NodeInfo{
+		wNodeInfo: map[string]*schedulercache.NodeInfo{
 			"assumed-node": nil,
-			"actual-node": {
-				requestedResource: &Resource{
+			"actual-node": newNodeInfo(
+				&schedulercache.Resource{
 					MilliCPU: 200,
 					Memory:   500,
 				},
-				nonzeroRequest: &Resource{
+				&schedulercache.Resource{
 					MilliCPU: 200,
 					Memory:   500,
 				},
-				TransientInfo:       newTransientSchedulerInfo(),
-				allocatableResource: &Resource{},
-				pods:                []*v1.Pod{updatedPod.DeepCopy()},
-				usedPorts:           newHostPortInfoBuilder().add("TCP", "0.0.0.0", 90).build(),
-				imageStates:         make(map[string]*ImageStateSummary),
-			},
+				[]*v1.Pod{updatedPod.DeepCopy()},
+				newHostPortInfoBuilder().add("TCP", "0.0.0.0", 90).build(),
+				make(map[string]*schedulercache.ImageStateSummary),
+			),
 		},
 	}}
 
@@ -462,24 +464,22 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	tests := []struct {
 		pod *v1.Pod
 
-		wNodeInfo *NodeInfo
+		wNodeInfo *schedulercache.NodeInfo
 	}{{
 		pod: basePod,
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{basePod},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{basePod},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}}
 
 	now := time.Now()
@@ -517,39 +517,35 @@ func TestUpdatePod(t *testing.T) {
 		podsToAdd    []*v1.Pod
 		podsToUpdate []*v1.Pod
 
-		wNodeInfo []*NodeInfo
+		wNodeInfo []*schedulercache.NodeInfo
 	}{{ // add a pod and then update it twice
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
-		wNodeInfo: []*NodeInfo{{
-			requestedResource: &Resource{
+		wNodeInfo: []*schedulercache.NodeInfo{newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		}, {
-			requestedResource: &Resource{
+			[]*v1.Pod{testPods[1]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		), newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		}},
+			[]*v1.Pod{testPods[0]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		)},
 	}}
 
 	for _, tt := range tests {
@@ -648,40 +644,36 @@ func TestExpireAddUpdatePod(t *testing.T) {
 		podsToAdd    []*v1.Pod
 		podsToUpdate []*v1.Pod
 
-		wNodeInfo []*NodeInfo
+		wNodeInfo []*schedulercache.NodeInfo
 	}{{ // Pod is assumed, expired, and added. Then it would be updated twice.
 		podsToAssume: []*v1.Pod{testPods[0]},
 		podsToAdd:    []*v1.Pod{testPods[0]},
 		podsToUpdate: []*v1.Pod{testPods[0], testPods[1], testPods[0]},
-		wNodeInfo: []*NodeInfo{{
-			requestedResource: &Resource{
+		wNodeInfo: []*schedulercache.NodeInfo{newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 200,
 				Memory:   1024,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		}, {
-			requestedResource: &Resource{
+			[]*v1.Pod{testPods[1]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		), newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		}},
+			[]*v1.Pod{testPods[0]},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		)},
 	}}
 
 	now := time.Now()
@@ -742,24 +734,22 @@ func TestEphemeralStorageResource(t *testing.T) {
 	podE := makePodWithEphemeralStorage(nodeName, "500")
 	tests := []struct {
 		pod       *v1.Pod
-		wNodeInfo *NodeInfo
+		wNodeInfo *schedulercache.NodeInfo
 	}{
 		{
 			pod: podE,
-			wNodeInfo: &NodeInfo{
-				requestedResource: &Resource{
+			wNodeInfo: newNodeInfo(
+				&schedulercache.Resource{
 					EphemeralStorage: 500,
 				},
-				nonzeroRequest: &Resource{
+				&schedulercache.Resource{
 					MilliCPU: priorityutil.DefaultMilliCPURequest,
 					Memory:   priorityutil.DefaultMemoryRequest,
 				},
-				TransientInfo:       newTransientSchedulerInfo(),
-				allocatableResource: &Resource{},
-				pods:                []*v1.Pod{podE},
-				usedPorts:           schedutil.HostPortInfo{},
-				imageStates:         make(map[string]*ImageStateSummary),
-			},
+				[]*v1.Pod{podE},
+				schedutil.HostPortInfo{},
+				make(map[string]*schedulercache.ImageStateSummary),
+			),
 		},
 	}
 	for i, tt := range tests {
@@ -789,24 +779,22 @@ func TestRemovePod(t *testing.T) {
 	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
 	tests := []struct {
 		pod       *v1.Pod
-		wNodeInfo *NodeInfo
+		wNodeInfo *schedulercache.NodeInfo
 	}{{
 		pod: basePod,
-		wNodeInfo: &NodeInfo{
-			requestedResource: &Resource{
+		wNodeInfo: newNodeInfo(
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			nonzeroRequest: &Resource{
+			&schedulercache.Resource{
 				MilliCPU: 100,
 				Memory:   500,
 			},
-			TransientInfo:       newTransientSchedulerInfo(),
-			allocatableResource: &Resource{},
-			pods:                []*v1.Pod{basePod},
-			usedPorts:           newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			imageStates:         make(map[string]*ImageStateSummary),
-		},
+			[]*v1.Pod{basePod},
+			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+			make(map[string]*schedulercache.ImageStateSummary),
+		),
 	}}
 
 	for i, tt := range tests {
@@ -885,7 +873,7 @@ func TestForgetPod(t *testing.T) {
 // getResourceRequest returns the resource request of all containers in Pods;
 // excuding initContainers.
 func getResourceRequest(pod *v1.Pod) v1.ResourceList {
-	result := &Resource{}
+	result := &schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
 		result.Add(container.Resources.Requests)
 	}
@@ -894,22 +882,30 @@ func getResourceRequest(pod *v1.Pod) v1.ResourceList {
 }
 
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
-func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *NodeInfo {
-	expected := NewNodeInfo()
+func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *schedulercache.NodeInfo {
+	expected := schedulercache.NewNodeInfo()
 
 	// Simulate SetNode.
-	expected.node = node
-	expected.allocatableResource = NewResource(node.Status.Allocatable)
-	expected.taints = node.Spec.Taints
-	expected.generation++
+	expected.SetNode(node)
+
+	expected.SetAllocatableResource(schedulercache.NewResource(node.Status.Allocatable))
+	expected.SetTaints(node.Spec.Taints)
+	expected.SetGeneration(expected.GetGeneration() + 1)
 
 	for _, pod := range pods {
 		// Simulate AddPod
-		expected.pods = append(expected.pods, pod)
-		expected.requestedResource.Add(getResourceRequest(pod))
-		expected.nonzeroRequest.Add(getResourceRequest(pod))
-		expected.updateUsedPorts(pod, true)
-		expected.generation++
+		pods := append(expected.Pods(), pod)
+		expected.SetPods(pods)
+		requestedResource := expected.RequestedResource()
+		newRequestedResource := &requestedResource
+		newRequestedResource.Add(getResourceRequest(pod))
+		expected.SetRequestedResource(newRequestedResource)
+		nonZeroRequest := expected.NonZeroRequest()
+		newNonZeroRequest := &nonZeroRequest
+		newNonZeroRequest.Add(getResourceRequest(pod))
+		expected.SetNonZeroRequest(newNonZeroRequest)
+		expected.UpdateUsedPorts(pod, true)
+		expected.SetGeneration(expected.GetGeneration() + 1)
 	}
 
 	return expected
@@ -1060,42 +1056,46 @@ func TestNodeOperators(t *testing.T) {
 		// Case 1: the node was added into cache successfully.
 		got, found := cache.nodes[node.Name]
 		if !found {
-			t.Errorf("Failed to find node %v in schedulercache.", node.Name)
+			t.Errorf("Failed to find node %v in schedulerinternalcache.", node.Name)
 		}
 		if cache.nodeTree.NumNodes != 1 || cache.nodeTree.Next() != node.Name {
 			t.Errorf("cache.nodeTree is not updated correctly after adding node: %v", node.Name)
 		}
 
 		// Generations are globally unique. We check in our unit tests that they are incremented correctly.
-		expected.generation = got.generation
+		expected.SetGeneration(got.GetGeneration())
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Failed to add node into schedulercache:\n got: %+v \nexpected: %+v", got, expected)
 		}
 
 		// Case 2: dump cached nodes successfully.
-		cachedNodes := map[string]*NodeInfo{}
+		cachedNodes := map[string]*schedulercache.NodeInfo{}
 		cache.UpdateNodeNameToInfoMap(cachedNodes)
 		newNode, found := cachedNodes[node.Name]
 		if !found || len(cachedNodes) != 1 {
 			t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes, cache.nodes)
 		}
-		expected.generation = newNode.generation
+		expected.SetGeneration(newNode.GetGeneration())
 		if !reflect.DeepEqual(newNode, expected) {
 			t.Errorf("Failed to clone node:\n got: %+v, \n expected: %+v", newNode, expected)
 		}
 
 		// Case 3: update node attribute successfully.
 		node.Status.Allocatable[v1.ResourceMemory] = mem50m
-		expected.allocatableResource.Memory = mem50m.Value()
+		allocatableResource := expected.AllocatableResource()
+		newAllocatableResource := &allocatableResource
+		newAllocatableResource.Memory = mem50m.Value()
+		expected.SetAllocatableResource(newAllocatableResource)
+
 		cache.UpdateNode(nil, node)
 		got, found = cache.nodes[node.Name]
 		if !found {
 			t.Errorf("Failed to find node %v in schedulercache after UpdateNode.", node.Name)
 		}
-		if got.generation <= expected.generation {
-			t.Errorf("generation is not incremented. got: %v, expected: %v", got.generation, expected.generation)
+		if got.GetGeneration() <= expected.GetGeneration() {
+			t.Errorf("Generation is not incremented. got: %v, expected: %v", got.GetGeneration(), expected.GetGeneration())
 		}
-		expected.generation = got.generation
+		expected.SetGeneration(got.GetGeneration())
 
 		if !reflect.DeepEqual(got, expected) {
 			t.Errorf("Failed to update node in schedulercache:\n got: %+v \nexpected: %+v", got, expected)
@@ -1132,7 +1132,7 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	cache := setupCacheOf1kNodes30kPods(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		cachedNodes := map[string]*NodeInfo{}
+		cachedNodes := map[string]*schedulercache.NodeInfo{}
 		cache.UpdateNodeNameToInfoMap(cachedNodes)
 	}
 }

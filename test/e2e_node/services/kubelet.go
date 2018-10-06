@@ -159,7 +159,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	kubeletConfigFlags = append(kubeletConfigFlags, "file-check-frequency")
 
 	// Assign a fixed CIDR to the node because there is no node controller.
-	// Note: this MUST be in sync with with the IP in
+	// Note: this MUST be in sync with the IP in
 	// - cluster/gce/config-test.sh and
 	// - test/e2e_node/conformance/run_test.sh.
 	kc.PodCIDR = "10.100.0.0/24"
