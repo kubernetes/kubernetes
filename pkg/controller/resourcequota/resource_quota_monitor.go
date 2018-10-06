@@ -70,7 +70,7 @@ type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
 	monitorLock sync.Mutex
-	// informersStarted is closed after after all of the controllers have been initialized and are running.
+	// informersStarted is closed after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
 
