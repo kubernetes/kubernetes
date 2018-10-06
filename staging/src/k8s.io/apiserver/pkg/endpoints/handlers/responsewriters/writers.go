@@ -88,6 +88,8 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 	}
 	defer out.Close()
 
+	// TODO: No audit?
+
 	if wsstream.IsWebSocketRequest(req) {
 		r := wsstream.NewReader(out, true, wsstream.NewDefaultReaderProtocols())
 		if err := r.Copy(w, req); err != nil {
@@ -113,7 +115,11 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 func SerializeObject(mediaType string, encoder runtime.Encoder, innerW http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	w := httpResponseWriterWithInit{mediaType: mediaType, innerW: innerW, statusCode: statusCode}
 
-	if err := encoder.Encode(object, w); err != nil {
+	if encodable, ok := object.(runtime.Encodable); ok {
+		if err := encodable.Encode(mediaType, encoder, w); err != nil {
+			errSerializationFatal(err, encoder, w)
+		}
+	} else if err := encoder.Encode(object, w); err != nil {
 		errSerializationFatal(err, encoder, w)
 	}
 }

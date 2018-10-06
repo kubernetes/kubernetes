@@ -192,6 +192,7 @@ type Cacher struct {
 // its internal cache and updating its cache in the background based on the
 // given configuration.
 func NewCacherFromConfig(config Config) *Cacher {
+	// TODO: Pass in trigger function here
 	watchCache := newWatchCache(config.CacheCapacity, config.KeyFunc, config.GetAttrsFunc, config.Versioner)
 	listerWatcher := newCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
@@ -391,7 +392,8 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		objVal.Set(reflect.ValueOf(elem.Object).Elem())
+		glog.Warningf("DeepCopyObject to ensure that object is not const-wrapped")
+		objVal.Set(reflect.ValueOf(elem.Object.DeepCopyObject()).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 		if !ignoreNotFound {
@@ -528,7 +530,8 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
 		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
-			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
+			glog.Warningf("DeepCopyObject to ensure that object is not const-wrapped")
+			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object.DeepCopyObject()).Elem()))
 		}
 	}
 	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
@@ -571,14 +574,16 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 		return nil, false
 	}
 	result := make([]string, 0, 2)
-	matchValues := c.triggerFunc(event.Object)
+	glog.Warningf("DeepCopyObject for trigger values")
+	// TODO: put into the watchCacheEvent?
+	matchValues := c.triggerFunc(event.Object.DeepCopyObject())
 	if len(matchValues) > 0 {
 		result = append(result, matchValues[0].Value)
 	}
 	if event.PrevObject == nil {
 		return result, len(result) > 0
 	}
-	prevMatchValues := c.triggerFunc(event.PrevObject)
+	prevMatchValues := c.triggerFunc(event.PrevObject.DeepCopyObject())
 	if len(prevMatchValues) > 0 {
 		if len(result) == 0 || result[0] != prevMatchValues[0].Value {
 			result = append(result, prevMatchValues[0].Value)
@@ -879,11 +884,12 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	var watchEvent watch.Event
 	switch {
 	case curObjPasses && !oldObjPasses:
-		watchEvent = watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
+		watchEvent = watch.Event{Type: watch.Added, Object: event.Object /*.DeepCopyObject()*/}
 	case curObjPasses && oldObjPasses:
-		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
+		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object /*.DeepCopyObject()*/}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
+		glog.Warningf("DeepCopy to change resource version for synthetic delete event")
 		oldObj := event.PrevObject.DeepCopyObject()
 		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))

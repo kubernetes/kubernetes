@@ -19,10 +19,12 @@ package handlers
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -205,11 +207,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			obj := event.Object
-			s.Fixup(obj)
-			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
-				// unexpected error
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
+			if err := s.encode(event.Object, buf); err != nil {
 				return
 			}
 
@@ -272,11 +270,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			obj := event.Object
-			s.Fixup(obj)
-			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
-				// unexpected error
-				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
+			if err := s.encode(event.Object, buf); err != nil {
 				return
 			}
 
@@ -321,4 +315,24 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			streamBuf.Reset()
 		}
 	}
+}
+
+func (s *WatchServer) encode(obj runtime.Object, w io.Writer) error {
+	// Fixup is really setting the selfLink, so maybe we can put this into Encodable?
+	s.Fixup(obj)
+	var err error
+	if encodable, ok := obj.(runtime.Encodable); ok {
+		// TODO: Is this the correct media type (but really we don't use mediaType anyway...)
+		err = encodable.Encode(s.MediaType, s.EmbeddedEncoder, w)
+	} else {
+		err = s.EmbeddedEncoder.Encode(obj, w)
+	}
+	if err != nil {
+		glog.Fatalf("unable to encode watch object %T: %v", obj, err)
+		// unexpected error
+		utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
+		return err
+	}
+
+	return nil
 }

@@ -46,6 +46,13 @@ type Encoder interface {
 	Encode(obj Object, w io.Writer) error
 }
 
+// Encodable is for objects that can encode themselves (in particular with caching)
+type Encodable interface {
+	// Encode writes the object to a stream. Implementations may return errors if the versions are
+	// incompatible, or if no conversion is defined.
+	Encode(mediaType string, encoder Encoder, w io.Writer) error
+}
+
 // Decoder attempts to load an object from data.
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the

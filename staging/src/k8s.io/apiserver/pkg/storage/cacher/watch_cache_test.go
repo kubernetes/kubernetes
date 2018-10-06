@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/constobj"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/client-go/tools/cache"
@@ -54,6 +55,12 @@ func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
 	}
 }
 
+func deconstify(e interface{}) *storeElement {
+	s := *(e.(*storeElement))
+	s.Object = constobj.DeconstifyForTest(s.Object)
+	return &s
+}
+
 func makeTestStoreElement(pod *v1.Pod) *storeElement {
 	return &storeElement{
 		Key:           "prefix/ns/" + pod.Name,
@@ -72,7 +79,7 @@ func newTestWatchCache(capacity int) *watchCache {
 	getAttrsFunc := func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 		pod, ok := obj.(*v1.Pod)
 		if !ok {
-			return nil, nil, false, fmt.Errorf("not a pod")
+			return nil, nil, false, fmt.Errorf("not a pod, was a %T", obj)
 		}
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, false, nil
 	}
@@ -94,7 +101,7 @@ func TestWatchCacheBasic(t *testing.T) {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 1))
-		if !apiequality.Semantic.DeepEqual(expected, item) {
+		if !apiequality.Semantic.DeepEqual(expected, deconstify(item)) {
 			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
@@ -106,7 +113,7 @@ func TestWatchCacheBasic(t *testing.T) {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 2))
-		if !apiequality.Semantic.DeepEqual(expected, item) {
+		if !apiequality.Semantic.DeepEqual(expected, deconstify(item)) {
 			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
@@ -131,7 +138,7 @@ func TestWatchCacheBasic(t *testing.T) {
 		items := make(map[string]storeElement, 0)
 		for _, item := range store.List() {
 			elem := item.(*storeElement)
-			items[elem.Key] = *elem
+			items[elem.Key] = *deconstify(elem)
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {
 			t.Errorf("expected %v, got %v", expected, items)
@@ -151,7 +158,7 @@ func TestWatchCacheBasic(t *testing.T) {
 		items := make(map[string]storeElement)
 		for _, item := range store.List() {
 			elem := item.(*storeElement)
-			items[elem.Key] = *elem
+			items[elem.Key] = *deconstify(elem)
 		}
 		if !apiequality.Semantic.DeepEqual(expected, items) {
 			t.Errorf("expected %v, got %v", expected, items)
@@ -171,7 +178,7 @@ func TestEvents(t *testing.T) {
 			t.Errorf("expected error too old")
 		}
 		if _, ok := err.(*errors.StatusError); !ok {
-			t.Errorf("expected error to be of type StatusError")
+			t.Errorf("expected error to be of type StatusError, was: %v", err)
 		}
 	}
 	{
@@ -186,7 +193,7 @@ func TestEvents(t *testing.T) {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
 		pod := makeTestPod("pod", uint64(3))
-		if !apiequality.Semantic.DeepEqual(pod, result[0].Object) {
+		if !apiequality.Semantic.DeepEqual(pod, constobj.DeconstifyForTest(result[0].Object)) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
 		if result[0].PrevObject != nil {
@@ -217,11 +224,11 @@ func TestEvents(t *testing.T) {
 				t.Errorf("unexpected event type: %v", result[i].Type)
 			}
 			pod := makeTestPod("pod", uint64(i+4))
-			if !apiequality.Semantic.DeepEqual(pod, result[i].Object) {
+			if !apiequality.Semantic.DeepEqual(pod, constobj.DeconstifyForTest(result[i].Object)) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
 			prevPod := makeTestPod("pod", uint64(i+3))
-			if !apiequality.Semantic.DeepEqual(prevPod, result[i].PrevObject) {
+			if !apiequality.Semantic.DeepEqual(prevPod, constobj.DeconstifyForTest(result[i].PrevObject)) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].PrevObject, prevPod)
 			}
 		}
@@ -248,7 +255,7 @@ func TestEvents(t *testing.T) {
 		}
 		for i := 0; i < 5; i++ {
 			pod := makeTestPod("pod", uint64(i+5))
-			if !apiequality.Semantic.DeepEqual(pod, result[i].Object) {
+			if !apiequality.Semantic.DeepEqual(pod, constobj.DeconstifyForTest(result[i].Object)) {
 				t.Errorf("unexpected item: %v, expected: %v", result[i].Object, pod)
 			}
 		}
@@ -269,11 +276,11 @@ func TestEvents(t *testing.T) {
 			t.Errorf("unexpected event type: %v", result[0].Type)
 		}
 		pod := makeTestPod("pod", uint64(10))
-		if !apiequality.Semantic.DeepEqual(pod, result[0].Object) {
+		if !apiequality.Semantic.DeepEqual(pod, constobj.DeconstifyForTest(result[0].Object)) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].Object, pod)
 		}
 		prevPod := makeTestPod("pod", uint64(9))
-		if !apiequality.Semantic.DeepEqual(prevPod, result[0].PrevObject) {
+		if !apiequality.Semantic.DeepEqual(prevPod, constobj.DeconstifyForTest(result[0].PrevObject)) {
 			t.Errorf("unexpected item: %v, expected: %v", result[0].PrevObject, prevPod)
 		}
 	}
@@ -309,7 +316,7 @@ func TestMarker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 || !apiequality.Semantic.DeepEqual(result[0].Object, pod) {
+	if len(result) != 1 || !apiequality.Semantic.DeepEqual(constobj.DeconstifyForTest(result[0].Object), pod) {
 		t.Errorf("unexpected result: %#v, expected %v", result, pod)
 	}
 }
@@ -355,7 +362,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 		t.Fatalf("no results returned: %#v", obj)
 	}
 	expected := makeTestStoreElement(makeTestPod("bar", 5))
-	if !apiequality.Semantic.DeepEqual(expected, obj) {
+	if !apiequality.Semantic.DeepEqual(expected, deconstify(obj)) {
 		t.Errorf("expected %v, got %v", expected, obj)
 	}
 }

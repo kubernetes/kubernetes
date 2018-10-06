@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/constobj"
 	"k8s.io/apiserver/pkg/storage"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
@@ -65,7 +66,8 @@ type watchCacheEvent struct {
 // in different List/Watch requests), in the underlying store we are
 // keeping structs (key, object, labels, fields, uninitialized).
 type storeElement struct {
-	Key           string
+	Key string
+	// TODO: Make it typed ConstObject (?)
 	Object        runtime.Object
 	Labels        labels.Set
 	Fields        fields.Set
@@ -219,7 +221,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	if err != nil {
 		return fmt.Errorf("couldn't compute key: %v", err)
 	}
-	elem := &storeElement{Key: key, Object: event.Object}
+	elem := &storeElement{Key: key, Object: constobj.Constify(event.Object)}
 	elem.Labels, elem.Fields, elem.Uninitialized, err = w.getAttrsFunc(event.Object)
 	if err != nil {
 		return err
@@ -379,7 +381,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		}
 		toReplace = append(toReplace, &storeElement{
 			Key:           key,
-			Object:        object,
+			Object:        constobj.Constify(object),
 			Labels:        objLabels,
 			Fields:        objFields,
 			Uninitialized: objUninitialized,
@@ -451,10 +453,12 @@ func (w *watchCache) GetAllEventsSinceThreadUnsafe(resourceVersion uint64) ([]*w
 			if !ok {
 				return nil, fmt.Errorf("not a storeElement: %v", elem)
 			}
-			objLabels, objFields, objUninitialized, err := w.getAttrsFunc(elem.Object)
-			if err != nil {
-				return nil, err
-			}
+			// Why are we evaluating getAttrsFunc a second time???
+			//objLabels, objFields, objUninitialized, err := w.getAttrsFunc(elem.Object)
+			//if err != nil {
+			//	return nil, err
+			// }
+			objLabels, objFields, objUninitialized := elem.Labels, elem.Fields, elem.Uninitialized
 			result[i] = &watchCacheEvent{
 				Type:             watch.Added,
 				Object:           elem.Object,

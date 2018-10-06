@@ -28,6 +28,7 @@ import (
 func IsListType(obj runtime.Object) bool {
 	// if we're a runtime.Unstructured, check whether this is a list.
 	// TODO: refactor GetItemsPtr to use an interface that returns []runtime.Object
+
 	if unstructured, ok := obj.(runtime.Unstructured); ok {
 		return unstructured.IsList()
 	}
@@ -36,11 +37,29 @@ func IsListType(obj runtime.Object) bool {
 	return err == nil
 }
 
+type ConstListObject interface {
+	IsConstList() bool
+	EachListItem(fn func(runtime.Object) error) error
+}
+
 // GetItemsPtr returns a pointer to the list object's Items member.
 // If 'list' doesn't have an Items member, it's not really a list type
 // and an error will be returned.
 // This function will either return a pointer to a slice, or an error, but not both.
 func GetItemsPtr(list runtime.Object) (interface{}, error) {
+	if a, ok := list.(ConstListObject); ok && a.IsConstList() {
+		// TODO: Switch our callers to use EachListItem?
+		var items []runtime.Object
+		err := a.EachListItem(func(o runtime.Object) error {
+			items = append(items, o)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &items, nil
+	}
+
 	v, err := conversion.EnforcePtr(list)
 	if err != nil {
 		return nil, err
