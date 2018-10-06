@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -360,6 +359,7 @@ type gcePDCSIDriver struct {
 func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
 	cs := f.ClientSet
 	framework.SkipUnlessProviderIs("gce", "gke")
+	framework.SkipIfMultizone(cs)
 
 	// TODO(#62561): Use credentials through external pod identity when that goes GA instead of downloading keys.
 	createGCESecrets(cs, config)
@@ -380,13 +380,10 @@ func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csi
 }
 
 func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
-	nodeZone, ok := node.GetLabels()[kubeletapis.LabelZoneFailureDomain]
-	Expect(ok).To(BeTrue(), "Could not get label %v from node %v", kubeletapis.LabelZoneFailureDomain, node.GetName())
-
 	return storageClassTest{
-		name:         "csi-gce-pd",
-		provisioner:  "csi-gce-pd",
-		parameters:   map[string]string{"type": "pd-standard", "zone": nodeZone},
+		name:         "com.google.csi.gcepd",
+		provisioner:  "com.google.csi.gcepd",
+		parameters:   map[string]string{"type": "pd-standard"},
 		claimSize:    "5Gi",
 		expectedSize: "5Gi",
 		nodeName:     node.Name,
