@@ -138,7 +138,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 	mountEtcHostsFile := len(podIP) > 0 && runtime.GOOS != "windows"
 	glog.V(3).Infof("container: %v/%v/%v podIP: %q creating hosts mount: %v", pod.Namespace, pod.Name, container.Name, podIP, mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
-	var cleanupAction func() = nil
+	var cleanupAction func()
 	for i, mount := range container.VolumeMounts {
 		// do not mount /etc/hosts if container is already mounting on the path
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
@@ -488,7 +488,7 @@ var masterServices = sets.NewString("kubernetes")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a
 // pod in namespace ns should see.
-func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
+func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[string]string, error) {
 	var (
 		serviceMap = make(map[string]*v1.Service)
 		m          = make(map[string]string)
@@ -514,19 +514,16 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 		}
 		serviceName := service.Name
 
-		switch service.Namespace {
-		// for the case whether the master service namespace is the namespace the pod
-		// is in, the pod should receive all the services in the namespace.
-		//
-		// ordering of the case clauses below enforces this
-		case ns:
-			serviceMap[serviceName] = service
-		case kl.masterServiceNamespace:
-			if masterServices.Has(serviceName) {
-				if _, exists := serviceMap[serviceName]; !exists {
-					serviceMap[serviceName] = service
-				}
+		// We always want to add environment variabled for master services
+		// from the master service namespace, even if enableServiceLinks is false.
+		// We also add environment variables for other services in the same
+		// namespace, if enableServiceLinks is true.
+		if service.Namespace == kl.masterServiceNamespace && masterServices.Has(serviceName) {
+			if _, exists := serviceMap[serviceName]; !exists {
+				serviceMap[serviceName] = service
 			}
+		} else if service.Namespace == ns && enableServiceLinks {
+			serviceMap[serviceName] = service
 		}
 	}
 
@@ -553,7 +550,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace)
+	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace, *pod.Spec.EnableServiceLinks)
 	if err != nil {
 		return result, err
 	}

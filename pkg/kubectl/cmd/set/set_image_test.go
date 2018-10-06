@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
 	"strings"
 	"testing"
 
@@ -30,7 +29,7 @@ import (
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +39,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -204,20 +202,20 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 
 func TestSetImageRemote(t *testing.T) {
 	inputs := []struct {
-		name                            string
-		object                          runtime.Object
-		apiPrefix, apiGroup, apiVersion string
-		testAPIGroup                    string
-		args                            []string
+		name         string
+		object       runtime.Object
+		groupVersion schema.GroupVersion
+		path         string
+		args         []string
 	}{
 		{
 			name: "set image extensionsv1beta1 ReplicaSet",
 			object: &extensionsv1beta1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: extensionsv1beta1.ReplicaSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -227,18 +225,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "extensions", apiVersion: "v1beta1",
-			args: []string{"replicaset", "nginx", "*=thingy"},
+			groupVersion: extensionsv1beta1.SchemeGroupVersion,
+			path:         "/namespaces/test/replicasets/nginx",
+			args:         []string{"replicaset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1beta2 ReplicaSet",
 			object: &appsv1beta2.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.ReplicaSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -248,18 +246,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
-			args: []string{"replicaset", "nginx", "*=thingy"},
+			groupVersion: appsv1beta2.SchemeGroupVersion,
+			path:         "/namespaces/test/replicasets/nginx",
+			args:         []string{"replicaset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1 ReplicaSet",
 			object: &appsv1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.ReplicaSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -269,18 +267,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
-			args: []string{"replicaset", "nginx", "*=thingy"},
+			groupVersion: appsv1.SchemeGroupVersion,
+			path:         "/namespaces/test/replicasets/nginx",
+			args:         []string{"replicaset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image extensionsv1beta1 DaemonSet",
 			object: &extensionsv1beta1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: extensionsv1beta1.DaemonSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -290,18 +288,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "extensions", apiVersion: "v1beta1",
-			args: []string{"daemonset", "nginx", "*=thingy"},
+			groupVersion: extensionsv1beta1.SchemeGroupVersion,
+			path:         "/namespaces/test/daemonsets/nginx",
+			args:         []string{"daemonset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1beta2 DaemonSet",
 			object: &appsv1beta2.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.DaemonSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -311,18 +309,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
-			args: []string{"daemonset", "nginx", "*=thingy"},
+			groupVersion: appsv1beta2.SchemeGroupVersion,
+			path:         "/namespaces/test/daemonsets/nginx",
+			args:         []string{"daemonset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1 DaemonSet",
 			object: &appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.DaemonSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -332,18 +330,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
-			args: []string{"daemonset", "nginx", "*=thingy"},
+			groupVersion: appsv1.SchemeGroupVersion,
+			path:         "/namespaces/test/daemonsets/nginx",
+			args:         []string{"daemonset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image extensionsv1beta1 Deployment",
 			object: &extensionsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -353,18 +351,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "extensions", apiVersion: "v1beta1",
-			args: []string{"deployment", "nginx", "*=thingy"},
+			groupVersion: extensionsv1beta1.SchemeGroupVersion,
+			path:         "/namespaces/test/deployments/nginx",
+			args:         []string{"deployment", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1beta1 Deployment",
 			object: &appsv1beta1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -374,18 +372,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta1",
-			args: []string{"deployment", "nginx", "*=thingy"},
+			groupVersion: appsv1beta1.SchemeGroupVersion,
+			path:         "/namespaces/test/deployments/nginx",
+			args:         []string{"deployment", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1beta2 Deployment",
 			object: &appsv1beta2.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -395,18 +393,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
-			args: []string{"deployment", "nginx", "*=thingy"},
+			groupVersion: appsv1beta2.SchemeGroupVersion,
+			path:         "/namespaces/test/deployments/nginx",
+			args:         []string{"deployment", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1 Deployment",
 			object: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.DeploymentSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -416,18 +414,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "extensions",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
-			args: []string{"deployment", "nginx", "*=thingy"},
+			groupVersion: appsv1.SchemeGroupVersion,
+			path:         "/namespaces/test/deployments/nginx",
+			args:         []string{"deployment", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1beta1 StatefulSet",
 			object: &appsv1beta1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta1.StatefulSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -437,18 +435,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "apps",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta1",
-			args: []string{"statefulset", "nginx", "*=thingy"},
+			groupVersion: appsv1beta1.SchemeGroupVersion,
+			path:         "/namespaces/test/statefulsets/nginx",
+			args:         []string{"statefulset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1beta2 StatefulSet",
 			object: &appsv1beta2.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1beta2.StatefulSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -458,18 +456,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "apps",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1beta2",
-			args: []string{"statefulset", "nginx", "*=thingy"},
+			groupVersion: appsv1beta2.SchemeGroupVersion,
+			path:         "/namespaces/test/statefulsets/nginx",
+			args:         []string{"statefulset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image appsv1 StatefulSet",
 			object: &appsv1.StatefulSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: appsv1.StatefulSetSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -479,18 +477,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "apps",
-			apiPrefix:    "/apis", apiGroup: "apps", apiVersion: "v1",
-			args: []string{"statefulset", "nginx", "*=thingy"},
+			groupVersion: appsv1.SchemeGroupVersion,
+			path:         "/namespaces/test/statefulsets/nginx",
+			args:         []string{"statefulset", "nginx", "*=thingy"},
 		},
 		{
 			name: "set image batchv1 Job",
 			object: &batchv1.Job{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
 				Spec: batchv1.JobSpec{
-					Template: v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -500,18 +498,18 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "batch",
-			apiPrefix:    "/apis", apiGroup: "batch", apiVersion: "v1",
-			args: []string{"job", "nginx", "*=thingy"},
+			groupVersion: batchv1.SchemeGroupVersion,
+			path:         "/namespaces/test/jobs/nginx",
+			args:         []string{"job", "nginx", "*=thingy"},
 		},
 		{
-			name: "set image v1.ReplicationController",
-			object: &v1.ReplicationController{
+			name: "set image corev1.ReplicationController",
+			object: &corev1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: v1.ReplicationControllerSpec{
-					Template: &v1.PodTemplateSpec{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{
+				Spec: corev1.ReplicationControllerSpec{
+					Template: &corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
 								{
 									Name:  "nginx",
 									Image: "nginx",
@@ -521,27 +519,24 @@ func TestSetImageRemote(t *testing.T) {
 					},
 				},
 			},
-			testAPIGroup: "",
-			apiPrefix:    "/api", apiGroup: "", apiVersion: "v1",
-			args: []string{"replicationcontroller", "nginx", "*=thingy"},
+			groupVersion: corev1.SchemeGroupVersion,
+			path:         "/namespaces/test/replicationcontrollers/nginx",
+			args:         []string{"replicationcontroller", "nginx", "*=thingy"},
 		},
 	}
 	for _, input := range inputs {
 		t.Run(input.name, func(t *testing.T) {
-			groupVersion := schema.GroupVersion{Group: input.apiGroup, Version: input.apiVersion}
-			testapi.Default = testapi.Groups[input.testAPIGroup]
 			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			tf.Client = &fake.RESTClient{
-				GroupVersion:         groupVersion,
+				GroupVersion:         input.groupVersion,
 				NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-					resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", "test", input.args[1])
 					switch p, m := req.URL.Path, req.Method; {
-					case p == resourcePath && m == http.MethodGet:
+					case p == input.path && m == http.MethodGet:
 						return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(input.object)}, nil
-					case p == resourcePath && m == http.MethodPatch:
+					case p == input.path && m == http.MethodPatch:
 						stream, err := req.GetBody()
 						if err != nil {
 							return nil, err
@@ -557,7 +552,6 @@ func TestSetImageRemote(t *testing.T) {
 						return nil, fmt.Errorf("unexpected request")
 					}
 				}),
-				VersionedAPIPath: path.Join(input.apiPrefix, testapi.Default.GroupVersion().String()),
 			}
 
 			outputFormat := "yaml"

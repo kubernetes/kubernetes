@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 var (
@@ -128,13 +128,24 @@ func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm co
 	return ssName, instanceID, *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
 }
 
-func (ss *scaleSet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+// GetPowerStatusByNodeName returns the power state of the specified node.
+func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, err error) {
 	_, _, vm, err := ss.getVmssVM(name)
 	if err != nil {
-		return provisioningState, err
+		return powerState, err
 	}
 
-	return *vm.ProvisioningState, nil
+	if vm.InstanceView != nil && vm.InstanceView.Statuses != nil {
+		statuses := *vm.InstanceView.Statuses
+		for _, status := range statuses {
+			state := to.String(status.Code)
+			if strings.HasPrefix(state, vmPowerStatePrefix) {
+				return strings.TrimPrefix(state, vmPowerStatePrefix), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("failed to get power status for node %q", name)
 }
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
@@ -280,8 +291,6 @@ func (ss *scaleSet) GetPrimaryVMSetName() string {
 }
 
 // GetIPByNodeName gets machine private IP and public IP by node name.
-// TODO(feiskyer): Azure vmss doesn't support associating a public IP to single virtual machine yet,
-// fix this after it is supported.
 func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
 	nic, err := ss.GetPrimaryInterface(nodeName)
 	if err != nil {
@@ -295,8 +304,30 @@ func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
 		return "", "", err
 	}
 
-	targetIP := *ipConfig.PrivateIPAddress
-	return targetIP, "", nil
+	internalIP := *ipConfig.PrivateIPAddress
+	publicIP := ""
+	if ipConfig.PublicIPAddress != nil && ipConfig.PublicIPAddress.ID != nil {
+		pipID := *ipConfig.PublicIPAddress.ID
+		pipName, err := getLastSegment(pipID)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to get publicIP name for node %q with pipID %q", nodeName, pipID)
+		}
+
+		resourceGroup, err := ss.GetNodeResourceGroup(nodeName)
+		if err != nil {
+			return "", "", err
+		}
+
+		pip, existsPip, err := ss.getPublicIPAddress(resourceGroup, pipName)
+		if err != nil {
+			return "", "", err
+		}
+		if existsPip {
+			publicIP = *pip.IPAddress
+		}
+	}
+
+	return internalIP, publicIP, nil
 }
 
 // This returns the full identifier of the primary NIC for the given VM.

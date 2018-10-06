@@ -109,8 +109,8 @@ func TestPullWithSecrets(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	dockerConfigJson := map[string]map[string]map[string]string{"auths": dockerCfg}
-	dockerConfigJsonContent, err := json.Marshal(dockerConfigJson)
+	dockerConfigJSON := map[string]map[string]map[string]string{"auths": dockerCfg}
+	dockerConfigJSONContent, err := json.Marshal(dockerConfigJSON)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestPullWithSecrets(t *testing.T) {
 		},
 		"builtin keyring secrets, but use passed with new docker config": {
 			"ubuntu",
-			[]v1.Secret{{Type: v1.SecretTypeDockerConfigJson, Data: map[string][]byte{v1.DockerConfigJsonKey: dockerConfigJsonContent}}},
+			[]v1.Secret{{Type: v1.SecretTypeDockerConfigJson, Data: map[string][]byte{v1.DockerConfigJsonKey: dockerConfigJSONContent}}},
 			credentialprovider.DockerConfig(map[string]credentialprovider.DockerConfigEntry{
 				"index.docker.io/v1/": {Username: "built-in", Password: "password", Provider: nil},
 			}),

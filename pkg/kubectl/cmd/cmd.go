@@ -370,6 +370,14 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
       Find more information at:
             https://kubernetes.io/docs/reference/kubectl/overview/`),
 		Run: runHelp,
+		// Hook before and after Run initialize and write profiles to disk,
+		// respectively.
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return initProfiling()
+		},
+		PersistentPostRunE: func(*cobra.Command, []string) error {
+			return flushProfiling()
+		},
 		BashCompletionFunction: bashCompletionFunc,
 	}
 
@@ -379,6 +387,8 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// Normalize all flags that are coming from other packages or pre-configurations
 	// a.k.a. change all "_" to "-". e.g. glog package
 	flags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+
+	addProfilingFlags(flags)
 
 	kubeConfigFlags := genericclioptions.NewConfigFlags()
 	kubeConfigFlags.AddFlags(flags)
@@ -458,6 +468,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		{
 			Message: "Advanced Commands:",
 			Commands: []*cobra.Command{
+				NewCmdDiff(f, ioStreams),
 				NewCmdApply("kubectl", f, ioStreams),
 				NewCmdPatch(f, ioStreams),
 				NewCmdReplace(f, ioStreams),

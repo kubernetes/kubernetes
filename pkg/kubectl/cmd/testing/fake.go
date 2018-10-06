@@ -43,11 +43,11 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapitesting "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
@@ -274,7 +274,7 @@ func NewTestFactory() *TestFactory {
 	return &TestFactory{
 		Factory:           cmdutil.NewFactory(configFlags),
 		kubeConfigFlags:   configFlags,
-		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(legacyscheme.Scheme),
+		FakeDynamicClient: fakedynamic.NewSimpleDynamicClient(scheme.Scheme),
 		tempConfigFile:    tmpFile,
 
 		ClientConfigVal: restConfig,
@@ -404,7 +404,7 @@ func testRESTMapper() meta.RESTMapper {
 	mapper = meta.FirstHitRESTMapper{
 		MultiRESTMapper: meta.MultiRESTMapper{
 			mapper,
-			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+			testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme),
 		},
 	}
 

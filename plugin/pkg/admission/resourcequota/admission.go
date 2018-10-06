@@ -21,13 +21,14 @@ import (
 	"io"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/validation"
 )
@@ -65,12 +66,13 @@ type QuotaAdmission struct {
 }
 
 var _ admission.ValidationInterface = &QuotaAdmission{}
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&QuotaAdmission{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&QuotaAdmission{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&QuotaAdmission{})
 var _ = kubeapiserveradmission.WantsQuotaConfiguration(&QuotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
-	items  []*api.ResourceQuota
+	items  []*corev1.ResourceQuota
 }
 
 // NewResourceQuota configures an admission controller that can enforce quota constraints
@@ -91,12 +93,12 @@ func NewResourceQuota(config *resourcequotaapi.Configuration, numEvaluators int,
 	}, nil
 }
 
-func (a *QuotaAdmission) SetInternalKubeClientSet(client internalclientset.Interface) {
+func (a *QuotaAdmission) SetExternalKubeClientSet(client kubernetes.Interface) {
 	a.quotaAccessor.client = client
 }
 
-func (a *QuotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
+func (a *QuotaAdmission) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	a.quotaAccessor.lister = f.Core().V1().ResourceQuotas().Lister()
 }
 
 func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {

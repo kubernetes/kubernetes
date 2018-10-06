@@ -46,9 +46,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	certutil "k8s.io/client-go/util/cert"
+	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -368,7 +367,7 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (os *OpenStack) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (os *OpenStack) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
 
 // mapNodeNameToServerName maps a k8s NodeName to an OpenStack Server Name
 // This is a simple string cast.

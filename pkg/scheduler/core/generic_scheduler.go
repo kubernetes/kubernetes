@@ -41,6 +41,8 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -94,9 +96,9 @@ func (f *FitError) Error() string {
 }
 
 type genericScheduler struct {
-	cache                    schedulercache.Cache
+	cache                    schedulerinternalcache.Cache
 	equivalenceCache         *equivalence.Cache
-	schedulingQueue          SchedulingQueue
+	schedulingQueue          internalqueue.SchedulingQueue
 	predicates               map[string]algorithm.FitPredicate
 	priorityMetaProducer     algorithm.PriorityMetadataProducer
 	predicateMetaProducer    algorithm.PredicateMetadataProducer
@@ -107,8 +109,28 @@ type genericScheduler struct {
 	cachedNodeInfoMap        map[string]*schedulercache.NodeInfo
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
+	pdbLister                algorithm.PDBLister
 	disablePreemption        bool
 	percentageOfNodesToScore int32
+}
+
+// snapshot snapshots equivalane cache and node infos for all fit and priority
+// functions.
+func (g *genericScheduler) snapshot() error {
+	// IMPORTANT NOTE: We must snapshot equivalence cache before snapshotting
+	// scheduler cache, otherwise stale data may be written into equivalence
+	// cache, e.g.
+	// 1. snapshot cache
+	// 2. event arrives, updating cache and invalidating predicates or whole node cache
+	// 3. snapshot ecache
+	// 4. evaludate predicates
+	// 5. stale result will be written to ecache
+	if g.equivalenceCache != nil {
+		g.equivalenceCache.Snapshot()
+	}
+
+	// Used for all fit and priority funcs.
+	return g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
@@ -130,8 +152,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 		return "", ErrNoNodesAvailable
 	}
 
-	// Used for all fit and priority funcs.
-	err = g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
+	err = g.snapshot()
 	if err != nil {
 		return "", err
 	}
@@ -227,7 +248,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if !ok || fitError == nil {
 		return nil, nil, nil, nil
 	}
-	err := g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
+	err := g.snapshot()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -248,7 +269,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		return nil, nil, []*v1.Pod{pod}, nil
 	}
-	pdbs, err := g.cache.ListPDBs(labels.Everything())
+	pdbs, err := g.pdbLister.List(labels.Everything())
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -396,14 +417,13 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 			var nodeCache *equivalence.NodeCache
 			nodeName := g.cache.NodeTree().Next()
 			if g.equivalenceCache != nil {
-				nodeCache, _ = g.equivalenceCache.GetNodeCache(nodeName)
+				nodeCache = g.equivalenceCache.LoadNodeCache(nodeName)
 			}
 			fits, failedPredicates, err := podFitsOnNode(
 				pod,
 				meta,
 				g.cachedNodeInfoMap[nodeName],
 				g.predicates,
-				g.cache,
 				nodeCache,
 				g.schedulingQueue,
 				g.alwaysCheckAllPredicates,
@@ -475,7 +495,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
 // any pod was found, 2) augmented meta data, 3) augmented nodeInfo.
 func addNominatedPods(podPriority int32, meta algorithm.PredicateMetadata,
-	nodeInfo *schedulercache.NodeInfo, queue SchedulingQueue) (bool, algorithm.PredicateMetadata,
+	nodeInfo *schedulercache.NodeInfo, queue internalqueue.SchedulingQueue) (bool, algorithm.PredicateMetadata,
 	*schedulercache.NodeInfo) {
 	if queue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
@@ -516,9 +536,8 @@ func podFitsOnNode(
 	meta algorithm.PredicateMetadata,
 	info *schedulercache.NodeInfo,
 	predicateFuncs map[string]algorithm.FitPredicate,
-	cache schedulercache.Cache,
 	nodeCache *equivalence.NodeCache,
-	queue SchedulingQueue,
+	queue internalqueue.SchedulingQueue,
 	alwaysCheckAllPredicates bool,
 	equivClass *equivalence.Class,
 ) (bool, []algorithm.PredicateFailureReason, error) {
@@ -558,7 +577,7 @@ func podFitsOnNode(
 		// TODO(bsalamat): consider using eCache and adding proper eCache invalidations
 		// when pods are nominated or their nominations change.
 		eCacheAvailable = equivClass != nil && nodeCache != nil && !podsAdded
-		for _, predicateKey := range predicates.Ordering() {
+		for predicateID, predicateKey := range predicates.Ordering() {
 			var (
 				fit     bool
 				reasons []algorithm.PredicateFailureReason
@@ -567,7 +586,7 @@ func podFitsOnNode(
 			//TODO (yastij) : compute average predicate restrictiveness to export it as Prometheus metric
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				if eCacheAvailable {
-					fit, reasons, err = nodeCache.RunPredicate(predicate, predicateKey, pod, metaToUse, nodeInfoToUse, equivClass, cache)
+					fit, reasons, err = nodeCache.RunPredicate(predicate, predicateKey, predicateID, pod, metaToUse, nodeInfoToUse, equivClass)
 				} else {
 					fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
 				}
@@ -650,6 +669,7 @@ func PrioritizeNodes(
 			results[i] = make(schedulerapi.HostPriorityList, len(nodes))
 		}
 	}
+
 	processNode := func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		var err error
@@ -660,11 +680,11 @@ func PrioritizeNodes(
 			results[i][index], err = priorityConfigs[i].Map(pod, meta, nodeInfo)
 			if err != nil {
 				appendError(err)
-				return
+				results[i][index].Host = nodes[index].Name
 			}
 		}
 	}
-	workqueue.Parallelize(16, len(nodes), processNode)
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), processNode)
 	for i, priorityConfig := range priorityConfigs {
 		if priorityConfig.Reduce == nil {
 			continue
@@ -869,7 +889,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	potentialNodes []*v1.Node,
 	predicates map[string]algorithm.FitPredicate,
 	metadataProducer algorithm.PredicateMetadataProducer,
-	queue SchedulingQueue,
+	queue internalqueue.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 
@@ -895,7 +915,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 			resultLock.Unlock()
 		}
 	}
-	workqueue.Parallelize(16, len(potentialNodes), checkNode)
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(potentialNodes), checkNode)
 	return nodeToVictims, nil
 }
 
@@ -958,7 +978,7 @@ func selectVictimsOnNode(
 	meta algorithm.PredicateMetadata,
 	nodeInfo *schedulercache.NodeInfo,
 	fitPredicates map[string]algorithm.FitPredicate,
-	queue SchedulingQueue,
+	queue internalqueue.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, bool) {
 	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
@@ -991,7 +1011,7 @@ func selectVictimsOnNode(
 	// that we should check is if the "pod" is failing to schedule due to pod affinity
 	// failure.
 	// TODO(bsalamat): Consider checking affinity to lower priority pods if feasible with reasonable performance.
-	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, nil, queue, false, nil); !fits {
+	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false, nil); !fits {
 		if err != nil {
 			glog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -1005,7 +1025,7 @@ func selectVictimsOnNode(
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)
 	reprievePod := func(p *v1.Pod) bool {
 		addPod(p)
-		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, nil, queue, false, nil)
+		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, nil, queue, false, nil)
 		if !fits {
 			removePod(p)
 			victims = append(victims, p)
@@ -1120,9 +1140,9 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
-	cache schedulercache.Cache,
+	cache schedulerinternalcache.Cache,
 	eCache *equivalence.Cache,
-	podQueue SchedulingQueue,
+	podQueue internalqueue.SchedulingQueue,
 	predicates map[string]algorithm.FitPredicate,
 	predicateMetaProducer algorithm.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
@@ -1130,6 +1150,7 @@ func NewGenericScheduler(
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
+	pdbLister algorithm.PDBLister,
 	alwaysCheckAllPredicates bool,
 	disablePreemption bool,
 	percentageOfNodesToScore int32,
@@ -1146,6 +1167,7 @@ func NewGenericScheduler(
 		cachedNodeInfoMap:        make(map[string]*schedulercache.NodeInfo),
 		volumeBinder:             volumeBinder,
 		pvcLister:                pvcLister,
+		pdbLister:                pdbLister,
 		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
 		disablePreemption:        disablePreemption,
 		percentageOfNodesToScore: percentageOfNodesToScore,

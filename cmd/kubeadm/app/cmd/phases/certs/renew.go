@@ -22,7 +22,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -50,7 +50,7 @@ var (
 func NewCmdCertsRenewal() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "renew",
-		Short: "Renews certificates for a kubernetes cluster",
+		Short: "Renews certificates for a Kubernetes cluster",
 		Long:  cmdutil.MacroCommandLongDescription,
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
@@ -63,7 +63,7 @@ func NewCmdCertsRenewal() *cobra.Command {
 type renewConfig struct {
 	cfgPath        string
 	kubeconfigPath string
-	cfg            kubeadmapiv1alpha3.InitConfiguration
+	cfg            kubeadmapiv1beta1.InitConfiguration
 	useAPI         bool
 }
 
@@ -110,7 +110,7 @@ func addFlags(cmd *cobra.Command, cfg *renewConfig) {
 	options.AddConfigFlag(cmd.Flags(), &cfg.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &cfg.cfg.CertificatesDir)
 	options.AddKubeConfigFlag(cmd.Flags(), &cfg.kubeconfigPath)
-	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the kubernetes certificate API to renew certificates")
+	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the Kubernetes certificate API to renew certificates")
 }
 
 // generateCertCommand takes mostly strings instead of structs to avoid using structs in a for loop

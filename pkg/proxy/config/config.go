@@ -207,7 +207,7 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 	}
 
 	for i := range c.eventHandlers {
-		glog.V(3).Infof("Calling handler.OnServiceSynced()")
+		glog.V(3).Info("Calling handler.OnServiceSynced()")
 		c.eventHandlers[i].OnServiceSynced()
 	}
 
@@ -221,7 +221,7 @@ func (c *ServiceConfig) handleAddService(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnServiceAdd")
+		glog.V(4).Info("Calling handler.OnServiceAdd")
 		c.eventHandlers[i].OnServiceAdd(service)
 	}
 }
@@ -238,7 +238,7 @@ func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnServiceUpdate")
+		glog.V(4).Info("Calling handler.OnServiceUpdate")
 		c.eventHandlers[i].OnServiceUpdate(oldService, service)
 	}
 }
@@ -257,7 +257,7 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnServiceDelete")
+		glog.V(4).Info("Calling handler.OnServiceDelete")
 		c.eventHandlers[i].OnServiceDelete(service)
 	}
 }

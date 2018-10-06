@@ -29,6 +29,7 @@ import (
 
 	"github.com/golang/glog"
 
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -41,6 +42,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
+	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -72,6 +74,19 @@ func clientsetForToken(user string, config *restclient.Config) (clientset.Interf
 	configCopy := *config
 	configCopy.BearerToken = user
 	return clientset.NewForConfigOrDie(&configCopy), externalclientset.NewForConfigOrDie(&configCopy)
+}
+
+func crdClientsetForToken(user string, config *restclient.Config) apiextensionsclient.Interface {
+	configCopy := *config
+	configCopy.BearerToken = user
+	return apiextensionsclient.NewForConfigOrDie(&configCopy)
+}
+
+func csiClientsetForToken(user string, config *restclient.Config) csiclientset.Interface {
+	configCopy := *config
+	configCopy.BearerToken = user
+	configCopy.ContentType = "application/json" // // csi client works with CRDs that support json only
+	return csiclientset.NewForConfigOrDie(&configCopy)
 }
 
 type testRESTOptionsGetter struct {

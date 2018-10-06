@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -51,10 +52,10 @@ var (
 
 func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "plugin [flags]",
+		Use:                   "plugin [flags]",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Provides utilities for interacting with plugins."),
-		Long:  plugin_long,
+		Short:                 i18n.T("Provides utilities for interacting with plugins."),
+		Long:                  plugin_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
 		},
@@ -108,7 +109,8 @@ func (o *PluginListOptions) Run() error {
 	pluginsFound := false
 	isFirstFile := true
 	pluginWarnings := 0
-	for _, dir := range filepath.SplitList(os.Getenv(path)) {
+	paths := sets.NewString(filepath.SplitList(os.Getenv(path))...)
+	for _, dir := range paths.List() {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
 			continue

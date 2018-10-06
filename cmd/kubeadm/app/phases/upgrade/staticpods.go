@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -489,7 +489,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)
 }
 
-// rollbackEtcdData rolls back the the content of etcd folder if something went wrong.
+// rollbackEtcdData rolls back the content of etcd folder if something went wrong.
 // When the folder contents are successfully rolled back, nil is returned, otherwise an error is returned.
 func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathManager) error {
 	backupEtcdDir := pathMgr.BackupEtcdDir()

@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -46,7 +44,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -65,12 +62,10 @@ type DrainOptions struct {
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
-	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	Selector           string
 	PodSelector        string
 	nodeInfos          []*resource.Info
-	typer              runtime.ObjectTyper
 
 	genericclioptions.IOStreams
 }
@@ -114,11 +109,11 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use: "cordon NODE",
+		Use:                   "cordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark node as unschedulable"),
-		Long:    cordon_long,
-		Example: cordon_example,
+		Short:                 i18n.T("Mark node as unschedulable"),
+		Long:                  cordon_long,
+		Example:               cordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
@@ -145,11 +140,11 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 	}
 
 	cmd := &cobra.Command{
-		Use: "uncordon NODE",
+		Use:                   "uncordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark node as schedulable"),
-		Long:    uncordon_long,
-		Example: uncordon_example,
+		Short:                 i18n.T("Mark node as schedulable"),
+		Long:                  uncordon_long,
+		Example:               uncordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(false))
@@ -199,7 +194,6 @@ func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 
 		IOStreams:          ioStreams,
-		backOff:            clockwork.NewRealClock(),
 		GracePeriodSeconds: -1,
 	}
 }
@@ -208,11 +202,11 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	options := NewDrainOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "drain NODE",
+		Use:                   "drain NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Drain node in preparation for maintenance"),
-		Long:    drain_long,
-		Example: drain_example,
+		Short:                 i18n.T("Drain node in preparation for maintenance"),
+		Long:                  drain_long,
+		Example:               drain_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunDrain())
@@ -284,7 +278,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceNames("nodes", args...).
 		SingleResourceType().
@@ -732,7 +726,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 
 	for _, nodeInfo := range o.nodeInfos {
 		if nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-			obj, err := legacyscheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+			obj, err := scheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
 				fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 				continue

@@ -239,6 +239,7 @@ func validatePSPFSGroup(fldPath *field.Path, groupOptions *policy.FSGroupStrateg
 
 	supportedRules := sets.NewString(
 		string(policy.FSGroupStrategyMustRunAs),
+		string(policy.FSGroupStrategyMayRunAs),
 		string(policy.FSGroupStrategyRunAsAny),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {
@@ -257,6 +258,7 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 
 	supportedRules := sets.NewString(
 		string(policy.SupplementalGroupsStrategyRunAsAny),
+		string(policy.SupplementalGroupsStrategyMayRunAs),
 		string(policy.SupplementalGroupsStrategyMustRunAs),
 	)
 	if !supportedRules.Has(string(groupOptions.Rule)) {

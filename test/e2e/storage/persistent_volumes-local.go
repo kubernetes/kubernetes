@@ -535,7 +535,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 	})
 
-	Context("StatefulSet with pod affinity", func() {
+	Context("StatefulSet with pod affinity [Slow]", func() {
 		var testVols map[string][]*localTestVolume
 		const (
 			ssReplicas  = 3
@@ -1464,6 +1464,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 	By("Bootstrapping local volume provisioner")
 	createServiceAccount(config)
 	createProvisionerClusterRoleBinding(config)
+	utils.PrivilegedTestPSPClusterRoleBinding(config.client, config.ns, false /* teardown */, []string{testServiceAccount})
 	createVolumeConfigMap(config)
 
 	for _, node := range config.nodes {
@@ -1477,6 +1478,7 @@ func setupLocalVolumeProvisioner(config *localTestConfig) {
 func cleanupLocalVolumeProvisioner(config *localTestConfig) {
 	By("Cleaning up cluster role binding")
 	deleteClusterRoleBinding(config)
+	utils.PrivilegedTestPSPClusterRoleBinding(config.client, config.ns, true /* teardown */, []string{testServiceAccount})
 
 	for _, node := range config.nodes {
 		By(fmt.Sprintf("Removing the test discovery directory on node %v", node.Name))

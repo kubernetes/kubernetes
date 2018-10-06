@@ -23,22 +23,22 @@ import (
 )
 
 var (
-	// Container image pull failed, kubelet is backing off image pull
+	// ErrImagePullBackOff - Container image pull failed, kubelet is backing off image pull
 	ErrImagePullBackOff = errors.New("ImagePullBackOff")
 
-	// Unable to inspect image
+	// ErrImageInspect - Unable to inspect image
 	ErrImageInspect = errors.New("ImageInspectError")
 
-	// General image pull error
+	// ErrImagePull - General image pull error
 	ErrImagePull = errors.New("ErrImagePull")
 
-	// Required Image is absent on host and PullPolicy is NeverPullImage
+	// ErrImageNeverPull - Required Image is absent on host and PullPolicy is NeverPullImage
 	ErrImageNeverPull = errors.New("ErrImageNeverPull")
 
-	// Get http error when pulling image from registry
-	RegistryUnavailable = errors.New("RegistryUnavailable")
+	// ErrRegistryUnavailable - Get http error when pulling image from registry
+	ErrRegistryUnavailable = errors.New("RegistryUnavailable")
 
-	// Unable to parse the image name.
+	// ErrInvalidImageName - Unable to parse the image name.
 	ErrInvalidImageName = errors.New("InvalidImageName")
 )
 

@@ -91,9 +91,8 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 		// plugin does not implement attach interface.
 		if devicePath != "" {
 			return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
-		} else {
-			return nil
 		}
+		return nil
 	}
 	return err
 }

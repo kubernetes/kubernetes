@@ -207,7 +207,7 @@ filename | sha256 hash
 
 # v1.11.2
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.2
 
@@ -301,7 +301,7 @@ filename | sha256 hash
 
 # v1.11.1
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.1
 
@@ -390,7 +390,7 @@ filename | sha256 hash
 
 # v1.11.0
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0
 
@@ -1106,7 +1106,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 
 # v1.11.0-rc.3
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0-rc.3
 
@@ -1167,7 +1167,7 @@ filename | sha256 hash
 
 # v1.11.0-rc.2
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0-rc.2
 
@@ -1227,7 +1227,7 @@ filename | sha256 hash
 
 # v1.11.0-rc.1
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0-rc.1
 
@@ -1310,7 +1310,7 @@ filename | sha256 hash
 
 # v1.11.0-beta.2
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0-beta.2
 
@@ -1457,7 +1457,7 @@ filename | sha256 hash
 
 # v1.11.0-beta.1
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.11/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0-beta.1
 
@@ -1676,7 +1676,7 @@ controllerManagerExtraVolumes:
 
 # v1.11.0-alpha.2
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0-alpha.2
 
@@ -1782,7 +1782,7 @@ filename | sha256 hash
 
 # v1.11.0-alpha.1
 
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/master/examples)
+[Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.11.0-alpha.1
 

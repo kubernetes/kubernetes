@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -1061,9 +1062,9 @@ func CreatePod(client clientset.Interface, namespace string, podCount int, podTe
 	}
 
 	if podCount < 30 {
-		workqueue.Parallelize(podCount, podCount, createPodFunc)
+		workqueue.ParallelizeUntil(context.TODO(), podCount, podCount, createPodFunc)
 	} else {
-		workqueue.Parallelize(30, podCount, createPodFunc)
+		workqueue.ParallelizeUntil(context.TODO(), 30, podCount, createPodFunc)
 	}
 	return createError
 }

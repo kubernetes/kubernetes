@@ -126,11 +126,11 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 
 	cmd := &cobra.Command{
-		Use: "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP|SCTP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
+		Use:                   "expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP|SCTP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"),
-		Long:    exposeLong,
-		Example: exposeExample,
+		Short:                 i18n.T("Take a replication controller, service, deployment or pod and expose it as a new Kubernetes Service"),
+		Long:                  exposeLong,
+		Example:               exposeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.RunExpose(cmd, args))
@@ -325,7 +325,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		if o.DryRun {
 			return o.PrintObj(object, o.Out)
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 

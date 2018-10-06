@@ -211,11 +211,18 @@ func findMatchingVolume(
 		}
 
 		// filter out:
+		// - volumes in non-available phase
 		// - volumes bound to another claim
 		// - volumes whose labels don't match the claim's selector, if specified
 		// - volumes in Class that is not requested
 		// - volumes whose NodeAffinity does not match the node
-		if volume.Spec.ClaimRef != nil {
+		if volume.Status.Phase != v1.VolumeAvailable {
+			// We ignore volumes in non-available phase, because volumes that
+			// satisfies matching criteria will be updated to available, binding
+			// them now has high chance of encountering unnecessary failures
+			// due to API conflicts.
+			continue
+		} else if volume.Spec.ClaimRef != nil {
 			continue
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue

@@ -387,8 +387,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig:                        {Default: true, PreRelease: utilfeature.Beta},
+	AppArmor:             {Default: true, PreRelease: utilfeature.Beta},
+	DynamicKubeletConfig: {Default: true, PreRelease: utilfeature.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
 	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
 	DevicePlugins:                               {Default: true, PreRelease: utilfeature.Beta},
@@ -408,7 +408,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	QOSReserved:                                 {Default: false, PreRelease: utilfeature.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: utilfeature.Beta},
 	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: utilfeature.Alpha},
-	AttachVolumeLimit:                           {Default: false, PreRelease: utilfeature.Beta},
+	AttachVolumeLimit:                           {Default: true, PreRelease: utilfeature.Beta},
 	CPUManager:                                  {Default: true, PreRelease: utilfeature.Beta},
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: utilfeature.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},

@@ -498,10 +498,10 @@ func runPausePod(cs clientset.Interface, pod *v1.Pod) (*v1.Pod, error) {
 		return nil, fmt.Errorf("Error creating pause pod: %v", err)
 	}
 	if err = waitForPodToSchedule(cs, pod); err != nil {
-		return pod, fmt.Errorf("Pod %v didn't schedule successfully. Error: %v", pod.Name, err)
+		return pod, fmt.Errorf("Pod %v/%v didn't schedule successfully. Error: %v", pod.Namespace, pod.Name, err)
 	}
 	if pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
-		return pod, fmt.Errorf("Error getting pod %v info: %v", pod.Name, err)
+		return pod, fmt.Errorf("Error getting pod %v/%v info: %v", pod.Namespace, pod.Name, err)
 	}
 	return pod, nil
 }
@@ -631,20 +631,20 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
 }
 
-// waitCachedPDBsStable waits for PDBs in scheduler cache to have "CurrentHealthy" status equal to
+// waitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
-func waitCachedPDBsStable(context *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
+func waitForPDBsStable(context *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
 	return wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		pdbList, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-		if len(cachedPDBs) != len(pdbs) {
+		if len(pdbList.Items) != len(pdbs) {
 			return false, nil
 		}
 		for i, pdb := range pdbs {
 			found := false
-			for _, cpdb := range cachedPDBs {
+			for _, cpdb := range pdbList.Items {
 				if pdb.Name == cpdb.Name && pdb.Namespace == cpdb.Namespace {
 					found = true
 					if cpdb.Status.CurrentHealthy != pdbPodNum[i] {

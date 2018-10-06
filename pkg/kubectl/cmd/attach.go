@@ -31,7 +31,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
@@ -97,11 +96,11 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAttachOptions(streams)
 	cmd := &cobra.Command{
-		Use: "attach (POD | TYPE/NAME) -c CONTAINER",
+		Use:                   "attach (POD | TYPE/NAME) -c CONTAINER",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Attach to a running container"),
-		Long:    "Attach to a process that is already running inside an existing container.",
-		Example: attachExample,
+		Short:                 i18n.T("Attach to a running container"),
+		Long:                  "Attach to a process that is already running inside an existing container.",
+		Example:               attachExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -137,7 +136,7 @@ func defaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 			Stdout:    o.Out != nil,
 			Stderr:    !o.DisableStderr,
 			TTY:       raw,
-		}, legacyscheme.ParameterCodec)
+		}, scheme.ParameterCodec)
 
 		return o.Attach.Attach("POST", req.URL(), o.Config, o.In, o.Out, o.ErrOut, raw, sizeQueue)
 	}

@@ -139,20 +139,22 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		}
 		glog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
 		return &fcDiskMounter{
-			fcDisk:     fcDisk,
-			fsType:     fc.FSType,
-			volumeMode: volumeMode,
-			readOnly:   readOnly,
-			mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-			deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+			fcDisk:       fcDisk,
+			fsType:       fc.FSType,
+			volumeMode:   volumeMode,
+			readOnly:     readOnly,
+			mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+			deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
+			mountOptions: []string{},
 		}, nil
 	}
 	return &fcDiskMounter{
-		fcDisk:     fcDisk,
-		fsType:     fc.FSType,
-		readOnly:   readOnly,
-		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-		deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+		fcDisk:       fcDisk,
+		fsType:       fc.FSType,
+		readOnly:     readOnly,
+		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+		deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
+		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
 
 }
@@ -374,11 +376,12 @@ func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
 
 type fcDiskMounter struct {
 	*fcDisk
-	readOnly   bool
-	fsType     string
-	volumeMode v1.PersistentVolumeMode
-	mounter    *mount.SafeFormatAndMount
-	deviceUtil util.DeviceUtil
+	readOnly     bool
+	fsType       string
+	volumeMode   v1.PersistentVolumeMode
+	mounter      *mount.SafeFormatAndMount
+	deviceUtil   util.DeviceUtil
+	mountOptions []string
 }
 
 var _ volume.Mounter = &fcDiskMounter{}

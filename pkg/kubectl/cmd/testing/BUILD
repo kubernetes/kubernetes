@@ -9,11 +9,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testing",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",

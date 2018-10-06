@@ -182,6 +182,10 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	if obj.SchedulerName == "" {
 		obj.SchedulerName = v1.DefaultSchedulerName
 	}
+	if obj.EnableServiceLinks == nil {
+		enableServiceLinks := v1.DefaultEnableServiceLinks
+		obj.EnableServiceLinks = &enableServiceLinks
+	}
 }
 func SetDefaults_Probe(obj *v1.Probe) {
 	if obj.TimeoutSeconds == 0 {

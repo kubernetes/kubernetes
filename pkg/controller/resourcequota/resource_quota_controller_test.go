@@ -33,9 +33,9 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
-	"k8s.io/kubernetes/pkg/quota/install"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
+	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	"k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
 func getResourceList(cpu, memory string) v1.ResourceList {

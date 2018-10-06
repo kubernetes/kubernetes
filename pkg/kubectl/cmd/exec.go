@@ -30,10 +30,9 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/term"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -73,11 +72,11 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
-		Use: "exec POD [-c CONTAINER] -- COMMAND [args...]",
+		Use:                   "exec POD [-c CONTAINER] -- COMMAND [args...]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Execute a command in a container"),
-		Long:    "Execute a command in a container.",
-		Example: exec_example,
+		Short:                 i18n.T("Execute a command in a container"),
+		Long:                  "Execute a command in a container.",
+		Example:               exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
@@ -314,14 +313,14 @@ func (p *ExecOptions) Run() error {
 			Namespace(pod.Namespace).
 			SubResource("exec").
 			Param("container", containerName)
-		req.VersionedParams(&api.PodExecOptions{
+		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.ErrOut != nil,
 			TTY:       t.Raw,
-		}, legacyscheme.ParameterCodec)
+		}, scheme.ParameterCodec)
 
 		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}

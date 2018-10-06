@@ -39,7 +39,7 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta1.HorizontalPodAu
 			{
 				Type: autoscalingv2beta1.ResourceMetricSourceType,
 				Resource: &autoscalingv2beta1.ResourceMetricSource{
-					Name: v1.ResourceCPU,
+					Name:                     v1.ResourceCPU,
 					TargetAverageUtilization: &utilizationDefaultVal,
 				},
 			},

@@ -68,9 +68,9 @@ import (
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/aws_ebs"
+	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
-	"k8s.io/kubernetes/pkg/volume/gce_pd"
+	"k8s.io/kubernetes/pkg/volume/gcepd"
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -313,12 +313,12 @@ func newTestKubeletWithImageList(
 	if initFakeVolumePlugin {
 		allPlugins = append(allPlugins, plug)
 	} else {
-		allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-		allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
+		allPlugins = append(allPlugins, gcepd.ProbeVolumePlugins()...)
 		allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	}
 
-	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
+	var prober volume.DynamicPluginProber // TODO (#51147) inject mock
 	kubelet.volumePluginMgr, err =
 		NewInitializedVolumePluginMgr(kubelet, kubelet.secretManager, kubelet.configMapManager, token.NewManager(kubelet.kubeClient), allPlugins, prober)
 	require.NoError(t, err, "Failed to initialize VolumePluginMgr")
@@ -1570,7 +1570,7 @@ func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	// Pretend the pod is deleted from apiserver, but is still active on the node.
 	// The pod directory should not be removed.
 	pods = []*v1.Pod{}
-	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{runningPod, ""}}
+	testKubelet.fakeRuntime.PodList = []*containertest.FakePod{{Pod: runningPod, NetnsPath: ""}}
 	syncAndVerifyPodDir(t, testKubelet, pods, []*v1.Pod{apiPod}, true)
 
 	// The pod is deleted and also not active on the node. The pod directory

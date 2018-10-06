@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 // VMSet defines functions all vmsets (including scale set and availability
@@ -65,6 +65,6 @@ type VMSet interface {
 	// GetDataDisks gets a list of data disks attached to the node.
 	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
 
-	// GetProvisioningStateByNodeName gets the provisioning state by node name.
-	GetProvisioningStateByNodeName(name string) (string, error)
+	// GetPowerStatusByNodeName returns the power state of the specified node.
+	GetPowerStatusByNodeName(name string) (string, error)
 }

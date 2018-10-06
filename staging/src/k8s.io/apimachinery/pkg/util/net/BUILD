@@ -16,7 +16,12 @@ go_test(
         "util_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
+    ],
 )
 
 go_library(

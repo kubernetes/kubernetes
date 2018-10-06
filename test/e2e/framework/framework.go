@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -67,6 +68,7 @@ type Framework struct {
 
 	ClientSet                        clientset.Interface
 	KubemarkExternalClusterClientSet clientset.Interface
+	APIExtensionsClientSet           apiextensionsclient.Interface
 	CSIClientSet                     csi.Interface
 
 	InternalClientset *internalclientset.Clientset
@@ -176,6 +178,8 @@ func (f *Framework) BeforeEach() {
 		}
 		f.ClientSet, err = clientset.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
+		f.APIExtensionsClientSet, err = apiextensionsclient.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
 		f.InternalClientset, err = internalclientset.NewForConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 		f.AggregatorClient, err = aggregatorclient.NewForConfig(config)
@@ -247,9 +251,19 @@ func (f *Framework) BeforeEach() {
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
 		var err error
+		var nodeMode NodesSet
+		switch TestContext.GatherKubeSystemResourceUsageData {
+		case "master":
+			nodeMode = MasterNodes
+		case "masteranddns":
+			nodeMode = MasterAndDNSNodes
+		default:
+			nodeMode = AllNodes
+		}
+
 		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
 			InKubemark:                  ProviderIs("kubemark"),
-			MasterOnly:                  TestContext.GatherKubeSystemResourceUsageData == "master",
+			Nodes:                       nodeMode,
 			ResourceDataGatheringPeriod: 60 * time.Second,
 			ProbeDuration:               15 * time.Second,
 			PrintVerboseLogs:            false,

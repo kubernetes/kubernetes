@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"testing"
 
 	"github.com/golang/glog"
 	"github.com/kardianos/osext"
@@ -105,12 +106,12 @@ func (e *E2EServices) Stop() {
 
 // RunE2EServices actually start the e2e services. This function is used to
 // start e2e services in current process. This is only used in run-services-mode.
-func RunE2EServices() {
+func RunE2EServices(t *testing.T) {
 	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
 	// This way, statically-linked components see the same feature gate config as the test context.
 	utilfeature.DefaultFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
 	e := newE2EServices()
-	if err := e.run(); err != nil {
+	if err := e.run(t); err != nil {
 		glog.Fatalf("Failed to run e2e services: %v", err)
 	}
 }

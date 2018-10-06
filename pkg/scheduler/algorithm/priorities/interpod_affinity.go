@@ -17,6 +17,7 @@ limitations under the License.
 package priorities
 
 import (
+	"context"
 	"sync"
 
 	"k8s.io/api/core/v1"
@@ -210,7 +211,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 			}
 		}
 	}
-	workqueue.Parallelize(16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
 	if pm.firstError != nil {
 		return nil, pm.firstError
 	}

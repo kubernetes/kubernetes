@@ -71,11 +71,11 @@ func NewCmdCreateClusterRole(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 		AggregationRule:   map[string]string{},
 	}
 	cmd := &cobra.Command{
-		Use: "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
+		Use:                   "clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   clusterRoleLong,
-		Long:    clusterRoleLong,
-		Example: clusterRoleExample,
+		Short:                 clusterRoleLong,
+		Long:                  clusterRoleLong,
+		Example:               clusterRoleExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(c.Complete(f, cmd, args))
 			cmdutil.CheckErr(c.Validate())

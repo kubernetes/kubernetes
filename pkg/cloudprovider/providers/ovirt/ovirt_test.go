@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 func TestOVirtCloudConfiguration(t *testing.T) {

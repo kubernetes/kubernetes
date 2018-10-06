@@ -46,6 +46,18 @@ const (
 
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
+	scheduleAttempts = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: SchedulerSubsystem,
+			Name:      "schedule_attempts_total",
+			Help:      "Number of attempts to schedule pods, by the result. 'unschedulable' means a pod could not be scheduled, while 'error' means an internal scheduler problem.",
+		}, []string{"result"})
+	// PodScheduleSuccesses counts how many pods were scheduled.
+	PodScheduleSuccesses = scheduleAttempts.With(prometheus.Labels{"result": "scheduled"})
+	// PodScheduleFailures counts how many pods could not be scheduled.
+	PodScheduleFailures = scheduleAttempts.With(prometheus.Labels{"result": "unschedulable"})
+	// PodScheduleErrors counts how many pods could not be scheduled due to a scheduler error.
+	PodScheduleErrors = scheduleAttempts.With(prometheus.Labels{"result": "error"})
 	SchedulingLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: SchedulerSubsystem,
@@ -135,6 +147,7 @@ var (
 		}, []string{"result"})
 
 	metricsList = []prometheus.Collector{
+		scheduleAttempts,
 		SchedulingLatency,
 		E2eSchedulingLatency,
 		SchedulingAlgorithmLatency,

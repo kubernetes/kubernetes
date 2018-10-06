@@ -89,11 +89,16 @@ func (nim *nodeInfoManager) AddNodeInfo(driverName string, driverNodeID string, 
 
 	nodeUpdateFuncs := []nodeUpdateFunc{
 		updateNodeIDInNode(driverName, driverNodeID),
-		updateMaxAttachLimit(driverName, maxAttachLimit),
 	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		nodeUpdateFuncs = append(nodeUpdateFuncs, updateTopologyLabels(topology))
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		nodeUpdateFuncs = append(nodeUpdateFuncs, updateMaxAttachLimit(driverName, maxAttachLimit))
+	}
+
 	err := nim.updateNode(nodeUpdateFuncs...)
 	if err != nil {
 		return fmt.Errorf("error updating Node object with CSI driver node info: %v", err)
@@ -353,7 +358,7 @@ func (nim *nodeInfoManager) createNodeInfoObject(
 		return fmt.Errorf("error getting CSI client")
 	}
 
-	var topologyKeys []string
+	topologyKeys := []string{} // must be an empty slice instead of nil to satisfy CRD OpenAPI Schema validation
 	if topology != nil {
 		for k := range topology.Segments {
 			topologyKeys = append(topologyKeys, k)

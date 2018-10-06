@@ -17,6 +17,7 @@ limitations under the License.
 package scalability
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -851,7 +852,7 @@ var _ = SIGDescribe("Density", func() {
 						name := additionalPodsPrefix + "-" + strconv.Itoa(podIndexOffset+i+1)
 						framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, rcNameToNsMap[name], name))
 					}
-					workqueue.Parallelize(25, nodeCount, deleteRC)
+					workqueue.ParallelizeUntil(context.TODO(), 25, nodeCount, deleteRC)
 					podDeletionPhase.End()
 				}
 				close(stopCh)

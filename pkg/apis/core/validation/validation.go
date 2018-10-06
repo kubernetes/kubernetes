@@ -5124,50 +5124,16 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *core.Namespace)
 	return allErrs
 }
 
-// Construct lookup map of old subset IPs to NodeNames.
-func updateEpAddrToNodeNameMap(ipToNodeName map[string]string, addresses []core.EndpointAddress) {
-	for n := range addresses {
-		if addresses[n].NodeName == nil {
-			continue
-		}
-		ipToNodeName[addresses[n].IP] = *addresses[n].NodeName
-	}
-}
-
-// Build a map across all subsets of IP -> NodeName
-func buildEndpointAddressNodeNameMap(subsets []core.EndpointSubset) map[string]string {
-	ipToNodeName := make(map[string]string)
-	for i := range subsets {
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].Addresses)
-		updateEpAddrToNodeNameMap(ipToNodeName, subsets[i].NotReadyAddresses)
-	}
-	return ipToNodeName
-}
-
-func validateEpAddrNodeNameTransition(addr *core.EndpointAddress, ipToNodeName map[string]string, fldPath *field.Path) field.ErrorList {
-	errList := field.ErrorList{}
-	existingNodeName, found := ipToNodeName[addr.IP]
-	if !found {
-		return errList
-	}
-	if addr.NodeName == nil || *addr.NodeName == existingNodeName {
-		return errList
-	}
-	// NodeName entry found for this endpoint IP, but user is attempting to change NodeName
-	return append(errList, field.Forbidden(fldPath, fmt.Sprintf("Cannot change NodeName for %s to %s", addr.IP, *addr.NodeName)))
-}
-
 // ValidateEndpoints tests if required fields are set.
 func ValidateEndpoints(endpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(endpoints.Annotations, field.NewPath("annotations"))...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, []core.EndpointSubset{}, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets, field.NewPath("subsets"))...)
 	return allErrs
 }
 
-func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
+func validateEndpointSubsets(subsets []core.EndpointSubset, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	ipToNodeName := buildEndpointAddressNodeNameMap(oldSubsets)
 	for i := range subsets {
 		ss := &subsets[i]
 		idxPath := fldPath.Index(i)
@@ -5178,10 +5144,10 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 			allErrs = append(allErrs, field.Required(idxPath, "must specify `addresses` or `notReadyAddresses`"))
 		}
 		for addr := range ss.Addresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.Addresses[addr], idxPath.Child("addresses").Index(addr))...)
 		}
 		for addr := range ss.NotReadyAddresses {
-			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr), ipToNodeName)...)
+			allErrs = append(allErrs, validateEndpointAddress(&ss.NotReadyAddresses[addr], idxPath.Child("notReadyAddresses").Index(addr))...)
 		}
 		for port := range ss.Ports {
 			allErrs = append(allErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1, idxPath.Child("ports").Index(port))...)
@@ -5191,7 +5157,7 @@ func validateEndpointSubsets(subsets []core.EndpointSubset, oldSubsets []core.En
 	return allErrs
 }
 
-func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path, ipToNodeName map[string]string) field.ErrorList {
+func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsValidIP(address.IP) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ip"), address.IP, msg))
@@ -5204,10 +5170,6 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path,
 		for _, msg := range ValidateNodeName(*address.NodeName, false) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg))
 		}
-	}
-	allErrs = append(allErrs, validateEpAddrNodeNameTransition(address, ipToNodeName, fldPath.Child("nodeName"))...)
-	if len(allErrs) > 0 {
-		return allErrs
 	}
 	allErrs = append(allErrs, validateNonSpecialIP(address.IP, fldPath.Child("ip"))...)
 	return allErrs
@@ -5260,9 +5222,11 @@ func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *fi
 }
 
 // ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
+// NodeName changes are allowed during update to accommodate the case where nodeIP or PodCIDR is reused.
+// An existing endpoint ip will have a different nodeName if this happens.
 func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newEndpoints.ObjectMeta, &oldEndpoints.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, oldEndpoints.Subsets, field.NewPath("subsets"))...)
+	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets, field.NewPath("subsets"))...)
 	allErrs = append(allErrs, ValidateEndpointsSpecificAnnotations(newEndpoints.Annotations, field.NewPath("annotations"))...)
 	return allErrs
 }

@@ -93,11 +93,11 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	o := NewCreateOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "create -f FILENAME",
+		Use:                   "create -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a resource from a file or from stdin."),
-		Long:    createLong,
-		Example: createExample,
+		Short:                 i18n.T("Create a resource from a file or from stdin."),
+		Long:                  createLong,
+		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
@@ -241,7 +241,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		if err != nil {
 			return err
 		}
-		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), info.Object, scheme.DefaultJSONEncoder()); err != nil {
 			return cmdutil.AddSourceToErr("creating", info.Source, err)
 		}
 
@@ -428,7 +428,7 @@ func (o *CreateSubcommandOptions) Run() error {
 			return err
 		}
 
-		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, cmdutil.InternalVersionJSONEncoder()); err != nil {
+		if err := kubectl.CreateOrUpdateAnnotation(o.CreateAnnotation, obj, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 
