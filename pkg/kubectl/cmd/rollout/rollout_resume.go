@@ -77,11 +77,11 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	validArgs := []string{"deployment"}
 
 	cmd := &cobra.Command{
-		Use: "resume RESOURCE",
+		Use:                   "resume RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Resume a paused resource"),
-		Long:    resume_long,
-		Example: resume_example,
+		Short:                 i18n.T("Resume a paused resource"),
+		Long:                  resume_long,
+		Example:               resume_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())

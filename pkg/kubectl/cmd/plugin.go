@@ -52,10 +52,10 @@ var (
 
 func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "plugin [flags]",
+		Use:                   "plugin [flags]",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Provides utilities for interacting with plugins."),
-		Long:  plugin_long,
+		Short:                 i18n.T("Provides utilities for interacting with plugins."),
+		Long:                  plugin_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.DefaultSubCommandRun(streams.ErrOut)(cmd, args)
 		},

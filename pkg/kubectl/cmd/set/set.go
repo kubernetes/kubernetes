@@ -33,11 +33,11 @@ var (
 
 func NewCmdSet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "set SUBCOMMAND",
+		Use:                   "set SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Set specific features on objects"),
-		Long:  set_long,
-		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
+		Short:                 i18n.T("Set specific features on objects"),
+		Long:                  set_long,
+		Run:                   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
 	// add subcommands

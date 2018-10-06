@@ -117,9 +117,9 @@ func NewHorizontalController(
 		scaleNamespacer:              scaleNamespacer,
 		hpaNamespacer:                hpaNamespacer,
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
-		queue:           workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
-		mapper:          mapper,
-		recommendations: map[string][]timestampedRecommendation{},
+		queue:                        workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
+		mapper:                       mapper,
+		recommendations:              map[string][]timestampedRecommendation{},
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
