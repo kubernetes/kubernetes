@@ -276,13 +276,13 @@ while true; do sleep 1; done
 				},
 				{
 					description: "should be able to pull image from gcr.io",
-					image:       "k8s.gcr.io/alpine-with-bash:1.0",
+					image:       "gcr.io/google-containers/debian-base:0.3.2",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
 				{
 					description: "should be able to pull image from docker hub",
-					image:       "alpine:3.1",
+					image:       "alpine:3.7",
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},

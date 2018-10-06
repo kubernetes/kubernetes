@@ -10,7 +10,7 @@ metadata:
 spec:
   containers:
     - name: master
-      image: kubernetes/redis:v1
+      image: gcr.io/kubernetes-e2e-test-images/redis:1.0
       env:
         - name: MASTER
           value: "true"
@@ -23,7 +23,7 @@ spec:
         - mountPath: /redis-master-data
           name: data
     - name: sentinel
-      image: kubernetes/redis:v1
+      image: gcr.io/kubernetes-e2e-test-images/redis:1.0
       env:
         - name: SENTINEL
           value: "true"
@@ -42,7 +42,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-serve-hostname
-    image: k8s.gcr.io/serve_hostname
+    image: gcr.io/kubernetes-e2e-test-images/serve-hostname:1.0
     resources:
       limits:
         cpu: "1"
