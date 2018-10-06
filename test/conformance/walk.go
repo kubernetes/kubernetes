@@ -38,20 +38,36 @@ import (
 )
 
 var (
-	baseURL                                           = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
-	confDoc                                           = flag.Bool("conformance", false, "write a conformance document")
-	totalConfTests, totalLegacyTests, missingComments int
+	baseURL          = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
+	confDoc          = flag.Bool("conformance", false, "write a conformance document")
+	totalConfTests   int
+	totalLegacyTests int
+	missingComments  int
+
+	regexTag = regexp.MustCompile(`(\[[a-zA-Z0-9:-]+\])`)
 )
 
-const regexDescribe = "Describe|KubeDescribe|SIGDescribe"
-const regexContext = "Context"
+const (
+	regexDescribe     = "Describe|KubeDescribe|SIGDescribe"
+	regexContext      = "Context"
+	regexFmtSpecifier = "*"
+	testName          = "Testname:"
+	description       = "Description:"
+)
+
+// Table based tests data
+type tableTestData struct {
+	rawText string              // holds unformated Args[0] from ConformanceIt()
+	data    []map[string]string // slice of KeyValue map of table based test options
+	tests   []string            // slice of table based test names in string literal format
+}
 
 type visitor struct {
 	FileSet      *token.FileSet
 	lastDescribe describe
 	cMap         ast.CommentMap
-	//list of all the conformance tests in the path
-	tests []conformanceData
+	tests        []conformanceData //list of all the conformance tests in the path
+	tableTests   *tableTestData
 }
 
 //describe contains text associated with ginkgo describe container
@@ -74,38 +90,39 @@ type conformanceData struct {
 	Description string
 }
 
-func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
+func (v *visitor) convertToConformanceData(n ast.Node, tName string) {
 	cd := conformanceData{}
+	switch at := n.(type) {
+	case *ast.BasicLit, *ast.CallExpr, *ast.BinaryExpr:
+		comment := v.comment(at)
+		pos := v.FileSet.Position(at.Pos())
+		cd.URL = fmt.Sprintf("%s%s#L%d", *baseURL, pos.Filename, pos.Line)
 
-	comment := v.comment(at)
-	pos := v.FileSet.Position(at.Pos())
-	cd.URL = fmt.Sprintf("%s%s#L%d", *baseURL, pos.Filename, pos.Line)
+		lines := strings.Split(comment, "\n")
+		cd.Description = ""
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, testName) {
+				line = strings.TrimSpace(line[9:])
+				cd.TestName = line
+				continue
+			}
+			if strings.HasPrefix(line, description) {
+				line = strings.TrimSpace(line[12:])
+			}
+			cd.Description += line + "\n"
+		}
 
-	lines := strings.Split(comment, "\n")
-	cd.Description = ""
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Testname:") {
-			line = strings.TrimSpace(line[9:])
-			cd.TestName = line
-			continue
+		if cd.TestName == "" {
+			testName := v.getDescription(tName)
+			i := strings.Index(testName, "[Conformance]")
+			if i > 0 {
+				cd.TestName = strings.TrimSpace(testName[:i])
+			} else {
+				cd.TestName = testName
+			}
 		}
-		if strings.HasPrefix(line, "Description:") {
-			line = strings.TrimSpace(line[12:])
-		}
-		cd.Description += line + "\n"
 	}
-
-	if cd.TestName == "" {
-		testName := v.getDescription(at.Value)
-		i := strings.Index(testName, "[Conformance]")
-		if i > 0 {
-			cd.TestName = strings.TrimSpace(testName[:i])
-		} else {
-			cd.TestName = testName
-		}
-	}
-
 	v.tests = append(v.tests, cd)
 }
 
@@ -113,6 +130,11 @@ func newVisitor() *visitor {
 	return &visitor{
 		FileSet: token.NewFileSet(),
 	}
+}
+
+// Return address of tableTestData store for each table based framework.ConformanceIt() block.
+func newTableTest() *tableTestData {
+	return &tableTestData{}
 }
 
 func (v *visitor) isConformanceCall(call *ast.CallExpr) bool {
@@ -158,34 +180,86 @@ func (v *visitor) failf(expr ast.Expr, format string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, "ERROR at %v: %s\n", v.FileSet.Position(expr.Pos()), msg)
 }
 
-func (v *visitor) comment(x *ast.BasicLit) string {
-	for _, comm := range v.cMap.Comments() {
-		testOffset := int(x.Pos()-comm.End()) - len("framework.ConformanceIt(\"")
-		if 0 < testOffset && testOffset < 3 {
-			return comm.Text()
+func (v *visitor) comment(n ast.Node) string {
+	switch x := n.(type) {
+	case *ast.BasicLit, *ast.CallExpr, *ast.BinaryExpr:
+		for _, comm := range v.cMap.Comments() {
+			testOffset := int(x.Pos()-comm.End()) - len("framework.ConformanceIt(\"")
+			if 0 < testOffset && testOffset <= 4 {
+				return comm.Text()
+			}
 		}
+	default:
+		fmt.Printf("Conformance comment function is not invoked from known types. Called type is:\t%v", x)
 	}
 	return ""
 }
 
-func (v *visitor) emit(arg ast.Expr) {
+// emit returns node and []tests to further retrieve comment block on that node wrt. to returning tests
+func (v *visitor) emit(arg ast.Expr) (ast.Node, []string) {
+	emittingTests := make([]string, 0)
 	switch at := arg.(type) {
 	case *ast.BasicLit:
 		if at.Kind != token.STRING {
 			v.failf(at, "framework.ConformanceIt() called with non-string argument")
-			return
+			return nil, emittingTests
 		}
 
 		at.Value = normalizeTestName(at.Value)
-		if *confDoc {
-			v.convertToConformanceData(at)
-		} else {
-			fmt.Printf("%s: %q\n", v.FileSet.Position(at.Pos()).Filename, at.Value)
+		emittingTests = append(emittingTests, at.Value)
+		return at, emittingTests
+
+	// handle string formation with fmt.Sprintf()
+	case *ast.CallExpr:
+		if se, ok := at.Fun.(*ast.SelectorExpr); ok {
+			if se.Sel.Name == "Sprintf" {
+				name := make([]string, 0)
+
+				// Stringify fmt.Sprinf() args
+				for _, exp := range at.Args {
+					str := funcName(exp)
+					if str != "" {
+						name = append(name, str)
+					}
+				}
+
+				// replace %s with respective variable name
+				for _, arg := range name[1:] {
+					name[0] = strings.Replace(name[0], "%s", arg, 1)
+				}
+
+				// populates conformance test name in "should match testcase.status" format
+				v.tableTests.rawText = name[0]
+
+				// normalize (replace testcase.name with respective value) and store all table based conformance test names
+				v.tableTests.conformanceTests()
+
+				tests := v.tableTests.getNormalisedConformanceTests()
+				for _, test := range tests {
+					emittingTests = append(emittingTests, test)
+				}
+			}
 		}
+		return at, emittingTests
+
+	// handle string formation with + operator
+	case *ast.BinaryExpr:
+		vString := stringBinaryExpr(at)
+		v.tableTests.rawText = vString
+
+		// populate all table based conformance test names
+		v.tableTests.conformanceTests()
+		tests := v.tableTests.getNormalisedConformanceTests()
+		for _, test := range tests {
+			emittingTests = append(emittingTests, test)
+		}
+		return at, emittingTests
+
 	default:
-		v.failf(at, "framework.ConformanceIt() called with non-literal argument")
+		v.failf(at, "framework.ConformanceIt() called with unexpected non-literal argument")
 		fmt.Fprintf(os.Stderr, "ERROR: non-literal argument %v at %v\n", arg, v.FileSet.Position(arg.Pos()))
 	}
+	return nil, emittingTests
 }
 
 func (v *visitor) getDescription(value string) string {
@@ -198,10 +272,6 @@ func (v *visitor) getDescription(value string) string {
 		" " + strings.Trim(value, "\"")
 }
 
-var (
-	regexTag = regexp.MustCompile(`(\[[a-zA-Z0-9:-]+\])`)
-)
-
 // normalizeTestName removes tags (e.g., [Feature:Foo]), double quotes and trim
 // the spaces to normalize the test name.
 func normalizeTestName(s string) string {
@@ -210,13 +280,131 @@ func normalizeTestName(s string) string {
 	return strings.TrimSpace(r)
 }
 
-// funcName converts a selectorExpr with two idents into a string,
-// x.y -> "x.y"
-func funcName(n ast.Expr) string {
-	if sel, ok := n.(*ast.SelectorExpr); ok {
-		if x, ok := sel.X.(*ast.Ident); ok {
-			return x.String() + "." + sel.Sel.String()
+func tableBasedConformanceCall(stmts []ast.Stmt) (*ast.CallExpr, bool) {
+	for _, stmt := range stmts {
+		if exStmt, ok := stmt.(*ast.ExprStmt); ok {
+			if cExpr, ok := exStmt.X.(*ast.CallExpr); ok {
+				return cExpr, true
+			}
 		}
+	}
+	return nil, false
+}
+
+func evalBinaryTreeSide(n ast.Node) string {
+	switch x := n.(type) {
+	case (*ast.SelectorExpr):
+		return funcName(x)
+	case (*ast.BinaryExpr):
+		return stringBinaryExpr(x)
+	case (*ast.BasicLit):
+		return funcName(x)
+	}
+	return ""
+}
+
+// stringify + operator formatted string sequence.
+func stringBinaryExpr(n *ast.BinaryExpr) string {
+	// Evaluate left side
+	left := evalBinaryTreeSide(n.X)
+
+	// Evaluate Right side
+	right := evalBinaryTreeSide(n.Y)
+
+	// Evaluate Operator
+	if n.Op == token.ADD {
+		return left + right
+	}
+	return ""
+}
+
+// Accept CompositeLit and iterate over elements of type: KeyValueExpr.
+// Value field of KeyValueExpr element can be of type BasicLit or CompositeLit.
+// If Value field of KeyValueExpr is of type CompositeLit, return type of function would be an slice of key value map.
+func (tData *tableTestData) stringifyConpositeLit(cl *ast.CompositeLit, key string) (ck, cv string) {
+	if key != "" {
+		ck = key + "." + ck
+	}
+	for _, elts := range cl.Elts {
+		switch t := elts.(type) {
+		case *ast.KeyValueExpr:
+			return tData.stringifyKeyValueExpr(t)
+		}
+	}
+	return ck, cv
+}
+
+func (tData *tableTestData) stringifyKeyValueExpr(kv *ast.KeyValueExpr) (ck, cv string) {
+	ck = funcName(kv.Key)
+	switch kvt := kv.Value.(type) {
+	case *ast.BasicLit:
+		cv = funcName(kvt)
+		return ck, cv
+	}
+	return ck, cv
+}
+
+// Traverse over all table based test options, stringify and store them in keyvalue map.
+func (tData *tableTestData) populateConformanceTestData(exprs []ast.Expr, key string) {
+	for _, expr := range exprs {
+		switch t := expr.(type) {
+		case *ast.CompositeLit:
+			if t.Type == nil {
+				mp := make(map[string]string)
+				k, v := tData.stringifyConpositeLit(t, "")
+				if key != "" {
+					k = key + "." + k
+				}
+				mp[k] = v
+				tData.data = append(tData.data, mp)
+			}
+		}
+	}
+}
+
+// Traverse all conformance texts and replace test variables with appropriate values
+// e.g testCase.name would be replaced with its appropriate value
+func (tData *tableTestData) conformanceTests() {
+	// cText := make([]string, 0)
+	for _, data := range tData.data {
+		for k, v := range data {
+			xx := strings.Replace(tData.rawText, k, v, -1)
+			tData.tests = append(tData.tests, xx)
+		}
+	}
+}
+
+// getNormalisedConformanceTests removes tags (e.g., [Feature:Foo]), double quotes and trim
+// the spaces to normalize the test name. Returns slice of all table based testNames.
+func (tData *tableTestData) getNormalisedConformanceTests() []string {
+	nTests := make([]string, 0)
+	for _, test := range tData.tests {
+		s := normalizeTestName(test)
+		nTests = append(nTests, s)
+	}
+	return nTests
+}
+
+// funcName converts a selectorExpr with two idents into a string,
+// Stringify a.b ,a or string
+func funcName(n ast.Node) string {
+	switch x := n.(type) {
+	case *ast.SelectorExpr:
+		if id, ok := x.X.(*ast.Ident); ok {
+			return id.String() + "." + x.Sel.String()
+		}
+	case *ast.Ident:
+		return x.String()
+	case *ast.BasicLit:
+		if x.Kind == token.STRING {
+			val, err := strconv.Unquote(x.Value)
+			if err != nil {
+				fmt.Printf("Error During string unquote: %v\n", err)
+			}
+			return val
+		}
+		fmt.Println("BasicLit is not a string kind")
+		return ""
 	}
 	return ""
 }
@@ -228,12 +416,13 @@ func isSprintf(n ast.Expr) bool {
 }
 
 // firstArg attempts to statically determine the value of the first
-// argument. It only handles strings, and converts any unknown values
-// (fmt.Sprintf interpolations) into *.
+// argument of "Describe|KubeDescribe|SIGDescribe|Context". It only handles strings, and converts any unknown values
+// (fmt.Sprintf interpolations) into regexFmtSpecifier=*.
 func (v *visitor) firstArg(n *ast.CallExpr) string {
 	if len(n.Args) == 0 {
 		return ""
 	}
+
 	var lit *ast.BasicLit
 	if isSprintf(n.Args[0]) {
 		return v.firstArg(n.Args[0].(*ast.CallExpr))
@@ -245,22 +434,23 @@ func (v *visitor) firstArg(n *ast.CallExpr) string {
 			panic(err)
 		}
 		if strings.Contains(val, "%") {
-			val = strings.Replace(val, "%d", "*", -1)
-			val = strings.Replace(val, "%v", "*", -1)
-			val = strings.Replace(val, "%s", "*", -1)
+			val = strings.Replace(val, "%d", regexFmtSpecifier, -1)
+			val = strings.Replace(val, "%v", regexFmtSpecifier, -1)
+			val = strings.Replace(val, "%s", regexFmtSpecifier, -1)
 		}
 		return val
 	}
 	if ident, ok := n.Args[0].(*ast.Ident); ok {
 		return ident.String()
 	}
-	return "*"
+	return regexFmtSpecifier
 }
 
 // matchFuncName returns the first argument of a function if it's
 // a Ginkgo-relevant function (Describe/KubeDescribe/Context),
 // and the empty string otherwise.
 func (v *visitor) matchFuncName(n *ast.CallExpr, pattern string) string {
+
 	switch x := n.Fun.(type) {
 	case *ast.SelectorExpr:
 		if match, err := regexp.MatchString(pattern, x.Sel.Name); err == nil && match {
@@ -276,25 +466,59 @@ func (v *visitor) matchFuncName(n *ast.CallExpr, pattern string) string {
 	return ""
 }
 
+func conformanceParse(v *visitor, t *ast.CallExpr) (w ast.Visitor) {
+	if name := v.matchFuncName(t, regexDescribe); name != "" && len(t.Args) >= 2 {
+		v.lastDescribe = describe{text: name}
+	} else if name := v.matchFuncName(t, regexContext); name != "" && len(t.Args) >= 2 {
+		v.lastDescribe.lastContext = context{text: name}
+	} else if v.isConformanceCall(t) {
+		node, tests := v.emit(t.Args[0])
+		totalConfTests = totalConfTests + len(tests)
+
+		for _, test := range tests {
+			if *confDoc {
+				v.convertToConformanceData(node, test)
+			} else {
+				fmt.Printf("%s: %q\n", v.FileSet.Position(node.Pos()).Filename, test)
+			}
+		}
+		return nil
+	} else if v.isLegacyItCall(t) {
+		totalLegacyTests++
+		v.failf(t, "Using It() with manual [Conformance] tag is no longer allowed.  Use framework.ConformanceIt() instead.")
+		return nil
+	}
+	return v
+}
+
 // Visit visits each node looking for either calls to framework.ConformanceIt,
 // which it will emit in its list of conformance tests, or legacy calls to
 // It() with a manually embedded [Conformance] tag, which it will complain
 // about.
 func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 	switch t := node.(type) {
+
+	// When ConformanceIt() is called from non-table based struct
 	case *ast.CallExpr:
-		if name := v.matchFuncName(t, regexDescribe); name != "" && len(t.Args) >= 2 {
-			v.lastDescribe = describe{text: name}
-		} else if name := v.matchFuncName(t, regexContext); name != "" && len(t.Args) >= 2 {
-			v.lastDescribe.lastContext = context{text: name}
-		} else if v.isConformanceCall(t) {
-			totalConfTests++
-			v.emit(t.Args[0])
-			return nil
-		} else if v.isLegacyItCall(t) {
-			totalLegacyTests++
-			v.failf(t, "Using It() with manual [Conformance] tag is no longer allowed.  Use framework.ConformanceIt() instead.")
-			return nil
+		return conformanceParse(v, t)
+
+	// When ConformanceIt() is called from table based struct
+	// It MUST follow range over struct
+	case *ast.RangeStmt:
+		if cLit, ok := t.X.(*ast.CompositeLit); ok { //range has compositeLit
+			tableTest := newTableTest()
+			vname := funcName(t.Value)
+			if rsBodyStmts := t.Body.List; len(rsBodyStmts) > 0 {
+				if at, ok := cLit.Type.(*ast.ArrayType); ok {
+					if _, ok = at.Elt.(*ast.StructType); ok {
+						if callExpr, ok := tableBasedConformanceCall(rsBodyStmts); ok { // return arg[0] of ConformanceIt() and True if ConformanceIt() block found
+							v.tableTests = tableTest
+							tableTest.populateConformanceTestData(cLit.Elts, vname)
+							return conformanceParse(v, callExpr)
+						}
+					}
+				}
+			}
 		}
 	}
 	return v
@@ -306,7 +530,6 @@ func scandir(dir string) {
 	if err != nil {
 		panic(err)
 	}
-
 	for _, p := range pkg {
 		ast.Walk(v, p)
 	}
@@ -318,9 +541,7 @@ func scanfile(path string, src interface{}) []conformanceData {
 	if err != nil {
 		panic(err)
 	}
-
 	v.cMap = ast.NewCommentMap(v.FileSet, file, file.Comments)
-
 	ast.Walk(v, file)
 	return v.tests
 }
