@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	// Register the kubeadm configuration types because CLI flag generation
@@ -96,7 +95,6 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		Use:   "alpha",
 		Short: "Experimental sub-commands not yet fully functional.",
 	}
-	experimentalCmd.AddCommand(phases.NewCmdPhase(out))
 	cmds.AddCommand(experimentalCmd)
 
 	AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
