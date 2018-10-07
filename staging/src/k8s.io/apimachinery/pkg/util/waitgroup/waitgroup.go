@@ -55,3 +55,20 @@ func (wg *SafeWaitGroup) Wait() {
 	wg.mu.Unlock()
 	wg.wg.Wait()
 }
+
+// Wrapper is a struct that as a waiter for all linetr-tasks.And it
+// encapsulates sync.WaitGroup that can be call as a interface.
+type Wrapper struct {
+	sync.WaitGroup
+}
+
+// Wrap implements a interface that run the function cd as a goroutine.And it
+// encapsulates Add(1) and Done() operation.You can just think go cd() but not
+// worry about synchronization and security issues.
+func (w *Wrapper) Wrap(cb func()) {
+	w.Add(1)
+	go func() {
+		defer w.Done()
+		cb()
+	}()
+}
