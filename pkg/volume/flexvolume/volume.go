@@ -50,6 +50,6 @@ type flexVolume struct {
 // volume.Volume interface
 
 func (f *flexVolume) GetPath() string {
-	name := f.driverName
+	name := flexVolumePluginNamePrefix + f.driverName
 	return f.plugin.host.GetPodVolumeDir(f.podUID, utilstrings.EscapeQualifiedNameForDisk(name), f.volName)
 }
