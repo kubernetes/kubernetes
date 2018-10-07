@@ -45,6 +45,11 @@ var PanicHandlers = []func(interface{}){logPanic}
 // of the Kubernetes project, nothing was going to restart apiserver and so
 // catching panics was important. But it's actually much simpler for monitoring
 // software if we just exit when an unexpected panic happens.
+// Note that as of EOY2017 panics are rather frequent and a cluster is not able
+// to recover from an api server restart under load. This needs to be fixed
+// before apiserver can just crash. See the following for details:
+// - https://github.com/kubernetes/kubernetes/issues/57405
+// - https://github.com/kubernetes/kubernetes/issues/56291
 func HandleCrash(additionalHandlers ...func(interface{})) {
 	if r := recover(); r != nil {
 		for _, fn := range PanicHandlers {
