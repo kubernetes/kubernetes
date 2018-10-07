@@ -81,6 +81,87 @@ var ingressUpgradeTests = []upgrades.Test{
 	&upgrades.IngressUpgradeTest{},
 }
 
+var skewedClusterUpgradeTests = []upgrades.Test{
+	&upgrades.ServiceUpgradeTest{},
+	&upgrades.SecretUpgradeTest{},
+	&apps.StatefulSetUpgradeTest{},
+	&apps.DeploymentUpgradeTest{},
+	&apps.JobUpgradeTest{},
+	&upgrades.ConfigMapUpgradeTest{},
+	&upgrades.HPAUpgradeTest{},
+	&storage.PersistentVolumeUpgradeTest{},
+	&apps.DaemonSetUpgradeTest{},
+	&upgrades.IngressUpgradeTest{},
+	&upgrades.AppArmorUpgradeTest{},
+}
+
+var _ = SIGDescribe("Upgrade HA-cluster [Feature:Upgrade] [Feature:HAMaster]", func() {
+	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce")
+	})
+
+	f := framework.NewDefaultFramework("ha-cluster-upgrade")
+	testFrameworks := createUpgradeFrameworks(upgradeTests)
+
+	Describe("single master upgrade", func() {
+		It("should maintain a functioning cluster [Feature:SkewMasterUpgrade]", func() {
+
+			zone := framework.TestContext.CloudConfig.Zone
+			masterPrefix := framework.TestContext.CloudConfig.MasterName
+			region := findRegionForZone(zone)
+			const numOfMasters = 3
+
+			allZones := findZonesForRegion(region)
+			extraZones := removeZoneFromZones(allZones, zone)[:numOfMasters-1]
+
+			// Precondition - cluster is *NOT* HA (only one replica)
+			framework.ExpectNoError(framework.WaitForMasters(masterPrefix, f.ClientSet, 1, 3*time.Minute))
+
+			// Create additional replicas - move to ha-cluster
+			for _, z := range extraZones {
+				framework.ExpectNoError(addMasterReplica(z))
+			}
+			framework.ExpectNoError(framework.WaitForMasters(masterPrefix, f.ClientSet, numOfMasters, 10*time.Minute))
+
+			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), framework.TestContext.UpgradeTarget)
+			framework.ExpectNoError(err)
+
+			defer func() {
+				for _, zone := range extraZones {
+					removeMasterReplica(zone)
+				}
+				framework.WaitForMasters(masterPrefix, f.ClientSet, 1, 10*time.Minute)
+			}()
+
+			masterUpgradeTest := &junit.TestCase{
+				Name:      "[sig-cluster-lifecycle] ha-cluster-upgrade",
+				Classname: "ha_cluster_upgrade_tests",
+			}
+			testSuite := &junit.TestSuite{
+				Name:      "HA-Cluster upgrade",
+				TestCases: []*junit.TestCase{masterUpgradeTest},
+			}
+
+			upgradeFunc := func() {
+				start := time.Now()
+				defer finalizeUpgradeTest(start, masterUpgradeTest)
+
+				// Upgrade single master replica -- remove & add
+				zone1 := extraZones[0]
+				framework.ExpectNoError(removeMasterReplica(zone1))
+				framework.ExpectNoError(framework.WaitForMasters(masterPrefix, f.ClientSet, numOfMasters-1, 10*time.Minute))
+				extraZones = extraZones[1:]
+
+				framework.ExpectNoError(addMasterReplica(zone1))
+				framework.ExpectNoError(framework.WaitForMasters(masterPrefix, f.ClientSet, numOfMasters, 10*time.Minute))
+				extraZones = append(extraZones, zone1)
+			}
+
+			runUpgradeSuite(f, skewedClusterUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.MasterUpgrade, upgradeFunc)
+		})
+	})
+})
+
 var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 	f := framework.NewDefaultFramework("cluster-upgrade")
 
