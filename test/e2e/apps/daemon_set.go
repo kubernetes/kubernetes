@@ -53,6 +53,10 @@ const (
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
 )
 
+// The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
+// node selectors labels to namespaces
+var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
+
 // This test must be run in serial because it assumes the Daemon Set pods will
 // always get scheduled.  If we run other tests in parallel, this may not
 // happen.  In the future, running in parallel may work if we have an eviction
@@ -99,7 +103,13 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		ns = f.Namespace.Name
 
 		c = f.ClientSet
-		err := clearDaemonSetNodeLabels(c)
+
+		updatedNS, err := updateNamespaceAnnotations(c, ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		ns = updatedNS.Name
+
+		err = clearDaemonSetNodeLabels(c)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -492,6 +502,26 @@ func clearDaemonSetNodeLabels(c clientset.Interface) error {
 		}
 	}
 	return nil
+}
+
+// updateNamespaceAnnotations sets node selectors related annotations on tests namespaces to empty
+func updateNamespaceAnnotations(c clientset.Interface, nsName string) (*v1.Namespace, error) {
+	nsClient := c.CoreV1().Namespaces()
+
+	ns, err := nsClient.Get(nsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if ns.Annotations == nil {
+		ns.Annotations = make(map[string]string)
+	}
+
+	for _, n := range NamespaceNodeSelectors {
+		ns.Annotations[n] = ""
+	}
+
+	return nsClient.Update(ns)
 }
 
 func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[string]string) (*v1.Node, error) {
