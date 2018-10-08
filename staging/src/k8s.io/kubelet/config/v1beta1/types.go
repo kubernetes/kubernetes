@@ -654,6 +654,12 @@ type KubeletConfiguration struct {
 	// Default: "Watching"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// PreferredProbeIPFamily is preferred IP address family based on which one of pod IPs is selected
+	// for pod's health, liveness and readiness probes if pod has both IPv4 and IPv6 addresses
+	// Valid options are "ipv4", "ipv6", "none".
+	// Default: "none"
+	// +optional
+	PreferredProbeIPFamily string `json:"preferredProbeIPFamily,omitempty"`
 
 	/* the following fields are meant for Node Allocatable */
 
@@ -785,4 +791,19 @@ type SerializedNodeConfigSource struct {
 	// Source is the source that we are serializing
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
+}
+
+type IPFamily string
+
+const (
+	// IPFamilyIPv4 represents IPv4 address family
+	IPFamilyIPv4 IPFamily = "ipv4"
+	// IPFamilyIPv6 represents IPv6 address family
+	IPFamilyIPv6 IPFamily = "ipv6"
+	// IPFamilyNone indicates we should select default pod ip
+	IPFamilyNone IPFamily = "none"
+)
+
+func (f IPFamily) String() string {
+	return string(f)
 }

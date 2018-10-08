@@ -3057,10 +3057,18 @@ type PodStatus struct {
 	// IP address of the host to which the pod is assigned. Empty if not yet scheduled.
 	// +optional
 	HostIP string `json:"hostIP,omitempty" protobuf:"bytes,5,opt,name=hostIP"`
-	// IP address allocated to the pod. Routable at least within the cluster.
+	// Default IP address allocated to the pod. Routable at least within the cluster.
 	// Empty if not yet allocated.
 	// +optional
 	PodIP string `json:"podIP,omitempty" protobuf:"bytes,6,opt,name=podIP"`
+
+	// IP addresses allocated to the pod with associated metadata.
+	// This list is inclusive, i.e. it includes the default IP stored in the
+	// "PodIP" field. It is empty if no IPs have been allocated yet.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	PodIPs []PodIPInfo `json:"podIPs,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,12,rep,name=podIPs"`
 
 	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.
@@ -3083,6 +3091,15 @@ type PodStatus struct {
 	// More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
+}
+
+// PodIPInfo represents IP information of a pod.
+type PodIPInfo struct {
+	// IP address allocated to the pod. Routable at least within the cluster.
+	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+	// Arbitrary metadata associated to the allocated IP.
+	// e.g. physical network to which the IP is associated.
+	Properties map[string]string `json:"properties,omitempty" protobuf:"bytes,2,rep,name=properties"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

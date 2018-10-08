@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -108,6 +109,7 @@ func newTestManager() *manager {
 		nil, // runner
 		refManager,
 		&record.FakeRecorder{},
+		kubeletconfigv1beta1.IPFamilyIPv4.String(),
 	).(*manager)
 	// Don't actually execute probes.
 	m.prober.exec = fakeExecProber{probe.Success, nil}

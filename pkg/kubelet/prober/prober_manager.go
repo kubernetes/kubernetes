@@ -92,9 +92,10 @@ func NewManager(
 	livenessManager results.Manager,
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) Manager {
+	recorder record.EventRecorder,
+	preferredIPFamily string) Manager {
 
-	prober := newProber(runner, refManager, recorder)
+	prober := newProber(runner, refManager, recorder, parseToIPFamily(preferredIPFamily))
 	readinessManager := results.NewManager()
 	return &manager{
 		statusManager:    statusManager,

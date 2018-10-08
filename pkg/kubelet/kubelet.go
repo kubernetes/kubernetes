@@ -772,7 +772,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.livenessManager,
 		klet.runner,
 		containerRefManager,
-		kubeDeps.Recorder)
+		kubeDeps.Recorder,
+		kubeCfg.PreferredProbeIPFamily)
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 

@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -37,12 +38,15 @@ import (
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 )
 
-const maxProbeRetries = 3
+const (
+	maxProbeRetries = 3
+)
 
 // Prober helps to check the liveness/readiness of a container.
 type prober struct {
@@ -54,6 +58,8 @@ type prober struct {
 	livenessHttp  httprobe.HTTPProber
 	tcp           tcprobe.TCPProber
 	runner        kubecontainer.ContainerCommandRunner
+	// preferred IP address family used for probes
+	preferredIPFamily kubeletconfigv1beta1.IPFamily
 
 	refManager *kubecontainer.RefManager
 	recorder   record.EventRecorder
@@ -64,16 +70,18 @@ type prober struct {
 func newProber(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) *prober {
+	recorder record.EventRecorder,
+	preferredIPFamily kubeletconfigv1beta1.IPFamily) *prober {
 
 	return &prober{
-		exec:          execprobe.New(),
-		readinessHttp: httprobe.New(),
-		livenessHttp:  httprobe.New(),
-		tcp:           tcprobe.New(),
-		runner:        runner,
-		refManager:    refManager,
-		recorder:      recorder,
+		exec:              execprobe.New(),
+		readinessHttp:     httprobe.New(),
+		livenessHttp:      httprobe.New(),
+		tcp:               tcprobe.New(),
+		runner:            runner,
+		preferredIPFamily: preferredIPFamily,
+		refManager:        refManager,
+		recorder:          recorder,
 	}
 }
 
@@ -155,7 +163,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		scheme := strings.ToLower(string(p.HTTPGet.Scheme))
 		host := p.HTTPGet.Host
 		if host == "" {
-			host = status.PodIP
+			host = selectProbeIP(status, pb.preferredIPFamily)
 		}
 		port, err := extractPort(p.HTTPGet.Port, container)
 		if err != nil {
@@ -179,7 +187,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		}
 		host := p.TCPSocket.Host
 		if host == "" {
-			host = status.PodIP
+			host = selectProbeIP(status, pb.preferredIPFamily)
 		}
 		glog.V(4).Infof("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
 		return pb.tcp.Probe(host, port, timeout)
@@ -276,4 +284,36 @@ func (eic execInContainer) SetStderr(out io.Writer) {
 
 func (eic execInContainer) Stop() {
 	//unimplemented
+}
+
+// selectProbeIP selects a pod IP for probes from the specified PodStatus
+// based on the specified preferredIPFamily
+func selectProbeIP(status v1.PodStatus, preferredIPFamily kubeletconfigv1beta1.IPFamily) (probeIP string) {
+	probeIP = status.PodIP
+	if len(status.PodIPs) == 0 || preferredIPFamily == kubeletconfigv1beta1.IPFamilyNone {
+		return probeIP
+	}
+	for _, podIP := range status.PodIPs {
+		switch preferredIPFamily {
+		case kubeletconfigv1beta1.IPFamilyIPv4:
+			if !utilnet.IsIPv6String(podIP.IP) {
+				return podIP.IP
+			}
+		case kubeletconfigv1beta1.IPFamilyIPv6:
+			if utilnet.IsIPv6String(podIP.IP) {
+				return podIP.IP
+			}
+		}
+	}
+	return probeIP
+}
+
+func parseToIPFamily(ipFamily string) kubeletconfigv1beta1.IPFamily {
+	if strings.EqualFold(ipFamily, kubeletconfigv1beta1.IPFamilyIPv4.String()) {
+		return kubeletconfigv1beta1.IPFamilyIPv4
+	} else if strings.EqualFold(ipFamily, kubeletconfigv1beta1.IPFamilyIPv6.String()) {
+		return kubeletconfigv1beta1.IPFamilyIPv6
+	} else {
+		return kubeletconfigv1beta1.IPFamilyNone
+	}
 }

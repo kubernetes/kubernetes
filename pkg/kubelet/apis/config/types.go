@@ -282,6 +282,10 @@ type KubeletConfiguration struct {
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
+	// PreferredProbeIPFamily is preferred IP address family based on which the first matched pod IP
+	// is selected for pod's health, liveness and readiness probes if pod has both IPv4 and IPv6 addresses.
+	// Valid options are "ipv4", "ipv6", "none". "none" indicates IP family of cluster's configured service CIDR.
+	PreferredProbeIPFamily string
 
 	/* the following fields are meant for Node Allocatable */
 

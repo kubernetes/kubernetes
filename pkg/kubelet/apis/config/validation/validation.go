@@ -23,6 +23,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -134,6 +135,12 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 
 	if err := validateKubeletOSConfiguration(kc); err != nil {
 		allErrors = append(allErrors, err)
+	}
+	if kc.PreferredProbeIPFamily != kubeletconfigv1beta1.IPFamilyIPv4.String() &&
+		kc.PreferredProbeIPFamily != kubeletconfigv1beta1.IPFamilyIPv6.String() &&
+		kc.PreferredProbeIPFamily != kubeletconfigv1beta1.IPFamilyNone.String() {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for PreferredProbeIPFamily (--preferred-probe-ip-family). Valid options are %q or %q or %q",
+			kc.PreferredProbeIPFamily, kubeletconfigv1beta1.IPFamilyIPv4, kubeletconfigv1beta1.IPFamilyIPv6, kubeletconfigv1beta1.IPFamilyNone))
 	}
 	return utilerrors.NewAggregate(allErrors)
 }

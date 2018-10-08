@@ -203,6 +203,7 @@ var (
 		"PodPidsLimit",
 		"PodsPerCore",
 		"Port",
+		"PreferredProbeIPFamily",
 		"ProtectKernelDefaults",
 		"ReadOnlyPort",
 		"RegistryBurst",

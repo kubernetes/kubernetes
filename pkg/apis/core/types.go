@@ -2156,6 +2156,12 @@ type PodList struct {
 	Items []Pod
 }
 
+// PodIPInfo represents IP information of a pod.
+type PodIPInfo struct {
+	IP         string
+	Properties map[string]string
+}
+
 // DNSPolicy defines how a pod's DNS will be configured.
 type DNSPolicy string
 
@@ -2766,6 +2772,8 @@ type PodStatus struct {
 	HostIP string
 	// +optional
 	PodIP string
+	// + optional
+	PodIPs []PodIPInfo
 
 	// Date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.

@@ -1420,6 +1420,16 @@ func (PodExecOptions) SwaggerDoc() map[string]string {
 	return map_PodExecOptions
 }
 
+var map_PodIPInfo = map[string]string{
+	"":           "PodIPInfo represents IP information of a pod.",
+	"ip":         "IP address allocated to the pod. Routable at least within the cluster.",
+	"properties": "Arbitrary metadata associated to the allocated IP. e.g. physical network to which the IP is associated.",
+}
+
+func (PodIPInfo) SwaggerDoc() map[string]string {
+	return map_PodIPInfo
+}
+
 var map_PodList = map[string]string{
 	"":         "PodList is a list of Pods.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -1543,7 +1553,8 @@ var map_PodStatus = map[string]string{
 	"reason":                "A brief CamelCase message indicating details about why the pod is in this state. e.g. 'Evicted'",
 	"nominatedNodeName":     "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
 	"hostIP":                "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
-	"podIP":                 "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"podIP":                 "Default IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"podIPs":                "IP addresses allocated to the pod with associated metadata. This list is inclusive, i.e. it includes the default IP stored in the \"PodIP\" field. It is empty if no IPs have been allocated yet.",
 	"startTime":             "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
 	"initContainerStatuses": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
 	"containerStatuses":     "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",

@@ -22275,7 +22275,14 @@
      },
      "podIP": {
       "type": "string",
-      "description": "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated."
+      "description": "Default IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated."
+     },
+     "podIPs": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.PodIPInfo"
+      },
+      "description": "IP addresses allocated to the pod with associated metadata. This list is inclusive, i.e. it includes the default IP stored in the \"PodIP\" field. It is empty if no IPs have been allocated yet."
      },
      "startTime": {
       "type": "string",
@@ -22332,6 +22339,20 @@
      "message": {
       "type": "string",
       "description": "Human-readable message indicating details about last transition."
+     }
+    }
+   },
+   "v1.PodIPInfo": {
+    "id": "v1.PodIPInfo",
+    "description": "PodIPInfo represents IP information of a pod.",
+    "properties": {
+     "ip": {
+      "type": "string",
+      "description": "IP address allocated to the pod. Routable at least within the cluster."
+     },
+     "properties": {
+      "type": "object",
+      "description": "Arbitrary metadata associated to the allocated IP. e.g. physical network to which the IP is associated."
      }
     }
    },
