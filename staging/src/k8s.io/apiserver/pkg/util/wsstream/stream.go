@@ -48,7 +48,7 @@ type ReaderProtocolConfig struct {
 // subprotocols "", "channel.k8s.io", "base64.channel.k8s.io".
 func NewDefaultReaderProtocols() map[string]ReaderProtocolConfig {
 	return map[string]ReaderProtocolConfig{
-		"": {Binary: true},
+		"":                            {Binary: true},
 		binaryWebSocketProtocol:       {Binary: true},
 		base64BinaryWebSocketProtocol: {Binary: false},
 	}

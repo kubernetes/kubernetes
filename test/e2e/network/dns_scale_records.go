@@ -17,6 +17,7 @@ limitations under the License.
 package network
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -66,7 +67,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]))
 		}
 		framework.Logf("Creating %v test services", maxServicesPerCluster)
-		workqueue.Parallelize(parallelCreateServiceWorkers, len(services), createService)
+		workqueue.ParallelizeUntil(context.TODO(), parallelCreateServiceWorkers, len(services), createService)
 		dnsTest := dnsTestCommon{
 			f:  f,
 			c:  f.ClientSet,

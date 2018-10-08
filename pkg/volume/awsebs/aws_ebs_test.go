@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -166,7 +167,7 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC:                           volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*awsElasticBlockStorePlugin).newProvisionerInternal(options, &fakePDManager{})
@@ -323,5 +324,55 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	}
 	if _, ok := unmounter.(volume.Mounter); ok {
 		t.Errorf("Volume Unmounter can be type-assert to Mounter")
+	}
+}
+
+func TestMountOptions(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("aws-ebs")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pvA",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{},
+			},
+			ClaimRef: &v1.ObjectReference{
+				Name: "claimA",
+			},
+			MountOptions: []string{"_netdev"},
+		},
+	}
+
+	fakeManager := &fakePDManager{}
+	fakeMounter := &mount.FakeMounter{}
+
+	mounter, err := plug.(*awsElasticBlockStorePlugin).newMounterInternal(volume.NewSpecFromPersistentVolume(pv, false), types.UID("poduid"), fakeManager, fakeMounter)
+	if err != nil {
+		t.Errorf("Failed to make a new Mounter: %v", err)
+	}
+	if mounter == nil {
+		t.Errorf("Got a nil Mounter")
+	}
+
+	if err := mounter.SetUp(nil); err != nil {
+		t.Errorf("Expected success, got: %v", err)
+	}
+	mountOptions := fakeMounter.MountPoints[0].Opts
+	expectedMountOptions := []string{"_netdev", "bind"}
+	if !reflect.DeepEqual(mountOptions, expectedMountOptions) {
+		t.Errorf("Expected mount options to be %v got %v", expectedMountOptions, mountOptions)
 	}
 }

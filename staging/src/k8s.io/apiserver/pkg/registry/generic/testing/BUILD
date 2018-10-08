@@ -15,7 +15,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest/resttest:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
     ],
 )

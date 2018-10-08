@@ -1174,8 +1174,8 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 					CreationTimestamp:          metav1.Time{Time: time.Now()},
 					DeletionTimestamp:          &metav1.Time{Time: time.Now()},
 					DeletionGracePeriodSeconds: new(int64),
-					Labels:      map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
-					Annotations: map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
+					Labels:                     map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
+					Annotations:                map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
 				},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{
@@ -1217,8 +1217,8 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 					CreationTimestamp:          metav1.Time{Time: time.Now()},
 					DeletionTimestamp:          &metav1.Time{Time: time.Now()},
 					DeletionGracePeriodSeconds: new(int64),
-					Labels:      map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
-					Annotations: map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
+					Labels:                     map[string]string{"label1": "label1", "label2": "label2", "label3": "label3"},
+					Annotations:                map[string]string{"annotation1": "annotation1", "annotation2": "annotation2", "annotation3": "annotation3"},
 				},
 				Spec: api.PersistentVolumeSpec{
 					PersistentVolumeSource: api.PersistentVolumeSource{

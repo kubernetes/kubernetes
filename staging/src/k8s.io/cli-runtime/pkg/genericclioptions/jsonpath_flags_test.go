@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 
@@ -101,6 +102,9 @@ func TestPrinterSupportsExpectedJSONPathFormats(t *testing.T) {
 			printFlags := JSONPathPrintFlags{
 				TemplateArgument: templateArg,
 			}
+			if !sort.StringsAreSorted(printFlags.AllowedFormats()) {
+				t.Fatalf("allowed formats are not sorted")
+			}
 
 			p, err := printFlags.ToPrinter(tc.outputFormat)
 			if tc.expectNoMatch {
@@ -179,6 +183,9 @@ func TestJSONPathPrinterDefaultsAllowMissingKeysToTrue(t *testing.T) {
 			printFlags := JSONPathPrintFlags{
 				TemplateArgument: &tc.templateArg,
 				AllowMissingKeys: tc.allowMissingKeys,
+			}
+			if !sort.StringsAreSorted(printFlags.AllowedFormats()) {
+				t.Fatalf("allowed formats are not sorted")
 			}
 
 			outputFormat := "jsonpath"

@@ -27,6 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
@@ -34,7 +35,6 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // FetchConfigFromFileOrCluster fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
@@ -61,7 +61,7 @@ func loadConfiguration(client clientset.Interface, w io.Writer, logPrefix, cfgPa
 	}
 
 	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
-	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.InitConfigurationConfigMap)
+	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -oyaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	return getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane)
 }
 
@@ -73,12 +73,10 @@ func loadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 
 	// Unmarshal the versioned configuration populated from the file,
 	// convert it to the internal API types, then default and validate
-	// NB the file can be one of
-	// - a single YAML, with a v1alpha2.MasterConfiguration object (with embedded component configs)
-	// - multiple YAML, with a combination of
-	// 		- a YAML with a v1alpha3.InitConfiguration object
-	// 		- a YAML with a v1alpha3.ClusterConfiguration object (without embedded component configs)
-	//		- separated YAML for components configs
+	// NB the file contains multiple YAML, with a combination of
+	// 	- a YAML with a InitConfiguration object
+	// 	- a YAML with a ClusterConfiguration object (without embedded component configs)
+	//	- separated YAML for components configs
 	initcfg, err := BytesToInternalConfig(configBytes)
 	if err != nil {
 		return nil, err
@@ -90,40 +88,16 @@ func loadInitConfigurationFromFile(cfgPath string) (*kubeadmapi.InitConfiguratio
 func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// TODO: This code should support reading the MasterConfiguration key as well for backwards-compat
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.InitConfigurationConfigMap, metav1.GetOptions{})
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: remove in V1.13
-	// If InitConfigurationConfigMapKey exist, the kubeadm-config was created with v1.11
-	if _, ok := configMap.Data[constants.InitConfigurationConfigMapKey]; ok {
-		return getInitConfigurationFromConfigMapV11(configMap.Data)
-	}
-
-	return getInitConfigurationFromConfigMaps(kubeconfigDir, client, configMap.Data, newControlPlane)
-}
-
-func getInitConfigurationFromConfigMapV11(data map[string]string) (*kubeadmapi.InitConfiguration, error) {
-	configBytes := []byte(data[constants.InitConfigurationConfigMapKey])
-
-	// Unmarshal the versioned configuration populated from the file,
-	// convert it to the internal API types, then default and validate
-	// NB the config map created with v11 is a single YAML, with a v1alpha2.MasterConfiguration object (with embedded component configs)
-	initcfg, err := BytesToInternalConfig(configBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return initcfg, nil
-}
-
-func getInitConfigurationFromConfigMaps(kubeconfigDir string, client clientset.Interface, data map[string]string, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
-	// In case of cluster crated with v1.12 InitConfiguration is composed with data from different places
+	// InitConfiguration is composed with data from different places
 	initcfg := &kubeadmapi.InitConfiguration{}
 
 	// gets ClusterConfiguration from kubeadm-config
-	clusterConfigurationData, ok := data[constants.ClusterConfigurationConfigMapKey]
+	clusterConfigurationData, ok := configMap.Data[constants.ClusterConfigurationConfigMapKey]
 	if !ok {
 		return nil, fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
 	}
@@ -144,7 +118,7 @@ func getInitConfigurationFromConfigMaps(kubeconfigDir string, client clientset.I
 			return nil, err
 		}
 		// gets the APIEndpoint for the current node from then ClusterStatus in the kubeadm-config ConfigMap
-		if err := getAPIEndpoint(data, initcfg.NodeRegistration.Name, &initcfg.APIEndpoint); err != nil {
+		if err := getAPIEndpoint(configMap.Data, initcfg.NodeRegistration.Name, &initcfg.APIEndpoint); err != nil {
 			return nil, err
 		}
 	}

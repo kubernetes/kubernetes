@@ -59,6 +59,12 @@ func TestFindClusterID(t *testing.T) {
 		},
 		{
 			Tags: map[string]string{
+				TagNameKubernetesClusterPrefix + "a": "shared",
+			},
+			ExpectedNew: "a",
+		},
+		{
+			Tags: map[string]string{
 				TagNameKubernetesClusterPrefix + "a": "",
 			},
 			ExpectedNew: "a",
@@ -105,6 +111,71 @@ func TestFindClusterID(t *testing.T) {
 				t.Errorf("unexpected new clusterid for tags %v: %s vs %s", g.Tags, g.ExpectedLegacy, actualLegacy)
 				continue
 			}
+		}
+	}
+}
+
+func TestHasClusterTag(t *testing.T) {
+	awsServices := NewFakeAWSServices(TestClusterId)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	grid := []struct {
+		Tags     map[string]string
+		Expected bool
+	}{
+		{
+			Tags: map[string]string{},
+		},
+		{
+			Tags: map[string]string{
+				TagNameKubernetesClusterLegacy: TestClusterId,
+			},
+			Expected: true,
+		},
+		{
+			Tags: map[string]string{
+				TagNameKubernetesClusterLegacy: "a",
+			},
+			Expected: false,
+		},
+		{
+			Tags: map[string]string{
+				TagNameKubernetesClusterPrefix + TestClusterId: "owned",
+			},
+			Expected: true,
+		},
+		{
+			Tags: map[string]string{
+				TagNameKubernetesClusterPrefix + TestClusterId: "",
+			},
+			Expected: true,
+		},
+		{
+			Tags: map[string]string{
+				TagNameKubernetesClusterLegacy:                 "a",
+				TagNameKubernetesClusterPrefix + TestClusterId: "shared",
+			},
+			Expected: true,
+		},
+		{
+			Tags: map[string]string{
+				TagNameKubernetesClusterPrefix + TestClusterId: "shared",
+				TagNameKubernetesClusterPrefix + "b":           "shared",
+			},
+			Expected: true,
+		},
+	}
+	for _, g := range grid {
+		var ec2Tags []*ec2.Tag
+		for k, v := range g.Tags {
+			ec2Tags = append(ec2Tags, &ec2.Tag{Key: aws.String(k), Value: aws.String(v)})
+		}
+		result := c.tagging.hasClusterTag(ec2Tags)
+		if result != g.Expected {
+			t.Errorf("Unexpected result for tags %v: %t", g.Tags, result)
 		}
 	}
 }

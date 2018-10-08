@@ -128,12 +128,23 @@ type endpointsInfo struct {
 	refCount   uint16
 }
 
+//Uses mac prefix and IPv4 address to return a mac address
+//This ensures mac addresses are unique for proper load balancing
+//Does not support IPv6 and returns a dummy mac
+func conjureMac(macPrefix string, ip net.IP) string {
+	if ip4 := ip.To4(); ip4 != nil {
+		a, b, c, d := ip4[0], ip4[1], ip4[2], ip4[3]
+		return fmt.Sprintf("%v-%02x-%02x-%02x-%02x", macPrefix, a, b, c, d)
+	}
+	return "02-11-22-33-44-55"
+}
+
 func newEndpointInfo(ip string, port uint16, isLocal bool) *endpointsInfo {
 	info := &endpointsInfo{
 		ip:         ip,
 		port:       port,
 		isLocal:    isLocal,
-		macAddress: "00:11:22:33:44:55", // Hardcoding to some Random Mac
+		macAddress: conjureMac("02-11", net.ParseIP(ip)),
 		refCount:   0,
 		hnsID:      "",
 	}
@@ -517,15 +528,14 @@ func CleanupLeftovers() (encounteredError bool) {
 
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []*endpointsInfo) {
 	Log(svcInfo, "Service Cleanup", 3)
-	if svcInfo.policyApplied {
-		svcInfo.deleteAllHnsLoadBalancerPolicy()
-		// Cleanup Endpoints references
-		for _, ep := range endpoints {
-			ep.Cleanup()
-		}
-
-		svcInfo.policyApplied = false
+	// Skip the svcInfo.policyApplied check to remove all the policies
+	svcInfo.deleteAllHnsLoadBalancerPolicy()
+	// Cleanup Endpoints references
+	for _, ep := range endpoints {
+		ep.Cleanup()
 	}
+
+	svcInfo.policyApplied = false
 }
 
 func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {

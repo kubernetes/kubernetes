@@ -24,7 +24,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -38,6 +41,11 @@ const (
 	KStart           KubeletOpt = "start"
 	KStop            KubeletOpt = "stop"
 	KRestart         KubeletOpt = "restart"
+)
+
+const (
+	// ClusterRole name for e2e test Priveledged Pod Security Policy User
+	podSecurityPolicyPrivilegedClusterRoleName = "e2e-test-privileged-psp"
 )
 
 // PodExec wraps RunKubectl to execute a bash cmd in target pod
@@ -385,4 +393,51 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
 
 	return pod
+}
+
+func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
+	namespace string,
+	teardown bool,
+	saNames []string) {
+	bindingString := "Binding"
+	if teardown {
+		bindingString = "Unbinding"
+	}
+	roleBindingClient := client.RbacV1().RoleBindings(namespace)
+	for _, saName := range saNames {
+		By(fmt.Sprintf("%v priviledged Pod Security Policy to the service account %s", bindingString, saName))
+		binding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "psp-" + saName,
+				Namespace: namespace,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      saName,
+					Namespace: namespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind:     "ClusterRole",
+				Name:     podSecurityPolicyPrivilegedClusterRoleName,
+				APIGroup: "rbac.authorization.k8s.io",
+			},
+		}
+
+		roleBindingClient.Delete(binding.GetName(), &metav1.DeleteOptions{})
+		err := wait.Poll(2*time.Second, 2*time.Minute, func() (bool, error) {
+			_, err := roleBindingClient.Get(binding.GetName(), metav1.GetOptions{})
+			return apierrs.IsNotFound(err), nil
+		})
+		framework.ExpectNoError(err, "Timed out waiting for deletion: %v", err)
+
+		if teardown {
+			continue
+		}
+
+		_, err = roleBindingClient.Create(binding)
+		framework.ExpectNoError(err, "Failed to create %s role binding: %v", binding.GetName(), err)
+
+	}
 }

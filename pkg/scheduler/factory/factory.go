@@ -28,7 +28,6 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,9 +57,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
-	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/core/equivalence"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
@@ -82,7 +82,7 @@ var (
 type configFactory struct {
 	client clientset.Interface
 	// queue for pods that need scheduling
-	podQueue core.SchedulingQueue
+	podQueue internalqueue.SchedulingQueue
 	// a means to list all known scheduled pods.
 	scheduledPodLister corelisters.PodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
@@ -111,7 +111,7 @@ type configFactory struct {
 
 	scheduledPodsHasSynced cache.InformerSynced
 
-	schedulerCache schedulercache.Cache
+	schedulerCache schedulerinternalcache.Cache
 
 	// SchedulerName of a scheduler is used to select which pods will be
 	// processed by this scheduler, based on pods's "spec.schedulerName".
@@ -131,7 +131,7 @@ type configFactory struct {
 	// Handles volume binding decisions
 	volumeBinder *volumebinder.VolumeBinder
 
-	// always check all predicates even if the middle of one predicate fails.
+	// Always check all predicates even if the middle of one predicate fails.
 	alwaysCheckAllPredicates bool
 
 	// Disable pod preemption or not.
@@ -162,11 +162,11 @@ type ConfigFactoryArgs struct {
 	BindTimeoutSeconds             int64
 }
 
-// NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
+// NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
 // return the interface.
 func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	stopEverything := make(chan struct{})
-	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
+	schedulerCache := schedulerinternalcache.New(30*time.Second, stopEverything)
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister
@@ -176,7 +176,8 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       core.NewSchedulingQueue(),
+		podQueue:                       internalqueue.NewSchedulingQueue(),
+		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
 		serviceLister:                  args.ServiceInformer.Lister(),
@@ -256,16 +257,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.deleteNodeFromCache,
 		},
 	)
-	c.nodeLister = args.NodeInformer.Lister()
-
-	args.PdbInformer.Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.addPDBToCache,
-			UpdateFunc: c.updatePDBInCache,
-			DeleteFunc: c.deletePDBFromCache,
-		},
-	)
-	c.pdbLister = args.PdbInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
@@ -277,7 +268,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.onPvDelete,
 		},
 	)
-	c.pVLister = args.PvInformer.Lister()
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
 	args.PvcInformer.Informer().AddEventHandler(
@@ -287,7 +277,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.onPvcDelete,
 		},
 	)
-	c.pVCLister = args.PvcInformer.Lister()
 
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
@@ -299,7 +288,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			DeleteFunc: c.onServiceDelete,
 		},
 	)
-	c.serviceLister = args.ServiceInformer.Lister()
 
 	// Existing equivalence cache should not be affected by add/delete RC/Deployment etc,
 	// it only make sense when pod is scheduled or deleted
@@ -320,7 +308,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 	comparer := &cacheComparer{
 		podLister:  args.PodInformer.Lister(),
 		nodeLister: args.NodeInformer.Lister(),
-		pdbLister:  args.PdbInformer.Lister(),
 		cache:      c.schedulerCache,
 		podQueue:   c.podQueue,
 	}
@@ -332,6 +319,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 		for {
 			select {
 			case <-c.StopEverything:
+				c.podQueue.Close()
 				return
 			case <-ch:
 				comparer.Compare()
@@ -1003,56 +991,6 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 	}
 }
 
-func (c *configFactory) addPDBToCache(obj interface{}) {
-	pdb, ok := obj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", obj)
-		return
-	}
-
-	if err := c.schedulerCache.AddPDB(pdb); err != nil {
-		glog.Errorf("scheduler cache AddPDB failed: %v", err)
-	}
-}
-
-func (c *configFactory) updatePDBInCache(oldObj, newObj interface{}) {
-	oldPDB, ok := oldObj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert oldObj to *v1beta1.PodDisruptionBudget: %v", oldObj)
-		return
-	}
-	newPDB, ok := newObj.(*v1beta1.PodDisruptionBudget)
-	if !ok {
-		glog.Errorf("cannot convert newObj to *v1beta1.PodDisruptionBudget: %v", newObj)
-		return
-	}
-
-	if err := c.schedulerCache.UpdatePDB(oldPDB, newPDB); err != nil {
-		glog.Errorf("scheduler cache UpdatePDB failed: %v", err)
-	}
-}
-
-func (c *configFactory) deletePDBFromCache(obj interface{}) {
-	var pdb *v1beta1.PodDisruptionBudget
-	switch t := obj.(type) {
-	case *v1beta1.PodDisruptionBudget:
-		pdb = t
-	case cache.DeletedFinalStateUnknown:
-		var ok bool
-		pdb, ok = t.Obj.(*v1beta1.PodDisruptionBudget)
-		if !ok {
-			glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t.Obj)
-			return
-		}
-	default:
-		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t)
-		return
-	}
-	if err := c.schedulerCache.RemovePDB(pdb); err != nil {
-		glog.Errorf("scheduler cache RemovePDB failed: %v", err)
-	}
-}
-
 // Create creates a scheduler with the default algorithm provider.
 func (c *configFactory) Create() (*scheduler.Config, error) {
 	return c.CreateFromProvider(DefaultProvider)
@@ -1203,6 +1141,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
+		c.pdbLister,
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
@@ -1281,6 +1220,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ReplicaSetLister:               c.replicaSetLister,
 		StatefulSetLister:              c.statefulSetLister,
 		NodeLister:                     &nodeLister{c.nodeLister},
+		PDBLister:                      c.pdbLister,
 		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: c.nodeLister},
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
@@ -1409,7 +1349,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 	}
 }
 
-func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error) {
+func (c *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)

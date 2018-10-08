@@ -24,7 +24,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	certscmdphase "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/certs"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -82,7 +82,7 @@ func NewCmdCerts() *cobra.Command {
 // getCertsSubCommands returns sub commands for certs phase
 func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -138,7 +138,7 @@ func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 	return subCmds
 }
 
-func makeCmd(certSpec *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration) *cobra.Command {
+func makeCmd(certSpec *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   certSpec.Name,
 		Short: fmt.Sprintf("Generates the %s", certSpec.LongName),
@@ -156,8 +156,8 @@ func makeCmd(certSpec *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
-	defaultConfig := &kubeadmapiv1alpha3.InitConfiguration{
-		APIEndpoint: kubeadmapiv1alpha3.APIEndpoint{
+	defaultConfig := &kubeadmapiv1beta1.InitConfiguration{
+		APIEndpoint: kubeadmapiv1beta1.APIEndpoint{
 			// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
 			AdvertiseAddress: "127.0.0.1",
 		},
@@ -188,7 +188,7 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	return fmt.Sprintf("\n\nDefault SANs are %s", strings.Join(sans, ", "))
 }
 
-func addFlags(cmd *cobra.Command, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration, addAPIFlags bool) {
+func addFlags(cmd *cobra.Command, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration, addAPIFlags bool) {
 	options.AddCertificateDirFlag(cmd.Flags(), &cfg.CertificatesDir)
 	options.AddConfigFlag(cmd.Flags(), cfgPath)
 	if addAPIFlags {
@@ -199,7 +199,7 @@ func addFlags(cmd *cobra.Command, cfgPath *string, cfg *kubeadmapiv1alpha3.InitC
 	}
 }
 
-func makeCommandsForCA(ca *certsphase.KubeadmCert, certList []*certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration) []*cobra.Command {
+func makeCommandsForCA(ca *certsphase.KubeadmCert, certList []*certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration) []*cobra.Command {
 	subCmds := []*cobra.Command{}
 
 	caCmd := makeCmd(ca, cfgPath, cfg)
@@ -221,7 +221,7 @@ func makeCommandsForCA(ca *certsphase.KubeadmCert, certList []*certsphase.Kubead
 	return subCmds
 }
 
-func makeCommandForCert(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1alpha3.InitConfiguration) *cobra.Command {
+func makeCommandForCert(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration) *cobra.Command {
 	certCmd := makeCmd(cert, cfgPath, cfg)
 
 	certCmd.Run = func(cmd *cobra.Command, args []string) {
