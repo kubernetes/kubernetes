@@ -69,15 +69,15 @@ var NetexecImageName = imageutils.GetE2EImage(imageutils.Netexec)
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(f *Framework) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name}
+	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: true}
 	By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setup(getServiceSelector())
 	return config
 }
 
 // NewNetworkingTestNodeE2EConfig creates and sets up a new test config helper for Node E2E.
-func NewCoreNetworkingTestConfig(f *Framework) *NetworkingTestConfig {
-	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name}
+func NewCoreNetworkingTestConfig(f *Framework, hostNetwork bool) *NetworkingTestConfig {
+	config := &NetworkingTestConfig{f: f, Namespace: f.Namespace.Name, HostNetwork: hostNetwork}
 	By(fmt.Sprintf("Performing setup for networking test in namespace %v", config.Namespace))
 	config.setupCore(getServiceSelector())
 	return config
@@ -98,9 +98,10 @@ type NetworkingTestConfig struct {
 	// TestContaienrPod is a test pod running the netexec image. It is capable
 	// of executing tcp/udp requests against ip:port.
 	TestContainerPod *v1.Pod
-	// HostTestContainerPod is a pod running with hostNetworking=true, and the
-	// hostexec image.
+	// HostTestContainerPod is a pod running using the hostexec image.
 	HostTestContainerPod *v1.Pod
+	// if the HostTestContainerPod is running with HostNetwork=true.
+	HostNetwork bool
 	// EndpointPods are the pods belonging to the Service created by this
 	// test config. Each invocation of `setup` creates a service with
 	// 1 pod per node running the netexecImage.
@@ -513,7 +514,7 @@ func (config *NetworkingTestConfig) DeleteNodePortService() {
 
 func (config *NetworkingTestConfig) createTestPods() {
 	testContainerPod := config.createTestPodSpec()
-	hostTestContainerPod := NewHostExecPodSpec(config.Namespace, hostTestPodName)
+	hostTestContainerPod := NewExecPodSpec(config.Namespace, hostTestPodName, config.HostNetwork)
 
 	config.createPod(testContainerPod)
 	config.createPod(hostTestContainerPod)

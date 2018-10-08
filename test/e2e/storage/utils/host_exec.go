@@ -50,7 +50,7 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 	f := h.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
-	hostExecPod := framework.NewHostExecPodSpec(ns.Name, fmt.Sprintf("hostexec-%s", node))
+	hostExecPod := framework.NewExecPodSpec(ns.Name, fmt.Sprintf("hostexec-%s", node), true)
 	hostExecPod.Spec.NodeName = node
 	hostExecPod.Spec.Volumes = []v1.Volume{
 		{
