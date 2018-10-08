@@ -36,12 +36,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+
 	// kubectl should not be taking dependencies on logic in the controllers
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -229,14 +227,7 @@ func simpleDryRun(deployment *appsv1.Deployment, c kubernetes.Interface, toRevis
 		if !ok {
 			return "", revisionNotFoundErr(toRevision)
 		}
-		buf := bytes.NewBuffer([]byte{})
-		internalTemplate := &api.PodTemplateSpec{}
-		if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-		}
-		w := printersinternal.NewPrefixWriter(buf)
-		printersinternal.DescribePodTemplate(internalTemplate, w)
-		return buf.String(), nil
+		return printTemplate(template)
 	}
 
 	// Sort the revisionToSpec map by revision
@@ -247,15 +238,7 @@ func simpleDryRun(deployment *appsv1.Deployment, c kubernetes.Interface, toRevis
 	sliceutil.SortInts64(revisions)
 
 	template, _ := revisionToSpec[revisions[len(revisions)-2]]
-	buf := bytes.NewBuffer([]byte{})
-	buf.WriteString("\n")
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(internalTemplate, w)
-	return buf.String(), nil
+	return printTemplate(template)
 }
 
 type DaemonSetRollbacker struct {
@@ -473,14 +456,11 @@ func findHistory(toRevision int64, allHistory []*appsv1.ControllerRevision) *app
 
 // printPodTemplate converts a given pod template into a human-readable string.
 func printPodTemplate(specTemplate *corev1.PodTemplateSpec) (string, error) {
-	content := bytes.NewBuffer([]byte{})
-	w := printersinternal.NewPrefixWriter(content)
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(specTemplate, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
+	podSpec, err := printTemplate(specTemplate)
+	if err != nil {
+		return "", err
 	}
-	printersinternal.DescribePodTemplate(internalTemplate, w)
-	return fmt.Sprintf("will roll back to %s", content.String()), nil
+	return fmt.Sprintf("will roll back to %s", podSpec), nil
 }
 
 func revisionNotFoundErr(r int64) error {
