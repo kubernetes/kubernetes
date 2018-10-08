@@ -44,6 +44,8 @@ const (
 	VolumeStatsInodesKey         = "volume_stats_inodes"
 	VolumeStatsInodesFreeKey     = "volume_stats_inodes_free"
 	VolumeStatsInodesUsedKey     = "volume_stats_inodes_used"
+	EmptyDirVolumeUsedKey        = "emptydir_volume_used_bytes"
+	EmptyDirVolumeCapacityKey    = "emptydir_volume_capacity_bytes"
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey        = "runtime_operations"
 	RuntimeOperationsLatencyKey = "runtime_operations_latency_microseconds"

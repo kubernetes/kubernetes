@@ -1328,6 +1328,7 @@ func (kl *Kubelet) initializeModules() error {
 		kl.runtimeCache,
 		collectors.NewVolumeStatsCollector(kl),
 		collectors.NewLogMetricsCollector(kl.StatsProvider.ListPodStats),
+		collectors.NewEmptyDirStatsCollector(kl),
 	)
 
 	// Setup filesystem directories.
