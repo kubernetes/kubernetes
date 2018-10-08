@@ -575,15 +575,7 @@ func TestRegisterPlugin(t *testing.T) {
 			nim = nodeInfoManager
 
 			err := registrationHandler.RegisterPlugin("some driver name", tc.sockPath)
-			if expectedErrMsg := tc.expectedRegisterPluginErrMsg; expectedErrMsg == "" {
-				if err != nil {
-					t.Errorf("Expected RegisterPlugin not to return an error, got: %v", err)
-				}
-			} else {
-				if !strings.Contains(err.Error(), expectedErrMsg) {
-					t.Errorf("Expected RegisterPlugin to return an error containing '%s', got: '%#v'", expectedErrMsg, err)
-				}
-			}
+			checkErr(t, err, tc.expectedRegisterPluginErrMsg)
 
 			if a, e := nodeInfoManager.AddNodeInfoCallCount(), tc.expectedNimAddCalls; e != a {
 				t.Errorf("Expected nim.AddNodeInfo to be called %d times, got called %d times", e, a)
