@@ -45,8 +45,8 @@ const (
 var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, "Internal Server Error: %#v", r.RequestURI)
+	errorMsg := fmt.Sprintf("Internal Server Error: %#v", r.RequestURI)
+	http.Error(w, errorMsg, http.StatusInternalServerError)
 	glog.Errorf(err.Error())
 }
 
