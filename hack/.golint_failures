@@ -122,7 +122,6 @@ pkg/credentialprovider/gcp
 pkg/credentialprovider/rancher
 pkg/features
 pkg/kubeapiserver
-pkg/kubeapiserver/options
 pkg/kubectl
 pkg/kubectl/apps
 pkg/kubectl/cmd/annotate

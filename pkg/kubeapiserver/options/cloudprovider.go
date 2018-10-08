@@ -20,20 +20,24 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// CloudProviderOptions holds the CloudProvider options for the server
 type CloudProviderOptions struct {
 	CloudConfigFile string
 	CloudProvider   string
 }
 
+// NewCloudProviderOptions returns the default cloud provider options
 func NewCloudProviderOptions() *CloudProviderOptions {
 	return &CloudProviderOptions{}
 }
 
+// Validate ensures the the cloud provider options appear to be consistent
 func (s *CloudProviderOptions) Validate() []error {
 	allErrors := []error{}
 	return allErrors
 }
 
+// AddFlags populates the cloud provider options from the passed in command line flags.
 func (s *CloudProviderOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider,
 		"The provider for cloud services. Empty string for no provider.")

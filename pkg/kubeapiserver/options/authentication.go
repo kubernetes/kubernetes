@@ -37,6 +37,7 @@ import (
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
+// BuiltInAuthenticationOptions holds the set of configurable authentication flags
 type BuiltInAuthenticationOptions struct {
 	APIAudiences    []string
 	Anonymous       *AnonymousAuthenticationOptions
@@ -53,14 +54,20 @@ type BuiltInAuthenticationOptions struct {
 	TokenFailureCacheTTL time.Duration
 }
 
+// AnonymousAuthenticationOptions holds the flag for enabling anonymous requests to the secure port of the API server.
+// Requests that are not rejected by another authentication method are treated as anonymous requests. Anonymous
+// requests have a username of system:anonymous, and a group name of system:unauthenticated.
 type AnonymousAuthenticationOptions struct {
 	Allow bool
 }
 
+// BootstrapTokenAuthenticationOptions holds the flag for enabling secrets of type
+// 'bootstrap.kubernetes.io/token' in the 'kube-system' namespace to be used for TLS bootstrapping authentication.
 type BootstrapTokenAuthenticationOptions struct {
 	Enable bool
 }
 
+// OIDCAuthenticationOptions holds the flags for OpenID Connect settings
 type OIDCAuthenticationOptions struct {
 	CAFile         string
 	ClientID       string
@@ -73,10 +80,14 @@ type OIDCAuthenticationOptions struct {
 	RequiredClaims map[string]string
 }
 
+// PasswordFileAuthenticationOptions holds the configuration for any mechanisms
+// used to admit requests to the API server
 type PasswordFileAuthenticationOptions struct {
 	BasicAuthFile string
 }
 
+// ServiceAccountAuthenticationOptions holds the configuration for everything
+// related to service accounts such as their scope and where the data is stored
 type ServiceAccountAuthenticationOptions struct {
 	KeyFiles      []string
 	Lookup        bool
@@ -84,15 +95,19 @@ type ServiceAccountAuthenticationOptions struct {
 	MaxExpiration time.Duration
 }
 
+// TokenFileAuthenticationOptions holds the configuration for the file that will be
+// used to secure the secure port of the API server via token authentication
 type TokenFileAuthenticationOptions struct {
 	TokenFile string
 }
 
+// WebHookAuthenticationOptions holds the configuration for any webhook such as token authentication in kubeconfig format
 type WebHookAuthenticationOptions struct {
 	ConfigFile string
 	CacheTTL   time.Duration
 }
 
+// NewBuiltInAuthenticationOptions returns a set of the default TTL authentication options.
 func NewBuiltInAuthenticationOptions() *BuiltInAuthenticationOptions {
 	return &BuiltInAuthenticationOptions{
 		TokenSuccessCacheTTL: 10 * time.Second,
@@ -100,6 +115,7 @@ func NewBuiltInAuthenticationOptions() *BuiltInAuthenticationOptions {
 	}
 }
 
+// WithAll returns a complete set of the enabled authentication options.
 func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 	return s.
 		WithAnonymous().
@@ -113,46 +129,58 @@ func (s *BuiltInAuthenticationOptions) WithAll() *BuiltInAuthenticationOptions {
 		WithWebHook()
 }
 
+// WithAnonymous returns a set of the authentication options enabling anonymous access
 func (s *BuiltInAuthenticationOptions) WithAnonymous() *BuiltInAuthenticationOptions {
 	s.Anonymous = &AnonymousAuthenticationOptions{Allow: true}
 	return s
 }
 
+// WithBootstrapToken returns a set of the authentication options enabling secrets of type
+// 'bootstrap.kubernetes.io/token' in the 'kube-system' namespace to be used for TLS
+// bootstrapping authentication.
 func (s *BuiltInAuthenticationOptions) WithBootstrapToken() *BuiltInAuthenticationOptions {
 	s.BootstrapToken = &BootstrapTokenAuthenticationOptions{}
 	return s
 }
 
+// WithClientCert returns a set of the authentication options for all the default signers that
+// you'll recognize for incoming client certificates
 func (s *BuiltInAuthenticationOptions) WithClientCert() *BuiltInAuthenticationOptions {
 	s.ClientCert = &genericoptions.ClientCertAuthenticationOptions{}
 	return s
 }
 
+// WithOIDC returns a set of the authentication options for default OpenID Connect settings
 func (s *BuiltInAuthenticationOptions) WithOIDC() *BuiltInAuthenticationOptions {
 	s.OIDC = &OIDCAuthenticationOptions{}
 	return s
 }
 
+// WithPasswordFile returns a set of the authentication options for default password file
 func (s *BuiltInAuthenticationOptions) WithPasswordFile() *BuiltInAuthenticationOptions {
 	s.PasswordFile = &PasswordFileAuthenticationOptions{}
 	return s
 }
 
+// WithRequestHeader returns a set of the authentication options for authenticating requests via request header
 func (s *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticationOptions {
 	s.RequestHeader = &genericoptions.RequestHeaderAuthenticationOptions{}
 	return s
 }
 
+// WithServiceAccounts returns a set of the authentication options to lookup service accounts in etcd
 func (s *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
 	s.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true}
 	return s
 }
 
+// WithTokenFile returns a set of the authentication options for checking tokens via a file
 func (s *BuiltInAuthenticationOptions) WithTokenFile() *BuiltInAuthenticationOptions {
 	s.TokenFile = &TokenFileAuthenticationOptions{}
 	return s
 }
 
+// WithWebHook returns a set of the authentication options with a TTL of two minutes
 func (s *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptions {
 	s.WebHook = &WebHookAuthenticationOptions{
 		CacheTTL: 2 * time.Minute,
@@ -189,6 +217,7 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 	return allErrors
 }
 
+// AddFlags constructs the authentication options from the passed in command line flags
 func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.APIAudiences, "api-audiences", s.APIAudiences, ""+
 		"Identifiers of the API. The service account token authenticator will validate that "+
@@ -307,6 +336,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
+// ToAuthenticationConfig converts the auth options into a Config object
 func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticator.Config {
 	ret := kubeauthenticator.Config{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
@@ -376,43 +406,44 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticato
 	return ret
 }
 
-func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
-	if o == nil {
+// ApplyTo modified a passed in Config object with the current authentication options
+func (s *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
+	if s == nil {
 		return nil
 	}
 
 	var err error
-	if o.ClientCert != nil {
-		if err = c.Authentication.ApplyClientCert(o.ClientCert.ClientCA, c.SecureServing); err != nil {
+	if s.ClientCert != nil {
+		if err = c.Authentication.ApplyClientCert(s.ClientCert.ClientCA, c.SecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
-	if o.RequestHeader != nil {
-		if err = c.Authentication.ApplyClientCert(o.RequestHeader.ClientCAFile, c.SecureServing); err != nil {
+	if s.RequestHeader != nil {
+		if err = c.Authentication.ApplyClientCert(s.RequestHeader.ClientCAFile, c.SecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 
-	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+	c.Authentication.SupportsBasicAuth = s.PasswordFile != nil && len(s.PasswordFile.BasicAuthFile) > 0
 
-	c.Authentication.APIAudiences = o.APIAudiences
-	if o.ServiceAccounts != nil && o.ServiceAccounts.Issuer != "" && len(o.APIAudiences) == 0 {
-		c.Authentication.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
+	c.Authentication.APIAudiences = s.APIAudiences
+	if s.ServiceAccounts != nil && s.ServiceAccounts.Issuer != "" && len(s.APIAudiences) == 0 {
+		c.Authentication.APIAudiences = authenticator.Audiences{s.ServiceAccounts.Issuer}
 	}
 
 	return nil
 }
 
 // ApplyAuthorization will conditionally modify the authentication options based on the authorization options
-func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltInAuthorizationOptions) {
-	if o == nil || authorization == nil || o.Anonymous == nil {
+func (s *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltInAuthorizationOptions) {
+	if s == nil || authorization == nil || s.Anonymous == nil {
 		return
 	}
 
 	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
 	// in such a case the AnonymousAuth is stomped to false and you get a message
-	if o.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
+	if s.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
 		klog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
-		o.Anonymous.Allow = false
+		s.Anonymous.Allow = false
 	}
 }
