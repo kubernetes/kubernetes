@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/api/admissionregistration/v1beta1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 )
@@ -41,5 +42,5 @@ type VersionedAttributes struct {
 // Dispatcher dispatches webhook call to a list of webhooks with admission attributes as argument.
 type Dispatcher interface {
 	// Dispatch a request to the webhooks using the given webhooks. A non-nil error means the request is rejected.
-	Dispatch(ctx context.Context, a *VersionedAttributes, hooks []*v1beta1.Webhook) error
+	Dispatch(ctx context.Context, a *VersionedAttributes, hooks []*v1beta1.Webhook) *apierrors.StatusError
 }

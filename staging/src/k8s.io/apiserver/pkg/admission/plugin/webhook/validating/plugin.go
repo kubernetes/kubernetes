@@ -17,6 +17,7 @@ limitations under the License.
 package validating
 
 import (
+	"fmt"
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
@@ -60,5 +61,11 @@ func NewValidatingAdmissionWebhook(configFile io.Reader) (*Plugin, error) {
 
 // Validate makes an admission decision based on the request attributes.
 func (a *Plugin) Validate(attr admission.Attributes) error {
-	return a.Webhook.Dispatch(attr)
+	if !a.WaitForReady() {
+		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
+	}
+	if err := a.Webhook.Dispatch(attr); err != nil {
+		return err
+	}
+	return nil
 }

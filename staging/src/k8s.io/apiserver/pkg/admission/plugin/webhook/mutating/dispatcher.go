@@ -53,7 +53,7 @@ func newMutatingDispatcher(p *Plugin) func(cm *webhook.ClientManager) generic.Di
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
 
-func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) error {
+func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) *apierrors.StatusError {
 	for _, hook := range relevantHooks {
 		t := time.Now()
 		err := a.callAttrMutatingHook(ctx, hook, attr)
@@ -62,21 +62,29 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 			continue
 		}
 
-		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
-		if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
+		switch err := err.(type) {
+		case *apierrors.StatusError:
+			glog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
+			return err
+		case *webhook.ErrCallingWebhook:
+			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 			if ignoreClientCallFailures {
-				glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-				utilruntime.HandleError(callErr)
+				glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, err)
+				utilruntime.HandleError(err)
 				continue
 			}
 			glog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+		default:
+			glog.Warningf("Internal webhook calling error %q: %#v", hook.Name, err)
+			return apierrors.NewInternalError(err)
 		}
-		return apierrors.NewInternalError(err)
 	}
 
 	// convert attr.VersionedObject to the internal version in the underlying admission.Attributes
 	if attr.VersionedObject != nil {
-		return a.plugin.scheme.Convert(attr.VersionedObject, attr.Attributes.GetObject(), nil)
+		if err := a.plugin.scheme.Convert(attr.VersionedObject, attr.Attributes.GetObject(), nil); err != nil {
+			return apierrors.NewInternalError(err)
+		}
 	}
 	return nil
 }
@@ -115,7 +123,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	if !response.Response.Allowed {
-		return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+		return webhookerrors.ToStatusErr(attr, h.Name, response.Response.Result)
 	}
 
 	patchJS := response.Response.Patch

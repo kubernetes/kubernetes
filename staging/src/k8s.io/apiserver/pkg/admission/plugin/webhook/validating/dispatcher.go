@@ -46,9 +46,9 @@ func newValidatingDispatcher(cm *webhook.ClientManager) generic.Dispatcher {
 
 var _ generic.Dispatcher = &validatingDispatcher{}
 
-func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) error {
+func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, relevantHooks []*v1beta1.Webhook) *apierrors.StatusError {
 	wg := sync.WaitGroup{}
-	errCh := make(chan error, len(relevantHooks))
+	errCh := make(chan *apierrors.StatusError, len(relevantHooks))
 	wg.Add(len(relevantHooks))
 	for i := range relevantHooks {
 		go func(hook *v1beta1.Webhook) {
@@ -61,27 +61,30 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 				return
 			}
 
-			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
-			if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
+			switch err := err.(type) {
+			case *apierrors.StatusError:
+				glog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
+				errCh <- err
+			case *webhook.ErrCallingWebhook:
+				ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 				if ignoreClientCallFailures {
-					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-					utilruntime.HandleError(callErr)
+					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, err)
+					utilruntime.HandleError(err)
 					return
 				}
 
 				glog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
 				errCh <- apierrors.NewInternalError(err)
-				return
+			default:
+				glog.Warningf("Internal webhook calling error %q: %#v", hook.Name, err)
+				errCh <- apierrors.NewInternalError(err)
 			}
-
-			glog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
-			errCh <- err
 		}(relevantHooks[i])
 	}
 	wg.Wait()
 	close(errCh)
 
-	var errs []error
+	var errs []*apierrors.StatusError
 	for e := range errCh {
 		errs = append(errs, e)
 	}

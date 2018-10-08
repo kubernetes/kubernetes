@@ -92,5 +92,11 @@ func (a *Plugin) ValidateInitialization() error {
 
 // Admit makes an admission decision based on the request attributes.
 func (a *Plugin) Admit(attr admission.Attributes) error {
-	return a.Webhook.Dispatch(attr)
+	if !a.WaitForReady() {
+		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
+	}
+	if err := a.Webhook.Dispatch(attr); err != nil {
+		return err
+	}
+	return nil
 }

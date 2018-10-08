@@ -156,12 +156,9 @@ func (a *Webhook) ShouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) 
 }
 
 // Dispatch is called by the downstream Validate or Admit methods.
-func (a *Webhook) Dispatch(attr admission.Attributes) error {
+func (a *Webhook) Dispatch(attr admission.Attributes) *apierrors.StatusError {
 	if rules.IsWebhookConfigurationResource(attr) {
 		return nil
-	}
-	if !a.WaitForReady() {
-		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
 	hooks := a.hookSource.Webhooks()
 	ctx := context.TODO()
