@@ -57,14 +57,50 @@ func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
 
 func deconstify(e interface{}) *storeElement {
 	s := *(e.(*storeElement))
-	s.Object = constobj.DeconstifyForTest(s.Object)
+	//s.Object = constobj.DeconstifyForTest(s.Object)
 	return &s
+}
+
+func semanticDeepEqual(l interface{}, r interface{}) bool {
+	lc := *(l.(*storeElement))
+	rc := *(r.(*storeElement))
+
+	// Compare objects
+	if !apiequality.Semantic.DeepEqual(constobj.DeconstifyForTest(lc.Object), constobj.DeconstifyForTest(rc.Object)) {
+		return false
+	}
+
+	// Mask object and compare remaining fields
+	lc.Object = nil
+	rc.Object = nil
+	if !apiequality.Semantic.DeepEqual(lc, rc) {
+		return false
+	}
+
+	return true
+}
+
+func semanticDeepEqualMap(l, r map[string]storeElement) bool {
+	if len(l) != len(r) {
+		return false
+	}
+
+	for k, lv := range l {
+		rv, ok := r[k]
+		if !ok {
+			return false
+		}
+		if !semanticDeepEqual(&lv, &rv) {
+			return false
+		}
+	}
+	return true
 }
 
 func makeTestStoreElement(pod *v1.Pod) *storeElement {
 	return &storeElement{
 		Key:           "prefix/ns/" + pod.Name,
-		Object:        pod,
+		Object:        constobj.Constify(pod),
 		Labels:        labels.Set(pod.Labels),
 		Fields:        fields.Set{"spec.nodeName": pod.Spec.NodeName},
 		Uninitialized: false,
@@ -101,7 +137,7 @@ func TestWatchCacheBasic(t *testing.T) {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 1))
-		if !apiequality.Semantic.DeepEqual(expected, deconstify(item)) {
+		if !semanticDeepEqual(expected, item) {
 			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
@@ -113,7 +149,7 @@ func TestWatchCacheBasic(t *testing.T) {
 		t.Errorf("didn't find pod")
 	} else {
 		expected := makeTestStoreElement(makeTestPod("pod", 2))
-		if !apiequality.Semantic.DeepEqual(expected, deconstify(item)) {
+		if !semanticDeepEqual(expected, item) {
 			t.Errorf("expected %v, got %v", expected, item)
 		}
 	}
@@ -138,9 +174,9 @@ func TestWatchCacheBasic(t *testing.T) {
 		items := make(map[string]storeElement, 0)
 		for _, item := range store.List() {
 			elem := item.(*storeElement)
-			items[elem.Key] = *deconstify(elem)
+			items[elem.Key] = *elem
 		}
-		if !apiequality.Semantic.DeepEqual(expected, items) {
+		if !semanticDeepEqualMap(expected, items) {
 			t.Errorf("expected %v, got %v", expected, items)
 		}
 	}
@@ -158,9 +194,9 @@ func TestWatchCacheBasic(t *testing.T) {
 		items := make(map[string]storeElement)
 		for _, item := range store.List() {
 			elem := item.(*storeElement)
-			items[elem.Key] = *deconstify(elem)
+			items[elem.Key] = *elem
 		}
-		if !apiequality.Semantic.DeepEqual(expected, items) {
+		if !semanticDeepEqualMap(expected, items) {
 			t.Errorf("expected %v, got %v", expected, items)
 		}
 	}
@@ -362,7 +398,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 		t.Fatalf("no results returned: %#v", obj)
 	}
 	expected := makeTestStoreElement(makeTestPod("bar", 5))
-	if !apiequality.Semantic.DeepEqual(expected, deconstify(obj)) {
+	if !semanticDeepEqual(expected, obj) {
 		t.Errorf("expected %v, got %v", expected, obj)
 	}
 }

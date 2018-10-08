@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/constobj"
 )
 
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
@@ -47,8 +48,8 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 		count++
 	}
 	initEvents := []*watchCacheEvent{
-		{Object: &v1.Pod{}},
-		{Object: &v1.Pod{}},
+		{Object: constobj.Constify(&v1.Pod{})},
+		{Object: constobj.Constify(&v1.Pod{})},
 	}
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
@@ -78,23 +79,23 @@ func TestCacheWatcherHandlesFiltering(t *testing.T) {
 			events: []*watchCacheEvent{
 				{
 					Type:            watch.Added,
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
 					ObjFields:       fields.Set{"spec.nodeName": "host"},
 					ResourceVersion: 1,
 				},
 				{
 					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					PrevObject:      constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
 					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
 					ObjFields:       fields.Set{"spec.nodeName": ""},
 					ResourceVersion: 2,
 				},
 				{
 					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					PrevObject:      constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
 					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}}),
 					ObjFields:       fields.Set{"spec.nodeName": "host"},
 					ResourceVersion: 3,
 				},
@@ -110,47 +111,47 @@ func TestCacheWatcherHandlesFiltering(t *testing.T) {
 			events: []*watchCacheEvent{
 				{
 					Type:            watch.Added,
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
 					ObjFields:       fields.Set{"spec.nodeName": ""},
 					ResourceVersion: 1,
 				},
 				{
 					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}},
+					PrevObject:      constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}),
 					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
 					ObjFields:       fields.Set{"spec.nodeName": ""},
 					ResourceVersion: 2,
 				},
 				{
 					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}},
+					PrevObject:      constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}),
 					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}}),
 					ObjFields:       fields.Set{"spec.nodeName": "host"},
 					ResourceVersion: 3,
 				},
 				{
 					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}},
+					PrevObject:      constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "3"}}),
 					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}}),
 					ObjFields:       fields.Set{"spec.nodeName": "host"},
 					ResourceVersion: 4,
 				},
 				{
 					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}},
+					PrevObject:      constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "4"}}),
 					PrevObjFields:   fields.Set{"spec.nodeName": "host"},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}}),
 					ObjFields:       fields.Set{"spec.nodeName": ""},
 					ResourceVersion: 5,
 				},
 				{
 					Type:            watch.Modified,
-					PrevObject:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}},
+					PrevObject:      constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "5"}}),
 					PrevObjFields:   fields.Set{"spec.nodeName": ""},
-					Object:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "6"}},
+					Object:          constobj.Constify(&v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "6"}}),
 					ObjFields:       fields.Set{"spec.nodeName": ""},
 					ResourceVersion: 6,
 				},
@@ -174,6 +175,7 @@ TestCase:
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
 			e := <-ch
+			e.Object = constobj.DeconstifyForTest(e.Object)
 			if !reflect.DeepEqual(event, e) {
 				t.Errorf("%d: unexpected event %d: %s", i, j, diff.ObjectReflectDiff(event, e))
 				break TestCase

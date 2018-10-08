@@ -60,6 +60,12 @@ func (c *ConstObject) GetObjectKind() schema.ObjectKind {
 
 // DeepCopyObject implements runtime.Object
 func (c *ConstObject) DeepCopyObject() runtime.Object {
+	return c
+	//return c.inner.DeepCopyObject()
+}
+
+// DeconstDeepCopyObject returns a mutable object, by deep-copying the inner object.  Expensive!
+func (c *ConstObject) DeconstDeepCopyObject() runtime.Object {
 	return c.inner.DeepCopyObject()
 }
 
@@ -248,7 +254,7 @@ func (c *ConstObject) SetClusterName(clusterName string) {
 
 // Constify wraps the specific object in a ConstObject, which does not allow mutation
 // Note that the original object can still be mutated, so care should be taken that this does not happen!
-func Constify(o runtime.Object) runtime.Object {
+func Constify(o runtime.Object) *ConstObject {
 	if o == nil {
 		return nil
 	}
@@ -275,4 +281,11 @@ func DeconstifyForTest(obj runtime.Object) runtime.Object {
 		return co.inner
 	}
 	return obj
+}
+
+func (c *ConstObject) String() string {
+	if stringer, ok := c.inner.(fmt.Stringer); ok {
+		return "ConstObject[" + stringer.String() + "]"
+	}
+	return fmt.Sprintf("ConstObject[type %T]", c.inner)
 }

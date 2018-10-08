@@ -48,11 +48,11 @@ const (
 // upper layers.
 type watchCacheEvent struct {
 	Type                 watch.EventType
-	Object               runtime.Object
+	Object               *constobj.ConstObject
 	ObjLabels            labels.Set
 	ObjFields            fields.Set
 	ObjUninitialized     bool
-	PrevObject           runtime.Object
+	PrevObject           *constobj.ConstObject
 	PrevObjLabels        labels.Set
 	PrevObjFields        fields.Set
 	PrevObjUninitialized bool
@@ -68,7 +68,7 @@ type watchCacheEvent struct {
 type storeElement struct {
 	Key string
 	// TODO: Make it typed ConstObject (?)
-	Object        runtime.Object
+	Object        *constobj.ConstObject
 	Labels        labels.Set
 	Fields        fields.Set
 	Uninitialized bool
@@ -350,7 +350,9 @@ func (w *watchCache) Get(obj interface{}) (interface{}, bool, error) {
 		return nil, false, fmt.Errorf("couldn't compute key: %v", err)
 	}
 
-	return w.store.Get(&storeElement{Key: key, Object: object})
+	// TODO: Why doesn't this just call GetByKey??
+	// return w.store.Get(&storeElement{Key: key, Object: object})
+	return w.store.GetByKey(key)
 }
 
 // GetByKey returns pointer to <storeElement>.
