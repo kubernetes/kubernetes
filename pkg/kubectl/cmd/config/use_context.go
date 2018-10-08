@@ -45,12 +45,12 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: "use-context CONTEXT_NAME",
+		Use:                   "use-context CONTEXT_NAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Sets the current-context in a kubeconfig file"),
-		Aliases: []string{"use"},
-		Long:    `Sets the current-context in a kubeconfig file`,
-		Example: use_context_example,
+		Short:                 i18n.T("Sets the current-context in a kubeconfig file"),
+		Aliases:               []string{"use"},
+		Long:                  `Sets the current-context in a kubeconfig file`,
+		Example:               use_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())

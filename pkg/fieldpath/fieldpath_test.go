@@ -160,9 +160,9 @@ func TestExtractFieldPathAsString(t *testing.T) {
 			expectedMessageFragment: "invalid key subscript in metadata.labels",
 		},
 		{
-			name:      "invalid subscript",
-			fieldPath: "metadata.notexisting['something']",
-			obj:       &v1.Pod{},
+			name:                    "invalid subscript",
+			fieldPath:               "metadata.notexisting['something']",
+			obj:                     &v1.Pod{},
 			expectedMessageFragment: "fieldPath \"metadata.notexisting['something']\" does not support subscript",
 		},
 	}

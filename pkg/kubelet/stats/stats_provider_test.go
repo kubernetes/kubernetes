@@ -634,8 +634,9 @@ type fakeResourceAnalyzer struct {
 	podVolumeStats serverstats.PodVolumeStats
 }
 
-func (o *fakeResourceAnalyzer) Start()                              {}
-func (o *fakeResourceAnalyzer) Get(bool) (*statsapi.Summary, error) { return nil, nil }
+func (o *fakeResourceAnalyzer) Start()                                           {}
+func (o *fakeResourceAnalyzer) Get(bool) (*statsapi.Summary, error)              { return nil, nil }
+func (o *fakeResourceAnalyzer) GetCPUAndMemoryStats() (*statsapi.Summary, error) { return nil, nil }
 func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.PodVolumeStats, bool) {
 	return o.podVolumeStats, true
 }

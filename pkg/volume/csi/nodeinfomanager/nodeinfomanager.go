@@ -89,11 +89,16 @@ func (nim *nodeInfoManager) AddNodeInfo(driverName string, driverNodeID string, 
 
 	nodeUpdateFuncs := []nodeUpdateFunc{
 		updateNodeIDInNode(driverName, driverNodeID),
-		updateMaxAttachLimit(driverName, maxAttachLimit),
 	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		nodeUpdateFuncs = append(nodeUpdateFuncs, updateTopologyLabels(topology))
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
+		nodeUpdateFuncs = append(nodeUpdateFuncs, updateMaxAttachLimit(driverName, maxAttachLimit))
+	}
+
 	err := nim.updateNode(nodeUpdateFuncs...)
 	if err != nil {
 		return fmt.Errorf("error updating Node object with CSI driver node info: %v", err)

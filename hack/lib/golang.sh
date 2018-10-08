@@ -360,7 +360,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(go version)"
   local minimum_go_version
-  minimum_go_version=go1.10.2
+  minimum_go_version=go1.11.1
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -586,6 +586,7 @@ kube::golang::build_binaries_for_platform() {
       -installsuffix static
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
+      -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
     )
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
@@ -595,6 +596,7 @@ kube::golang::build_binaries_for_platform() {
     build_args=(
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
+      -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
@@ -608,6 +610,7 @@ kube::golang::build_binaries_for_platform() {
     go test -c \
       ${goflags:+"${goflags[@]}"} \
       -gcflags "${gogcflags:-}" \
+      -asmflags "${goasmflags:-}" \
       -ldflags "${goldflags:-}" \
       -o "${outfile}" \
       "${testpkg}"
@@ -661,10 +664,11 @@ kube::golang::build_binaries() {
     host_platform=$(kube::golang::host_platform)
 
     # Use eval to preserve embedded quoted strings.
-    local goflags goldflags gogcflags
+    local goflags goldflags goasmflags gogcflags
     eval "goflags=(${GOFLAGS:-})"
-    goldflags="${GOLDFLAGS:-} $(kube::version::ldflags)"
-    gogcflags="${GOGCFLAGS:-}"
+    goldflags="${GOLDFLAGS:-} -s -w $(kube::version::ldflags)"
+    goasmflags="-trimpath=${KUBE_ROOT}"
+    gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
     local -a targets=()
     local arg

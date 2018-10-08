@@ -11,7 +11,7 @@ go_test(
     srcs = ["proxy_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
         "//pkg/apis/core:go_default_library",

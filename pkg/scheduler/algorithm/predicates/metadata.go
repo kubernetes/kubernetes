@@ -17,6 +17,7 @@ limitations under the License.
 package predicates
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -143,10 +144,10 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		return nil
 	}
 	predicateMetadata := &predicateMetadata{
-		pod:           pod,
-		podBestEffort: isPodBestEffort(pod),
-		podRequest:    GetResourceRequest(pod),
-		podPorts:      schedutil.GetContainerPorts(pod),
+		pod:                                    pod,
+		podBestEffort:                          isPodBestEffort(pod),
+		podRequest:                             GetResourceRequest(pod),
+		podPorts:                               schedutil.GetContainerPorts(pod),
 		topologyPairsPotentialAffinityPods:     incomingPodAffinityMap,
 		topologyPairsPotentialAntiAffinityPods: incomingPodAntiAffinityMap,
 		topologyPairsAntiAffinityPodsMap:       existingPodAntiAffinityMap,
@@ -487,12 +488,12 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
-	workqueue.Parallelize(16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
 	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, firstError
 }
 
 // targetPodMatchesAffinityOfPod returns true if "targetPod" matches ALL affinity terms of
-// "pod". Similar to getPodsMatchingAffinity, this function does not check topology.
+// "pod". This function does not check topology.
 // So, whether the targetPod actually matches or not needs further checks for a specific
 // node.
 func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
@@ -509,7 +510,7 @@ func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
 }
 
 // targetPodMatchesAntiAffinityOfPod returns true if "targetPod" matches ANY anti-affinity
-// term of "pod". Similar to getPodsMatchingAffinity, this function does not check topology.
+// term of "pod". This function does not check topology.
 // So, whether the targetPod actually matches or not needs further checks for a specific
 // node.
 func targetPodMatchesAntiAffinityOfPod(pod, targetPod *v1.Pod) bool {

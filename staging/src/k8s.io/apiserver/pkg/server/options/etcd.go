@@ -60,7 +60,6 @@ type EtcdOptions struct {
 
 var storageTypes = sets.NewString(
 	storagebackend.StorageTypeUnset,
-	storagebackend.StorageTypeETCD2,
 	storagebackend.StorageTypeETCD3,
 )
 

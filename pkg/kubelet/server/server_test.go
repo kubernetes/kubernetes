@@ -51,6 +51,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+
 	// Do some initialization to decode the query parameters correctly.
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1166,7 +1167,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true)
+	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1332,7 +1333,7 @@ func testExecAttach(t *testing.T, verb string) {
 					return http.ErrUseLastResponse
 				}
 			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
+				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 
@@ -1429,7 +1430,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Post(url, "", nil)
@@ -1536,7 +1537,7 @@ func TestServePortForward(t *testing.T) {
 					return http.ErrUseLastResponse
 				}
 			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true)
+				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
 				c = &http.Client{Transport: upgradeRoundTripper}
 			}
 

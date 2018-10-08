@@ -52,7 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	utilexec "k8s.io/utils/exec"
@@ -1166,15 +1166,18 @@ func NewIngressTestJig(c clientset.Interface) *IngressTestJig {
 // If svcAnnotations is specified it will overwrite any annotations in svc.yaml
 func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[string]string, svcAnnotations map[string]string) {
 	var err error
-	mkpath := func(file string) string {
-		return filepath.Join(TestContext.RepoRoot, manifestPath, file)
+	read := func(file string) string {
+		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file), Fail))
+	}
+	exists := func(file string) bool {
+		return testfiles.Exists(filepath.Join(manifestPath, file), Fail)
 	}
 
 	j.Logger.Infof("creating replication controller")
-	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	RunKubectlOrDieInput(read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 
 	j.Logger.Infof("creating service")
-	RunKubectlOrDie("create", "-f", mkpath("svc.yaml"), fmt.Sprintf("--namespace=%v", ns))
+	RunKubectlOrDieInput(read("svc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 	if len(svcAnnotations) > 0 {
 		svcList, err := j.Client.CoreV1().Services(ns).List(metav1.ListOptions{})
 		ExpectNoError(err)
@@ -1185,9 +1188,9 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 		}
 	}
 
-	if exists, _ := utilfile.FileExists(mkpath("secret.yaml")); exists {
+	if exists("secret.yaml") {
 		j.Logger.Infof("creating secret")
-		RunKubectlOrDie("create", "-f", mkpath("secret.yaml"), fmt.Sprintf("--namespace=%v", ns))
+		RunKubectlOrDieInput(read("secret.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 	}
 	j.Logger.Infof("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
 
@@ -1608,11 +1611,11 @@ type NginxIngressController struct {
 
 // Init initializes the NginxIngressController
 func (cont *NginxIngressController) Init() {
-	mkpath := func(file string) string {
-		return filepath.Join(TestContext.RepoRoot, IngressManifestPath, "nginx", file)
+	read := func(file string) string {
+		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file), Fail))
 	}
 	Logf("initializing nginx ingress controller")
-	RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.Ns))
+	RunKubectlOrDieInput(read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))
 
 	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
 	ExpectNoError(err)

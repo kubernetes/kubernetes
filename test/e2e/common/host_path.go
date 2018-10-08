@@ -136,9 +136,12 @@ var _ = Describe("[sig-storage] HostPath", func() {
 
 		// Create the subPath directory on the host
 		existing := path.Join(source.Path, subPath)
-		externalIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
+		nodeIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
+		if err != nil {
+			nodeIP, err = framework.GetNodeInternalIP(&nodeList.Items[0])
+		}
 		framework.ExpectNoError(err)
-		result, err := framework.SSH(fmt.Sprintf("mkdir -p %s", existing), externalIP, framework.TestContext.Provider)
+		result, err := framework.SSH(fmt.Sprintf("mkdir -p %s", existing), nodeIP, framework.TestContext.Provider)
 		framework.LogSSHResult(result)
 		framework.ExpectNoError(err)
 		if result.Code != 0 {
@@ -182,9 +185,12 @@ var _ = Describe("[sig-storage] HostPath", func() {
 
 		// Create the subPath file on the host
 		existing := path.Join(source.Path, subPath)
-		externalIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
+		nodeIP, err := framework.GetNodeExternalIP(&nodeList.Items[0])
+		if err != nil {
+			nodeIP, err = framework.GetNodeInternalIP(&nodeList.Items[0])
+		}
 		framework.ExpectNoError(err)
-		result, err := framework.SSH(fmt.Sprintf("echo \"mount-tester new file\" > %s", existing), externalIP, framework.TestContext.Provider)
+		result, err := framework.SSH(fmt.Sprintf("echo \"mount-tester new file\" > %s", existing), nodeIP, framework.TestContext.Provider)
 		framework.LogSSHResult(result)
 		framework.ExpectNoError(err)
 		if result.Code != 0 {

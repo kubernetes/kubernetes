@@ -21,16 +21,16 @@ import (
 	"strings"
 	"testing"
 
-	api "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func encodeOrDie(obj runtime.Object) []byte {
-	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(api.SchemeGroupVersion), obj)
+	data, err := runtime.Encode(scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), obj)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -40,19 +40,19 @@ func encodeOrDie(obj runtime.Object) []byte {
 func TestSortingPrinter(t *testing.T) {
 	intPtr := func(val int32) *int32 { return &val }
 
-	a := &api.Pod{
+	a := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "a",
 		},
 	}
 
-	b := &api.Pod{
+	b := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "b",
 		},
 	}
 
-	c := &api.Pod{
+	c := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "c",
 		},
@@ -67,8 +67,8 @@ func TestSortingPrinter(t *testing.T) {
 	}{
 		{
 			name: "in-order-already",
-			obj: &api.PodList{
-				Items: []api.Pod{
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
@@ -86,8 +86,8 @@ func TestSortingPrinter(t *testing.T) {
 					},
 				},
 			},
-			sort: &api.PodList{
-				Items: []api.Pod{
+			sort: &corev1.PodList{
+				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
@@ -109,8 +109,8 @@ func TestSortingPrinter(t *testing.T) {
 		},
 		{
 			name: "reverse-order",
-			obj: &api.PodList{
-				Items: []api.Pod{
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "b",
@@ -128,8 +128,8 @@ func TestSortingPrinter(t *testing.T) {
 					},
 				},
 			},
-			sort: &api.PodList{
-				Items: []api.Pod{
+			sort: &corev1.PodList{
+				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "a",
@@ -151,8 +151,8 @@ func TestSortingPrinter(t *testing.T) {
 		},
 		{
 			name: "random-order-timestamp",
-			obj: &api.PodList{
-				Items: []api.Pod{
+			obj: &corev1.PodList{
+				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(300, 0),
@@ -170,8 +170,8 @@ func TestSortingPrinter(t *testing.T) {
 					},
 				},
 			},
-			sort: &api.PodList{
-				Items: []api.Pod{
+			sort: &corev1.PodList{
+				Items: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							CreationTimestamp: metav1.Unix(100, 0),
@@ -193,39 +193,39 @@ func TestSortingPrinter(t *testing.T) {
 		},
 		{
 			name: "random-order-numbers",
-			obj: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{
+			obj: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{
 					{
-						Spec: api.ReplicationControllerSpec{
+						Spec: corev1.ReplicationControllerSpec{
 							Replicas: intPtr(5),
 						},
 					},
 					{
-						Spec: api.ReplicationControllerSpec{
+						Spec: corev1.ReplicationControllerSpec{
 							Replicas: intPtr(1),
 						},
 					},
 					{
-						Spec: api.ReplicationControllerSpec{
+						Spec: corev1.ReplicationControllerSpec{
 							Replicas: intPtr(9),
 						},
 					},
 				},
 			},
-			sort: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{
+			sort: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{
 					{
-						Spec: api.ReplicationControllerSpec{
+						Spec: corev1.ReplicationControllerSpec{
 							Replicas: intPtr(1),
 						},
 					},
 					{
-						Spec: api.ReplicationControllerSpec{
+						Spec: corev1.ReplicationControllerSpec{
 							Replicas: intPtr(5),
 						},
 					},
 					{
-						Spec: api.ReplicationControllerSpec{
+						Spec: corev1.ReplicationControllerSpec{
 							Replicas: intPtr(9),
 						},
 					},
@@ -235,14 +235,14 @@ func TestSortingPrinter(t *testing.T) {
 		},
 		{
 			name: "v1.List in order",
-			obj: &api.List{
+			obj: &corev1.List{
 				Items: []runtime.RawExtension{
 					{Raw: encodeOrDie(a)},
 					{Raw: encodeOrDie(b)},
 					{Raw: encodeOrDie(c)},
 				},
 			},
-			sort: &api.List{
+			sort: &corev1.List{
 				Items: []runtime.RawExtension{
 					{Raw: encodeOrDie(a)},
 					{Raw: encodeOrDie(b)},
@@ -253,14 +253,14 @@ func TestSortingPrinter(t *testing.T) {
 		},
 		{
 			name: "v1.List in reverse",
-			obj: &api.List{
+			obj: &corev1.List{
 				Items: []runtime.RawExtension{
 					{Raw: encodeOrDie(c)},
 					{Raw: encodeOrDie(b)},
 					{Raw: encodeOrDie(a)},
 				},
 			},
-			sort: &api.List{
+			sort: &corev1.List{
 				Items: []runtime.RawExtension{
 					{Raw: encodeOrDie(a)},
 					{Raw: encodeOrDie(b)},
@@ -372,16 +372,16 @@ func TestSortingPrinter(t *testing.T) {
 		},
 		{
 			name: "model-invalid-fields",
-			obj: &api.ReplicationControllerList{
-				Items: []api.ReplicationController{
+			obj: &corev1.ReplicationControllerList{
+				Items: []corev1.ReplicationController{
 					{
-						Status: api.ReplicationControllerStatus{},
+						Status: corev1.ReplicationControllerStatus{},
 					},
 					{
-						Status: api.ReplicationControllerStatus{},
+						Status: corev1.ReplicationControllerStatus{},
 					},
 					{
-						Status: api.ReplicationControllerStatus{},
+						Status: corev1.ReplicationControllerStatus{},
 					},
 				},
 			},
@@ -391,7 +391,7 @@ func TestSortingPrinter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sort := &SortingPrinter{SortField: tt.field, Decoder: legacyscheme.Codecs.UniversalDecoder()}
+			sort := &SortingPrinter{SortField: tt.field, Decoder: scheme.Codecs.UniversalDecoder()}
 			err := sort.sortObj(tt.obj)
 			if err != nil {
 				if len(tt.expectedErr) > 0 {
@@ -415,8 +415,8 @@ func TestSortingPrinter(t *testing.T) {
 func TestRuntimeSortLess(t *testing.T) {
 	var testobj runtime.Object
 
-	testobj = &api.PodList{
-		Items: []api.Pod{
+	testobj = &corev1.PodList{
+		Items: []corev1.Pod{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "b",

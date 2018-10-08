@@ -78,7 +78,6 @@ func (k *KernelValidator) Validate(spec SysSpec) (error, error) {
 
 // validateKernelVersion validates the kernel version.
 func (k *KernelValidator) validateKernelVersion(kSpec KernelSpec) error {
-	glog.V(1).Info("Validating kernel version")
 	versionRegexps := kSpec.Versions
 	for _, versionRegexp := range versionRegexps {
 		r := regexp.MustCompile(versionRegexp)
@@ -93,7 +92,6 @@ func (k *KernelValidator) validateKernelVersion(kSpec KernelSpec) error {
 
 // validateKernelConfig validates the kernel configurations.
 func (k *KernelValidator) validateKernelConfig(kSpec KernelSpec) error {
-	glog.V(1).Info("Validating kernel config")
 	allConfig, err := k.getKernelConfig()
 	if err != nil {
 		return fmt.Errorf("failed to parse kernel config: %v", err)

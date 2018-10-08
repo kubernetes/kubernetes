@@ -106,6 +106,7 @@ type podRecord struct {
 
 type podRecords map[types.UID]*podRecord
 
+// NewGenericPLEG instantiates a new GenericPLEG object and return it.
 func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
@@ -118,7 +119,7 @@ func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
 	}
 }
 
-// Returns a channel from which the subscriber can receive PodLifecycleEvent
+// Watch returns a channel from which the subscriber can receive PodLifecycleEvent
 // events.
 // TODO: support multiple subscribers.
 func (g *GenericPLEG) Watch() chan *PodLifecycleEvent {
@@ -130,6 +131,8 @@ func (g *GenericPLEG) Start() {
 	go wait.Until(g.relist, g.relistPeriod, wait.NeverStop)
 }
 
+// Healthy check if PLEG work properly.
+// relistThreshold is the maximum interval between two relist.
 func (g *GenericPLEG) Healthy() (bool, error) {
 	relistTime := g.getRelistTime()
 	elapsed := g.clock.Since(relistTime)

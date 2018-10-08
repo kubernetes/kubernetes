@@ -135,7 +135,7 @@ func TestImpersonationRoundTripper(t *testing.T) {
 				},
 			},
 			expected: map[string][]string{
-				ImpersonateUserHeader:                                               {"user"},
+				ImpersonateUserHeader: {"user"},
 				ImpersonateUserExtraHeaderPrefix + `Test.example.com%2fthing.thing`: {"A", "a"},
 			},
 		},
@@ -219,11 +219,11 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 			username: "user",
 			groups:   []string{"groupA", "groupB"},
 			extra: map[string][]string{
-				"one": {"alpha", "bravo"},
+				"one":                     {"alpha", "bravo"},
 				"example.com/two%20three": {"charlie", "delta"},
 			},
 			expectedExtra: map[string][]string{
-				"one": {"alpha", "bravo"},
+				"one":                         {"alpha", "bravo"},
 				"example.com%2ftwo%2520three": {"charlie", "delta"},
 			},
 		},

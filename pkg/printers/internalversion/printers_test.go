@@ -1293,7 +1293,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Image: "foo/bar",
+									Image:                  "foo/bar",
 									TerminationMessagePath: api.TerminationMessagePathDefault,
 									ImagePullPolicy:        api.PullIfNotPresent,
 								},

@@ -28,7 +28,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
-// CombinedInsecureServingOptions sets up up to two insecure listeners for healthz and metrics. The flags
+// CombinedInsecureServingOptions sets up to two insecure listeners for healthz and metrics. The flags
 // override the ComponentConfig and DeprecatedInsecureServingOptions values for both.
 type CombinedInsecureServingOptions struct {
 	Healthz *apiserveroptions.DeprecatedInsecureServingOptions

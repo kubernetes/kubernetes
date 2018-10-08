@@ -118,8 +118,10 @@ func (plugin *vsphereVolumePlugin) newMounterInternal(spec *volume.Spec, podUID 
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
-		fsType:      fsType,
-		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		fsType:       fsType,
+		diskMounter:  util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mountOptions: util.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *vsphereVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager vdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -186,8 +188,9 @@ var _ volume.Mounter = &vsphereVolumeMounter{}
 
 type vsphereVolumeMounter struct {
 	*vsphereVolume
-	fsType      string
-	diskMounter *mount.SafeFormatAndMount
+	fsType       string
+	diskMounter  *mount.SafeFormatAndMount
+	mountOptions []string
 }
 
 func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
@@ -233,7 +236,8 @@ func (b *vsphereVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.volPath)
-	err = b.mounter.Mount(globalPDPath, dir, "", options)
+	mountOptions := util.JoinMountOptions(options, b.mountOptions)
+	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {

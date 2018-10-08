@@ -138,6 +138,8 @@ func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.GroupStra
 	switch opts.Rule {
 	case policy.FSGroupStrategyRunAsAny:
 		return group.NewRunAsAny()
+	case policy.FSGroupStrategyMayRunAs:
+		return group.NewMayRunAs(opts.Ranges)
 	case policy.FSGroupStrategyMustRunAs:
 		return group.NewMustRunAs(opts.Ranges)
 	default:
@@ -150,6 +152,8 @@ func createSupplementalGroupStrategy(opts *policy.SupplementalGroupsStrategyOpti
 	switch opts.Rule {
 	case policy.SupplementalGroupsStrategyRunAsAny:
 		return group.NewRunAsAny()
+	case policy.SupplementalGroupsStrategyMayRunAs:
+		return group.NewMayRunAs(opts.Ranges)
 	case policy.SupplementalGroupsStrategyMustRunAs:
 		return group.NewMustRunAs(opts.Ranges)
 	default:

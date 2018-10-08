@@ -14,7 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/nodeipam",
     deps = [
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
         "//pkg/controller/nodeipam/ipam/sync:go_default_library",
@@ -27,6 +26,7 @@ go_library(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )

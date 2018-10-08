@@ -50,10 +50,14 @@ import (
 )
 
 var (
+	// ErrCreateContainerConfig - failed to create container config
 	ErrCreateContainerConfig = errors.New("CreateContainerConfigError")
-	ErrCreateContainer       = errors.New("CreateContainerError")
-	ErrPreStartHook          = errors.New("PreStartHookError")
-	ErrPostStartHook         = errors.New("PostStartHookError")
+	// ErrCreateContainer - failed to create container
+	ErrCreateContainer = errors.New("CreateContainerError")
+	// ErrPreStartHook - failed to execute PreStartHook
+	ErrPreStartHook = errors.New("PreStartHookError")
+	// ErrPostStartHook - failed to execute PostStartHook
+	ErrPostStartHook = errors.New("PostStartHookError")
 )
 
 // recordContainerEvent should be used by the runtime manager for all container related events.
@@ -512,8 +516,8 @@ func (m *kubeGenericRuntimeManager) restoreSpecsFromContainerLabels(containerID 
 		},
 	}
 	container = &v1.Container{
-		Name:  l.ContainerName,
-		Ports: a.ContainerPorts,
+		Name:                   l.ContainerName,
+		Ports:                  a.ContainerPorts,
 		TerminationMessagePath: a.TerminationMessagePath,
 	}
 	if a.PreStopHandler != nil {

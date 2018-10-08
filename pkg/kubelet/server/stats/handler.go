@@ -192,10 +192,23 @@ func (h *handler) handleStats(request *restful.Request, response *restful.Respon
 }
 
 // Handles stats summary requests to /stats/summary
+// If "only_cpu_and_memory" GET param is true then only cpu and memory is returned in response.
 func (h *handler) handleSummary(request *restful.Request, response *restful.Response) {
-	// external calls to the summary API use cached stats
-	forceStatsUpdate := false
-	summary, err := h.summaryProvider.Get(forceStatsUpdate)
+	onlyCPUAndMemory := false
+	request.Request.ParseForm()
+	if onlyCluAndMemoryParam, found := request.Request.Form["only_cpu_and_memory"]; found &&
+		len(onlyCluAndMemoryParam) == 1 && onlyCluAndMemoryParam[0] == "true" {
+		onlyCPUAndMemory = true
+	}
+	var summary *statsapi.Summary
+	var err error
+	if onlyCPUAndMemory {
+		summary, err = h.summaryProvider.GetCPUAndMemoryStats()
+	} else {
+		// external calls to the summary API use cached stats
+		forceStatsUpdate := false
+		summary, err = h.summaryProvider.Get(forceStatsUpdate)
+	}
 	if err != nil {
 		handleError(response, "/stats/summary", err)
 	} else {
