@@ -459,14 +459,14 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	return false
 }
 
-func ProxyMode(f *Framework) (string, error) {
+func ProxyMode(f *Framework, hostNetwork bool) (string, error) {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "kube-proxy-mode-detector",
 			Namespace: f.Namespace.Name,
 		},
 		Spec: v1.PodSpec{
-			HostNetwork: true,
+			HostNetwork: hostNetwork,
 			Containers: []v1.Container{
 				{
 					Name:    "detector",
@@ -3409,8 +3409,8 @@ func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
 	return nil
 }
 
-// NewHostExecPodSpec returns the pod spec of hostexec pod
-func NewHostExecPodSpec(ns, name string) *v1.Pod {
+// NewExecPodSpec returns the pod spec of hostexec pod
+func NewExecPodSpec(ns, name string, hostNetwork bool) *v1.Pod {
 	immediate := int64(0)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3425,7 +3425,7 @@ func NewHostExecPodSpec(ns, name string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
-			HostNetwork:                   true,
+			HostNetwork:                   hostNetwork,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &immediate,
 		},
@@ -3467,8 +3467,8 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 
 // LaunchHostExecPod launches a hostexec pod in the given namespace and waits
 // until it's Running
-func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
-	hostExecPod := NewHostExecPodSpec(ns, name)
+func LaunchHostExecPod(client clientset.Interface, ns, name string, hostNetwork bool) *v1.Pod {
+	hostExecPod := NewExecPodSpec(ns, name, hostNetwork)
 	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
 	ExpectNoError(err)
 	err = WaitForPodRunningInNamespace(client, pod)

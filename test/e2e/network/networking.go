@@ -87,7 +87,7 @@ var _ = SIGDescribe("Networking", func() {
 	It("should check kube-proxy urls", func() {
 		// TODO: this is overkill we just need the host networking pod
 		// to hit kube-proxy urls.
-		config := framework.NewNetworkingTestConfig(f)
+		config := framework.NewNetworkingTestConfig(f, true)
 
 		By("checking kube-proxy URLs")
 		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "200 OK")
@@ -101,7 +101,7 @@ var _ = SIGDescribe("Networking", func() {
 	Describe("Granular Checks: Services [Slow]", func() {
 
 		It("should function for pod-Service: http", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
 			config.DialFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -110,7 +110,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for pod-Service: udp", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterUdpPort))
 			config.DialFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -119,7 +119,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for node-Service: http", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, framework.ClusterHttpPort))
 			config.DialFromNode("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -128,7 +128,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for node-Service: udp", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (config.clusterIP)", config.NodeIP, config.ClusterIP, framework.ClusterUdpPort))
 			config.DialFromNode("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -137,7 +137,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for endpoint-Service: http", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(http) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, framework.ClusterHttpPort))
 			config.DialFromEndpointContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -146,7 +146,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for endpoint-Service: udp", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(udp) %v (endpoint) --> %v:%v (config.clusterIP)", config.EndpointPods[0].Name, config.ClusterIP, framework.ClusterUdpPort))
 			config.DialFromEndpointContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -155,7 +155,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should update endpoints: http", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
 			config.DialFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -166,7 +166,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should update endpoints: udp", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterUdpPort))
 			config.DialFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -178,7 +178,7 @@ var _ = SIGDescribe("Networking", func() {
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
 		It("should update nodePort: http [Slow]", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(http) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeHttpPort))
 			config.DialFromNode("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -190,7 +190,7 @@ var _ = SIGDescribe("Networking", func() {
 
 		// Slow because we confirm that the nodePort doesn't serve traffic, which requires a period of polling.
 		It("should update nodePort: udp [Slow]", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(udp) %v (node) --> %v:%v (nodeIP)", config.NodeIP, config.NodeIP, config.NodeUdpPort))
 			config.DialFromNode("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 
@@ -201,7 +201,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for client IP based session affinity: http", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterHttpPort))
 
 			// Check if number of endpoints returned are exactly one.
@@ -218,7 +218,7 @@ var _ = SIGDescribe("Networking", func() {
 		})
 
 		It("should function for client IP based session affinity: udp", func() {
-			config := framework.NewNetworkingTestConfig(f)
+			config := framework.NewNetworkingTestConfig(f, false)
 			By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterUdpPort))
 
 			// Check if number of endpoints returned are exactly one.
