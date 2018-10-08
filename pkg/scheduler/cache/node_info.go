@@ -36,6 +36,14 @@ var (
 	generation    int64
 )
 
+// ImageStateSummary provides summarized information about the state of an image.
+type ImageStateSummary struct {
+	// Size of the image
+	Size int64
+	// Used to track how many nodes have this image
+	NumNodes int
+}
+
 // NodeInfo is node level aggregated information.
 type NodeInfo struct {
 	// Overall node information.
@@ -66,7 +74,7 @@ type NodeInfo struct {
 	// TransientInfo holds the information pertaining to a scheduling cycle. This will be destructed at the end of
 	// scheduling cycle.
 	// TODO: @ravig. Remove this once we have a clear approach for message passing across predicates and priorities.
-	TransientInfo *transientSchedulerInfo
+	TransientInfo *TransientSchedulerInfo
 
 	// Cached conditions of node for faster lookup.
 	memoryPressureCondition v1.ConditionStatus
@@ -99,28 +107,28 @@ type nodeTransientInfo struct {
 	RequestedVolumes int
 }
 
-// transientSchedulerInfo is a transient structure which is destructed at the end of each scheduling cycle.
+// TransientSchedulerInfo is a transient structure which is destructed at the end of each scheduling cycle.
 // It consists of items that are valid for a scheduling cycle and is used for message passing across predicates and
 // priorities. Some examples which could be used as fields are number of volumes being used on node, current utilization
 // on node etc.
 // IMPORTANT NOTE: Make sure that each field in this structure is documented along with usage. Expand this structure
 // only when absolutely needed as this data structure will be created and destroyed during every scheduling cycle.
-type transientSchedulerInfo struct {
+type TransientSchedulerInfo struct {
 	TransientLock sync.Mutex
 	// NodeTransInfo holds the information related to nodeTransientInformation. NodeName is the key here.
 	TransNodeInfo nodeTransientInfo
 }
 
-// newTransientSchedulerInfo returns a new scheduler transient structure with initialized values.
-func newTransientSchedulerInfo() *transientSchedulerInfo {
-	tsi := &transientSchedulerInfo{
+// NewTransientSchedulerInfo returns a new scheduler transient structure with initialized values.
+func NewTransientSchedulerInfo() *TransientSchedulerInfo {
+	tsi := &TransientSchedulerInfo{
 		TransNodeInfo: initializeNodeTransientInfo(),
 	}
 	return tsi
 }
 
-// resetTransientSchedulerInfo resets the transientSchedulerInfo.
-func (transientSchedInfo *transientSchedulerInfo) resetTransientSchedulerInfo() {
+// ResetTransientSchedulerInfo resets the TransientSchedulerInfo.
+func (transientSchedInfo *TransientSchedulerInfo) ResetTransientSchedulerInfo() {
 	transientSchedInfo.TransientLock.Lock()
 	defer transientSchedInfo.TransientLock.Unlock()
 	// Reset TransientNodeInfo.
@@ -259,7 +267,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		requestedResource:   &Resource{},
 		nonzeroRequest:      &Resource{},
 		allocatableResource: &Resource{},
-		TransientInfo:       newTransientSchedulerInfo(),
+		TransientInfo:       NewTransientSchedulerInfo(),
 		generation:          nextGeneration(),
 		usedPorts:           make(util.HostPortInfo),
 		imageStates:         make(map[string]*ImageStateSummary),
@@ -286,6 +294,11 @@ func (n *NodeInfo) Pods() []*v1.Pod {
 	return n.pods
 }
 
+// SetPods sets all pods scheduled (including assumed to be) on this node.
+func (n *NodeInfo) SetPods(pods []*v1.Pod) {
+	n.pods = pods
+}
+
 // UsedPorts returns used ports on this node.
 func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 	if n == nil {
@@ -294,12 +307,22 @@ func (n *NodeInfo) UsedPorts() util.HostPortInfo {
 	return n.usedPorts
 }
 
+// SetUsedPorts sets the used ports on this node.
+func (n *NodeInfo) SetUsedPorts(newUsedPorts util.HostPortInfo) {
+	n.usedPorts = newUsedPorts
+}
+
 // ImageStates returns the state information of all images.
 func (n *NodeInfo) ImageStates() map[string]*ImageStateSummary {
 	if n == nil {
 		return nil
 	}
 	return n.imageStates
+}
+
+// SetImageStates sets the state information of all images.
+func (n *NodeInfo) SetImageStates(newImageStates map[string]*ImageStateSummary) {
+	n.imageStates = newImageStates
 }
 
 // PodsWithAffinity return all pods with (anti)affinity constraints on this node.
@@ -324,6 +347,11 @@ func (n *NodeInfo) Taints() ([]v1.Taint, error) {
 		return nil, nil
 	}
 	return n.taints, n.taintsErr
+}
+
+// SetTaints sets the taints list on this node.
+func (n *NodeInfo) SetTaints(newTaints []v1.Taint) {
+	n.taints = newTaints
 }
 
 // MemoryPressureCondition returns the memory pressure condition status on this node.
@@ -358,12 +386,22 @@ func (n *NodeInfo) RequestedResource() Resource {
 	return *n.requestedResource
 }
 
+// SetRequestedResource sets the aggregated resource request of pods on this node.
+func (n *NodeInfo) SetRequestedResource(newResource *Resource) {
+	n.requestedResource = newResource
+}
+
 // NonZeroRequest returns aggregated nonzero resource request of pods on this node.
 func (n *NodeInfo) NonZeroRequest() Resource {
 	if n == nil {
 		return emptyResource
 	}
 	return *n.nonzeroRequest
+}
+
+// SetNonZeroRequest sets the aggregated nonzero resource request of pods on this node.
+func (n *NodeInfo) SetNonZeroRequest(newResource *Resource) {
+	n.nonzeroRequest = newResource
 }
 
 // AllocatableResource returns allocatable resources on a given node.
@@ -378,6 +416,19 @@ func (n *NodeInfo) AllocatableResource() Resource {
 func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
 	n.allocatableResource = allocatableResource
 	n.generation = nextGeneration()
+}
+
+// GetGeneration returns the generation on this node.
+func (n *NodeInfo) GetGeneration() int64 {
+	if n == nil {
+		return 0
+	}
+	return n.generation
+}
+
+// SetGeneration sets the generation on this node. This is for testing only.
+func (n *NodeInfo) SetGeneration(newGeneration int64) {
+	n.generation = newGeneration
 }
 
 // Clone returns a copy of this node.
@@ -464,20 +515,20 @@ func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	}
 
 	// Consume ports when pods added.
-	n.updateUsedPorts(pod, true)
+	n.UpdateUsedPorts(pod, true)
 
 	n.generation = nextGeneration()
 }
 
 // RemovePod subtracts pod information from this NodeInfo.
 func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
-	k1, err := getPodKey(pod)
+	k1, err := GetPodKey(pod)
 	if err != nil {
 		return err
 	}
 
 	for i := range n.podsWithAffinity {
-		k2, err := getPodKey(n.podsWithAffinity[i])
+		k2, err := GetPodKey(n.podsWithAffinity[i])
 		if err != nil {
 			glog.Errorf("Cannot get pod key, err: %v", err)
 			continue
@@ -490,7 +541,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 		}
 	}
 	for i := range n.pods {
-		k2, err := getPodKey(n.pods[i])
+		k2, err := GetPodKey(n.pods[i])
 		if err != nil {
 			glog.Errorf("Cannot get pod key, err: %v", err)
 			continue
@@ -515,7 +566,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.nonzeroRequest.Memory -= non0Mem
 
 			// Release ports when remove Pods.
-			n.updateUsedPorts(pod, false)
+			n.UpdateUsedPorts(pod, false)
 
 			n.generation = nextGeneration()
 
@@ -539,7 +590,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	return
 }
 
-func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
+// UpdateUsedPorts updates the UsedPorts of NodeInfo.
+func (n *NodeInfo) UpdateUsedPorts(pod *v1.Pod, add bool) {
 	for j := range pod.Spec.Containers {
 		container := &pod.Spec.Containers[j]
 		for k := range container.Ports {
@@ -573,7 +625,7 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			// We ignore other conditions.
 		}
 	}
-	n.TransientInfo = newTransientSchedulerInfo()
+	n.TransientInfo = NewTransientSchedulerInfo()
 	n.generation = nextGeneration()
 	return nil
 }
@@ -614,9 +666,9 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-		podKey, _ := getPodKey(p)
+		podKey, _ := GetPodKey(p)
 		for _, np := range n.Pods() {
-			npodkey, _ := getPodKey(np)
+			npodkey, _ := GetPodKey(np)
 			if npodkey == podKey {
 				filtered = append(filtered, p)
 				break
@@ -626,8 +678,8 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 	return filtered
 }
 
-// getPodKey returns the string key of a pod.
-func getPodKey(pod *v1.Pod) (string, error) {
+// GetPodKey returns the string key of a pod.
+func GetPodKey(pod *v1.Pod) (string, error) {
 	uid := string(pod.UID)
 	if len(uid) == 0 {
 		return "", errors.New("Cannot get cache key for pod with empty UID")

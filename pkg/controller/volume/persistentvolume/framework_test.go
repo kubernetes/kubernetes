@@ -1222,6 +1222,9 @@ func (plugin *mockVolumePlugin) Provision(selectedNode *v1.Node, allowedTopologi
 					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{},
 				},
 			},
+			Status: v1.PersistentVolumeStatus{
+				Phase: v1.VolumeAvailable,
+			},
 		}
 	}
 

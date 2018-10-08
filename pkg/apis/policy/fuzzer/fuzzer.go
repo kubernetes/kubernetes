@@ -48,12 +48,14 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 
 			supplementalGroupsRules := []policy.SupplementalGroupsStrategyType{
 				policy.SupplementalGroupsStrategyRunAsAny,
+				policy.SupplementalGroupsStrategyMayRunAs,
 				policy.SupplementalGroupsStrategyMustRunAs,
 			}
 			psp.SupplementalGroups.Rule = supplementalGroupsRules[c.Rand.Intn(len(supplementalGroupsRules))]
 
 			fsGroupRules := []policy.FSGroupStrategyType{
 				policy.FSGroupStrategyMustRunAs,
+				policy.FSGroupStrategyMayRunAs,
 				policy.FSGroupStrategyRunAsAny,
 			}
 			psp.FSGroup.Rule = fsGroupRules[c.Rand.Intn(len(fsGroupRules))]

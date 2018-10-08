@@ -37,6 +37,9 @@ const (
 
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
 func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
+	if cfg.ClusterConfiguration.Etcd.External != nil {
+		return fmt.Errorf("etcd static pod manifest cannot be generated for cluster using external etcd")
+	}
 	glog.V(1).Infoln("creating local etcd static pod manifest file")
 	// gets etcd StaticPodSpec, actualized for the current InitConfiguration
 	spec := GetEtcdPodSpec(cfg)

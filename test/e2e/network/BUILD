@@ -33,7 +33,6 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
         "//pkg/controller/endpoint:go_default_library",
@@ -61,6 +60,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/network/scale:go_default_library",
         "//test/images/net/nat:go_default_library",

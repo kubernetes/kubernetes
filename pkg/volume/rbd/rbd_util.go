@@ -417,7 +417,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			if err == wait.ErrWaitTimeout {
 				return "", fmt.Errorf("rbd image %s/%s is still being used", b.Pool, b.Image)
 			}
-			// Return error if any other errors were encountered during wating for the image to become available.
+			// Return error if any other errors were encountered during waiting for the image to become available.
 			if err != nil {
 				return "", err
 			}

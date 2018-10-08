@@ -23,7 +23,7 @@ install -m 755 -d %{buildroot}%{_bindir}
 install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/
 install -m 755 -d %{buildroot}%{_sysconfdir}/kubernetes/manifests/
 install -p -m 755 -t %{buildroot}%{_bindir} {kubelet}
-install -p -m 755 -t %{buildroot}%{_sysconfdir}/systemd/system/ {kubelet.service}
+install -p -m 644 -t %{buildroot}%{_sysconfdir}/systemd/system/ {kubelet.service}
 
 %files
 %{_bindir}/kubelet

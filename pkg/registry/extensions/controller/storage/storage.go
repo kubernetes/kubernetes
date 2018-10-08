@@ -46,7 +46,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) ContainerStorage {
 
 	return ContainerStorage{
 		ReplicationController: &RcREST{},
-		Scale: &ScaleREST{store: controllerREST.Store},
+		Scale:                 &ScaleREST{store: controllerREST.Store},
 	}
 }
 

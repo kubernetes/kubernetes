@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
-	//"k8s.io/kubernetes/pkg/util/version"
+	//"k8s.io/apimachinery/pkg/util/version"
 )
 
 // failedCreatePrepuller is a fake prepuller that errors for kube-controller-manager in the CreateFunc call

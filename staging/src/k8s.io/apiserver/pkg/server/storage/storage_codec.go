@@ -24,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-
-	"github.com/golang/glog"
 )
 
 // StorageCodecConfig are the arguments passed to newStorageCodecFn
@@ -48,22 +46,12 @@ func NewStorageCodec(opts StorageCodecConfig) (runtime.Codec, error) {
 		return nil, fmt.Errorf("%q is not a valid mime-type", opts.StorageMediaType)
 	}
 
-	if opts.Config.Type == storagebackend.StorageTypeETCD2 && mediaType != "application/json" {
-		glog.Warningf(`storage type %q does not support media type %q, using "application/json"`, storagebackend.StorageTypeETCD2, mediaType)
-		mediaType = "application/json"
-	}
-
 	serializer, ok := runtime.SerializerInfoForMediaType(opts.StorageSerializer.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, fmt.Errorf("unable to find serializer for %q", mediaType)
 	}
 
 	s := serializer.Serializer
-
-	// make sure the selected encoder supports string data
-	if !serializer.EncodesAsText && opts.Config.Type == storagebackend.StorageTypeETCD2 {
-		return nil, fmt.Errorf("storage type %q does not support binary media type %q", storagebackend.StorageTypeETCD2, mediaType)
-	}
 
 	// Give callers the opportunity to wrap encoders and decoders.  For decoders, each returned decoder will
 	// be passed to the recognizer so that multiple decoders are available.

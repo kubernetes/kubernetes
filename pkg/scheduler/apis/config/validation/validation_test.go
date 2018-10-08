@@ -58,7 +58,8 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 				RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
-		BindTimeoutSeconds: &testTimeout,
+		BindTimeoutSeconds:       &testTimeout,
+		PercentageOfNodesToScore: 35,
 	}
 
 	HardPodAffinitySymmetricWeightGt100 := validConfig.DeepCopy()
@@ -91,6 +92,9 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 
 	bindTimeoutUnset := validConfig.DeepCopy()
 	bindTimeoutUnset.BindTimeoutSeconds = nil
+
+	percentageOfNodesToScore101 := validConfig.DeepCopy()
+	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -135,6 +139,10 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"bind-timeout-unset": {
 			expectedToFail: true,
 			config:         bindTimeoutUnset,
+		},
+		"bad-percentage-of-nodes-to-score": {
+			expectedToFail: true,
+			config:         percentageOfNodesToScore101,
 		},
 	}
 

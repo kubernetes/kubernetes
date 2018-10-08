@@ -1,7 +1,7 @@
 apiEndpoint:
   advertiseAddress: 192.168.2.2
   bindPort: 6443
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 bootstrapTokens:
 - groups:
   - system:bootstrappers:kubeadm:default-node-token
@@ -18,7 +18,7 @@ nodeRegistration:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
 ---
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 auditPolicy:
   logDir: /var/log/kubernetes/audit
   logMaxAge: 2
@@ -32,7 +32,7 @@ etcd:
     image: ""
 imageRepository: my-company.com
 kind: ClusterConfiguration
-kubernetesVersion: v1.11.2
+kubernetesVersion: v1.12.0
 networking:
   dnsDomain: cluster.global
   podSubnet: 10.148.0.0/16

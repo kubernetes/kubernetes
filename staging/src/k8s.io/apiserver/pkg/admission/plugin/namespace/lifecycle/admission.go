@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	// Name of admission plug-in
+	// PluginName indicates the name of admission plug-in
 	PluginName = "NamespaceLifecycle"
 	// how long a namespace stays in the force live lookup cache before expiration.
 	forceLiveLookupTTL = 30 * time.Second
@@ -72,6 +72,7 @@ type Lifecycle struct {
 var _ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
 var _ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
 
+// Admit makes an admission decision based on the request attributes
 func (l *Lifecycle) Admit(a admission.Attributes) error {
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() && l.immortalNamespaces.Has(a.GetName()) {

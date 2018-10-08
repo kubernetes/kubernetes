@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -55,8 +55,8 @@ func assertDirEmpty(t *testing.T, path string) {
 
 func TestNewReset(t *testing.T) {
 	var in io.Reader
-	certsDir := kubeadmapiv1alpha3.DefaultCertificatesDir
-	criSocketPath := kubeadmapiv1alpha3.DefaultCRISocket
+	certsDir := kubeadmapiv1beta1.DefaultCertificatesDir
+	criSocketPath := kubeadmapiv1beta1.DefaultCRISocket
 	forceReset := true
 
 	ignorePreflightErrors := []string{"all"}

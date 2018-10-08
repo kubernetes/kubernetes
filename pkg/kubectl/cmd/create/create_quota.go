@@ -49,7 +49,7 @@ func NewCmdCreateQuota(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 	}
 
 	cmd := &cobra.Command{
-		Use: "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
+		Use:                   "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"resourcequota"},
 		Short:                 i18n.T("Create a quota with the specified name."),

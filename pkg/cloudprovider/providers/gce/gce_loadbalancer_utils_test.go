@@ -23,9 +23,7 @@ package gce
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -35,12 +33,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
@@ -53,26 +48,6 @@ const (
 	wrongTier               = "SupremeLuxury"
 	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""
 )
-
-type TestClusterValues struct {
-	ProjectID         string
-	Region            string
-	ZoneName          string
-	SecondaryZoneName string
-	ClusterID         string
-	ClusterName       string
-}
-
-func DefaultTestClusterValues() TestClusterValues {
-	return TestClusterValues{
-		ProjectID:         "test-project",
-		Region:            "us-central1",
-		ZoneName:          "us-central1-b",
-		SecondaryZoneName: "us-central1-c",
-		ClusterID:         "test-cluster-id",
-		ClusterName:       "Test Cluster Name",
-	}
-}
 
 func fakeLoadbalancerService(lbType string) *v1.Service {
 	return &v1.Service{
@@ -91,73 +66,6 @@ func fakeLoadbalancerService(lbType string) *v1.Service {
 var (
 	FilewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 )
-
-type fakeRoundTripper struct{}
-
-func (*fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, fmt.Errorf("err: test used fake http client")
-}
-
-func fakeGCECloud(vals TestClusterValues) (*GCECloud, error) {
-	client := &http.Client{Transport: &fakeRoundTripper{}}
-
-	service, err := compute.New(client)
-	if err != nil {
-		return nil, err
-	}
-
-	// Used in disk unit tests
-	fakeManager := newFakeManager(vals.ProjectID, vals.Region)
-	zonesWithNodes := createNodeZones([]string{vals.ZoneName})
-
-	alphaFeatureGate := NewAlphaFeatureGate([]string{})
-	if err != nil {
-		return nil, err
-	}
-
-	gce := &GCECloud{
-		region:             vals.Region,
-		service:            service,
-		manager:            fakeManager,
-		managedZones:       []string{vals.ZoneName},
-		projectID:          vals.ProjectID,
-		networkProjectID:   vals.ProjectID,
-		AlphaFeatureGate:   alphaFeatureGate,
-		nodeZones:          zonesWithNodes,
-		nodeInformerSynced: func() bool { return true },
-		ClusterID:          fakeClusterID(vals.ClusterID),
-	}
-
-	c := cloud.NewMockGCE(&gceProjectRouter{gce})
-	c.MockTargetPools.AddInstanceHook = mock.AddInstanceHook
-	c.MockTargetPools.RemoveInstanceHook = mock.RemoveInstanceHook
-	c.MockForwardingRules.InsertHook = mock.InsertFwdRuleHook
-	c.MockAddresses.InsertHook = mock.InsertAddressHook
-	c.MockAlphaAddresses.InsertHook = mock.InsertAlphaAddressHook
-	c.MockAlphaAddresses.X = mock.AddressAttributes{}
-	c.MockAddresses.X = mock.AddressAttributes{}
-
-	c.MockInstanceGroups.X = mock.InstanceGroupAttributes{
-		InstanceMap: make(map[meta.Key]map[string]*compute.InstanceWithNamedPorts),
-		Lock:        &sync.Mutex{},
-	}
-	c.MockInstanceGroups.AddInstancesHook = mock.AddInstancesHook
-	c.MockInstanceGroups.RemoveInstancesHook = mock.RemoveInstancesHook
-	c.MockInstanceGroups.ListInstancesHook = mock.ListInstancesHook
-
-	c.MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
-	c.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
-	c.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
-
-	keyGA := meta.GlobalKey("key-ga")
-	c.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
-		Obj: &compute.Zone{Name: vals.ZoneName, Region: gce.getRegionLink(vals.Region)},
-	}
-
-	gce.c = c
-
-	return gce, nil
-}
 
 func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([]*v1.Node, error) {
 	nodes := []*v1.Node{}
@@ -206,17 +114,6 @@ func createAndInsertNodes(gce *GCECloud, nodeNames []string, zoneName string) ([
 	}
 
 	return nodes, nil
-}
-
-// Stubs ClusterID so that ClusterID.getOrInitialize() does not require calling
-// gce.Initialize()
-func fakeClusterID(clusterID string) ClusterID {
-	return ClusterID{
-		clusterID: &clusterID,
-		store: cache.NewStore(func(obj interface{}) (string, error) {
-			return "", nil
-		}),
-	}
 }
 
 func assertExternalLbResources(t *testing.T, gce *GCECloud, apiService *v1.Service, vals TestClusterValues, nodeNames []string) {

@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 )
@@ -150,7 +150,7 @@ func (t *TokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, e
 	}, true, nil
 }
 
-// Copied from k8s.io/client-go/tools/bootstrap/token/api
+// Copied from k8s.io/cluster-bootstrap/token/api
 func getSecretString(secret *api.Secret, key string) string {
 	data, ok := secret.Data[key]
 	if !ok {
@@ -160,7 +160,7 @@ func getSecretString(secret *api.Secret, key string) string {
 	return string(data)
 }
 
-// Copied from k8s.io/client-go/tools/bootstrap/token/api
+// Copied from k8s.io/cluster-bootstrap/token/api
 func isSecretExpired(secret *api.Secret) bool {
 	expiration := getSecretString(secret, bootstrapapi.BootstrapTokenExpirationKey)
 	if len(expiration) > 0 {

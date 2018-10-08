@@ -640,6 +640,7 @@ items:
   - apiGroups:
     - ""
     resources:
+    - configmaps
     - endpoints
     - namespaces
     - secrets

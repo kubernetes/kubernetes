@@ -627,6 +627,14 @@
 			"Rev": "de0752318171da717af4ce24d0a2e8626afaeb11"
 		},
 		{
+			"ImportPath": "golang.org/x/crypto/cryptobyte",
+			"Rev": "de0752318171da717af4ce24d0a2e8626afaeb11"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/cryptobyte/asn1",
+			"Rev": "de0752318171da717af4ce24d0a2e8626afaeb11"
+		},
+		{
 			"ImportPath": "golang.org/x/crypto/ed25519",
 			"Rev": "de0752318171da717af4ce24d0a2e8626afaeb11"
 		},

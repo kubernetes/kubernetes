@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -55,11 +54,10 @@ type csiTestDriver interface {
 
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
 	"hostPath": initCSIHostpath,
-	// Feature tag to skip test in CI, pending fix of #62237
-	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
+	"gcePD":    initCSIgcePD,
 }
 
-var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
+var _ = utils.SIGDescribe("CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (
@@ -89,15 +87,11 @@ var _ = utils.SIGDescribe("[Serial] CSI Volumes", func() {
 		createCSICRDs(crdclient)
 	})
 
-	AfterEach(func() {
-		deleteCSICRDs(crdclient)
-	})
-
 	for driverName, initCSIDriver := range csiTestDrivers {
 		curDriverName := driverName
 		curInitCSIDriver := initCSIDriver
 
-		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s [Serial]", curDriverName), func() {
+		Context(fmt.Sprintf("CSI plugin test using CSI driver: %s", curDriverName), func() {
 			var (
 				driver csiTestDriver
 			)
@@ -229,7 +223,7 @@ func createCSIDriver(csics csiclient.Interface, attachable bool) *csiv1alpha1.CS
 }
 
 func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) string {
-	// re-get the claim to the the latest state with bound volume
+	// re-get the claim to the latest state with bound volume
 	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.ExpectNoError(err, "Cannot get PVC")
@@ -335,6 +329,8 @@ func (h *hostpathCSIDriver) createCSIDriver() {
 	config := h.config
 	h.serviceAccount = csiServiceAccount(cs, config, "hostpath", false)
 	csiClusterRoleBindings(cs, config, false, h.serviceAccount, h.combinedClusterRoleNames)
+	role := csiControllerRole(cs, config, false)
+	csiControllerRoleBinding(cs, config, false, role, h.serviceAccount)
 	csiHostPathPod(cs, config, false, f, h.serviceAccount)
 }
 
@@ -345,6 +341,8 @@ func (h *hostpathCSIDriver) cleanupCSIDriver() {
 	config := h.config
 	csiHostPathPod(cs, config, true, f, h.serviceAccount)
 	csiClusterRoleBindings(cs, config, true, h.serviceAccount, h.combinedClusterRoleNames)
+	role := csiControllerRole(cs, config, true)
+	csiControllerRoleBinding(cs, config, true, role, h.serviceAccount)
 	csiServiceAccount(cs, config, "hostpath", true)
 }
 
@@ -361,9 +359,11 @@ type gcePDCSIDriver struct {
 func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
 	cs := f.ClientSet
 	framework.SkipUnlessProviderIs("gce", "gke")
-	// Currently you will need to manually add the required GCP Credentials as a secret "cloud-sa"
-	// kubectl create generic cloud-sa --from-file=PATH/TO/cloud-sa.json --namespace={{config.Namespace}}
-	// TODO(#62561): Inject the necessary credentials automatically to the driver containers in e2e test
+	framework.SkipIfMultizone(cs)
+
+	// TODO(#62561): Use credentials through external pod identity when that goes GA instead of downloading keys.
+	createGCESecrets(cs, config)
+
 	framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
 
 	return &gcePDCSIDriver{
@@ -380,13 +380,10 @@ func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csi
 }
 
 func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
-	nodeZone, ok := node.GetLabels()[kubeletapis.LabelZoneFailureDomain]
-	Expect(ok).To(BeTrue(), "Could not get label %v from node %v", kubeletapis.LabelZoneFailureDomain, node.GetName())
-
 	return storageClassTest{
-		name:         "csi-gce-pd",
-		provisioner:  "csi-gce-pd",
-		parameters:   map[string]string{"type": "pd-standard", "zone": nodeZone},
+		name:         "com.google.csi.gcepd",
+		provisioner:  "com.google.csi.gcepd",
+		parameters:   map[string]string{"type": "pd-standard"},
 		claimSize:    "5Gi",
 		expectedSize: "5Gi",
 		nodeName:     node.Name,
@@ -402,6 +399,10 @@ func (g *gcePDCSIDriver) createCSIDriver() {
 	g.nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false /* teardown */)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, false, /* teardown */
+		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
+	role := csiControllerRole(cs, config, false)
+	csiControllerRoleBinding(cs, config, false, role, g.controllerServiceAccount)
 	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 }
 
@@ -413,6 +414,10 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, true, /* teardown */
+		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
+	role := csiControllerRole(cs, config, true)
+	csiControllerRoleBinding(cs, config, true, role, g.controllerServiceAccount)
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
 	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
 }
