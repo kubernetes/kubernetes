@@ -174,7 +174,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 func TestEmptyPluginDir(t *testing.T) {
 	// Arrange
 	fs := utilfs.NewFakeFs()
-	watcher := NewFakeWatcher()
+	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -268,7 +268,7 @@ func TestProberMultipleEvents(t *testing.T) {
 
 func TestProberError(t *testing.T) {
 	fs := utilfs.NewFakeFs()
-	watcher := NewFakeWatcher()
+	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,
@@ -296,7 +296,7 @@ func initTestEnvironment(t *testing.T) (
 	watcher *fakeWatcher,
 	prober volume.DynamicPluginProber) {
 	fs = utilfs.NewFakeFs()
-	watcher = NewFakeWatcher()
+	watcher = newFakeWatcher()
 	prober = &flexVolumeProber{
 		pluginDir: pluginDir,
 		watcher:   watcher,

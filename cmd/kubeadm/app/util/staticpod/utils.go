@@ -67,6 +67,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 			Containers:        []v1.Container{container},
 			PriorityClassName: "system-cluster-critical",
 			HostNetwork:       true,
+			DNSPolicy:         v1.DNSClusterFirstWithHostNet,
 			Volumes:           VolumeMapToSlice(volumes),
 		},
 	}

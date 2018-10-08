@@ -576,7 +576,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		return true
 	}
 	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
-	// Check if the node already exsits
+	// Check if the node already exists
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	if found {
 		// this marks the node as having been observed via an informer event

@@ -130,7 +130,7 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 			},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					"foo": "bar",
+					"foo":                                "bar",
 					kubeadmconstants.LabelNodeRoleMaster: "",
 				},
 			},

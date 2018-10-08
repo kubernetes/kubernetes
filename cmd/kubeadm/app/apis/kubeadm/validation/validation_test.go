@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -109,15 +109,15 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		criSocket      string
 		expectedErrors bool
 	}{
-		{"", "/some/path", true},                                                              // node name can't be empty
-		{"INVALID-NODENAME", "/some/path", true},                                              // Upper cases is invalid
-		{"invalid-nodename-", "/some/path", true},                                             // Can't have trailing dashes
-		{"invalid-node?name", "/some/path", true},                                             // Unsupported characters
-		{"valid-nodename", "/some/path", false},                                               // supported
-		{"valid-nodename-with-numbers01234", "/some/path/with/numbers/01234/", false},         // supported, with numbers as well
-		{"valid-nodename", kubeadmapiv1alpha3.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
-		{"valid-nodename", "bla:///some/path", true},                                          // unsupported url scheme
-		{"valid-nodename", ":::", true},                                                       // unparseable url
+		{"", "/some/path", true},                                                             // node name can't be empty
+		{"INVALID-NODENAME", "/some/path", true},                                             // Upper cases is invalid
+		{"invalid-nodename-", "/some/path", true},                                            // Can't have trailing dashes
+		{"invalid-node?name", "/some/path", true},                                            // Unsupported characters
+		{"valid-nodename", "/some/path", false},                                              // supported
+		{"valid-nodename-with-numbers01234", "/some/path/with/numbers/01234/", false},        // supported, with numbers as well
+		{"valid-nodename", kubeadmapiv1beta1.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
+		{"valid-nodename", "bla:///some/path", true},                                         // unsupported url scheme
+		{"valid-nodename", ":::", true},                                                      // unparseable url
 	}
 	for _, rt := range tests {
 		nro := kubeadm.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: rt.criSocket}
@@ -448,9 +448,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 							},
 							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								Max:        utilpointer.Int32Ptr(2),
-								MaxPerCore: utilpointer.Int32Ptr(1),
-								Min:        utilpointer.Int32Ptr(1),
+								Max:                   utilpointer.Int32Ptr(2),
+								MaxPerCore:            utilpointer.Int32Ptr(1),
+								Min:                   utilpointer.Int32Ptr(1),
 								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 							},
@@ -495,9 +495,9 @@ func TestValidateInitConfiguration(t *testing.T) {
 								MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 							},
 							Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-								Max:        utilpointer.Int32Ptr(2),
-								MaxPerCore: utilpointer.Int32Ptr(1),
-								Min:        utilpointer.Int32Ptr(1),
+								Max:                   utilpointer.Int32Ptr(2),
+								MaxPerCore:            utilpointer.Int32Ptr(1),
+								Min:                   utilpointer.Int32Ptr(1),
 								TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 								TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 							},

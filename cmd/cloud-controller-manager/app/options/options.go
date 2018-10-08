@@ -51,6 +51,8 @@ import (
 const (
 	// CloudControllerManagerUserAgent is the userAgent name when starting cloud-controller managers.
 	CloudControllerManagerUserAgent = "cloud-controller-manager"
+	// DefaultInsecureCloudControllerManagerPort is the default insecure cloud-controller manager port.
+	DefaultInsecureCloudControllerManagerPort = 0
 )
 
 // CloudControllerManagerOptions is the main context object for the controller manager.
@@ -74,7 +76,7 @@ type CloudControllerManagerOptions struct {
 
 // NewCloudControllerManagerOptions creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) {
-	componentConfig, err := NewDefaultComponentConfig(ports.InsecureCloudControllerManagerPort)
+	componentConfig, err := NewDefaultComponentConfig(DefaultInsecureCloudControllerManagerPort)
 	if err != nil {
 		return nil, err
 	}

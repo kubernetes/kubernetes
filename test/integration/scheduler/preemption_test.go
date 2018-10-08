@@ -842,8 +842,8 @@ func TestPDBInPreemption(t *testing.T) {
 				t.Fatalf("Failed to create PDB: %v", err)
 			}
 		}
-		// Wait for PDBs to show up in the scheduler's cache and become stable.
-		if err := waitCachedPDBsStable(context, test.pdbs, test.pdbPodNum); err != nil {
+		// Wait for PDBs to become stable.
+		if err := waitForPDBsStable(context, test.pdbs, test.pdbPodNum); err != nil {
 			t.Fatalf("Not all pdbs are stable in the cache: %v", err)
 		}
 

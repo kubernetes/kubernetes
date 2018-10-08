@@ -24,9 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -39,7 +37,7 @@ func TestCreateClusterRole(t *testing.T) {
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{}
-	tf.ClientConfigVal = defaultClientConfig()
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 
 	tests := map[string]struct {
 		verbs               string
@@ -512,16 +510,5 @@ func TestClusterRoleValidate(t *testing.T) {
 				t.Errorf("%s: unexpected error: %v", name, err)
 			}
 		})
-	}
-}
-
-func defaultClientConfig() *restclient.Config {
-	return &restclient.Config{
-		APIPath: "/api",
-		ContentConfig: restclient.ContentConfig{
-			NegotiatedSerializer: scheme.Codecs,
-			ContentType:          runtime.ContentTypeJSON,
-			GroupVersion:         &schema.GroupVersion{Version: "v1"},
-		},
 	}
 }

@@ -766,7 +766,7 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 	for _, mountOption := range systemOptions {
 		allMountOptions.Insert(mountOption)
 	}
-	return allMountOptions.UnsortedList()
+	return allMountOptions.List()
 }
 
 // ValidateZone returns:

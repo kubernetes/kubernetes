@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -91,7 +91,7 @@ func NewCmdPreFlightMaster(cfgPath *string, ignorePreflightErrors *[]string) *co
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(*ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
-			cfg := &kubeadmapiv1alpha3.InitConfiguration{}
+			cfg := &kubeadmapiv1beta1.InitConfiguration{}
 			kubeadmscheme.Scheme.Default(cfg)
 
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
@@ -125,7 +125,7 @@ func NewCmdPreFlightNode(cfgPath *string, ignorePreflightErrors *[]string) *cobr
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(*ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
-			cfg := &kubeadmapiv1alpha3.JoinConfiguration{}
+			cfg := &kubeadmapiv1beta1.JoinConfiguration{}
 			kubeadmscheme.Scheme.Default(cfg)
 
 			internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)

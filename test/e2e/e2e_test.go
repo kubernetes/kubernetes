@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/generated"
 
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
@@ -42,6 +44,21 @@ import (
 
 func init() {
 	framework.ViperizeFlags()
+
+	// TODO: Deprecating repo-root over time... instead just use gobindata_util.go , see #23987.
+	// Right now it is still needed, for example by
+	// test/e2e/framework/ingress/ingress_utils.go
+	// for providing the optional secret.yaml file and by
+	// test/e2e/framework/util.go for cluster/log-dump.
+	if framework.TestContext.RepoRoot != "" {
+		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
+	}
+
+	// Enable bindata file lookup as fallback.
+	testfiles.AddFileSource(testfiles.BindataFileSource{
+		Asset:      generated.Asset,
+		AssetNames: generated.AssetNames,
+	})
 }
 
 func TestE2E(t *testing.T) {

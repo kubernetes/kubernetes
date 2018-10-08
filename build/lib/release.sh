@@ -355,8 +355,16 @@ function kube::release::create_docker_images_for_server() {
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
         ln "${binary_dir}/${binary_name}" "${docker_build_path}/${binary_name}"
-        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > "${docker_file_path}"
-
+        ln "${KUBE_ROOT}/build/nsswitch.conf" "${docker_build_path}/nsswitch.conf"
+        chmod 0644 "${docker_build_path}/nsswitch.conf"
+        cat <<EOF > "${docker_file_path}"
+FROM ${base_image}
+COPY ${binary_name} /usr/local/bin/${binary_name}
+EOF
+        # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
+        if [[ "${base_image}" =~ busybox ]]; then
+          echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
+        fi
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
         "${DOCKER[@]}" tag "${docker_image_tag}" "${deprecated_image_tag}" >/dev/null
         "${DOCKER[@]}" save "${docker_image_tag}" "${deprecated_image_tag}" > "${binary_dir}/${binary_name}.tar"
@@ -409,7 +417,6 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/cluster-autoscaler.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd.manifest" "${dst_dir}"
   cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
-  cp "${src_dir}/kms-plugin-container.manifest" "${dst_dir}"
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"

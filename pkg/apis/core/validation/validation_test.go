@@ -10285,14 +10285,14 @@ func TestValidateNode(t *testing.T) {
 		for i := range errs {
 			field := errs[i].Field
 			expectedFields := map[string]bool{
-				"metadata.name":                                                                                               true,
-				"metadata.labels":                                                                                             true,
-				"metadata.annotations":                                                                                        true,
-				"metadata.namespace":                                                                                          true,
-				"spec.externalID":                                                                                             true,
-				"spec.taints[0].key":                                                                                          true,
-				"spec.taints[0].value":                                                                                        true,
-				"spec.taints[0].effect":                                                                                       true,
+				"metadata.name":         true,
+				"metadata.labels":       true,
+				"metadata.annotations":  true,
+				"metadata.namespace":    true,
+				"spec.externalID":       true,
+				"spec.taints[0].key":    true,
+				"spec.taints[0].value":  true,
+				"spec.taints[0].effect": true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature":                          true,
 				"metadata.annotations.scheduler.alpha.kubernetes.io/preferAvoidPods[0].PodSignature.PodController.Controller": true,
 			}
@@ -12235,7 +12235,7 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 		secret core.Secret
 		valid  bool
 	}{
-		"valid": {validBasicAuthSecret(), true},
+		"valid":                         {validBasicAuthSecret(), true},
 		"missing username and password": {missingBasicAuthUsernamePasswordKeys, false},
 	}
 
@@ -12965,11 +12965,12 @@ func newNodeNameEndpoint(nodeName string) *core.Endpoints {
 func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
 	oldEndpoint := newNodeNameEndpoint("kubernetes-node-setup-by-backend")
 	updatedEndpoint := newNodeNameEndpoint("kubernetes-changed-nodename")
-	// Check that NodeName cannot be changed during update (if already set)
+	// Check that NodeName can be changed during update, this is to accommodate the case where nodeIP or PodCIDR is reused.
+	// The same ip will now have a different nodeName.
 	errList := ValidateEndpoints(updatedEndpoint)
 	errList = append(errList, ValidateEndpointsUpdate(updatedEndpoint, oldEndpoint)...)
-	if len(errList) == 0 {
-		t.Error("Endpoint should not allow changing of Subset.Addresses.NodeName on update")
+	if len(errList) != 0 {
+		t.Error("Endpoint should allow changing of Subset.Addresses.NodeName on update")
 	}
 }
 

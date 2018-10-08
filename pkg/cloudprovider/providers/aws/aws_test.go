@@ -1123,7 +1123,7 @@ func TestGetLoadBalancerAdditionalTags(t *testing.T) {
 		{
 			Annotations: map[string]string{
 				ServiceAnnotationLoadBalancerAdditionalTags: "Key1=, Key2=Val2",
-				"anotherKey":                                "anotherValue",
+				"anotherKey": "anotherValue",
 			},
 			Tags: map[string]string{
 				"Key1": "",
@@ -1194,6 +1194,38 @@ func TestLBExtraSecurityGroupsAnnotation(t *testing.T) {
 			extraSGs := sgList[1:]
 			assert.True(t, sets.NewString(test.expectedSGs...).Equal(sets.NewString(extraSGs...)),
 				"Security Groups expected=%q , returned=%q", test.expectedSGs, extraSGs)
+		})
+	}
+}
+
+func TestLBSecurityGroupsAnnotation(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterId)
+	c, _ := newAWSCloud(CloudConfig{}, awsServices)
+
+	sg1 := map[string]string{ServiceAnnotationLoadBalancerSecurityGroups: "sg-000001"}
+	sg2 := map[string]string{ServiceAnnotationLoadBalancerSecurityGroups: "sg-000002"}
+	sg3 := map[string]string{ServiceAnnotationLoadBalancerSecurityGroups: "sg-000001, sg-000002"}
+
+	tests := []struct {
+		name string
+
+		annotations map[string]string
+		expectedSGs []string
+	}{
+		{"SG specified", sg1, []string{sg1[ServiceAnnotationLoadBalancerSecurityGroups]}},
+		{"Multiple SGs specified", sg3, []string{sg1[ServiceAnnotationLoadBalancerSecurityGroups], sg2[ServiceAnnotationLoadBalancerSecurityGroups]}},
+	}
+
+	awsServices.ec2.(*MockedFakeEC2).expectDescribeSecurityGroups(TestClusterId, "k8s-elb-aid", "cluster.test")
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			serviceName := types.NamespacedName{Namespace: "default", Name: "myservice"}
+
+			sgList, err := c.buildELBSecurityGroupList(serviceName, "aid", test.annotations)
+			assert.NoError(t, err, "buildELBSecurityGroupList failed")
+			assert.True(t, sets.NewString(test.expectedSGs...).Equal(sets.NewString(sgList...)),
+				"Security Groups expected=%q , returned=%q", test.expectedSGs, sgList)
 		})
 	}
 }
