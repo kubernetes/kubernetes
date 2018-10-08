@@ -36,11 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	// kubectl should not be taking dependencies on logic in the controllers
@@ -185,7 +185,7 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 
 func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toRevision int64) (string, error) {
 	externalDeployment := &appsv1.Deployment{}
-	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
+	if err := scheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
 		return "", fmt.Errorf("failed to convert deployment, %v", err)
 	}
 
@@ -382,7 +382,7 @@ func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations 
 	return rollbackSuccess, nil
 }
 
-var appsCodec = legacyscheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
+var appsCodec = scheme.Codecs.LegacyCodec(appsv1.SchemeGroupVersion)
 
 // applyRevision returns a new StatefulSet constructed by restoring the state in revision to set. If the returned error
 // is nil, the returned StatefulSet is valid.
