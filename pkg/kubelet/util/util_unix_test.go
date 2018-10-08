@@ -1,5 +1,7 @@
+// +build freebsd linux darwin
+
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,6 +40,11 @@ func TestParseEndpoint(t *testing.T) {
 			endpoint:         "tcp://localhost:15880",
 			expectedProtocol: "tcp",
 			expectedAddr:     "localhost:15880",
+		},
+		{
+			endpoint:         "npipe://./pipe/mypipe",
+			expectedProtocol: "npipe",
+			expectError:      true,
 		},
 		{
 			endpoint:         "tcp1://abc",
