@@ -46,6 +46,17 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
+const (
+	// A hook specified in storage class to indicate it's provisioning
+	// is expected to fail.
+	ExpectProvisionFailureKey = "expect-provision-failure"
+	// The node is marked as uncertain. The attach operation will fail and return timeout error
+	// but the operation is actually succeeded.
+	UncertainAttachNode = "uncertain-attach-node"
+	// The node is marked as multi-attach which means it is allowed to attach the volume to multiple nodes.
+	MultiAttachNode = "multi-attach-node"
+)
+
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
 	rootDir    string
@@ -264,10 +275,15 @@ var _ VolumePluginWithAttachLimits = &FakeVolumePlugin{}
 var _ DeviceMountableVolumePlugin = &FakeVolumePlugin{}
 
 func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
+	volumeList := *list
+	if list != nil && len(volumeList) > 0 {
+		return volumeList[0]
+	}
 	volume := &FakeVolume{
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
 	}
+	volume.VolumesAttached = make(map[string]types.NodeName)
 	*list = append(*list, volume)
 	return volume
 }
@@ -320,6 +336,8 @@ func (plugin *FakeVolumePlugin) NewMounter(spec *Spec, pod *v1.Pod, opts VolumeO
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.Mounters)
+	volume.Lock()
+	defer volume.Unlock()
 	volume.PodUID = pod.UID
 	volume.VolName = spec.Name()
 	volume.Plugin = plugin
@@ -337,6 +355,8 @@ func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.Unmounters)
+	volume.Lock()
+	defer volume.Unlock()
 	volume.PodUID = podUID
 	volume.VolName = volName
 	volume.Plugin = plugin
@@ -355,6 +375,8 @@ func (plugin *FakeVolumePlugin) NewBlockVolumeMapper(spec *Spec, pod *v1.Pod, op
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.BlockVolumeMappers)
+	volume.Lock()
+	defer volume.Unlock()
 	if pod != nil {
 		volume.PodUID = pod.UID
 	}
@@ -375,6 +397,8 @@ func (plugin *FakeVolumePlugin) NewBlockVolumeUnmapper(volName string, podUID ty
 	plugin.Lock()
 	defer plugin.Unlock()
 	volume := plugin.getFakeVolume(&plugin.BlockVolumeUnmappers)
+	volume.Lock()
+	defer volume.Unlock()
 	volume.PodUID = podUID
 	volume.VolName = volName
 	volume.Plugin = plugin
@@ -415,7 +439,16 @@ func (plugin *FakeVolumePlugin) NewDetacher() (Detacher, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
-	return plugin.getFakeVolume(&plugin.Detachers), nil
+	detacher := plugin.getFakeVolume(&plugin.Detachers)
+	attacherList := plugin.Attachers
+	if attacherList != nil && len(attacherList) > 0 {
+		detacherList := plugin.Detachers
+		if detacherList != nil && len(detacherList) > 0 {
+			detacherList[0].VolumesAttached = attacherList[0].VolumesAttached
+		}
+
+	}
+	return detacher, nil
 }
 
 func (plugin *FakeVolumePlugin) NewDeviceUnmounter() (DeviceUnmounter, error) {
@@ -632,6 +665,7 @@ type FakeVolume struct {
 	VolName string
 	Plugin  *FakeVolumePlugin
 	MetricsNil
+	VolumesAttached map[string]types.NodeName
 
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
@@ -650,6 +684,20 @@ type FakeVolume struct {
 	MapDeviceCallCount          int
 	GlobalMapPathCallCount      int
 	PodDeviceMapPathCallCount   int
+}
+
+func getUniqueVolumeName(spec *Spec) (string, error) {
+	var volumeName string
+	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
+		volumeName = spec.Volume.GCEPersistentDisk.PDName
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
+		volumeName = spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	}
+	if volumeName == "" {
+		volumeName = spec.Name()
+	}
+	return volumeName, nil
 }
 
 func (_ *FakeVolume) GetAttributes() Attributes {
@@ -797,6 +845,25 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 	fv.Lock()
 	defer fv.Unlock()
 	fv.AttachCallCount++
+	volumeName, err := getUniqueVolumeName(spec)
+	if err != nil {
+		return "", err
+	}
+	volumeNode, exist := fv.VolumesAttached[volumeName]
+	if exist {
+		if nodeName == UncertainAttachNode {
+			return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+		}
+		if volumeNode == nodeName || volumeNode == MultiAttachNode || nodeName == MultiAttachNode {
+			return "/dev/vdb-test", nil
+		}
+		return "", fmt.Errorf("volume %q trying to attach to node %q is already attached to node %q", volumeName, nodeName, volumeNode)
+	}
+
+	fv.VolumesAttached[volumeName] = nodeName
+	if nodeName == UncertainAttachNode {
+		return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+	}
 	return "/dev/vdb-test", nil
 }
 
@@ -846,6 +913,10 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.DetachCallCount++
+	if _, exist := fv.VolumesAttached[volumeName]; !exist {
+		return fmt.Errorf("Trying to detach volume %q that is not attached to the node %q", volumeName, nodeName)
+	}
+	delete(fv.VolumesAttached, volumeName)
 	return nil
 }
 
@@ -1006,7 +1077,7 @@ func VerifyAttachCallCount(
 	fakeVolumePlugin *FakeVolumePlugin) error {
 	for _, attacher := range fakeVolumePlugin.GetAttachers() {
 		actualCallCount := attacher.GetAttachCallCount()
-		if actualCallCount == expectedAttachCallCount {
+		if actualCallCount >= expectedAttachCallCount {
 			return nil
 		}
 	}
@@ -1039,7 +1110,7 @@ func VerifyWaitForAttachCallCount(
 	fakeVolumePlugin *FakeVolumePlugin) error {
 	for _, attacher := range fakeVolumePlugin.GetAttachers() {
 		actualCallCount := attacher.GetWaitForAttachCallCount()
-		if actualCallCount == expectedWaitForAttachCallCount {
+		if actualCallCount >= expectedWaitForAttachCallCount {
 			return nil
 		}
 	}
@@ -1072,7 +1143,7 @@ func VerifyMountDeviceCallCount(
 	fakeVolumePlugin *FakeVolumePlugin) error {
 	for _, attacher := range fakeVolumePlugin.GetAttachers() {
 		actualCallCount := attacher.GetMountDeviceCallCount()
-		if actualCallCount == expectedMountDeviceCallCount {
+		if actualCallCount >= expectedMountDeviceCallCount {
 			return nil
 		}
 	}
