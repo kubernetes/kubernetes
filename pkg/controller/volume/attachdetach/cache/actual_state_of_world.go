@@ -47,8 +47,10 @@ type ActualStateOfWorld interface {
 	// operationexecutor to interact with it.
 	operationexecutor.ActualStateOfWorldAttacherUpdater
 
-	// AddVolumeNode adds the given volume and node to the underlying store
-	// indicating the specified volume is attached to the specified node.
+	// AddVolumeNode adds the given volume and node to the underlying store.
+	// If attached is set to true, it indicates the specified volume is already
+	// attached to the specified node. If attached set to false, it means that
+	// the volume is not confirmed to be attached to the node yet.
 	// A unique volume name is generated from the volumeSpec and returned on
 	// success.
 	// If volumeSpec is not an attachable volume plugin, an error is returned.
@@ -332,7 +334,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 			nodeName)
 	}
 	volumeObj.nodesAttachedTo[nodeName] = node
-	
+
 	if isAttached {
 		asw.addVolumeToReportAsAttached(volumeName, nodeName)
 	}
