@@ -43,7 +43,7 @@ type ThreadSafeStore interface {
 	ListKeys() []string
 	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
-	IndexKeys(indexName, indexKey string) ([]string, error)
+	GetIndexedObjectsKeys(indexName, indexKey string) ([]string, error)
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
 	GetIndexers() Indexers
@@ -185,9 +185,9 @@ func (c *threadSafeMap) ByIndex(indexName, indexKey string) ([]interface{}, erro
 	return list, nil
 }
 
-// IndexKeys returns a list of keys that match on the index function.
-// IndexKeys is thread-safe so long as you treat all items as immutable.
-func (c *threadSafeMap) IndexKeys(indexName, indexKey string) ([]string, error) {
+// GetIndexedObjectsKeys returns a list of keys that match on the index function.
+// GetIndexedObjectsKeys is thread-safe so long as you treat all items as immutable.
+func (c *threadSafeMap) GetIndexedObjectsKeys(indexName, indexKey string) ([]string, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 

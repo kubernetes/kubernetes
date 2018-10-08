@@ -121,7 +121,7 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 	if c.indexer == nil {
 		return nil, fmt.Errorf("no indexer has been provided to the mutation cache")
 	}
-	keys, err := c.indexer.IndexKeys(name, indexKey)
+	keys, err := c.indexer.GetIndexedObjectsKeys(name, indexKey)
 	if err != nil {
 		return nil, err
 	}
