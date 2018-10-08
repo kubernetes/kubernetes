@@ -110,7 +110,7 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
 		for _, attachedVolume := range node.Status.VolumesAttached {
-			found := adc.actualStateOfWorld.VolumeNodeExists(attachedVolume.Name, nodeName)
+			found := adc.actualStateOfWorld.IsVolumeAttachedToNode(attachedVolume.Name, nodeName)
 			if !found {
 				t.Fatalf("Run failed with error. Node %s, volume %s not found", nodeName, attachedVolume.Name)
 			}
@@ -278,7 +278,7 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		var detachedVolumesNum int = 0
 
 		time.Sleep(time.Second * 1) // Wait for a second
-		for _, volumeList := range testPlugin.GetAttachedVolumes() {
+		for _, volumeList := range testPlugin.GetAllVolumes() {
 			attachedVolumesNum += len(volumeList)
 		}
 		for _, volumeList := range testPlugin.GetDetachedVolumes() {

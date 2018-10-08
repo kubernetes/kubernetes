@@ -183,7 +183,7 @@ func (collector *attachDetachStateCollector) getTotalVolumesCount() volumeCount 
 			stateVolumeMap.add("desired_state_of_world", pluginName)
 		}
 	}
-	for _, v := range collector.asw.GetAttachedVolumes() {
+	for _, v := range collector.asw.GetAllVolumes() {
 		if plugin, err := collector.volumePluginMgr.FindPluginBySpec(v.VolumeSpec); err == nil {
 			pluginName := pluginNameNotAvailable
 			if plugin != nil {

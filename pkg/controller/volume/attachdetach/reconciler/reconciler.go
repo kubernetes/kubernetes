@@ -175,16 +175,15 @@ func (rc *reconciler) reconcile() {
 	// pods that are rescheduled to a different node are detached first.
 
 	// Ensure volumes that should be detached are detached.
-	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
+	for _, attachedVolume := range rc.actualStateOfWorld.GetAllVolumes() {
 		if !rc.desiredStateOfWorld.VolumeExists(
 			attachedVolume.VolumeName, attachedVolume.NodeName) {
-
 			// Don't even try to start an operation if there is already one running
 			// This check must be done before we do any other checks, as otherwise the other checks
 			// may pass while at the same time the volume leaves the pending state, resulting in
 			// double detach attempts
 			if rc.attacherDetacher.IsOperationPending(attachedVolume.VolumeName, "") {
-				glog.V(10).Infof("Operation for volume %q is already running. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+				glog.V(2).Infof("Operation for volume %q is already running. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 				continue
 			}
 
@@ -198,7 +197,7 @@ func (rc *reconciler) reconcile() {
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
 			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
 			if attachedVolume.MountedByNode && !timeout {
-				glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted", ""))
+				glog.V(2).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted", ""))
 				continue
 			}
 
@@ -253,7 +252,7 @@ func (rc *reconciler) reconcile() {
 func (rc *reconciler) attachDesiredVolumes() {
 	// Ensure volumes that should be attached are attached.
 	for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
-		if rc.actualStateOfWorld.VolumeNodeExists(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
+		if rc.actualStateOfWorld.IsVolumeAttachedToNode(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
 			// Volume/Node exists, touch it to reset detachRequestedTime
 			if glog.V(5) {
 				glog.Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
