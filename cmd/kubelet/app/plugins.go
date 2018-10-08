@@ -25,12 +25,12 @@ import (
 	_ "k8s.io/kubernetes/pkg/credentialprovider/rancher"
 	"k8s.io/utils/exec"
 	// Volume plugins
+	"k8s.io/cloud-provider-openstack/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cephfs"
-	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"

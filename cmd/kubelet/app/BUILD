@@ -71,7 +71,6 @@ go_library(
         "//pkg/volume/azure_dd:go_default_library",
         "//pkg/volume/azure_file:go_default_library",
         "//pkg/volume/cephfs:go_default_library",
-        "//pkg/volume/cinder:go_default_library",
         "//pkg/volume/configmap:go_default_library",
         "//pkg/volume/csi:go_default_library",
         "//pkg/volume/downwardapi:go_default_library",
@@ -126,6 +125,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/cloud-provider-openstack/pkg/volume/cinder:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [

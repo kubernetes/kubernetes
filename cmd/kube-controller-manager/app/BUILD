@@ -86,7 +86,6 @@ go_library(
         "//pkg/volume/awsebs:go_default_library",
         "//pkg/volume/azure_dd:go_default_library",
         "//pkg/volume/azure_file:go_default_library",
-        "//pkg/volume/cinder:go_default_library",
         "//pkg/volume/csi:go_default_library",
         "//pkg/volume/fc:go_default_library",
         "//pkg/volume/flexvolume:go_default_library",
@@ -133,6 +132,7 @@ go_library(
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/cloud-provider-openstack/pkg/volume/cinder:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
