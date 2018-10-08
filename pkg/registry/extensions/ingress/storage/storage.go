@@ -62,9 +62,16 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 // Implement ShortNamesProvider
 var _ rest.ShortNamesProvider = &REST{}
 
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"ing"}
+}
+
+func (r *REST) Categories() []string {
+	return []string{"all"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of an ingress
