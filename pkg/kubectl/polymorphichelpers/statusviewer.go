@@ -18,20 +18,10 @@ package polymorphichelpers
 
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 // statusViewer returns a StatusViewer for printing rollout status.
-func statusViewer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-	clientConfig, err := restClientGetter.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-	clientset, err := kubernetes.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+func statusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
+	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind())
 }

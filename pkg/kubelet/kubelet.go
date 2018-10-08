@@ -54,9 +54,9 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
+	cloudprovider "k8s.io/cloud-provider"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
@@ -485,47 +485,47 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	klet := &Kubelet{
-		hostname:                       hostname,
-		hostnameOverridden:             len(hostnameOverride) > 0,
-		nodeName:                       nodeName,
-		kubeClient:                     kubeDeps.KubeClient,
-		csiClient:                      kubeDeps.CSIClient,
-		heartbeatClient:                kubeDeps.HeartbeatClient,
-		onRepeatedHeartbeatFailure:     kubeDeps.OnHeartbeatFailure,
-		rootDirectory:                  rootDirectory,
-		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
-		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
-		registerNode:                   registerNode,
-		registerWithTaints:             registerWithTaints,
-		registerSchedulable:            registerSchedulable,
-		dnsConfigurer:                  dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
-		serviceLister:                  serviceLister,
-		nodeInfo:                       nodeInfo,
-		masterServiceNamespace:         masterServiceNamespace,
-		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
-		recorder:                       kubeDeps.Recorder,
-		cadvisor:                       kubeDeps.CAdvisorInterface,
-		cloud:                          kubeDeps.Cloud,
-		externalCloudProvider:     cloudprovider.IsExternal(cloudProvider),
-		providerID:                providerID,
-		nodeRef:                   nodeRef,
-		nodeLabels:                nodeLabels,
-		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
-		os:                         kubeDeps.OSInterface,
-		oomWatcher:                 oomWatcher,
-		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
-		cgroupRoot:                 kubeCfg.CgroupRoot,
-		mounter:                    kubeDeps.Mounter,
-		maxPods:                    int(kubeCfg.MaxPods),
-		podsPerCore:                int(kubeCfg.PodsPerCore),
-		syncLoopMonitor:            atomic.Value{},
-		daemonEndpoints:            daemonEndpoints,
-		containerManager:           kubeDeps.ContainerManager,
-		containerRuntimeName:       containerRuntime,
-		redirectContainerStreaming: crOptions.RedirectContainerStreaming,
-		nodeIP:          parsedNodeIP,
-		nodeIPValidator: validateNodeIP,
-		clock:           clock.RealClock{},
+		hostname:                                hostname,
+		hostnameOverridden:                      len(hostnameOverride) > 0,
+		nodeName:                                nodeName,
+		kubeClient:                              kubeDeps.KubeClient,
+		csiClient:                               kubeDeps.CSIClient,
+		heartbeatClient:                         kubeDeps.HeartbeatClient,
+		onRepeatedHeartbeatFailure:              kubeDeps.OnHeartbeatFailure,
+		rootDirectory:                           rootDirectory,
+		resyncInterval:                          kubeCfg.SyncFrequency.Duration,
+		sourcesReady:                            config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
+		registerNode:                            registerNode,
+		registerWithTaints:                      registerWithTaints,
+		registerSchedulable:                     registerSchedulable,
+		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
+		serviceLister:                           serviceLister,
+		nodeInfo:                                nodeInfo,
+		masterServiceNamespace:                  masterServiceNamespace,
+		streamingConnectionIdleTimeout:          kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		recorder:                                kubeDeps.Recorder,
+		cadvisor:                                kubeDeps.CAdvisorInterface,
+		cloud:                                   kubeDeps.Cloud,
+		externalCloudProvider:                   cloudprovider.IsExternal(cloudProvider),
+		providerID:                              providerID,
+		nodeRef:                                 nodeRef,
+		nodeLabels:                              nodeLabels,
+		nodeStatusUpdateFrequency:               kubeCfg.NodeStatusUpdateFrequency.Duration,
+		os:                                      kubeDeps.OSInterface,
+		oomWatcher:                              oomWatcher,
+		cgroupsPerQOS:                           kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                              kubeCfg.CgroupRoot,
+		mounter:                                 kubeDeps.Mounter,
+		maxPods:                                 int(kubeCfg.MaxPods),
+		podsPerCore:                             int(kubeCfg.PodsPerCore),
+		syncLoopMonitor:                         atomic.Value{},
+		daemonEndpoints:                         daemonEndpoints,
+		containerManager:                        kubeDeps.ContainerManager,
+		containerRuntimeName:                    containerRuntime,
+		redirectContainerStreaming:              crOptions.RedirectContainerStreaming,
+		nodeIP:                                  parsedNodeIP,
+		nodeIPValidator:                         validateNodeIP,
+		clock:                                   clock.RealClock{},
 		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
 		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), protocol),
 		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
@@ -1561,8 +1561,8 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !kubecontainer.IsHostNetworkPod(pod) {
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "network is not ready: %v", rs)
-		return fmt.Errorf("network is not ready: %v", rs)
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, rs)
+		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, rs)
 	}
 
 	// Create Cgroups for the pod and apply resource parameters

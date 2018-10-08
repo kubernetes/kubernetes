@@ -48,15 +48,15 @@ func TestContainerLabels(t *testing.T) {
 		},
 	}
 	container := &v1.Container{
-		Name: "test_container",
+		Name:                   "test_container",
 		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test_pod",
-			Namespace: "test_pod_namespace",
-			UID:       "test_pod_uid",
+			Name:                       "test_pod",
+			Namespace:                  "test_pod_namespace",
+			UID:                        "test_pod_uid",
 			DeletionGracePeriodSeconds: &deletionGracePeriod,
 		},
 		Spec: v1.PodSpec{
@@ -193,16 +193,16 @@ func TestContainerAnnotations(t *testing.T) {
 		},
 	}
 	container := &v1.Container{
-		Name:  "test_container",
-		Ports: containerPorts,
+		Name:                   "test_container",
+		Ports:                  containerPorts,
 		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test_pod",
-			Namespace: "test_pod_namespace",
-			UID:       "test_pod_uid",
+			Name:                       "test_pod",
+			Namespace:                  "test_pod_namespace",
+			UID:                        "test_pod_uid",
 			DeletionGracePeriodSeconds: &deletionGracePeriod,
 		},
 		Spec: v1.PodSpec{
@@ -214,10 +214,10 @@ func TestContainerAnnotations(t *testing.T) {
 		ContainerPorts:            containerPorts,
 		PodDeletionGracePeriod:    pod.DeletionGracePeriodSeconds,
 		PodTerminationGracePeriod: pod.Spec.TerminationGracePeriodSeconds,
-		Hash:                   kubecontainer.HashContainer(container),
-		RestartCount:           restartCount,
-		TerminationMessagePath: container.TerminationMessagePath,
-		PreStopHandler:         container.Lifecycle.PreStop,
+		Hash:                      kubecontainer.HashContainer(container),
+		RestartCount:              restartCount,
+		TerminationMessagePath:    container.TerminationMessagePath,
+		PreStopHandler:            container.Lifecycle.PreStop,
 	}
 
 	// Test whether we can get right information from label

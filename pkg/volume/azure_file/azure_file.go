@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	"k8s.io/kubernetes/pkg/util/mount"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -269,7 +269,9 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if runtime.GOOS == "windows" {
 		mountOptions = []string{fmt.Sprintf("AZURE\\%s", accountName), accountKey}
 	} else {
-		os.MkdirAll(dir, 0700)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return err
+		}
 		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
 		options := []string{fmt.Sprintf("username=%s,password=%s", accountName, accountKey)}
 		if b.readOnly {

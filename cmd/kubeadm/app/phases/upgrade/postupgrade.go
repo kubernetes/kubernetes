@@ -26,10 +26,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -43,7 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 var expiry = 180 * 24 * time.Hour
@@ -174,7 +174,7 @@ func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.InitConfig
 
 // BackupAPIServerCertIfNeeded rotates the kube-apiserver certificate if older than 180 days
 func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
-	certAndKeyDir := kubeadmapiv1alpha3.DefaultCertificatesDir
+	certAndKeyDir := kubeadmapiv1beta1.DefaultCertificatesDir
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	if err != nil {
 		// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.

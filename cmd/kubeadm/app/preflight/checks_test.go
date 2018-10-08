@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -744,7 +744,7 @@ func TestImagePullCheck(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/docker", nil },
 	}
 
-	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, kubeadmapiv1alpha3.DefaultCRISocket)
+	containerRuntime, err := utilruntime.NewContainerRuntime(&fexec, kubeadmapiv1beta1.DefaultCRISocket)
 	if err != nil {
 		t.Errorf("unexpected NewContainerRuntime error: %v", err)
 	}

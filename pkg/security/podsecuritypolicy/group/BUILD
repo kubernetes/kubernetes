@@ -10,6 +10,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "helpers.go",
+        "mayrunas.go",
         "mustrunas.go",
         "runasany.go",
         "types.go",
@@ -26,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "mayrunas_test.go",
         "mustrunas_test.go",
         "runasany_test.go",
     ],

@@ -51,7 +51,7 @@ func newDefaultLeaseManager(client *clientv3.Client) *leaseManager {
 // value x means x*100%.
 func newLeaseManager(client *clientv3.Client, leaseReuseDurationSeconds int64, leaseReuseDurationPercent float64) *leaseManager {
 	return &leaseManager{
-		client: client,
+		client:                    client,
 		leaseReuseDurationSeconds: leaseReuseDurationSeconds,
 		leaseReuseDurationPercent: leaseReuseDurationPercent,
 	}

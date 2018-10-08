@@ -66,7 +66,7 @@ func testLabels() map[string]string {
 	return map[string]string{"name": "test"}
 }
 
-// newDeployment returns a RollingUpdate Deployment with with a fake container image
+// newDeployment returns a RollingUpdate Deployment with a fake container image
 func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 	return &apps.Deployment{
 		TypeMeta: metav1.TypeMeta{

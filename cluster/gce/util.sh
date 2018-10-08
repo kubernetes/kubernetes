@@ -1665,10 +1665,6 @@ function create-node-template() {
     gcloud="gcloud beta"
   fi
 
-  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud beta"
-  fi
-
   local preemptible_minions=""
   if [[ "${PREEMPTIBLE_NODE}" == "true" ]]; then
     preemptible_minions="--preemptible --maintenance-policy TERMINATE"
@@ -1903,13 +1899,13 @@ function create-subnetworks() {
 
   # Look for the alias subnet, it must exist and have a secondary
   # range configured.
-  local subnet=$(gcloud beta compute networks subnets describe \
+  local subnet=$(gcloud compute networks subnets describe \
     --project "${NETWORK_PROJECT}" \
     --region ${REGION} \
     ${IP_ALIAS_SUBNETWORK} 2>/dev/null)
   if [[ -z ${subnet} ]]; then
     echo "Creating subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-    gcloud beta compute networks subnets create \
+    gcloud compute networks subnets create \
       ${IP_ALIAS_SUBNETWORK} \
       --description "Automatically generated subnet for ${INSTANCE_PREFIX} cluster. This will be removed on cluster teardown." \
       --project "${NETWORK_PROJECT}" \
@@ -1948,7 +1944,7 @@ function detect-subnetworks() {
     return 0
   fi
 
-  SUBNETWORK=$(gcloud beta compute networks subnets list \
+  SUBNETWORK=$(gcloud compute networks subnets list \
     --network=${NETWORK} \
     --regions=${REGION} \
     --project=${NETWORK_PROJECT} \
@@ -2017,11 +2013,11 @@ function delete-subnetworks() {
     # Only delete the subnet if we created it (i.e it's not pre-existing).
     if [[ -z "${KUBE_GCE_IP_ALIAS_SUBNETWORK:-}" ]]; then
       echo "Removing auto-created subnet ${NETWORK}:${IP_ALIAS_SUBNETWORK}"
-      if [[ -n $(gcloud beta compute networks subnets describe \
+      if [[ -n $(gcloud compute networks subnets describe \
             --project "${NETWORK_PROJECT}" \
             --region ${REGION} \
             ${IP_ALIAS_SUBNETWORK} 2>/dev/null) ]]; then
-        gcloud beta --quiet compute networks subnets delete \
+        gcloud --quiet compute networks subnets delete \
           --project "${NETWORK_PROJECT}" \
           --region ${REGION} \
           ${IP_ALIAS_SUBNETWORK}
@@ -2392,10 +2388,6 @@ function create-nodes() {
 # - IP_ALIAS_SIZE
 function create-heapster-node() {
   local gcloud="gcloud"
-
-  if [[ "${ENABLE_IP_ALIASES:-}" == 'true' ]]; then
-    gcloud="gcloud beta"
-  fi
 
   local network=$(make-gcloud-network-argument \
       "${NETWORK_PROJECT}" \

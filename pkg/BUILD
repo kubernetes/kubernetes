@@ -52,7 +52,6 @@ filegroup(
         "//pkg/auth/authorizer/abac:all-srcs",
         "//pkg/auth/nodeidentifier:all-srcs",
         "//pkg/capabilities:all-srcs",
-        "//pkg/client/chaosclient:all-srcs",
         "//pkg/client/clientset_generated/internalclientset:all-srcs",
         "//pkg/client/conditions:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion:all-srcs",

@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd"
@@ -594,8 +593,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 			data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", kv.Key, err))
-				continue
+				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
 			}
 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner); err != nil {

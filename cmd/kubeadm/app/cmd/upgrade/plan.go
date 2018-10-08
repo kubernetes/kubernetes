@@ -27,14 +27,14 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	"k8s.io/apimachinery/pkg/util/version"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 type planFlags struct {
@@ -63,7 +63,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {

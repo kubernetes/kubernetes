@@ -631,20 +631,20 @@ func waitForPodUnschedulable(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForPodUnschedulableWithTimeout(cs, pod, 30*time.Second)
 }
 
-// waitCachedPDBsStable waits for PDBs in scheduler cache to have "CurrentHealthy" status equal to
+// waitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
-func waitCachedPDBsStable(context *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
+func waitForPDBsStable(context *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
 	return wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		pdbList, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
-		if len(cachedPDBs) != len(pdbs) {
+		if len(pdbList.Items) != len(pdbs) {
 			return false, nil
 		}
 		for i, pdb := range pdbs {
 			found := false
-			for _, cpdb := range cachedPDBs {
+			for _, cpdb := range pdbList.Items {
 				if pdb.Name == cpdb.Name && pdb.Namespace == cpdb.Namespace {
 					found = true
 					if cpdb.Status.CurrentHealthy != pdbPodNum[i] {

@@ -342,6 +342,12 @@ func untrustedIssuer(token string) (string, error) {
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return "", fmt.Errorf("while unmarshaling token: %v", err)
 	}
+	// Coalesce the legacy GoogleIss with the new one.
+	//
+	// http://openid.net/specs/openid-connect-core-1_0.html#GoogleIss
+	if claims.Issuer == "accounts.google.com" {
+		return "https://accounts.google.com", nil
+	}
 	return claims.Issuer, nil
 }
 

@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -718,13 +717,10 @@ func TestTransformationFailure(t *testing.T) {
 	}
 	store.transformer = oldTransformer
 
-	// only the first item is returned, and no error
+	// List should fail
 	var got example.PodList
-	if err := store.List(ctx, "/", "", storage.Everything, &got); err != nil {
+	if err := store.List(ctx, "/", "", storage.Everything, &got); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error %v", err)
-	}
-	if e, a := []example.Pod{*preset[0].storedObj}, got.Items; !reflect.DeepEqual(e, a) {
-		t.Errorf("Unexpected: %s", diff.ObjectReflectDiff(e, a))
 	}
 
 	// Get should fail

@@ -44,8 +44,7 @@ type StatsProvider interface {
 	ImageFsStats() (*statsapi.FsStats, error)
 }
 
-// Manages lifecycle of all images.
-//
+// ImageGCManager is an interface for managing lifecycle of all images.
 // Implementation is thread-safe.
 type ImageGCManager interface {
 	// Applies the garbage collection policy. Errors include being unable to free
@@ -61,7 +60,7 @@ type ImageGCManager interface {
 	DeleteUnusedImages() error
 }
 
-// A policy for garbage collecting images. Policy defines an allowed band in
+// ImageGCPolicy is a policy for garbage collecting images. Policy defines an allowed band in
 // which garbage collection will be run.
 type ImageGCPolicy struct {
 	// Any usage above this threshold will always trigger garbage collection.
@@ -144,6 +143,7 @@ type imageRecord struct {
 	size int64
 }
 
+// NewImageGCManager instantiates a new ImageGCManager object.
 func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy, sandboxImage string) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
@@ -297,7 +297,7 @@ func (im *realImageGCManager) GarbageCollect() error {
 	usagePercent := 100 - int(available*100/capacity)
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
-		glog.Infof("[imageGCManager]: Disk usage on image filesystem is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", usagePercent, im.policy.HighThresholdPercent, amountToFree)
+		glog.Infof("[imageGCManager]: Disk usage on image filesystem is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes down to the low threshold (%d%%).", usagePercent, im.policy.HighThresholdPercent, amountToFree, im.policy.LowThresholdPercent)
 		freed, err := im.freeSpace(amountToFree, time.Now())
 		if err != nil {
 			return err

@@ -53,11 +53,11 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: "unset PROPERTY_NAME",
+		Use:                   "unset PROPERTY_NAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Unsets an individual value in a kubeconfig file"),
-		Long:    unsetLong,
-		Example: unsetExample,
+		Short:                 i18n.T("Unsets an individual value in a kubeconfig file"),
+		Long:                  unsetLong,
+		Example:               unsetExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd, args))
 			cmdutil.CheckErr(options.run(out))

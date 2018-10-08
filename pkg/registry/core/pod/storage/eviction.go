@@ -86,6 +86,16 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 		return nil, err
 	}
 	pod := obj.(*api.Pod)
+	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
+	// There is no need to check for pdb.
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+		_, _, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+		if err != nil {
+			return nil, err
+		}
+		return &metav1.Status{
+			Status: metav1.StatusSuccess}, nil
+	}
 	var rtStatus *metav1.Status
 	var pdbName string
 	err = retry.RetryOnConflict(EvictionsRetry, func() error {

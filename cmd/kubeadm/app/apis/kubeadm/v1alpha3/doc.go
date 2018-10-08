@@ -23,18 +23,32 @@ limitations under the License.
 // Some of these options are also available as command line flags, but
 // the preferred way to configure kubeadm is to pass a single YAML file with
 // multiple configuration types in with the --config option.
+// The configuration types should be separated by a line with `---`.
 //
-// kubeadm defines several configuration types:
+// kubeadm uses several API types:
 // * InitConfiguration
+// https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3#InitConfiguration
 // * JoinConfiguration
+// https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3#JoinConfiguration
 // * ClusterConfiguration
+// https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3#ClusterConfiguration
+// * KubeProxyConfiguration
+// https://godoc.org/k8s.io/kube-proxy/config/v1alpha1#KubeProxyConfiguration
+// * KubeletConfiguration
+// https://godoc.org/k8s.io/kubelet/config/v1beta1#KubeletConfiguration
 //
-// InitConfiguration and JoinConfiguration cannot share a single YAML file,
-// however it is expected that InitConfiguration and ClusterConfiguration will
-// share a single YAML file.
+// For `kubeadm init` you can include the following types:
+//   InitConfiguration, ClusterConfiguration, KubeProxyConfiguration, KubeletConfiguration
 //
-//  A fully populated example of a single YAML file containing multiple
+// For `kubeadm join` you can include the following types:
+//   JoinConfiguration, KubeProxyConfiguration, KubeletConfiguration
+//
+// To print the default values for certain API type you can use:
+//   kubeadm config print-default --api-objects=<type1>,<type2>
+//
+//  Here is a fully populated example of a single YAML file containing multiple
 //  configuration types to be used during a `kubeadm init` run.
+//
 //	apiVersion: kubeadm.k8s.io/v1alpha3
 //	kind: InitConfiguration
 //	bootstrapTokens:
@@ -127,4 +141,5 @@ limitations under the License.
 //
 // TODO: The BootstrapTokenString object should move out to either k8s.io/client-go or k8s.io/api in the future
 // (probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.
+//
 package v1alpha3 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"

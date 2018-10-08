@@ -349,9 +349,9 @@ func TestPodFitsResources(t *testing.T) {
 				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
-			fits: true,
+			fits:                     true,
 			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
-			name: "skip checking ignored extended resource",
+			name:                     "skip checking ignored extended resource",
 		},
 	}
 
@@ -2983,7 +2983,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"machine3": false,
 			},
 			nodesExpectAffinityFailureReasons: [][]algorithm.PredicateFailureReason{nil, nil, {ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch}},
-			name: "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that match the affinity rules",
+			name:                              "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that match the affinity rules",
 		},
 		{
 			pod: &v1.Pod{
@@ -4980,5 +4980,67 @@ func TestGetMaxVols(t *testing.T) {
 	os.Unsetenv(KubeMaxPDVols)
 	if previousValue != "" {
 		os.Setenv(KubeMaxPDVols, previousValue)
+	}
+}
+
+func TestCheckNodeUnschedulablePredicate(t *testing.T) {
+	testCases := []struct {
+		name string
+		pod  *v1.Pod
+		node *v1.Node
+		fit  bool
+	}{
+		{
+			name: "Does not schedule pod to unschedulable node (node.Spec.Unschedulable==true)",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: false,
+		},
+		{
+			name: "Schedule pod to normal node",
+			pod:  &v1.Pod{},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: false,
+				},
+			},
+			fit: true,
+		},
+		{
+			name: "Schedule pod with toleration to unschedulable node (node.Spec.Unschedulable==true)",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Tolerations: []v1.Toleration{
+						{
+							Key:    algorithm.TaintNodeUnschedulable,
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					},
+				},
+			},
+			node: &v1.Node{
+				Spec: v1.NodeSpec{
+					Unschedulable: true,
+				},
+			},
+			fit: true,
+		},
+	}
+
+	for _, test := range testCases {
+		nodeInfo := schedulercache.NewNodeInfo()
+		nodeInfo.SetNode(test.node)
+		fit, _, err := CheckNodeUnschedulablePredicate(test.pod, nil, nodeInfo)
+		if err != nil {
+			t.Fatalf("Failed to check node unschedulable: %v", err)
+		}
+
+		if fit != test.fit {
+			t.Errorf("Unexpected fit: expected %v, got %v", test.fit, fit)
+		}
 	}
 }

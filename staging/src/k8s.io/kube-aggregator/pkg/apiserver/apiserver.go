@@ -153,14 +153,14 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	)
 
 	s := &APIAggregator{
-		GenericAPIServer: genericServer,
-		delegateHandler:  delegationTarget.UnprotectedHandler(),
-		proxyClientCert:  c.ExtraConfig.ProxyClientCert,
-		proxyClientKey:   c.ExtraConfig.ProxyClientKey,
-		proxyTransport:   c.ExtraConfig.ProxyTransport,
-		proxyHandlers:    map[string]*proxyHandler{},
-		handledGroups:    sets.String{},
-		lister:           informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		GenericAPIServer:         genericServer,
+		delegateHandler:          delegationTarget.UnprotectedHandler(),
+		proxyClientCert:          c.ExtraConfig.ProxyClientCert,
+		proxyClientKey:           c.ExtraConfig.ProxyClientKey,
+		proxyTransport:           c.ExtraConfig.ProxyTransport,
+		proxyHandlers:            map[string]*proxyHandler{},
+		handledGroups:            sets.String{},
+		lister:                   informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}

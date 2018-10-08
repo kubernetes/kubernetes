@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1alpha3:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",

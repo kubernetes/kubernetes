@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (

@@ -372,6 +372,9 @@ type FSGroupStrategyOptions struct {
 type FSGroupStrategyType string
 
 const (
+	// FSGroupStrategyMayRunAs means that container does not need to have FSGroup of X applied.
+	// However, when FSGroups are specified, they have to fall in the defined range.
+	FSGroupStrategyMayRunAs FSGroupStrategyType = "MayRunAs"
 	// FSGroupStrategyMustRunAs means that container must have FSGroup of X applied.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
 	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
@@ -394,6 +397,9 @@ type SupplementalGroupsStrategyOptions struct {
 type SupplementalGroupsStrategyType string
 
 const (
+	// SupplementalGroupsStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when gids are specified, they have to fall in the defined range.
+	SupplementalGroupsStrategyMayRunAs SupplementalGroupsStrategyType = "MayRunAs"
 	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
