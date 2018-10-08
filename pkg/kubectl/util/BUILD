@@ -7,6 +7,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "pod_port.go",
         "service_port.go",
         "umask.go",
         "umask_windows.go",
@@ -78,6 +79,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "pod_port_test.go",
         "service_port_test.go",
         "util_test.go",
     ],
