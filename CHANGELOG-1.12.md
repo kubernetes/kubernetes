@@ -172,6 +172,7 @@ filename | sha512 hash
 * Adds permissions for startup of an on-cluster kube-controller-manager ([#69062](https://github.com/kubernetes/kubernetes/pull/69062), [@dghubble](https://github.com/dghubble))
 * Get public IP for Azure vmss nodes. ([#68498](https://github.com/kubernetes/kubernetes/pull/68498), [@feiskyer](https://github.com/feiskyer))
 * Deduplicate PATH items when reading plugins. ([#69170](https://github.com/kubernetes/kubernetes/pull/69170), [@soltysh](https://github.com/soltysh))
+* Fix OpenAPI spec and API reference: posting a rollback returns a v1 status ([#68864](https://github.com/kubernetes/kubernetes/pull/68864), [@roycaihw](https://github.com/roycaihw))
 
 
 
