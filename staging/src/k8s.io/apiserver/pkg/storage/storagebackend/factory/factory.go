@@ -32,10 +32,6 @@ func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	case "etcd2":
 		return nil, nil, fmt.Errorf("%v is no longer a supported storage backend", c.Type)
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
-		// TODO: We have the following features to implement:
-		// - Support secure connection by using key, cert, and CA files.
-		// - Honor "https" scheme to support secure connection in gRPC.
-		// - Support non-quorum read.
 		return newETCD3Storage(c)
 	default:
 		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
