@@ -32,10 +32,13 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	fakecsi "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/kubernetes/pkg/features"
@@ -599,6 +602,102 @@ func TestRegisterPlugin(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCSIPluginInit(t *testing.T) {
+	testcases := map[string]struct {
+		expectedErrMsg  string
+		registryEnabled bool
+	}{
+		"with registry disabled": {},
+		"with registry enabled":  {registryEnabled: true},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			plugin := csiPlugin{}
+
+			csiClient := fakecsi.NewSimpleClientset(
+				getCSIDriver("fake csi driver name", nil, nil),
+			)
+			volumeHost := volumetest.NewFakeVolumeHostWithCSINodeName(
+				"fakeTmpDir", // root dirctory
+				nil,          // kube clientset
+				csiClient,    // csi clientset
+				nil,          // plugins
+				"fake node",  // node name
+			)
+
+			if tc.registryEnabled {
+				defer utilfeaturetesting.SetFeatureGateDuringTest(
+					t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true,
+				)()
+			}
+
+			err := plugin.Init(volumeHost)
+			checkErr(t, err, tc.expectedErrMsg)
+
+			if plugin.host != volumeHost {
+				t.Errorf("Expected plugin.host to be the volume host")
+			}
+
+			if csiDrivers.driversMap == nil {
+				t.Errorf("Expected csiDrivers to be initialized")
+			}
+			if nim == nil {
+				t.Errorf("Expected nodeInfoManager to be initialized")
+			}
+
+			if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+				// with the csi driver registry disabled, there is not much more we can
+				// check for
+				return
+			}
+
+			informer := plugin.csiDriverInformer
+			lister := plugin.csiDriverLister
+
+			if lister == nil {
+				t.Errorf("Expected plugin.csiDriverLister to be set up")
+			}
+			if informer == nil {
+				t.Errorf("Expected plugin.csiDriverInformer to be set up")
+			}
+
+			waitForInformerSync(t, informer.Informer())
+
+			csiDriverList, err := lister.List(labels.Everything())
+			if err != nil {
+				t.Errorf("Expected no error on plugin.csiDriverLister.List(), got: %#v", err)
+			}
+			if csiDriverList[0].ObjectMeta.Name != "fake csi driver name" {
+				t.Errorf("Expected to get only the fake csi driver from the lister, got those drivers: %#v", csiDriverList)
+			}
+		})
+	}
+}
+
+func waitForInformerSync(t *testing.T, informer cache.SharedInformer) {
+	t.Helper()
+	err := wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
+		return informer.HasSynced(), nil
+	})
+	if err != nil {
+		t.Fatal("Timeout waiting for informer to sync")
+	}
+}
+
+func checkErr(t *testing.T, actualErr error, expectedErrMsg string) {
+	t.Helper()
+	if expectedErrMsg == "" {
+		if actualErr != nil {
+			t.Errorf("Expected no error, got: %v", actualErr)
+		}
+	} else {
+		if !strings.Contains(actualErr.Error(), expectedErrMsg) {
+			t.Errorf("Expected an error containing '%s', got: '%#v'", expectedErrMsg, actualErr)
+		}
 	}
 }
 
