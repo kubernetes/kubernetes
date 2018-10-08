@@ -128,7 +128,7 @@ func NewCmdPreFlightNode(cfgPath *string, ignorePreflightErrors *[]string) *cobr
 			cfg := &kubeadmapiv1beta1.JoinConfiguration{}
 			kubeadmscheme.Scheme.Default(cfg)
 
-			internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
+			internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 			kubeadmutil.CheckErr(err)
 			err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
 			kubeadmutil.CheckErr(err)
