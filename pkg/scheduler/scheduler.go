@@ -134,7 +134,6 @@ var defaultSchedulerOptions = schedulerOptions{
 }
 
 // New returns a Scheduler
-// TODO：Once we have the nice constructor，we should modify cmd/kube-scheduler to use it.
 func New(client clientset.Interface,
 	nodeInformer coreinformers.NodeInformer,
 	podInformer coreinformers.PodInformer,

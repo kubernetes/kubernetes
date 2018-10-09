@@ -147,14 +147,24 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 	}
 
 	// Create the scheduler.
-	sched, err := scheduler.New(c.Client, c.InformerFactory.Core().V1().Nodes(), c.PodInformer,
-		c.InformerFactory.Core().V1().PersistentVolumes(), c.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		c.InformerFactory.Core().V1().ReplicationControllers(), c.InformerFactory.Apps().V1().ReplicaSets(),
-		c.InformerFactory.Apps().V1().StatefulSets(), c.InformerFactory.Core().V1().Services(),
-		c.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(), storageClassInformer, c.Recorder, c.ComponentConfig.AlgorithmSource,
-		scheduler.WithName(c.ComponentConfig.SchedulerName), scheduler.WithHardPodAffinitySymmetricWeight(c.ComponentConfig.HardPodAffinitySymmetricWeight),
+	sched, err := scheduler.New(c.Client,
+		c.InformerFactory.Core().V1().Nodes(),
+		c.PodInformer,
+		c.InformerFactory.Core().V1().PersistentVolumes(),
+		c.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		c.InformerFactory.Core().V1().ReplicationControllers(),
+		c.InformerFactory.Apps().V1().ReplicaSets(),
+		c.InformerFactory.Apps().V1().StatefulSets(),
+		c.InformerFactory.Core().V1().Services(),
+		c.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		storageClassInformer,
+		c.Recorder,
+		c.ComponentConfig.AlgorithmSource,
+		scheduler.WithName(c.ComponentConfig.SchedulerName),
+		scheduler.WithHardPodAffinitySymmetricWeight(c.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithEquivalenceClassCacheEnabled(c.ComponentConfig.EnableContentionProfiling),
-		scheduler.WithPreemptionDisabled(c.ComponentConfig.DisablePreemption), scheduler.WithPercentageOfNodesToScore(c.ComponentConfig.PercentageOfNodesToScore),
+		scheduler.WithPreemptionDisabled(c.ComponentConfig.DisablePreemption),
+		scheduler.WithPercentageOfNodesToScore(c.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithBindTimeoutSeconds(*c.ComponentConfig.BindTimeoutSeconds))
 	if err != nil {
 		return err
