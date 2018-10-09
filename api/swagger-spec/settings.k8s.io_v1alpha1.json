@@ -1721,6 +1721,10 @@
      "storageos": {
       "$ref": "v1.StorageOSVolumeSource",
       "description": "StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes."
+     },
+     "csi": {
+      "$ref": "v1.CSIVolumeSource",
+      "description": "CSI (Container Storage Interface) represents storage that handled by an external CSI driver (Beta feature)."
      }
     }
    },
@@ -2614,6 +2618,47 @@
      "secretRef": {
       "$ref": "v1.LocalObjectReference",
       "description": "SecretRef specifies the secret to use for obtaining the StorageOS API credentials.  If not specified, default values will be attempted."
+     }
+    }
+   },
+   "v1.CSIVolumeSource": {
+    "id": "v1.CSIVolumeSource",
+    "description": "Represents a source location of a volume to mount, managed by an external CSI driver",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "type": "string",
+      "description": "Driver is the name of the driver to use for this volume. Required."
+     },
+     "volumeHandle": {
+      "type": "string",
+      "description": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. If not provided, that handle will be auto-generated."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write)."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Ex. \"ext4\", \"xfs\", \"ntfs\". If not provided, the empty value is passed to the associated CSI driver which will determine the default filesystem to apply."
+     },
+     "volumeAttributes": {
+      "type": "object",
+      "description": "VolumeAttributes store immutable properties of the volume copied during provision. These attributes are passed back to the driver during controller publish calls."
+     },
+     "controllerPublishSecretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "ControllerPublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI ControllerPublishVolume and ControllerUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed."
+     },
+     "nodeStageSecretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "NodeStageSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodeStageVolume and NodeStageVolume and NodeUnstageVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed."
+     },
+     "nodePublishSecretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "NodePublishSecretRef is a reference to the secret object containing sensitive information to pass to the CSI driver to complete the CSI NodePublishVolume and NodeUnpublishVolume calls. This field is optional, and  may be empty if no secret is required. If the secret object contains more than one secret, all secret references are passed."
      }
     }
    },

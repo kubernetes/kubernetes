@@ -2616,6 +2616,13 @@
       },
       "description": "allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes is allowed in the \"volumes\" field."
      },
+     "allowedCSIDrivers": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AllowedCSIDriver"
+      },
+      "description": "AllowedCSIDrivers is a whitelist of allowed CSI drivers.  This slice will be checked to verify which CSI driver is allowed to run in the cluster."
+     },
      "allowedUnsafeSysctls": {
       "type": "array",
       "items": {
@@ -2824,6 +2831,19 @@
      "driver": {
       "type": "string",
       "description": "driver is the name of the Flexvolume driver."
+     }
+    }
+   },
+   "v1beta1.AllowedCSIDriver": {
+    "id": "v1beta1.AllowedCSIDriver",
+    "description": "AllowedCSIDriver represents a single CSI Driver that is allowed to be used.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the CSI driver"
      }
     }
    },

@@ -7,6 +7,7 @@ go_library(
         "csi_block.go",
         "csi_client.go",
         "csi_mounter.go",
+        "csi_mounter_inline.go",
         "csi_plugin.go",
         "csi_util.go",
     ],
@@ -23,6 +24,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -33,6 +35,8 @@ go_library(
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 
@@ -42,6 +46,7 @@ go_test(
         "csi_attacher_test.go",
         "csi_block_test.go",
         "csi_client_test.go",
+        "csi_mounter_inline_test.go",
         "csi_mounter_test.go",
         "csi_plugin_test.go",
     ],
