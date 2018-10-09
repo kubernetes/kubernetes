@@ -24,6 +24,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
+// RegistryList holds public and private image registries
 type RegistryList struct {
 	DockerLibraryRegistry string `yaml:"dockerLibraryRegistry"`
 	E2eRegistry           string `yaml:"e2eRegistry"`
@@ -31,21 +32,26 @@ type RegistryList struct {
 	PrivateRegistry       string `yaml:"privateRegistry"`
 	SampleRegistry        string `yaml:"sampleRegistry"`
 }
-type ImageConfig struct {
+
+// Config holds an images registry, name, and version
+type Config struct {
 	registry string
 	name     string
 	version  string
 }
 
-func (i *ImageConfig) SetRegistry(registry string) {
+// SetRegistry sets an image registry in a Config struct
+func (i *Config) SetRegistry(registry string) {
 	i.registry = registry
 }
 
-func (i *ImageConfig) SetName(name string) {
+// SetName sets an image name in a Config struct
+func (i *Config) SetName(name string) {
 	i.name = name
 }
 
-func (i *ImageConfig) SetVersion(version string) {
+// SetVersion sets an image version in a Config struct
+func (i *Config) SetVersion(version string) {
 	i.version = version
 }
 
@@ -79,55 +85,60 @@ var (
 	dockerLibraryRegistry = registry.DockerLibraryRegistry
 	e2eRegistry           = registry.E2eRegistry
 	gcRegistry            = registry.GcRegistry
-	PrivateRegistry       = registry.PrivateRegistry
-	sampleRegistry        = registry.SampleRegistry
-
-	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.13v1"}
-	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0"}
-	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0"}
-	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29"}
-	CheckMetadataConcealment = ImageConfig{e2eRegistry, "metadata-concealment", "1.0"}
-	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0"}
-	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1"}
-	EchoServer               = ImageConfig{e2eRegistry, "echoserver", "2.2"}
-	EntrypointTester         = ImageConfig{e2eRegistry, "entrypoint-tester", "1.0"}
-	Fakegitserver            = ImageConfig{e2eRegistry, "fakegitserver", "1.0"}
-	GBFrontend               = ImageConfig{sampleRegistry, "gb-frontend", "v6"}
-	GBRedisSlave             = ImageConfig{sampleRegistry, "gb-redisslave", "v3"}
-	Hostexec                 = ImageConfig{e2eRegistry, "hostexec", "1.1"}
-	IpcUtils                 = ImageConfig{e2eRegistry, "ipc-utils", "1.0"}
-	Iperf                    = ImageConfig{e2eRegistry, "iperf", "1.0"}
-	JessieDnsutils           = ImageConfig{e2eRegistry, "jessie-dnsutils", "1.0"}
-	Kitten                   = ImageConfig{e2eRegistry, "kitten", "1.0"}
-	Liveness                 = ImageConfig{e2eRegistry, "liveness", "1.0"}
-	LogsGenerator            = ImageConfig{e2eRegistry, "logs-generator", "1.0"}
-	Mounttest                = ImageConfig{e2eRegistry, "mounttest", "1.0"}
-	MounttestUser            = ImageConfig{e2eRegistry, "mounttest-user", "1.0"}
-	Nautilus                 = ImageConfig{e2eRegistry, "nautilus", "1.0"}
-	Net                      = ImageConfig{e2eRegistry, "net", "1.0"}
-	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.1"}
-	Nettest                  = ImageConfig{e2eRegistry, "nettest", "1.0"}
-	Nginx                    = ImageConfig{dockerLibraryRegistry, "nginx", "1.14-alpine"}
-	NginxNew                 = ImageConfig{dockerLibraryRegistry, "nginx", "1.15-alpine"}
-	Nonewprivs               = ImageConfig{e2eRegistry, "nonewprivs", "1.0"}
-	NoSnatTest               = ImageConfig{e2eRegistry, "no-snat-test", "1.0"}
-	NoSnatTestProxy          = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0"}
-	// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	Pause               = ImageConfig{gcRegistry, "pause", "3.1"}
-	Porter              = ImageConfig{e2eRegistry, "porter", "1.0"}
-	PortForwardTester   = ImageConfig{e2eRegistry, "port-forward-tester", "1.0"}
-	Redis               = ImageConfig{e2eRegistry, "redis", "1.0"}
-	ResourceConsumer    = ImageConfig{e2eRegistry, "resource-consumer", "1.3"}
-	ResourceController  = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0"}
-	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.1"}
-	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0"}
-	VolumeNFSServer     = ImageConfig{e2eRegistry, "volume/nfs", "1.0"}
-	VolumeISCSIServer   = ImageConfig{e2eRegistry, "volume/iscsi", "1.0"}
-	VolumeGlusterServer = ImageConfig{e2eRegistry, "volume/gluster", "1.0"}
-	VolumeRBDServer     = ImageConfig{e2eRegistry, "volume/rbd", "1.0.1"}
+	// PrivateRegistry is a user configured image repository
+	PrivateRegistry = registry.PrivateRegistry
+	sampleRegistry  = registry.SampleRegistry
 )
 
-func GetE2EImage(image ImageConfig) string {
+// Preconfigured image configs
+var (
+	AdmissionWebhook         = Config{e2eRegistry, "webhook", "1.13v1"}
+	APIServer                = Config{e2eRegistry, "sample-apiserver", "1.0"}
+	AppArmorLoader           = Config{e2eRegistry, "apparmor-loader", "1.0"}
+	BusyBox                  = Config{dockerLibraryRegistry, "busybox", "1.29"}
+	CheckMetadataConcealment = Config{e2eRegistry, "metadata-concealment", "1.0"}
+	CudaVectorAdd            = Config{e2eRegistry, "cuda-vector-add", "1.0"}
+	Dnsutils                 = Config{e2eRegistry, "dnsutils", "1.1"}
+	EchoServer               = Config{e2eRegistry, "echoserver", "2.2"}
+	EntrypointTester         = Config{e2eRegistry, "entrypoint-tester", "1.0"}
+	Fakegitserver            = Config{e2eRegistry, "fakegitserver", "1.0"}
+	GBFrontend               = Config{sampleRegistry, "gb-frontend", "v6"}
+	GBRedisSlave             = Config{sampleRegistry, "gb-redisslave", "v3"}
+	Hostexec                 = Config{e2eRegistry, "hostexec", "1.1"}
+	IpcUtils                 = Config{e2eRegistry, "ipc-utils", "1.0"}
+	Iperf                    = Config{e2eRegistry, "iperf", "1.0"}
+	JessieDnsutils           = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
+	Kitten                   = Config{e2eRegistry, "kitten", "1.0"}
+	Liveness                 = Config{e2eRegistry, "liveness", "1.0"}
+	LogsGenerator            = Config{e2eRegistry, "logs-generator", "1.0"}
+	Mounttest                = Config{e2eRegistry, "mounttest", "1.0"}
+	MounttestUser            = Config{e2eRegistry, "mounttest-user", "1.0"}
+	Nautilus                 = Config{e2eRegistry, "nautilus", "1.0"}
+	Net                      = Config{e2eRegistry, "net", "1.0"}
+	Netexec                  = Config{e2eRegistry, "netexec", "1.1"}
+	Nettest                  = Config{e2eRegistry, "nettest", "1.0"}
+	Nginx                    = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
+	NginxNew                 = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
+	Nonewprivs               = Config{e2eRegistry, "nonewprivs", "1.0"}
+	NoSnatTest               = Config{e2eRegistry, "no-snat-test", "1.0"}
+	NoSnatTestProxy          = Config{e2eRegistry, "no-snat-test-proxy", "1.0"}
+	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
+	Pause               = Config{gcRegistry, "pause", "3.1"}
+	Porter              = Config{e2eRegistry, "porter", "1.0"}
+	PortForwardTester   = Config{e2eRegistry, "port-forward-tester", "1.0"}
+	Redis               = Config{e2eRegistry, "redis", "1.0"}
+	ResourceConsumer    = Config{e2eRegistry, "resource-consumer", "1.3"}
+	ResourceController  = Config{e2eRegistry, "resource-consumer/controller", "1.0"}
+	ServeHostname       = Config{e2eRegistry, "serve-hostname", "1.1"}
+	TestWebserver       = Config{e2eRegistry, "test-webserver", "1.0"}
+	VolumeNFSServer     = Config{e2eRegistry, "volume/nfs", "1.0"}
+	VolumeISCSIServer   = Config{e2eRegistry, "volume/iscsi", "1.0"}
+	VolumeGlusterServer = Config{e2eRegistry, "volume/gluster", "1.0"}
+	VolumeRBDServer     = Config{e2eRegistry, "volume/rbd", "1.0.1"}
+)
+
+// GetE2EImage returns the fully qualified URI to an image (including version)
+func GetE2EImage(image Config) string {
 	return fmt.Sprintf("%s/%s:%s", image.registry, image.name, image.version)
 }
 
