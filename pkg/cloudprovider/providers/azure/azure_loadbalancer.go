@@ -27,7 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
-	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
+	cloudutil "k8s.io/cloud-provider/util"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -702,7 +702,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			newConfigs = append(newConfigs,
 				network.FrontendIPConfiguration{
-					Name: to.StringPtr(lbFrontendIPConfigName),
+					Name:                                    to.StringPtr(lbFrontendIPConfigName),
 					FrontendIPConfigurationPropertiesFormat: fipConfigurationProperties,
 				})
 			glog.V(10).Infof("reconcileLoadBalancer for service (%s)(%t): lb frontendconfig(%s) - adding", serviceName, wantLb, lbFrontendIPConfigName)
@@ -888,8 +888,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 			return expectedProbes, expectedRules, err
 		}
 
-		if serviceapi.NeedsHealthCheck(service) {
-			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
+		if cloudutil.NeedsHealthCheck(service) {
+			podPresencePath, podPresencePort := cloudutil.GetServiceHealthCheckPathPort(service)
 
 			expectedProbes = append(expectedProbes, network.Probe{
 				Name: &lbRuleName,
@@ -983,7 +983,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		destinationIPAddress = "*"
 	}
 
-	sourceRanges, err := serviceapi.GetLoadBalancerSourceRanges(service)
+	sourceRanges, err := cloudutil.GetLoadBalancerSourceRanges(service)
 	if err != nil {
 		return nil, err
 	}
@@ -992,7 +992,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		return nil, err
 	}
 	var sourceAddressPrefixes []string
-	if (sourceRanges == nil || serviceapi.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
+	if (sourceRanges == nil || cloudutil.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
 			sourceAddressPrefixes = []string{"Internet"}
 		}
@@ -1025,8 +1025,8 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 						DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
 						SourceAddressPrefix:      to.StringPtr(sourceAddressPrefixes[j]),
 						DestinationAddressPrefix: to.StringPtr(destinationIPAddress),
-						Access:    network.SecurityRuleAccessAllow,
-						Direction: network.SecurityRuleDirectionInbound,
+						Access:                   network.SecurityRuleAccessAllow,
+						Direction:                network.SecurityRuleDirectionInbound,
 					},
 				}
 			}
@@ -1226,8 +1226,8 @@ func makeConsolidatable(rule network.SecurityRule) network.SecurityRule {
 			SourceAddressPrefix:        rule.SourceAddressPrefix,
 			SourceAddressPrefixes:      rule.SourceAddressPrefixes,
 			DestinationAddressPrefixes: collectionOrSingle(rule.DestinationAddressPrefixes, rule.DestinationAddressPrefix),
-			Access:    rule.Access,
-			Direction: rule.Direction,
+			Access:                     rule.Access,
+			Direction:                  rule.Direction,
 		},
 	}
 }
@@ -1248,8 +1248,8 @@ func consolidate(existingRule network.SecurityRule, newRule network.SecurityRule
 			SourceAddressPrefix:        existingRule.SourceAddressPrefix,
 			SourceAddressPrefixes:      existingRule.SourceAddressPrefixes,
 			DestinationAddressPrefixes: destinations,
-			Access:    existingRule.Access,
-			Direction: existingRule.Direction,
+			Access:                     existingRule.Access,
+			Direction:                  existingRule.Direction,
 		},
 	}
 }

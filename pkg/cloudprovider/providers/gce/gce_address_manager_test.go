@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	compute "google.golang.org/api/compute/v1"
+
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 

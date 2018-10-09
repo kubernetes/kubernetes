@@ -29,7 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
+	cloudutil "k8s.io/cloud-provider/util"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 )
@@ -169,7 +169,7 @@ func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}
 	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
 
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !cloudutil.RequestsOnlyLocalTraffic(svc)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	existingHC := newInternalLBHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
@@ -224,7 +224,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	}
 	gce.CreateFirewall(existingFirewall)
 
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !cloudutil.RequestsOnlyLocalTraffic(svc)
 	hcName := makeHealthCheckName(lbName, vals.ClusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}

@@ -27,7 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
+	cloudutil "k8s.io/cloud-provider/util"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 )
 
@@ -69,12 +69,12 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 
 	// Ensure health check exists before creating the backend service. The health check is shared
 	// if externalTrafficPolicy=Cluster.
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !cloudutil.RequestsOnlyLocalTraffic(svc)
 	hcName := makeHealthCheckName(loadBalancerName, clusterID, sharedHealthCheck)
 	hcPath, hcPort := GetNodesHealthCheckPath(), GetNodesHealthCheckPort()
 	if !sharedHealthCheck {
 		// Service requires a special health check, retrieve the OnlyLocal port & path
-		hcPath, hcPort = v1_service.GetServiceHealthCheckPathPort(svc)
+		hcPath, hcPort = cloudutil.GetServiceHealthCheckPathPort(svc)
 	}
 	hc, err := gce.ensureInternalHealthCheck(hcName, nm, sharedHealthCheck, hcPath, hcPort)
 	if err != nil {
@@ -224,7 +224,7 @@ func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID st
 	_, protocol := getPortsAndProtocol(svc.Spec.Ports)
 	scheme := cloud.SchemeInternal
 	sharedBackend := shareBackendService(svc)
-	sharedHealthCheck := !v1_service.RequestsOnlyLocalTraffic(svc)
+	sharedHealthCheck := !cloudutil.RequestsOnlyLocalTraffic(svc)
 
 	gce.sharedResourceLock.Lock()
 	defer gce.sharedResourceLock.Unlock()
@@ -367,7 +367,7 @@ func (gce *GCECloud) ensureInternalFirewalls(loadBalancerName, ipAddress, cluste
 	// First firewall is for ingress traffic
 	fwDesc := makeFirewallDescription(nm.String(), ipAddress)
 	ports, protocol := getPortsAndProtocol(svc.Spec.Ports)
-	sourceRanges, err := v1_service.GetLoadBalancerSourceRanges(svc)
+	sourceRanges, err := cloudutil.GetLoadBalancerSourceRanges(svc)
 	if err != nil {
 		return err
 	}
@@ -578,7 +578,7 @@ func (gce *GCECloud) ensureInternalBackendServiceGroups(name string, igLinks []s
 }
 
 func shareBackendService(svc *v1.Service) bool {
-	return GetLoadBalancerAnnotationBackendShare(svc) && !v1_service.RequestsOnlyLocalTraffic(svc)
+	return GetLoadBalancerAnnotationBackendShare(svc) && !cloudutil.RequestsOnlyLocalTraffic(svc)
 }
 
 func backendsFromGroupLinks(igLinks []string) (backends []*compute.Backend) {
