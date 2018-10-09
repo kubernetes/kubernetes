@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/validation"
 	"net/http"
 )
 
@@ -41,6 +42,12 @@ func NewSkusClientWithBaseURI(baseURI string, subscriptionID string) SkusClient 
 
 // List lists the available SKUs supported by Microsoft.Storage for given subscription.
 func (client SkusClient) List(ctx context.Context) (result SkuListResult, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: client.SubscriptionID,
+			Constraints: []validation.Constraint{{Target: "client.SubscriptionID", Name: validation.MinLength, Rule: 1, Chain: nil}}}}); err != nil {
+		return result, validation.NewError("storage.SkusClient", "List", err.Error())
+	}
+
 	req, err := client.ListPreparer(ctx)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "storage.SkusClient", "List", nil, "Failure preparing request")
@@ -68,7 +75,7 @@ func (client SkusClient) ListPreparer(ctx context.Context) (*http.Request, error
 		"subscriptionId": autorest.Encode("path", client.SubscriptionID),
 	}
 
-	const APIVersion = "2017-10-01"
+	const APIVersion = "2018-07-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}

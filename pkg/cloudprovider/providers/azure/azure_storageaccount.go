@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
 )

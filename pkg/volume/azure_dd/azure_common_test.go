@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/pkg/util/mount"

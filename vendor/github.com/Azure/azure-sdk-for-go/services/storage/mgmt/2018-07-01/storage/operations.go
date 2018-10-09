@@ -24,51 +24,47 @@ import (
 	"net/http"
 )
 
-// UsageClient is the the Azure Storage Management API.
-type UsageClient struct {
+// OperationsClient is the the Azure Storage Management API.
+type OperationsClient struct {
 	BaseClient
 }
 
-// NewUsageClient creates an instance of the UsageClient client.
-func NewUsageClient(subscriptionID string) UsageClient {
-	return NewUsageClientWithBaseURI(DefaultBaseURI, subscriptionID)
+// NewOperationsClient creates an instance of the OperationsClient client.
+func NewOperationsClient(subscriptionID string) OperationsClient {
+	return NewOperationsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewUsageClientWithBaseURI creates an instance of the UsageClient client.
-func NewUsageClientWithBaseURI(baseURI string, subscriptionID string) UsageClient {
-	return UsageClient{NewWithBaseURI(baseURI, subscriptionID)}
+// NewOperationsClientWithBaseURI creates an instance of the OperationsClient client.
+func NewOperationsClientWithBaseURI(baseURI string, subscriptionID string) OperationsClient {
+	return OperationsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
-// List gets the current usage count and the limit for the resources under the subscription.
-func (client UsageClient) List(ctx context.Context) (result UsageListResult, err error) {
+// List lists all of the available Storage Rest API operations.
+func (client OperationsClient) List(ctx context.Context) (result OperationListResult, err error) {
 	req, err := client.ListPreparer(ctx)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "storage.UsageClient", "List", nil, "Failure preparing request")
+		err = autorest.NewErrorWithError(err, "storage.OperationsClient", "List", nil, "Failure preparing request")
 		return
 	}
 
 	resp, err := client.ListSender(req)
 	if err != nil {
 		result.Response = autorest.Response{Response: resp}
-		err = autorest.NewErrorWithError(err, "storage.UsageClient", "List", resp, "Failure sending request")
+		err = autorest.NewErrorWithError(err, "storage.OperationsClient", "List", resp, "Failure sending request")
 		return
 	}
 
 	result, err = client.ListResponder(resp)
 	if err != nil {
-		err = autorest.NewErrorWithError(err, "storage.UsageClient", "List", resp, "Failure responding to request")
+		err = autorest.NewErrorWithError(err, "storage.OperationsClient", "List", resp, "Failure responding to request")
 	}
 
 	return
 }
 
 // ListPreparer prepares the List request.
-func (client UsageClient) ListPreparer(ctx context.Context) (*http.Request, error) {
-	pathParameters := map[string]interface{}{
-		"subscriptionId": autorest.Encode("path", client.SubscriptionID),
-	}
-
-	const APIVersion = "2017-10-01"
+func (client OperationsClient) ListPreparer(ctx context.Context) (*http.Request, error) {
+	const APIVersion = "2018-07-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -76,21 +72,21 @@ func (client UsageClient) ListPreparer(ctx context.Context) (*http.Request, erro
 	preparer := autorest.CreatePreparer(
 		autorest.AsGet(),
 		autorest.WithBaseURL(client.BaseURI),
-		autorest.WithPathParameters("/subscriptions/{subscriptionId}/providers/Microsoft.Storage/usages", pathParameters),
+		autorest.WithPath("/providers/Microsoft.Storage/operations"),
 		autorest.WithQueryParameters(queryParameters))
 	return preparer.Prepare((&http.Request{}).WithContext(ctx))
 }
 
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
-func (client UsageClient) ListSender(req *http.Request) (*http.Response, error) {
+func (client OperationsClient) ListSender(req *http.Request) (*http.Response, error) {
 	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // ListResponder handles the response to the List request. The method always
 // closes the http.Response Body.
-func (client UsageClient) ListResponder(resp *http.Response) (result UsageListResult, err error) {
+func (client OperationsClient) ListResponder(resp *http.Response) (result OperationListResult, err error) {
 	err = autorest.Respond(
 		resp,
 		client.ByInspecting(),

@@ -117,6 +117,38 @@ func PossibleHTTPProtocolValues() []HTTPProtocol {
 	return []HTTPProtocol{HTTPS, Httpshttp}
 }
 
+// ImmutabilityPolicyState enumerates the values for immutability policy state.
+type ImmutabilityPolicyState string
+
+const (
+	// Locked ...
+	Locked ImmutabilityPolicyState = "Locked"
+	// Unlocked ...
+	Unlocked ImmutabilityPolicyState = "Unlocked"
+)
+
+// PossibleImmutabilityPolicyStateValues returns an array of possible values for the ImmutabilityPolicyState const type.
+func PossibleImmutabilityPolicyStateValues() []ImmutabilityPolicyState {
+	return []ImmutabilityPolicyState{Locked, Unlocked}
+}
+
+// ImmutabilityPolicyUpdateType enumerates the values for immutability policy update type.
+type ImmutabilityPolicyUpdateType string
+
+const (
+	// Extend ...
+	Extend ImmutabilityPolicyUpdateType = "extend"
+	// Lock ...
+	Lock ImmutabilityPolicyUpdateType = "lock"
+	// Put ...
+	Put ImmutabilityPolicyUpdateType = "put"
+)
+
+// PossibleImmutabilityPolicyUpdateTypeValues returns an array of possible values for the ImmutabilityPolicyUpdateType const type.
+func PossibleImmutabilityPolicyUpdateTypeValues() []ImmutabilityPolicyUpdateType {
+	return []ImmutabilityPolicyUpdateType{Extend, Lock, Put}
+}
+
 // KeyPermission enumerates the values for key permission.
 type KeyPermission string
 
@@ -153,6 +185,10 @@ type Kind string
 const (
 	// BlobStorage ...
 	BlobStorage Kind = "BlobStorage"
+	// BlockBlobStorage ...
+	BlockBlobStorage Kind = "BlockBlobStorage"
+	// FileStorage ...
+	FileStorage Kind = "FileStorage"
 	// Storage ...
 	Storage Kind = "Storage"
 	// StorageV2 ...
@@ -161,7 +197,58 @@ const (
 
 // PossibleKindValues returns an array of possible values for the Kind const type.
 func PossibleKindValues() []Kind {
-	return []Kind{BlobStorage, Storage, StorageV2}
+	return []Kind{BlobStorage, BlockBlobStorage, FileStorage, Storage, StorageV2}
+}
+
+// LeaseDuration enumerates the values for lease duration.
+type LeaseDuration string
+
+const (
+	// Fixed ...
+	Fixed LeaseDuration = "Fixed"
+	// Infinite ...
+	Infinite LeaseDuration = "Infinite"
+)
+
+// PossibleLeaseDurationValues returns an array of possible values for the LeaseDuration const type.
+func PossibleLeaseDurationValues() []LeaseDuration {
+	return []LeaseDuration{Fixed, Infinite}
+}
+
+// LeaseState enumerates the values for lease state.
+type LeaseState string
+
+const (
+	// LeaseStateAvailable ...
+	LeaseStateAvailable LeaseState = "Available"
+	// LeaseStateBreaking ...
+	LeaseStateBreaking LeaseState = "Breaking"
+	// LeaseStateBroken ...
+	LeaseStateBroken LeaseState = "Broken"
+	// LeaseStateExpired ...
+	LeaseStateExpired LeaseState = "Expired"
+	// LeaseStateLeased ...
+	LeaseStateLeased LeaseState = "Leased"
+)
+
+// PossibleLeaseStateValues returns an array of possible values for the LeaseState const type.
+func PossibleLeaseStateValues() []LeaseState {
+	return []LeaseState{LeaseStateAvailable, LeaseStateBreaking, LeaseStateBroken, LeaseStateExpired, LeaseStateLeased}
+}
+
+// LeaseStatus enumerates the values for lease status.
+type LeaseStatus string
+
+const (
+	// LeaseStatusLocked ...
+	LeaseStatusLocked LeaseStatus = "Locked"
+	// LeaseStatusUnlocked ...
+	LeaseStatusUnlocked LeaseStatus = "Unlocked"
+)
+
+// PossibleLeaseStatusValues returns an array of possible values for the LeaseStatus const type.
+func PossibleLeaseStatusValues() []LeaseStatus {
+	return []LeaseStatus{LeaseStatusLocked, LeaseStatusUnlocked}
 }
 
 // Permissions enumerates the values for permissions.
@@ -206,6 +293,23 @@ const (
 // PossibleProvisioningStateValues returns an array of possible values for the ProvisioningState const type.
 func PossibleProvisioningStateValues() []ProvisioningState {
 	return []ProvisioningState{Creating, ResolvingDNS, Succeeded}
+}
+
+// PublicAccess enumerates the values for public access.
+type PublicAccess string
+
+const (
+	// PublicAccessBlob ...
+	PublicAccessBlob PublicAccess = "Blob"
+	// PublicAccessContainer ...
+	PublicAccessContainer PublicAccess = "Container"
+	// PublicAccessNone ...
+	PublicAccessNone PublicAccess = "None"
+)
+
+// PossiblePublicAccessValues returns an array of possible values for the PublicAccess const type.
+func PossiblePublicAccessValues() []PublicAccess {
+	return []PublicAccess{PublicAccessBlob, PublicAccessContainer, PublicAccessNone}
 }
 
 // Reason enumerates the values for reason.
@@ -299,6 +403,8 @@ type SkuName string
 const (
 	// PremiumLRS ...
 	PremiumLRS SkuName = "Premium_LRS"
+	// PremiumZRS ...
+	PremiumZRS SkuName = "Premium_ZRS"
 	// StandardGRS ...
 	StandardGRS SkuName = "Standard_GRS"
 	// StandardLRS ...
@@ -311,7 +417,7 @@ const (
 
 // PossibleSkuNameValues returns an array of possible values for the SkuName const type.
 func PossibleSkuNameValues() []SkuName {
-	return []SkuName{PremiumLRS, StandardGRS, StandardLRS, StandardRAGRS, StandardZRS}
+	return []SkuName{PremiumLRS, PremiumZRS, StandardGRS, StandardLRS, StandardRAGRS, StandardZRS}
 }
 
 // SkuTier enumerates the values for sku tier.
@@ -378,22 +484,22 @@ type Account struct {
 	autorest.Response `json:"-"`
 	// Sku - Gets the SKU.
 	Sku *Sku `json:"sku,omitempty"`
-	// Kind - Gets the Kind. Possible values include: 'Storage', 'StorageV2', 'BlobStorage'
+	// Kind - Gets the Kind. Possible values include: 'Storage', 'StorageV2', 'BlobStorage', 'FileStorage', 'BlockBlobStorage'
 	Kind Kind `json:"kind,omitempty"`
 	// Identity - The identity of the resource.
 	Identity *Identity `json:"identity,omitempty"`
 	// AccountProperties - Properties of the storage account.
 	*AccountProperties `json:"properties,omitempty"`
-	// ID - Resource Id
-	ID *string `json:"id,omitempty"`
-	// Name - Resource name
-	Name *string `json:"name,omitempty"`
-	// Type - Resource type
-	Type *string `json:"type,omitempty"`
-	// Location - Resource location
-	Location *string `json:"location,omitempty"`
-	// Tags - Tags assigned to a resource; can be used for viewing and grouping a resource (across resource groups).
+	// Tags - Resource tags.
 	Tags map[string]*string `json:"tags"`
+	// Location - The geo-location where the resource lives
+	Location *string `json:"location,omitempty"`
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
 }
 
 // MarshalJSON is the custom marshaler for Account.
@@ -411,6 +517,12 @@ func (a Account) MarshalJSON() ([]byte, error) {
 	if a.AccountProperties != nil {
 		objectMap["properties"] = a.AccountProperties
 	}
+	if a.Tags != nil {
+		objectMap["tags"] = a.Tags
+	}
+	if a.Location != nil {
+		objectMap["location"] = a.Location
+	}
 	if a.ID != nil {
 		objectMap["id"] = a.ID
 	}
@@ -419,12 +531,6 @@ func (a Account) MarshalJSON() ([]byte, error) {
 	}
 	if a.Type != nil {
 		objectMap["type"] = a.Type
-	}
-	if a.Location != nil {
-		objectMap["location"] = a.Location
-	}
-	if a.Tags != nil {
-		objectMap["tags"] = a.Tags
 	}
 	return json.Marshal(objectMap)
 }
@@ -474,6 +580,24 @@ func (a *Account) UnmarshalJSON(body []byte) error {
 				}
 				a.AccountProperties = &accountProperties
 			}
+		case "tags":
+			if v != nil {
+				var tags map[string]*string
+				err = json.Unmarshal(*v, &tags)
+				if err != nil {
+					return err
+				}
+				a.Tags = tags
+			}
+		case "location":
+			if v != nil {
+				var location string
+				err = json.Unmarshal(*v, &location)
+				if err != nil {
+					return err
+				}
+				a.Location = &location
+			}
 		case "id":
 			if v != nil {
 				var ID string
@@ -501,24 +625,6 @@ func (a *Account) UnmarshalJSON(body []byte) error {
 				}
 				a.Type = &typeVar
 			}
-		case "location":
-			if v != nil {
-				var location string
-				err = json.Unmarshal(*v, &location)
-				if err != nil {
-					return err
-				}
-				a.Location = &location
-			}
-		case "tags":
-			if v != nil {
-				var tags map[string]*string
-				err = json.Unmarshal(*v, &tags)
-				if err != nil {
-					return err
-				}
-				a.Tags = tags
-			}
 		}
 	}
 
@@ -537,7 +643,7 @@ type AccountCheckNameAvailabilityParameters struct {
 type AccountCreateParameters struct {
 	// Sku - Required. Gets or sets the sku name.
 	Sku *Sku `json:"sku,omitempty"`
-	// Kind - Required. Indicates the type of storage account. Possible values include: 'Storage', 'StorageV2', 'BlobStorage'
+	// Kind - Required. Indicates the type of storage account. Possible values include: 'Storage', 'StorageV2', 'BlobStorage', 'FileStorage', 'BlockBlobStorage'
 	Kind Kind `json:"kind,omitempty"`
 	// Location - Required. Gets or sets the location of the resource. This will be one of the supported and registered Azure Geo Regions (e.g. West US, East US, Southeast Asia, etc.). The geo region of a resource cannot be changed once it is created, but if an identical geo region is specified on update, the request will succeed.
 	Location *string `json:"location,omitempty"`
@@ -666,6 +772,96 @@ type AccountListResult struct {
 	Value *[]Account `json:"value,omitempty"`
 }
 
+// AccountManagementPolicies the Get Storage Account ManagementPolicies operation response.
+type AccountManagementPolicies struct {
+	autorest.Response `json:"-"`
+	// AccountManagementPoliciesRulesProperty - Returns the Storage Account Data Policies Rules.
+	*AccountManagementPoliciesRulesProperty `json:"properties,omitempty"`
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for AccountManagementPolicies.
+func (amp AccountManagementPolicies) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if amp.AccountManagementPoliciesRulesProperty != nil {
+		objectMap["properties"] = amp.AccountManagementPoliciesRulesProperty
+	}
+	if amp.ID != nil {
+		objectMap["id"] = amp.ID
+	}
+	if amp.Name != nil {
+		objectMap["name"] = amp.Name
+	}
+	if amp.Type != nil {
+		objectMap["type"] = amp.Type
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for AccountManagementPolicies struct.
+func (amp *AccountManagementPolicies) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var accountManagementPoliciesRulesProperty AccountManagementPoliciesRulesProperty
+				err = json.Unmarshal(*v, &accountManagementPoliciesRulesProperty)
+				if err != nil {
+					return err
+				}
+				amp.AccountManagementPoliciesRulesProperty = &accountManagementPoliciesRulesProperty
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				amp.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				amp.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				amp.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// AccountManagementPoliciesRulesProperty the Storage Account Data Policies properties.
+type AccountManagementPoliciesRulesProperty struct {
+	// LastModifiedTime - Returns the date and time the ManagementPolicies was last modified.
+	LastModifiedTime *date.Time `json:"lastModifiedTime,omitempty"`
+	// Policy - The Storage Account ManagementPolicies Rules, in JSON format. See more details in: https://docs.microsoft.com/en-us/azure/storage/common/storage-lifecycle-managment-concepts.
+	Policy interface{} `json:"policy,omitempty"`
+}
+
 // AccountProperties properties of the storage account.
 type AccountProperties struct {
 	// ProvisioningState - Gets the status of the storage account at the time the operation was called. Possible values include: 'Creating', 'ResolvingDNS', 'Succeeded'
@@ -692,10 +888,14 @@ type AccountProperties struct {
 	Encryption *Encryption `json:"encryption,omitempty"`
 	// AccessTier - Required for storage accounts where kind = BlobStorage. The access tier used for billing. Possible values include: 'Hot', 'Cool'
 	AccessTier AccessTier `json:"accessTier,omitempty"`
+	// EnableAzureFilesAadIntegration - Enables Azure Files AAD Integration for SMB if sets to true.
+	EnableAzureFilesAadIntegration *bool `json:"azureFilesAadIntegration,omitempty"`
 	// EnableHTTPSTrafficOnly - Allows https traffic only to storage service if sets to true.
 	EnableHTTPSTrafficOnly *bool `json:"supportsHttpsTrafficOnly,omitempty"`
 	// NetworkRuleSet - Network rule set
 	NetworkRuleSet *NetworkRuleSet `json:"networkAcls,omitempty"`
+	// IsHnsEnabled - Account HierarchicalNamespace enabled if sets to true.
+	IsHnsEnabled *bool `json:"isHnsEnabled,omitempty"`
 }
 
 // AccountPropertiesCreateParameters the parameters used to create the storage account.
@@ -708,8 +908,12 @@ type AccountPropertiesCreateParameters struct {
 	NetworkRuleSet *NetworkRuleSet `json:"networkAcls,omitempty"`
 	// AccessTier - Required for storage accounts where kind = BlobStorage. The access tier used for billing. Possible values include: 'Hot', 'Cool'
 	AccessTier AccessTier `json:"accessTier,omitempty"`
+	// EnableAzureFilesAadIntegration - Enables Azure Files AAD Integration for SMB if sets to true.
+	EnableAzureFilesAadIntegration *bool `json:"azureFilesAadIntegration,omitempty"`
 	// EnableHTTPSTrafficOnly - Allows https traffic only to storage service if sets to true.
 	EnableHTTPSTrafficOnly *bool `json:"supportsHttpsTrafficOnly,omitempty"`
+	// IsHnsEnabled - Account HierarchicalNamespace enabled if sets to true.
+	IsHnsEnabled *bool `json:"isHnsEnabled,omitempty"`
 }
 
 // AccountPropertiesUpdateParameters the parameters used when updating a storage account.
@@ -720,6 +924,8 @@ type AccountPropertiesUpdateParameters struct {
 	Encryption *Encryption `json:"encryption,omitempty"`
 	// AccessTier - Required for storage accounts where kind = BlobStorage. The access tier used for billing. Possible values include: 'Hot', 'Cool'
 	AccessTier AccessTier `json:"accessTier,omitempty"`
+	// EnableAzureFilesAadIntegration - Enables Azure Files AAD Integration for SMB if sets to true.
+	EnableAzureFilesAadIntegration *bool `json:"azureFilesAadIntegration,omitempty"`
 	// EnableHTTPSTrafficOnly - Allows https traffic only to storage service if sets to true.
 	EnableHTTPSTrafficOnly *bool `json:"supportsHttpsTrafficOnly,omitempty"`
 	// NetworkRuleSet - Network rule set
@@ -782,7 +988,7 @@ func (future *AccountsCreateFuture) Result(client AccountsClient) (a Account, er
 
 // AccountUpdateParameters the parameters that can be provided when updating the storage account properties.
 type AccountUpdateParameters struct {
-	// Sku - Gets or sets the SKU name. Note that the SKU name cannot be updated to Standard_ZRS or Premium_LRS, nor can accounts of those sku names be updated to any other value.
+	// Sku - Gets or sets the SKU name. Note that the SKU name cannot be updated to Standard_ZRS, Premium_LRS or Premium_ZRS, nor can accounts of those sku names be updated to any other value.
 	Sku *Sku `json:"sku,omitempty"`
 	// Tags - Gets or sets a list of key value pairs that describe the resource. These tags can be used in viewing and grouping this resource (across resource groups). A maximum of 15 tags can be provided for a resource. Each tag must have a key no greater in length than 128 characters and a value no greater in length than 256 characters.
 	Tags map[string]*string `json:"tags"`
@@ -790,7 +996,7 @@ type AccountUpdateParameters struct {
 	Identity *Identity `json:"identity,omitempty"`
 	// AccountPropertiesUpdateParameters - The parameters used when updating a storage account.
 	*AccountPropertiesUpdateParameters `json:"properties,omitempty"`
-	// Kind - Optional. Indicates the type of storage account. Currently only StorageV2 value supported by server. Possible values include: 'Storage', 'StorageV2', 'BlobStorage'
+	// Kind - Optional. Indicates the type of storage account. Currently only StorageV2 value supported by server. Possible values include: 'Storage', 'StorageV2', 'BlobStorage', 'FileStorage', 'BlockBlobStorage'
 	Kind Kind `json:"kind,omitempty"`
 }
 
@@ -875,6 +1081,114 @@ func (aup *AccountUpdateParameters) UnmarshalJSON(body []byte) error {
 	return nil
 }
 
+// AzureEntityResource the resource model definition for a Azure Resource Manager resource with an etag.
+type AzureEntityResource struct {
+	// Etag - Resource Etag.
+	Etag *string `json:"etag,omitempty"`
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// BlobContainer properties of the blob container, including Id, resource name, resource type, Etag.
+type BlobContainer struct {
+	autorest.Response `json:"-"`
+	// ContainerProperties - Properties of the blob container.
+	*ContainerProperties `json:"properties,omitempty"`
+	// Etag - Resource Etag.
+	Etag *string `json:"etag,omitempty"`
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for BlobContainer.
+func (bc BlobContainer) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if bc.ContainerProperties != nil {
+		objectMap["properties"] = bc.ContainerProperties
+	}
+	if bc.Etag != nil {
+		objectMap["etag"] = bc.Etag
+	}
+	if bc.ID != nil {
+		objectMap["id"] = bc.ID
+	}
+	if bc.Name != nil {
+		objectMap["name"] = bc.Name
+	}
+	if bc.Type != nil {
+		objectMap["type"] = bc.Type
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for BlobContainer struct.
+func (bc *BlobContainer) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var containerProperties ContainerProperties
+				err = json.Unmarshal(*v, &containerProperties)
+				if err != nil {
+					return err
+				}
+				bc.ContainerProperties = &containerProperties
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				bc.Etag = &etag
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				bc.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				bc.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				bc.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
 // CheckNameAvailabilityResult the CheckNameAvailability operation response.
 type CheckNameAvailabilityResult struct {
 	autorest.Response `json:"-"`
@@ -884,6 +1198,66 @@ type CheckNameAvailabilityResult struct {
 	Reason Reason `json:"reason,omitempty"`
 	// Message - Gets an error message explaining the Reason value in more detail.
 	Message *string `json:"message,omitempty"`
+}
+
+// ContainerProperties the properties of a container.
+type ContainerProperties struct {
+	// PublicAccess - Specifies whether data in the container may be accessed publicly and the level of access. Possible values include: 'PublicAccessContainer', 'PublicAccessBlob', 'PublicAccessNone'
+	PublicAccess PublicAccess `json:"publicAccess,omitempty"`
+	// LastModifiedTime - Returns the date and time the container was last modified.
+	LastModifiedTime *date.Time `json:"lastModifiedTime,omitempty"`
+	// LeaseStatus - The lease status of the container. Possible values include: 'LeaseStatusLocked', 'LeaseStatusUnlocked'
+	LeaseStatus LeaseStatus `json:"leaseStatus,omitempty"`
+	// LeaseState - Lease state of the container. Possible values include: 'LeaseStateAvailable', 'LeaseStateLeased', 'LeaseStateExpired', 'LeaseStateBreaking', 'LeaseStateBroken'
+	LeaseState LeaseState `json:"leaseState,omitempty"`
+	// LeaseDuration - Specifies whether the lease on a container is of infinite or fixed duration, only when the container is leased. Possible values include: 'Infinite', 'Fixed'
+	LeaseDuration LeaseDuration `json:"leaseDuration,omitempty"`
+	// Metadata - A name-value pair to associate with the container as metadata.
+	Metadata map[string]*string `json:"metadata"`
+	// ImmutabilityPolicy - The ImmutabilityPolicy property of the container.
+	ImmutabilityPolicy *ImmutabilityPolicyProperties `json:"immutabilityPolicy,omitempty"`
+	// LegalHold - The LegalHold property of the container.
+	LegalHold *LegalHoldProperties `json:"legalHold,omitempty"`
+	// HasLegalHold - The hasLegalHold public property is set to true by SRP if there are at least one existing tag. The hasLegalHold public property is set to false by SRP if all existing legal hold tags are cleared out. There can be a maximum of 1000 blob containers with hasLegalHold=true for a given account.
+	HasLegalHold *bool `json:"hasLegalHold,omitempty"`
+	// HasImmutabilityPolicy - The hasImmutabilityPolicy public property is set to true by SRP if ImmutabilityPolicy has been created for this container. The hasImmutabilityPolicy public property is set to false by SRP if ImmutabilityPolicy has not been created for this container.
+	HasImmutabilityPolicy *bool `json:"hasImmutabilityPolicy,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ContainerProperties.
+func (cp ContainerProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if cp.PublicAccess != "" {
+		objectMap["publicAccess"] = cp.PublicAccess
+	}
+	if cp.LastModifiedTime != nil {
+		objectMap["lastModifiedTime"] = cp.LastModifiedTime
+	}
+	if cp.LeaseStatus != "" {
+		objectMap["leaseStatus"] = cp.LeaseStatus
+	}
+	if cp.LeaseState != "" {
+		objectMap["leaseState"] = cp.LeaseState
+	}
+	if cp.LeaseDuration != "" {
+		objectMap["leaseDuration"] = cp.LeaseDuration
+	}
+	if cp.Metadata != nil {
+		objectMap["metadata"] = cp.Metadata
+	}
+	if cp.ImmutabilityPolicy != nil {
+		objectMap["immutabilityPolicy"] = cp.ImmutabilityPolicy
+	}
+	if cp.LegalHold != nil {
+		objectMap["legalHold"] = cp.LegalHold
+	}
+	if cp.HasLegalHold != nil {
+		objectMap["hasLegalHold"] = cp.HasLegalHold
+	}
+	if cp.HasImmutabilityPolicy != nil {
+		objectMap["hasImmutabilityPolicy"] = cp.HasImmutabilityPolicy
+	}
+	return json.Marshal(objectMap)
 }
 
 // CustomDomain the custom domain assigned to this storage account. This can be set via Update.
@@ -932,7 +1306,7 @@ type EncryptionServices struct {
 	Queue *EncryptionService `json:"queue,omitempty"`
 }
 
-// Endpoints the URIs that are used to perform a retrieval of a public blob, queue, or table object.
+// Endpoints the URIs that are used to perform a retrieval of a public blob, queue, table, web or dfs object.
 type Endpoints struct {
 	// Blob - Gets the blob endpoint.
 	Blob *string `json:"blob,omitempty"`
@@ -942,6 +1316,10 @@ type Endpoints struct {
 	Table *string `json:"table,omitempty"`
 	// File - Gets the file endpoint.
 	File *string `json:"file,omitempty"`
+	// Web - Gets the web endpoint.
+	Web *string `json:"web,omitempty"`
+	// Dfs - Gets the dfs endpoint.
+	Dfs *string `json:"dfs,omitempty"`
 }
 
 // Identity identity for the resource.
@@ -952,6 +1330,178 @@ type Identity struct {
 	TenantID *string `json:"tenantId,omitempty"`
 	// Type - The identity type.
 	Type *string `json:"type,omitempty"`
+}
+
+// ImmutabilityPolicy the ImmutabilityPolicy property of a blob container, including Id, resource name, resource
+// type, Etag.
+type ImmutabilityPolicy struct {
+	autorest.Response `json:"-"`
+	// ImmutabilityPolicyProperty - The properties of an ImmutabilityPolicy of a blob container.
+	*ImmutabilityPolicyProperty `json:"properties,omitempty"`
+	// Etag - Resource Etag.
+	Etag *string `json:"etag,omitempty"`
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ImmutabilityPolicy.
+func (IP ImmutabilityPolicy) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if IP.ImmutabilityPolicyProperty != nil {
+		objectMap["properties"] = IP.ImmutabilityPolicyProperty
+	}
+	if IP.Etag != nil {
+		objectMap["etag"] = IP.Etag
+	}
+	if IP.ID != nil {
+		objectMap["id"] = IP.ID
+	}
+	if IP.Name != nil {
+		objectMap["name"] = IP.Name
+	}
+	if IP.Type != nil {
+		objectMap["type"] = IP.Type
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for ImmutabilityPolicy struct.
+func (IP *ImmutabilityPolicy) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var immutabilityPolicyProperty ImmutabilityPolicyProperty
+				err = json.Unmarshal(*v, &immutabilityPolicyProperty)
+				if err != nil {
+					return err
+				}
+				IP.ImmutabilityPolicyProperty = &immutabilityPolicyProperty
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				IP.Etag = &etag
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				IP.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				IP.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				IP.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// ImmutabilityPolicyProperties the properties of an ImmutabilityPolicy of a blob container.
+type ImmutabilityPolicyProperties struct {
+	// ImmutabilityPolicyProperty - The properties of an ImmutabilityPolicy of a blob container.
+	*ImmutabilityPolicyProperty `json:"properties,omitempty"`
+	// Etag - ImmutabilityPolicy Etag.
+	Etag *string `json:"etag,omitempty"`
+	// UpdateHistory - The ImmutabilityPolicy update history of the blob container.
+	UpdateHistory *[]UpdateHistoryProperty `json:"updateHistory,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ImmutabilityPolicyProperties.
+func (ipp ImmutabilityPolicyProperties) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if ipp.ImmutabilityPolicyProperty != nil {
+		objectMap["properties"] = ipp.ImmutabilityPolicyProperty
+	}
+	if ipp.Etag != nil {
+		objectMap["etag"] = ipp.Etag
+	}
+	if ipp.UpdateHistory != nil {
+		objectMap["updateHistory"] = ipp.UpdateHistory
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for ImmutabilityPolicyProperties struct.
+func (ipp *ImmutabilityPolicyProperties) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var immutabilityPolicyProperty ImmutabilityPolicyProperty
+				err = json.Unmarshal(*v, &immutabilityPolicyProperty)
+				if err != nil {
+					return err
+				}
+				ipp.ImmutabilityPolicyProperty = &immutabilityPolicyProperty
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				ipp.Etag = &etag
+			}
+		case "updateHistory":
+			if v != nil {
+				var updateHistory []UpdateHistoryProperty
+				err = json.Unmarshal(*v, &updateHistory)
+				if err != nil {
+					return err
+				}
+				ipp.UpdateHistory = &updateHistory
+			}
+		}
+	}
+
+	return nil
+}
+
+// ImmutabilityPolicyProperty the properties of an ImmutabilityPolicy of a blob container.
+type ImmutabilityPolicyProperty struct {
+	// ImmutabilityPeriodSinceCreationInDays - The immutability period for the blobs in the container since the policy creation, in days.
+	ImmutabilityPeriodSinceCreationInDays *int32 `json:"immutabilityPeriodSinceCreationInDays,omitempty"`
+	// State - The ImmutabilityPolicy state of a blob container, possible values include: Locked and Unlocked. Possible values include: 'Locked', 'Unlocked'
+	State ImmutabilityPolicyState `json:"state,omitempty"`
 }
 
 // IPRule IP rule with specific IP or IP range in CIDR format.
@@ -972,6 +1522,23 @@ type KeyVaultProperties struct {
 	KeyVaultURI *string `json:"keyvaulturi,omitempty"`
 }
 
+// LegalHold the LegalHold property of a blob container.
+type LegalHold struct {
+	autorest.Response `json:"-"`
+	// HasLegalHold - The hasLegalHold public property is set to true by SRP if there are at least one existing tag. The hasLegalHold public property is set to false by SRP if all existing legal hold tags are cleared out. There can be a maximum of 1000 blob containers with hasLegalHold=true for a given account.
+	HasLegalHold *bool `json:"hasLegalHold,omitempty"`
+	// Tags - Each tag should be 3 to 23 alphanumeric characters and is normalized to lower case at SRP.
+	Tags *[]string `json:"tags,omitempty"`
+}
+
+// LegalHoldProperties the LegalHold property of a blob container.
+type LegalHoldProperties struct {
+	// HasLegalHold - The hasLegalHold public property is set to true by SRP if there are at least one existing tag. The hasLegalHold public property is set to false by SRP if all existing legal hold tags are cleared out. There can be a maximum of 1000 blob containers with hasLegalHold=true for a given account.
+	HasLegalHold *bool `json:"hasLegalHold,omitempty"`
+	// Tags - The list of LegalHold tags of a blob container.
+	Tags *[]TagProperty `json:"tags,omitempty"`
+}
+
 // ListAccountSasResponse the List SAS credentials operation response.
 type ListAccountSasResponse struct {
 	autorest.Response `json:"-"`
@@ -979,11 +1546,160 @@ type ListAccountSasResponse struct {
 	AccountSasToken *string `json:"accountSasToken,omitempty"`
 }
 
+// ListContainerItem the blob container properties be listed out.
+type ListContainerItem struct {
+	// ContainerProperties - The blob container properties be listed out.
+	*ContainerProperties `json:"properties,omitempty"`
+	// Etag - Resource Etag.
+	Etag *string `json:"etag,omitempty"`
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ListContainerItem.
+func (lci ListContainerItem) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if lci.ContainerProperties != nil {
+		objectMap["properties"] = lci.ContainerProperties
+	}
+	if lci.Etag != nil {
+		objectMap["etag"] = lci.Etag
+	}
+	if lci.ID != nil {
+		objectMap["id"] = lci.ID
+	}
+	if lci.Name != nil {
+		objectMap["name"] = lci.Name
+	}
+	if lci.Type != nil {
+		objectMap["type"] = lci.Type
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for ListContainerItem struct.
+func (lci *ListContainerItem) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var containerProperties ContainerProperties
+				err = json.Unmarshal(*v, &containerProperties)
+				if err != nil {
+					return err
+				}
+				lci.ContainerProperties = &containerProperties
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				lci.Etag = &etag
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				lci.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				lci.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				lci.Type = &typeVar
+			}
+		}
+	}
+
+	return nil
+}
+
+// ListContainerItems the list of blob containers.
+type ListContainerItems struct {
+	autorest.Response `json:"-"`
+	// Value - The list of blob containers.
+	Value *[]ListContainerItem `json:"value,omitempty"`
+}
+
 // ListServiceSasResponse the List service SAS credentials operation response.
 type ListServiceSasResponse struct {
 	autorest.Response `json:"-"`
 	// ServiceSasToken - List service SAS credentials of speicific resource.
 	ServiceSasToken *string `json:"serviceSasToken,omitempty"`
+}
+
+// ManagementPoliciesRules the Storage Account ManagementPolicies Rules, in JSON format. See more details in:
+// https://docs.microsoft.com/en-us/azure/storage/common/storage-lifecycle-managment-concepts.
+type ManagementPoliciesRules struct {
+	// Policy - The Storage Account ManagementPolicies Rules, in JSON format. See more details in: https://docs.microsoft.com/en-us/azure/storage/common/storage-lifecycle-managment-concepts.
+	Policy interface{} `json:"policy,omitempty"`
+}
+
+// ManagementPoliciesRulesSetParameter the Storage Account ManagementPolicies Rules, in JSON format. See more
+// details in: https://docs.microsoft.com/en-us/azure/storage/common/storage-lifecycle-managment-concepts.
+type ManagementPoliciesRulesSetParameter struct {
+	// ManagementPoliciesRules - The Storage Account ManagementPolicies Rules, in JSON format. See more details in: https://docs.microsoft.com/en-us/azure/storage/common/storage-lifecycle-managment-concepts.
+	*ManagementPoliciesRules `json:"properties,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ManagementPoliciesRulesSetParameter.
+func (mprsp ManagementPoliciesRulesSetParameter) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if mprsp.ManagementPoliciesRules != nil {
+		objectMap["properties"] = mprsp.ManagementPoliciesRules
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for ManagementPoliciesRulesSetParameter struct.
+func (mprsp *ManagementPoliciesRulesSetParameter) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var managementPoliciesRules ManagementPoliciesRules
+				err = json.Unmarshal(*v, &managementPoliciesRules)
+				if err != nil {
+					return err
+				}
+				mprsp.ManagementPoliciesRules = &managementPoliciesRules
+			}
+		}
+	}
+
+	return nil
 }
 
 // MetricSpecification metric specification of operation.
@@ -1109,6 +1825,8 @@ type OperationDisplay struct {
 	Resource *string `json:"resource,omitempty"`
 	// Operation - Type of operation: get, read, delete, etc.
 	Operation *string `json:"operation,omitempty"`
+	// Description - Description of the operation.
+	Description *string `json:"description,omitempty"`
 }
 
 // OperationListResult result of the request to list Storage operations. It contains a list of operations and a URL
@@ -1125,39 +1843,25 @@ type OperationProperties struct {
 	ServiceSpecification *ServiceSpecification `json:"serviceSpecification,omitempty"`
 }
 
-// Resource describes a storage resource.
-type Resource struct {
-	// ID - Resource Id
+// ProxyResource the resource model definition for a ARM proxy resource. It will have everything other than
+// required location and tags
+type ProxyResource struct {
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
 	ID *string `json:"id,omitempty"`
-	// Name - Resource name
+	// Name - The name of the resource
 	Name *string `json:"name,omitempty"`
-	// Type - Resource type
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
 	Type *string `json:"type,omitempty"`
-	// Location - Resource location
-	Location *string `json:"location,omitempty"`
-	// Tags - Tags assigned to a resource; can be used for viewing and grouping a resource (across resource groups).
-	Tags map[string]*string `json:"tags"`
 }
 
-// MarshalJSON is the custom marshaler for Resource.
-func (r Resource) MarshalJSON() ([]byte, error) {
-	objectMap := make(map[string]interface{})
-	if r.ID != nil {
-		objectMap["id"] = r.ID
-	}
-	if r.Name != nil {
-		objectMap["name"] = r.Name
-	}
-	if r.Type != nil {
-		objectMap["type"] = r.Type
-	}
-	if r.Location != nil {
-		objectMap["location"] = r.Location
-	}
-	if r.Tags != nil {
-		objectMap["tags"] = r.Tags
-	}
-	return json.Marshal(objectMap)
+// Resource ...
+type Resource struct {
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
 }
 
 // Restriction the restriction because of which SKU cannot be used.
@@ -1166,7 +1870,7 @@ type Restriction struct {
 	Type *string `json:"type,omitempty"`
 	// Values - The value of restrictions. If the restriction type is set to location. This would be different locations where the SKU is restricted.
 	Values *[]string `json:"values,omitempty"`
-	// ReasonCode - The reason for the restriction. As of now this can be “QuotaId” or “NotAvailableForSubscription”. Quota Id is set when the SKU has requiredQuotas parameter as the subscription does not belong to that quota. The “NotAvailableForSubscription” is related to capacity at DC. Possible values include: 'QuotaID', 'NotAvailableForSubscription'
+	// ReasonCode - The reason for the restriction. As of now this can be "QuotaId" or "NotAvailableForSubscription". Quota Id is set when the SKU has requiredQuotas parameter as the subscription does not belong to that quota. The "NotAvailableForSubscription" is related to capacity at DC. Possible values include: 'QuotaID', 'NotAvailableForSubscription'
 	ReasonCode ReasonCode `json:"reasonCode,omitempty"`
 }
 
@@ -1218,13 +1922,13 @@ type ServiceSpecification struct {
 
 // Sku the SKU of the storage account.
 type Sku struct {
-	// Name - Gets or sets the sku name. Required for account creation; optional for update. Note that in older versions, sku name was called accountType. Possible values include: 'StandardLRS', 'StandardGRS', 'StandardRAGRS', 'StandardZRS', 'PremiumLRS'
+	// Name - Gets or sets the sku name. Required for account creation; optional for update. Note that in older versions, sku name was called accountType. Possible values include: 'StandardLRS', 'StandardGRS', 'StandardRAGRS', 'StandardZRS', 'PremiumLRS', 'PremiumZRS'
 	Name SkuName `json:"name,omitempty"`
 	// Tier - Gets the sku tier. This is based on the SKU name. Possible values include: 'Standard', 'Premium'
 	Tier SkuTier `json:"tier,omitempty"`
 	// ResourceType - The type of the resource, usually it is 'storageAccounts'.
 	ResourceType *string `json:"resourceType,omitempty"`
-	// Kind - Indicates the type of storage account. Possible values include: 'Storage', 'StorageV2', 'BlobStorage'
+	// Kind - Indicates the type of storage account. Possible values include: 'Storage', 'StorageV2', 'BlobStorage', 'FileStorage', 'BlockBlobStorage'
 	Kind Kind `json:"kind,omitempty"`
 	// Locations - The set of locations that the SKU is available. This will be supported and registered Azure Geo Regions (e.g. West US, East US, Southeast Asia, etc.).
 	Locations *[]string `json:"locations,omitempty"`
@@ -1248,6 +1952,71 @@ type SkuListResult struct {
 	autorest.Response `json:"-"`
 	// Value - Get the list result of storage SKUs and their properties.
 	Value *[]Sku `json:"value,omitempty"`
+}
+
+// TagProperty a tag of the LegalHold of a blob container.
+type TagProperty struct {
+	// Tag - The tag value.
+	Tag *string `json:"tag,omitempty"`
+	// Timestamp - Returns the date and time the tag was added.
+	Timestamp *date.Time `json:"timestamp,omitempty"`
+	// ObjectIdentifier - Returns the Object ID of the user who added the tag.
+	ObjectIdentifier *string `json:"objectIdentifier,omitempty"`
+	// TenantID - Returns the Tenant ID that issued the token for the user who added the tag.
+	TenantID *string `json:"tenantId,omitempty"`
+	// Upn - Returns the User Principal Name of the user who added the tag.
+	Upn *string `json:"upn,omitempty"`
+}
+
+// TrackedResource the resource model definition for a ARM tracked top level resource
+type TrackedResource struct {
+	// Tags - Resource tags.
+	Tags map[string]*string `json:"tags"`
+	// Location - The geo-location where the resource lives
+	Location *string `json:"location,omitempty"`
+	// ID - Fully qualified resource Id for the resource. Ex - /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID *string `json:"id,omitempty"`
+	// Name - The name of the resource
+	Name *string `json:"name,omitempty"`
+	// Type - The type of the resource. Ex- Microsoft.Compute/virtualMachines or Microsoft.Storage/storageAccounts.
+	Type *string `json:"type,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for TrackedResource.
+func (tr TrackedResource) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if tr.Tags != nil {
+		objectMap["tags"] = tr.Tags
+	}
+	if tr.Location != nil {
+		objectMap["location"] = tr.Location
+	}
+	if tr.ID != nil {
+		objectMap["id"] = tr.ID
+	}
+	if tr.Name != nil {
+		objectMap["name"] = tr.Name
+	}
+	if tr.Type != nil {
+		objectMap["type"] = tr.Type
+	}
+	return json.Marshal(objectMap)
+}
+
+// UpdateHistoryProperty an update history of the ImmutabilityPolicy of a blob container.
+type UpdateHistoryProperty struct {
+	// Update - The ImmutabilityPolicy update type of a blob container, possible values include: put, lock and extend. Possible values include: 'Put', 'Lock', 'Extend'
+	Update ImmutabilityPolicyUpdateType `json:"update,omitempty"`
+	// ImmutabilityPeriodSinceCreationInDays - The immutability period for the blobs in the container since the policy creation, in days.
+	ImmutabilityPeriodSinceCreationInDays *int32 `json:"immutabilityPeriodSinceCreationInDays,omitempty"`
+	// Timestamp - Returns the date and time the ImmutabilityPolicy was updated.
+	Timestamp *date.Time `json:"timestamp,omitempty"`
+	// ObjectIdentifier - Returns the Object ID of the user who updated the ImmutabilityPolicy.
+	ObjectIdentifier *string `json:"objectIdentifier,omitempty"`
+	// TenantID - Returns the Tenant ID that issued the token for the user who updated the ImmutabilityPolicy.
+	TenantID *string `json:"tenantId,omitempty"`
+	// Upn - Returns the User Principal Name of the user who updated the ImmutabilityPolicy.
+	Upn *string `json:"upn,omitempty"`
 }
 
 // Usage describes Storage Resource Usage.
