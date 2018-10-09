@@ -1202,7 +1202,7 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 			return notImplemented(action)
 		})
 
-		result := kubelet.tryRegisterWithAPIServer(tc.newNode)
+		result, _ := kubelet.tryRegisterWithAPIServer(tc.newNode)
 		require.Equal(t, tc.expectedResult, result, "test [%s]", tc.name)
 
 		actions := kubeClient.Actions()
