@@ -12,7 +12,8 @@ go_library(
         "doc.go",
         "ipnet.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/util/net/sets",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/net/sets",
+    importpath = "k8s.io/apimachinery/pkg/util/net/sets",
 )
 
 go_test(

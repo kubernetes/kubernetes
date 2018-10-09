@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )

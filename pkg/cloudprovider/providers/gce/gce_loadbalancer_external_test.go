@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	netsets "k8s.io/apimachinery/pkg/util/net/sets"
 )
 
 func TestEnsureStaticIP(t *testing.T) {

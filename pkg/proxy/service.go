@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
 // BaseServiceInfo contains base information that defines a service.

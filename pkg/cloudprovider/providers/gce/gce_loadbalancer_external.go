@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	netsets "k8s.io/apimachinery/pkg/util/net/sets"
 
 	"github.com/golang/glog"
 	computealpha "google.golang.org/api/compute/v0.alpha"
