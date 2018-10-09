@@ -251,14 +251,9 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 // It is more extensive than IsLikelyNotMountPoint
 // and it detects bind mounts in linux
 func IsNotMountPoint(mounter Interface, file string) (bool, error) {
-	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
-	resolvedFile, err := mounter.EvalHostSymlinks(file)
-	if err != nil {
-		return true, err
-	}
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
-	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(resolvedFile)
+	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
 	if notMntErr != nil && os.IsPermission(notMntErr) {
 		// We were not allowed to do the simple stat() check, e.g. on NFS with
 		// root_squash. Fall back to /proc/mounts check below.
@@ -272,6 +267,13 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	if notMnt == false {
 		return notMnt, nil
 	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+	resolvedFile, err := mounter.EvalHostSymlinks(file)
+	if err != nil {
+		return true, err
+	}
+
 	// check all mountpoints since IsLikelyNotMountPoint
 	// is not reliable for some mountpoint types
 	mountPoints, mountPointsErr := mounter.List()
