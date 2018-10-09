@@ -389,8 +389,6 @@ pkg/volume/cephfs
 pkg/volume/configmap
 pkg/volume/csi/fake
 pkg/volume/empty_dir
-pkg/volume/fc
-pkg/volume/flocker
 pkg/volume/git_repo
 pkg/volume/host_path
 pkg/volume/iscsi

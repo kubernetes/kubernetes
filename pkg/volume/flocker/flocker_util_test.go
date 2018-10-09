@@ -44,7 +44,7 @@ func TestFlockerUtil_CreateVolume(t *testing.T) {
 	defer os.RemoveAll(dir)
 	provisioner.flockerClient = fakeFlockerClient
 
-	flockerUtil := &FlockerUtil{}
+	flockerUtil := &flockerUtil{}
 
 	datasetID, size, _, err := flockerUtil.CreateVolume(provisioner)
 	assert.NoError(err)
