@@ -29,6 +29,7 @@ go_library(
     srcs = [
         "http.go",
         "interface.go",
+        "net.go",
         "port_range.go",
         "port_split.go",
         "util.go",
@@ -51,6 +52,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net/sets:all-srcs",
+    ],
     tags = ["automanaged"],
 )
