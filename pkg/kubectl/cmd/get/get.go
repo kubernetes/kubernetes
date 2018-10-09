@@ -381,7 +381,7 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 
 	return &RuntimeSorter{
 		field:   parsedField,
-		decoder: cmdutil.InternalVersionDecoder(),
+		decoder: legacyscheme.Codecs.UniversalDecoder(),
 		objects: objects,
 	}
 }

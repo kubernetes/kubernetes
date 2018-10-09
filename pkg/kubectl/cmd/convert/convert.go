@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -173,7 +174,9 @@ func (o *ConvertOptions) RunConvert() error {
 		}
 	}
 
-	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, cmdutil.InternalVersionJSONEncoder())
+	internalEncoder := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	internalVersionJSONEncoder := unstructured.JSONFallbackEncoder{Encoder: internalEncoder}
+	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder)
 	if err != nil {
 		return err
 	}
