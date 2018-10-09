@@ -127,6 +127,62 @@ func TestGetPrefix(t *testing.T) {
 	}
 }
 
+func TestStripPathShortcuts(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "test single path shortcut prefix",
+			input:    "../foo/bar",
+			expected: "foo/bar",
+		},
+		{
+			name:     "test multiple path shortcuts",
+			input:    "../../foo/bar",
+			expected: "foo/bar",
+		},
+		{
+			name:     "test multiple path shortcuts with absolute path",
+			input:    "/tmp/one/two/../../foo/bar",
+			expected: "tmp/foo/bar",
+		},
+		{
+			name:     "test multiple path shortcuts with no named directory",
+			input:    "../../",
+			expected: "",
+		},
+		{
+			name:     "test multiple path shortcuts with no named directory and no trailing slash",
+			input:    "../..",
+			expected: "",
+		},
+		{
+			name:     "test multiple path shortcuts with absolute path and filename containing leading dots",
+			input:    "/tmp/one/two/../../foo/..bar",
+			expected: "tmp/foo/..bar",
+		},
+		{
+			name:     "test multiple path shortcuts with no named directory and filename containing leading dots",
+			input:    "../...foo",
+			expected: "...foo",
+		},
+		{
+			name:     "test filename containing leading dots",
+			input:    "...foo",
+			expected: "...foo",
+		},
+	}
+
+	for _, test := range tests {
+		out := stripPathShortcuts(test.input)
+		if out != test.expected {
+			t.Errorf("expected: %s, saw: %s", test.expected, out)
+		}
+	}
+}
+
 func TestTarUntar(t *testing.T) {
 	dir, err := ioutil.TempDir("", "input")
 	dir2, err2 := ioutil.TempDir("", "output")
