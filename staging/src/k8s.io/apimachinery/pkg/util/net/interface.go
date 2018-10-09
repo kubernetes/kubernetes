@@ -395,6 +395,16 @@ func chooseHostInterfaceFromRoute(routes []Route, nw networkInterfacer) (net.IP,
 				klog.V(4).Infof("Found active IP %v ", finalIP)
 				return finalIP, nil
 			}
+			klog.V(4).Infof("Default route exists for IPv%d, however interface %q does not have global unicast addresses. Checking loopback interface", uint(family), route.Interface)
+			loopbackIP, err := getIPFromInterface("lo", family, nw)
+			if err != nil {
+				return nil, err
+			}
+			if loopbackIP != nil {
+				klog.V(4).Infof("Found active IP %v on loopback interface", loopbackIP)
+				return loopbackIP, nil
+			}
+
 		}
 	}
 	klog.V(4).Infof("No active IP found by looking at default routes")
