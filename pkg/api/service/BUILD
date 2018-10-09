@@ -12,7 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/api/service",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/util/net/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net/sets:go_default_library",
     ],
 )
 
@@ -22,7 +22,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/util/net/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/net/sets:go_default_library",
     ],
 )
 

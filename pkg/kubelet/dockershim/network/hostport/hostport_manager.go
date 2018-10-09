@@ -31,7 +31,7 @@ import (
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/utils/exec"
 )
 
