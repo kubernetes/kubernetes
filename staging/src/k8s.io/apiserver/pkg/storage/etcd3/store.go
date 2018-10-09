@@ -82,16 +82,10 @@ type objState struct {
 
 // New returns an etcd3 implementation of storage.Interface.
 func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
-	return newStore(c, true, pagingEnabled, codec, prefix, transformer)
+	return newStore(c, pagingEnabled, codec, prefix, transformer)
 }
 
-// NewWithNoQuorumRead returns etcd3 implementation of storage.Interface
-// where Get operations don't require quorum read.
-func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
-	return newStore(c, false, pagingEnabled, codec, prefix, transformer)
-}
-
-func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
+func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -105,11 +99,6 @@ func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.
 		pathPrefix:   path.Join("/", prefix),
 		watcher:      newWatcher(c, codec, versioner, transformer),
 		leaseManager: newDefaultLeaseManager(c),
-	}
-	if !quorumRead {
-		// In case of non-quorum reads, we can set WithSerializable()
-		// options for all Get operations.
-		result.getOps = append(result.getOps, clientv3.WithSerializable())
 	}
 	return result
 }
