@@ -69,6 +69,7 @@ filegroup(
         "//pkg/kubectl/util/hash:all-srcs",
         "//pkg/kubectl/util/i18n:all-srcs",
         "//pkg/kubectl/util/logs:all-srcs",
+        "//pkg/kubectl/util/podutils:all-srcs",
         "//pkg/kubectl/util/slice:all-srcs",
         "//pkg/kubectl/util/term:all-srcs",
     ],
