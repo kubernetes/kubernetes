@@ -122,10 +122,7 @@ var (
 	Nonewprivs               = Config{e2eRegistry, "nonewprivs", "1.0"}
 	NoSnatTest               = Config{e2eRegistry, "no-snat-test", "1.0"}
 	NoSnatTestProxy          = Config{e2eRegistry, "no-snat-test-proxy", "1.0"}
-)
-
-// When these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-var (
+	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
 	Pause               = Config{gcRegistry, "pause", "3.1"}
 	Porter              = Config{e2eRegistry, "porter", "1.0"}
 	PortForwardTester   = Config{e2eRegistry, "port-forward-tester", "1.0"}
