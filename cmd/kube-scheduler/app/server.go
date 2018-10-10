@@ -232,7 +232,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithAuthorization(handler, authz, legacyscheme.Codecs)
-	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler)
+	handler = genericapifilters.WithAuthentication(handler, authn, failedHandler, nil)
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericfilters.WithPanicRecovery(handler)
 

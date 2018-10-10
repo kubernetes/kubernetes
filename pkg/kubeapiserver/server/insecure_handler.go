@@ -32,7 +32,7 @@ import (
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
 	handler := apiHandler
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
-	handler = genericapifilters.WithAuthentication(handler, server.InsecureSuperuser{}, nil)
+	handler = genericapifilters.WithAuthentication(handler, server.InsecureSuperuser{}, nil, nil)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
