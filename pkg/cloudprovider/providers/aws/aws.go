@@ -60,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // NLBHealthCheckRuleDescription is the comment used on a security group rule to
@@ -2322,7 +2321,7 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 			devicePath := aws.StringValue(attachment.Device)
 			nodeName := mapInstanceToNodeName(attachedInstance)
 
-			danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+			danglingErr := cloudvolumes.NewDanglingError(attachErr, nodeName, devicePath)
 			return false, danglingErr
 		}
 
@@ -2496,7 +2495,7 @@ func (c *Cloud) ResizeDisk(
 		return oldSize, descErr
 	}
 	// AWS resizes in chunks of GiB (not GB)
-	requestGiB := volumeutil.RoundUpToGiB(newSize)
+	requestGiB := cloudvolumes.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGiB))
 
 	// If disk already if of greater or equal size than requested we return

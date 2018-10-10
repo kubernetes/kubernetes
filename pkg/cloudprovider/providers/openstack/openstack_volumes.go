@@ -41,7 +41,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudvolumes "k8s.io/cloud-provider/volumes"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type volumeService interface {
@@ -344,7 +343,7 @@ func (os *OpenStack) AttachDisk(instanceID, volumeID string) (string, error) {
 		}
 		// using volume.AttachedDevice may cause problems because cinder does not report device path correctly see issue #33128
 		devicePath := volume.AttachedDevice
-		danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+		danglingErr := cloudvolumes.NewDanglingError(attachErr, nodeName, devicePath)
 		glog.V(2).Infof("Found dangling volume %s attached to node %s", volumeID, nodeName)
 		return "", danglingErr
 	}
@@ -412,7 +411,7 @@ func (os *OpenStack) ExpandVolume(volumeID string, oldSize resource.Quantity, ne
 	}
 
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGiB, err := volumeutil.RoundUpToGiBInt(newSize)
+	volSizeGiB, err := cloudvolumes.RoundUpToGiBInt(newSize)
 	if err != nil {
 		return oldSize, err
 	}

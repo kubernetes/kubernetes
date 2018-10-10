@@ -746,7 +746,7 @@ func (gce *GCECloud) ResizeDisk(diskToResize string, oldSize resource.Quantity, 
 	}
 
 	// GCE resizes in chunks of GiBs
-	requestGIB := volumeutil.RoundUpToGiB(newSize)
+	requestGIB := cloudvolumes.RoundUpToGiB(newSize)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dGi", requestGIB))
 
 	// If disk is already of size equal or greater than requested size, we simply return
@@ -812,7 +812,7 @@ func (gce *GCECloud) GetAutoLabelsForPD(name string, zone string) (map[string]st
 		// However it is more consistent to ensure the disk exists,
 		// and in future we may gather addition information (e.g. disk type, IOPS etc)
 		if utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
-			zoneSet, err := volumeutil.LabelZonesToSet(zone)
+			zoneSet, err := cloudvolumes.LabelZonesToSet(zone)
 			if err != nil {
 				glog.Warningf("Failed to parse zone field: %q. Will use raw field.", zone)
 			}
