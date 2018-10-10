@@ -16,10 +16,14 @@ limitations under the License.
 
 package probe
 
+// Result is a string used to handle the results for probing container readiness/livenss
 type Result string
 
 const (
+	// Success Result
 	Success Result = "success"
+	// Failure Result
 	Failure Result = "failure"
+	// Unknown Result
 	Unknown Result = "unknown"
 )

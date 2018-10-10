@@ -264,10 +264,6 @@ pkg/master/tunneler
 pkg/printers
 pkg/printers/internalversion
 pkg/printers/storage
-pkg/probe
-pkg/probe/exec
-pkg/probe/http
-pkg/probe/tcp
 pkg/proxy
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1

@@ -31,18 +31,20 @@ import (
 	"github.com/golang/glog"
 )
 
-func New() HTTPProber {
+// New creates Prober that will skip TLS verification while probing.
+func New() Prober {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
 	return NewWithTLSConfig(tlsConfig)
 }
 
 // NewWithTLSConfig takes tls config as parameter.
-func NewWithTLSConfig(config *tls.Config) HTTPProber {
+func NewWithTLSConfig(config *tls.Config) Prober {
 	transport := utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: config, DisableKeepAlives: true})
 	return httpProber{transport}
 }
 
-type HTTPProber interface {
+// Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
+type Prober interface {
 	Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error)
 }
 
@@ -50,12 +52,13 @@ type httpProber struct {
 	transport *http.Transport
 }
 
-// Probe returns a ProbeRunner capable of running an http check.
+// Probe returns a ProbeRunner capable of running an HTTP check.
 func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
 	return DoHTTPProbe(url, headers, &http.Client{Timeout: timeout, Transport: pr.transport})
 }
 
-type HTTPGetInterface interface {
+// GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
+type GetHTTPInterface interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
@@ -63,7 +66,7 @@ type HTTPGetInterface interface {
 // If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
 // If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url *url.URL, headers http.Header, client HTTPGetInterface) (probe.Result, string, error) {
+func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (probe.Result, string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
