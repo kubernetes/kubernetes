@@ -41,6 +41,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
+	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -526,7 +527,7 @@ func TestSkipPodUpdate(t *testing.T) {
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
 			c := &configFactory{
-				schedulerCache: &schedulertesting.FakeCache{
+				schedulerCache: &fakecache.Cache{
 					IsAssumedPodFunc: test.isAssumedPodFunc,
 					GetPodFunc:       test.getPodFunc,
 				},
