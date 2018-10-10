@@ -202,10 +202,10 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return assignedNonTerminatedPod(t)
+					return assignedPod(t)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return assignedNonTerminatedPod(pod)
+						return assignedPod(pod)
 					}
 					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
 					return false
@@ -227,10 +227,10 @@ func NewConfigFactory(args *ConfigFactoryArgs) scheduler.Configurator {
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
 				case *v1.Pod:
-					return unassignedNonTerminatedPod(t) && responsibleForPod(t, args.SchedulerName)
+					return !assignedPod(t) && responsibleForPod(t, args.SchedulerName)
 				case cache.DeletedFinalStateUnknown:
 					if pod, ok := t.Obj.(*v1.Pod); ok {
-						return unassignedNonTerminatedPod(pod) && responsibleForPod(pod, args.SchedulerName)
+						return !assignedPod(pod) && responsibleForPod(pod, args.SchedulerName)
 					}
 					runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
 					return false
@@ -1240,26 +1240,9 @@ func (c *configFactory) getNextPod() *v1.Pod {
 	return nil
 }
 
-// unassignedNonTerminatedPod selects pods that are unassigned and non-terminal.
-func unassignedNonTerminatedPod(pod *v1.Pod) bool {
-	if len(pod.Spec.NodeName) != 0 {
-		return false
-	}
-	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-		return false
-	}
-	return true
-}
-
-// assignedNonTerminatedPod selects pods that are assigned and non-terminal (scheduled and running).
-func assignedNonTerminatedPod(pod *v1.Pod) bool {
-	if len(pod.Spec.NodeName) == 0 {
-		return false
-	}
-	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-		return false
-	}
-	return true
+// assignedPod selects pods that are assigned (scheduled and running).
+func assignedPod(pod *v1.Pod) bool {
+	return len(pod.Spec.NodeName) != 0
 }
 
 // responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
