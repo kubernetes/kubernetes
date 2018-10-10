@@ -26,14 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
-	cloudprovider "k8s.io/cloud-provider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	k8s_volume "k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
+	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	volumes_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
@@ -42,7 +35,13 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
+	cloudvolumes "k8s.io/cloud-provider/volumes"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type volumeService interface {
@@ -572,7 +571,7 @@ func (os *OpenStack) DeleteVolume(volumeID string) error {
 	}
 	if used {
 		msg := fmt.Sprintf("Cannot delete the volume %q, it's still attached to a node", volumeID)
-		return k8s_volume.NewDeletedVolumeInUseError(msg)
+		return cloudvolumes.NewDeletedVolumeInUseError(msg)
 	}
 
 	volumes, err := os.volumeService("")
@@ -698,7 +697,7 @@ func (os *OpenStack) ShouldTrustDevicePath() bool {
 // GetLabelsForVolume implements PVLabeler.GetLabelsForVolume
 func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.Cinder.VolumeID == k8s_volume.ProvisionedVolumeName {
+	if pv.Spec.Cinder.VolumeID == cloudvolumes.ProvisionedVolumeName {
 		return nil, nil
 	}
 

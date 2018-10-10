@@ -23,24 +23,23 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/api/core/v1"
-
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
-	cloudprovider "k8s.io/cloud-provider"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
 	"github.com/golang/glog"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cloudprovider "k8s.io/cloud-provider"
+	cloudvolumes "k8s.io/cloud-provider/volumes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/meta"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type DiskType string
@@ -512,7 +511,7 @@ func newDiskMetricContextRegional(request, region string) *metricContext {
 
 func (gce *GCECloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
 	// Ignore any volumes that are being provisioned
-	if pv.Spec.GCEPersistentDisk.PDName == volume.ProvisionedVolumeName {
+	if pv.Spec.GCEPersistentDisk.PDName == cloudvolumes.ProvisionedVolumeName {
 		return nil, nil
 	}
 
@@ -730,7 +729,7 @@ func getDiskType(diskType string) (string, error) {
 func (gce *GCECloud) DeleteDisk(diskToDelete string) error {
 	err := gce.doDeleteDisk(diskToDelete)
 	if isGCEError(err, "resourceInUseByAnotherResource") {
-		return volume.NewDeletedVolumeInUseError(err.Error())
+		return cloudvolumes.NewDeletedVolumeInUseError(err.Error())
 	}
 
 	if err == cloudprovider.DiskNotFound {

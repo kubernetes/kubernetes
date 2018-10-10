@@ -34,7 +34,7 @@ import (
 	"github.com/rubiojr/go-vhd/vhd"
 
 	kwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/volume"
+	cloudvolumes "k8s.io/cloud-provider/volumes"
 )
 
 const (
@@ -119,7 +119,7 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 		if strings.Contains(detail, errLeaseIDMissing) {
 			// disk is still being used
 			// see https://msdn.microsoft.com/en-us/library/microsoft.windowsazure.storage.blob.protocol.bloberrorcodestrings.leaseidmissing.aspx
-			return volume.NewDeletedVolumeInUseError(fmt.Sprintf("disk %q is still in use while being deleted", diskURI))
+			return cloudvolumes.NewDeletedVolumeInUseError(fmt.Sprintf("disk %q is still in use while being deleted", diskURI))
 		}
 		return fmt.Errorf("failed to delete vhd %v, account %s, blob %s, err: %v", diskURI, accountName, blob, err)
 	}
