@@ -12,7 +12,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
-			"Rev": "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
+			"Rev": "c7ce16629ff4cd059ed96ed06419dd3856fd3577"
 		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
@@ -168,7 +168,7 @@
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "670d4cfef0544295bc27a114dbac37980d83185a"
+			"Rev": "5420a8b6744d3b0345ab293f6fcba19c978f1183"
 		},
 		{
 			"ImportPath": "k8s.io/api/admissionregistration/v1alpha1",
