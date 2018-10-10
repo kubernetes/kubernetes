@@ -23,11 +23,11 @@ go_library(
     visibility = ["//build/visible_to:pkg_kubectl_cmd_create_CONSUMERS"],
     deps = [
         "//pkg/kubectl:go_default_library",
-        "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/editor:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
+        "//pkg/kubectl/util/templates:go_default_library",
         "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
