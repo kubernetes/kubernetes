@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	cloudutil "k8s.io/cloud-provider/util"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
 )
@@ -547,7 +547,7 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 						var addressType v1.NodeAddressType
 						if strings.HasPrefix(i.HardwareAddr.String(), MacOuiVC) ||
 							strings.HasPrefix(i.HardwareAddr.String(), MacOuiEsx) {
-							v1helper.AddToNodeAddresses(&addrs,
+							cloudutil.AddToNodeAddresses(&addrs,
 								v1.NodeAddress{
 									Type:    v1.NodeExternalIP,
 									Address: ipnet.IP.String(),
@@ -610,7 +610,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 			return nil, err
 		}
 		// add the hostname address
-		v1helper.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
+		cloudutil.AddToNodeAddresses(&addrs, v1.NodeAddress{Type: v1.NodeHostName, Address: vs.hostName})
 		return addrs, nil
 	}
 
@@ -648,7 +648,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 		if vs.cfg.Network.PublicNetwork == v.Network {
 			for _, ip := range v.IpAddress {
 				if net.ParseIP(ip).To4() != nil {
-					v1helper.AddToNodeAddresses(&addrs,
+					cloudutil.AddToNodeAddresses(&addrs,
 						v1.NodeAddress{
 							Type:    v1.NodeExternalIP,
 							Address: ip,
