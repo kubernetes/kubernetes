@@ -36,6 +36,7 @@ go_library(
         "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/instrumentation/common:go_default_library",
         "//test/e2e/scheduling:go_default_library",
