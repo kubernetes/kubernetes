@@ -211,8 +211,7 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			err := SetKubernetesVersion(nil, cfg)
-			kubeadmutil.CheckErr(err)
+			SetKubernetesVersion(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -250,8 +249,7 @@ func NewCmdKubeletAnnotateCRI() *cobra.Command {
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			err := SetKubernetesVersion(nil, cfg)
-			kubeadmutil.CheckErr(err)
+			SetKubernetesVersion(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -322,8 +320,7 @@ func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			err := SetKubernetesVersion(nil, cfg)
-			kubeadmutil.CheckErr(err)
+			SetKubernetesVersion(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
