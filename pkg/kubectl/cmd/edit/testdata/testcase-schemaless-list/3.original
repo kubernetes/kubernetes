@@ -7,7 +7,7 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    creationTimestamp: 2017-02-12T20:11:19Z
+    creationTimestamp: "2017-02-12T20:11:19Z"
     labels:
       component: apiserver
       provider: kubernetes
@@ -30,7 +30,7 @@ items:
 - apiVersion: company.com/v1
   kind: Bar
   metadata:
-    creationTimestamp: 2017-02-13T00:47:26Z
+    creationTimestamp: "2017-02-13T00:47:26Z"
     name: test
     namespace: default
     resourceVersion: "16954"
@@ -49,7 +49,7 @@ items:
     b: false
   kind: Bar
   metadata:
-    creationTimestamp: 2017-02-13T00:50:10Z
+    creationTimestamp: "2017-02-13T00:50:10Z"
     name: test2
     namespace: default
     resourceVersion: "16955"
