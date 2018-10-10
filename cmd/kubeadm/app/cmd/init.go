@@ -382,7 +382,6 @@ func (i *Init) Run(out io.Writer) error {
 	waiter := getWaiter(i, client)
 
 	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
-	fmt.Println("[init] this might take a minute or longer if the control plane images have to be pulled")
 
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
