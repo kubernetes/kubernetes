@@ -270,16 +270,6 @@ func EnforceVersionPolicies(flags *applyFlags, versionGetter upgrade.VersionGett
 // PerformControlPlaneUpgrade actually performs the upgrade procedure for the cluster of your type (self-hosted or static-pod-hosted)
 func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration) error {
 
-	// Check if the cluster is self-hosted and act accordingly
-	glog.V(1).Infoln("checking if cluster is self-hosted")
-	if upgrade.IsControlPlaneSelfHosted(client) {
-		fmt.Printf("[upgrade/apply] Upgrading your Self-Hosted control plane to version %q...\n", flags.newK8sVersionStr)
-
-		// Upgrade the self-hosted cluster
-		glog.V(1).Infoln("[upgrade/apply] upgrading self-hosted cluster")
-		return upgrade.SelfHostedControlPlane(client, waiter, internalcfg, flags.newK8sVersion)
-	}
-
 	// OK, the cluster is hosted using static pods. Upgrade a static-pod hosted cluster
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", flags.newK8sVersionStr)
 

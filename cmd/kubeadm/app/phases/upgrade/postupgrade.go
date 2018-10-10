@@ -42,7 +42,6 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -91,11 +90,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
 	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// Upgrade to a self-hosted control plane if possible
-	if err := upgradeToSelfHosting(client, cfg, dryRun); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -158,20 +152,6 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration,
 		}
 		return nil
 	}, 10)
-}
-
-func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
-	if features.Enabled(cfg.FeatureGates, features.SelfHosting) && !IsControlPlaneSelfHosted(client) {
-
-		waiter := getWaiter(dryRun, client)
-
-		// kubeadm will now convert the static Pod-hosted control plane into a self-hosted one
-		fmt.Println("[self-hosted] Creating self-hosted control plane.")
-		if err := selfhosting.CreateSelfHostedControlPlane(kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubernetesDir, cfg, client, waiter, dryRun); err != nil {
-			return pkgerrors.Wrap(err, "error creating self hosted control plane")
-		}
-	}
-	return nil
 }
 
 // BackupAPIServerCertIfNeeded rotates the kube-apiserver certificate if older than 180 days
@@ -240,15 +220,6 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		}
 	}
 	return errors.NewAggregate(errs)
-}
-
-// getWaiter gets the right waiter implementation for the right occasion
-// TODO: Consolidate this with what's in init.go?
-func getWaiter(dryRun bool, client clientset.Interface) apiclient.Waiter {
-	if dryRun {
-		return dryrunutil.NewWaiter()
-	}
-	return apiclient.NewKubeWaiter(client, 30*time.Minute, os.Stdout)
 }
 
 // getKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.

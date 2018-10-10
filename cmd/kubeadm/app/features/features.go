@@ -27,17 +27,9 @@ import (
 )
 
 const (
-	// HighAvailability is alpha in v1.9 - deprecated in v1.12 (TODO remove in v1.13)
-	HighAvailability = "HighAvailability"
 
 	// CoreDNS is GA in v1.11
 	CoreDNS = "CoreDNS"
-
-	// SelfHosting is alpha in v1.8 and v1.9 - deprecated in v1.12 (TODO remove in v1.13)
-	SelfHosting = "SelfHosting"
-
-	// StoreCertsInSecrets is alpha in v1.8 and v1.9 - deprecated in v1.12 (TODO remove in v1.13)
-	StoreCertsInSecrets = "StoreCertsInSecrets"
 
 	// DynamicKubeletConfig is beta in v1.11
 	DynamicKubeletConfig = "DynamicKubeletConfig"
@@ -46,18 +38,8 @@ const (
 	Auditing = "Auditing"
 )
 
-var selfHostingDeprecationMessage = "featureGates:SelfHosting has been removed in v1.12"
-
-var storeCertsInSecretsDeprecationMessage = "featureGates:StoreCertsInSecrets has been removed in v1.12"
-
-var highAvailabilityMessage = "featureGates:HighAvailability has been removed in v1.12\n" +
-	"\tThis feature has been replaced by the kubeadm join --control-plane workflow."
-
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:          {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: selfHostingDeprecationMessage},
-	StoreCertsInSecrets:  {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: storeCertsInSecretsDeprecationMessage},
-	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: highAvailabilityMessage},
 	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.GA}},
 	DynamicKubeletConfig: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
 	Auditing:             {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
@@ -174,8 +156,6 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 		featureGate[k] = boolValue
 	}
 
-	ResolveFeatureGateDependencies(featureGate)
-
 	return featureGate, nil
 }
 
@@ -200,19 +180,4 @@ func CheckDeprecatedFlags(f *FeatureList, features map[string]bool) map[string]s
 	}
 
 	return deprecatedMsg
-}
-
-// ResolveFeatureGateDependencies resolve dependencies between feature gates
-func ResolveFeatureGateDependencies(featureGate map[string]bool) {
-
-	// if HighAvailability enabled and StoreCertsInSecrets disabled, both StoreCertsInSecrets
-	// and SelfHosting should enabled
-	if Enabled(featureGate, HighAvailability) && !Enabled(featureGate, StoreCertsInSecrets) {
-		featureGate[StoreCertsInSecrets] = true
-	}
-
-	// if StoreCertsInSecrets enabled, SelfHosting should enabled
-	if Enabled(featureGate, StoreCertsInSecrets) {
-		featureGate[SelfHosting] = true
-	}
 }

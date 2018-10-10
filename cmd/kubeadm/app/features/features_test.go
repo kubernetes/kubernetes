@@ -166,39 +166,6 @@ func TestValidateVersion(t *testing.T) {
 	}
 }
 
-func TestResolveFeatureGateDependencies(t *testing.T) {
-
-	var tests = []struct {
-		inputFeatures    map[string]bool
-		expectedFeatures map[string]bool
-	}{
-		{ // no flags
-			inputFeatures:    map[string]bool{},
-			expectedFeatures: map[string]bool{},
-		},
-		{ // others flags
-			inputFeatures:    map[string]bool{CoreDNS: false},
-			expectedFeatures: map[string]bool{CoreDNS: false},
-		},
-		{ // just StoreCertsInSecrets flags
-			inputFeatures:    map[string]bool{StoreCertsInSecrets: true},
-			expectedFeatures: map[string]bool{StoreCertsInSecrets: true, SelfHosting: true},
-		},
-		{ // just HighAvailability flags
-			inputFeatures:    map[string]bool{HighAvailability: true},
-			expectedFeatures: map[string]bool{HighAvailability: true, StoreCertsInSecrets: true, SelfHosting: true},
-		},
-	}
-
-	for _, test := range tests {
-		ResolveFeatureGateDependencies(test.inputFeatures)
-		if !reflect.DeepEqual(test.inputFeatures, test.expectedFeatures) {
-			t.Errorf("ResolveFeatureGateDependencies failed, expected: %v, got: %v", test.inputFeatures, test.expectedFeatures)
-
-		}
-	}
-}
-
 // TestEnabledDefaults tests that Enabled returns the default values for
 // each feature gate when no feature gates are specified.
 func TestEnabledDefaults(t *testing.T) {
