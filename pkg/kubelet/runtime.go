@@ -74,7 +74,9 @@ func (s *runtimeState) runtimeErrors() []string {
 	s.RLock()
 	defer s.RUnlock()
 	var ret []string
-	if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
+	if s.lastBaseRuntimeSync.IsZero() {
+		ret = append(ret, "container runtime status check may not have completed yet")
+	} else if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
 		ret = append(ret, "container runtime is down")
 	}
 	for _, hc := range s.healthChecks {
