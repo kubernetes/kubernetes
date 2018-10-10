@@ -808,7 +808,7 @@ def configure_cdk_addons():
     ceph_ep = endpoint_from_flag('ceph-storage.available')
     ceph = {}
     default_storage = ''
-    if ceph_ep:
+    if ceph_ep and ceph_ep.key():
         b64_ceph_key = base64.b64encode(ceph_ep.key().encode('utf-8'))
         ceph['admin_key'] = b64_ceph_key.decode('ascii')
         ceph['kubernetes_key'] = b64_ceph_key.decode('ascii')
