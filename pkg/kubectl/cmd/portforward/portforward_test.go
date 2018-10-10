@@ -181,6 +181,35 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 			err:        false,
 		},
 		{
+			name: "test success 1 (int port with random local port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{":80"},
+			translated: []string{":8080"},
+			err:        false,
+		},
+		{
 			name: "test success 2 (clusterIP: None)",
 			svc: corev1.Service{
 				Spec: corev1.ServiceSpec{
@@ -211,7 +240,37 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 			err:        false,
 		},
 		{
-			name: "test success 3 (named port)",
+			name: "test success 2 (clusterIP: None with random local port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					ClusterIP: "None",
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromInt(8080),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{":80"},
+			translated: []string{":80"},
+			err:        false,
+		},
+		{
+			name: "test success 3 (named target port)",
 			svc: corev1.Service{
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
@@ -247,6 +306,114 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 			err:        false,
 		},
 		{
+			name: "test success 3 (named target port with random local port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromString("http"),
+						},
+						{
+							Port:       443,
+							TargetPort: intstr.FromString("https"),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+								{
+									Name:          "https",
+									ContainerPort: int32(8443)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{":80", ":443"},
+			translated: []string{":8080", ":8443"},
+			err:        false,
+		},
+		{
+			name: "test success 4 (named service port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							Name:       "http",
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Port:       443,
+							Name:       "https",
+							TargetPort: intstr.FromInt(8443),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: int32(8080)},
+								{
+									ContainerPort: int32(8443)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"http", "https"},
+			translated: []string{"80:8080", "443:8443"},
+			err:        false,
+		},
+		{
+			name: "test success 4 (named service port with random local port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							Name:       "http",
+							TargetPort: intstr.FromInt(8080),
+						},
+						{
+							Port:       443,
+							Name:       "https",
+							TargetPort: intstr.FromInt(8443),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: int32(8080)},
+								{
+									ContainerPort: int32(8443)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{":http", ":https"},
+			translated: []string{":8080", ":8443"},
+			err:        false,
+		},
+		{
 			name: "test success (targetPort omitted)",
 			svc: corev1.Service{
 				Spec: corev1.ServiceSpec{
@@ -275,7 +442,35 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 			err:        false,
 		},
 		{
-			name: "test failure 1 (named port lookup failure)",
+			name: "test success (targetPort omitted with random local port)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port: 80,
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{":80"},
+			translated: []string{":80"},
+			err:        false,
+		},
+		{
+			name: "test failure 1 (named target port lookup failure)",
 			svc: corev1.Service{
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
@@ -300,6 +495,35 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 				},
 			},
 			ports:      []string{"80"},
+			translated: []string{},
+			err:        true,
+		},
+		{
+			name: "test failure 1 (named service port lookup failure)",
+			svc: corev1.Service{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Port:       80,
+							TargetPort: intstr.FromString("http"),
+						},
+					},
+				},
+			},
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(8080)},
+							},
+						},
+					},
+				},
+			},
+			ports:      []string{"https"},
 			translated: []string{},
 			err:        true,
 		},
@@ -371,5 +595,187 @@ func execPod() *corev1.Pod {
 		Status: corev1.PodStatus{
 			Phase: corev1.PodRunning,
 		},
+	}
+}
+
+func TestConvertPodNamedPortToNumber(t *testing.T) {
+	cases := []struct {
+		name      string
+		pod       corev1.Pod
+		ports     []string
+		converted []string
+		err       bool
+	}{
+		{
+			name: "port number without local port",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:     []string{"80"},
+			converted: []string{"80"},
+			err:       false,
+		},
+		{
+			name: "port number with local port",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:     []string{"8000:80"},
+			converted: []string{"8000:80"},
+			err:       false,
+		},
+		{
+			name: "port number with random local port",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:     []string{":80"},
+			converted: []string{":80"},
+			err:       false,
+		},
+		{
+			name: "named port without local port",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:     []string{"http"},
+			converted: []string{"80"},
+			err:       false,
+		},
+		{
+			name: "named port with local port",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:     []string{"8000:http"},
+			converted: []string{"8000:80"},
+			err:       false,
+		},
+		{
+			name: "named port with random local port",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: int32(80)},
+							},
+						},
+					},
+				},
+			},
+			ports:     []string{":http"},
+			converted: []string{":80"},
+			err:       false,
+		},
+		{
+			name: "named port can not be found",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "https",
+									ContainerPort: int32(443)},
+							},
+						},
+					},
+				},
+			},
+			ports: []string{"http"},
+			err:   true,
+		},
+		{
+			name: "one of the requested named ports can not be found",
+			pod: corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "https",
+									ContainerPort: int32(443)},
+							},
+						},
+					},
+				},
+			},
+			ports: []string{"https", "http"},
+			err:   true,
+		},
+	}
+
+	for _, tc := range cases {
+		converted, err := convertPodNamedPortToNumber(tc.ports, tc.pod)
+		if err != nil {
+			if tc.err {
+				continue
+			}
+
+			t.Errorf("%v: unexpected error: %v", tc.name, err)
+			continue
+		}
+
+		if tc.err {
+			t.Errorf("%v: unexpected success", tc.name)
+			continue
+		}
+
+		if !reflect.DeepEqual(converted, tc.converted) {
+			t.Errorf("%v: expected %v; got %v", tc.name, tc.converted, converted)
+		}
 	}
 }
