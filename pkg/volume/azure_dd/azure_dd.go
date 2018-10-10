@@ -145,7 +145,7 @@ func (plugin *azureDataDiskPlugin) GetVolumeLimits() (map[string]int64, error) {
 		// default values from here will mean, no one can
 		// override them.
 		glog.Errorf("failed to get azure cloud in GetVolumeLimits, plugin.host: %s", plugin.host.GetHostName())
-		return volumeLimits, nil
+		return nil, fmt.Errorf("No cloudprovider present")
 	}
 
 	instances, ok := az.Instances()
