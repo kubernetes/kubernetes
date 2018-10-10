@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package fake
 
 import (
 	"k8s.io/api/core/v1"
@@ -23,8 +23,8 @@ import (
 	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
-// FakeCache is used for testing
-type FakeCache struct {
+// Cache is used for testing
+type Cache struct {
 	AssumeFunc       func(*v1.Pod)
 	ForgetFunc       func(*v1.Pod)
 	IsAssumedPodFunc func(*v1.Pod) bool
@@ -32,65 +32,65 @@ type FakeCache struct {
 }
 
 // AssumePod is a fake method for testing.
-func (f *FakeCache) AssumePod(pod *v1.Pod) error {
-	f.AssumeFunc(pod)
+func (c *Cache) AssumePod(pod *v1.Pod) error {
+	c.AssumeFunc(pod)
 	return nil
 }
 
 // FinishBinding is a fake method for testing.
-func (f *FakeCache) FinishBinding(pod *v1.Pod) error { return nil }
+func (c *Cache) FinishBinding(pod *v1.Pod) error { return nil }
 
 // ForgetPod is a fake method for testing.
-func (f *FakeCache) ForgetPod(pod *v1.Pod) error {
-	f.ForgetFunc(pod)
+func (c *Cache) ForgetPod(pod *v1.Pod) error {
+	c.ForgetFunc(pod)
 	return nil
 }
 
 // AddPod is a fake method for testing.
-func (f *FakeCache) AddPod(pod *v1.Pod) error { return nil }
+func (c *Cache) AddPod(pod *v1.Pod) error { return nil }
 
 // UpdatePod is a fake method for testing.
-func (f *FakeCache) UpdatePod(oldPod, newPod *v1.Pod) error { return nil }
+func (c *Cache) UpdatePod(oldPod, newPod *v1.Pod) error { return nil }
 
 // RemovePod is a fake method for testing.
-func (f *FakeCache) RemovePod(pod *v1.Pod) error { return nil }
+func (c *Cache) RemovePod(pod *v1.Pod) error { return nil }
 
 // IsAssumedPod is a fake method for testing.
-func (f *FakeCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
-	return f.IsAssumedPodFunc(pod), nil
+func (c *Cache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	return c.IsAssumedPodFunc(pod), nil
 }
 
 // GetPod is a fake method for testing.
-func (f *FakeCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
-	return f.GetPodFunc(pod), nil
+func (c *Cache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
+	return c.GetPodFunc(pod), nil
 }
 
 // AddNode is a fake method for testing.
-func (f *FakeCache) AddNode(node *v1.Node) error { return nil }
+func (c *Cache) AddNode(node *v1.Node) error { return nil }
 
 // UpdateNode is a fake method for testing.
-func (f *FakeCache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
+func (c *Cache) UpdateNode(oldNode, newNode *v1.Node) error { return nil }
 
 // RemoveNode is a fake method for testing.
-func (f *FakeCache) RemoveNode(node *v1.Node) error { return nil }
+func (c *Cache) RemoveNode(node *v1.Node) error { return nil }
 
 // UpdateNodeNameToInfoMap is a fake method for testing.
-func (f *FakeCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
+func (c *Cache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
 	return nil
 }
 
 // List is a fake method for testing.
-func (f *FakeCache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }
+func (c *Cache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }
 
 // FilteredList is a fake method for testing.
-func (f *FakeCache) FilteredList(filter schedulerinternalcache.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+func (c *Cache) FilteredList(filter schedulerinternalcache.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	return nil, nil
 }
 
 // Snapshot is a fake method for testing
-func (f *FakeCache) Snapshot() *schedulerinternalcache.Snapshot {
+func (c *Cache) Snapshot() *schedulerinternalcache.Snapshot {
 	return &schedulerinternalcache.Snapshot{}
 }
 
 // NodeTree is a fake method for testing.
-func (f *FakeCache) NodeTree() *schedulerinternalcache.NodeTree { return nil }
+func (c *Cache) NodeTree() *schedulerinternalcache.NodeTree { return nil }

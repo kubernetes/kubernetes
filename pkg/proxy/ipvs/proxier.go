@@ -451,7 +451,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersion)
 	b, err = ioutil.ReadFile(builtinModsFilePath)
 	if err != nil {
-		glog.Errorf("Failed to read file %s with error %v", builtinModsFilePath, err)
+		glog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
 	}
 	var bmods []string
 	for _, module := range ipvsModules {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -427,6 +428,15 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
+
+	resorceQuotaColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Request", Type: "string", Description: "Request represents a minimum amount of cpu/memory that a container may consume."},
+		{Name: "Limit", Type: "string", Description: "Limits control the maximum amount of cpu/memory that a container may use independent of contention on the node."},
+	}
+	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuota)
+	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuotaList)
 
 	AddDefaultHandlers(h)
 }
@@ -1877,6 +1887,50 @@ func printControllerRevisionList(list *apps.ControllerRevisionList, options prin
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printControllerRevision(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printResourceQuota(resourceQuota *api.ResourceQuota, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: resourceQuota},
+	}
+
+	resources := make([]api.ResourceName, 0, len(resourceQuota.Status.Hard))
+	for resource := range resourceQuota.Status.Hard {
+		resources = append(resources, resource)
+	}
+	sort.Sort(SortableResourceNames(resources))
+
+	requestColumn := bytes.NewBuffer([]byte{})
+	limitColumn := bytes.NewBuffer([]byte{})
+	for i := range resources {
+		w := requestColumn
+		resource := resources[i]
+		usedQuantity := resourceQuota.Status.Used[resource]
+		hardQuantity := resourceQuota.Status.Hard[resource]
+
+		// use limitColumn writer if a resource name prefixed with "limits" is found
+		if pieces := strings.Split(resource.String(), "."); len(pieces) > 1 && pieces[0] == "limits" {
+			w = limitColumn
+		}
+
+		fmt.Fprintf(w, "%s: %s/%s, ", resource, usedQuantity.String(), hardQuantity.String())
+	}
+
+	age := translateTimestampSince(resourceQuota.CreationTimestamp)
+	row.Cells = append(row.Cells, resourceQuota.Name, age, strings.TrimSuffix(requestColumn.String(), ", "), strings.TrimSuffix(limitColumn.String(), ", "))
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printResourceQuotaList(list *api.ResourceQuotaList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printResourceQuota(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
