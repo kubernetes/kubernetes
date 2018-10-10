@@ -380,3 +380,75 @@ func TestKubeadmVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateStableVersion(t *testing.T) {
+	type T struct {
+		name          string
+		remoteVersion string
+		clientVersion string
+		output        string
+		expectedError bool
+	}
+	cases := []T{
+		{
+			name:          "valid: remote version is newer; return stable label [1]",
+			remoteVersion: "v1.12.0",
+			clientVersion: "v1.11.0",
+			output:        "stable-1.11",
+		},
+		{
+			name:          "valid: remote version is newer; return stable label [2]",
+			remoteVersion: "v2.0.0",
+			clientVersion: "v1.11.0",
+			output:        "stable-1.11",
+		},
+		{
+			name:          "valid: remote version is newer; return stable label [3]",
+			remoteVersion: "v2.1.5",
+			clientVersion: "v1.11.5",
+			output:        "stable-1.11",
+		},
+		{
+			name:          "valid: return the remote version as it is part of the same release",
+			remoteVersion: "v1.11.5",
+			clientVersion: "v1.11.0",
+			output:        "v1.11.5",
+		},
+		{
+			name:          "valid: return the same version",
+			remoteVersion: "v1.11.0",
+			clientVersion: "v1.11.0",
+			output:        "v1.11.0",
+		},
+		{
+			name:          "valid: client version is empty; use remote version",
+			remoteVersion: "v1.12.1",
+			clientVersion: "",
+			output:        "v1.12.1",
+		},
+		{
+			name:          "invalid: error parsing the remote version",
+			remoteVersion: "invalid-version",
+			clientVersion: "v1.12.0",
+			expectedError: true,
+		},
+		{
+			name:          "invalid: error parsing the client version",
+			remoteVersion: "v1.12.0",
+			clientVersion: "invalid-version",
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := validateStableVersion(tc.remoteVersion, tc.clientVersion)
+			if (err != nil) != tc.expectedError {
+				t.Fatalf("expected error: %v, got: %v", tc.expectedError, err != nil)
+			}
+			if output != tc.output {
+				t.Fatalf("expected output: %s, got: %s", tc.output, output)
+			}
+		})
+	}
+}
