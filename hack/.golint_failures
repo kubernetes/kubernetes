@@ -778,4 +778,3 @@ test/integration/scheduler
 test/integration/scheduler_perf
 test/integration/volume
 test/utils
-test/utils/image
