@@ -36,7 +36,6 @@
                     "--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig",
                     "--expander=price",
                     "--cloud-provider=gke",
-                    "--node-autoprovisioning-enabled=true",
                     "--expendable-pods-priority-cutoff=-10",
                     "{{params}}"
                 ],
