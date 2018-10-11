@@ -786,4 +786,3 @@ test/integration/scheduler_perf
 test/integration/volume
 test/list
 test/utils
-test/utils/image
