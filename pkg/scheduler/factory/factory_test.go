@@ -54,7 +54,9 @@ const (
 
 func TestCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 	factory.Create()
 }
 
@@ -65,7 +67,9 @@ func TestCreateFromConfig(t *testing.T) {
 	var policy schedulerapi.Policy
 
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -103,7 +107,9 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	var policy schedulerapi.Policy
 
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -142,7 +148,9 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	var policy schedulerapi.Policy
 
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	configData = []byte(`{}`)
 	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
@@ -157,7 +165,9 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 // The predicate/priority from DefaultProvider will be used.
 func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
@@ -190,7 +200,9 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 // Empty predicate/priority sets will be used.
 func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateOne)
 	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
@@ -242,7 +254,9 @@ func TestDefaultErrorFunc(t *testing.T) {
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
 	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
 	errFunc := factory.MakeDefaultErrorFunc(podBackoff, queue)
@@ -372,7 +386,9 @@ func testBind(binding *v1.Binding, t *testing.T) {
 func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	// factory of "default-scheduler"
-	factory := newConfigFactory(client, -1)
+	stopCh := make(chan struct{})
+	factory := newConfigFactory(client, -1, stopCh)
+	defer close(stopCh)
 	_, err := factory.Create()
 	if err == nil {
 		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
@@ -401,7 +417,9 @@ func TestInvalidFactoryArgs(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight)
+			stopCh := make(chan struct{})
+			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh)
+			defer close(stopCh)
 			_, err := factory.Create()
 			if err == nil {
 				t.Errorf("expected err: %s, got nothing", test.expectErr)
@@ -503,7 +521,7 @@ func TestSkipPodUpdate(t *testing.T) {
 	}
 }
 
-func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32) Configurator {
+func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return NewConfigFactory(&ConfigFactoryArgs{
 		v1.DefaultSchedulerName,
@@ -523,6 +541,7 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		disablePodPreemption,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
+		stopCh,
 	})
 }
 

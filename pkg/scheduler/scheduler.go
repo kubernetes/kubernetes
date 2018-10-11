@@ -59,12 +59,6 @@ type Scheduler struct {
 	config *factory.Config
 }
 
-// StopEverything closes the scheduler config's StopEverything channel, to shut
-// down the Scheduler.
-func (sched *Scheduler) StopEverything() {
-	close(sched.config.StopEverything)
-}
-
 // Cache returns the cache in scheduler for test to check the data in scheduler.
 func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
 	return sched.config.SchedulerCache

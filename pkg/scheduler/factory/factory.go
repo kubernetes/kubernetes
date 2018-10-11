@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -127,7 +128,7 @@ type Config struct {
 	Recorder record.EventRecorder
 
 	// Close this to shut down the scheduler.
-	StopEverything chan struct{}
+	StopEverything <-chan struct{}
 
 	// VolumeBinder handles PVC/PV binding for the pod.
 	VolumeBinder *volumebinder.VolumeBinder
@@ -200,7 +201,7 @@ type configFactory struct {
 	storageClassLister storagelisters.StorageClassLister
 
 	// Close this to stop all reflectors
-	StopEverything chan struct{}
+	StopEverything <-chan struct{}
 
 	scheduledPodsHasSynced cache.InformerSynced
 
@@ -253,12 +254,16 @@ type ConfigFactoryArgs struct {
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
+	StopCh                         <-chan struct{}
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
 // return the interface.
 func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
-	stopEverything := make(chan struct{})
+	stopEverything := args.StopCh
+	if stopEverything == nil {
+		stopEverything = wait.NeverStop
+	}
 	schedulerCache := schedulerinternalcache.New(30*time.Second, stopEverything)
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate

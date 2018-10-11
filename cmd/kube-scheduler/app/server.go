@@ -145,6 +145,7 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
 		storageClassInformer = c.InformerFactory.Storage().V1().StorageClasses()
 	}
+	schedulerConfig.StopEverything = stopCh
 
 	// Create the scheduler.
 	sched, err := scheduler.New(c.Client,

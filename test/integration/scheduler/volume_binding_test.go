@@ -901,9 +901,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 	// Set feature gates
 	utilfeature.DefaultFeatureGate.SetFromMap(features)
 
-	controllerCh := make(chan struct{})
-
-	context := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), controllerCh, false, nil, false, disableEquivalenceCache, resyncPeriod)
+	context := initTestSchedulerWithOptions(t, initTestMaster(t, nsName, nil), false, nil, false, disableEquivalenceCache, resyncPeriod)
 
 	clientset := context.clientSet
 	ns := context.ns.Name
@@ -912,10 +910,10 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(controllerCh)
+	go ctrl.Run(context.stopCh)
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(controllerCh)
-	informerFactory.WaitForCacheSync(controllerCh)
+	informerFactory.Start(context.stopCh)
+	informerFactory.WaitForCacheSync(context.stopCh)
 
 	// Create shared objects
 	// Create nodes
@@ -936,7 +934,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, features map[s
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   controllerCh,
+		stop:   context.stopCh,
 		teardown: func() {
 			deleteTestObjects(clientset, ns, nil)
 			cleanupTest(t, context)
