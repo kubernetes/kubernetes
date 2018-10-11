@@ -64,7 +64,13 @@ var _ = SIGDescribe("ReplicationController", func() {
 		testRCAdoptMatchingOrphans(f)
 	})
 
-	It("should release no longer matching pods", func() {
+	/*
+		Release : v1.13
+		Testname: Replication Controller, release pods
+		Description: Replication Controller Should release no longer matching pods, By creating a given Replicatio Controller. Pod should released, by using PollImmediate by checking the lable of the pod .
+	*/
+
+	framework.ConformanceIt("should release no longer matching pods", func() {
 		testRCReleaseControlledNotMatching(f)
 	})
 })
