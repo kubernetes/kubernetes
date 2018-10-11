@@ -580,13 +580,17 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 }
 
 func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg string) {
-	By(fmt.Sprintf("Creating pod %s", pod.Name))
+	By(fmt.Sprintf("Creating pod %s (expected to fail with subpath error)", pod.Name))
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	Expect(err).ToNot(HaveOccurred(), "while creating pod")
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
-	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
+
+	// Check if the pod starts running - that would be unexpected
+	// We will delay by the full timeout, so keep it reasonably short: 30s
+	// This is primarily a sanity check; the actual check is the error event.
+	err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, 30*time.Second)
 	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
 
 	By("Checking for subpath error event")
@@ -596,7 +600,9 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   "Failed",
 	}.AsSelector().String()
-	err = framework.WaitTimeoutForPodEvent(f.ClientSet, pod.Name, f.Namespace.Name, selector, errorMsg, framework.PodEventTimeout)
+	// Wait for pod to have time to start, and time for the event to be posted
+	timeout := framework.PodStartTimeout + framework.PodEventTimeout
+	err = framework.WaitTimeoutForPodEvent(f.ClientSet, pod.Name, f.Namespace.Name, selector, errorMsg, timeout)
 	Expect(err).To(HaveOccurred(), "while waiting for failed event to occur")
 }
 
