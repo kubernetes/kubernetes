@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package path contains an authorizer that allows certain paths and path prefixes.
-package path
+package path // import "k8s.io/apiserver/pkg/authorization/path"
