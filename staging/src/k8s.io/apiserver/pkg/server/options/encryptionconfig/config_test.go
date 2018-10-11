@@ -228,8 +228,7 @@ resources:
 
 // testEnvelopeService is a mock envelope service which can be used to simulate remote Envelope services
 // for testing of the envelope transformer with other transformers.
-type testEnvelopeService struct {
-}
+type testEnvelopeService struct{}
 
 func (t *testEnvelopeService) Decrypt(data []byte) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(string(data))
@@ -341,5 +340,59 @@ func TestEncryptionProviderConfigInvalidKey(t *testing.T) {
 func TestEncryptionProviderConfigNoEndpointForKMS(t *testing.T) {
 	if _, err := ParseEncryptionConfiguration(strings.NewReader(incorrectConfigNoEndpointForKMS)); err == nil {
 		t.Fatalf("invalid configuration file (kms has no endpoint) got parsed:\n%s", incorrectConfigNoEndpointForKMS)
+	}
+}
+
+func TestKMSConfigTimeout(t *testing.T) {
+	testCases := []struct {
+		desc   string
+		config string
+		want   time.Duration
+	}{
+		{
+			desc: "duration explicitly provided",
+			config: `kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+        timeout:   15s
+`,
+			want: 15 * time.Second,
+		},
+		{
+			desc: "duration is not provided, default will be supplied",
+			config: `kind: EncryptionConfig
+apiVersion: v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+`,
+			want: kmsPluginConnectionTimeout,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			envelopeServiceFactory = func(endpoint string, callTimeout time.Duration) (envelope.Service, error) {
+				if callTimeout != tt.want {
+					t.Fatalf("got timeout: %v, want %v", callTimeout, tt.want)
+				}
+
+				return newMockEnvelopeService(endpoint, callTimeout)
+			}
+
+			if _, err := ParseEncryptionConfiguration(strings.NewReader(tt.config)); err != nil {
+				t.Fatalf("invalid configuration file got parsed:\n%s", tt.config)
+			}
+		})
 	}
 }

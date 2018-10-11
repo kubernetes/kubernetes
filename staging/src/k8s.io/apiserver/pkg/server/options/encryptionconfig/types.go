@@ -16,6 +16,8 @@ limitations under the License.
 
 package encryptionconfig
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 // EncryptionConfig stores the complete configuration for encryption providers.
 type EncryptionConfig struct {
 	// kind is the type of configuration file.
@@ -83,4 +85,6 @@ type KMSConfig struct {
 	CacheSize int `json:"cachesize,omitempty"`
 	// the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string `json:"endpoint"`
+	// Timeout for gRPC calls to kms-plugin (ex. 5s).
+	Timeout metav1.Duration `json:"timeout"`
 }
