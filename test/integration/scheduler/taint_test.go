@@ -85,13 +85,10 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
-	controllerCh := make(chan struct{})
-	defer close(controllerCh)
-
 	// Apply feature gates to enable TaintNodesByCondition
 	algorithmprovider.ApplyFeatureGates()
 
-	context = initTestScheduler(t, context, controllerCh, false, nil)
+	context = initTestScheduler(t, context, false, nil)
 	cs := context.clientSet
 	informers := context.informerFactory
 	nsName := context.ns.Name
@@ -120,13 +117,13 @@ func TestTaintNodeByCondition(t *testing.T) {
 		t.Errorf("Failed to create node controller: %v", err)
 		return
 	}
-	go nc.Run(controllerCh)
+	go nc.Run(context.stopCh)
 
 	// Waiting for all controller sync.
-	externalInformers.Start(controllerCh)
-	externalInformers.WaitForCacheSync(controllerCh)
-	informers.Start(controllerCh)
-	informers.WaitForCacheSync(controllerCh)
+	externalInformers.Start(context.stopCh)
+	externalInformers.WaitForCacheSync(context.stopCh)
+	informers.Start(context.stopCh)
+	informers.WaitForCacheSync(context.stopCh)
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.

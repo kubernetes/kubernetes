@@ -160,6 +160,7 @@ func run(cmd *cobra.Command, args []string, opts *options.Options) error {
 		storageClassInformer,
 		c.Recorder,
 		c.ComponentConfig.AlgorithmSource,
+		stopCh,
 		scheduler.WithName(c.ComponentConfig.SchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(c.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithEquivalenceClassCacheEnabled(c.ComponentConfig.EnableContentionProfiling),

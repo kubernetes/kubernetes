@@ -175,6 +175,8 @@ func TestSchedulerCreation(t *testing.T) {
 	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
 	factory.RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 	_, err := New(client,
 		informerFactory.Core().V1().Nodes(),
 		factory.NewPodInformer(client, 0),
@@ -188,6 +190,7 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory.Storage().V1().StorageClasses(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
+		stopCh,
 		WithBindTimeoutSeconds(defaultBindTimeout))
 
 	if err != nil {

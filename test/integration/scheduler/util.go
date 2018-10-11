@@ -65,6 +65,7 @@ type TestContext struct {
 	schedulerConfigFactory factory.Configurator
 	schedulerConfig        *factory.Config
 	scheduler              *scheduler.Scheduler
+	stopCh                 chan struct{}
 }
 
 // createConfiguratorWithPodInformer creates a configurator for scheduler.
@@ -73,6 +74,7 @@ func createConfiguratorWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
+	stopCh <-chan struct{},
 ) factory.Configurator {
 	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  schedulerName,
@@ -92,13 +94,16 @@ func createConfiguratorWithPodInformer(
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		BindTimeoutSeconds:             600,
+		StopCh:                         stopCh,
 	})
 }
 
 // initTestMasterAndScheduler initializes a test environment and creates a master with default
 // configuration.
 func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *TestContext {
-	var context TestContext
+	context := TestContext{
+		stopCh: make(chan struct{}),
+	}
 
 	// 1. Create master
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
@@ -138,13 +143,12 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 func initTestScheduler(
 	t *testing.T,
 	context *TestContext,
-	controllerCh chan struct{},
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
 	// feature gate is enabled at the same time.
-	return initTestSchedulerWithOptions(t, context, controllerCh, setPodInformer, policy, false, false, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, false, false, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -152,7 +156,6 @@ func initTestScheduler(
 func initTestSchedulerWithOptions(
 	t *testing.T,
 	context *TestContext,
-	controllerCh chan struct{},
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 	disablePreemption bool,
@@ -179,7 +182,7 @@ func initTestSchedulerWithOptions(
 	}
 
 	context.schedulerConfigFactory = createConfiguratorWithPodInformer(
-		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory)
+		v1.DefaultSchedulerName, context.clientSet, podInformer, context.informerFactory, context.stopCh)
 
 	var err error
 
@@ -191,11 +194,6 @@ func initTestSchedulerWithOptions(
 
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler config: %v", err)
-	}
-
-	// set controllerCh if provided.
-	if controllerCh != nil {
-		context.schedulerConfig.StopEverything = controllerCh
 	}
 
 	// set DisablePreemption option
@@ -252,21 +250,21 @@ func initDisruptionController(context *TestContext) *disruption.DisruptionContro
 // initTest initializes a test environment and creates master and scheduler with default
 // configuration.
 func initTest(t *testing.T, nsPrefix string) *TestContext {
-	return initTestScheduler(t, initTestMaster(t, nsPrefix, nil), nil, true, nil)
+	return initTestScheduler(t, initTestMaster(t, nsPrefix, nil), true, nil)
 }
 
 // initTestDisablePreemption initializes a test environment and creates master and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	return initTestSchedulerWithOptions(
-		t, initTestMaster(t, nsPrefix, nil), nil, true, nil, true, false, time.Second)
+		t, initTestMaster(t, nsPrefix, nil), true, nil, true, false, time.Second)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
 // at the end of a test.
 func cleanupTest(t *testing.T, context *TestContext) {
 	// Kill the scheduler.
-	close(context.schedulerConfig.StopEverything)
+	close(context.stopCh)
 	// Cleanup nodes.
 	context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	framework.DeleteTestingNamespace(context.ns, context.httpServer, t)

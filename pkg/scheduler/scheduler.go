@@ -59,12 +59,6 @@ type Scheduler struct {
 	config *factory.Config
 }
 
-// StopEverything closes the scheduler config's StopEverything channel, to shut
-// down the Scheduler.
-func (sched *Scheduler) StopEverything() {
-	close(sched.config.StopEverything)
-}
-
 // Cache returns the cache in scheduler for test to check the data in scheduler.
 func (sched *Scheduler) Cache() schedulerinternalcache.Cache {
 	return sched.config.SchedulerCache
@@ -147,6 +141,7 @@ func New(client clientset.Interface,
 	storageClassInformer storageinformers.StorageClassInformer,
 	recorder record.EventRecorder,
 	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
+	stopCh <-chan struct{},
 	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
 
 	options := defaultSchedulerOptions
@@ -230,6 +225,7 @@ func New(client clientset.Interface,
 	// Additional tweaks to the config produced by the configurator.
 	config.Recorder = recorder
 	config.DisablePreemption = options.disablePreemption
+	config.StopEverything = stopCh
 	// Create the scheduler.
 	sched := NewFromConfig(config)
 	return sched, nil

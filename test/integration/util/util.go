@@ -66,7 +66,8 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 	evtWatch := evtBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
 		Interface: clientSet.CoreV1().Events("")})
 
-	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory)
+	stopCh := make(chan struct{})
+	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory, stopCh)
 
 	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *factory.Config) {
 		conf.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
@@ -75,16 +76,13 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 		glog.Fatalf("Error creating scheduler: %v", err)
 	}
 
-	stop := make(chan struct{})
-	informerFactory.Start(stop)
-
+	informerFactory.Start(stopCh)
 	sched.Run()
 
 	shutdownFunc := func() {
 		glog.Infof("destroying scheduler")
 		evtWatch.Stop()
-		sched.StopEverything()
-		close(stop)
+		close(stopCh)
 		glog.Infof("destroyed scheduler")
 	}
 	return schedulerConfigurator, shutdownFunc
@@ -94,6 +92,7 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 func createSchedulerConfigurator(
 	clientSet clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
+	stopCh <-chan struct{},
 ) factory.Configurator {
 	// Enable EnableEquivalenceClassCache for all integration tests.
 	utilfeature.DefaultFeatureGate.Set("EnableEquivalenceClassCache=true")
@@ -115,5 +114,6 @@ func createSchedulerConfigurator(
 		EnableEquivalenceClassCache:    utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+		StopCh:                         stopCh,
 	})
 }
