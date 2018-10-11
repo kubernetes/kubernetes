@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -33,10 +34,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
@@ -48,13 +48,13 @@ import (
 const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.
-func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer) *PodSecurityPolicyPlugin {
+func NewTestAdmission(psps []*policyv1beta1.PodSecurityPolicy, authz authorizer.Authorizer) *PodSecurityPolicyPlugin {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	store := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Informer().GetStore()
+	store := informerFactory.Policy().V1beta1().PodSecurityPolicies().Informer().GetStore()
 	for _, psp := range psps {
 		store.Add(psp)
 	}
-	lister := informerFactory.Policy().InternalVersion().PodSecurityPolicies().Lister()
+	lister := informerFactory.Policy().V1beta1().PodSecurityPolicies().Lister()
 	if authz == nil {
 		authz = &TestAuthorizer{}
 	}
@@ -215,7 +215,7 @@ func TestAdmitSeccomp(t *testing.T) {
 				},
 			},
 		}
-		testPSPAdmit(k, []*policy.PodSecurityPolicy{psp}, pod, v.shouldPassAdmit, v.shouldPassValidate, psp.Name, t)
+		testPSPAdmit(k, []*policyv1beta1.PodSecurityPolicy{psp}, pod, v.shouldPassAdmit, v.shouldPassValidate, psp.Name, t)
 	}
 }
 
@@ -239,7 +239,7 @@ func TestAdmitPrivileged(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedPriv       *bool
@@ -247,7 +247,7 @@ func TestAdmitPrivileged(t *testing.T) {
 	}{
 		"pod with priv=nil allowed under non priv PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{nonPrivilegedPSP},
+			psps:               []*policyv1beta1.PodSecurityPolicy{nonPrivilegedPSP},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPriv:       nil,
@@ -255,7 +255,7 @@ func TestAdmitPrivileged(t *testing.T) {
 		},
 		"pod with priv=nil allowed under priv PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{privilegedPSP},
+			psps:               []*policyv1beta1.PodSecurityPolicy{privilegedPSP},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPriv:       nil,
@@ -263,7 +263,7 @@ func TestAdmitPrivileged(t *testing.T) {
 		},
 		"pod with priv=false allowed under non priv PSP": {
 			pod:                createPodWithPriv(false),
-			psps:               []*policy.PodSecurityPolicy{nonPrivilegedPSP},
+			psps:               []*policyv1beta1.PodSecurityPolicy{nonPrivilegedPSP},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPriv:       &falseValue,
@@ -271,7 +271,7 @@ func TestAdmitPrivileged(t *testing.T) {
 		},
 		"pod with priv=false allowed under priv PSP": {
 			pod:                createPodWithPriv(false),
-			psps:               []*policy.PodSecurityPolicy{privilegedPSP},
+			psps:               []*policyv1beta1.PodSecurityPolicy{privilegedPSP},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPriv:       &falseValue,
@@ -279,13 +279,13 @@ func TestAdmitPrivileged(t *testing.T) {
 		},
 		"pod with priv=true denied by non priv PSP": {
 			pod:                createPodWithPriv(true),
-			psps:               []*policy.PodSecurityPolicy{nonPrivilegedPSP},
+			psps:               []*policyv1beta1.PodSecurityPolicy{nonPrivilegedPSP},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with priv=true allowed by priv PSP": {
 			pod:                createPodWithPriv(true),
-			psps:               []*policy.PodSecurityPolicy{nonPrivilegedPSP, privilegedPSP},
+			psps:               []*policyv1beta1.PodSecurityPolicy{nonPrivilegedPSP, privilegedPSP},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPriv:       &trueValue,
@@ -323,11 +323,11 @@ func defaultPod(t *testing.T, pod *kapi.Pod) *kapi.Pod {
 func TestAdmitPreferNonmutating(t *testing.T) {
 	mutating1 := restrictivePSP()
 	mutating1.Name = "mutating1"
-	mutating1.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: int64(1), Max: int64(1)}}
+	mutating1.Spec.RunAsUser.Ranges = []policyv1beta1.IDRange{{Min: int64(1), Max: int64(1)}}
 
 	mutating2 := restrictivePSP()
 	mutating2.Name = "mutating2"
-	mutating2.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: int64(2), Max: int64(2)}}
+	mutating2.Spec.RunAsUser.Ranges = []policyv1beta1.IDRange{{Min: int64(2), Max: int64(2)}}
 
 	privilegedPSP := permissivePSP()
 	privilegedPSP.Name = "privileged"
@@ -362,7 +362,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		operation             kadmission.Operation
 		pod                   *kapi.Pod
 		podBeforeUpdate       *kapi.Pod
-		psps                  []*policy.PodSecurityPolicy
+		psps                  []*policyv1beta1.PodSecurityPolicy
 		shouldPassValidate    bool
 		expectMutation        bool
 		expectedContainerUser *int64
@@ -371,7 +371,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		"pod should not be mutated by allow-all strategies": {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			psps:                  []*policy.PodSecurityPolicy{privilegedPSP},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{privilegedPSP},
 			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedContainerUser: nil,
@@ -380,7 +380,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		"pod should prefer non-mutating PSP on create": {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			psps:                  []*policy.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
 			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedContainerUser: nil,
@@ -389,7 +389,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		"pod should use deterministic mutating PSP on create": {
 			operation:             kadmission.Create,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
-			psps:                  []*policy.PodSecurityPolicy{mutating2, mutating1},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{mutating2, mutating1},
 			shouldPassValidate:    true,
 			expectMutation:        true,
 			expectedContainerUser: &mutating1.Spec.RunAsUser.Ranges[0].Min,
@@ -398,7 +398,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 		"pod should use deterministic mutating PSP on create even if ValidatedPSPAnnotation is set": {
 			operation:             kadmission.Create,
 			pod:                   podWithAnnotation,
-			psps:                  []*policy.PodSecurityPolicy{mutating2, mutating1},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{mutating2, mutating1},
 			shouldPassValidate:    true,
 			expectMutation:        true,
 			expectedContainerUser: &mutating1.Spec.RunAsUser.Ranges[0].Min,
@@ -408,7 +408,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Update,
 			pod:                   changedPodWithSC.DeepCopy(),
 			podBeforeUpdate:       podWithSC.DeepCopy(),
-			psps:                  []*policy.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{mutating2, mutating1, privilegedPSP},
 			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedContainerUser: nil,
@@ -418,7 +418,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Update,
 			pod:                   changedPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
-			psps:                  []*policy.PodSecurityPolicy{mutating2, mutating1},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{mutating2, mutating1},
 			shouldPassValidate:    false,
 			expectMutation:        false,
 			expectedContainerUser: nil,
@@ -428,7 +428,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Update,
 			pod:                   unprivilegedRunAsAnyPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
-			psps:                  []*policy.PodSecurityPolicy{mutating2, mutating1},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{mutating2, mutating1},
 			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedContainerUser: nil,
@@ -438,7 +438,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 			operation:             kadmission.Update,
 			pod:                   gcChangedPod.DeepCopy(),
 			podBeforeUpdate:       unprivilegedRunAsAnyPod.DeepCopy(),
-			psps:                  []*policy.PodSecurityPolicy{mutating2, mutating1},
+			psps:                  []*policyv1beta1.PodSecurityPolicy{mutating2, mutating1},
 			shouldPassValidate:    true,
 			expectMutation:        false,
 			expectedContainerUser: nil,
@@ -514,11 +514,11 @@ func TestAdmitCaps(t *testing.T) {
 
 	allowAllInAllowed := restrictivePSP()
 	allowAllInAllowed.Name = "allowAllCapsInAllowed"
-	allowAllInAllowed.Spec.AllowedCapabilities = []kapi.Capability{policy.AllowAllCapabilities}
+	allowAllInAllowed.Spec.AllowedCapabilities = []kapi.Capability{policyv1beta1.AllowAllCapabilities}
 
 	tc := map[string]struct {
 		pod                  *kapi.Pod
-		psps                 []*policy.PodSecurityPolicy
+		psps                 []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit      bool
 		shouldPassValidate   bool
 		expectedCapabilities *kapi.Capabilities
@@ -528,7 +528,7 @@ func TestAdmitCaps(t *testing.T) {
 		// should be rejected.
 		"should reject cap add when not allowed or required": {
 			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:               []*policy.PodSecurityPolicy{restricted},
+			psps:               []*policyv1beta1.PodSecurityPolicy{restricted},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
@@ -536,7 +536,7 @@ func TestAdmitCaps(t *testing.T) {
 		// to add the cap.
 		"should accept cap add when in allowed": {
 			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:               []*policy.PodSecurityPolicy{restricted, allowsFooInAllowed},
+			psps:               []*policyv1beta1.PodSecurityPolicy{restricted, allowsFooInAllowed},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        allowsFooInAllowed.Name,
@@ -545,7 +545,7 @@ func TestAdmitCaps(t *testing.T) {
 		// to add the cap.
 		"should accept cap add when in required": {
 			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:               []*policy.PodSecurityPolicy{restricted, allowsFooInRequired},
+			psps:               []*policyv1beta1.PodSecurityPolicy{restricted, allowsFooInRequired},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        allowsFooInRequired.Name,
@@ -554,7 +554,7 @@ func TestAdmitCaps(t *testing.T) {
 		// in the verification of adds and verification of drops
 		"should reject cap add when requested cap is required to be dropped": {
 			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:               []*policy.PodSecurityPolicy{restricted, requiresFooToBeDropped},
+			psps:               []*policyv1beta1.PodSecurityPolicy{restricted, requiresFooToBeDropped},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
@@ -562,7 +562,7 @@ func TestAdmitCaps(t *testing.T) {
 		// a manual request to drop the cap.
 		"should accept cap drop when cap is required to be dropped": {
 			pod:                createPodWithCaps(&kapi.Capabilities{Drop: []kapi.Capability{"foo"}}),
-			psps:               []*policy.PodSecurityPolicy{requiresFooToBeDropped},
+			psps:               []*policyv1beta1.PodSecurityPolicy{requiresFooToBeDropped},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        requiresFooToBeDropped.Name,
@@ -570,7 +570,7 @@ func TestAdmitCaps(t *testing.T) {
 		// UC 6: required add is defaulted
 		"required add is defaulted": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{allowsFooInRequired},
+			psps:               []*policyv1beta1.PodSecurityPolicy{allowsFooInRequired},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedCapabilities: &kapi.Capabilities{
@@ -581,7 +581,7 @@ func TestAdmitCaps(t *testing.T) {
 		// UC 7: required drop is defaulted
 		"required drop is defaulted": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{requiresFooToBeDropped},
+			psps:               []*policyv1beta1.PodSecurityPolicy{requiresFooToBeDropped},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedCapabilities: &kapi.Capabilities{
@@ -592,7 +592,7 @@ func TestAdmitCaps(t *testing.T) {
 		// UC 8: using '*' in allowed caps
 		"should accept cap add when all caps are allowed": {
 			pod:                createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
-			psps:               []*policy.PodSecurityPolicy{restricted, allowAllInAllowed},
+			psps:               []*policyv1beta1.PodSecurityPolicy{restricted, allowAllInAllowed},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        allowAllInAllowed.Name,
@@ -650,19 +650,19 @@ func TestAdmitVolumes(t *testing.T) {
 		psp := restrictivePSP()
 
 		// expect a denial for this PSP
-		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*policy.PodSecurityPolicy{psp}, pod, false, false, "", t)
+		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*policyv1beta1.PodSecurityPolicy{psp}, pod, false, false, "", t)
 
 		// also expect a denial for this PSP if it's an init container
 		useInitContainers(pod)
-		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*policy.PodSecurityPolicy{psp}, pod, false, false, "", t)
+		testPSPAdmit(fmt.Sprintf("%s denial", string(fsType)), []*policyv1beta1.PodSecurityPolicy{psp}, pod, false, false, "", t)
 
 		// now add the fstype directly to the psp and it should validate
-		psp.Spec.Volumes = []policy.FSType{fsType}
-		testPSPAdmit(fmt.Sprintf("%s direct accept", string(fsType)), []*policy.PodSecurityPolicy{psp}, pod, true, true, psp.Name, t)
+		psp.Spec.Volumes = []policyv1beta1.FSType{fsType}
+		testPSPAdmit(fmt.Sprintf("%s direct accept", string(fsType)), []*policyv1beta1.PodSecurityPolicy{psp}, pod, true, true, psp.Name, t)
 
 		// now change the psp to allow any volumes and the pod should still validate
-		psp.Spec.Volumes = []policy.FSType{policy.All}
-		testPSPAdmit(fmt.Sprintf("%s wildcard accept", string(fsType)), []*policy.PodSecurityPolicy{psp}, pod, true, true, psp.Name, t)
+		psp.Spec.Volumes = []policyv1beta1.FSType{policyv1beta1.All}
+		testPSPAdmit(fmt.Sprintf("%s wildcard accept", string(fsType)), []*policyv1beta1.PodSecurityPolicy{psp}, pod, true, true, psp.Name, t)
 	}
 }
 
@@ -683,7 +683,7 @@ func TestAdmitHostNetwork(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                 *kapi.Pod
-		psps                []*policy.PodSecurityPolicy
+		psps                []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit     bool
 		shouldPassValidate  bool
 		expectedHostNetwork bool
@@ -691,7 +691,7 @@ func TestAdmitHostNetwork(t *testing.T) {
 	}{
 		"pod without hostnetwork request allowed under noHostNetwork PSP": {
 			pod:                 goodPod(),
-			psps:                []*policy.PodSecurityPolicy{noHostNetwork},
+			psps:                []*policyv1beta1.PodSecurityPolicy{noHostNetwork},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedHostNetwork: false,
@@ -699,7 +699,7 @@ func TestAdmitHostNetwork(t *testing.T) {
 		},
 		"pod without hostnetwork request allowed under hostNetwork PSP": {
 			pod:                 goodPod(),
-			psps:                []*policy.PodSecurityPolicy{hostNetwork},
+			psps:                []*policyv1beta1.PodSecurityPolicy{hostNetwork},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedHostNetwork: false,
@@ -707,13 +707,13 @@ func TestAdmitHostNetwork(t *testing.T) {
 		},
 		"pod with hostnetwork request denied by noHostNetwork PSP": {
 			pod:                createPodWithHostNetwork(true),
-			psps:               []*policy.PodSecurityPolicy{noHostNetwork},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostNetwork},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with hostnetwork request allowed by hostNetwork PSP": {
 			pod:                 createPodWithHostNetwork(true),
-			psps:                []*policy.PodSecurityPolicy{noHostNetwork, hostNetwork},
+			psps:                []*policyv1beta1.PodSecurityPolicy{noHostNetwork, hostNetwork},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedHostNetwork: true,
@@ -758,47 +758,47 @@ func TestAdmitHostPorts(t *testing.T) {
 
 	hostPorts := restrictivePSP()
 	hostPorts.Name = "hostPorts"
-	hostPorts.Spec.HostPorts = []policy.HostPortRange{
+	hostPorts.Spec.HostPorts = []policyv1beta1.HostPortRange{
 		{Min: 1, Max: 10},
 	}
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedPSP        string
 	}{
 		"host port out of range": {
 			pod:                createPodWithHostPorts(11),
-			psps:               []*policy.PodSecurityPolicy{hostPorts},
+			psps:               []*policyv1beta1.PodSecurityPolicy{hostPorts},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"host port in range": {
 			pod:                createPodWithHostPorts(5),
-			psps:               []*policy.PodSecurityPolicy{hostPorts},
+			psps:               []*policyv1beta1.PodSecurityPolicy{hostPorts},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        hostPorts.Name,
 		},
 		"no host ports with range": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{hostPorts},
+			psps:               []*policyv1beta1.PodSecurityPolicy{hostPorts},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        hostPorts.Name,
 		},
 		"no host ports without range": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{noHostPorts},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostPorts},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        noHostPorts.Name,
 		},
 		"host ports without range": {
 			pod:                createPodWithHostPorts(5),
-			psps:               []*policy.PodSecurityPolicy{noHostPorts},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostPorts},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
@@ -829,7 +829,7 @@ func TestAdmitHostPID(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedHostPID    bool
@@ -837,7 +837,7 @@ func TestAdmitHostPID(t *testing.T) {
 	}{
 		"pod without hostpid request allowed under noHostPID PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{noHostPID},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostPID},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedHostPID:    false,
@@ -845,7 +845,7 @@ func TestAdmitHostPID(t *testing.T) {
 		},
 		"pod without hostpid request allowed under hostPID PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{hostPID},
+			psps:               []*policyv1beta1.PodSecurityPolicy{hostPID},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedHostPID:    false,
@@ -853,12 +853,12 @@ func TestAdmitHostPID(t *testing.T) {
 		},
 		"pod with hostpid request denied by noHostPID PSP": {
 			pod:             createPodWithHostPID(true),
-			psps:            []*policy.PodSecurityPolicy{noHostPID},
+			psps:            []*policyv1beta1.PodSecurityPolicy{noHostPID},
 			shouldPassAdmit: false,
 		},
 		"pod with hostpid request allowed by hostPID PSP": {
 			pod:                createPodWithHostPID(true),
-			psps:               []*policy.PodSecurityPolicy{noHostPID, hostPID},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostPID, hostPID},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedHostPID:    true,
@@ -894,7 +894,7 @@ func TestAdmitHostIPC(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedHostIPC    bool
@@ -902,7 +902,7 @@ func TestAdmitHostIPC(t *testing.T) {
 	}{
 		"pod without hostIPC request allowed under noHostIPC PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{noHostIPC},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostIPC},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedHostIPC:    false,
@@ -910,7 +910,7 @@ func TestAdmitHostIPC(t *testing.T) {
 		},
 		"pod without hostIPC request allowed under hostIPC PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{hostIPC},
+			psps:               []*policyv1beta1.PodSecurityPolicy{hostIPC},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedHostIPC:    false,
@@ -918,13 +918,13 @@ func TestAdmitHostIPC(t *testing.T) {
 		},
 		"pod with hostIPC request denied by noHostIPC PSP": {
 			pod:                createPodWithHostIPC(true),
-			psps:               []*policy.PodSecurityPolicy{noHostIPC},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostIPC},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with hostIPC request allowed by hostIPC PSP": {
 			pod:                createPodWithHostIPC(true),
-			psps:               []*policy.PodSecurityPolicy{noHostIPC, hostIPC},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noHostIPC, hostIPC},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedHostIPC:    true,
@@ -953,12 +953,12 @@ func createPodWithSecurityContexts(podSC *kapi.PodSecurityContext, containerSC *
 func TestAdmitSELinux(t *testing.T) {
 	runAsAny := permissivePSP()
 	runAsAny.Name = "runAsAny"
-	runAsAny.Spec.SELinux.Rule = policy.SELinuxStrategyRunAsAny
+	runAsAny.Spec.SELinux.Rule = policyv1beta1.SELinuxStrategyRunAsAny
 	runAsAny.Spec.SELinux.SELinuxOptions = nil
 
 	mustRunAs := permissivePSP()
 	mustRunAs.Name = "mustRunAs"
-	mustRunAs.Spec.SELinux.Rule = policy.SELinuxStrategyMustRunAs
+	mustRunAs.Spec.SELinux.Rule = policyv1beta1.SELinuxStrategyMustRunAs
 	mustRunAs.Spec.SELinux.SELinuxOptions = &kapi.SELinuxOptions{}
 	mustRunAs.Spec.SELinux.SELinuxOptions.Level = "level"
 	mustRunAs.Spec.SELinux.SELinuxOptions.Role = "role"
@@ -967,7 +967,7 @@ func TestAdmitSELinux(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                 *kapi.Pod
-		psps                []*policy.PodSecurityPolicy
+		psps                []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit     bool
 		shouldPassValidate  bool
 		expectedPodSC       *kapi.PodSecurityContext
@@ -976,7 +976,7 @@ func TestAdmitSELinux(t *testing.T) {
 	}{
 		"runAsAny with no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -985,7 +985,7 @@ func TestAdmitSELinux(t *testing.T) {
 		},
 		"runAsAny with empty pod request": {
 			pod:                 createPodWithSecurityContexts(&kapi.PodSecurityContext{}, nil),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{},
@@ -994,7 +994,7 @@ func TestAdmitSELinux(t *testing.T) {
 		},
 		"runAsAny with empty container request": {
 			pod:                 createPodWithSecurityContexts(nil, &kapi.SecurityContext{}),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -1004,7 +1004,7 @@ func TestAdmitSELinux(t *testing.T) {
 
 		"runAsAny with pod request": {
 			pod:                 createPodWithSecurityContexts(&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}, nil),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}},
@@ -1013,7 +1013,7 @@ func TestAdmitSELinux(t *testing.T) {
 		},
 		"runAsAny with container request": {
 			pod:                 createPodWithSecurityContexts(nil, &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -1022,7 +1022,7 @@ func TestAdmitSELinux(t *testing.T) {
 		},
 		"runAsAny with pod and container request": {
 			pod:                 createPodWithSecurityContexts(&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "bar"}}, &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "bar"}},
@@ -1032,19 +1032,19 @@ func TestAdmitSELinux(t *testing.T) {
 
 		"mustRunAs with bad pod request": {
 			pod:                createPodWithSecurityContexts(&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}, nil),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"mustRunAs with bad container request": {
 			pod:                createPodWithSecurityContexts(nil, &kapi.SecurityContext{SELinuxOptions: &kapi.SELinuxOptions{User: "foo"}}),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"mustRunAs with no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
-			psps:                []*policy.PodSecurityPolicy{mustRunAs},
+			psps:                []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
@@ -1056,7 +1056,7 @@ func TestAdmitSELinux(t *testing.T) {
 				&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{Level: "level", Role: "role", Type: "type", User: "user"}},
 				nil,
 			),
-			psps:                []*policy.PodSecurityPolicy{mustRunAs},
+			psps:                []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
@@ -1068,7 +1068,7 @@ func TestAdmitSELinux(t *testing.T) {
 				&kapi.PodSecurityContext{SELinuxOptions: &kapi.SELinuxOptions{Level: "level", Role: "role", Type: "type", User: "user"}},
 				nil,
 			),
-			psps:                []*policy.PodSecurityPolicy{mustRunAs},
+			psps:                []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       &kapi.PodSecurityContext{SELinuxOptions: mustRunAs.Spec.SELinux.SELinuxOptions},
@@ -1115,7 +1115,7 @@ func TestAdmitAppArmor(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psp                *policy.PodSecurityPolicy
+		psp                *policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedProfile    string
@@ -1170,7 +1170,7 @@ func TestAdmitAppArmor(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testPSPAdmit(k, []*policy.PodSecurityPolicy{v.psp}, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.psp.Name, t)
+		testPSPAdmit(k, []*policyv1beta1.PodSecurityPolicy{v.psp}, v.pod, v.shouldPassAdmit, v.shouldPassValidate, v.psp.Name, t)
 
 		if v.shouldPassAdmit {
 			assert.Equal(t, v.expectedProfile, apparmor.GetProfileNameFromPodAnnotations(v.pod.Annotations, defaultContainerName), k)
@@ -1188,24 +1188,24 @@ func TestAdmitRunAsUser(t *testing.T) {
 
 	runAsAny := permissivePSP()
 	runAsAny.Name = "runAsAny"
-	runAsAny.Spec.RunAsUser.Rule = policy.RunAsUserStrategyRunAsAny
+	runAsAny.Spec.RunAsUser.Rule = policyv1beta1.RunAsUserStrategyRunAsAny
 
 	mustRunAs := permissivePSP()
 	mustRunAs.Name = "mustRunAs"
-	mustRunAs.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
-	mustRunAs.Spec.RunAsUser.Ranges = []policy.IDRange{
+	mustRunAs.Spec.RunAsUser.Rule = policyv1beta1.RunAsUserStrategyMustRunAs
+	mustRunAs.Spec.RunAsUser.Ranges = []policyv1beta1.IDRange{
 		{Min: int64(999), Max: int64(1000)},
 	}
 
 	runAsNonRoot := permissivePSP()
 	runAsNonRoot.Name = "runAsNonRoot"
-	runAsNonRoot.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAsNonRoot
+	runAsNonRoot.Spec.RunAsUser.Rule = policyv1beta1.RunAsUserStrategyMustRunAsNonRoot
 
 	trueValue := true
 
 	tests := map[string]struct {
 		pod                 *kapi.Pod
-		psps                []*policy.PodSecurityPolicy
+		psps                []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit     bool
 		shouldPassValidate  bool
 		expectedPodSC       *kapi.PodSecurityContext
@@ -1214,7 +1214,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 	}{
 		"runAsAny no pod request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -1223,7 +1223,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		},
 		"runAsAny pod request": {
 			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), nil),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       podSC(utilpointer.Int64Ptr(1)),
@@ -1232,7 +1232,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		},
 		"runAsAny container request": {
 			pod:                 createPodWithSecurityContexts(nil, containerSC(utilpointer.Int64Ptr(1))),
-			psps:                []*policy.PodSecurityPolicy{runAsAny},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -1242,20 +1242,20 @@ func TestAdmitRunAsUser(t *testing.T) {
 
 		"mustRunAs pod request out of range": {
 			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), nil),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"mustRunAs container request out of range": {
 			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(999)), containerSC(utilpointer.Int64Ptr(1))),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 
 		"mustRunAs pod request in range": {
 			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(999)), nil),
-			psps:                []*policy.PodSecurityPolicy{mustRunAs},
+			psps:                []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       podSC(&mustRunAs.Spec.RunAsUser.Ranges[0].Min),
@@ -1264,7 +1264,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		},
 		"mustRunAs container request in range": {
 			pod:                 createPodWithSecurityContexts(nil, containerSC(utilpointer.Int64Ptr(999))),
-			psps:                []*policy.PodSecurityPolicy{mustRunAs},
+			psps:                []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -1273,7 +1273,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		},
 		"mustRunAs pod and container request in range": {
 			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(999)), containerSC(utilpointer.Int64Ptr(1000))),
-			psps:                []*policy.PodSecurityPolicy{mustRunAs},
+			psps:                []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       podSC(utilpointer.Int64Ptr(999)),
@@ -1282,7 +1282,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 		},
 		"mustRunAs no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
-			psps:                []*policy.PodSecurityPolicy{mustRunAs},
+			psps:                []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -1292,7 +1292,7 @@ func TestAdmitRunAsUser(t *testing.T) {
 
 		"runAsNonRoot no request": {
 			pod:                 createPodWithSecurityContexts(nil, nil),
-			psps:                []*policy.PodSecurityPolicy{runAsNonRoot},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       nil,
@@ -1301,13 +1301,13 @@ func TestAdmitRunAsUser(t *testing.T) {
 		},
 		"runAsNonRoot pod request root": {
 			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(0)), nil),
-			psps:               []*policy.PodSecurityPolicy{runAsNonRoot},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"runAsNonRoot pod request non-root": {
 			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), nil),
-			psps:               []*policy.PodSecurityPolicy{runAsNonRoot},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPodSC:      podSC(utilpointer.Int64Ptr(1)),
@@ -1315,13 +1315,13 @@ func TestAdmitRunAsUser(t *testing.T) {
 		},
 		"runAsNonRoot container request root": {
 			pod:                createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), containerSC(utilpointer.Int64Ptr(0))),
-			psps:               []*policy.PodSecurityPolicy{runAsNonRoot},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"runAsNonRoot container request non-root": {
 			pod:                 createPodWithSecurityContexts(podSC(utilpointer.Int64Ptr(1)), containerSC(utilpointer.Int64Ptr(2))),
-			psps:                []*policy.PodSecurityPolicy{runAsNonRoot},
+			psps:                []*policyv1beta1.PodSecurityPolicy{runAsNonRoot},
 			shouldPassAdmit:     true,
 			shouldPassValidate:  true,
 			expectedPodSC:       podSC(utilpointer.Int64Ptr(1)),
@@ -1351,16 +1351,16 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 
 	runAsAny := permissivePSP()
 	runAsAny.Name = "runAsAny"
-	runAsAny.Spec.SupplementalGroups.Rule = policy.SupplementalGroupsStrategyRunAsAny
+	runAsAny.Spec.SupplementalGroups.Rule = policyv1beta1.SupplementalGroupsStrategyRunAsAny
 
 	mustRunAs := permissivePSP()
 	mustRunAs.Name = "mustRunAs"
-	mustRunAs.Spec.SupplementalGroups.Rule = policy.SupplementalGroupsStrategyMustRunAs
-	mustRunAs.Spec.SupplementalGroups.Ranges = []policy.IDRange{{Min: int64(999), Max: int64(1000)}}
+	mustRunAs.Spec.SupplementalGroups.Rule = policyv1beta1.SupplementalGroupsStrategyMustRunAs
+	mustRunAs.Spec.SupplementalGroups.Ranges = []policyv1beta1.IDRange{{Min: int64(999), Max: int64(1000)}}
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedPodSC      *kapi.PodSecurityContext
@@ -1368,7 +1368,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 	}{
 		"runAsAny no pod request": {
 			pod:                createPodWithSecurityContexts(nil, nil),
-			psps:               []*policy.PodSecurityPolicy{runAsAny},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPodSC:      nil,
@@ -1376,7 +1376,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		},
 		"runAsAny empty pod request": {
 			pod:                createPodWithSecurityContexts(&kapi.PodSecurityContext{}, nil),
-			psps:               []*policy.PodSecurityPolicy{runAsAny},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPodSC:      &kapi.PodSecurityContext{},
@@ -1384,7 +1384,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		},
 		"runAsAny empty pod request empty supplemental groups": {
 			pod:                createPodWithSecurityContexts(&kapi.PodSecurityContext{SupplementalGroups: []int64{}}, nil),
-			psps:               []*policy.PodSecurityPolicy{runAsAny},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPodSC:      &kapi.PodSecurityContext{SupplementalGroups: []int64{}},
@@ -1392,7 +1392,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		},
 		"runAsAny pod request": {
 			pod:                createPodWithSecurityContexts(podSC(1), nil),
-			psps:               []*policy.PodSecurityPolicy{runAsAny},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPodSC:      &kapi.PodSecurityContext{SupplementalGroups: []int64{1}},
@@ -1400,7 +1400,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		},
 		"mustRunAs no pod request": {
 			pod:                createPodWithSecurityContexts(nil, nil),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPodSC:      podSC(mustRunAs.Spec.SupplementalGroups.Ranges[0].Min),
@@ -1408,13 +1408,13 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 		},
 		"mustRunAs bad pod request": {
 			pod:                createPodWithSecurityContexts(podSC(1), nil),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"mustRunAs good pod request": {
 			pod:                createPodWithSecurityContexts(podSC(999), nil),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPodSC:      podSC(999),
@@ -1445,14 +1445,14 @@ func TestAdmitFSGroup(t *testing.T) {
 
 	runAsAny := restrictivePSP()
 	runAsAny.Name = "runAsAny"
-	runAsAny.Spec.FSGroup.Rule = policy.FSGroupStrategyRunAsAny
+	runAsAny.Spec.FSGroup.Rule = policyv1beta1.FSGroupStrategyRunAsAny
 
 	mustRunAs := restrictivePSP()
 	mustRunAs.Name = "mustRunAs"
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedFSGroup    *int64
@@ -1460,7 +1460,7 @@ func TestAdmitFSGroup(t *testing.T) {
 	}{
 		"runAsAny no pod request": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{runAsAny},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedFSGroup:    nil,
@@ -1468,7 +1468,7 @@ func TestAdmitFSGroup(t *testing.T) {
 		},
 		"runAsAny pod request": {
 			pod:                createPodWithFSGroup(1),
-			psps:               []*policy.PodSecurityPolicy{runAsAny},
+			psps:               []*policyv1beta1.PodSecurityPolicy{runAsAny},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedFSGroup:    utilpointer.Int64Ptr(1),
@@ -1476,7 +1476,7 @@ func TestAdmitFSGroup(t *testing.T) {
 		},
 		"mustRunAs no pod request": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedFSGroup:    &mustRunAs.Spec.SupplementalGroups.Ranges[0].Min,
@@ -1484,13 +1484,13 @@ func TestAdmitFSGroup(t *testing.T) {
 		},
 		"mustRunAs bad pod request": {
 			pod:                createPodWithFSGroup(1),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"mustRunAs good pod request": {
 			pod:                createPodWithFSGroup(999),
-			psps:               []*policy.PodSecurityPolicy{mustRunAs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mustRunAs},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedFSGroup:    utilpointer.Int64Ptr(999),
@@ -1538,7 +1538,7 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedRORFS      bool
@@ -1546,7 +1546,7 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 	}{
 		"no-rorfs allows pod request with rorfs": {
 			pod:                createPodWithRORFS(true),
-			psps:               []*policy.PodSecurityPolicy{noRORFS},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noRORFS},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedRORFS:      true,
@@ -1554,7 +1554,7 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 		},
 		"no-rorfs allows pod request without rorfs": {
 			pod:                createPodWithRORFS(false),
-			psps:               []*policy.PodSecurityPolicy{noRORFS},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noRORFS},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedRORFS:      false,
@@ -1562,13 +1562,13 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 		},
 		"rorfs rejects pod request without rorfs": {
 			pod:                createPodWithRORFS(false),
-			psps:               []*policy.PodSecurityPolicy{rorfs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{rorfs},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"rorfs defaults nil pod request": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{rorfs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{rorfs},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedRORFS:      true,
@@ -1576,7 +1576,7 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 		},
 		"rorfs accepts pod request with rorfs": {
 			pod:                createPodWithRORFS(true),
-			psps:               []*policy.PodSecurityPolicy{rorfs},
+			psps:               []*policyv1beta1.PodSecurityPolicy{rorfs},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedRORFS:      true,
@@ -1644,93 +1644,93 @@ func TestAdmitSysctls(t *testing.T) {
 
 	tests := map[string]struct {
 		pod                *kapi.Pod
-		psps               []*policy.PodSecurityPolicy
+		psps               []*policyv1beta1.PodSecurityPolicy
 		shouldPassAdmit    bool
 		shouldPassValidate bool
 		expectedPSP        string
 	}{
 		"pod without any sysctls request allowed under safeSysctls PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{safeSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{safeSysctls},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        safeSysctls.Name,
 		},
 		"pod without any sysctls request allowed under noSysctls PSP": {
 			pod:                goodPod(),
-			psps:               []*policy.PodSecurityPolicy{noSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noSysctls},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        noSysctls.Name,
 		},
 		"pod with safe sysctls request allowed under safeSysctls PSP": {
 			pod:                podWithSysctls([]string{"kernel.shm_rmid_forced", "net.ipv4.tcp_syncookies"}, []string{}),
-			psps:               []*policy.PodSecurityPolicy{safeSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{safeSysctls},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        safeSysctls.Name,
 		},
 		"pod with unsafe sysctls request disallowed under noSysctls PSP": {
 			pod:                podWithSysctls([]string{}, []string{"a", "b"}),
-			psps:               []*policy.PodSecurityPolicy{noSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noSysctls},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 			expectedPSP:        noSysctls.Name,
 		},
 		"pod with unsafe sysctls a, b request disallowed under aUnsafeSysctl SCC": {
 			pod:                podWithSysctls([]string{}, []string{"a", "b"}),
-			psps:               []*policy.PodSecurityPolicy{aUnsafeSysctl},
+			psps:               []*policyv1beta1.PodSecurityPolicy{aUnsafeSysctl},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with unsafe sysctls b request disallowed under aUnsafeSysctl SCC": {
 			pod:                podWithSysctls([]string{}, []string{"b"}),
-			psps:               []*policy.PodSecurityPolicy{aUnsafeSysctl},
+			psps:               []*policyv1beta1.PodSecurityPolicy{aUnsafeSysctl},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with unsafe sysctls a request allowed under aUnsafeSysctl SCC": {
 			pod:                podWithSysctls([]string{}, []string{"a"}),
-			psps:               []*policy.PodSecurityPolicy{aUnsafeSysctl},
+			psps:               []*policyv1beta1.PodSecurityPolicy{aUnsafeSysctl},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        aUnsafeSysctl.Name,
 		},
 		"pod with safe net sysctl request allowed under aUnsafeSysctl SCC": {
 			pod:                podWithSysctls([]string{"net.ipv4.ip_local_port_range"}, []string{}),
-			psps:               []*policy.PodSecurityPolicy{aUnsafeSysctl},
+			psps:               []*policyv1beta1.PodSecurityPolicy{aUnsafeSysctl},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        aUnsafeSysctl.Name,
 		},
 		"pod with safe sysctls request disallowed under noSysctls PSP": {
 			pod:                podWithSysctls([]string{"net.ipv4.ip_local_port_range"}, []string{}),
-			psps:               []*policy.PodSecurityPolicy{noSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{noSysctls},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with matching sysctls request allowed under mixedSysctls PSP": {
 			pod:                podWithSysctls([]string{"kernel.shm_rmid_forced"}, []string{"a.b", "b.a"}),
-			psps:               []*policy.PodSecurityPolicy{mixedSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mixedSysctls},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        mixedSysctls.Name,
 		},
 		"pod with not-matching unsafe sysctls request disallowed under mixedSysctls PSP": {
 			pod:                podWithSysctls([]string{}, []string{"e"}),
-			psps:               []*policy.PodSecurityPolicy{mixedSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mixedSysctls},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with not-matching safe sysctls request disallowed under mixedSysctls PSP": {
 			pod:                podWithSysctls([]string{"net.ipv4.ip_local_port_range"}, []string{}),
-			psps:               []*policy.PodSecurityPolicy{mixedSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{mixedSysctls},
 			shouldPassAdmit:    false,
 			shouldPassValidate: false,
 		},
 		"pod with sysctls request allowed under catchallSysctls PSP": {
 			pod:                podWithSysctls([]string{"net.ipv4.ip_local_port_range"}, []string{"f"}),
-			psps:               []*policy.PodSecurityPolicy{catchallSysctls},
+			psps:               []*policyv1beta1.PodSecurityPolicy{catchallSysctls},
 			shouldPassAdmit:    true,
 			shouldPassValidate: true,
 			expectedPSP:        catchallSysctls.Name,
@@ -1750,7 +1750,7 @@ func TestAdmitSysctls(t *testing.T) {
 	}
 }
 
-func testPSPAdmit(testCaseName string, psps []*policy.PodSecurityPolicy, pod *kapi.Pod, shouldPassAdmit, shouldPassValidate bool, expectedPSP string, t *testing.T) {
+func testPSPAdmit(testCaseName string, psps []*policyv1beta1.PodSecurityPolicy, pod *kapi.Pod, shouldPassAdmit, shouldPassValidate bool, expectedPSP string, t *testing.T) {
 	testPSPAdmitAdvanced(testCaseName, kadmission.Create, psps, nil, &user.DefaultInfo{}, pod, nil, shouldPassAdmit, shouldPassValidate, true, expectedPSP, t)
 }
 
@@ -1765,7 +1765,7 @@ func (f fakeAttributes) AddAnnotation(k, v string) error {
 	return f.Attributes.AddAnnotation(k, v)
 }
 
-func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer, userInfo user.Info, pod, oldPod *kapi.Pod, shouldPassAdmit, shouldPassValidate bool, canMutate bool, expectedPSP string, t *testing.T) {
+func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*policyv1beta1.PodSecurityPolicy, authz authorizer.Authorizer, userInfo user.Info, pod, oldPod *kapi.Pod, shouldPassAdmit, shouldPassValidate bool, canMutate bool, expectedPSP string, t *testing.T) {
 	originalPod := pod.DeepCopy()
 	plugin := NewTestAdmission(psps, authz)
 
@@ -1891,50 +1891,50 @@ func TestAssignSecurityContext(t *testing.T) {
 func TestCreateProvidersFromConstraints(t *testing.T) {
 	testCases := map[string]struct {
 		// use a generating function so we can test for non-mutation
-		psp         func() *policy.PodSecurityPolicy
+		psp         func() *policyv1beta1.PodSecurityPolicy
 		expectedErr string
 	}{
 		"valid psp": {
-			psp: func() *policy.PodSecurityPolicy {
-				return &policy.PodSecurityPolicy{
+			psp: func() *policyv1beta1.PodSecurityPolicy {
+				return &policyv1beta1.PodSecurityPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "valid psp",
 					},
-					Spec: policy.PodSecurityPolicySpec{
-						SELinux: policy.SELinuxStrategyOptions{
-							Rule: policy.SELinuxStrategyRunAsAny,
+					Spec: policyv1beta1.PodSecurityPolicySpec{
+						SELinux: policyv1beta1.SELinuxStrategyOptions{
+							Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 						},
-						RunAsUser: policy.RunAsUserStrategyOptions{
-							Rule: policy.RunAsUserStrategyRunAsAny,
+						RunAsUser: policyv1beta1.RunAsUserStrategyOptions{
+							Rule: policyv1beta1.RunAsUserStrategyRunAsAny,
 						},
-						FSGroup: policy.FSGroupStrategyOptions{
-							Rule: policy.FSGroupStrategyRunAsAny,
+						FSGroup: policyv1beta1.FSGroupStrategyOptions{
+							Rule: policyv1beta1.FSGroupStrategyRunAsAny,
 						},
-						SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
-							Rule: policy.SupplementalGroupsStrategyRunAsAny,
+						SupplementalGroups: policyv1beta1.SupplementalGroupsStrategyOptions{
+							Rule: policyv1beta1.SupplementalGroupsStrategyRunAsAny,
 						},
 					},
 				}
 			},
 		},
 		"bad psp strategy options": {
-			psp: func() *policy.PodSecurityPolicy {
-				return &policy.PodSecurityPolicy{
+			psp: func() *policyv1beta1.PodSecurityPolicy {
+				return &policyv1beta1.PodSecurityPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bad psp user options",
 					},
-					Spec: policy.PodSecurityPolicySpec{
-						SELinux: policy.SELinuxStrategyOptions{
-							Rule: policy.SELinuxStrategyRunAsAny,
+					Spec: policyv1beta1.PodSecurityPolicySpec{
+						SELinux: policyv1beta1.SELinuxStrategyOptions{
+							Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 						},
-						RunAsUser: policy.RunAsUserStrategyOptions{
-							Rule: policy.RunAsUserStrategyMustRunAs,
+						RunAsUser: policyv1beta1.RunAsUserStrategyOptions{
+							Rule: policyv1beta1.RunAsUserStrategyMustRunAs,
 						},
-						FSGroup: policy.FSGroupStrategyOptions{
-							Rule: policy.FSGroupStrategyRunAsAny,
+						FSGroup: policyv1beta1.FSGroupStrategyOptions{
+							Rule: policyv1beta1.FSGroupStrategyRunAsAny,
 						},
-						SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
-							Rule: policy.SupplementalGroupsStrategyRunAsAny,
+						SupplementalGroups: policyv1beta1.SupplementalGroupsStrategyOptions{
+							Rule: policyv1beta1.SupplementalGroupsStrategyRunAsAny,
 						},
 					},
 				}
@@ -1950,7 +1950,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 		}
 
 		psp := v.psp()
-		_, errs := admit.createProvidersFromPolicies([]*policy.PodSecurityPolicy{psp}, "namespace")
+		_, errs := admit.createProvidersFromPolicies([]*policyv1beta1.PodSecurityPolicy{psp}, "namespace")
 
 		if !reflect.DeepEqual(psp, v.psp()) {
 			diff := diff.ObjectDiff(psp, v.psp())
@@ -1975,7 +1975,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 }
 
 func TestPolicyAuthorization(t *testing.T) {
-	policyWithName := func(name string) *policy.PodSecurityPolicy {
+	policyWithName := func(name string) *policyv1beta1.PodSecurityPolicy {
 		p := permissivePSP()
 		p.Name = name
 		return p
@@ -1986,7 +1986,7 @@ func TestPolicyAuthorization(t *testing.T) {
 		sa             string
 		ns             string
 		expectedPolicy string
-		inPolicies     []*policy.PodSecurityPolicy
+		inPolicies     []*policyv1beta1.PodSecurityPolicy
 		allowed        map[string]map[string]map[string]bool
 		allowedGroup   string
 	}{
@@ -1999,7 +1999,7 @@ func TestPolicyAuthorization(t *testing.T) {
 					"test": {"policy": true},
 				},
 			},
-			inPolicies:     []*policy.PodSecurityPolicy{policyWithName("policy")},
+			inPolicies:     []*policyv1beta1.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicy: "policy",
 		},
 		"policy allowed by sa (extensions API Group)": {
@@ -2011,7 +2011,7 @@ func TestPolicyAuthorization(t *testing.T) {
 					"test": {"policy": true},
 				},
 			},
-			inPolicies:     []*policy.PodSecurityPolicy{policyWithName("policy")},
+			inPolicies:     []*policyv1beta1.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicy: "policy",
 		},
 		"policy allowed by user (policy API Group)": {
@@ -2023,9 +2023,9 @@ func TestPolicyAuthorization(t *testing.T) {
 					"test": {"policy": true},
 				},
 			},
-			inPolicies:     []*policy.PodSecurityPolicy{policyWithName("policy")},
+			inPolicies:     []*policyv1beta1.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicy: "policy",
-			allowedGroup:   policy.GroupName,
+			allowedGroup:   policyv1beta1.GroupName,
 		},
 		"policy allowed by sa (policy API Group)": {
 			user: &user.DefaultInfo{Name: "user"},
@@ -2036,16 +2036,16 @@ func TestPolicyAuthorization(t *testing.T) {
 					"test": {"policy": true},
 				},
 			},
-			inPolicies:     []*policy.PodSecurityPolicy{policyWithName("policy")},
+			inPolicies:     []*policyv1beta1.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicy: "policy",
-			allowedGroup:   policy.GroupName,
+			allowedGroup:   policyv1beta1.GroupName,
 		},
 		"no policies allowed": {
 			user:           &user.DefaultInfo{Name: "user"},
 			sa:             "sa",
 			ns:             "test",
 			allowed:        map[string]map[string]map[string]bool{},
-			inPolicies:     []*policy.PodSecurityPolicy{policyWithName("policy")},
+			inPolicies:     []*policyv1beta1.PodSecurityPolicy{policyWithName("policy")},
 			expectedPolicy: "",
 		},
 		"multiple policies allowed": {
@@ -2064,7 +2064,7 @@ func TestPolicyAuthorization(t *testing.T) {
 					"other": {"policy7": true},
 				},
 			},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				// Prefix to force checking these policies first.
 				policyWithName("a_policy1"), // not allowed in this namespace
 				policyWithName("a_policy2"), // not allowed in this namespace
@@ -2088,7 +2088,7 @@ func TestPolicyAuthorization(t *testing.T) {
 					"test": {"policy2": true},
 				},
 			},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 				policyWithName("policy3"),
@@ -2108,7 +2108,7 @@ func TestPolicyAuthorization(t *testing.T) {
 					"test": {"policy2": true},
 				},
 			},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 				policyWithName("policy3"),
@@ -2128,7 +2128,7 @@ func TestPolicyAuthorization(t *testing.T) {
 					"test": {"policy2": true},
 				},
 			},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 				policyWithName("policy3"),
@@ -2153,7 +2153,7 @@ func TestPolicyAuthorization(t *testing.T) {
 }
 
 func TestPolicyAuthorizationErrors(t *testing.T) {
-	policyWithName := func(name string) *policy.PodSecurityPolicy {
+	policyWithName := func(name string) *policyv1beta1.PodSecurityPolicy {
 		p := restrictivePSP()
 		p.Name = name
 		return p
@@ -2166,13 +2166,13 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 	)
 
 	tests := map[string]struct {
-		inPolicies           []*policy.PodSecurityPolicy
+		inPolicies           []*policyv1beta1.PodSecurityPolicy
 		allowed              map[string]map[string]map[string]bool
 		expectValidationErrs int
 	}{
 		"policies not allowed": {
 			allowed: map[string]map[string]map[string]bool{},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 			},
@@ -2184,7 +2184,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 					"test": {"policy1": true},
 				},
 			},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 			},
@@ -2196,7 +2196,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 					"test": {"policy2": true},
 				},
 			},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 			},
@@ -2211,7 +2211,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 					"test": {"policy2": true},
 				},
 			},
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				policyWithName("policy1"),
 				policyWithName("policy2"),
 			},
@@ -2238,26 +2238,26 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 }
 
 func TestPreferValidatedPSP(t *testing.T) {
-	restrictivePSPWithName := func(name string) *policy.PodSecurityPolicy {
+	restrictivePSPWithName := func(name string) *policyv1beta1.PodSecurityPolicy {
 		p := restrictivePSP()
 		p.Name = name
 		return p
 	}
 
-	permissivePSPWithName := func(name string) *policy.PodSecurityPolicy {
+	permissivePSPWithName := func(name string) *policyv1beta1.PodSecurityPolicy {
 		p := permissivePSP()
 		p.Name = name
 		return p
 	}
 
 	tests := map[string]struct {
-		inPolicies           []*policy.PodSecurityPolicy
+		inPolicies           []*policyv1beta1.PodSecurityPolicy
 		expectValidationErrs int
 		validatedPSPHint     string
 		expectedPSP          string
 	}{
 		"no policy saved in annotations, PSPs are ordered lexicographically": {
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				restrictivePSPWithName("001restrictive"),
 				restrictivePSPWithName("002restrictive"),
 				permissivePSPWithName("002permissive"),
@@ -2269,7 +2269,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			expectedPSP:          "001permissive",
 		},
 		"policy saved in annotations is preferred": {
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				restrictivePSPWithName("001restrictive"),
 				restrictivePSPWithName("002restrictive"),
 				permissivePSPWithName("001permissive"),
@@ -2281,7 +2281,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			expectedPSP:          "002permissive",
 		},
 		"policy saved in annotations is invalid": {
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				restrictivePSPWithName("001restrictive"),
 				restrictivePSPWithName("002restrictive"),
 			},
@@ -2290,7 +2290,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			expectedPSP:          "",
 		},
 		"policy saved in annotations is disallowed anymore": {
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				restrictivePSPWithName("001restrictive"),
 				restrictivePSPWithName("002restrictive"),
 			},
@@ -2299,7 +2299,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			expectedPSP:          "",
 		},
 		"policy saved in annotations is disallowed anymore, but find another one": {
-			inPolicies: []*policy.PodSecurityPolicy{
+			inPolicies: []*policyv1beta1.PodSecurityPolicy{
 				restrictivePSPWithName("001restrictive"),
 				restrictivePSPWithName("002restrictive"),
 				permissivePSPWithName("002permissive"),
@@ -2330,34 +2330,34 @@ func TestPreferValidatedPSP(t *testing.T) {
 	}
 }
 
-func restrictivePSP() *policy.PodSecurityPolicy {
-	return &policy.PodSecurityPolicy{
+func restrictivePSP() *policyv1beta1.PodSecurityPolicy {
+	return &policyv1beta1.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "restrictive",
 			Annotations: map[string]string{},
 		},
-		Spec: policy.PodSecurityPolicySpec{
-			RunAsUser: policy.RunAsUserStrategyOptions{
-				Rule: policy.RunAsUserStrategyMustRunAs,
-				Ranges: []policy.IDRange{
+		Spec: policyv1beta1.PodSecurityPolicySpec{
+			RunAsUser: policyv1beta1.RunAsUserStrategyOptions{
+				Rule: policyv1beta1.RunAsUserStrategyMustRunAs,
+				Ranges: []policyv1beta1.IDRange{
 					{Min: int64(999), Max: int64(999)},
 				},
 			},
-			SELinux: policy.SELinuxStrategyOptions{
-				Rule: policy.SELinuxStrategyMustRunAs,
+			SELinux: policyv1beta1.SELinuxStrategyOptions{
+				Rule: policyv1beta1.SELinuxStrategyMustRunAs,
 				SELinuxOptions: &kapi.SELinuxOptions{
 					Level: "s9:z0,z1",
 				},
 			},
-			FSGroup: policy.FSGroupStrategyOptions{
-				Rule: policy.FSGroupStrategyMustRunAs,
-				Ranges: []policy.IDRange{
+			FSGroup: policyv1beta1.FSGroupStrategyOptions{
+				Rule: policyv1beta1.FSGroupStrategyMustRunAs,
+				Ranges: []policyv1beta1.IDRange{
 					{Min: int64(999), Max: int64(999)},
 				},
 			},
-			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
-				Rule: policy.SupplementalGroupsStrategyMustRunAs,
-				Ranges: []policy.IDRange{
+			SupplementalGroups: policyv1beta1.SupplementalGroupsStrategyOptions{
+				Rule: policyv1beta1.SupplementalGroupsStrategyMustRunAs,
+				Ranges: []policyv1beta1.IDRange{
 					{Min: int64(999), Max: int64(999)},
 				},
 			},
@@ -2365,31 +2365,31 @@ func restrictivePSP() *policy.PodSecurityPolicy {
 	}
 }
 
-func permissivePSP() *policy.PodSecurityPolicy {
-	return &policy.PodSecurityPolicy{
+func permissivePSP() *policyv1beta1.PodSecurityPolicy {
+	return &policyv1beta1.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "privileged",
 			Annotations: map[string]string{},
 		},
-		Spec: policy.PodSecurityPolicySpec{
+		Spec: policyv1beta1.PodSecurityPolicySpec{
 			AllowPrivilegeEscalation: true,
 			HostIPC:                  true,
 			HostNetwork:              true,
 			HostPID:                  true,
-			HostPorts:                []policy.HostPortRange{{Min: 0, Max: 65536}},
-			Volumes:                  []policy.FSType{policy.All},
-			AllowedCapabilities:      []kapi.Capability{policy.AllowAllCapabilities},
-			RunAsUser: policy.RunAsUserStrategyOptions{
-				Rule: policy.RunAsUserStrategyRunAsAny,
+			HostPorts:                []policyv1beta1.HostPortRange{{Min: 0, Max: 65536}},
+			Volumes:                  []policyv1beta1.FSType{policyv1beta1.All},
+			AllowedCapabilities:      []kapi.Capability{policyv1beta1.AllowAllCapabilities},
+			RunAsUser: policyv1beta1.RunAsUserStrategyOptions{
+				Rule: policyv1beta1.RunAsUserStrategyRunAsAny,
 			},
-			SELinux: policy.SELinuxStrategyOptions{
-				Rule: policy.SELinuxStrategyRunAsAny,
+			SELinux: policyv1beta1.SELinuxStrategyOptions{
+				Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 			},
-			FSGroup: policy.FSGroupStrategyOptions{
-				Rule: policy.FSGroupStrategyRunAsAny,
+			FSGroup: policyv1beta1.FSGroupStrategyOptions{
+				Rule: policyv1beta1.FSGroupStrategyRunAsAny,
 			},
-			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
-				Rule: policy.SupplementalGroupsStrategyRunAsAny,
+			SupplementalGroups: policyv1beta1.SupplementalGroupsStrategyOptions{
+				Rule: policyv1beta1.SupplementalGroupsStrategyRunAsAny,
 			},
 		},
 	}
