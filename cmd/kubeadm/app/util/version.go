@@ -78,6 +78,10 @@ func KubernetesReleaseVersion(version string) (string, error) {
 
 	// kubeReleaseLabelRegex matches labels such as: latest, latest-1, latest-1.10
 	if kubeReleaseLabelRegex.MatchString(versionLabel) {
+		var clientVersion string
+		// Try to obtain a client version.
+		clientVersion, _ = kubeadmVersion(pkgversion.Get().String())
+		// Fetch version from the internet.
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
 		body, err := fetchFromURL(url, getReleaseVersionTimeout)
 		if err != nil {
@@ -87,11 +91,13 @@ func KubernetesReleaseVersion(version string) (string, error) {
 			}
 			// Handle air-gapped environments by falling back to the client version.
 			glog.Infof("could not fetch a Kubernetes version from the internet: %v", err)
-			body, err = kubeadmVersion(pkgversion.Get().String())
-			if err != nil {
-				return "", err
-			}
-			glog.Infof("falling back to the local client version: %s", body)
+			glog.Infof("falling back to the local client version: %s", clientVersion)
+			return KubernetesReleaseVersion(clientVersion)
+		}
+		// both the client and the remote version are obtained; validate them and pick a stable version
+		body, err = validateStableVersion(body, clientVersion)
+		if err != nil {
+			return "", err
 		}
 		// Re-validate received version and return.
 		return KubernetesReleaseVersion(body)
@@ -203,4 +209,32 @@ func kubeadmVersion(info string) (string, error) {
 	}
 	vStr := fmt.Sprintf("v%d.%d.%d%s", v.Major(), v.Minor(), patch, pre)
 	return vStr, nil
+}
+
+// Validate if the remote version is one Minor release newer than the client version.
+// This is done to conform with "stable-X" and only allow remote versions from
+// the same Patch level release.
+func validateStableVersion(remoteVersion, clientVersion string) (string, error) {
+	if clientVersion == "" {
+		glog.Infof("could not obtain client version; using remote version: %s", remoteVersion)
+		return remoteVersion, nil
+	}
+
+	verRemote, err := versionutil.ParseGeneric(remoteVersion)
+	if err != nil {
+		return "", fmt.Errorf("remote version error: %v", err)
+	}
+	verClient, err := versionutil.ParseGeneric(clientVersion)
+	if err != nil {
+		return "", fmt.Errorf("client version error: %v", err)
+	}
+	// If the remote Major version is bigger or if the Major versions are the same,
+	// but the remote Minor is bigger use the client version release. This handles Major bumps too.
+	if verClient.Major() < verRemote.Major() ||
+		(verClient.Major() == verRemote.Major()) && verClient.Minor() < verRemote.Minor() {
+		estimatedRelease := fmt.Sprintf("stable-%d.%d", verClient.Major(), verClient.Minor())
+		glog.Infof("remote version is much newer: %s; falling back to: %s", remoteVersion, estimatedRelease)
+		return estimatedRelease, nil
+	}
+	return remoteVersion, nil
 }
