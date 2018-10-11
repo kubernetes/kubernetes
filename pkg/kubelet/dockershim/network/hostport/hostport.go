@@ -31,7 +31,7 @@ const (
 	// the hostport chain
 	kubeHostportsChain utiliptables.Chain = "KUBE-HOSTPORTS"
 	// prefix for hostport chains
-	kubeHostportChainPrefix string = "KUBE-HP-"
+	kubeHostportChainPrefix = "KUBE-HP-"
 )
 
 // PortMapping represents a network port in a container

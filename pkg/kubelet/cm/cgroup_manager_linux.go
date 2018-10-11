@@ -46,7 +46,7 @@ const (
 	// libcontainerSystemd means use libcontainer with systemd
 	libcontainerSystemd libcontainerCgroupManagerType = "systemd"
 	// systemdSuffix is the cgroup name suffix for systemd
-	systemdSuffix string = ".slice"
+	systemdSuffix = ".slice"
 )
 
 // hugePageSizeList is useful for converting to the hugetlb canonical unit

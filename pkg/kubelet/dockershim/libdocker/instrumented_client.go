@@ -26,6 +26,33 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 )
 
+//actions of docker
+const (
+	list_containers            = "list_containers"
+	inspect_container          = "inspect_container"
+	inspect_container_withsize = "inspect_container_withsize"
+	create_container           = "create_container"
+	start_container            = "start_container"
+	stop_container             = "stop_container"
+	remove_container           = "remove_container"
+	update_container           = "update_container"
+	inspect_image              = "inspect_image"
+	list_images                = "list_images"
+	pull_image                 = "pull_image"
+	remove_image               = "remove_image"
+	logs                       = "logs"
+	version                    = "version"
+	info                       = "info"
+	create_exec                = "create_exec"
+	start_exec                 = "start_exec"
+	inspect_exec               = "inspect_exec"
+	attach                     = "attach"
+	image_history              = "image_history"
+	resize_exec                = "resize_exec"
+	resize_container           = "resize_container"
+	stats                      = "stats"
+)
+
 // instrumentedInterface wraps the Interface and records the operations
 // and errors metrics.
 type instrumentedInterface struct {
@@ -57,216 +84,192 @@ func recordError(operation string, err error) {
 }
 
 func (in instrumentedInterface) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
-	const operation = "list_containers"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(list_containers, time.Now())
 
 	out, err := in.client.ListContainers(options)
-	recordError(operation, err)
+	recordError(list_containers, err)
 	return out, err
 }
 
 func (in instrumentedInterface) InspectContainer(id string) (*dockertypes.ContainerJSON, error) {
-	const operation = "inspect_container"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(inspect_container, time.Now())
 
 	out, err := in.client.InspectContainer(id)
-	recordError(operation, err)
+	recordError(inspect_container, err)
 	return out, err
 }
 
 func (in instrumentedInterface) InspectContainerWithSize(id string) (*dockertypes.ContainerJSON, error) {
-	const operation = "inspect_container_withsize"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(inspect_container_withsize, time.Now())
 
 	out, err := in.client.InspectContainerWithSize(id)
-	recordError(operation, err)
+	recordError(inspect_container_withsize, err)
 	return out, err
 }
 
 func (in instrumentedInterface) CreateContainer(opts dockertypes.ContainerCreateConfig) (*dockercontainer.ContainerCreateCreatedBody, error) {
-	const operation = "create_container"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(create_container, time.Now())
 
 	out, err := in.client.CreateContainer(opts)
-	recordError(operation, err)
+	recordError(create_container, err)
 	return out, err
 }
 
 func (in instrumentedInterface) StartContainer(id string) error {
-	const operation = "start_container"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(start_container, time.Now())
 
 	err := in.client.StartContainer(id)
-	recordError(operation, err)
+	recordError(start_container, err)
 	return err
 }
 
 func (in instrumentedInterface) StopContainer(id string, timeout time.Duration) error {
-	const operation = "stop_container"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(stop_container, time.Now())
 
 	err := in.client.StopContainer(id, timeout)
-	recordError(operation, err)
+	recordError(stop_container, err)
 	return err
 }
 
 func (in instrumentedInterface) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
-	const operation = "remove_container"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(remove_container, time.Now())
 
 	err := in.client.RemoveContainer(id, opts)
-	recordError(operation, err)
+	recordError(remove_container, err)
 	return err
 }
 
 func (in instrumentedInterface) UpdateContainerResources(id string, updateConfig dockercontainer.UpdateConfig) error {
-	const operation = "update_container"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(update_container, time.Now())
 
 	err := in.client.UpdateContainerResources(id, updateConfig)
-	recordError(operation, err)
+	recordError(update_container, err)
 	return err
 }
 
 func (in instrumentedInterface) InspectImageByRef(image string) (*dockertypes.ImageInspect, error) {
-	const operation = "inspect_image"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(inspect_image, time.Now())
 
 	out, err := in.client.InspectImageByRef(image)
-	recordError(operation, err)
+	recordError(inspect_image, err)
 	return out, err
 }
 
 func (in instrumentedInterface) InspectImageByID(image string) (*dockertypes.ImageInspect, error) {
-	const operation = "inspect_image"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(inspect_image, time.Now())
 
 	out, err := in.client.InspectImageByID(image)
-	recordError(operation, err)
+	recordError(inspect_image, err)
 	return out, err
 }
 
 func (in instrumentedInterface) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error) {
-	const operation = "list_images"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(list_images, time.Now())
 
 	out, err := in.client.ListImages(opts)
-	recordError(operation, err)
+	recordError(list_images, err)
 	return out, err
 }
 
 func (in instrumentedInterface) PullImage(imageID string, auth dockertypes.AuthConfig, opts dockertypes.ImagePullOptions) error {
-	const operation = "pull_image"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(pull_image, time.Now())
 	err := in.client.PullImage(imageID, auth, opts)
-	recordError(operation, err)
+	recordError(pull_image, err)
 	return err
 }
 
 func (in instrumentedInterface) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
-	const operation = "remove_image"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(remove_image, time.Now())
 
 	imageDelete, err := in.client.RemoveImage(image, opts)
-	recordError(operation, err)
+	recordError(remove_image, err)
 	return imageDelete, err
 }
 
 func (in instrumentedInterface) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {
-	const operation = "logs"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(logs, time.Now())
 
 	err := in.client.Logs(id, opts, sopts)
-	recordError(operation, err)
+	recordError(logs, err)
 	return err
 }
 
 func (in instrumentedInterface) Version() (*dockertypes.Version, error) {
-	const operation = "version"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(version, time.Now())
 
 	out, err := in.client.Version()
-	recordError(operation, err)
+	recordError(version, err)
 	return out, err
 }
 
 func (in instrumentedInterface) Info() (*dockertypes.Info, error) {
-	const operation = "info"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(info, time.Now())
 
 	out, err := in.client.Info()
-	recordError(operation, err)
+	recordError(info, err)
 	return out, err
 }
 
 func (in instrumentedInterface) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.IDResponse, error) {
-	const operation = "create_exec"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(create_exec, time.Now())
 
 	out, err := in.client.CreateExec(id, opts)
-	recordError(operation, err)
+	recordError(create_exec, err)
 	return out, err
 }
 
 func (in instrumentedInterface) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
-	const operation = "start_exec"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(start_exec, time.Now())
 
 	err := in.client.StartExec(startExec, opts, sopts)
-	recordError(operation, err)
+	recordError(start_exec, err)
 	return err
 }
 
 func (in instrumentedInterface) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
-	const operation = "inspect_exec"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(inspect_exec, time.Now())
 
 	out, err := in.client.InspectExec(id)
-	recordError(operation, err)
+	recordError(inspect_exec, err)
 	return out, err
 }
 
 func (in instrumentedInterface) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
-	const operation = "attach"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(attach, time.Now())
 
 	err := in.client.AttachToContainer(id, opts, sopts)
-	recordError(operation, err)
+	recordError(attach, err)
 	return err
 }
 
 func (in instrumentedInterface) ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error) {
-	const operation = "image_history"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(image_history, time.Now())
 
 	out, err := in.client.ImageHistory(id)
-	recordError(operation, err)
+	recordError(image_history, err)
 	return out, err
 }
 
 func (in instrumentedInterface) ResizeExecTTY(id string, height, width uint) error {
-	const operation = "resize_exec"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(resize_exec, time.Now())
 
 	err := in.client.ResizeExecTTY(id, height, width)
-	recordError(operation, err)
+	recordError(resize_exec, err)
 	return err
 }
 
 func (in instrumentedInterface) ResizeContainerTTY(id string, height, width uint) error {
-	const operation = "resize_container"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(resize_container, time.Now())
 
 	err := in.client.ResizeContainerTTY(id, height, width)
-	recordError(operation, err)
+	recordError(resize_container, err)
 	return err
 }
 
 func (in instrumentedInterface) GetContainerStats(id string) (*dockertypes.StatsJSON, error) {
-	const operation = "stats"
-	defer recordOperation(operation, time.Now())
+	defer recordOperation(stats, time.Now())
 
 	out, err := in.client.GetContainerStats(id)
-	recordError(operation, err)
+	recordError(stats, err)
 	return out, err
 }
