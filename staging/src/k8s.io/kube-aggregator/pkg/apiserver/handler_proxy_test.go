@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 type targetHTTPHandler struct {

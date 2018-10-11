@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 func TestHandleVersionUpdate(t *testing.T) {

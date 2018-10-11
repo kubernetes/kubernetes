@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 
-	apiregistrationapi "k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	apiregistrationv1beta1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
 // apisHandler serves the `/apis` endpoint.
@@ -40,7 +40,7 @@ type apisHandler struct {
 }
 
 var discoveryGroup = metav1.APIGroup{
-	Name: apiregistrationapi.GroupName,
+	Name: apiregistrationv1api.GroupName,
 	Versions: []metav1.GroupVersionForDiscovery{
 		{
 			GroupVersion: apiregistrationv1api.SchemeGroupVersion.String(),
@@ -69,7 +69,7 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	apiServicesByGroup := apiregistrationapi.SortedByGroupAndVersion(apiServices)
+	apiServicesByGroup := apiregistrationv1apihelper.SortedByGroupAndVersion(apiServices)
 	for _, apiGroupServers := range apiServicesByGroup {
 		// skip the legacy group
 		if len(apiGroupServers[0].Spec.Group) == 0 {
@@ -86,8 +86,8 @@ func (r *apisHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // convertToDiscoveryAPIGroup takes apiservices in a single group and returns a discovery compatible object.
 // if none of the services are available, it will return nil.
-func convertToDiscoveryAPIGroup(apiServices []*apiregistrationapi.APIService) *metav1.APIGroup {
-	apiServicesByGroup := apiregistrationapi.SortedByGroupAndVersion(apiServices)[0]
+func convertToDiscoveryAPIGroup(apiServices []*apiregistrationv1api.APIService) *metav1.APIGroup {
+	apiServicesByGroup := apiregistrationv1apihelper.SortedByGroupAndVersion(apiServices)[0]
 
 	var discoveryGroup *metav1.APIGroup
 
@@ -135,7 +135,7 @@ func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	apiServicesForGroup := []*apiregistrationapi.APIService{}
+	apiServicesForGroup := []*apiregistrationv1api.APIService{}
 	for _, apiService := range apiServices {
 		if apiService.Spec.Group == r.groupName {
 			apiServicesForGroup = append(apiServicesForGroup, apiService)

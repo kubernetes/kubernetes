@@ -24,9 +24,9 @@ import (
 	v1listers "k8s.io/client-go/listers/core/v1"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
 func newEndpoints(namespace, name string) *v1.Endpoints {

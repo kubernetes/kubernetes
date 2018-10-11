@@ -27,13 +27,13 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/pkg/version"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
-	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	openapicontroller "k8s.io/kube-aggregator/pkg/controllers/openapi"
 	statuscontrollers "k8s.io/kube-aggregator/pkg/controllers/status"
 	apiservicerest "k8s.io/kube-aggregator/pkg/registry/apiservice/rest"
@@ -143,7 +143,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil, err
 	}
 
-	apiregistrationClient, err := internalclientset.NewForConfig(c.GenericConfig.LoopbackClientConfig)
+	apiregistrationClient, err := clientset.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		proxyTransport:           c.ExtraConfig.ProxyTransport,
 		proxyHandlers:            map[string]*proxyHandler{},
 		handledGroups:            sets.String{},
-		lister:                   informerFactory.Apiregistration().InternalVersion().APIServices().Lister(),
+		lister:                   informerFactory.Apiregistration().V1().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
 	}
@@ -177,9 +177,9 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle("/apis", apisHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandle("/apis/", apisHandler)
 
-	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().InternalVersion().APIServices(), s)
+	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
 	availableController := statuscontrollers.NewAvailableConditionController(
-		informerFactory.Apiregistration().InternalVersion().APIServices(),
+		informerFactory.Apiregistration().V1().APIServices(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Services(),
 		c.GenericConfig.SharedInformerFactory.Core().V1().Endpoints(),
 		apiregistrationClient.Apiregistration(),
@@ -226,7 +226,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread
-func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) error {
+func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
 	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
@@ -287,7 +287,7 @@ func (s *APIAggregator) AddAPIService(apiService *apiregistration.APIService) er
 // RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so its ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
-	version := apiregistration.APIServiceNameToGroupVersion(apiServiceName)
+	version := v1helper.APIServiceNameToGroupVersion(apiServiceName)
 
 	proxyPath := "/apis/" + version.Group + "/" + version.Version
 	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.

@@ -25,7 +25,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32) apiregistration.APIService {

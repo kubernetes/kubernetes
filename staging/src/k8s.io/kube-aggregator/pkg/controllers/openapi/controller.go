@@ -27,7 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 const (
@@ -45,7 +45,7 @@ const (
 
 // AggregationManager is the interface between this controller and OpenAPI Aggregator service.
 type AggregationManager interface {
-	AddUpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) error
+	AddUpdateAPIService(handler http.Handler, apiService *v1.APIService) error
 	UpdateAPIServiceSpec(apiServiceName string, spec *spec.Swagger, etag string) error
 	RemoveAPIServiceSpec(apiServiceName string) error
 	GetAPIServiceInfo(apiServiceName string) (handler http.Handler, etag string, exists bool)
@@ -146,7 +146,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 }
 
 // AddAPIService adds a new API Service to OpenAPI Aggregation.
-func (c *AggregationController) AddAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) AddAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}
@@ -157,7 +157,7 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 }
 
 // UpdateAPIService updates API Service's info and handler.
-func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}
