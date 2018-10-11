@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
@@ -216,6 +217,15 @@ func (w *worker) doProbe() (keepGoing bool) {
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
+	}
+
+	// event message to be logged stating that the probe is healthy again and the amount of time the pod was unhealthy.
+	if w.probeType == readiness && w.lastResult == results.Failure && result == results.Success {
+		timeUnhealthy := time.Duration(w.spec.PeriodSeconds*int32(w.resultRun+1)) * time.Second
+		ref, hasRef := w.probeManager.prober.refManager.GetRef(w.containerID)
+		if hasRef {
+			w.probeManager.prober.recorder.Eventf(ref, v1.EventTypeNormal, events.ContainerTurnHealthy, "Readiness probe is now healthy after failing for %v", timeUnhealthy)
+		}
 	}
 
 	if w.lastResult == result {
