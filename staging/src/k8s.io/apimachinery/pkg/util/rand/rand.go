@@ -27,7 +27,7 @@ var rng = struct {
 	sync.Mutex
 	rand *rand.Rand
 }{
-	rand: rand.New(rand.NewSource(time.Now().UTC().UnixNano())),
+	rand: rand.New(rand.NewSource(time.Now().UnixNano())),
 }
 
 // Intn generates an integer in range [0,max).

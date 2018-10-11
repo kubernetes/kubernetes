@@ -119,7 +119,7 @@ func TestE2eNode(t *testing.T) {
 		return
 	}
 	// If run-services-mode is not specified, run test.
-	rand.Seed(time.Now().UTC().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 	RegisterFailHandler(Fail)
 	reporters := []Reporter{}
 	reportDir := framework.TestContext.ReportDir
