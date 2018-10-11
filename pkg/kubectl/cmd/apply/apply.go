@@ -42,6 +42,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -76,11 +77,12 @@ type ApplyOptions struct {
 	PruneWhitelist             []string
 	ShouldIncludeUninitialized bool
 
-	Validator     validation.Schema
-	Builder       *resource.Builder
-	Mapper        meta.RESTMapper
-	DynamicClient dynamic.Interface
-	OpenAPISchema openapi.Resources
+	Validator       validation.Schema
+	Builder         *resource.Builder
+	Mapper          meta.RESTMapper
+	DynamicClient   dynamic.Interface
+	DiscoveryClient discovery.DiscoveryInterface
+	OpenAPISchema   openapi.Resources
 
 	Namespace        string
 	EnforceNamespace bool
@@ -207,6 +209,11 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	o.DiscoveryClient, err = f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
@@ -403,19 +410,25 @@ func (o *ApplyOptions) Run() error {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
+			dryRunVerifier := &DryRunVerifier{
+				Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
+				OpenAPIGetter: o.DiscoveryClient,
+			}
+
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &Patcher{
-				Mapping:       info.Mapping,
-				Helper:        helper,
-				DynamicClient: o.DynamicClient,
-				Overwrite:     o.Overwrite,
-				BackOff:       clockwork.NewRealClock(),
-				Force:         o.DeleteOptions.ForceDeletion,
-				Cascade:       o.DeleteOptions.Cascade,
-				Timeout:       o.DeleteOptions.Timeout,
-				GracePeriod:   o.DeleteOptions.GracePeriod,
-				ServerDryRun:  o.ServerDryRun,
-				OpenapiSchema: openapiSchema,
+				Mapping:        info.Mapping,
+				Helper:         helper,
+				DynamicClient:  o.DynamicClient,
+				DryRunVerifier: dryRunVerifier,
+				Overwrite:      o.Overwrite,
+				BackOff:        clockwork.NewRealClock(),
+				Force:          o.DeleteOptions.ForceDeletion,
+				Cascade:        o.DeleteOptions.Cascade,
+				Timeout:        o.DeleteOptions.Timeout,
+				GracePeriod:    o.DeleteOptions.GracePeriod,
+				ServerDryRun:   o.ServerDryRun,
+				OpenapiSchema:  openapiSchema,
 			}
 
 			patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
@@ -668,9 +681,10 @@ func (p *Patcher) delete(namespace, name string) error {
 }
 
 type Patcher struct {
-	Mapping       *meta.RESTMapping
-	Helper        *resource.Helper
-	DynamicClient dynamic.Interface
+	Mapping        *meta.RESTMapping
+	Helper         *resource.Helper
+	DynamicClient  dynamic.Interface
+	DryRunVerifier *DryRunVerifier
 
 	Overwrite bool
 	BackOff   clockwork.Clock
@@ -684,7 +698,52 @@ type Patcher struct {
 	OpenapiSchema openapi.Resources
 }
 
+// DryRunVerifier verifies if a given group-version-kind supports DryRun
+// against the current server. Sending dryRun requests to apiserver that
+// don't support it will result in objects being unwillingly persisted.
+//
+// It reads the OpenAPI to see if the given GVK supports dryRun. If the
+// GVK can not be found, we assume that CRDs will have the same level of
+// support as "namespaces", and non-CRDs will not be supported. We
+// delay the check for CRDs as much as possible though, since it
+// requires an extra round-trip to the server.
+type DryRunVerifier struct {
+	Finder        cmdutil.CRDFinder
+	OpenAPIGetter discovery.OpenAPISchemaInterface
+}
+
+// HasSupport verifies if the given gvk supports DryRun. An error is
+// returned if it doesn't.
+func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	oapi, err := v.OpenAPIGetter.OpenAPISchema()
+	if err != nil {
+		return fmt.Errorf("failed to download openapi: %v", err)
+	}
+	supports, err := openapi.SupportsDryRun(oapi, gvk)
+	if err != nil {
+		// We assume that we couldn't find the type, then check for namespace:
+		supports, _ = openapi.SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
+		// If namespace supports dryRun, then we will support dryRun for CRDs only.
+		if supports {
+			supports, err = v.Finder.HasCRD(gvk.GroupKind())
+			if err != nil {
+				return fmt.Errorf("failed to check CRD: %v", err)
+			}
+		}
+	}
+	if !supports {
+		return fmt.Errorf("%v doesn't support dry-run", gvk)
+	}
+	return nil
+}
+
 func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+	if p.ServerDryRun {
+		if err := p.DryRunVerifier.HasSupport(p.Mapping.GroupVersionKind); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
