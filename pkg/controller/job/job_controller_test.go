@@ -1422,6 +1422,21 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 		expectedCondition       *batch.JobConditionType
 		expectedConditionReason string
 	}{
+		"backoffLimit 0 should have 1 pod active": {
+			1, 1, 0,
+			true, []int32{0},
+			1, 0, 0, nil, "",
+		},
+		"backoffLimit 1 with restartCount 0 should have 1 pod active": {
+			1, 1, 1,
+			true, []int32{0},
+			1, 0, 0, nil, "",
+		},
+		"backoffLimit 1 with restartCount 1 should have 0 pod active": {
+			1, 1, 1,
+			true, []int32{1},
+			0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
+		},
 		"too many job failures - single pod": {
 			1, 5, 2,
 			true, []int32{2},
