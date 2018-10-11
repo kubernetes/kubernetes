@@ -402,7 +402,6 @@ pkg/util/sysctl
 pkg/util/sysctl/testing
 pkg/util/system
 pkg/util/taints
-pkg/util/term
 pkg/util/threading
 pkg/util/tolerations
 pkg/util/workqueue/prometheus
