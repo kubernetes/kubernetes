@@ -17,9 +17,10 @@ limitations under the License.
 package storage
 
 import (
-	"math/rand"
 	"sync"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func TestHighWaterMark(t *testing.T) {

@@ -18,7 +18,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra/doc"
 	"github.com/spf13/pflag"
@@ -34,6 +36,7 @@ import (
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
 	path := ""
 	module := ""

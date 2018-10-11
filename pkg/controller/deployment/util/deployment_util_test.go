@@ -19,7 +19,6 @@ package util
 import (
 	"fmt"
 	"math"
-	"math/rand"
 	"reflect"
 	"sort"
 	"strconv"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"

@@ -35,14 +35,14 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/test/e2e_node/remote"
-
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
+
+	"k8s.io/kubernetes/test/e2e_node/remote"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")

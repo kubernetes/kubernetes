@@ -19,10 +19,11 @@ package trace
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 type traceStep struct {

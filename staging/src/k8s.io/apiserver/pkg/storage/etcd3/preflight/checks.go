@@ -18,10 +18,11 @@ package preflight
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"net/url"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 const connectionTimeout = 1 * time.Second

@@ -28,7 +28,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -42,6 +41,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -398,7 +398,7 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 
 func (l *SSHTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
 	start := time.Now()
-	id := mathrand.Int63() // So you can match begins/ends in the log.
+	id := utilrand.Int63() // So you can match begins/ends in the log.
 	glog.Infof("[%x: %v] Dialing...", id, addr)
 	defer func() {
 		glog.Infof("[%x: %v] Dialed in %v.", id, addr, time.Since(start))
@@ -424,7 +424,7 @@ func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 		}
 	}
 	glog.Warningf("SSH tunnel not found for address %q, picking random node", addr)
-	n := mathrand.Intn(len(l.entries))
+	n := utilrand.Intn(len(l.entries))
 	return l.entries[n].Tunnel, nil
 }
 

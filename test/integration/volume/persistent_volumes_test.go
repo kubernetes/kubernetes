@@ -18,17 +18,20 @@ package volume
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http/httptest"
 	"os"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -40,9 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-
-	"github.com/golang/glog"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // Several tests in this file are configurable by environment variables:

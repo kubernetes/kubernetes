@@ -17,12 +17,13 @@ limitations under the License.
 package prober
 
 import (
-	"math/rand"
 	"time"
 
 	"github.com/golang/glog"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"

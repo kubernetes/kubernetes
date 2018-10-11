@@ -18,10 +18,10 @@ package dockershim
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/rand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 )

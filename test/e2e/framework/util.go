@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -60,6 +59,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -2097,8 +2097,7 @@ func LoadClientset() (*clientset.Clientset, error) {
 //       need to use such a function and can instead
 //       use the UUID utility function.
 func randomSuffix() string {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return strconv.Itoa(r.Int() % 10000)
+	return strconv.Itoa(rand.Intn(10000))
 }
 
 func ExpectNoError(err error, explain ...interface{}) {

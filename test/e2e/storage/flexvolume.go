@@ -18,15 +18,15 @@ package storage
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"path"
-
 	"time"
 
 	. "github.com/onsi/ginkgo"
+
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/rand"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"

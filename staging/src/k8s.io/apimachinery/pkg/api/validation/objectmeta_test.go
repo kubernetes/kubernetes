@@ -17,13 +17,13 @@ limitations under the License.
 package validation
 
 import (
-	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 

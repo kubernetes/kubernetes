@@ -17,15 +17,15 @@ limitations under the License.
 package meta
 
 import (
-	"math/rand"
 	"reflect"
 	"testing"
+
+	fuzz "github.com/google/gofuzz"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/util/diff"
-
-	fuzz "github.com/google/gofuzz"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func TestAsPartialObjectMetadata(t *testing.T) {

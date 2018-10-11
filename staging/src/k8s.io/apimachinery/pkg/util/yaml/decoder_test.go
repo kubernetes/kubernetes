@@ -23,10 +23,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func TestYAMLDecoderReadBytesLength(t *testing.T) {

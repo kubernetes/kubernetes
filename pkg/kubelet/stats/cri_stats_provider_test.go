@@ -17,7 +17,6 @@ limitations under the License.
 package stats
 
 import (
-	"math/rand"
 	"runtime"
 	"testing"
 	"time"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	critest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"

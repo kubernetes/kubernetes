@@ -18,11 +18,12 @@ package kuberuntime
 
 import (
 	"fmt"
-	"math/rand"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

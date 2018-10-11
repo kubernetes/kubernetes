@@ -20,8 +20,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 
 	mangen "github.com/cpuguy83/go-md2man/md2man"
 	"github.com/spf13/cobra"
@@ -39,6 +41,7 @@ import (
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
 	path := "docs/man/man1"
 	module := ""

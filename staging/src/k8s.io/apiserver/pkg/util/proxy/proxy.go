@@ -18,16 +18,15 @@ package proxy
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"net/url"
 	"strconv"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	listersv1 "k8s.io/client-go/listers/core/v1"
-
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
+	listersv1 "k8s.io/client-go/listers/core/v1"
 )
 
 // findServicePort finds the service port by name or numerically.

@@ -18,7 +18,6 @@ package apps
 
 import (
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"

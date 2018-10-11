@@ -18,22 +18,21 @@ package storage
 
 import (
 	"fmt"
-	mathrand "math/rand"
 	"strings"
 	"time"
-
-	"google.golang.org/api/googleapi"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"google.golang.org/api/googleapi"
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -79,8 +78,6 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		Expect(len(nodes.Items)).To(BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
-
-		mathrand.Seed(time.Now().UnixNano())
 	})
 
 	Context("schedule pods each with a PD, delete pod and verify detach [Slow]", func() {
@@ -178,7 +175,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					By("writing content to host0Pod on node0")
 					containerName = "mycontainer"
 					testFile = "/testpd1/tracker"
-					testFileContents = fmt.Sprintf("%v", mathrand.Int())
+					testFileContents = fmt.Sprintf("%v", rand.Int())
 					framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 					framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 					By("verifying PD is present in node0's VolumeInUse list")
@@ -278,11 +275,11 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					By(fmt.Sprintf("writing %d file(s) via a container", numPDs))
 					containerName := "mycontainer"
 					if numContainers > 1 {
-						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
+						containerName = fmt.Sprintf("mycontainer%v", rand.Intn(numContainers)+1)
 					}
 					for x := 1; x <= numPDs; x++ {
 						testFile := fmt.Sprintf("/testpd%d/tracker%d", x, i)
-						testFileContents := fmt.Sprintf("%v", mathrand.Int())
+						testFileContents := fmt.Sprintf("%v", rand.Int())
 						fileAndContentToVerify[testFile] = testFileContents
 						framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 						framework.Logf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name)
@@ -290,7 +287,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 					By("verifying PD contents via a container")
 					if numContainers > 1 {
-						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
+						containerName = fmt.Sprintf("mycontainer%v", rand.Intn(numContainers)+1)
 					}
 					verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
@@ -377,7 +374,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				By("writing content to host0Pod")
 				testFile := "/testpd1/tracker"
-				testFileContents := fmt.Sprintf("%v", mathrand.Int())
+				testFileContents := fmt.Sprintf("%v", rand.Int())
 				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 				framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 

@@ -17,7 +17,6 @@ limitations under the License.
 package unstructured_test
 
 import (
-	"math/rand"
 	"reflect"
 	"testing"
 
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func TestNilUnstructuredContent(t *testing.T) {

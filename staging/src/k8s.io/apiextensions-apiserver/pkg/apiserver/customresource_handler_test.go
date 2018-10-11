@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"math/rand"
 	"reflect"
 	"testing"
 
@@ -34,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 

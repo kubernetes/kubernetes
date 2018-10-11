@@ -18,7 +18,6 @@ package testing
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"sync"
 	"testing"
@@ -30,6 +29,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/watch"
 )
 

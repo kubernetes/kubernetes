@@ -18,7 +18,6 @@ package util
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -28,6 +27,8 @@ import (
 
 	etcd "github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 const validEtcdVersion = "etcd 2.0.9"

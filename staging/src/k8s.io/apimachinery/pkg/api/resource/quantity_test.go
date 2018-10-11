@@ -18,14 +18,14 @@ package resource
 
 import (
 	"encoding/json"
-	"math/rand"
 	"strings"
 	"testing"
 	"unicode"
 
 	fuzz "github.com/google/gofuzz"
-
 	inf "gopkg.in/inf.v0"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 func amount(i int64, exponent int) infDecAmount {

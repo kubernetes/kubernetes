@@ -19,10 +19,10 @@ package wait
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 

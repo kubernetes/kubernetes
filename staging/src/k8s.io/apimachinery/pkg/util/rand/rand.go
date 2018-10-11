@@ -138,11 +138,13 @@ func Read(p []byte) (n int, err error) {
 }
 
 // Seed seeds the rng with the provided seed.
+// This method should only be used for testing.
 func Seed(seed int64) {
 	UseSource(rand.NewSource(seed))
 }
 
 // UseSource makes the rng use the provided source.
+// This method should only be used for testing.
 func UseSource(source rand.Source) {
 	rng.Lock()
 	defer rng.Unlock()

@@ -21,7 +21,6 @@ import (
 	"encoding/hex"
 	gojson "encoding/json"
 	"io/ioutil"
-	"math/rand"
 	"reflect"
 	"testing"
 
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"

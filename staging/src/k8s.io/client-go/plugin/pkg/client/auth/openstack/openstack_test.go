@@ -17,10 +17,11 @@ limitations under the License.
 package openstack
 
 import (
-	"math/rand"
 	"net/http"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 // testTokenGetter is a simple random token getter.

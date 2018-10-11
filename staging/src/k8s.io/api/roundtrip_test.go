@@ -17,8 +17,9 @@ limitations under the License.
 package testing
 
 import (
-	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
@@ -51,8 +52,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
-
-	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
@@ -60,6 +59,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 var groups = []runtime.SchemeBuilder{

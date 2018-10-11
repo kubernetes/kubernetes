@@ -18,7 +18,6 @@ package testing
 
 import (
 	"bytes"
-	"math/rand"
 	"reflect"
 	"testing"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 

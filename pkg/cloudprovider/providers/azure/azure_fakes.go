@@ -19,14 +19,13 @@ package azure
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	cloudprovider "k8s.io/cloud-provider"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
@@ -474,7 +473,6 @@ func (fNSG *fakeAzureNSGClient) List(ctx context.Context, resourceGroupName stri
 }
 
 func getRandomIPPtr() *string {
-	rand.Seed(time.Now().UnixNano())
 	return to.StringPtr(fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256)))
 }
 

@@ -17,13 +17,13 @@ limitations under the License.
 package cache
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/pborman/uuid"
 
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )

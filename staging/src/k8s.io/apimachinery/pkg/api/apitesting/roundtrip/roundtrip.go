@@ -19,7 +19,6 @@ package roundtrip
 import (
 	"bytes"
 	"encoding/hex"
-	"math/rand"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

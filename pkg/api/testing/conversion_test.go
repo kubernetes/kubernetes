@@ -18,7 +18,6 @@ package testing
 
 import (
 	"io/ioutil"
-	"math/rand"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
