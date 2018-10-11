@@ -108,10 +108,6 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
 		Expect(err).NotTo(HaveOccurred())
-		// TODO: kops PR job is still using etcd2, which prevents this feature from working. Remove this check when kops is upgraded to etcd3
-		if len(pagedTable.Rows) > 2 {
-			framework.Skipf("ERROR: This cluster does not support chunking, which means it is running etcd2 and not supported.")
-		}
 		Expect(len(pagedTable.Rows)).To(Equal(2))
 		Expect(pagedTable.ResourceVersion).ToNot(Equal(""))
 		Expect(pagedTable.SelfLink).ToNot(Equal(""))
