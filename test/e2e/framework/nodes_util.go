@@ -31,6 +31,8 @@ func EtcdUpgrade(target_storage, target_version string) error {
 	switch TestContext.Provider {
 	case "gce":
 		return etcdUpgradeGCE(target_storage, target_version)
+	case "aws":
+		return etcdUpgradeKops(target_storage, target_version)
 	default:
 		return fmt.Errorf("EtcdUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
@@ -51,6 +53,8 @@ func MasterUpgrade(v string) error {
 		return masterUpgradeGCE(v, false)
 	case "gke":
 		return masterUpgradeGKE(v)
+	case "aws":
+		return masterUpgradeKops(v)
 	case "kubernetes-anywhere":
 		return masterUpgradeKubernetesAnywhere(v)
 	default:
@@ -67,6 +71,27 @@ func etcdUpgradeGCE(target_storage, target_version string) error {
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
+}
+
+func etcdUpgradeKops(targetStorage, targetVersion string) error {
+	Logf("Upgrading etcd to targetStorage=%q, targetVersion=%q", targetStorage, targetVersion)
+	fields := []string{
+		fmt.Sprintf("cluster.spec.etcdClusters[*].version=%s", targetVersion),
+	}
+
+	if err := kopsSetCluster(fields); err != nil {
+		return err
+	}
+	if err := kopsUpdateCluster(); err != nil {
+		return err
+	}
+	if err := kopsRollingUpdateCluster(nil); err != nil {
+		return err
+	}
+	if err := kopsValidateCluster(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func ingressUpgradeGCE(isUpgrade bool) error {
@@ -154,6 +179,78 @@ func masterUpgradeGKE(v string) error {
 	return nil
 }
 
+func masterUpgradeKops(v string) error {
+	Logf("Upgrading master to %q", v)
+	fields := []string{
+		fmt.Sprintf("spec.kubernetesVersion=%s", v),
+	}
+
+	if err := kopsSetCluster(fields); err != nil {
+		return err
+	}
+	if err := kopsUpdateCluster(); err != nil {
+		return err
+	}
+	if err := kopsRollingUpdateCluster([]string{"Master"}); err != nil {
+		return err
+	}
+	if err := kopsValidateCluster(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// kopsSetCluster runs `kops set cluster`
+func kopsSetCluster(fields []string) error {
+	args := []string{"set", "cluster"}
+	for _, f := range fields {
+		args = append(args, f)
+	}
+	if _, _, err := RunCmd("kops", args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// kopsUpdateCluster runs `kops update cluster` in preview mode and then "for real"
+func kopsUpdateCluster() error {
+	args := []string{"update", "cluster"}
+	if _, _, err := RunCmd("kops", args...); err != nil {
+		return err
+	}
+	args = append(args, "--yes")
+	if _, _, err := RunCmd("kops", args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// kopsRollingUpdateCluster runs `kops rolling-update cluster` in preview mode and then "for real"
+func kopsRollingUpdateCluster(roles []string) error {
+	args := []string{"rolling-update", "cluster"}
+	for _, r := range roles {
+		args = append(args, "--instance-group-role", r)
+	}
+
+	if _, _, err := RunCmd("kops", args...); err != nil {
+		return err
+	}
+	args = append(args, "--yes")
+	if _, _, err := RunCmd("kops", args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// kopsValidateCluster runs `kops validate cluster`
+func kopsValidateCluster() error {
+	args := []string{"validate", "cluster"}
+	if _, _, err := RunCmd("kops", args...); err != nil {
+		return err
+	}
+	return nil
+}
+
 func masterUpgradeKubernetesAnywhere(v string) error {
 	Logf("Upgrading master to %q", v)
 
@@ -199,6 +296,8 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 		err = nodeUpgradeGCE(v, img, false)
 	case "gke":
 		err = nodeUpgradeGKE(v, img)
+	case "aws":
+		err = nodeUpgradeKops(v, img)
 	default:
 		err = fmt.Errorf("NodeUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
@@ -269,6 +368,31 @@ func nodeUpgradeGKE(v string, img string) error {
 
 	waitForSSHTunnels()
 
+	return nil
+}
+
+func nodeUpgradeKops(v string, img string) error {
+	Logf("Upgrading nodes to %q", v)
+	fields := []string{
+		fmt.Sprintf("spec.kubernetesVersion=%s", v),
+	}
+
+	if img != "" {
+		return fmt.Errorf("changing node image with kops is not yet implemented (img=%q)", img)
+	}
+
+	if err := kopsSetCluster(fields); err != nil {
+		return err
+	}
+	if err := kopsUpdateCluster(); err != nil {
+		return err
+	}
+	if err := kopsRollingUpdateCluster([]string{"Node"}); err != nil {
+		return err
+	}
+	if err := kopsValidateCluster(); err != nil {
+		return err
+	}
 	return nil
 }
 
