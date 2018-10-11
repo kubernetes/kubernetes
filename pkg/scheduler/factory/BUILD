@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "cache_comparer.go",
         "factory.go",
         "plugins.go",
         "signal.go",
@@ -22,10 +21,10 @@ go_library(
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/validation:go_default_library",
-        "//pkg/scheduler/cache:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/core/equivalence:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
+        "//pkg/scheduler/internal/cache/comparer:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
@@ -57,7 +56,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "cache_comparer_test.go",
         "factory_test.go",
         "plugins_test.go",
     ],
@@ -78,7 +76,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",

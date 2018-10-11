@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package factory
+package comparer
 
 import (
 	"reflect"
@@ -64,7 +64,7 @@ func TestCompareNodes(t *testing.T) {
 }
 
 func testCompareNodes(actual, cached, missing, redundant []string, t *testing.T) {
-	compare := compareStrategy{}
+	compare := CacheComparer{}
 	nodes := []*v1.Node{}
 	for _, nodeName := range actual {
 		node := &v1.Node{}
@@ -155,7 +155,7 @@ func TestComparePods(t *testing.T) {
 }
 
 func testComparePods(actual, cached, queued, missing, redundant []string, t *testing.T) {
-	compare := compareStrategy{}
+	compare := CacheComparer{}
 	pods := []*v1.Pod{}
 	for _, uid := range actual {
 		pod := &v1.Pod{}
