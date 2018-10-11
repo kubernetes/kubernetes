@@ -59,7 +59,7 @@ func StartApiserver() (string, ShutdownFunc) {
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns a handle to the configurator for the running scheduler
 // and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (scheduler.Configurator, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface) (factory.Configurator, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	evtBroadcaster := record.NewBroadcaster()
@@ -68,7 +68,7 @@ func StartScheduler(clientSet clientset.Interface) (scheduler.Configurator, Shut
 
 	schedulerConfigurator := createSchedulerConfigurator(clientSet, informerFactory)
 
-	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *scheduler.Config) {
+	sched, err := scheduler.NewFromConfigurator(schedulerConfigurator, func(conf *factory.Config) {
 		conf.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
 	})
 	if err != nil {
@@ -94,7 +94,7 @@ func StartScheduler(clientSet clientset.Interface) (scheduler.Configurator, Shut
 func createSchedulerConfigurator(
 	clientSet clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
-) scheduler.Configurator {
+) factory.Configurator {
 	// Enable EnableEquivalenceClassCache for all integration tests.
 	utilfeature.DefaultFeatureGate.Set("EnableEquivalenceClassCache=true")
 
