@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -198,7 +199,7 @@ func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistra
 		if !pendingServiceNames.Has(service.Name) {
 			return
 		}
-		if apiregistration.IsAPIServiceConditionTrue(service, apiregistration.Available) {
+		if v1helper.IsAPIServiceConditionTrue(service, v1.Available) {
 			pendingServiceNames.Delete(service.Name)
 		}
 	}
