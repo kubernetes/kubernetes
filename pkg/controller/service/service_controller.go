@@ -38,6 +38,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -334,9 +335,9 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 }
 
 func (s *ServiceController) persistUpdate(service *v1.Service) error {
-	var err error
-	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(service)
+	retryOptions := wait.Backoff{Duration: clientRetryInterval, Steps: clientRetryCount}
+	return retry.RetryOnConflict(retryOptions, func() error {
+		_, err := s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			return nil
 		}
@@ -355,9 +356,8 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 		}
 		glog.Warningf("Failed to persist updated LoadBalancerStatus to service '%s/%s' after creating its load balancer: %v",
 			service.Namespace, service.Name, err)
-		time.Sleep(clientRetryInterval)
-	}
-	return err
+		return nil
+	})
 }
 
 func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
