@@ -133,7 +133,7 @@ function create-master-instance-internal() {
       --image-project="${MASTER_IMAGE_PROJECT}" \
       --image "${MASTER_IMAGE}" \
       --tags "${MASTER_TAG}" \
-      --scopes "storage-ro,compute-rw,monitoring,logging-write" \
+      --scopes "storage-ro,compute-rw,monitoring,logging-write,https://www.googleapis.com/auth/trace.append" \
       --metadata-from-file "${metadata}" \
       --disk "${disk}" \
       --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \

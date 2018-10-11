@@ -18,7 +18,9 @@ package pod
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -26,6 +28,10 @@ import (
 	"strings"
 	"time"
 
+	"contrib.go.opencensus.io/exporter/stackdriver"
+	"github.com/golang/glog"
+	"go.opencensus.io/trace"
+	"go.opencensus.io/trace/propagation"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,6 +76,40 @@ func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
+	}
+
+	glog.V(3).Infoln("Preparing for create")
+
+	// Create an register a OpenCensus
+	// Stackdriver Trace exporter.
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID: "samnaser-gke-dev-217421",
+	})
+	if err != nil {
+		glog.V(3).Infoln("stackdriver exporter not configured")
+		log.Fatal(err)
+	}
+
+	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	trace.RegisterExporter(exporter)
+
+	if string(pod.Name) == "" {
+		trace.ApplyConfig(trace.Config{DefaultSampler: trace.NeverSample()})
+	}
+
+	spanContext := context.Background()
+	_, span := trace.StartSpan(spanContext, "API server: prepare for create")
+	span.AddAttributes(trace.StringAttribute("pod", string(pod.Name)))
+	defer span.End()
+
+	//Before pod creation, begin our trace
+	rawContextBytes := propagation.Binary(span.SpanContext())
+	encodedContext := base64.StdEncoding.EncodeToString(rawContextBytes)
+	pod.TraceContext = encodedContext
+	span.AddAttributes(trace.StringAttribute("currentTraceContext", encodedContext))
+
+	if string(pod.Name) == "" {
+		pod.TraceContext = ""
 	}
 
 	podutil.DropDisabledAlphaFields(&pod.Spec)

@@ -250,6 +250,9 @@ type ObjectMeta struct {
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+
+	// Represents the base64 span context for this object up to now
+	TraceContext string `json:"traceContext,omitempty" protobuf:"bytes,17,opt,name=traceContext"`
 }
 
 // Initializers tracks the progress of initialization.

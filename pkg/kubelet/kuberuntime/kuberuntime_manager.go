@@ -17,13 +17,18 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
 	"time"
 
+	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"go.opencensus.io/trace"
+	"go.opencensus.io/trace/propagation"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +46,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
@@ -581,6 +587,38 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  5. Create init containers.
 //  6. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+
+	// Create an register a OpenCensus
+	// Stackdriver Trace exporter.
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID: "samnaser-gke-dev-217421",
+	})
+	if err != nil {
+		log.Errorf("could not register Stackdriver exporter in Kubelet")
+	}
+
+	trace.RegisterExporter(exporter)
+	trace.ApplyConfig(trace.Config{DefaultSampler: trace.NeverSample()})
+
+	if pod.TraceContext != "" {
+		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	}
+
+	// Extract trace context
+	decodedContextBytes, err := base64.StdEncoding.DecodeString(pod.TraceContext)
+	if err != nil {
+		glog.V(3).Infoln("Trace could not be decoded")
+	}
+
+	// Create new span with this old context
+	remoteContext, _ := propagation.FromBinary(decodedContextBytes)
+	ctx, remoteSpan := trace.StartSpanWithRemoteParent(context.Background(), "Kubelet: pod synchronization", remoteContext)
+
+	remoteSpan.AddAttributes(trace.StringAttribute("inheritedTraceContext", pod.TraceContext))
+	remoteSpan.AddAttributes(trace.StringAttribute("podId", pod.GetName()))
+
+	ctx, createSandboxSpan := trace.StartSpan(ctx, "Kubelet: creating sandbox")
+
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
 	glog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
@@ -596,8 +634,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		}
 	}
 
+	createSandboxSpan.End()
+
 	// Step 2: Kill the pod if the sandbox has changed.
 	if podContainerChanges.KillPod {
+
+		_, killPodSpan := trace.StartSpan(ctx, "Kubelet: check for and perform kill condition")
+
 		if !podContainerChanges.CreateSandbox {
 			glog.V(4).Infof("Stopping PodSandbox for %q because all other containers are dead.", format.Pod(pod))
 		} else {
@@ -614,6 +657,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		if podContainerChanges.CreateSandbox {
 			m.purgeInitContainers(pod, podStatus)
 		}
+
+		killPodSpan.End()
+
 	} else {
 		// Step 3: kill any running containers in this pod which are not to keep.
 		for containerID, containerInfo := range podContainerChanges.ContainersToKill {
@@ -650,6 +696,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 	// Step 4: Create a sandbox for the pod if necessary.
 	podSandboxID := podContainerChanges.SandboxID
 	if podContainerChanges.CreateSandbox {
+
+		_, sandboxSpan := trace.StartSpan(ctx, "Kubelet: creating sandbox if needed")
+
 		var msg string
 		var err error
 
@@ -688,6 +737,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			podIP = m.determinePodSandboxIP(pod.Namespace, pod.Name, podSandboxStatus)
 			glog.V(4).Infof("Determined the ip %q for pod %q after sandbox changed", podIP, format.Pod(pod))
 		}
+
+		sandboxSpan.End()
+
 	}
 
 	// Get podSandboxConfig for containers to start.
@@ -700,6 +752,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, message)
 		return
 	}
+
+	ctx, initContainerSpan := trace.StartSpan(ctx, "Kubelet: starting init container")
 
 	// Step 5: start the init container.
 	if container := podContainerChanges.NextInitContainerToStart; container != nil {
@@ -723,6 +777,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 		// Successfully started the container; clear the entry in the failure
 		glog.V(4).Infof("Completed init container %q for pod %q", container.Name, format.Pod(pod))
 	}
+
+	initContainerSpan.End()
+	ctx, startContainersSpan := trace.StartSpan(ctx, "Kubelet: start containers")
 
 	// Step 6: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
@@ -751,6 +808,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 			continue
 		}
 	}
+
+	startContainersSpan.End()
+	remoteSpan.End()
 
 	return
 }

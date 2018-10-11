@@ -19,6 +19,7 @@ package kubelet
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -32,7 +33,10 @@ import (
 	"strings"
 	"sync"
 
+	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/golang/glog"
+	"go.opencensus.io/trace"
+	"go.opencensus.io/trace/propagation"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -815,6 +820,7 @@ func (kl *Kubelet) killPod(pod *v1.Pod, runningPod *kubecontainer.Pod, status *k
 
 // makePodDataDirs creates the dirs for the pod datas.
 func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
+
 	uid := pod.UID
 	if err := os.MkdirAll(kl.getPodDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
@@ -825,12 +831,44 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 	if err := os.MkdirAll(kl.getPodPluginsDir(uid), 0750); err != nil && !os.IsExist(err) {
 		return err
 	}
+
 	return nil
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
 // secrets.
 func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
+
+	// Create an register a OpenCensus
+	// Stackdriver Trace exporter.
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID: "samnaser-gke-dev-217421",
+	})
+	if err != nil {
+		log.Errorf("could not register Stackdriver exporter in Kubelet")
+	}
+
+	trace.ApplyConfig(trace.Config{DefaultSampler: trace.NeverSample()})
+	if pod.TraceContext != "" {
+		trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	}
+
+	trace.RegisterExporter(exporter)
+
+	// Extract trace context
+	decodedContextBytes, err := base64.StdEncoding.DecodeString(pod.TraceContext)
+	if err != nil {
+		glog.V(3).Infoln("Trace could not be decoded")
+	}
+
+	// Create new span with this old context
+	remoteContext, _ := propagation.FromBinary(decodedContextBytes)
+	_, remoteSpan := trace.StartSpanWithRemoteParent(context.Background(), "Kubelet: Pull secrets", remoteContext)
+
+	remoteSpan.AddAttributes(trace.StringAttribute("inheritedTraceContext", pod.TraceContext))
+	remoteSpan.AddAttributes(trace.StringAttribute("podId", pod.GetName()))
+	defer remoteSpan.End()
+
 	pullSecrets := []v1.Secret{}
 
 	for _, secretRef := range pod.Spec.ImagePullSecrets {

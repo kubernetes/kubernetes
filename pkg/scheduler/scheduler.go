@@ -17,8 +17,13 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
+	"encoding/base64"
 	"time"
 
+	"contrib.go.opencensus.io/exporter/stackdriver"
+	"go.opencensus.io/trace"
+	"go.opencensus.io/trace/propagation"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,6 +33,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -193,6 +199,37 @@ func (sched *Scheduler) Config() *Config {
 
 // schedule implements the scheduling algorithm and returns the suggested host.
 func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
+
+	glog.V(3).Infoln("Test to see if I can check logs for this")
+
+	// Create an register a OpenCensus
+	// Stackdriver Trace exporter.
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID: "samnaser-gke-dev-217421",
+	})
+	if err != nil {
+		log.Errorf("could not register Stackdriver exporter in Kubelet")
+	}
+
+	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	trace.RegisterExporter(exporter)
+
+	// Extract trace context
+	decodedContextBytes, err := base64.StdEncoding.DecodeString(pod.TraceContext)
+	glog.V(3).Infoln("Identifiable pod trace please: " + pod.TraceContext)
+	if err != nil {
+		glog.V(3).Infoln("Trace could not be decoded")
+	}
+
+	// Create new span with this old context
+	remoteContext, _ := propagation.FromBinary(decodedContextBytes)
+	_, remoteSpan := trace.StartSpanWithRemoteParent(context.Background(), "Scheduler: schedule pod", remoteContext)
+	remoteSpan.AddAttributes(trace.StringAttribute("inheritedTraceContext", pod.TraceContext))
+	remoteSpan.AddAttributes(trace.StringAttribute("podId", pod.GetName()))
+
+	glog.V(3).Infoln("Ok we did it, here is the trace ID: " + remoteContext.TraceID.String())
+	defer remoteSpan.End()
+
 	host, err := sched.config.Algorithm.Schedule(pod, sched.config.NodeLister)
 	if err != nil {
 		pod = pod.DeepCopy()
@@ -365,6 +402,23 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 // bind binds a pod to a given node defined in a binding object.  We expect this to run asynchronously, so we
 // handle binding metrics internally.
 func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
+
+	// Create an register a OpenCensus
+	// Stackdriver Trace exporter.
+	exporter, _ := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID: "samnaser-gke-dev-217421",
+	})
+
+	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
+	trace.RegisterExporter(exporter)
+
+	// Extract trace context
+	decodedContextBytes, _ := base64.StdEncoding.DecodeString(assumed.TraceContext)
+
+	// Create new span with this old context
+	remoteContext, _ := propagation.FromBinary(decodedContextBytes)
+	_, remoteSpan := trace.StartSpanWithRemoteParent(context.Background(), "Scheduler: bind pod to node", remoteContext)
+
 	bindingStart := time.Now()
 	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 	// it's atomic with setting host.
@@ -390,6 +444,9 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 	metrics.SchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
 	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
+
+	remoteSpan.End()
+
 	return nil
 }
 

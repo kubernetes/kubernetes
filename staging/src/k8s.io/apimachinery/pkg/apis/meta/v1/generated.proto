@@ -617,6 +617,9 @@ message ObjectMeta {
   // This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
   // +optional
   optional string clusterName = 15;
+
+  // Represents the base64 span context for this object up to now
+  optional string traceContext = 17;
 }
 
 // OwnerReference contains enough information to let you identify an owning
