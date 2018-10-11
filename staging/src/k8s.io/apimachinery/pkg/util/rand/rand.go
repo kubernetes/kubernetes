@@ -30,6 +30,13 @@ var rng = struct {
 	rand: rand.New(rand.NewSource(time.Now().UnixNano())),
 }
 
+// Int returns a non-negative pseudo-random int.
+func Int() int {
+	rng.Lock()
+	defer rng.Unlock()
+	return rng.rand.Int()
+}
+
 // Intn generates an integer in range [0,max).
 // By design this should panic if input is invalid, <= 0.
 func Intn(max int) int {

@@ -18,7 +18,6 @@ package flocker
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -68,7 +67,6 @@ func (util *FlockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID 
 	}
 
 	// select random node
-	rand.Seed(time.Now().UnixNano())
 	node := nodes[rand.Intn(len(nodes))]
 	glog.V(2).Infof("selected flocker node with UUID '%s' to provision dataset", node.UUID)
 
