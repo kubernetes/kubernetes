@@ -115,7 +115,11 @@ var (
 	MounttestUser            = Config{e2eRegistry, "mounttest-user", "1.0"}
 	Nautilus                 = Config{e2eRegistry, "nautilus", "1.0"}
 	Net                      = Config{e2eRegistry, "net", "1.0"}
+<<<<<<< HEAD
 	Netexec                  = Config{e2eRegistry, "netexec", "1.1"}
+=======
+	Netexec                  = Config{e2eRegistry, "netexec", "1.0"}
+>>>>>>> 474def1677b731489a55b91d42b171418475b01e
 	Nettest                  = Config{e2eRegistry, "nettest", "1.0"}
 	Nginx                    = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	NginxNew                 = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
