@@ -124,9 +124,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 		Use:   "init",
 		Short: "Run this command in order to set up the Kubernetes master.",
 		Run: func(cmd *cobra.Command, args []string) {
-
-			kubeadmscheme.Scheme.Default(externalcfg)
-
 			var err error
 			if externalcfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 				kubeadmutil.CheckErr(err)

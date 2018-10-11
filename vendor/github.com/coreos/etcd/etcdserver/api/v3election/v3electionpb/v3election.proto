@@ -19,21 +19,21 @@ service Election {
   // leadership still being held, and resign from the election.
   rpc Campaign(CampaignRequest) returns (CampaignResponse) {
       option (google.api.http) = {
-        post: "/v3alpha/election/campaign"
+        post: "/v3beta/election/campaign"
         body: "*"
     };
   }
   // Proclaim updates the leader's posted value with a new value.
   rpc Proclaim(ProclaimRequest) returns (ProclaimResponse) {
       option (google.api.http) = {
-        post: "/v3alpha/election/proclaim"
+        post: "/v3beta/election/proclaim"
         body: "*"
     };
   }
   // Leader returns the current election proclamation, if any.
   rpc Leader(LeaderRequest) returns (LeaderResponse) {
       option (google.api.http) = {
-        post: "/v3alpha/election/leader"
+        post: "/v3beta/election/leader"
         body: "*"
     };
   }
@@ -41,7 +41,7 @@ service Election {
   // elected leaders.
   rpc Observe(LeaderRequest) returns (stream LeaderResponse) {
       option (google.api.http) = {
-        post: "/v3alpha/election/observe"
+        post: "/v3beta/election/observe"
         body: "*"
     };
   }
@@ -49,7 +49,7 @@ service Election {
   // leadership on the election.
   rpc Resign(ResignRequest) returns (ResignResponse) {
       option (google.api.http) = {
-        post: "/v3alpha/election/resign"
+        post: "/v3beta/election/resign"
         body: "*"
     };
   }
