@@ -26,19 +26,19 @@ import (
 
 const (
 	// NamespaceDefault means the object is in the default namespace which is applied when not specified by clients
-	NamespaceDefault string = "default"
+	NamespaceDefault = "default"
 	// NamespaceAll is the default argument to specify on a context when you want to list or filter resources across all namespaces
-	NamespaceAll string = ""
+	NamespaceAll = ""
 	// NamespaceNone is the argument for a context when there is no namespace.
-	NamespaceNone string = ""
+	NamespaceNone = ""
 	// NamespaceSystem is the system namespace where we place system components.
-	NamespaceSystem string = "kube-system"
+	NamespaceSystem = "kube-system"
 	// NamespacePublic is the namespace where we place public info (ConfigMaps)
-	NamespacePublic string = "kube-public"
+	NamespacePublic = "kube-public"
 	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
-	NamespaceNodeLease string = "kube-node-lease"
+	NamespaceNodeLease = "kube-node-lease"
 	// TerminationMessagePathDefault means the default path to capture the application termination message running in a container
-	TerminationMessagePathDefault string = "/dev/termination-log"
+	TerminationMessagePathDefault = "/dev/termination-log"
 )
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
