@@ -122,6 +122,8 @@ func (as *requestOpStringer) String() string {
 	switch op := as.Op.Request.(type) {
 	case *RequestOp_RequestPut:
 		return fmt.Sprintf("request_put:<%s>", newLoggablePutRequest(op.RequestPut).String())
+	case *RequestOp_RequestTxn:
+		return fmt.Sprintf("request_txn:<%s>", NewLoggableTxnRequest(op.RequestTxn).String())
 	default:
 		// nothing to redact
 	}
@@ -136,6 +138,7 @@ type loggableValueCompare struct {
 	Target    Compare_CompareTarget `protobuf:"varint,2,opt,name=target,proto3,enum=etcdserverpb.Compare_CompareTarget"`
 	Key       []byte                `protobuf:"bytes,3,opt,name=key,proto3"`
 	ValueSize int                   `protobuf:"bytes,7,opt,name=value_size,proto3"`
+	RangeEnd  []byte                `protobuf:"bytes,64,opt,name=range_end,proto3"`
 }
 
 func newLoggableValueCompare(c *Compare, cv *Compare_Value) *loggableValueCompare {
@@ -144,6 +147,7 @@ func newLoggableValueCompare(c *Compare, cv *Compare_Value) *loggableValueCompar
 		c.Target,
 		c.Key,
 		len(cv.Value),
+		c.RangeEnd,
 	}
 }
 

@@ -20,7 +20,7 @@ service Lock {
   // lease associate with the owner expires.
   rpc Lock(LockRequest) returns (LockResponse) {
       option (google.api.http) = {
-        post: "/v3alpha/lock/lock"
+        post: "/v3beta/lock/lock"
         body: "*"
     };
   }
@@ -30,7 +30,7 @@ service Lock {
   // ownership of the lock.
   rpc Unlock(UnlockRequest) returns (UnlockResponse) {
       option (google.api.http) = {
-        post: "/v3alpha/lock/unlock"
+        post: "/v3beta/lock/unlock"
         body: "*"
     };
   }

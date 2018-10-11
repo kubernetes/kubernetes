@@ -8,6 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/etcdserverpb:go_default_library",
+        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
     ],
 )
