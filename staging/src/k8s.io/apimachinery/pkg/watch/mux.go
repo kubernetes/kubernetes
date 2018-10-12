@@ -19,6 +19,8 @@ package watch
 import (
 	"sync"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -220,11 +222,12 @@ func (m *Broadcaster) distribute(event Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if m.fullChannelBehavior == DropIfChannelFull {
-		for _, w := range m.watchers {
+		for i, w := range m.watchers {
 			select {
 			case w.result <- event:
 			case <-w.stopped:
 			default: // Don't block if the event can't be queued.
+				glog.Warningf("Dropping event '%#v' (result channel of watcher %d is full)", event, i)
 			}
 		}
 	} else {

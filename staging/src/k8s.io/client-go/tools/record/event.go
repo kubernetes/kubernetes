@@ -135,6 +135,7 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 		utilruntime.HandleError(err)
 	}
 	if result.Skip {
+		glog.Warningf("Dropping event '%#v' (rate limit exceeded!)", event)
 		return
 	}
 	tries := 0
