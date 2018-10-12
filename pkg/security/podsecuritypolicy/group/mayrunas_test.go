@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 func TestMayRunAsOptions(t *testing.T) {
