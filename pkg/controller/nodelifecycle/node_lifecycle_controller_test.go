@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	coordv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -30,7 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
+	coordinformers "k8s.io/client-go/informers/coordination/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -42,10 +46,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -61,6 +67,7 @@ func alwaysReady() bool { return true }
 
 type nodeLifecycleController struct {
 	*Controller
+	leaseInformer     coordinformers.LeaseInformer
 	nodeInformer      coreinformers.NodeInformer
 	daemonSetInformer extensionsinformers.DaemonSetInformer
 }
@@ -84,6 +91,28 @@ func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNode
 		}
 	}
 	return podEvicted
+}
+
+func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1beta1.Lease {
+	return &coordv1beta1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeName,
+			Namespace: v1.NamespaceNodeLease,
+		},
+		Spec: coordv1beta1.LeaseSpec{
+			HolderIdentity: pointer.StringPtr(nodeName),
+			RenewTime:      &renewTime,
+		},
+	}
+}
+
+func (nc *nodeLifecycleController) syncLeaseStore(lease *coordv1beta1.Lease) error {
+	if lease == nil {
+		return nil
+	}
+	newElems := make([]interface{}, 0, 1)
+	newElems = append(newElems, lease)
+	return nc.leaseInformer.Informer().GetStore().Replace(newElems, "newRV")
 }
 
 func (nc *nodeLifecycleController) syncNodeStore(fakeNodeHandler *testutil.FakeNodeHandler) error {
@@ -114,10 +143,12 @@ func newNodeLifecycleControllerFromClient(
 
 	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 
+	leaseInformer := factory.Coordination().V1beta1().Leases()
 	nodeInformer := factory.Core().V1().Nodes()
 	daemonSetInformer := factory.Extensions().V1beta1().DaemonSets()
 
 	nc, err := NewNodeLifecycleController(
+		leaseInformer,
 		factory.Core().V1().Pods(),
 		nodeInformer,
 		daemonSetInformer,
@@ -139,11 +170,12 @@ func newNodeLifecycleControllerFromClient(
 		return nil, err
 	}
 
+	nc.leaseInformerSynced = alwaysReady
 	nc.podInformerSynced = alwaysReady
 	nc.nodeInformerSynced = alwaysReady
 	nc.daemonSetInformerSynced = alwaysReady
 
-	return &nodeLifecycleController{nc, nodeInformer, daemonSetInformer}, nil
+	return &nodeLifecycleController{nc, leaseInformer, nodeInformer, daemonSetInformer}, nil
 }
 
 func TestMonitorNodeHealthEvictPods(t *testing.T) {
@@ -1543,12 +1575,12 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
-		fakeNodeHandler      *testutil.FakeNodeHandler
-		timeToPass           time.Duration
-		newNodeStatus        v1.NodeStatus
-		expectedEvictPods    bool
-		expectedRequestCount int
-		expectedNodes        []*v1.Node
+		fakeNodeHandler         *testutil.FakeNodeHandler
+		timeToPass              time.Duration
+		newNodeStatus           v1.NodeStatus
+		expectedRequestCount    int
+		expectedNodes           []*v1.Node
+		expectedPodStatusUpdate bool
 	}{
 		// Node created long time ago, without status:
 		// Expect Unknown status posted from node controller.
@@ -1617,6 +1649,7 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 					},
 				},
 			},
+			expectedPodStatusUpdate: false, // Pod was never scheduled
 		},
 		// Node created recently, without status.
 		// Expect no action from node controller (within startup grace period).
@@ -1632,8 +1665,9 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
-			expectedRequestCount: 1, // List
-			expectedNodes:        nil,
+			expectedRequestCount:    1, // List
+			expectedNodes:           nil,
+			expectedPodStatusUpdate: false,
 		},
 		// Node created long time ago, with status updated by kubelet exceeds grace period.
 		// Expect Unknown status posted from node controller.
@@ -1751,6 +1785,7 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 					},
 				},
 			},
+			expectedPodStatusUpdate: true,
 		},
 		// Node created long time ago, with status updated recently.
 		// Expect no action from node controller (within monitor grace period).
@@ -1781,8 +1816,9 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 				},
 				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
 			},
-			expectedRequestCount: 1, // List
-			expectedNodes:        nil,
+			expectedRequestCount:    1, // List
+			expectedNodes:           nil,
+			expectedPodStatusUpdate: false,
 		},
 	}
 
@@ -1826,6 +1862,604 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 		if len(item.fakeNodeHandler.UpdatedNodeStatuses) > 0 && !apiequality.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodeStatuses) {
 			t.Errorf("Case[%d] unexpected nodes: %s", i, diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
 		}
+
+		podStatusUpdated := false
+		for _, action := range item.fakeNodeHandler.Actions() {
+			if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+				podStatusUpdated = true
+			}
+		}
+		if podStatusUpdated != item.expectedPodStatusUpdate {
+			t.Errorf("Case[%d] expect pod status updated to be %v, but got %v", i, item.expectedPodStatusUpdate, podStatusUpdated)
+		}
+	}
+}
+
+func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+
+	nodeCreationTime := metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)
+	fakeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	testcases := []struct {
+		description             string
+		fakeNodeHandler         *testutil.FakeNodeHandler
+		lease                   *coordv1beta1.Lease
+		timeToPass              time.Duration
+		newNodeStatus           v1.NodeStatus
+		newLease                *coordv1beta1.Lease
+		expectedRequestCount    int
+		expectedNodes           []*v1.Node
+		expectedPodStatusUpdate bool
+	}{
+		// Node created recently, without status. Node lease is missing.
+		// Expect no action from node controller (within startup grace period).
+		{
+			description: "Node created recently, without status. Node lease is missing.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: fakeNow,
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedRequestCount:    1, // List
+			expectedNodes:           nil,
+			expectedPodStatusUpdate: false,
+		},
+		// Node created recently, without status. Node lease is renewed recently.
+		// Expect no action from node controller (within startup grace period).
+		{
+			description: "Node created recently, without status. Node lease is renewed recently.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: fakeNow,
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease:                   createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)),
+			expectedRequestCount:    1, // List
+			expectedNodes:           nil,
+			expectedPodStatusUpdate: false,
+		},
+		// Node created long time ago, without status. Node lease is missing.
+		// Expect Unknown status posted from node controller.
+		{
+			description: "Node created long time ago, without status. Node lease is missing.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			expectedRequestCount: 2, // List+Update
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodeOutOfDisk,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodeMemoryPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodeDiskPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodePIDPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: fakeNow,
+							},
+						},
+					},
+				},
+			},
+			expectedPodStatusUpdate: false, // Pod was never scheduled because the node was never ready.
+		},
+		// Node created long time ago, without status. Node lease is renewed recently.
+		// Expect no action from node controller (within monitor grace period).
+		{
+			description: "Node created long time ago, without status. Node lease is renewed recently.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease:                createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)),
+			timeToPass:           time.Hour,
+			newLease:             createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time.Add(time.Hour))), // Lease is renewed after 1 hour.
+			expectedRequestCount: 2,                                                                          // List+List
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+				},
+			},
+			expectedPodStatusUpdate: false,
+		},
+		// Node created long time ago, without status. Node lease is expired.
+		// Expect Unknown status posted from node controller.
+		{
+			description: "Node created long time ago, without status. Node lease is expired.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease:                createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)),
+			timeToPass:           time.Hour,
+			newLease:             createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)), // Lease is not renewed after 1 hour.
+			expectedRequestCount: 3,                                                           // List+List+Update
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeOutOfDisk,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeMemoryPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeDiskPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodePIDPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+						},
+					},
+				},
+			},
+			expectedPodStatusUpdate: false,
+		},
+		// Node created long time ago, with status updated by kubelet exceeds grace period. Node lease is renewed.
+		// Expect no action from node controller (within monitor grace period).
+		{
+			description: "Node created long time ago, with status updated by kubelet exceeds grace period. Node lease is renewed.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+								{
+									Type:               v1.NodeOutOfDisk,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease:                createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)),
+			expectedRequestCount: 2, // List+List
+			timeToPass:           time.Hour,
+			newNodeStatus: v1.NodeStatus{
+				// Node status hasn't been updated for 1 hour.
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionTrue,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+					{
+						Type:               v1.NodeOutOfDisk,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			newLease: createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time.Add(time.Hour))), // Lease is renewed after 1 hour.
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodeOutOfDisk,
+								Status:             v1.ConditionFalse,
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: fakeNow,
+							},
+						},
+						Capacity: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+				},
+			},
+			expectedPodStatusUpdate: false,
+		},
+		// Node created long time ago, with status updated by kubelet recently. Node lease is expired.
+		// Expect no action from node controller (within monitor grace period).
+		{
+			description: "Node created long time ago, with status updated by kubelet recently. Node lease is expired.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+								{
+									Type:               v1.NodeOutOfDisk,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease:                createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)),
+			expectedRequestCount: 2, // List+List
+			timeToPass:           time.Hour,
+			newNodeStatus: v1.NodeStatus{
+				// Node status is updated after 1 hour.
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionTrue,
+						LastHeartbeatTime:  metav1.Time{Time: fakeNow.Add(time.Hour)},
+						LastTransitionTime: fakeNow,
+					},
+					{
+						Type:               v1.NodeOutOfDisk,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  metav1.Time{Time: fakeNow.Add(time.Hour)},
+						LastTransitionTime: fakeNow,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			newLease: createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)), // Lease is not renewed after 1 hour.
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionTrue,
+								LastHeartbeatTime:  metav1.Time{Time: fakeNow.Add(time.Hour)},
+								LastTransitionTime: fakeNow,
+							},
+							{
+								Type:               v1.NodeOutOfDisk,
+								Status:             v1.ConditionFalse,
+								LastHeartbeatTime:  metav1.Time{Time: fakeNow.Add(time.Hour)},
+								LastTransitionTime: fakeNow,
+							},
+						},
+						Capacity: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+				},
+			},
+			expectedPodStatusUpdate: false,
+		},
+		// Node created long time ago, with status updated by kubelet exceeds grace period. Node lease is also expired.
+		// Expect Unknown status posted from node controller.
+		{
+			description: "Node created long time ago, with status updated by kubelet exceeds grace period. Node lease is also expired.",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: nodeCreationTime,
+						},
+						Status: v1.NodeStatus{
+							Conditions: []v1.NodeCondition{
+								{
+									Type:               v1.NodeReady,
+									Status:             v1.ConditionTrue,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+								{
+									Type:               v1.NodeOutOfDisk,
+									Status:             v1.ConditionFalse,
+									LastHeartbeatTime:  fakeNow,
+									LastTransitionTime: fakeNow,
+								},
+							},
+							Capacity: v1.ResourceList{
+								v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+								v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			lease:                createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)),
+			expectedRequestCount: 3, // List+List+Update
+			timeToPass:           time.Hour,
+			newNodeStatus: v1.NodeStatus{
+				// Node status hasn't been updated for 1 hour.
+				Conditions: []v1.NodeCondition{
+					{
+						Type:               v1.NodeReady,
+						Status:             v1.ConditionTrue,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+					{
+						Type:               v1.NodeOutOfDisk,
+						Status:             v1.ConditionFalse,
+						LastHeartbeatTime:  fakeNow,
+						LastTransitionTime: fakeNow,
+					},
+				},
+				Capacity: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+					v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			newLease: createNodeLease("node0", metav1.NewMicroTime(fakeNow.Time)), // Lease is not renewed after 1 hour.
+			expectedNodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "node0",
+						CreationTimestamp: nodeCreationTime,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:               v1.NodeReady,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusUnknown",
+								Message:            "Kubelet stopped posting node status.",
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeOutOfDisk,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusUnknown",
+								Message:            "Kubelet stopped posting node status.",
+								LastHeartbeatTime:  fakeNow,
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeMemoryPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime, // should default to node creation time if condition was never updated
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodeDiskPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime, // should default to node creation time if condition was never updated
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+							{
+								Type:               v1.NodePIDPressure,
+								Status:             v1.ConditionUnknown,
+								Reason:             "NodeStatusNeverUpdated",
+								Message:            "Kubelet never posted node status.",
+								LastHeartbeatTime:  nodeCreationTime, // should default to node creation time if condition was never updated
+								LastTransitionTime: metav1.Time{Time: fakeNow.Add(time.Hour)},
+							},
+						},
+						Capacity: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse("10"),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
+				},
+			},
+			expectedPodStatusUpdate: true,
+		},
+	}
+
+	for _, item := range testcases {
+		t.Run(item.description, func(t *testing.T) {
+			nodeController, _ := newNodeLifecycleControllerFromClient(
+				nil,
+				item.fakeNodeHandler,
+				5*time.Minute,
+				testRateLimiterQPS,
+				testRateLimiterQPS,
+				testLargeClusterThreshold,
+				testUnhealthyThreshold,
+				testNodeMonitorGracePeriod,
+				testNodeStartupGracePeriod,
+				testNodeMonitorPeriod,
+				false)
+			nodeController.now = func() metav1.Time { return fakeNow }
+			nodeController.recorder = testutil.NewFakeRecorder()
+			if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := nodeController.syncLeaseStore(item.lease); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := nodeController.monitorNodeHealth(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if item.timeToPass > 0 {
+				nodeController.now = func() metav1.Time { return metav1.Time{Time: fakeNow.Add(item.timeToPass)} }
+				item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+				if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if err := nodeController.syncLeaseStore(item.newLease); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if err := nodeController.monitorNodeHealth(); err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+			if item.expectedRequestCount != item.fakeNodeHandler.RequestCount {
+				t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
+			}
+			if len(item.fakeNodeHandler.UpdatedNodes) > 0 && !apiequality.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
+				t.Errorf("unexpected nodes: %s", diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0]))
+			}
+			if len(item.fakeNodeHandler.UpdatedNodeStatuses) > 0 && !apiequality.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodeStatuses) {
+				t.Errorf("unexpected nodes: %s", diff.ObjectDiff(item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodeStatuses[0]))
+			}
+
+			podStatusUpdated := false
+			for _, action := range item.fakeNodeHandler.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+					podStatusUpdated = true
+				}
+			}
+			if podStatusUpdated != item.expectedPodStatusUpdate {
+				t.Errorf("expect pod status updated to be %v, but got %v", item.expectedPodStatusUpdate, podStatusUpdated)
+			}
+		})
 	}
 }
 
