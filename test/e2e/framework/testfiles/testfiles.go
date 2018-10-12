@@ -128,7 +128,7 @@ type RootFileSource struct {
 	Root string
 }
 
-// ReadTestFile looks looks for the file relative to the configured
+// ReadTestFile looks for the file relative to the configured
 // root directory.
 func (r RootFileSource) ReadTestFile(filePath string) ([]byte, error) {
 	fullPath := filepath.Join(r.Root, filePath)
