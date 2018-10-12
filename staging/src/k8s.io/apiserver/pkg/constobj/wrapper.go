@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -142,8 +141,9 @@ func (c *ConstObject) GetSelfLink() string {
 
 // todo fix this SetSelfLink implements metav1.Object
 func (c *ConstObject) SetSelfLink(selfLink string) {
-	current := c.accessor.GetSelfLink()
-	glog.Warningf("SetSelfLink is incorrectly handled  (from %q -> %q)", current, selfLink)
+	// DeconstCopyObject should be called here
+	//current := c.accessor.GetSelfLink()
+	//glog.Warningf("SetSelfLink is incorrectly handled  (from %q -> %q)", current, selfLink)
 	// TODO: Copying ConstObject itself is pretty cheap; the problem is
 	// that this SelfLink appears in the serialized output.
 	// Possibility: clone ConstObject, allow SelfLink to be set, when

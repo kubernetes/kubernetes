@@ -318,7 +318,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 }
 
 func (s *WatchServer) encode(obj runtime.Object, w io.Writer) error {
-	glog.Warningf("WatchServer::encode object of type %T", obj)
+	//glog.Warningf("WatchServer::encode object of type %T", obj)
 
 	// Fixup is really setting the selfLink, so maybe we can put this into Encodable?
 	s.Fixup(obj)

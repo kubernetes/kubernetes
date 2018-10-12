@@ -392,7 +392,7 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		glog.Warningf("DeconstDeepCopyObject to ensure that object is not const-wrapped")
+		//glog.Warningf("DeconstDeepCopyObject to ensure that object is not const-wrapped")
 		objVal.Set(reflect.ValueOf(elem.Object.DeconstDeepCopyObject()).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
@@ -530,7 +530,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
 		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
-			glog.Warningf("DeepCopyObject to ensure that object is not const-wrapped")
+			//glog.Warningf("DeepCopyObject to ensure that object is not const-wrapped")
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object.DeconstDeepCopyObject()).Elem()))
 		}
 	}
@@ -575,7 +575,7 @@ func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
 		return nil, false
 	}
 	result := make([]string, 0, 2)
-	glog.Warningf("DeepCopyObject for trigger values - not needed")
+	//glog.Warningf("DeepCopyObject for trigger values - not needed")
 	// TODO: put into the watchCacheEvent?
 	matchValues := c.triggerFunc(event.Object.DeconstDeepCopyObject())
 	if len(matchValues) > 0 {
@@ -890,7 +890,7 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 		watchEvent = watch.Event{Type: watch.Modified, Object: event.Object /*.DeepCopyObject()*/}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
-		glog.Warningf("DeepCopy to change resource version for synthetic delete event")
+		//glog.Warningf("DeepCopy to change resource version for synthetic delete event")
 		oldObj := event.PrevObject.DeconstDeepCopyObject()
 		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
 			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))
