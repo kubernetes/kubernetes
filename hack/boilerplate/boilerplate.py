@@ -62,6 +62,16 @@ def get_refs():
 
     return refs
 
+def is_gke_internal_file(filename):
+    if re.match(".*/gke/(build|cluster)/.*", filename) is not None:
+        return True
+    if re.match(".*cluster/gce/.*/gke-internal-.*", filename) is not None:
+        return True
+    if any(x in filename for x in gke_internal_files):
+        return True
+    return False
+
+gke_internal_files = ["cluster/images/etcd/backup-before-start.sh"]
 
 def is_generated_file(filename, data, regexs):
     for d in skipped_ungenerated_files:
@@ -73,6 +83,11 @@ def is_generated_file(filename, data, regexs):
 
 
 def file_passes(filename, refs, regexs):
+
+    # GKE internal files don't need boilerplate
+    if is_gke_internal_file(filename):
+        return True
+
     try:
         f = open(filename, 'r')
     except Exception as exc:
