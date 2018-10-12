@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -135,10 +136,10 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=foo",
-				"--listen-client-urls=https://127.0.0.1:2379",
-				"--advertise-client-urls=https://127.0.0.1:2379",
-				"--listen-peer-urls=https://127.0.0.1:2380",
-				"--initial-advertise-peer-urls=https://127.0.0.1:2380",
+				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--advertise-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
 				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
 				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
@@ -149,7 +150,7 @@ func TestGetEtcdCommand(t *testing.T) {
 				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
-				"--initial-cluster=foo=https://127.0.0.1:2380",
+				fmt.Sprintf("--initial-cluster=foo=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
 			},
 		},
 		{
@@ -174,8 +175,8 @@ func TestGetEtcdCommand(t *testing.T) {
 				"--name=bar",
 				"--listen-client-urls=https://10.0.1.10:2379",
 				"--advertise-client-urls=https://10.0.1.10:2379",
-				"--listen-peer-urls=https://127.0.0.1:2380",
-				"--initial-advertise-peer-urls=https://127.0.0.1:2380",
+				fmt.Sprintf("--listen-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/var/lib/etcd",
 				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
 				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
@@ -186,7 +187,7 @@ func TestGetEtcdCommand(t *testing.T) {
 				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
-				"--initial-cluster=bar=https://127.0.0.1:2380",
+				fmt.Sprintf("--initial-cluster=bar=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
 			},
 		},
 		{
@@ -205,10 +206,10 @@ func TestGetEtcdCommand(t *testing.T) {
 			expected: []string{
 				"etcd",
 				"--name=wombat",
-				"--listen-client-urls=https://127.0.0.1:2379",
-				"--advertise-client-urls=https://127.0.0.1:2379",
-				"--listen-peer-urls=https://127.0.0.1:2380",
-				"--initial-advertise-peer-urls=https://127.0.0.1:2380",
+				fmt.Sprintf("--listen-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--advertise-client-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
+				fmt.Sprintf("--listen-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
+				fmt.Sprintf("--initial-advertise-peer-urls=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
 				"--data-dir=/etc/foo",
 				"--cert-file=" + kubeadmconstants.EtcdServerCertName,
 				"--key-file=" + kubeadmconstants.EtcdServerKeyName,
@@ -219,7 +220,7 @@ func TestGetEtcdCommand(t *testing.T) {
 				"--peer-trusted-ca-file=" + kubeadmconstants.EtcdCACertName,
 				"--snapshot-count=10000",
 				"--peer-client-cert-auth=true",
-				"--initial-cluster=wombat=https://127.0.0.1:2380",
+				fmt.Sprintf("--initial-cluster=wombat=https://127.0.0.1:%d", kubeadmconstants.EtcdListenPeerPort),
 			},
 		},
 	}
