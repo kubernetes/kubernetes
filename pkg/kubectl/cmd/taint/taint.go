@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
 // TaintOptions have the data required to perform the taint operation
@@ -159,7 +158,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		return fmt.Errorf("at least one taint update is required")
 	}
 
-	if o.taintsToAdd, o.taintsToRemove, err = taintutils.ParseTaints(taintArgs); err != nil {
+	if o.taintsToAdd, o.taintsToRemove, err = parseTaints(taintArgs); err != nil {
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 	o.builder = f.NewBuilder().
@@ -298,11 +297,11 @@ func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("unexpected type %T, expected Node", obj)
 	}
 	if !o.overwrite {
-		if exists := taintutils.CheckIfTaintsAlreadyExists(node.Spec.Taints, o.taintsToAdd); len(exists) != 0 {
+		if exists := checkIfTaintsAlreadyExists(node.Spec.Taints, o.taintsToAdd); len(exists) != 0 {
 			return "", fmt.Errorf("Node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
 		}
 	}
-	operation, newTaints, err := taintutils.ReorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)
+	operation, newTaints, err := reorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)
 	if err != nil {
 		return "", err
 	}
