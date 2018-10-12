@@ -40,6 +40,13 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			psp.RunAsUser.Rule = runAsUserRules[c.Rand.Intn(len(runAsUserRules))]
 
+			runAsGroupRules := []policy.RunAsGroupStrategy{
+				policy.RunAsGroupStrategyMustRunAs,
+				policy.RunAsGroupStrategyRunAsAny,
+				policy.RunAsGroupStrategyMayRunAs,
+			}
+			psp.RunAsGroup = &policy.RunAsGroupStrategyOptions{}
+			psp.RunAsGroup.Rule = runAsGroupRules[c.Rand.Intn(len(runAsGroupRules))]
 			seLinuxRules := []policy.SELinuxStrategy{
 				policy.SELinuxStrategyMustRunAs,
 				policy.SELinuxStrategyRunAsAny,
