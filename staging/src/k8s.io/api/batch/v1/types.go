@@ -77,7 +77,7 @@ type JobSpec struct {
 	// +optional
 	Completions *int32 `json:"completions,omitempty" protobuf:"varint,2,opt,name=completions"`
 
-	// Specifies the duration in seconds relative to the startTime that the job may be active
+	// Specifies the duration in seconds relative to the startTime that the job must be active
 	// before the system tries to terminate it; value must be positive integer
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
