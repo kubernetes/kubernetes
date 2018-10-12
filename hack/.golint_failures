@@ -374,7 +374,6 @@ pkg/util/goroutinemap/exponentialbackoff
 pkg/util/initsystem
 pkg/util/iptables
 pkg/util/iptables/testing
-pkg/util/labels
 pkg/util/mount
 pkg/util/netsh/testing
 pkg/util/normalizer
