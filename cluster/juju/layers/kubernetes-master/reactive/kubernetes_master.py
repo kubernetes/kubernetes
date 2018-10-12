@@ -501,16 +501,27 @@ def set_final_status():
             msg = 'Stopped services: {}'.format(','.join(failing_services))
             hookenv.status_set('blocked', msg)
             return
+    else:
+        # if we don't have components starting, we're waiting for that and
+        # shouldn't fall through to Kubernetes master running.
+        if (is_state('cni.available')):
+            hookenv.status_set('maintenance',
+                               'Waiting for master components to start')
+        else:
+            hookenv.status_set('waiting',
+                               'Waiting for CNI plugins to become available')
+        return
 
+    # Note that after this point, kubernetes-master.components.started is always
+    # True.
     is_leader = is_state('leadership.is_leader')
     authentication_setup = is_state('authentication.setup')
     if not is_leader and not authentication_setup:
         hookenv.status_set('waiting', 'Waiting on leaders crypto keys.')
         return
 
-    components_started = is_state('kubernetes-master.components.started')
     addons_configured = is_state('cdk-addons.configured')
-    if is_leader and components_started and not addons_configured:
+    if is_leader and not addons_configured:
         hookenv.status_set('waiting', 'Waiting to retry addon deployment')
         return
 
