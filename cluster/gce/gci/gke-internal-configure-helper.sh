@@ -76,7 +76,7 @@ EOF
 
   # Create a certificate authority
   openssl genrsa -out ${certs_dir}/caKey.pem 2048
-  openssl req -x509 -new -nodes -key ${certs_dir}/caKey.pem -days 100000 -out ${certs_dir}/caCert.pem -subj "/CN=vpa_webhook_ca"
+  openssl req -x509 -new -nodes -key ${certs_dir}/caKey.pem -days 100000 -out ${certs_dir}/caCert.pem -subj "/CN=gke_vpa_webhook_ca"
 
   # Create a server certiticate
   openssl genrsa -out ${certs_dir}/serverKey.pem 2048

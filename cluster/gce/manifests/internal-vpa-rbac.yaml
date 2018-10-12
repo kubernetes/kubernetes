@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:metrics-reader
+  name: system:gke-vpa-metrics-reader
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
@@ -16,7 +16,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:vpa-actor
+  name: system:gke-vpa-actor
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
@@ -54,7 +54,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:vpa-checkpoint-actor
+  name: system:gke-vpa-checkpoint-actor
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
@@ -80,7 +80,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:vpa-cr-actor
+  name: system:gke-vpa-cr-actor
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
@@ -99,7 +99,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:evictioner
+  name: system:gke-vpa-evictioner
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
@@ -127,13 +127,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:metrics-reader
+  name: system:gke-vpa-metrics-reader
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:metrics-reader
+  name: system:gke-vpa-metrics-reader
 subjects:
 - kind: User
   name: vpa-recommender
@@ -142,13 +142,13 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:vpa-cr-actor
+  name: system:gke-vpa-cr-actor
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:vpa-cr-actor
+  name: system:gke-vpa-cr-actor
 subjects:
 - kind: User
   name: vpa-updater
@@ -157,13 +157,13 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:vpa-actor
+  name: system:gke-vpa-actor
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:vpa-actor
+  name: system:gke-vpa-actor
 subjects:
 - kind: User
   name: vpa-recommender
@@ -175,13 +175,13 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:vpa-checkpoint-actor
+  name: system:gke-vpa-checkpoint-actor
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:vpa-checkpoint-actor
+  name: system:gke-vpa-checkpoint-actor
 subjects:
 - kind: User
   name: vpa-recommender
@@ -190,13 +190,13 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:replicasets-reader
+  name: system:gke-vpa-evictioner
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:evictioner
+  name: system:gke-vpa-evictioner
 subjects:
 - kind: User
   name: vpa-updater
@@ -205,7 +205,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: system:admission-controller
+  name: system:gke-vpa-admission-controller
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
@@ -250,13 +250,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: system:admission-controller
+  name: system:gke-vpa-admission-controller
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: system:admission-controller
+  name: system:gke-vpa-admission-controller
 subjects:
 - kind: User
   name: vpa-admission-controller
