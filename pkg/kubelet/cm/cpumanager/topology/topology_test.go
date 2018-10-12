@@ -46,10 +46,10 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 4}},
-							{Id: 1, Threads: []int{1, 5}},
-							{Id: 2, Threads: []int{2, 6}},
-							{Id: 3, Threads: []int{3, 7}},
+							{Id: 0, Threads: []uint32{0, 4}},
+							{Id: 1, Threads: []uint32{1, 5}},
+							{Id: 2, Threads: []uint32{2, 6}},
+							{Id: 3, Threads: []uint32{3, 7}},
 						},
 					},
 				},
@@ -58,7 +58,7 @@ func Test_Discover(t *testing.T) {
 				NumCPUs:    8,
 				NumSockets: 1,
 				NumCores:   4,
-				CPUDetails: map[int]CPUInfo{
+				CPUDetails: map[uint32]CPUInfo{
 					0: {CoreID: 0, SocketID: 0},
 					1: {CoreID: 1, SocketID: 0},
 					2: {CoreID: 2, SocketID: 0},
@@ -78,14 +78,14 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0}},
-							{Id: 2, Threads: []int{2}},
+							{Id: 0, Threads: []uint32{0}},
+							{Id: 2, Threads: []uint32{2}},
 						},
 					},
 					{Id: 1,
 						Cores: []cadvisorapi.Core{
-							{Id: 1, Threads: []int{1}},
-							{Id: 3, Threads: []int{3}},
+							{Id: 1, Threads: []uint32{1}},
+							{Id: 3, Threads: []uint32{3}},
 						},
 					},
 				},
@@ -94,7 +94,7 @@ func Test_Discover(t *testing.T) {
 				NumCPUs:    4,
 				NumSockets: 2,
 				NumCores:   4,
-				CPUDetails: map[int]CPUInfo{
+				CPUDetails: map[uint32]CPUInfo{
 					0: {CoreID: 0, SocketID: 0},
 					1: {CoreID: 1, SocketID: 1},
 					2: {CoreID: 2, SocketID: 0},
@@ -110,16 +110,16 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 6}},
-							{Id: 1, Threads: []int{1, 7}},
-							{Id: 2, Threads: []int{2, 8}},
+							{Id: 0, Threads: []uint32{0, 6}},
+							{Id: 1, Threads: []uint32{1, 7}},
+							{Id: 2, Threads: []uint32{2, 8}},
 						},
 					},
 					{Id: 1,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{3, 9}},
-							{Id: 1, Threads: []int{4, 10}},
-							{Id: 2, Threads: []int{5, 11}},
+							{Id: 0, Threads: []uint32{3, 9}},
+							{Id: 1, Threads: []uint32{4, 10}},
+							{Id: 2, Threads: []uint32{5, 11}},
 						},
 					},
 				},
@@ -128,7 +128,7 @@ func Test_Discover(t *testing.T) {
 				NumCPUs:    12,
 				NumSockets: 2,
 				NumCores:   6,
-				CPUDetails: map[int]CPUInfo{
+				CPUDetails: map[uint32]CPUInfo{
 					0:  {CoreID: 0, SocketID: 0},
 					1:  {CoreID: 1, SocketID: 0},
 					2:  {CoreID: 2, SocketID: 0},
@@ -152,10 +152,10 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 4}},
-							{Id: 1, Threads: []int{1, 5}},
-							{Id: 2, Threads: []int{2, 2}}, // Wrong case - should fail here
-							{Id: 3, Threads: []int{3, 7}},
+							{Id: 0, Threads: []uint32{0, 4}},
+							{Id: 1, Threads: []uint32{1, 5}},
+							{Id: 2, Threads: []uint32{2, 2}}, // Wrong case - should fail here
+							{Id: 3, Threads: []uint32{3, 7}},
 						},
 					},
 				},
@@ -170,10 +170,10 @@ func Test_Discover(t *testing.T) {
 				Topology: []cadvisorapi.Node{
 					{Id: 0,
 						Cores: []cadvisorapi.Core{
-							{Id: 0, Threads: []int{0, 4}},
-							{Id: 1, Threads: []int{1, 5}},
-							{Id: 2, Threads: []int{2, 6}},
-							{Id: 3, Threads: []int{}}, // Wrong case - should fail here
+							{Id: 0, Threads: []uint32{0, 4}},
+							{Id: 1, Threads: []uint32{1, 5}},
+							{Id: 2, Threads: []uint32{2, 6}},
+							{Id: 3, Threads: []uint32{}}, // Wrong case - should fail here
 						},
 					},
 				},

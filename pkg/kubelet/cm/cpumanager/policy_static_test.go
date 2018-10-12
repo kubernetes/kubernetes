@@ -30,7 +30,7 @@ import (
 type staticPolicyTest struct {
 	description     string
 	topo            *topology.CPUTopology
-	numReservedCPUs int
+	numReservedCPUs uint32
 	containerID     string
 	stAssignments   state.ContainerCPUAssignments
 	stDefaultCPUSet cpuset.CPUSet
@@ -127,7 +127,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			policy.Start(st)
 
 			if !testCase.stDefaultCPUSet.IsEmpty() {
-				for cpuid := 1; cpuid < policy.topology.NumCPUs; cpuid++ {
+				for cpuid := uint32(1); cpuid < policy.topology.NumCPUs; cpuid++ {
 					if !st.defaultCPUSet.Contains(cpuid) {
 						t.Errorf("StaticPolicy Start() error. expected cpuid %d to be present in defaultCPUSet", cpuid)
 					}

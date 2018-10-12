@@ -23,7 +23,7 @@ import (
 
 func TestCPUSetBuilder(t *testing.T) {
 	b := NewBuilder()
-	elems := []int{1, 2, 3, 4, 5}
+	elems := []uint32{1, 2, 3, 4, 5}
 	for _, elem := range elems {
 		b.Add(elem)
 	}
@@ -33,7 +33,7 @@ func TestCPUSetBuilder(t *testing.T) {
 			t.Fatalf("expected cpuset to contain element %d: [%v]", elem, result)
 		}
 	}
-	if len(elems) != result.Size() {
+	if uint32(len(elems)) != result.Size() {
 		t.Fatalf("expected cpuset %s to have the same size as %v", result, elems)
 	}
 }
@@ -41,7 +41,7 @@ func TestCPUSetBuilder(t *testing.T) {
 func TestCPUSetSize(t *testing.T) {
 	testCases := []struct {
 		cpuset   CPUSet
-		expected int
+		expected uint32
 	}{
 		{NewCPUSet(), 0},
 		{NewCPUSet(5), 1},
@@ -77,12 +77,12 @@ func TestCPUSetIsEmpty(t *testing.T) {
 func TestCPUSetContains(t *testing.T) {
 	testCases := []struct {
 		cpuset         CPUSet
-		mustContain    []int
-		mustNotContain []int
+		mustContain    []uint32
+		mustNotContain []uint32
 	}{
-		{NewCPUSet(), []int{}, []int{1, 2, 3, 4, 5}},
-		{NewCPUSet(5), []int{5}, []int{1, 2, 3, 4}},
-		{NewCPUSet(1, 2, 4, 5), []int{1, 2, 4, 5}, []int{0, 3, 6}},
+		{NewCPUSet(), []uint32{}, []uint32{1, 2, 3, 4, 5}},
+		{NewCPUSet(5), []uint32{5}, []uint32{1, 2, 3, 4}},
+		{NewCPUSet(1, 2, 4, 5), []uint32{1, 2, 4, 5}, []uint32{0, 3, 6}},
 	}
 
 	for _, c := range testCases {

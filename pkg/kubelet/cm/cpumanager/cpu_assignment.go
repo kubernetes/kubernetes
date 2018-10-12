@@ -29,11 +29,11 @@ import (
 type cpuAccumulator struct {
 	topo          *topology.CPUTopology
 	details       topology.CPUDetails
-	numCPUsNeeded int
+	numCPUsNeeded uint32
 	result        cpuset.CPUSet
 }
 
-func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) *cpuAccumulator {
+func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs uint32) *cpuAccumulator {
 	return &cpuAccumulator{
 		topo:          topo,
 		details:       topo.CPUDetails.KeepOnly(availableCPUs),
@@ -49,18 +49,18 @@ func (a *cpuAccumulator) take(cpus cpuset.CPUSet) {
 }
 
 // Returns true if the supplied socket is fully available in `topoDetails`.
-func (a *cpuAccumulator) isSocketFree(socketID int) bool {
+func (a *cpuAccumulator) isSocketFree(socketID uint32) bool {
 	return a.details.CPUsInSocket(socketID).Size() == a.topo.CPUsPerSocket()
 }
 
 // Returns true if the supplied core is fully available in `topoDetails`.
-func (a *cpuAccumulator) isCoreFree(coreID int) bool {
+func (a *cpuAccumulator) isCoreFree(coreID uint32) bool {
 	return a.details.CPUsInCore(coreID).Size() == a.topo.CPUsPerCore()
 }
 
 // Returns free socket IDs as a slice sorted by:
 // - socket ID, ascending.
-func (a *cpuAccumulator) freeSockets() []int {
+func (a *cpuAccumulator) freeSockets() []uint32 {
 	return a.details.Sockets().Filter(a.isSocketFree).ToSlice()
 }
 
@@ -68,7 +68,7 @@ func (a *cpuAccumulator) freeSockets() []int {
 // - the number of whole available cores on the socket, ascending
 // - socket ID, ascending
 // - core ID, ascending
-func (a *cpuAccumulator) freeCores() []int {
+func (a *cpuAccumulator) freeCores() []uint32 {
 	socketIDs := a.details.Sockets().ToSlice()
 	sort.Slice(socketIDs,
 		func(i, j int) bool {
@@ -77,7 +77,7 @@ func (a *cpuAccumulator) freeCores() []int {
 			return iCores.Size() < jCores.Size() || socketIDs[i] < socketIDs[j]
 		})
 
-	coreIDs := []int{}
+	coreIDs := []uint32{}
 	for _, s := range socketIDs {
 		coreIDs = append(coreIDs, a.details.CoresInSocket(s).Filter(a.isCoreFree).ToSlice()...)
 	}
@@ -90,8 +90,8 @@ func (a *cpuAccumulator) freeCores() []int {
 // - number of CPUs available on the same core
 // - socket ID.
 // - core ID.
-func (a *cpuAccumulator) freeCPUs() []int {
-	result := []int{}
+func (a *cpuAccumulator) freeCPUs() []uint32 {
+	result := []uint32{}
 	cores := a.details.Cores().ToSlice()
 
 	sort.Slice(
@@ -134,7 +134,7 @@ func (a *cpuAccumulator) freeCPUs() []int {
 	return result
 }
 
-func (a *cpuAccumulator) needs(n int) bool {
+func (a *cpuAccumulator) needs(n uint32) bool {
 	return a.numCPUsNeeded >= n
 }
 
@@ -146,7 +146,7 @@ func (a *cpuAccumulator) isFailed() bool {
 	return a.numCPUsNeeded > a.details.CPUs().Size()
 }
 
-func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs uint32) (cpuset.CPUSet, error) {
 	acc := newCPUAccumulator(topo, availableCPUs, numCPUs)
 	if acc.isSatisfied() {
 		return acc.result, nil

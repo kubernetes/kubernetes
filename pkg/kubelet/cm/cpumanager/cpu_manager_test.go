@@ -146,7 +146,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			NumCPUs:    4,
 			NumSockets: 1,
 			NumCores:   4,
-			CPUDetails: map[int]topology.CPUInfo{
+			CPUDetails: map[uint32]topology.CPUInfo{
 				0: {CoreID: 0, SocketID: 0},
 				1: {CoreID: 1, SocketID: 0},
 				2: {CoreID: 2, SocketID: 0},

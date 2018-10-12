@@ -26,22 +26,22 @@ import (
 )
 
 // CPUDetails is a map from CPU ID to Core ID and Socket ID.
-type CPUDetails map[int]CPUInfo
+type CPUDetails map[uint32]CPUInfo
 
 // CPUTopology contains details of node cpu, where :
 // CPU  - logical CPU, cadvisor - thread
 // Core - physical CPU, cadvisor - Core
 // Socket - socket, cadvisor - Node
 type CPUTopology struct {
-	NumCPUs    int
-	NumCores   int
-	NumSockets int
+	NumCPUs    uint32
+	NumCores   uint32
+	NumSockets uint32
 	CPUDetails CPUDetails
 }
 
 // CPUsPerCore returns the number of logical CPUs are associated with
 // each core.
-func (topo *CPUTopology) CPUsPerCore() int {
+func (topo *CPUTopology) CPUsPerCore() uint32 {
 	if topo.NumCores == 0 {
 		return 0
 	}
@@ -50,7 +50,7 @@ func (topo *CPUTopology) CPUsPerCore() int {
 
 // CPUsPerSocket returns the number of logical CPUs are associated with
 // each socket.
-func (topo *CPUTopology) CPUsPerSocket() int {
+func (topo *CPUTopology) CPUsPerSocket() uint32 {
 	if topo.NumSockets == 0 {
 		return 0
 	}
@@ -59,8 +59,8 @@ func (topo *CPUTopology) CPUsPerSocket() int {
 
 // CPUInfo contains the socket and core IDs associated with a CPU.
 type CPUInfo struct {
-	SocketID int
-	CoreID   int
+	SocketID uint32
+	CoreID   uint32
 }
 
 // KeepOnly returns a new CPUDetails object with only the supplied cpus.
@@ -86,7 +86,7 @@ func (d CPUDetails) Sockets() cpuset.CPUSet {
 
 // CPUsInSocket returns all of the logical CPU IDs associated with the
 // given socket ID in this CPUDetails.
-func (d CPUDetails) CPUsInSocket(id int) cpuset.CPUSet {
+func (d CPUDetails) CPUsInSocket(id uint32) cpuset.CPUSet {
 	b := cpuset.NewBuilder()
 	for cpu, info := range d {
 		if info.SocketID == id {
@@ -108,7 +108,7 @@ func (d CPUDetails) Cores() cpuset.CPUSet {
 
 // CoresInSocket returns all of the core IDs associated with the given
 // socket ID in this CPUDetails.
-func (d CPUDetails) CoresInSocket(id int) cpuset.CPUSet {
+func (d CPUDetails) CoresInSocket(id uint32) cpuset.CPUSet {
 	b := cpuset.NewBuilder()
 	for _, info := range d {
 		if info.SocketID == id {
@@ -129,7 +129,7 @@ func (d CPUDetails) CPUs() cpuset.CPUSet {
 
 // CPUsInCore returns all of the logical CPU IDs associated with the
 // given core ID in this CPUDetails.
-func (d CPUDetails) CPUsInCore(id int) cpuset.CPUSet {
+func (d CPUDetails) CPUsInCore(id uint32) cpuset.CPUSet {
 	b := cpuset.NewBuilder()
 	for cpu, info := range d {
 		if info.CoreID == id {
@@ -149,7 +149,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 	CPUDetails := CPUDetails{}
 	numCPUs := machineInfo.NumCores
 	numPhysicalCores := 0
-	var coreID int
+	var coreID uint32
 	var err error
 
 	for _, socket := range machineInfo.Topology {
@@ -161,18 +161,18 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 				return nil, err
 			}
 			for _, cpu := range core.Threads {
-				CPUDetails[cpu] = CPUInfo{
+				CPUDetails[uint32(cpu)] = CPUInfo{
 					CoreID:   coreID,
-					SocketID: socket.Id,
+					SocketID: uint32(socket.Id),
 				}
 			}
 		}
 	}
 
 	return &CPUTopology{
-		NumCPUs:    numCPUs,
-		NumSockets: len(machineInfo.Topology),
-		NumCores:   numPhysicalCores,
+		NumCPUs:    uint32(numCPUs),
+		NumSockets: uint32(len(machineInfo.Topology)),
+		NumCores:   uint32(numPhysicalCores),
 		CPUDetails: CPUDetails,
 	}, nil
 }
@@ -180,18 +180,25 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 // getUniqueCoreID computes coreId as the lowest cpuID
 // for a given Threads []int slice. This will assure that coreID's are
 // platform unique (opposite to what cAdvisor reports - socket unique)
-func getUniqueCoreID(threads []int) (coreID int, err error) {
+func getUniqueCoreID(threads []int) (coreID uint32, err error) {
 	err = nil
 	if len(threads) == 0 {
 		return 0, fmt.Errorf("no cpus provided")
 	}
 
-	if len(threads) != cpuset.NewCPUSet(threads...).Size() {
+	transThreads := []uint32{}
+	for _, t := range threads {
+		transThreads = append(transThreads, uint32(t))
+	}
+
+	if uint32(len(threads)) != cpuset.NewCPUSet(transThreads...).Size() {
 		return 0, fmt.Errorf("cpus provided are not unique")
 	}
 
-	tmpThreads := make([]int, len(threads))
-	copy(tmpThreads, threads)
-	sort.Ints(tmpThreads)
+	tmpThreads := make([]uint32, len(threads))
+	copy(tmpThreads, transThreads)
+	sort.Slice(tmpThreads, func(i, j int) bool {
+		return tmpThreads[i] < tmpThreads[j]
+	})
 	return tmpThreads[0], err
 }

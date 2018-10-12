@@ -262,8 +262,8 @@ func TestCPUAccumulatorTake(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		acc := newCPUAccumulator(tc.topo, tc.availableCPUs, tc.numCPUs)
-		totalTaken := 0
+		acc := newCPUAccumulator(tc.topo, tc.availableCPUs, uint32(tc.numCPUs))
+		totalTaken := uint32(0)
 		for _, cpus := range tc.takeCPUs {
 			acc.take(cpus)
 			totalTaken += cpus.Size()
@@ -283,7 +283,7 @@ func TestCPUAccumulatorTake(t *testing.T) {
 				t.Errorf("[%s] expected [%s] to be a subset of acc.result [%s]", tc.description, cpus, acc.result)
 			}
 		}
-		expNumCPUsNeeded := tc.numCPUs - totalTaken
+		expNumCPUsNeeded := uint32(tc.numCPUs) - uint32(totalTaken)
 		if acc.numCPUsNeeded != expNumCPUsNeeded {
 			t.Errorf("[%s] expected acc.numCPUsNeeded to be %d (got %d)", tc.description, expNumCPUsNeeded, acc.numCPUsNeeded)
 		}
@@ -374,7 +374,7 @@ func TestTakeByTopology(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result, err := takeByTopology(tc.topo, tc.availableCPUs, tc.numCPUs)
+		result, err := takeByTopology(tc.topo, tc.availableCPUs, uint32(tc.numCPUs))
 		if tc.expErr != "" && err.Error() != tc.expErr {
 			t.Errorf("expected error to be [%v] but it was [%v] in test \"%s\"", tc.expErr, err, tc.description)
 		}

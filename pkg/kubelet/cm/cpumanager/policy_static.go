@@ -81,7 +81,7 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs uint32) Policy {
 	allCPUs := topology.CPUDetails.CPUs()
 	// takeByTopology allocates CPUs associated with low-numbered cores from
 	// allCPUs.
@@ -201,7 +201,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error 
 	return nil
 }
 
-func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, error) {
+func (p *staticPolicy) allocateCPUs(s state.State, numCPUs uint32) (cpuset.CPUSet, error) {
 	glog.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
 	result, err := takeByTopology(p.topology, p.assignableCPUs(s), numCPUs)
 	if err != nil {
@@ -214,7 +214,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, 
 	return result, nil
 }
 
-func guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
+func guaranteedCPUs(pod *v1.Pod, container *v1.Container) uint32 {
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return 0
 	}
@@ -225,5 +225,5 @@ func guaranteedCPUs(pod *v1.Pod, container *v1.Container) int {
 	// Safe downcast to do for all systems with < 2.1 billion CPUs.
 	// Per the language spec, `int` is guaranteed to be at least 32 bits wide.
 	// https://golang.org/ref/spec#Numeric_types
-	return int(cpuQuantity.Value())
+	return uint32(cpuQuantity.Value())
 }

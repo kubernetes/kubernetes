@@ -128,7 +128,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		// Take the ceiling of the reservation, since fractional CPUs cannot be
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
-		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
+		numReservedCPUs := uint32(math.Ceil(reservedCPUsFloat))
 		policy = NewStaticPolicy(topo, numReservedCPUs)
 
 	default:

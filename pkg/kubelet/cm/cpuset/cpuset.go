@@ -37,14 +37,14 @@ type Builder struct {
 func NewBuilder() Builder {
 	return Builder{
 		result: CPUSet{
-			elems: map[int]struct{}{},
+			elems: map[uint32]struct{}{},
 		},
 	}
 }
 
 // Add adds the supplied elements to the result. Calling Add after calling
 // Result has no effect.
-func (b Builder) Add(elems ...int) {
+func (b Builder) Add(elems ...uint32) {
 	if b.done {
 		return
 	}
@@ -62,11 +62,11 @@ func (b Builder) Result() CPUSet {
 
 // CPUSet is a thread-safe, immutable set-like data structure for CPU IDs.
 type CPUSet struct {
-	elems map[int]struct{}
+	elems map[uint32]struct{}
 }
 
 // NewCPUSet returns a new CPUSet containing the supplied elements.
-func NewCPUSet(cpus ...int) CPUSet {
+func NewCPUSet(cpus ...uint32) CPUSet {
 	b := NewBuilder()
 	for _, c := range cpus {
 		b.Add(c)
@@ -75,8 +75,8 @@ func NewCPUSet(cpus ...int) CPUSet {
 }
 
 // Size returns the number of elements in this set.
-func (s CPUSet) Size() int {
-	return len(s.elems)
+func (s CPUSet) Size() uint32 {
+	return uint32(len(s.elems))
 }
 
 // IsEmpty returns true if there are zero elements in this set.
@@ -85,7 +85,7 @@ func (s CPUSet) IsEmpty() bool {
 }
 
 // Contains returns true if the supplied element is present in this set.
-func (s CPUSet) Contains(cpu int) bool {
+func (s CPUSet) Contains(cpu uint32) bool {
 	_, found := s.elems[cpu]
 	return found
 }
@@ -98,7 +98,7 @@ func (s CPUSet) Equals(s2 CPUSet) bool {
 
 // Filter returns a new CPU set that contains all of the elements from this
 // set that match the supplied predicate, without mutating the source set.
-func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
+func (s CPUSet) Filter(predicate func(uint32) bool) CPUSet {
 	b := NewBuilder()
 	for cpu := range s.elems {
 		if predicate(cpu) {
@@ -111,7 +111,7 @@ func (s CPUSet) Filter(predicate func(int) bool) CPUSet {
 // FilterNot returns a new CPU set that contains all of the elements from this
 // set that do not match the supplied predicate, without mutating the source
 // set.
-func (s CPUSet) FilterNot(predicate func(int) bool) CPUSet {
+func (s CPUSet) FilterNot(predicate func(uint32) bool) CPUSet {
 	b := NewBuilder()
 	for cpu := range s.elems {
 		if !predicate(cpu) {
@@ -151,24 +151,24 @@ func (s CPUSet) Union(s2 CPUSet) CPUSet {
 // that are present in both this set and the supplied set, without mutating
 // either source set.
 func (s CPUSet) Intersection(s2 CPUSet) CPUSet {
-	return s.Filter(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.Filter(func(cpu uint32) bool { return s2.Contains(cpu) })
 }
 
 // Difference returns a new CPU set that contains all of the elements that
 // are present in this set and not the supplied set, without mutating either
 // source set.
 func (s CPUSet) Difference(s2 CPUSet) CPUSet {
-	return s.FilterNot(func(cpu int) bool { return s2.Contains(cpu) })
+	return s.FilterNot(func(cpu uint32) bool { return s2.Contains(cpu) })
 }
 
 // ToSlice returns a slice of integers that contains all elements from
 // this set.
-func (s CPUSet) ToSlice() []int {
-	result := []int{}
+func (s CPUSet) ToSlice() []uint32 {
+	result := []uint32{}
 	for cpu := range s.elems {
 		result = append(result, cpu)
 	}
-	sort.Ints(result)
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	return result
 }
 
@@ -184,8 +184,8 @@ func (s CPUSet) String() string {
 	elems := s.ToSlice()
 
 	type rng struct {
-		start int
-		end   int
+		start uint32
+		end   uint32
 	}
 
 	ranges := []rng{{elems[0], elems[0]}}
@@ -206,7 +206,7 @@ func (s CPUSet) String() string {
 	var result bytes.Buffer
 	for _, r := range ranges {
 		if r.start == r.end {
-			result.WriteString(strconv.Itoa(r.start))
+			result.WriteString(strconv.FormatUint(uint64(r.start), 10))
 		} else {
 			result.WriteString(fmt.Sprintf("%d-%d", r.start, r.end))
 		}
@@ -245,25 +245,25 @@ func Parse(s string) (CPUSet, error) {
 		boundaries := strings.Split(r, "-")
 		if len(boundaries) == 1 {
 			// Handle ranges that consist of only one element like "34".
-			elem, err := strconv.Atoi(boundaries[0])
+			elem, err := strconv.ParseUint(boundaries[0], 0, 32)
 			if err != nil {
 				return NewCPUSet(), err
 			}
-			b.Add(elem)
+			b.Add(uint32(elem))
 		} else if len(boundaries) == 2 {
 			// Handle multi-element ranges like "0-5".
-			start, err := strconv.Atoi(boundaries[0])
+			start, err := strconv.ParseUint(boundaries[0], 0, 32)
 			if err != nil {
 				return NewCPUSet(), err
 			}
-			end, err := strconv.Atoi(boundaries[1])
+			end, err := strconv.ParseUint(boundaries[1], 0, 32)
 			if err != nil {
 				return NewCPUSet(), err
 			}
 			// Add all elements to the result.
 			// e.g. "0-5", "46-48" => [0, 1, 2, 3, 4, 5, 46, 47, 48].
 			for e := start; e <= end; e++ {
-				b.Add(e)
+				b.Add(uint32(e))
 			}
 		}
 	}

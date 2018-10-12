@@ -25,7 +25,7 @@ var (
 		NumCPUs:    8,
 		NumSockets: 1,
 		NumCores:   4,
-		CPUDetails: map[int]topology.CPUInfo{
+		CPUDetails: map[uint32]topology.CPUInfo{
 			0: {CoreID: 0, SocketID: 0},
 			1: {CoreID: 1, SocketID: 0},
 			2: {CoreID: 2, SocketID: 0},
@@ -41,7 +41,7 @@ var (
 		NumCPUs:    12,
 		NumSockets: 2,
 		NumCores:   6,
-		CPUDetails: map[int]topology.CPUInfo{
+		CPUDetails: map[uint32]topology.CPUInfo{
 			0:  {CoreID: 0, SocketID: 0},
 			1:  {CoreID: 1, SocketID: 1},
 			2:  {CoreID: 2, SocketID: 0},
@@ -61,7 +61,7 @@ var (
 		NumCPUs:    8,
 		NumSockets: 2,
 		NumCores:   8,
-		CPUDetails: map[int]topology.CPUInfo{
+		CPUDetails: map[uint32]topology.CPUInfo{
 			0: {CoreID: 0, SocketID: 0},
 			1: {CoreID: 1, SocketID: 0},
 			2: {CoreID: 2, SocketID: 0},
@@ -96,7 +96,7 @@ var (
 		NumCPUs:    288,
 		NumSockets: 4,
 		NumCores:   72,
-		CPUDetails: map[int]topology.CPUInfo{
+		CPUDetails: map[uint32]topology.CPUInfo{
 			0:   {CoreID: 0, SocketID: 0},
 			169: {CoreID: 0, SocketID: 0},
 			109: {CoreID: 0, SocketID: 0},
