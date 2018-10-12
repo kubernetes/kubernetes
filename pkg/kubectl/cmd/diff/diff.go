@@ -122,8 +122,7 @@ func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
 
 // Run runs the detected diff program. `from` and `to` are the directory to diff.
 func (d *DiffProgram) Run(from, to string) error {
-	d.getCommand(from, to).Run() // Ignore diff return code
-	return nil
+	return d.getCommand(from, to).Run()
 }
 
 // Printer is used to print an object.
@@ -396,8 +395,5 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		return err
 	}
 
-	// Error ignore on purpose. diff(1) for example, returns an error if there is any diff.
-	_ = differ.Run(diff)
-
-	return nil
+	return differ.Run(diff)
 }
