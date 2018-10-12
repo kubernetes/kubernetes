@@ -146,7 +146,7 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 
 	server, err := proxy.NewServer(staticDir, apiProxyPrefix, staticPrefix, filter, clientConfig, keepalive)
 	if err != nil {
-		glog.Fatal(err)
+		return err
 	}
 
 	// Separate listening from serving so we can report the bound port
@@ -161,6 +161,5 @@ func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		glog.Fatal(err)
 	}
 	fmt.Fprintf(out, "Starting to serve on %s\n", l.Addr().String())
-	glog.Fatal(server.ServeOnListener(l))
-	return nil
+	return server.ServeOnListener(l)
 }
