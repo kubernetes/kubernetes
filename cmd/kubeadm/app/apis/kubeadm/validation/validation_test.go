@@ -140,7 +140,7 @@ func TestValidateCertSANs(t *testing.T) {
 		expected bool
 	}{
 		{[]string{}, true},                                                     // ok if not provided
-		{[]string{"1,2,,3"}, false},                                            // not a DNS label or IP
+		{[]string{"1,2,3"}, false},                                            // not a DNS label or IP
 		{[]string{"my-hostname", "???&?.garbage"}, false},                      // not valid
 		{[]string{"my-hostname", "my.subdomain", "1.2.3.4"}, true},             // supported
 		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true},    // supported
