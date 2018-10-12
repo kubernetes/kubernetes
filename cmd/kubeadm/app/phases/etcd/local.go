@@ -74,6 +74,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.InitConfiguration) v1.Pod {
 			cfg, kubeadmconstants.Etcd, 2379, cfg.CertificatesDir,
 			kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
 		),
+		Resources:       staticpodutil.ComponentResources("100m"),
 	}, etcdMounts)
 }
 

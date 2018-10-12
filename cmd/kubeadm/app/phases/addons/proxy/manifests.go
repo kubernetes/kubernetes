@@ -77,6 +77,10 @@ spec:
       - name: kube-proxy
         image: {{ .Image }}
         imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 50Mi
         command:
         - /usr/local/bin/kube-proxy
         - --config=/var/lib/kube-proxy/{{ .ProxyConfigMapKey }}
