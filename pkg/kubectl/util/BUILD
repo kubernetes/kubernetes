@@ -70,6 +70,7 @@ filegroup(
         "//pkg/kubectl/util/i18n:all-srcs",
         "//pkg/kubectl/util/logs:all-srcs",
         "//pkg/kubectl/util/slice:all-srcs",
+        "//pkg/kubectl/util/templates:all-srcs",
         "//pkg/kubectl/util/term:all-srcs",
     ],
     tags = ["automanaged"],

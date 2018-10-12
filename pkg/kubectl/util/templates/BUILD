@@ -12,9 +12,9 @@ go_library(
         "templater.go",
         "templates.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/templates",
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util/templates",
     visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_templates_CONSUMERS",
+        "//build/visible_to:pkg_kubectl_util_templates_CONSUMERS",
     ],
     deps = [
         "//pkg/kubectl/util/term:go_default_library",
@@ -36,6 +36,6 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_templates_CONSUMERS",
+        "//build/visible_to:pkg_kubectl_util_templates_CONSUMERS",
     ],
 )
