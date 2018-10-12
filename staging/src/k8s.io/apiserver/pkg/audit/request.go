@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	maxUserAgentLength      = 1024
+	maxUserAgentLength      = 16384
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
