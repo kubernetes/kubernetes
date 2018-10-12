@@ -19,6 +19,8 @@ package schema
 import (
 	"fmt"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 // ParseResourceArg takes the common style of string which may be either `resource.group.com` or `resource.version.group.com`
@@ -210,6 +212,10 @@ func (gv GroupVersion) KindForGroupVersionKinds(kinds []GroupVersionKind) (targe
 	return GroupVersionKind{}, false
 }
 
+func (gv GroupVersion) VersionKey() string {
+	return gv.Group + "/" + gv.Version
+}
+
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
 // if it cannot parse the string.
 func ParseGroupVersion(gv string) (GroupVersion, error) {
@@ -264,6 +270,11 @@ func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (Gro
 		return bestMatch(kinds, targets), true
 	}
 	return GroupVersionKind{}, false
+}
+
+func (gvs GroupVersions) VersionKey() string {
+	glog.Warningf("GroupVersions does not support VersionKey")
+	return ""
 }
 
 // bestMatch tries to pick best matching GroupVersionKind and falls back to the first

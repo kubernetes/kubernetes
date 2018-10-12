@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -608,6 +609,11 @@ type testGroupVersioner struct {
 
 func (m testGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	return m.target, m.ok
+}
+
+func (m testGroupVersioner) VersionKey() string {
+	glog.Warningf("testGroupVersioner does not implement VersionKey")
+	return ""
 }
 
 func TestConvertToVersion(t *testing.T) {

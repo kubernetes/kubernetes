@@ -36,12 +36,17 @@ import (
 // NewSerializer creates a JSON serializer that handles encoding versioned objects into the proper JSON form. If typer
 // is not nil, the object has the group, version, and kind fields set.
 func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper, pretty bool) *Serializer {
+	encoderKey := "json"
+	if pretty {
+		encoderKey += "-pretty"
+	}
 	return &Serializer{
-		meta:    meta,
-		creater: creater,
-		typer:   typer,
-		yaml:    false,
-		pretty:  pretty,
+		meta:       meta,
+		creater:    creater,
+		typer:      typer,
+		yaml:       false,
+		pretty:     pretty,
+		encoderKey: encoderKey,
 	}
 }
 
@@ -49,11 +54,13 @@ func NewSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtim
 // is not nil, the object has the group, version, and kind fields set. This serializer supports only the subset of YAML that
 // matches JSON, and will error if constructs are used that do not serialize to JSON.
 func NewYAMLSerializer(meta MetaFactory, creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
+	encoderKey := "yaml"
 	return &Serializer{
-		meta:    meta,
-		creater: creater,
-		typer:   typer,
-		yaml:    true,
+		meta:       meta,
+		creater:    creater,
+		typer:      typer,
+		yaml:       true,
+		encoderKey: encoderKey,
 	}
 }
 
@@ -63,6 +70,12 @@ type Serializer struct {
 	typer   runtime.ObjectTyper
 	yaml    bool
 	pretty  bool
+
+	encoderKey string
+}
+
+func (s *Serializer) EncoderKey() string {
+	return s.encoderKey
 }
 
 // Serializer implements Serializer

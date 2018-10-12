@@ -324,6 +324,11 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, 
 	return obj, &gvk, nil
 }
 
+func (unstructuredJSONScheme) EncoderKey() string {
+	// TODO: json - is this compatible with the normal JSON encoder (for encode)?
+	return "unstructured-json"
+}
+
 func (unstructuredJSONScheme) Encode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case *Unstructured:

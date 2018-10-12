@@ -37,6 +37,9 @@ type GroupVersioner interface {
 	// Scheme.New(target) and then perform a conversion between the current Go type and the destination Go type.
 	// Sophisticated implementations may use additional information about the input kinds to pick a destination kind.
 	KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (target schema.GroupVersionKind, ok bool)
+
+	// VersionKey returns a unique ID for a specified version
+	VersionKey() string
 }
 
 // Encoder writes objects to a serialized form
@@ -44,6 +47,8 @@ type Encoder interface {
 	// Encode writes an object to a stream. Implementations may return errors if the versions are
 	// incompatible, or if no conversion is defined.
 	Encode(obj Object, w io.Writer) error
+
+	EncoderKey() string
 }
 
 // Encodable is for objects that can encode themselves (in particular with caching)
@@ -51,6 +56,11 @@ type Encodable interface {
 	// Encode writes the object to a stream. Implementations may return errors if the versions are
 	// incompatible, or if no conversion is defined.
 	Encode(mediaType string, encoder Encoder, w io.Writer) error
+}
+
+// HasCodecInfo allows codecs to identify themselves, which supports caching
+type HasCodecInfo interface {
+	EncoderInfo() string
 }
 
 // Decoder attempts to load an object from data.

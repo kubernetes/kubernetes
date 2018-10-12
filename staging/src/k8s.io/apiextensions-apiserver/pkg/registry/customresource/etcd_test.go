@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -541,6 +542,11 @@ func (c unstructuredJsonCodec) Encode(obj runtime.Object, w io.Writer) error {
 	}
 	w.Write(bs)
 	return nil
+}
+
+func (c unstructuredJsonCodec) EncoderKey() string {
+	glog.Warningf("unstructuredJsonCodec does not implement EncoderKey")
+	return ""
 }
 
 func setSpecReplicas(u *unstructured.Unstructured, replicas int64) {

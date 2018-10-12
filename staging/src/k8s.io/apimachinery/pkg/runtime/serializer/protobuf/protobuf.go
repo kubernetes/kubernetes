@@ -90,6 +90,10 @@ type Serializer struct {
 var _ runtime.Serializer = &Serializer{}
 var _ recognizer.RecognizingDecoder = &Serializer{}
 
+func (s *Serializer) EncoderKey() string {
+	return "protobuf"
+}
+
 // Decode attempts to convert the provided data into a protobuf message, extract the stored schema kind, apply the provided default
 // gvk, and then load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown,
 // the raw data will be extracted and no decoding will be performed. If into is not registered with the typer, then the object will
@@ -320,6 +324,10 @@ type RawSerializer struct {
 }
 
 var _ runtime.Serializer = &RawSerializer{}
+
+func (s *RawSerializer) EncoderKey() string {
+	return "raw-protobuf"
+}
 
 // Decode attempts to convert the provided data into a protobuf message, extract the stored schema kind, apply the provided default
 // gvk, and then load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown,

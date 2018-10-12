@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"reflect"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -102,6 +103,10 @@ var _ Serializer = NoopEncoder{}
 
 func (n NoopEncoder) Encode(obj Object, w io.Writer) error {
 	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
+}
+
+func (n NoopEncoder) EncoderKey() string {
+	return "noop"
 }
 
 // NoopDecoder converts an Encoder to a Serializer or Codec for code that expects them but only uses encoding.
@@ -253,11 +258,19 @@ func (internalGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersi
 	return schema.GroupVersionKind{}, false
 }
 
+func (internalGroupVersioner) VersionKey() string {
+	return "internal"
+}
+
 type disabledGroupVersioner struct{}
 
 // KindForGroupVersionKinds returns false for any input.
 func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	return schema.GroupVersionKind{}, false
+}
+
+func (disabledGroupVersioner) VersionKey() string {
+	return "disabled"
 }
 
 // GroupVersioners implements GroupVersioner and resolves to the first exact match for any kind.
@@ -309,4 +322,9 @@ func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersio
 		}
 	}
 	return schema.GroupVersionKind{}, false
+}
+
+func (v multiGroupVersioner) VersionKey() string {
+	glog.Warningf("multiGroupVersioner %v does not support VersionKey", v)
+	return ""
 }

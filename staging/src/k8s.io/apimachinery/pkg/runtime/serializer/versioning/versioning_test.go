@@ -326,6 +326,10 @@ func (s *mockSerializer) Decode(data []byte, defaults *schema.GroupVersionKind, 
 	return s.obj, s.actual, s.err
 }
 
+func (s *mockSerializer) EncoderKey() string {
+	return ""
+}
+
 func (s *mockSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	s.obj = obj
 	s.encodingObjGVK = obj.GetObjectKind().GroupVersionKind()

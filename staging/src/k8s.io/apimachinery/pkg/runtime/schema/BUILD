@@ -21,7 +21,10 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/runtime/schema",
     importpath = "k8s.io/apimachinery/pkg/runtime/schema",
-    deps = ["//vendor/github.com/gogo/protobuf/proto:go_default_library"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+    ],
 )
 
 filegroup(

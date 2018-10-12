@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -36,6 +37,11 @@ func keepUnversioned(group string) bool {
 type stripVersionEncoder struct {
 	encoder    runtime.Encoder
 	serializer runtime.Serializer
+}
+
+func (c stripVersionEncoder) EncoderKey() string {
+	glog.Warningf("stripVersionEncoder does not support EncoderKey")
+	return ""
 }
 
 func (c stripVersionEncoder) Encode(obj runtime.Object, w io.Writer) error {

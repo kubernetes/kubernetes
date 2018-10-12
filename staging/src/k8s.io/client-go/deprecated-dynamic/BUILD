@@ -22,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
 

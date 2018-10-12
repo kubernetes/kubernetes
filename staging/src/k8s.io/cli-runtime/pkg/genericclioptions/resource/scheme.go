@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/golang/glog"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,6 +55,11 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
+}
+
+func (dynamicCodec) EncoderKey() string {
+	glog.Warningf("dynamicCodec does not support EncoderKey")
+	return ""
 }
 
 // ContentConfig returns a rest.ContentConfig for dynamic types.  It includes enough codecs to act as a "normal"

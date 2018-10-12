@@ -19,6 +19,7 @@ package versioning
 import (
 	"io"
 
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,6 +64,7 @@ func NewCodec(
 
 		originalSchemeName: originalSchemeName,
 	}
+
 	return internal
 }
 
@@ -79,6 +81,24 @@ type codec struct {
 
 	// originalSchemeName is optional, but when filled in it holds the name of the scheme from which this codec originates
 	originalSchemeName string
+}
+
+func (c *codec) EncoderKey() string {
+	// TODO: Return string, bool?
+	// TODO: Cache
+	k := c.encoder.EncoderKey()
+	if k == "" {
+		glog.Warningf("codec.encoder did not implement EncoderKey: %T", c.encoder)
+		return ""
+	}
+
+	versionKey := c.encodeVersion.VersionKey()
+	if versionKey == "" {
+		glog.Warningf("codec.encodeVersion did not implement VersionKey: %T", c.encodeVersion)
+		return ""
+	}
+
+	return k + "::" + versionKey
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is

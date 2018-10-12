@@ -17,11 +17,13 @@ limitations under the License.
 package constobj
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +40,12 @@ type ConstObject struct {
 
 	mutex        sync.Mutex
 	protobufData []byte
+	cached       []cacheEntry
+}
+
+type cacheEntry struct {
+	key  string
+	data []byte
 }
 
 var _ runtime.Object = &ConstObject{}
@@ -276,8 +284,45 @@ func Constify(o runtime.Object) *ConstObject {
 // Encode implements runtime.Encodable
 // TODO: Get our own encoder?
 func (c *ConstObject) Encode(mediaType string, encoder runtime.Encoder, w io.Writer) error {
-	// TODO: Caching
-	return encoder.Encode(c.inner, w)
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	key := encoder.EncoderKey()
+	if key == "" {
+		glog.Warningf("encoder did not have key, cannot cache: %T", encoder)
+	} else {
+		for _, cached := range c.cached {
+			if cached.key == key {
+				//			glog.Infof("cache hit on %s", key)
+				_, err := w.Write(cached.data)
+				return err
+			}
+		}
+		/*
+			if len(c.cached) != 0 {
+				glog.Warningf("cache miss on %s, have %d (%s...)", key, len(c.cached), c.cached[0].key)
+			}
+		*/
+	}
+
+	if key == "" {
+		return encoder.Encode(c.inner, w)
+	} else {
+		var b bytes.Buffer
+		err := encoder.Encode(c.inner, &b)
+		if err != nil {
+			return err
+		}
+
+		data := b.Bytes()
+		c.cached = append(c.cached, cacheEntry{
+			key:  key,
+			data: data,
+		})
+
+		_, err = w.Write(data)
+		return err
+	}
 }
 
 // DeconstifyForTest allows access to the inner object; this should only be used for tests as it breaks our contract
