@@ -24,6 +24,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -86,11 +87,11 @@ func mutatePodSpec(mutators map[string][]PodSpecMutatorFunc, name string, podSpe
 // addNodeSelectorToPodSpec makes Pod require to be scheduled on a node marked with the master label
 func addNodeSelectorToPodSpec(podSpec *v1.PodSpec) {
 	if podSpec.NodeSelector == nil {
-		podSpec.NodeSelector = map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""}
+		podSpec.NodeSelector = map[string]string{core.LabelNodeRoleMaster: ""}
 		return
 	}
 
-	podSpec.NodeSelector[kubeadmconstants.LabelNodeRoleMaster] = ""
+	podSpec.NodeSelector[core.LabelNodeRoleMaster] = ""
 }
 
 // setMasterTolerationOnPodSpec makes the Pod tolerate the master taint

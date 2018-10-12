@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // healthCheck is a helper struct for easily performing healthchecks against the cluster and printing the output
@@ -110,7 +111,7 @@ func apiServerHealthy(client clientset.Interface) error {
 // masterNodesReady checks whether all master Nodes in the cluster are in the Running state
 func masterNodesReady(client clientset.Interface) error {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
-		constants.LabelNodeRoleMaster: "",
+		core.LabelNodeRoleMaster: "",
 	}))
 	masters, err := client.CoreV1().Nodes().List(metav1.ListOptions{
 		LabelSelector: selector.String(),

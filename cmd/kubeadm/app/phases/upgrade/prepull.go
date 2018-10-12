@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -179,7 +180,7 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 						},
 					},
 					NodeSelector: map[string]string{
-						constants.LabelNodeRoleMaster: "",
+						core.LabelNodeRoleMaster: "",
 					},
 					Tolerations:                   []v1.Toleration{constants.MasterToleration},
 					TerminationGracePeriodSeconds: &gracePeriodSecs,

@@ -21,14 +21,14 @@ import (
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 // MarkMaster taints the master and sets the master label
 func MarkMaster(client clientset.Interface, masterName string, taints []v1.Taint) error {
 
-	fmt.Printf("[markmaster] Marking the node %s as master by adding the label \"%s=''\"\n", masterName, constants.LabelNodeRoleMaster)
+	fmt.Printf("[markmaster] Marking the node %s as master by adding the label \"%s=''\"\n", masterName, core.LabelNodeRoleMaster)
 
 	if taints != nil && len(taints) > 0 {
 		taintStrs := []string{}
@@ -54,7 +54,7 @@ func taintExists(taint v1.Taint, taints []v1.Taint) bool {
 }
 
 func markMasterNode(n *v1.Node, taints []v1.Taint) {
-	n.ObjectMeta.Labels[constants.LabelNodeRoleMaster] = ""
+	n.ObjectMeta.Labels[core.LabelNodeRoleMaster] = ""
 
 	for _, nt := range n.Spec.Taints {
 		if !taintExists(nt, taints) {

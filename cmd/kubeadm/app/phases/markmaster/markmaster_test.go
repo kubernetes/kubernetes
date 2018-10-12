@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/apis/core"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/node"
 )
@@ -69,21 +70,21 @@ func TestMarkMaster(t *testing.T) {
 		},
 		{
 			"master taint missing",
-			kubeadmconstants.LabelNodeRoleMaster,
+			core.LabelNodeRoleMaster,
 			nil,
 			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"nothing missing",
-			kubeadmconstants.LabelNodeRoleMaster,
+			core.LabelNodeRoleMaster,
 			[]v1.Taint{kubeadmconstants.MasterTaint},
 			[]v1.Taint{kubeadmconstants.MasterTaint},
 			"{}",
 		},
 		{
 			"has taint and no new taints wanted",
-			kubeadmconstants.LabelNodeRoleMaster,
+			core.LabelNodeRoleMaster,
 			[]v1.Taint{
 				{
 					Key:    "node.cloudprovider.kubernetes.io/uninitialized",
@@ -95,7 +96,7 @@ func TestMarkMaster(t *testing.T) {
 		},
 		{
 			"has taint and should merge with wanted taint",
-			kubeadmconstants.LabelNodeRoleMaster,
+			core.LabelNodeRoleMaster,
 			[]v1.Taint{
 				{
 					Key:    "node.cloudprovider.kubernetes.io/uninitialized",

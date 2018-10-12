@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 const (
@@ -102,7 +103,7 @@ func kubeDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface)
 			DNSBindAddr:     dnsBindAddr,
 			DNSProbeAddr:    dnsProbeAddr,
 			DNSDomain:       cfg.Networking.DNSDomain,
-			MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+			MasterTaintKey:  core.LabelNodeRoleMaster,
 		})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
@@ -152,7 +153,7 @@ func coreDNSAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface)
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct{ ImageRepository, MasterTaintKey, Version string }{
 		ImageRepository: cfg.ImageRepository,
-		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+		MasterTaintKey:  core.LabelNodeRoleMaster,
 		Version:         kubeadmconstants.CoreDNSVersion,
 	})
 	if err != nil {

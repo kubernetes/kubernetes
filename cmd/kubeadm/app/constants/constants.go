@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -180,10 +181,6 @@ const (
 	// Default behaviour is 24 hours
 	DefaultTokenDuration = 24 * time.Hour
 
-	// LabelNodeRoleMaster specifies that a node is a master
-	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
-
 	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
 	// init/join time for use later. kubeadm annotates the node object with this information
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
@@ -322,13 +319,13 @@ const (
 var (
 	// MasterTaint is the taint to apply on the PodSpec for being able to run that Pod on the master
 	MasterTaint = v1.Taint{
-		Key:    LabelNodeRoleMaster,
+		Key:    core.LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
 	// MasterToleration is the toleration to apply on the PodSpec for being able to run that Pod on the master
 	MasterToleration = v1.Toleration{
-		Key:    LabelNodeRoleMaster,
+		Key:    core.LabelNodeRoleMaster,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 

@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestMutatePodSpec(t *testing.T) {
@@ -64,7 +65,7 @@ func TestMutatePodSpec(t *testing.T) {
 				},
 
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					core.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
 					kubeadmconstants.MasterToleration,
@@ -77,7 +78,7 @@ func TestMutatePodSpec(t *testing.T) {
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					core.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
 					kubeadmconstants.MasterToleration,
@@ -90,7 +91,7 @@ func TestMutatePodSpec(t *testing.T) {
 			podSpec:   &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					core.LabelNodeRoleMaster: "",
 				},
 				Tolerations: []v1.Toleration{
 					kubeadmconstants.MasterToleration,
@@ -118,7 +119,7 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 			podSpec: &v1.PodSpec{},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					core.LabelNodeRoleMaster: "",
 				},
 			},
 		},
@@ -130,8 +131,8 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 			},
 			expected: v1.PodSpec{
 				NodeSelector: map[string]string{
-					"foo":                                "bar",
-					kubeadmconstants.LabelNodeRoleMaster: "",
+					"foo":                    "bar",
+					core.LabelNodeRoleMaster: "",
 				},
 			},
 		},

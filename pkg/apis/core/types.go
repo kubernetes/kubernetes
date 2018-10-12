@@ -3718,6 +3718,20 @@ type Node struct {
 	Status NodeStatus
 }
 
+// We define LabelNodeRoleMaster and LabelNodeRoleNode, which are the preferred
+// form, but we will also recognize other forms that are known to be in
+// widespread use (NodeLabelKubeadmAlphaRole, NodeLabelRole, etc) .
+const (
+	// LabelNodeMasterRole is set to the value "true" indicating a master node.
+	// A master node typically runs kubernetes system components and will not typically run user workloads.
+	// When set to any value other than "true" it is ignored.
+	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+
+	// LabelNodeRoleNode is set to the value "true" indicating a "normal" node.
+	// When set to any value other than "true" it is ignored.
+	LabelNodeRoleNode = "node-role.kubernetes.io/node"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NodeList is a list of nodes.
