@@ -879,7 +879,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 	if cfg.Etcd.Local != nil {
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
-			PortOpenCheck{port: 2379},
+			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort},
 			DirAvailableCheck{Path: cfg.Etcd.Local.DataDir},
 		)
 	}

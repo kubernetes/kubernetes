@@ -112,7 +112,7 @@ func RunPlan(flags *planFlags) error {
 		etcdClient = client
 	} else {
 		client, err := etcdutil.NewFromStaticPod(
-			[]string{"localhost:2379"},
+			[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
 			constants.GetStaticPodDirectory(),
 			upgradeVars.cfg.CertificatesDir,
 		)
