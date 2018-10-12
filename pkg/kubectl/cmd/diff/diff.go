@@ -26,7 +26,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -226,11 +225,10 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
-	LocalObj       runtime.Object
-	Info           *resource.Info
-	Encoder        runtime.Encoder
-	OpenAPI        openapi.Resources
-	DryRunVerifier *apply.DryRunVerifier
+	LocalObj runtime.Object
+	Info     *resource.Info
+	Encoder  runtime.Encoder
+	OpenAPI  openapi.Resources
 }
 
 var _ Object = &InfoObject{}
@@ -262,13 +260,12 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 	// This is using the patcher from apply, to keep the same behavior.
 	// We plan on replacing this with server-side apply when it becomes available.
 	patcher := &apply.Patcher{
-		DryRunVerifier: obj.DryRunVerifier,
-		Mapping:        obj.Info.Mapping,
-		Helper:         resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
-		Overwrite:      true,
-		BackOff:        clockwork.NewRealClock(),
-		ServerDryRun:   true,
-		OpenapiSchema:  obj.OpenAPI,
+		Mapping:       obj.Info.Mapping,
+		Helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
+		Overwrite:     true,
+		BackOff:       clockwork.NewRealClock(),
+		ServerDryRun:  true,
+		OpenapiSchema: obj.OpenAPI,
 	}
 
 	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
@@ -375,6 +372,10 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 			return err
 		}
 
+		if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+			return err
+		}
+
 		local := info.Object.DeepCopyObject()
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
@@ -384,11 +385,10 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		}
 
 		obj := InfoObject{
-			LocalObj:       local,
-			Info:           info,
-			Encoder:        scheme.DefaultJSONEncoder(),
-			OpenAPI:        schema,
-			DryRunVerifier: dryRunVerifier,
+			LocalObj: local,
+			Info:     info,
+			Encoder:  scheme.DefaultJSONEncoder(),
+			OpenAPI:  schema,
 		}
 
 		return differ.Diff(obj, printer)

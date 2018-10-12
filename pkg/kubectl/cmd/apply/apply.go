@@ -25,7 +25,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -300,6 +299,11 @@ func (o *ApplyOptions) Run() error {
 		openapiSchema = o.OpenAPISchema
 	}
 
+	dryRunVerifier := &DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
+		OpenAPIGetter: o.DiscoveryClient,
+	}
+
 	// include the uninitialized objects by default if --prune is true
 	// unless explicitly set --include-uninitialized=false
 	r := o.Builder.
@@ -361,6 +365,13 @@ func (o *ApplyOptions) Run() error {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if o.ServerDryRun {
+				if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return err
+				}
+			}
+
 			// Create the resource if it doesn't exist
 			// First, update the annotation used by kubectl apply
 			if err := kubectl.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
@@ -410,25 +421,19 @@ func (o *ApplyOptions) Run() error {
 				fmt.Fprintf(o.ErrOut, warningNoLastAppliedConfigAnnotation, o.cmdBaseName)
 			}
 
-			dryRunVerifier := &DryRunVerifier{
-				Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
-				OpenAPIGetter: o.DiscoveryClient,
-			}
-
 			helper := resource.NewHelper(info.Client, info.Mapping)
 			patcher := &Patcher{
-				Mapping:        info.Mapping,
-				Helper:         helper,
-				DynamicClient:  o.DynamicClient,
-				DryRunVerifier: dryRunVerifier,
-				Overwrite:      o.Overwrite,
-				BackOff:        clockwork.NewRealClock(),
-				Force:          o.DeleteOptions.ForceDeletion,
-				Cascade:        o.DeleteOptions.Cascade,
-				Timeout:        o.DeleteOptions.Timeout,
-				GracePeriod:    o.DeleteOptions.GracePeriod,
-				ServerDryRun:   o.ServerDryRun,
-				OpenapiSchema:  openapiSchema,
+				Mapping:       info.Mapping,
+				Helper:        helper,
+				DynamicClient: o.DynamicClient,
+				Overwrite:     o.Overwrite,
+				BackOff:       clockwork.NewRealClock(),
+				Force:         o.DeleteOptions.ForceDeletion,
+				Cascade:       o.DeleteOptions.Cascade,
+				Timeout:       o.DeleteOptions.Timeout,
+				GracePeriod:   o.DeleteOptions.GracePeriod,
+				ServerDryRun:  o.ServerDryRun,
+				OpenapiSchema: openapiSchema,
 			}
 
 			patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
@@ -681,10 +686,9 @@ func (p *Patcher) delete(namespace, name string) error {
 }
 
 type Patcher struct {
-	Mapping        *meta.RESTMapping
-	Helper         *resource.Helper
-	DynamicClient  dynamic.Interface
-	DryRunVerifier *DryRunVerifier
+	Mapping       *meta.RESTMapping
+	Helper        *resource.Helper
+	DynamicClient dynamic.Interface
 
 	Overwrite bool
 	BackOff   clockwork.Clock
@@ -738,12 +742,6 @@ func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
 }
 
 func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
-	if p.ServerDryRun {
-		if err := p.DryRunVerifier.HasSupport(p.Mapping.GroupVersionKind); err != nil {
-			return nil, nil, err
-		}
-	}
-
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
