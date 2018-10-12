@@ -457,3 +457,34 @@ func (lengthDelimitedFramer) NewFrameWriter(w io.Writer) io.Writer {
 func (lengthDelimitedFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
 	return framer.NewLengthDelimitedFrameReader(r)
 }
+
+// Encode simply encodes the provided object to a []byte.
+// TODO: We really want errNotMarshalable
+func Marshal(obj runtime.Object) ([]byte, error) {
+	switch t := obj.(type) {
+	/*case bufferedMarshaller:
+	// this path performs a single allocation during write but requires the caller to implement
+	// the more efficient Size and MarshalTo methods
+	encodedSize := uint64(t.Size())
+	estimatedSize := prefixSize + estimateUnknownSize(&unk, encodedSize)
+	data := make([]byte, estimatedSize)
+
+	i, err := unk.NestedMarshalTo(data[prefixSize:], t, encodedSize)
+	if err != nil {
+		return err
+	}
+
+	copy(data, s.prefix)
+
+	_, err = w.Write(data[:prefixSize+uint64(i)])
+	return err
+	*/
+	case proto.Marshaler:
+		// this path performs extra allocations
+		return t.Marshal()
+
+	default:
+		// TODO: marshal with a different content type and serializer (JSON for third party objects)
+		return nil, errNotMarshalable{reflect.TypeOf(obj)}
+	}
+}

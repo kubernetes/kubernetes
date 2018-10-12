@@ -19,12 +19,15 @@ package constobj
 import (
 	"fmt"
 	"io"
+	"sync"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -33,6 +36,9 @@ import (
 type ConstObject struct {
 	inner    runtime.Object
 	accessor metav1.Object
+
+	mutex        sync.Mutex
+	protobufData []byte
 }
 
 var _ runtime.Object = &ConstObject{}
@@ -288,4 +294,47 @@ func (c *ConstObject) String() string {
 		return "ConstObject[" + stringer.String() + "]"
 	}
 	return fmt.Sprintf("ConstObject[type %T]", c.inner)
+}
+
+// Support for protobuf marshalling
+
+var _ proto.Sizer = &ConstObject{}
+var _ runtime.ProtobufMarshaller = &ConstObject{}
+
+// Size implements proto.Sizer
+func (c *ConstObject) Size() int {
+	if err := c.ensureProtobuf(); err != nil {
+		return 0
+	}
+
+	return len(c.protobufData)
+}
+
+// MarshalTo implements runtime.ProtobufMarshaller
+func (c *ConstObject) MarshalTo(data []byte) (int, error) {
+	if err := c.ensureProtobuf(); err != nil {
+		return 0, err
+	}
+
+	// TODO: What if data is too small?
+	n := copy(data, c.protobufData)
+	return n, nil
+}
+
+// ensureProtobuf encodes the object to protobuf
+func (c *ConstObject) ensureProtobuf() error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.protobufData != nil {
+		return nil
+	}
+
+	data, err := protobuf.Marshal(c.inner)
+	if err != nil {
+		return err
+	}
+
+	c.protobufData = data
+	return nil
 }
