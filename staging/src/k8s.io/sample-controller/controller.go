@@ -118,6 +118,13 @@ func NewController(
 	fooInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueFoo,
 		UpdateFunc: func(old, new interface{}) {
+			newDepl := new.(*samplev1alpha1.Foo)
+			oldDepl := old.(*samplev1alpha1.Foo)
+			if newDepl.ResourceVersion == oldDepl.ResourceVersion {
+				// Periodic resync will send update events for all known Foo instances.
+				// Two different versions of the same Foo will always have different RVs.
+				return
+			}
 			controller.enqueueFoo(new)
 		},
 	})
@@ -247,6 +254,9 @@ func (c *Controller) syncHandler(key string) error {
 		return nil
 	}
 
+	// flag that determines whether foo resource instance is indeed modified or not
+	fooModified := false
+
 	// Get the Foo resource with this namespace/name
 	foo, err := c.foosLister.Foos(namespace).Get(name)
 	if err != nil {
@@ -274,6 +284,7 @@ func (c *Controller) syncHandler(key string) error {
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
 		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Create(newDeployment(foo))
+		fooModified = true
 	}
 
 	// If an error occurs during Get/Create, we'll requeue the item so we can
@@ -297,6 +308,7 @@ func (c *Controller) syncHandler(key string) error {
 	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
 		glog.V(4).Infof("Foo %s replicas: %d, deployment replicas: %d", name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
 		deployment, err = c.kubeclientset.AppsV1().Deployments(foo.Namespace).Update(newDeployment(foo))
+		fooModified = true
 	}
 
 	// If an error occurs during Update, we'll requeue the item so we can
@@ -308,9 +320,11 @@ func (c *Controller) syncHandler(key string) error {
 
 	// Finally, we update the status block of the Foo resource to reflect the
 	// current state of the world
-	err = c.updateFooStatus(foo, deployment)
-	if err != nil {
-		return err
+	if fooModified {
+		err = c.updateFooStatus(foo, deployment)
+		if err != nil {
+		   return err
+		}
 	}
 
 	c.recorder.Event(foo, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)

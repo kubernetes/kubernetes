@@ -42,6 +42,10 @@ This is an example of how to build a kube-like controller with a single type.
 
 ```sh
 # assumes you have a working kubeconfig, not required if operating in-cluster
+# assumes that GOPATH is set to the path where your go code lives.
+
+$ cd $GOPATH/src/k8s.io/sample-controller
+
 $ go build -o sample-controller .
 $ ./sample-controller -kubeconfig=$HOME/.kube/config
 
@@ -51,8 +55,22 @@ $ kubectl create -f artifacts/examples/crd.yaml
 # create a custom resource of type Foo
 $ kubectl create -f artifacts/examples/example-foo.yaml
 
-# check deployments created through the custom resource
+# check foo resource
+$ kubectl get foo
+
+$ kubectl describe foo example-foo
+
+# check deployments and pods created through the custom resource
 $ kubectl get deployments
+
+$ kubectl get pods
+
+# update foo
+$ kubectl apply -f artifacts/examples/update-foo.yaml
+
+# check pods
+$ kubectl get pods
+
 ```
 
 ## Use Cases
