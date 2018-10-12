@@ -18,6 +18,7 @@ nodeRegistration:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
 ---
+apiServer: {}
 apiVersion: kubeadm.k8s.io/v1beta1
 auditPolicy:
   logDir: /var/log/kubernetes/audit
@@ -26,6 +27,7 @@ auditPolicy:
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""
+controllerManager: {}
 etcd:
   local:
     dataDir: /var/lib/etcd
@@ -37,6 +39,7 @@ networking:
   dnsDomain: cluster.global
   podSubnet: 10.148.0.0/16
   serviceSubnet: 10.196.0.0/12
+scheduler: {}
 unifiedControlPlaneImage: ""
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1

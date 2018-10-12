@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha3
 
 import (
+	"unsafe"
+
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -73,6 +75,42 @@ func Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kubeadm
 	} else if in.Discovery.File != nil {
 		out.DiscoveryFile = in.Discovery.File.KubeConfigPath
 	}
+
+	return nil
+}
+
+func Convert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	out.APIServer.ExtraArgs = in.APIServerExtraArgs
+	out.APIServer.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.APIServerExtraVolumes))
+	out.APIServer.CertSANs = in.APIServerCertSANs
+
+	out.ControllerManager.ExtraArgs = in.ControllerManagerExtraArgs
+	out.ControllerManager.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ControllerManagerExtraVolumes))
+
+	out.Scheduler.ExtraArgs = in.SchedulerExtraArgs
+	out.Scheduler.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.SchedulerExtraVolumes))
+
+	return nil
+}
+
+func Convert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_ClusterConfiguration_To_v1alpha3_ClusterConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	out.APIServerExtraArgs = in.APIServer.ExtraArgs
+	out.APIServerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.APIServer.ExtraVolumes))
+	out.APIServerCertSANs = in.APIServer.CertSANs
+
+	out.ControllerManagerExtraArgs = in.ControllerManager.ExtraArgs
+	out.ControllerManagerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ControllerManager.ExtraVolumes))
+
+	out.SchedulerExtraArgs = in.Scheduler.ExtraArgs
+	out.SchedulerExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.Scheduler.ExtraVolumes))
 
 	return nil
 }

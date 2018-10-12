@@ -63,8 +63,9 @@ apiEndpoint:
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterConfiguration
 
-apiServerCertSANs: null
-apiServerExtraArgs: null
+apiServer:
+  certSANs: null
+  extraArgs: null
 certificatesDir: %s
 controllerManagerExtraArgs: null
 etcd:

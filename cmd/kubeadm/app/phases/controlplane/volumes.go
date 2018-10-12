@@ -99,9 +99,9 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) con
 
 	// Merge user defined mounts and ensure unique volume and volume mount
 	// names
-	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeAPIServer, cfg.APIServerExtraVolumes)
-	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeControllerManager, cfg.ControllerManagerExtraVolumes)
-	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeScheduler, cfg.SchedulerExtraVolumes)
+	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeAPIServer, cfg.APIServer.ExtraVolumes)
+	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeControllerManager, cfg.ControllerManager.ExtraVolumes)
+	mounts.AddExtraHostPathMounts(kubeadmconstants.KubeScheduler, cfg.Scheduler.ExtraVolumes)
 
 	return mounts
 }

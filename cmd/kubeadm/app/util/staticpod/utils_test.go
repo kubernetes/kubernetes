@@ -128,7 +128,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv4 controller-manager probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ControllerManagerExtraArgs: map[string]string{"address": "1.2.3.4"},
+					ControllerManager: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "1.2.3.4"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -141,7 +143,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv6 controller-manager probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					ControllerManagerExtraArgs: map[string]string{"address": "2001:db8::1"},
+					ControllerManager: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "2001:db8::1"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeControllerManager,
@@ -154,7 +158,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv4 scheduler probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					SchedulerExtraArgs: map[string]string{"address": "1.2.3.4"},
+					Scheduler: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "1.2.3.4"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeScheduler,
@@ -167,7 +173,9 @@ func TestComponentProbe(t *testing.T) {
 			name: "valid IPv6 scheduler probe",
 			cfg: &kubeadmapi.InitConfiguration{
 				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					SchedulerExtraArgs: map[string]string{"address": "2001:db8::1"},
+					Scheduler: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{"address": "2001:db8::1"},
+					},
 				},
 			},
 			component: kubeadmconstants.KubeScheduler,

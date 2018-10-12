@@ -18,8 +18,9 @@ nodeRegistration:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
 ---
-apiServerExtraArgs:
-  authorization-mode: Node,RBAC,Webhook
+apiServer:
+  extraArgs:
+    authorization-mode: Node,RBAC,Webhook
 apiVersion: kubeadm.k8s.io/v1beta1
 auditPolicy:
   logDir: /var/log/kubernetes/audit
@@ -28,6 +29,7 @@ auditPolicy:
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
 controlPlaneEndpoint: ""
+controllerManager: {}
 etcd:
   local:
     dataDir: /var/lib/etcd
@@ -39,6 +41,7 @@ networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
+scheduler: {}
 unifiedControlPlaneImage: ""
 ---
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
