@@ -26,7 +26,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -50,7 +49,7 @@ var (
 
 		Output is always YAML.
 
-		KUBERNETES_EXTERNAL_DIFF environment variable can be used to select your own
+		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
 		diff command. By default, the "diff" command available in your path will be
 		run with "-u" (unicode) and "-N" (treat new files as empty) options.`))
 	diffExample = templates.Examples(i18n.T(`
@@ -98,7 +97,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 }
 
 // DiffProgram finds and run the diff program. The value of
-// KUBERNETES_EXTERNAL_DIFF environment variable will be used a diff
+// KUBECTL_EXTERNAL_DIFF environment variable will be used a diff
 // program. By default, `diff(1)` will be used.
 type DiffProgram struct {
 	Exec exec.Interface
@@ -107,7 +106,7 @@ type DiffProgram struct {
 
 func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
 	diff := ""
-	if envDiff := os.Getenv("KUBERNETES_EXTERNAL_DIFF"); envDiff != "" {
+	if envDiff := os.Getenv("KUBECTL_EXTERNAL_DIFF"); envDiff != "" {
 		diff = envDiff
 	} else {
 		diff = "diff"
