@@ -166,7 +166,7 @@ func (l *persistentVolumeLabel) Admit(a admission.Attributes) (err error) {
 				volume.Spec.NodeAffinity.Required = new(api.NodeSelector)
 			}
 			if len(volume.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-				// Need atleast one term pre-allocated whose MatchExpressions can be appended to
+				// Need at least one term pre-allocated whose MatchExpressions can be appended to
 				volume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]api.NodeSelectorTerm, 1)
 			}
 			if nodeSelectorRequirementKeysExistInNodeSelectorTerms(requirements, volume.Spec.NodeAffinity.Required.NodeSelectorTerms) {
