@@ -61,6 +61,9 @@ def get_refs():
 
     return refs
 
+def is_gke_internal_file(filename):
+    return re.match(".*cluster/gce/.*/gke-internal-.*", filename) is not None
+
 def is_generated_file(filename, data, regexs):
     for d in skipped_ungenerated_files:
         if d in filename:
@@ -70,6 +73,11 @@ def is_generated_file(filename, data, regexs):
     return p.search(data)
 
 def file_passes(filename, refs, regexs):
+
+    # GKE internal files don't need boilerplate
+    if is_gke_internal_file(filename):
+        return True
+
     try:
         f = open(filename, 'r')
     except Exception as exc:
