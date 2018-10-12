@@ -31,6 +31,7 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
+        "//pkg/kubectl/util/printers:go_default_library",
         "//pkg/kubectl/util/templates:go_default_library",
         "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
