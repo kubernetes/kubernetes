@@ -11,7 +11,7 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    creationTimestamp: 2017-02-03T06:11:32Z
+    creationTimestamp: "2017-02-03T06:11:32Z"
     labels:
       app: svc1
     name: svc1
@@ -36,7 +36,7 @@ items:
     foo: changed-value2
   kind: ConfigMap
   metadata:
-    creationTimestamp: 2017-02-03T06:12:07Z
+    creationTimestamp: "2017-02-03T06:12:07Z"
     name: cm1
     namespace: edit-test
     resourceVersion: "1903"

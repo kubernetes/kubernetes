@@ -8,7 +8,7 @@ data:
   foo: changed-value2
 kind: ConfigMap
 metadata:
-  creationTimestamp: 2017-02-03T06:12:07Z
+  creationTimestamp: "2017-02-03T06:12:07Z"
   name: cm1-modified
   namespace: edit-test
   resourceVersion: "2071"
