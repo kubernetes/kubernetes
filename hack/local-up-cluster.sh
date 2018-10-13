@@ -108,6 +108,7 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
+ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
@@ -139,6 +140,11 @@ fi
 
 if [ "$(id -u)" != "0" ]; then
     echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
+fi
+
+if [ -z "$CLOUD_PROVIDER" ]; then
+    ENABLE_HOSTPATH_PROVISIONER=true
+    echo "WARNING : The hostpath provisioner is used only for development and testing only and WILL NOT WORK in a multi-node cluster."
 fi
 
 # Stop right away if the build fails
@@ -226,7 +232,6 @@ CONTAINER_RUNTIME_ENDPOINT=${CONTAINER_RUNTIME_ENDPOINT:-""}
 IMAGE_SERVICE_ENDPOINT=${IMAGE_SERVICE_ENDPOINT:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-true}
-ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 ENABLE_CONTROLLER_ATTACH_DETACH=${ENABLE_CONTROLLER_ATTACH_DETACH:-"true"} # current default
 # This is the default dir and filename where the apiserver will generate a self-signed cert
@@ -252,8 +257,6 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
     ln -s /var/log/docker.log ${LOG_DIR}/docker.log
   fi
 fi
-
-
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
