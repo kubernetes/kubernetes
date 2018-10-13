@@ -137,7 +137,7 @@ func TestToAuthenticationConfig(t *testing.T) {
 		TokenFailureCacheTTL: 0,
 	}
 
-	expectConfig := authenticator.AuthenticatorConfig{
+	expectConfig := authenticator.Config{
 		Anonymous:                   false,
 		BasicAuthFile:               "/testBasicAuthFile",
 		BootstrapToken:              false,

@@ -45,7 +45,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
-type AuthenticatorConfig struct {
+type Config struct {
 	Anonymous                   bool
 	BasicAuthFile               string
 	BootstrapToken              bool
@@ -79,7 +79,7 @@ type AuthenticatorConfig struct {
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func (config AuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
+func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
 	var authenticators []authenticator.Request
 	var tokenAuthenticators []authenticator.Token
 	securityDefinitions := spec.SecurityDefinitions{}

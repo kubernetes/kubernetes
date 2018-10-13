@@ -283,8 +283,8 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Config {
+	ret := authenticator.Config{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
 	}
@@ -349,38 +349,38 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 	return ret
 }
 
-func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
-	if o == nil {
+func (s *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
+	if s == nil {
 		return nil
 	}
 
 	var err error
-	if o.ClientCert != nil {
-		if err = c.Authentication.ApplyClientCert(o.ClientCert.ClientCA, c.SecureServing); err != nil {
+	if s.ClientCert != nil {
+		if err = c.Authentication.ApplyClientCert(s.ClientCert.ClientCA, c.SecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
-	if o.RequestHeader != nil {
-		if err = c.Authentication.ApplyClientCert(o.RequestHeader.ClientCAFile, c.SecureServing); err != nil {
+	if s.RequestHeader != nil {
+		if err = c.Authentication.ApplyClientCert(s.RequestHeader.ClientCAFile, c.SecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 
-	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+	c.Authentication.SupportsBasicAuth = s.PasswordFile != nil && len(s.PasswordFile.BasicAuthFile) > 0
 
 	return nil
 }
 
 // ApplyAuthorization will conditionally modify the authentication options based on the authorization options
-func (o *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltInAuthorizationOptions) {
-	if o == nil || authorization == nil || o.Anonymous == nil {
+func (s *BuiltInAuthenticationOptions) ApplyAuthorization(authorization *BuiltInAuthorizationOptions) {
+	if s == nil || authorization == nil || s.Anonymous == nil {
 		return
 	}
 
 	// authorization ModeAlwaysAllow cannot be combined with AnonymousAuth.
 	// in such a case the AnonymousAuth is stomped to false and you get a message
-	if o.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
+	if s.Anonymous.Allow && sets.NewString(authorization.Modes...).Has(authzmodes.ModeAlwaysAllow) {
 		glog.Warningf("AnonymousAuth is not allowed with the AlwaysAllow authorizer. Resetting AnonymousAuth to false. You should use a different authorizer")
-		o.Anonymous.Allow = false
+		s.Anonymous.Allow = false
 	}
 }
