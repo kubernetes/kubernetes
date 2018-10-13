@@ -48,7 +48,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/pointer"
@@ -1435,7 +1435,7 @@ func TestCloudProviderNodeShutdown(t *testing.T) {
 					ProviderID: "node0",
 					Taints: []v1.Taint{
 						{
-							Key:    algorithm.TaintNodeShutdown,
+							Key:    schedulerapi.TaintNodeShutdown,
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
@@ -2806,19 +2806,19 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	nodeController.recorder = testutil.NewFakeRecorder()
 
 	outOfDiskTaint := &v1.Taint{
-		Key:    algorithm.TaintNodeOutOfDisk,
+		Key:    schedulerapi.TaintNodeOutOfDisk,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 	networkUnavailableTaint := &v1.Taint{
-		Key:    algorithm.TaintNodeNetworkUnavailable,
+		Key:    schedulerapi.TaintNodeNetworkUnavailable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 	notReadyTaint := &v1.Taint{
-		Key:    algorithm.TaintNodeNotReady,
+		Key:    schedulerapi.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 	unreachableTaint := &v1.Taint{
-		Key:    algorithm.TaintNodeUnreachable,
+		Key:    schedulerapi.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
@@ -3115,22 +3115,22 @@ func TestFixDeprecatedTaintKey(t *testing.T) {
 	nodeController.recorder = testutil.NewFakeRecorder()
 
 	deprecatedNotReadyTaint := &v1.Taint{
-		Key:    algorithm.DeprecatedTaintNodeNotReady,
+		Key:    schedulerapi.DeprecatedTaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	nodeNotReadyTaint := &v1.Taint{
-		Key:    algorithm.TaintNodeNotReady,
+		Key:    schedulerapi.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	deprecatedUnreachableTaint := &v1.Taint{
-		Key:    algorithm.DeprecatedTaintNodeUnreachable,
+		Key:    schedulerapi.DeprecatedTaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	nodeUnreachableTaint := &v1.Taint{
-		Key:    algorithm.TaintNodeUnreachable,
+		Key:    schedulerapi.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
 

@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	nodectrlutil "k8s.io/kubernetes/pkg/controller/util/node"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -425,7 +425,7 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 
 func getCloudTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.Key == algorithm.TaintExternalCloudProvider {
+		if taint.Key == schedulerapi.TaintExternalCloudProvider {
 			return &taint
 		}
 	}

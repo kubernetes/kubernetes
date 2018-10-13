@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -78,13 +78,13 @@ func nowPointer() *metav1.Time {
 
 var (
 	nodeNotReady = []v1.Taint{{
-		Key:       algorithm.TaintNodeNotReady,
+		Key:       schedulerapi.TaintNodeNotReady,
 		Effect:    v1.TaintEffectNoExecute,
 		TimeAdded: nowPointer(),
 	}}
 
 	nodeUnreachable = []v1.Taint{{
-		Key:       algorithm.TaintNodeUnreachable,
+		Key:       schedulerapi.TaintNodeUnreachable,
 		Effect:    v1.TaintEffectNoExecute,
 		TimeAdded: nowPointer(),
 	}}
@@ -529,7 +529,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 			}
 
 			field := nodeSelector.NodeSelectorTerms[0].MatchFields[0]
-			if field.Key == algorithm.NodeFieldSelectorKeyNodeName {
+			if field.Key == schedulerapi.NodeFieldSelectorKeyNodeName {
 				if field.Operator != v1.NodeSelectorOpIn {
 					t.Fatalf("the operation of hostname NodeAffinity is not %v", v1.NodeSelectorOpIn)
 				}
@@ -1759,7 +1759,7 @@ func TestTaintOutOfDiskNodeDaemonLaunchesCriticalPod(t *testing.T) {
 
 			node := newNode("not-enough-disk", nil)
 			node.Status.Conditions = []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}
-			node.Spec.Taints = []v1.Taint{{Key: algorithm.TaintNodeOutOfDisk, Effect: v1.TaintEffectNoSchedule}}
+			node.Spec.Taints = []v1.Taint{{Key: schedulerapi.TaintNodeOutOfDisk, Effect: v1.TaintEffectNoSchedule}}
 			manager.nodeStore.Add(node)
 
 			// NOTE: Whether or not TaintNodesByCondition is enabled, it'll add toleration to DaemonSet pods.
@@ -1801,8 +1801,8 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 				{Type: v1.NodeMemoryPressure, Status: v1.ConditionTrue},
 			}
 			node.Spec.Taints = []v1.Taint{
-				{Key: algorithm.TaintNodeDiskPressure, Effect: v1.TaintEffectNoSchedule},
-				{Key: algorithm.TaintNodeMemoryPressure, Effect: v1.TaintEffectNoSchedule},
+				{Key: schedulerapi.TaintNodeDiskPressure, Effect: v1.TaintEffectNoSchedule},
+				{Key: schedulerapi.TaintNodeMemoryPressure, Effect: v1.TaintEffectNoSchedule},
 			}
 			manager.nodeStore.Add(node)
 
