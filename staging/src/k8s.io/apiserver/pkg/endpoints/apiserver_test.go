@@ -38,7 +38,6 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful"
-
 	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -68,8 +67,11 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/filters"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 )
 
 type alwaysMutatingDeny struct{}
@@ -3865,7 +3867,9 @@ func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx conte
 	return nil, nil
 }
 
-func TestDryRun(t *testing.T) {
+func TestDryRunDisabled(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, false)()
+
 	tests := []struct {
 		path        string
 		verb        string
