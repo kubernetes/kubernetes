@@ -25,14 +25,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-// RemoveAllOneFilesystem removes path and any children it contains.
+// OneFilesystem removes path and any children it contains.
 // It removes everything it can but returns the first error
 // it encounters. If the path does not exist, RemoveAll
 // returns nil (no error).
 // It makes sure it does not cross mount boundary, i.e. it does *not* remove
 // files from another filesystems. Like 'rm -rf --one-file-system'.
 // It is copied from RemoveAll() sources, with IsLikelyNotMountPoint
-func RemoveAllOneFilesystem(mounter mount.Interface, path string) error {
+func OneFilesystem(mounter mount.Interface, path string) error {
 	// Simple case: if Remove works, we're done.
 	err := os.Remove(path)
 	if err == nil || os.IsNotExist(err) {
@@ -76,7 +76,7 @@ func RemoveAllOneFilesystem(mounter mount.Interface, path string) error {
 	for {
 		names, err1 := fd.Readdirnames(100)
 		for _, name := range names {
-			err1 := RemoveAllOneFilesystem(mounter, path+string(os.PathSeparator)+name)
+			err1 := OneFilesystem(mounter, path+string(os.PathSeparator)+name)
 			if err == nil {
 				err = err1
 			}
