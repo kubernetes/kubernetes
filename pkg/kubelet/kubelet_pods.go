@@ -215,15 +215,16 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			}
 		}
 
-		// Docker Volume Mounts fail on Windows if it is not of the form C:/ nor a named pipe starting with \\.\pipe\
+		// Docker Volume Mounts fail on Windows if it is not of the form C:/
 		containerPath := mount.MountPath
 		if runtime.GOOS == "windows" {
-			if !volumeutil.IsWindowsNamedPipe(runtime.GOOS, hostPath) && (strings.HasPrefix(hostPath, "/") || strings.HasPrefix(hostPath, "\\")) && !strings.Contains(hostPath, ":") {
+			// Append C: only if it looks like a local path. Do not process UNC path/SMB shares/named pipes
+			if (strings.HasPrefix(hostPath, "/") || strings.HasPrefix(hostPath, "\\")) && !strings.Contains(hostPath, ":") && !volumeutil.IsWindowsUNCPath(runtime.GOOS, hostPath) {
 				hostPath = "c:" + hostPath
 			}
 		}
-		// IsAbs returns false for named pipes (\\.\pipe\...) in Windows. So check for it specifically and skip MakeAbsolutePath
-		if !volumeutil.IsWindowsNamedPipe(runtime.GOOS, containerPath) && !filepath.IsAbs(containerPath) {
+		// IsAbs returns false for UNC path/SMB shares/named pipes in Windows. So check for those specifically and skip MakeAbsolutePath
+		if !volumeutil.IsWindowsUNCPath(runtime.GOOS, containerPath) && !filepath.IsAbs(containerPath) {
 			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)
 		}
 

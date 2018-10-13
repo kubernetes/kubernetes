@@ -945,8 +945,15 @@ func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
 	return utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
 }
 
-func IsWindowsNamedPipe(goos, path string) bool {
-	if goos == "windows" && strings.HasPrefix(path, `\\.\pipe\`) {
+// IsWindowsUNCPath checks if path is prefixed with \\
+// This can be used to skip any processing of paths
+// that point to SMB shares, local named pipes and local UNC path
+func IsWindowsUNCPath(goos, path string) bool {
+	if goos != "windows" {
+		return false
+	}
+	// Check for UNC prefix \\
+	if strings.HasPrefix(path, `\\`) {
 		return true
 	}
 	return false

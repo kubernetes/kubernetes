@@ -2373,43 +2373,53 @@ func TestGetWindowsPath(t *testing.T) {
 	}
 }
 
-func TestIsWindowsNamedPipe(t *testing.T) {
+func TestIsWindowsUNCPath(t *testing.T) {
 	tests := []struct {
-		goos        string
-		path        string
-		isNamedPipe bool
+		goos      string
+		path      string
+		isUNCPath bool
 	}{
 		{
-			goos:        "linux",
-			path:        `/usr/bin`,
-			isNamedPipe: false,
+			goos:      "linux",
+			path:      `/usr/bin`,
+			isUNCPath: false,
 		},
 		{
-			goos:        "linux",
-			path:        `\\.\pipe\foo`,
-			isNamedPipe: false,
+			goos:      "linux",
+			path:      `\\.\pipe\foo`,
+			isUNCPath: false,
 		},
 		{
-			goos:        "windows",
-			path:        `C:\foo`,
-			isNamedPipe: false,
+			goos:      "windows",
+			path:      `C:\foo`,
+			isUNCPath: false,
 		},
 		{
-			goos:        "windows",
-			path:        `\\.\invalid`,
-			isNamedPipe: false,
+			goos:      "windows",
+			path:      `\\server\share\foo`,
+			isUNCPath: true,
 		},
 		{
-			goos:        "windows",
-			path:        `\\.\pipe\valid_pipe`,
-			isNamedPipe: true,
+			goos:      "windows",
+			path:      `\\?\server\share`,
+			isUNCPath: true,
+		},
+		{
+			goos:      "windows",
+			path:      `\\?\c:\`,
+			isUNCPath: true,
+		},
+		{
+			goos:      "windows",
+			path:      `\\.\pipe\valid_pipe`,
+			isUNCPath: true,
 		},
 	}
 
 	for _, test := range tests {
-		result := IsWindowsNamedPipe(test.goos, test.path)
-		if result != test.isNamedPipe {
-			t.Errorf("IsWindowsNamedPipe(%v) returned (%v), expected (%v)", test.path, result, test.isNamedPipe)
+		result := IsWindowsUNCPath(test.goos, test.path)
+		if result != test.isUNCPath {
+			t.Errorf("IsWindowsUNCPath(%v) returned (%v), expected (%v)", test.path, result, test.isUNCPath)
 		}
 	}
 }
