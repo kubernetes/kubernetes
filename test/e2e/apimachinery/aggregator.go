@@ -34,12 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -92,8 +90,7 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.CoreV1().Services(namespace).Delete("sample-api", nil)
 	_ = client.CoreV1().ServiceAccounts(namespace).Delete("sample-apiserver", nil)
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete("wardler-auth-reader", nil)
-	_ = client.RbacV1beta1().ClusterRoles().Delete("wardler", nil)
-	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":anonymous", nil)
+	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":auth-delegator", nil)
 }
 
 // A basic test if the sample-apiserver code from 1.7 and compiled against 1.7
@@ -102,16 +99,10 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
-	iclient := f.InternalClientset
 	aggrclient := f.AggregatorClient
 
 	namespace := f.Namespace.Name
 	context := setupServerCert(namespace, "sample-api")
-	if framework.ProviderIs("gke") {
-		// kubectl create clusterrolebinding user-cluster-admin-binding --clusterrole=cluster-admin --user=user@domain.com
-		authenticated := rbacv1beta1.Subject{Kind: rbacv1beta1.GroupKind, Name: user.AllAuthenticated}
-		framework.BindClusterRole(client.RbacV1beta1(), "cluster-admin", namespace, authenticated)
-	}
 
 	// kubectl create -f namespace.yaml
 	// NOTE: aggregated apis should generally be set up in there own namespace. As the test framework is setting up a new namespace, we are just using that.
@@ -130,6 +121,27 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	}
 	_, err := client.CoreV1().Secrets(namespace).Create(secret)
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
+
+	// kubectl create -f authDelegator.yaml
+	_, err = client.RbacV1beta1().ClusterRoleBindings().Create(&rbacv1beta1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "wardler:" + namespace + ":auth-delegator",
+		},
+		RoleRef: rbacv1beta1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "system:auth-delegator",
+		},
+		Subjects: []rbacv1beta1.Subject{
+			{
+				APIGroup:  "",
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespace,
+			},
+		},
+	})
+	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":auth-delegator")
 
 	// kubectl create -f deploy.yaml
 	deploymentName := "sample-apiserver-deployment"
@@ -229,48 +241,6 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver"}}
 	_, err = client.CoreV1().ServiceAccounts(namespace).Create(sa)
 	framework.ExpectNoError(err, "creating service account %s in namespace %s", "sample-apiserver", namespace)
-
-	// kubectl create -f authDelegator.yaml
-	_, err = client.RbacV1beta1().ClusterRoleBindings().Create(&rbacv1beta1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "wardler:" + namespace + ":anonymous",
-		},
-		RoleRef: rbacv1beta1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "wardler",
-		},
-		Subjects: []rbacv1beta1.Subject{
-			{
-				APIGroup: "rbac.authorization.k8s.io",
-				Kind:     "User",
-				Name:     namespace + ":anonymous",
-			},
-		},
-	})
-	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":anonymous")
-
-	// kubectl create -f role.yaml
-	resourceRule, err := rbacapi.NewRule("create", "delete", "deletecollection", "get", "list", "patch", "update", "watch").Groups("wardle.k8s.io").Resources("flunders").Rule()
-	framework.ExpectNoError(err, "creating cluster resource rule")
-	urlRule, err := rbacapi.NewRule("get").URLs("*").Rule()
-	framework.ExpectNoError(err, "creating cluster url rule")
-	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		roleLabels := map[string]string{"kubernetes.io/bootstrapping": "wardle-default"}
-		role := rbacapi.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "wardler",
-				Labels: roleLabels,
-			},
-			Rules: []rbacapi.PolicyRule{resourceRule, urlRule},
-		}
-		_, err = iclient.Rbac().ClusterRoles().Create(&role)
-		if err != nil {
-			return false, nil
-		}
-		return true, nil
-	})
-	framework.ExpectNoError(err, "creating cluster role wardler - may not have permissions")
 
 	// kubectl create -f auth-reader.yaml
 	_, err = client.RbacV1beta1().RoleBindings("kube-system").Create(&rbacv1beta1.RoleBinding{
