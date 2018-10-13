@@ -57,6 +57,20 @@ IFS=" " read -ra KUBE_SERVER_IMAGE_TARGETS <<< "$(kube::golang::server_image_tar
 readonly KUBE_SERVER_IMAGE_TARGETS
 readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
 
+# The set of conformance targets we build docker image for
+kube::golang::conformance_image_targets() {
+  # NOTE: this contains cmd targets for kube::release::build_conformance_image
+  local targets=(
+    vendor/github.com/onsi/ginkgo/ginkgo
+    test/e2e/e2e.test
+    cmd/kubectl
+  )
+  echo "${targets[@]}"
+}
+
+IFS=" " read -ra KUBE_CONFORMANCE_IMAGE_TARGETS <<< "$(kube::golang::conformance_image_targets)"
+readonly KUBE_CONFORMANCE_IMAGE_TARGETS
+
 # The set of server targets that we are only building for Kubernetes nodes
 # If you update this list, please also update build/BUILD.
 kube::golang::node_targets() {
