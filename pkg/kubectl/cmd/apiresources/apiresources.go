@@ -86,7 +86,8 @@ func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 		Long:    "Print the supported API resources on the server",
 		Example: apiresourcesExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Complete(cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunApiResources(cmd, f))
 		},
 	}
@@ -101,10 +102,17 @@ func NewCmdApiResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 	return cmd
 }
 
-func (o *ApiResourcesOptions) Validate(cmd *cobra.Command) error {
+func (o *ApiResourcesOptions) Validate() error {
 	supportedOutputTypes := sets.NewString("", "wide", "name")
 	if !supportedOutputTypes.Has(o.Output) {
 		return fmt.Errorf("--output %v is not available", o.Output)
+	}
+	return nil
+}
+
+func (o *ApiResourcesOptions) Complete(cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "unexpected args: %v", args)
 	}
 	return nil
 }
