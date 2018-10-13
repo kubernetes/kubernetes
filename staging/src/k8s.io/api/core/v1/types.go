@@ -5210,7 +5210,7 @@ type SecurityContext struct {
 	// readonly paths and masked paths.
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
-	ProcMount *ProcMountType `json:"procMount,omitEmpty" protobuf:"bytes,9,opt,name=procMount"`
+	ProcMount *ProcMountType `json:"procMount,omitempty" protobuf:"bytes,9,opt,name=procMount"`
 }
 
 type ProcMountType string
