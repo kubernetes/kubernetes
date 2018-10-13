@@ -511,7 +511,8 @@ var _ = SIGDescribe("Density", func() {
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
-		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "density", profileGatheringDelay)
+		//		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "density", profileGatheringDelay)
+		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-scheduler", "density", profileGatheringDelay)
 
 		// Start etcs metrics collection.
 		etcdMetricsCollector = framework.NewEtcdMetricsCollector()

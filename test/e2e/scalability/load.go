@@ -160,7 +160,8 @@ var _ = SIGDescribe("Load capacity", func() {
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
-		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "load", profileGatheringDelay)
+		//profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "load", profileGatheringDelay)
+		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-scheduler", "load", profileGatheringDelay)
 	})
 
 	type Load struct {
