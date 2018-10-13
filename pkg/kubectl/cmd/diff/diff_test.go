@@ -52,7 +52,7 @@ func (f *FakeObject) Live() runtime.Object {
 }
 
 func TestDiffProgram(t *testing.T) {
-	os.Setenv("KUBERNETES_EXTERNAL_DIFF", "echo")
+	os.Setenv("KUBECTL_EXTERNAL_DIFF", "echo")
 	streams, _, stdout, _ := genericclioptions.NewTestIOStreams()
 	diff := DiffProgram{
 		IOStreams: streams,
