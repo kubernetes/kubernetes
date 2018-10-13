@@ -400,7 +400,6 @@ pkg/util/sysctl
 pkg/util/sysctl/testing
 pkg/util/system
 pkg/util/taints
-pkg/util/threading
 pkg/util/tolerations
 pkg/util/workqueue/prometheus
 pkg/version/verflag
