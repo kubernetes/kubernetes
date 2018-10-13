@@ -52,6 +52,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -3481,6 +3482,51 @@ func TestPrintLease(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintPriorityClass(t *testing.T) {
+	tests := []struct {
+		pc     scheduling.PriorityClass
+		expect string
+	}{
+		{
+			scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Value: 1,
+			},
+			"pc1\t1\tfalse\t0s\n",
+		},
+		{
+			scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Value:         1000000000,
+				GlobalDefault: true,
+			},
+			"pc2\t1000000000\ttrue\t5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
 		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
 			t.Fatal(err)
 		}
