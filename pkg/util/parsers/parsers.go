@@ -27,6 +27,7 @@ import (
 )
 
 const (
+	// DefaultImageTag is the image tag used wen no tag was passed to ParseImageName
 	DefaultImageTag = "latest"
 )
 

@@ -378,7 +378,6 @@ pkg/util/mount
 pkg/util/netsh/testing
 pkg/util/normalizer
 pkg/util/oom
-pkg/util/parsers
 pkg/util/procfs
 pkg/util/removeall
 pkg/util/rlimit
