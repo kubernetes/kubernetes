@@ -253,6 +253,10 @@ type AllowedHostPath struct {
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
+// AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities
+// field and means that any capabilities are allowed to be requested.
+var AllowAllCapabilities v1.Capability = "*"
+
 var (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
@@ -273,8 +277,15 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	VsphereVolume         FSType = "vsphereVolume"
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
+	PhotonPersistentDisk  FSType = "photonPersistentDisk"
+	StorageOS             FSType = "storageos"
+	Projected             FSType = "projected"
+	PortworxVolume        FSType = "portworxVolume"
+	ScaleIO               FSType = "scaleIO"
+	CSI                   FSType = "csi"
 	All                   FSType = "*"
 )
 
@@ -385,6 +396,9 @@ type FSGroupStrategyOptions struct {
 type FSGroupStrategyType string
 
 const (
+	// FSGroupStrategyMayRunAs means that container does not need to have FSGroup of X applied.
+	// However, when FSGroups are specified, they have to fall in the defined range.
+	FSGroupStrategyMayRunAs FSGroupStrategyType = "MayRunAs"
 	// FSGroupStrategyMustRunAs meant that container must have FSGroup of X applied.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
 	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
@@ -407,6 +421,9 @@ type SupplementalGroupsStrategyOptions struct {
 type SupplementalGroupsStrategyType string
 
 const (
+	// SupplementalGroupsStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when gids are specified, they have to fall in the defined range.
+	SupplementalGroupsStrategyMayRunAs SupplementalGroupsStrategyType = "MayRunAs"
 	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
