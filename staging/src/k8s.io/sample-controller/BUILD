@@ -55,6 +55,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/sample-controller/artifacts/examples:all-srcs",
         "//staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller:all-srcs",
         "//staging/src/k8s.io/sample-controller/pkg/client/clientset/versioned:all-srcs",
         "//staging/src/k8s.io/sample-controller/pkg/client/informers/externalversions:all-srcs",

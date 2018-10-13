@@ -127,6 +127,22 @@ In the above steps, use `crd-status-subresource.yaml` to create the CRD:
 $ kubectl create -f artifacts/examples/crd-status-subresource.yaml
 ```
 
+The CRD in [`crd-scale-subresource.yaml`](./artifacts/examples/crd-scale-subresource.yaml) enables the `/scale` subresource
+for custom resources.
+This means that `scale` can be used by the controller to update the `.spec.replicas` part of the custom resource, and `.status.availableReplicas`
+part. There is an [example](./artifacts/examples/main.go) show how you can use the `scale` 
+sub resource.
+
+In the above steps, use `crd-scale-subresource.yaml` to create the CRD:
+
+```sh
+# create a CustomResourceDefinition supporting the scale subresource
+$ kubectl create -f artifacts/examples/crd-scale-subresource.yaml
+```
+And you can scale the replicas by:
+```sh
+ # kubectl scale --replicas=n foo/name
+```
 ## Cleanup
 
 You can clean up the created CustomResourceDefinition with:
