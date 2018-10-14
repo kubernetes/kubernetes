@@ -280,6 +280,7 @@ func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
 // List returns a list of items matching labels and field according to the
 // store's PredicateFunc.
 func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+	ctx, _ = context.WithTimeout(ctx, 10*time.Second)
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
@@ -326,6 +327,7 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 
 // Create inserts a new item according to the unique key from the object.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	ctx, _ = context.WithTimeout(ctx, 10*time.Second)
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -526,6 +528,7 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
 func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	ctx, _ = context.WithTimeout(ctx, 10*time.Second)
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
@@ -679,6 +682,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 // Get retrieves the item from storage.
 func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	ctx, _ = context.WithTimeout(ctx, 10*time.Second)
 	obj := e.NewFunc()
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
@@ -955,6 +959,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 
 // Delete removes the item from storage.
 func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	ctx, _ = context.WithTimeout(ctx, 10*time.Second)
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
@@ -1157,6 +1162,7 @@ func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks
 // a matcher that matches by key. SelectionPredicate does this for you
 // automatically.
 func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+	ctx, _ = context.WithTimeout(ctx, 10*time.Second)
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
