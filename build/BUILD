@@ -72,7 +72,6 @@ DOCKERIZED_BINARIES = {
 
 [container_bundle(
     name = binary,
-    # TODO(thockin): remove the google_containers name after release 1.11.
     images = {
         "k8s.gcr.io/%s:{STABLE_DOCKER_TAG}" % binary: binary + "-internal",
     },
