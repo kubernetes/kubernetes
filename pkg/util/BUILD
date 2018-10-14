@@ -35,7 +35,6 @@ filegroup(
         "//pkg/util/ipvs:all-srcs",
         "//pkg/util/keymutex:all-srcs",
         "//pkg/util/labels:all-srcs",
-        "//pkg/util/limitwriter:all-srcs",
         "//pkg/util/maps:all-srcs",
         "//pkg/util/metrics:all-srcs",
         "//pkg/util/mount:all-srcs",
