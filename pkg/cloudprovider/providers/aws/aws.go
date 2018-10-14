@@ -260,7 +260,7 @@ const MaxReadThenCreateRetries = 30
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
 
-// Used to call RecognizeWellKnownRegions just once
+// Used to call recognizeWellKnownRegions just once
 var once sync.Once
 
 // AWS implements PVLabeler.
@@ -1063,7 +1063,7 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 
 	// Trust that if we get a region from configuration or AWS metadata that it is valid,
 	// and register ECR providers
-	RecognizeRegion(regionName)
+	recognizeRegion(regionName)
 
 	if !cfg.Global.DisableStrictZoneCheck {
 		valid := isRegionValid(regionName)
@@ -1152,7 +1152,7 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 
 	// Register regions, in particular for ECR credentials
 	once.Do(func() {
-		RecognizeWellKnownRegions()
+		recognizeWellKnownRegions()
 	})
 
 	return awsCloud, nil
