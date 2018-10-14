@@ -161,7 +161,7 @@ package_group(
 )
 
 package_group(
-    name = "pkg_kubectl_cmd_templates_CONSUMERS",
+    name = "pkg_kubectl_util_templates_CONSUMERS",
     includes = [
         ":COMMON_generators",
         ":COMMON_testing",
@@ -207,12 +207,12 @@ package_group(
         "//pkg/kubectl/cmd/scale",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/taint",
-        "//pkg/kubectl/cmd/templates",
         "//pkg/kubectl/cmd/top",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/sanity",
         "//pkg/kubectl/cmd/version",
         "//pkg/kubectl/cmd/wait",
+        "//pkg/kubectl/util",
     ],
 )
 

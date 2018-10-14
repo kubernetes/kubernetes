@@ -19,6 +19,9 @@ package podsecuritypolicy
 import (
 	"fmt"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+
 	"k8s.io/apimachinery/pkg/util/errors"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -45,6 +48,14 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 	userStrat, err := createUserStrategy(&psp.Spec.RunAsUser)
 	if err != nil {
 		errs = append(errs, err)
+	}
+
+	var groupStrat group.GroupStrategy
+	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+		groupStrat, err = createRunAsGroupStrategy(psp.Spec.RunAsGroup)
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	seLinuxStrat, err := createSELinuxStrategy(&psp.Spec.SELinux)
@@ -85,6 +96,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 
 	strategies := &ProviderStrategies{
 		RunAsUserStrategy:         userStrat,
+		RunAsGroupStrategy:        groupStrat,
 		SELinuxStrategy:           seLinuxStrat,
 		AppArmorStrategy:          appArmorStrat,
 		FSGroupStrategy:           fsGroupStrat,
@@ -108,6 +120,23 @@ func createUserStrategy(opts *policy.RunAsUserStrategyOptions) (user.RunAsUserSt
 		return user.NewRunAsAny(opts)
 	default:
 		return nil, fmt.Errorf("Unrecognized RunAsUser strategy type %s", opts.Rule)
+	}
+}
+
+// createRunAsGroupStrategy creates a new group strategy.
+func createRunAsGroupStrategy(opts *policy.RunAsGroupStrategyOptions) (group.GroupStrategy, error) {
+	if opts == nil {
+		return group.NewRunAsAny()
+	}
+	switch opts.Rule {
+	case policy.RunAsGroupStrategyMustRunAs:
+		return group.NewMustRunAs(opts.Ranges)
+	case policy.RunAsGroupStrategyRunAsAny:
+		return group.NewRunAsAny()
+	case policy.RunAsGroupStrategyMayRunAs:
+		return group.NewMayRunAs(opts.Ranges)
+	default:
+		return nil, fmt.Errorf("Unrecognized RunAsGroup strategy type %s", opts.Rule)
 	}
 }
 

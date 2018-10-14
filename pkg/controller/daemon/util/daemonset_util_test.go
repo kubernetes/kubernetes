@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
@@ -190,7 +190,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -227,7 +227,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -277,7 +277,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -296,7 +296,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1", "host_2"},
 									},
@@ -314,7 +314,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -335,7 +335,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -363,7 +363,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_2"},
 									},
@@ -381,7 +381,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -400,7 +400,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpNotIn,
 										Values:   []string{"host_2"},
 									},
@@ -418,7 +418,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -458,7 +458,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -529,7 +529,7 @@ func TestGetTargetNodeName(t *testing.T) {
 										{
 											MatchFields: []v1.NodeSelectorRequirement{
 												{
-													Key:      algorithm.NodeFieldSelectorKeyNodeName,
+													Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 													Operator: v1.NodeSelectorOpIn,
 													Values:   []string{"node-1"},
 												},
@@ -557,7 +557,7 @@ func TestGetTargetNodeName(t *testing.T) {
 										{
 											MatchFields: []v1.NodeSelectorRequirement{
 												{
-													Key:      algorithm.NodeFieldSelectorKeyNodeName,
+													Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 													Operator: v1.NodeSelectorOpIn,
 													Values:   []string{"node-1", "node-2"},
 												},

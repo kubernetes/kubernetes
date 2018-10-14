@@ -28,6 +28,7 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: metadata-agent
+      priorityClassName: system-node-critical
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent
@@ -84,6 +85,7 @@ spec:
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       serviceAccountName: metadata-agent
+      priorityClassName: system-cluster-critical
       containers:
       - image: gcr.io/stackdriver-agents/stackdriver-metadata-agent:0.2-0.0.21-1
         imagePullPolicy: IfNotPresent

@@ -174,6 +174,11 @@ type PodSecurityPolicySpec struct {
 	SELinux SELinuxStrategyOptions `json:"seLinux" protobuf:"bytes,10,opt,name=seLinux"`
 	// runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
 	RunAsUser RunAsUserStrategyOptions `json:"runAsUser" protobuf:"bytes,11,opt,name=runAsUser"`
+	// RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
+	// If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
+	// RunAsGroup feature gate to be enabled.
+	// +optional
+	RunAsGroup *RunAsGroupStrategyOptions `json:"runAsGroup,omitempty" protobuf:"bytes,22,opt,name=runAsGroup"`
 	// supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
 	SupplementalGroups SupplementalGroupsStrategyOptions `json:"supplementalGroups" protobuf:"bytes,12,opt,name=supplementalGroups"`
 	// fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.
@@ -248,6 +253,10 @@ type AllowedHostPath struct {
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
+// AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities
+// field and means that any capabilities are allowed to be requested.
+var AllowAllCapabilities v1.Capability = "*"
+
 var (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
@@ -268,8 +277,15 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	VsphereVolume         FSType = "vsphereVolume"
 	Quobyte               FSType = "quobyte"
 	AzureDisk             FSType = "azureDisk"
+	PhotonPersistentDisk  FSType = "photonPersistentDisk"
+	StorageOS             FSType = "storageos"
+	Projected             FSType = "projected"
+	PortworxVolume        FSType = "portworxVolume"
+	ScaleIO               FSType = "scaleIO"
+	CSI                   FSType = "csi"
 	All                   FSType = "*"
 )
 
@@ -319,6 +335,16 @@ type RunAsUserStrategyOptions struct {
 	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
 }
 
+// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
+type RunAsGroupStrategyOptions struct {
+	// rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
+	Rule RunAsGroupStrategy `json:"rule" protobuf:"bytes,1,opt,name=rule,casttype=RunAsGroupStrategy"`
+	// ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
+	// then supply a single range with the same start and end. Required for MustRunAs.
+	// +optional
+	Ranges []IDRange `json:"ranges,omitempty" protobuf:"bytes,2,rep,name=ranges"`
+}
+
 // IDRange provides a min/max of an allowed range of IDs.
 type IDRange struct {
 	// min is the start of the range, inclusive.
@@ -340,6 +366,20 @@ const (
 	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
 )
 
+// RunAsGroupStrategy denotes strategy types for generating RunAsGroup values for a
+// Security Context.
+type RunAsGroupStrategy string
+
+const (
+	// RunAsGroupStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when RunAsGroup are specified, they have to fall in the defined range.
+	RunAsGroupStrategyMayRunAs RunAsGroupStrategy = "MayRunAs"
+	// RunAsGroupStrategyMustRunAs means that container must run as a particular gid.
+	RunAsGroupStrategyMustRunAs RunAsGroupStrategy = "MustRunAs"
+	// RunAsUserStrategyRunAsAny means that container may make requests for any gid.
+	RunAsGroupStrategyRunAsAny RunAsGroupStrategy = "RunAsAny"
+)
+
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
 type FSGroupStrategyOptions struct {
 	// rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
@@ -356,6 +396,9 @@ type FSGroupStrategyOptions struct {
 type FSGroupStrategyType string
 
 const (
+	// FSGroupStrategyMayRunAs means that container does not need to have FSGroup of X applied.
+	// However, when FSGroups are specified, they have to fall in the defined range.
+	FSGroupStrategyMayRunAs FSGroupStrategyType = "MayRunAs"
 	// FSGroupStrategyMustRunAs meant that container must have FSGroup of X applied.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
 	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
@@ -378,6 +421,9 @@ type SupplementalGroupsStrategyOptions struct {
 type SupplementalGroupsStrategyType string
 
 const (
+	// SupplementalGroupsStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when gids are specified, they have to fall in the defined range.
+	SupplementalGroupsStrategyMayRunAs SupplementalGroupsStrategyType = "MayRunAs"
 	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.

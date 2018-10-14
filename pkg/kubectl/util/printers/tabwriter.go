@@ -1,7 +1,5 @@
-// +build !windows
-
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,14 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package term
+package printers
 
 import (
-	"github.com/docker/docker/pkg/term"
-	"k8s.io/client-go/tools/remotecommand"
+	"io"
+	"text/tabwriter"
 )
 
-// SetSize sets the terminal size associated with fd.
-func SetSize(fd uintptr, size remotecommand.TerminalSize) error {
-	return term.SetWinsize(fd, &term.Winsize{Height: size.Height, Width: size.Width})
+const (
+	tabwriterMinWidth = 6
+	tabwriterWidth    = 4
+	tabwriterPadding  = 3
+	tabwriterPadChar  = ' '
+	tabwriterFlags    = 0
+)
+
+// GetNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.
+func GetNewTabWriter(output io.Writer) *tabwriter.Writer {
+	return tabwriter.NewWriter(output, tabwriterMinWidth, tabwriterWidth, tabwriterPadding, tabwriterPadChar, tabwriterFlags)
 }

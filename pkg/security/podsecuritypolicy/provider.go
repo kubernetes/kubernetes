@@ -21,8 +21,10 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/features"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -119,6 +121,17 @@ func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container
 			return err
 		}
 		sc.SetRunAsUser(uid)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+		if sc.RunAsGroup() == nil {
+			gid, err := s.strategies.RunAsGroupStrategy.GenerateSingle(pod)
+			if err != nil {
+				return err
+			}
+			sc.SetRunAsGroup(gid)
+		}
+
 	}
 
 	if sc.SELinuxOptions() == nil {
@@ -280,6 +293,14 @@ func (s *simpleProvider) ValidateContainer(pod *api.Pod, container *api.Containe
 
 	scPath := containerPath.Child("securityContext")
 	allErrs = append(allErrs, s.strategies.RunAsUserStrategy.Validate(scPath, pod, container, sc.RunAsNonRoot(), sc.RunAsUser())...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
+		var runAsGroups []int64
+		if sc.RunAsGroup() != nil {
+			runAsGroups = []int64{*sc.RunAsGroup()}
+		}
+		allErrs = append(allErrs, s.strategies.RunAsGroupStrategy.Validate(scPath, pod, runAsGroups)...)
+	}
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(scPath.Child("seLinuxOptions"), pod, container, sc.SELinuxOptions())...)
 	allErrs = append(allErrs, s.strategies.AppArmorStrategy.Validate(pod, container)...)
 	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidateContainer(pod, container)...)

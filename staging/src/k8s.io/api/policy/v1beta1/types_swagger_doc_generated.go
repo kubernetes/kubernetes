@@ -162,6 +162,7 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"hostIPC":                         "hostIPC determines if the policy allows the use of HostIPC in the pod spec.",
 	"seLinux":                         "seLinux is the strategy that will dictate the allowable labels that may be set.",
 	"runAsUser":                       "runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.",
+	"runAsGroup":                      "RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set. If this field is omitted, the pod's RunAsGroup can take any value. This field requires the RunAsGroup feature gate to be enabled.",
 	"supplementalGroups":              "supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.",
 	"fsGroup":                         "fsGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
 	"readOnlyRootFilesystem":          "readOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
@@ -176,6 +177,16 @@ var map_PodSecurityPolicySpec = map[string]string{
 
 func (PodSecurityPolicySpec) SwaggerDoc() map[string]string {
 	return map_PodSecurityPolicySpec
+}
+
+var map_RunAsGroupStrategyOptions = map[string]string{
+	"":       "RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.",
+	"rule":   "rule is the strategy that will dictate the allowable RunAsGroup values that may be set.",
+	"ranges": "ranges are the allowed ranges of gids that may be used. If you would like to force a single gid then supply a single range with the same start and end. Required for MustRunAs.",
+}
+
+func (RunAsGroupStrategyOptions) SwaggerDoc() map[string]string {
+	return map_RunAsGroupStrategyOptions
 }
 
 var map_RunAsUserStrategyOptions = map[string]string{

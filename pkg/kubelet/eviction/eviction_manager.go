@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
@@ -145,7 +145,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. OutOfDisk.
 		if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) &&
 			v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
-				Key:    algorithm.TaintNodeMemoryPressure,
+				Key:    schedulerapi.TaintNodeMemoryPressure,
 				Effect: v1.TaintEffectNoSchedule,
 			}) {
 			return lifecycle.PodAdmitResult{Admit: true}

@@ -36,7 +36,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
@@ -540,7 +539,7 @@ func TestSkipPodUpdate(t *testing.T) {
 	}
 }
 
-func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeight int32) scheduler.Configurator {
+func newConfigFactory(client *clientset.Clientset, hardPodAffinitySymmetricWeight int32) Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return NewConfigFactory(&ConfigFactoryArgs{
 		v1.DefaultSchedulerName,

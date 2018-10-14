@@ -15,7 +15,7 @@ items:
   metadata:
     annotations:
       kubernetes.io/change-cause: original creating command a
-    creationTimestamp: 2017-02-03T06:12:07Z
+    creationTimestamp: "2017-02-03T06:12:07Z"
     name: cm1
     namespace: edit-test
     resourceVersion: "1414"
@@ -26,7 +26,7 @@ items:
   metadata:
     annotations:
       kubernetes.io/change-cause: original creating command b
-    creationTimestamp: 2017-02-03T06:11:32Z
+    creationTimestamp: "2017-02-03T06:11:32Z"
     labels:
       app: svc1
       new-label: foo

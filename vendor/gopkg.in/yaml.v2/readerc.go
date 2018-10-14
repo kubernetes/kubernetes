@@ -93,9 +93,18 @@ func yaml_parser_update_buffer(parser *yaml_parser_t, length int) bool {
 		panic("read handler must be set")
 	}
 
+	// [Go] This function was changed to guarantee the requested length size at EOF.
+	// The fact we need to do this is pretty awful, but the description above implies
+	// for that to be the case, and there are tests 
+
 	// If the EOF flag is set and the raw buffer is empty, do nothing.
 	if parser.eof && parser.raw_buffer_pos == len(parser.raw_buffer) {
-		return true
+		// [Go] ACTUALLY! Read the documentation of this function above.
+		// This is just broken. To return true, we need to have the
+		// given length in the buffer. Not doing that means every single
+		// check that calls this function to make sure the buffer has a
+		// given length is Go) panicking; or C) accessing invalid memory.
+		//return true
 	}
 
 	// Return if the buffer contains enough characters.
@@ -388,6 +397,15 @@ func yaml_parser_update_buffer(parser *yaml_parser_t, length int) bool {
 			parser.unread++
 			break
 		}
+	}
+	// [Go] Read the documentation of this function above. To return true,
+	// we need to have the given length in the buffer. Not doing that means
+	// every single check that calls this function to make sure the buffer
+	// has a given length is Go) panicking; or C) accessing invalid memory.
+	// This happens here due to the EOF above breaking early.
+	for buffer_len < length {
+		parser.buffer[buffer_len] = 0
+		buffer_len++
 	}
 	parser.buffer = parser.buffer[:buffer_len]
 	return true
