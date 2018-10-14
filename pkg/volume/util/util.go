@@ -734,6 +734,21 @@ func UnmountViaEmptyDir(dir string, host volume.VolumeHost, volName string, volS
 	return wrapped.TearDownAt(dir)
 }
 
+// MountEFSFromSpec return true if mount-efs=true annoation is set
+func MountEFSFromSpec(spec *volume.Spec, options ...string) bool {
+    pv := spec.PersistentVolume
+
+    if pv != nil {
+        // Use beta annotation first
+        if efs, ok := pv.Annotations[v1.MountEFSAnnotation]; ok {
+            if (efs == "true") {
+               return true
+            }
+        }
+    }
+    return false
+}
+
 // MountOptionFromSpec extracts and joins mount options from volume spec with supplied options
 func MountOptionFromSpec(spec *volume.Spec, options ...string) []string {
 	pv := spec.PersistentVolume

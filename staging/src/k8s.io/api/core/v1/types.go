@@ -260,6 +260,10 @@ const (
 
 	// MountOptionAnnotation defines mount option annotation used in PVs
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
+
+	// MountEFSAnnotation use mount.efs for NFS mounts annotation used in PVs
+	// The AWS EFS Helper needs to be installed to provide mount.efs
+	MountEFSAnnotation = "volume.beta.kubernetes.io/mount-efs"
 )
 
 // +genclient

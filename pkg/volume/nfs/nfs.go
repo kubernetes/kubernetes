@@ -124,6 +124,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 		server:       source.Server,
 		exportPath:   source.Path,
 		readOnly:     readOnly,
+		mountEFS: util.MountEFSFromSpec(spec),
 		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
 }
@@ -195,6 +196,11 @@ func (nfsMounter *nfsMounter) CanMount() error {
 	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
+		if nfsMounter.mountEFS {
+			if _, err := exec.Run("test", "-x", "/sbin/mount.efs"); err != nil {
+				return fmt.Errorf("Required binary /sbin/mount.efs is missing",)
+			}
+		}
 		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
 		}
@@ -215,6 +221,7 @@ type nfsMounter struct {
 	server       string
 	exportPath   string
 	readOnly     bool
+	mountEFS     bool
 	mountOptions []string
 }
 
@@ -251,7 +258,11 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 		options = append(options, "ro")
 	}
 	mountOptions := util.JoinMountOptions(b.mountOptions, options)
-	err = b.mounter.Mount(source, dir, "nfs", mountOptions)
+	if b.mountEFS {
+		err = b.mounter.Mount(source, dir, "efs", mountOptions)
+	} else {
+		err = b.mounter.Mount(source, dir, "nfs", mountOptions)
+	}
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsNotMountPoint(dir)
 		if mntErr != nil {
