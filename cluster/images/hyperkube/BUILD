@@ -1,11 +1,12 @@
-load("@io_bazel_rules_docker//docker:docker.bzl", "docker_build", "docker_bundle")
+load("@io_bazel_rules_docker//container:container.bzl", "container_bundle", "container_image")
 
-docker_build(
+container_image(
     name = "hyperkube-internal",
     base = "@debian-hyperkube-base-amd64//image",
     files = [
         "//cmd/hyperkube",
     ],
+    stamp = True,
     symlinks = {
         "/%s" % path: "/hyperkube"
         for path in [
@@ -25,7 +26,7 @@ docker_build(
     },
 )
 
-docker_bundle(
+container_bundle(
     name = "hyperkube",
     images = {"k8s.gcr.io/hyperkube-amd64:{STABLE_DOCKER_TAG}": "hyperkube-internal"},
     stamp = True,
