@@ -43,13 +43,18 @@ var (
 
 	clusterinfoExample = templates.Examples(i18n.T(`
 		# Print the address of the master and cluster services
-		kubectl cluster-info`))
+		kubectl cluster-info
+
+		# Print info without colors (useful in scripting)
+		kubectl cluster-info --color=false
+`))
 )
 
 type ClusterInfoOptions struct {
 	genericclioptions.IOStreams
 
 	Namespace string
+	Color     bool
 
 	Builder *resource.Builder
 	Client  *restclient.Config
@@ -58,18 +63,23 @@ type ClusterInfoOptions struct {
 func NewCmdClusterInfo(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := &ClusterInfoOptions{
 		IOStreams: ioStreams,
+		Color:     true,
 	}
 
 	cmd := &cobra.Command{
-		Use:     "cluster-info",
-		Short:   i18n.T("Display cluster info"),
-		Long:    longDescr,
-		Example: clusterinfoExample,
+		Use:                   "cluster-info",
+		DisableFlagsInUseLine: true,
+		Short:                 i18n.T("Display cluster info"),
+		Long:                  longDescr,
+		Example:               clusterinfoExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
+
+	cmd.Flags().BoolVar(&o.Color, "color", o.Color, "Enable colors in the output")
+
 	cmd.AddCommand(NewCmdClusterInfoDump(f, ioStreams))
 	return cmd
 }
@@ -103,7 +113,7 @@ func (o *ClusterInfoOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		printService(o.Out, "Kubernetes master", o.Client.Host)
+		printService(o.Out, "Kubernetes master", o.Client.Host, o.Color)
 
 		services := r.Object.(*corev1.ServiceList).Items
 		for _, service := range services {
@@ -144,7 +154,7 @@ func (o *ClusterInfoOptions) Run() error {
 			if len(name) == 0 {
 				name = service.ObjectMeta.Name
 			}
-			printService(o.Out, name, link)
+			printService(o.Out, name, link, o.Color)
 		}
 		return nil
 	})
@@ -154,13 +164,21 @@ func (o *ClusterInfoOptions) Run() error {
 	// TODO consider printing more information about cluster
 }
 
-func printService(out io.Writer, name, link string) {
-	ct.ChangeColor(ct.Green, false, ct.None, false)
+func printService(out io.Writer, name, link string, colorize bool) {
+	if colorize {
+		ct.ChangeColor(ct.Green, false, ct.None, false)
+	}
 	fmt.Fprint(out, name)
-	ct.ResetColor()
+	if colorize {
+		ct.ResetColor()
+	}
 	fmt.Fprint(out, " is running at ")
-	ct.ChangeColor(ct.Yellow, false, ct.None, false)
+	if colorize {
+		ct.ChangeColor(ct.Yellow, false, ct.None, false)
+	}
 	fmt.Fprint(out, link)
-	ct.ResetColor()
+	if colorize {
+		ct.ResetColor()
+	}
 	fmt.Fprintln(out, "")
 }
