@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -120,7 +120,7 @@ func setKubernetesDefaults(config *rest.Config) error {
 		config.APIPath = "/api"
 	}
 	if config.NegotiatedSerializer == nil {
-		config.NegotiatedSerializer = legacyscheme.Codecs
+		config.NegotiatedSerializer = scheme.Codecs
 	}
 	return rest.SetKubernetesDefaults(config)
 }

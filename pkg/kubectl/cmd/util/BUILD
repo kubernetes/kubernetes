@@ -20,6 +20,7 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/validation:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/templates:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//pkg/printers:go_default_library",
