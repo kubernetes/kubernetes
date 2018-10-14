@@ -192,7 +192,7 @@ func (gv GroupVersion) String() string {
 }
 
 // KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
-// if none of the options match the group. It prefers a match to group and version over just group.
+// if none of the options match the group. It only matches on both group and version.
 // TODO: Move GroupVersion to a package under pkg/runtime, since it's used by scheme.
 // TODO: Introduce an adapter type between GroupVersion and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
 //   in fewer places.
@@ -200,11 +200,6 @@ func (gv GroupVersion) KindForGroupVersionKinds(kinds []GroupVersionKind) (targe
 	for _, gvk := range kinds {
 		if gvk.Group == gv.Group && gvk.Version == gv.Version {
 			return gvk, true
-		}
-	}
-	for _, gvk := range kinds {
-		if gvk.Group == gv.Group {
-			return gv.WithKind(gvk.Kind), true
 		}
 	}
 	return GroupVersionKind{}, false
