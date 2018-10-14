@@ -105,7 +105,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	context := setupServerCert(namespace, "sample-api")
 
 	// kubectl create -f namespace.yaml
-	// NOTE: aggregated apis should generally be set up in there own namespace. As the test framework is setting up a new namespace, we are just using that.
+	// NOTE: aggregated apis should generally be set up in their own namespace. As the test framework is setting up a new namespace, we are just using that.
 
 	// kubectl create -f secret.yaml
 	secretName := "sample-apiserver-secret"
@@ -267,7 +267,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 
 	// Wait for the extension apiserver to be up and healthy
 	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
-	// NOTE: aggregated apis should generally be set up in there own namespace (<aggregated-api-namespace>). As the test framework
+	// NOTE: aggregated apis should generally be set up in their own namespace (<aggregated-api-namespace>). As the test framework
 	// is setting up a new namespace, we are just using that.
 	err = framework.WaitForDeploymentComplete(client, deployment)
 	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", namespace)
