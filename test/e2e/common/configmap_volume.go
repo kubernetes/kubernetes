@@ -557,6 +557,16 @@ func newConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
 }
 
 func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
+	if uid != 0 || fsGroup != 0 {
+		// Windows does not support running as an UID / GID.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
+	if defaultMode != nil {
+		// Windows does not support setting specific file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
 	userID := int64(uid)
 	groupID := int64(fsGroup)
 
@@ -636,6 +646,16 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, d
 }
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
+	if uid != 0 || fsGroup != 0 {
+		// Windows does not support running as an UID / GID.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
+	if itemMode != nil {
+		// Windows does not support setting specific file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
 	userID := int64(uid)
 	groupID := int64(fsGroup)
 

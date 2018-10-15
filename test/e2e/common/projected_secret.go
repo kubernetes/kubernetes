@@ -403,6 +403,16 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 
 func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32,
 	secretName string, fsGroup *int64, uid *int64) {
+	if uid != nil || fsGroup != nil {
+		// Windows does not support running as an UID / GID.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
+	if defaultMode != nil {
+		// Windows does not support setting specific file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
 	var (
 		volumeName      = "projected-secret-volume"
 		volumeMountPath = "/etc/projected-secret-volume"
@@ -483,6 +493,11 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 }
 
 func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
+	if mode != nil {
+		// Windows does not support setting specific file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
 	var (
 		name            = "projected-secret-test-map-" + string(uuid.NewUUID())
 		volumeName      = "projected-secret-volume"

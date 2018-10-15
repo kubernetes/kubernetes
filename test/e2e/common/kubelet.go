@@ -142,6 +142,9 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Description: Create a Pod with hostAliases and a container with command to output /etc/hosts entries. Pod's logs MUST have matching entries of specified hostAliases to the output of /etc/hosts entries.
 		*/
 		framework.ConformanceIt("should write entries to /etc/hosts [NodeConformance]", func() {
+			// Cannot mount files in Windows Containers at the moment.
+			// TODO(claudiub): Remove this check when it will be supported.
+			framework.SkipIfNodeOSDistroIs("windows")
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -192,6 +195,8 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 			Description: Create a Pod with security context set with ReadOnlyRootFileSystem set to true. The Pod then tries to write to the /file on the root, write operation to the root filesystem MUST fail as expected.
 		*/
 		framework.ConformanceIt("should not write to root filesystem [NodeConformance]", func() {
+			// Windows Docker does not support creating containers with read-only access.
+			framework.SkipIfNodeOSDistroIs("windows")
 			isReadOnly := true
 			podClient.CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{

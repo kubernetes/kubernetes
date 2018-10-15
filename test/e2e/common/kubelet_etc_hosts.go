@@ -59,6 +59,9 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 			3. The Pod with hostNetwork=true , /etc/hosts file MUST not be managed by the Kubelet.
 	*/
 	framework.ConformanceIt("should test kubelet managed /etc/hosts file [NodeConformance]", func() {
+		// Cannot mount files in Windows Containers at the moment.
+		// TODO(claudiub): Remove this check when it will be supported.
+		framework.SkipIfNodeOSDistroIs("windows")
 		By("Setting up the test")
 		config.setup()
 

@@ -36,6 +36,9 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		var privilegedSecurityContext bool = false
 
 		BeforeEach(func() {
+			// Cannot mount files in Windows Containers at the moment.
+			// TODO(claudiub): Remove this check when it will be supported.
+			framework.SkipIfNodeOSDistroIs("windows")
 			By("Setting up data")
 			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "my-secret"}, Data: map[string][]byte{"secret-key": []byte("secret-value")}}
 			secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)

@@ -58,6 +58,8 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		}
 		createAndWaitUserPod := func(userid int64) {
+			// Windows does not support running as an UID / GID.
+			framework.SkipIfNodeOSDistroIs("windows")
 			podName := fmt.Sprintf("busybox-user-%d-%s", userid, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
 				framework.BusyBoxImage,
@@ -133,6 +135,8 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		  Description: when a container has configured readOnlyRootFilesystem to true, write operations are not allowed.
 		*/
 		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [NodeConformance]", func() {
+			// Windows Docker does not support creating containers with read-only access.
+			framework.SkipIfNodeOSDistroIs("windows")
 			createAndWaitUserPod(true)
 		})
 
@@ -214,6 +218,8 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		}
 		createAndMatchOutput := func(podName, output string, allowPrivilegeEscalation *bool, uid int64) error {
+			// Windows does not support running as an UID / GID.
+			framework.SkipIfNodeOSDistroIs("windows")
 			podClient.Create(makeAllowPrivilegeEscalationPod(podName,
 				allowPrivilegeEscalation,
 				uid,

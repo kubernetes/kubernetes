@@ -261,6 +261,11 @@ var _ = Describe("[sig-storage] Projected downwardAPI", func() {
 })
 
 func projectedDownwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMode *int32) *v1.Pod {
+	if itemMode != nil || defaultMode != nil {
+		// Windows does not support setting specific file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
 	pod := projectedDownwardAPIVolumeBasePod(name, nil, nil)
 
 	pod.Spec.Containers = []v1.Container{

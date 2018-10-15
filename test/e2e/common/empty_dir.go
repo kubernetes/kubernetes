@@ -199,6 +199,9 @@ const (
 )
 
 func doTestSetgidFSGroup(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting specific file permissions.
+	framework.SkipIfNodeOSDistroIs("windows")
+
 	var (
 		filePath = path.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
@@ -228,6 +231,9 @@ func doTestSetgidFSGroup(f *framework.Framework, image string, medium v1.Storage
 }
 
 func doTestSubPathFSGroup(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting specific file permissions.
+	framework.SkipIfNodeOSDistroIs("windows")
+
 	var (
 		subPath = "test-sub"
 		source  = &v1.EmptyDirVolumeSource{Medium: medium}
@@ -260,6 +266,9 @@ func doTestSubPathFSGroup(f *framework.Framework, image string, medium v1.Storag
 }
 
 func doTestVolumeModeFSGroup(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting specific file permissions.
+	framework.SkipIfNodeOSDistroIs("windows")
+
 	var (
 		source = &v1.EmptyDirVolumeSource{Medium: medium}
 		pod    = testPodWithVolume(testImageRootUid, volumePath, source)
@@ -284,6 +293,9 @@ func doTestVolumeModeFSGroup(f *framework.Framework, image string, medium v1.Sto
 }
 
 func doTest0644FSGroup(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting specific file permissions.
+	framework.SkipIfNodeOSDistroIs("windows")
+
 	var (
 		filePath = path.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
@@ -311,6 +323,8 @@ func doTest0644FSGroup(f *framework.Framework, image string, medium v1.StorageMe
 }
 
 func doTestVolumeMode(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting seLinuxOptions.
+	framework.SkipIfNodeOSDistroIs("windows")
 	var (
 		source = &v1.EmptyDirVolumeSource{Medium: medium}
 		pod    = testPodWithVolume(testImageRootUid, volumePath, source)
@@ -332,6 +346,8 @@ func doTestVolumeMode(f *framework.Framework, image string, medium v1.StorageMed
 }
 
 func doTest0644(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting specific file permissions.
+	framework.SkipIfNodeOSDistroIs("windows")
 	var (
 		filePath = path.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
@@ -356,6 +372,8 @@ func doTest0644(f *framework.Framework, image string, medium v1.StorageMedium) {
 }
 
 func doTest0666(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting specific file permissions.
+	framework.SkipIfNodeOSDistroIs("windows")
 	var (
 		filePath = path.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}
@@ -380,6 +398,8 @@ func doTest0666(f *framework.Framework, image string, medium v1.StorageMedium) {
 }
 
 func doTest0777(f *framework.Framework, image string, medium v1.StorageMedium) {
+	// Windows does not support setting specific file permissions.
+	framework.SkipIfNodeOSDistroIs("windows")
 	var (
 		filePath = path.Join(volumePath, "test-file")
 		source   = &v1.EmptyDirVolumeSource{Medium: medium}

@@ -207,6 +207,9 @@ while true; do sleep 1; done
 				},
 			} {
 				It(fmt.Sprintf("should report termination message %s", testCase.name), func() {
+					// Cannot mount files in Windows Containers at the moment.
+					// TODO(claudiub): Remove this check when it will be supported.
+					framework.SkipIfNodeOSDistroIs("windows")
 					testCase.container.Name = "termination-message-container"
 					c := ConformanceContainer{
 						PodClient:     f.PodClient(),

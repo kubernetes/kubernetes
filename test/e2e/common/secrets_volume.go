@@ -382,6 +382,16 @@ func secretForTest(namespace, name string) *v1.Secret {
 
 func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secretName string,
 	fsGroup *int64, uid *int64) {
+	if uid != nil || fsGroup != nil {
+		// Windows does not support running as an UID / GID.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
+	if defaultMode != nil {
+		// Windows does not support setting specific file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
 	var (
 		volumeName      = "secret-volume"
 		volumeMountPath = "/etc/secret-volume"
@@ -453,6 +463,11 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 }
 
 func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
+	if mode != nil {
+		// Windows does not support setting specific file permissions.
+		framework.SkipIfNodeOSDistroIs("windows")
+	}
+
 	var (
 		name            = "secret-test-map-" + string(uuid.NewUUID())
 		volumeName      = "secret-volume"
