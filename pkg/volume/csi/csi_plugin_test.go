@@ -517,6 +517,8 @@ func TestPluginConstructBlockVolumeSpec(t *testing.T) {
 	}
 }
 
+//go:generate $KUBE_ROOT/hack/generate-mocks.sh ./nodeinfomanager/nodeinfomanager.go Interface ./fake/fake_node_info_manager.go FakeNodeInfoManager
+//go:generate $KUBE_ROOT/hack/generate-mocks.sh $KUBE_ROOT/vendor/github.com/container-storage-interface/spec/lib/go/csi/v0/csi.pb.go NodeServer ./fake/fake_node_server.go
 func TestRegisterPlugin(t *testing.T) {
 	testcases := map[string]struct {
 		// setup
