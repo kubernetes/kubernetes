@@ -102,7 +102,7 @@ func (p *podNodeSelector) Admit(a admission.Attributes) error {
 	}
 	updateInitialized, err := util.IsUpdatingInitializedObject(a)
 	if err != nil {
-		return err
+		return admission.NewForbidden(a, err)
 	}
 	if updateInitialized {
 		// node selector of an initialized pod is immutable

@@ -98,7 +98,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	if a.GetOperation() == admission.Create || updateUninitialized {
 		ts, err := p.getNamespaceDefaultTolerations(a.GetNamespace())
 		if err != nil {
-			return err
+			return admission.NewForbidden(a, err)
 		}
 
 		// If the namespace has not specified its default tolerations,
@@ -110,7 +110,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 		if len(ts) > 0 {
 			if len(pod.Spec.Tolerations) > 0 {
 				if tolerations.IsConflict(ts, pod.Spec.Tolerations) {
-					return fmt.Errorf("namespace tolerations and pod tolerations conflict")
+					return admission.NewForbidden(a, fmt.Errorf("namespace tolerations and pod tolerations conflict"))
 				}
 
 				// modified pod tolerations = namespace tolerations + current pod tolerations

@@ -116,12 +116,12 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 
 	list, err := c.lister.PodPresets(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
-		return fmt.Errorf("listing pod presets failed: %v", err)
+		return err
 	}
 
 	matchingPPs, err := filterPodPresets(list, pod)
 	if err != nil {
-		return fmt.Errorf("filtering pod presets failed: %v", err)
+		return errors.NewBadRequest(fmt.Sprintf("filtering pod presets failed: %v", err))
 	}
 
 	if len(matchingPPs) == 0 {
