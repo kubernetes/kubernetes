@@ -29,7 +29,7 @@ import (
 // NodeFieldSelectorKeys is a map that: the key are node field selector keys; the values are
 // the functions to get the value of the node field.
 var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
-	NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
+	schedulerapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
 }
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.

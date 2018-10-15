@@ -35,9 +35,9 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 )
 
 func newInt32Ptr(val int) *int32 {
@@ -443,7 +443,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *corev1.ReplicationController, m
 			if v1Pod.DeletionTimestamp != nil {
 				continue
 			}
-			if !podutil.IsPodAvailable(&v1Pod, minReadySeconds, r.nowFn()) {
+			if !podutils.IsPodAvailable(&v1Pod, minReadySeconds, r.nowFn()) {
 				continue
 			}
 			switch controller.Name {

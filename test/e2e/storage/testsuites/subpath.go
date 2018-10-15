@@ -597,7 +597,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 		"reason":                   "Failed",
 	}.AsSelector().String()
 	err = framework.WaitTimeoutForPodEvent(f.ClientSet, pod.Name, f.Namespace.Name, selector, errorMsg, framework.PodEventTimeout)
-	Expect(err).To(HaveOccurred(), "while waiting for failed event to occur")
+	Expect(err).NotTo(HaveOccurred(), "while waiting for failed event to occur")
 }
 
 // Tests that the existing subpath mount is detected when a container restarts

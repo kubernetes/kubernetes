@@ -314,12 +314,33 @@ func toTTLOptions(r *pb.Request) store.TTLOptionSet {
 }
 
 func applyRequest(r *pb.Request, applyV2 etcdserver.ApplierV2) {
+	// TODO: find a sane way to perform this cast or avoid it in the first place
+	reqV2 := &etcdserver.RequestV2{
+		ID:               r.ID,
+		Method:           r.Method,
+		Path:             r.Path,
+		Val:              r.Val,
+		Dir:              r.Dir,
+		PrevValue:        r.PrevValue,
+		PrevIndex:        r.PrevIndex,
+		PrevExist:        r.PrevExist,
+		Expiration:       r.Expiration,
+		Wait:             r.Wait,
+		Since:            r.Since,
+		Recursive:        r.Recursive,
+		Sorted:           r.Sorted,
+		Quorum:           r.Quorum,
+		Time:             r.Time,
+		Stream:           r.Stream,
+		Refresh:          r.Refresh,
+		XXX_unrecognized: r.XXX_unrecognized,
+	}
 	toTTLOptions(r)
 	switch r.Method {
 	case "PUT":
-		applyV2.Put(r)
+		applyV2.Put(reqV2)
 	case "DELETE":
-		applyV2.Delete(r)
+		applyV2.Delete(reqV2)
 	case "POST", "QGET", "SYNC":
 		return
 	default:

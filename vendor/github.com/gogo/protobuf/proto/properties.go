@@ -193,6 +193,7 @@ type Properties struct {
 	Default     string // default value
 	HasDefault  bool   // whether an explicit default was provided
 	CustomType  string
+	CastType    string
 	StdTime     bool
 	StdDuration bool
 
@@ -341,6 +342,8 @@ func (p *Properties) Parse(s string) {
 			p.OrigName = strings.Split(f, "=")[1]
 		case strings.HasPrefix(f, "customtype="):
 			p.CustomType = strings.Split(f, "=")[1]
+		case strings.HasPrefix(f, "casttype="):
+			p.CastType = strings.Split(f, "=")[1]
 		case f == "stdtime":
 			p.StdTime = true
 		case f == "stdduration":

@@ -47,9 +47,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -630,7 +630,7 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 							{
 								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      algorithm.NodeFieldSelectorKeyNodeName,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"node-1"},
 									},
@@ -1059,7 +1059,7 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 			node.Spec.Unschedulable = true
 			node.Spec.Taints = []v1.Taint{
 				{
-					Key:    algorithm.TaintNodeUnschedulable,
+					Key:    schedulerapi.TaintNodeUnschedulable,
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			}
@@ -1077,7 +1077,7 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 			}
 			nodeNU.Spec.Taints = []v1.Taint{
 				{
-					Key:    algorithm.TaintNodeNetworkUnavailable,
+					Key:    schedulerapi.TaintNodeNetworkUnavailable,
 					Effect: v1.TaintEffectNoSchedule,
 				},
 			}

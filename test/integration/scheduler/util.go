@@ -62,8 +62,8 @@ type TestContext struct {
 	ns                     *v1.Namespace
 	clientSet              *clientset.Clientset
 	informerFactory        informers.SharedInformerFactory
-	schedulerConfigFactory scheduler.Configurator
-	schedulerConfig        *scheduler.Config
+	schedulerConfigFactory factory.Configurator
+	schedulerConfig        *factory.Config
 	scheduler              *scheduler.Scheduler
 }
 
@@ -73,7 +73,7 @@ func createConfiguratorWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
-) scheduler.Configurator {
+) factory.Configurator {
 	return factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		SchedulerName:                  schedulerName,
 		Client:                         clientSet,

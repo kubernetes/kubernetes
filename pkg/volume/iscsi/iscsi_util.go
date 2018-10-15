@@ -36,6 +36,23 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+const (
+	// Minimum number of paths that the volume plugin considers enough when a multipath volume is requested.
+	minMultipathCount = 2
+
+	// Minimal number of attempts to attach all paths of a multipath volumes. If at least minMultipathCount paths
+	// are available after this nr. of attempts, the volume plugin continues with mounting the volume.
+	minAttachAttempts = 2
+
+	// Total number of attempts to attach at least minMultipathCount paths. If there are less than minMultipathCount,
+	// the volume plugin tries to attach the remaining paths at least this number of times in total. After
+	// maxAttachAttempts attempts, it mounts even a single path.
+	maxAttachAttempts = 5
+
+	// How many seconds to wait for a multipath device if at least two paths are available.
+	multipathDeviceTimeout = 10
+)
+
 var (
 	chap_st = []string{
 		"discovery.sendtargets.auth.username",
@@ -268,7 +285,7 @@ func waitForMultiPathToExist(devicePaths []string, maxRetries int, deviceUtil vo
 // AttachDisk returns devicePath of volume if attach succeeded otherwise returns error
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var devicePath string
-	var devicePaths []string
+	devicePaths := map[string]string{}
 	var iscsiTransport string
 	var lastErr error
 
@@ -308,118 +325,145 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	}
 	glog.V(4).Infof("AttachDisk portal->host map for %s is %v", b.Iqn, portalHostMap)
 
-	for _, tp := range bkpPortal {
-		hostNumber, loggedIn := portalHostMap[tp]
-		if !loggedIn {
-			glog.V(4).Infof("Could not get SCSI host number for portal %s, will attempt login", tp)
-
-			// build discoverydb and discover iscsi target
-			b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "new")
-			// update discoverydb with CHAP secret
-			err = updateISCSIDiscoverydb(b, tp)
-			if err != nil {
-				lastErr = fmt.Errorf("iscsi: failed to update discoverydb to portal %s error: %v", tp, err)
+	for i := 1; i <= maxAttachAttempts; i++ {
+		for _, tp := range bkpPortal {
+			if _, found := devicePaths[tp]; found {
+				glog.V(4).Infof("Device for portal %q already known", tp)
 				continue
-			}
-			out, err = b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "--discover")
-			if err != nil {
-				// delete discoverydb record
-				b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "delete")
-				lastErr = fmt.Errorf("iscsi: failed to sendtargets to portal %s output: %s, err %v", tp, string(out), err)
-				continue
-			}
-			err = updateISCSINode(b, tp)
-			if err != nil {
-				// failure to update node db is rare. But deleting record will likely impact those who already start using it.
-				lastErr = fmt.Errorf("iscsi: failed to update iscsi node to portal %s error: %v", tp, err)
-				continue
-			}
-			// login to iscsi target
-			out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "--login")
-			if err != nil {
-				// delete the node record from database
-				b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-I", b.Iface, "-T", b.Iqn, "-o", "delete")
-				lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
-				continue
-			}
-			// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
-			out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
-			if err != nil {
-				// don't fail if we can't set startup mode, but log warning so there is a clue
-				glog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
 			}
 
-			// Rebuild the host map after logging in
-			portalHostMap, err := b.deviceUtil.GetISCSIPortalHostMapForTarget(b.Iqn)
+			hostNumber, loggedIn := portalHostMap[tp]
+			if !loggedIn {
+				glog.V(4).Infof("Could not get SCSI host number for portal %s, will attempt login", tp)
+
+				// build discoverydb and discover iscsi target
+				b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "new")
+
+				// update discoverydb with CHAP secret
+				err = updateISCSIDiscoverydb(b, tp)
+				if err != nil {
+					lastErr = fmt.Errorf("iscsi: failed to update discoverydb to portal %s error: %v", tp, err)
+					continue
+				}
+
+				out, err = b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "--discover")
+				if err != nil {
+					// delete discoverydb record
+					b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "delete")
+					lastErr = fmt.Errorf("iscsi: failed to sendtargets to portal %s output: %s, err %v", tp, string(out), err)
+					continue
+				}
+
+				err = updateISCSINode(b, tp)
+				if err != nil {
+					// failure to update node db is rare. But deleting record will likely impact those who already start using it.
+					lastErr = fmt.Errorf("iscsi: failed to update iscsi node to portal %s error: %v", tp, err)
+					continue
+				}
+
+				// login to iscsi target
+				out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "--login")
+				if err != nil {
+					// delete the node record from database
+					b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-I", b.Iface, "-T", b.Iqn, "-o", "delete")
+					lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
+					continue
+				}
+
+				// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
+				out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
+				if err != nil {
+					// don't fail if we can't set startup mode, but log warning so there is a clue
+					glog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
+				}
+
+				// Rebuild the host map after logging in
+				portalHostMap, err := b.deviceUtil.GetISCSIPortalHostMapForTarget(b.Iqn)
+				if err != nil {
+					return "", err
+				}
+				glog.V(6).Infof("AttachDisk portal->host map for %s is %v", b.Iqn, portalHostMap)
+
+				hostNumber, loggedIn = portalHostMap[tp]
+				if !loggedIn {
+					glog.Warningf("Could not get SCSI host number for portal %s after logging in", tp)
+					continue
+				}
+			}
+
+			glog.V(5).Infof("AttachDisk: scanning SCSI host %d LUN %s", hostNumber, b.Lun)
+			lunNumber, err := strconv.Atoi(b.Lun)
+			if err != nil {
+				return "", fmt.Errorf("AttachDisk: lun is not a number: %s\nError: %v", b.Lun, err)
+			}
+
+			// Scan the iSCSI bus for the LUN
+			err = scanOneLun(hostNumber, lunNumber)
 			if err != nil {
 				return "", err
 			}
-			glog.V(6).Infof("AttachDisk portal->host map for %s is %v", b.Iqn, portalHostMap)
 
-			hostNumber, loggedIn = portalHostMap[tp]
-			if !loggedIn {
-				glog.Warningf("Could not get SCSI host number for portal %s after logging in", tp)
+			if iscsiTransport == "" {
+				glog.Errorf("iscsi: could not find transport name in iface %s", b.Iface)
+				return "", fmt.Errorf("Could not parse iface file for %s", b.Iface)
+			}
+			if iscsiTransport == "tcp" {
+				devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
+			} else {
+				devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
+			}
+
+			if exist := waitForPathToExist(&devicePath, multipathDeviceTimeout, iscsiTransport); !exist {
+				glog.Errorf("Could not attach disk: Timeout after 10s")
+				// update last error
+				lastErr = fmt.Errorf("Could not attach disk: Timeout after 10s")
 				continue
+			} else {
+				devicePaths[tp] = devicePath
 			}
 		}
-
-		glog.V(5).Infof("AttachDisk: scanning SCSI host %d LUN %s", hostNumber, b.Lun)
-		lunNumber, err := strconv.Atoi(b.Lun)
-		if err != nil {
-			return "", fmt.Errorf("AttachDisk: lun is not a number: %s\nError: %v", b.Lun, err)
+		glog.V(4).Infof("iscsi: tried all devices for %q %d times, %d paths found", b.Iqn, i, len(devicePaths))
+		if len(devicePaths) == 0 {
+			// No path attached, report error and stop trying. kubelet will try again in a short while
+			// delete cloned iface
+			b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
+			glog.Errorf("iscsi: failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
+			return "", fmt.Errorf("failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 		}
-
-		// Scan the iSCSI bus for the LUN
-		err = scanOneLun(hostNumber, lunNumber)
-		if err != nil {
-			return "", err
+		if len(devicePaths) == len(bkpPortal) {
+			// We have all paths
+			glog.V(4).Infof("iscsi: all devices for %q found", b.Iqn)
+			break
 		}
-
-		if iscsiTransport == "" {
-			glog.Errorf("iscsi: could not find transport name in iface %s", b.Iface)
-			return "", fmt.Errorf("Could not parse iface file for %s", b.Iface)
-		}
-		if iscsiTransport == "tcp" {
-			devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
-		} else {
-			devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
-		}
-
-		if exist := waitForPathToExist(&devicePath, 10, iscsiTransport); !exist {
-			glog.Errorf("Could not attach disk: Timeout after 10s")
-			// update last error
-			lastErr = fmt.Errorf("Could not attach disk: Timeout after 10s")
-			continue
-		} else {
-			devicePaths = append(devicePaths, devicePath)
+		if len(devicePaths) >= minMultipathCount && i >= minAttachAttempts {
+			// We have at least two paths for multipath and we tried the other paths long enough
+			glog.V(4).Infof("%d devices found for %q", len(devicePaths), b.Iqn)
+			break
 		}
 	}
 
-	if len(devicePaths) == 0 {
-		// delete cloned iface
-		b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
-		glog.Errorf("iscsi: failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
-		return "", fmt.Errorf("failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
-	}
 	if lastErr != nil {
 		glog.Errorf("iscsi: last error occurred during iscsi init:\n%v", lastErr)
 	}
 
+	devicePathList := []string{}
+	for _, path := range devicePaths {
+		devicePathList = append(devicePathList, path)
+	}
 	// Try to find a multipath device for the volume
-	if 1 < len(bkpPortal) {
-		// If the PV has 2 or more portals, wait up to 10 seconds for the multipath
-		// device to appear
-		devicePath = waitForMultiPathToExist(devicePaths, 10, b.deviceUtil)
+	if len(bkpPortal) > 1 {
+		// Multipath volume was requested. Wait up to 10 seconds for the multipath device to appear.
+		devicePath = waitForMultiPathToExist(devicePathList, 10, b.deviceUtil)
 	} else {
 		// For PVs with 1 portal, just try one time to find the multipath device. This
 		// avoids a long pause when the multipath device will never get created, and
 		// matches legacy behavior.
-		devicePath = waitForMultiPathToExist(devicePaths, 1, b.deviceUtil)
+		devicePath = waitForMultiPathToExist(devicePathList, 1, b.deviceUtil)
 	}
 
 	// When no multipath device is found, just use the first (and presumably only) device
 	if devicePath == "" {
-		devicePath = devicePaths[0]
+		devicePath = devicePathList[0]
 	}
 
 	glog.V(5).Infof("iscsi: AttachDisk devicePath: %s", devicePath)

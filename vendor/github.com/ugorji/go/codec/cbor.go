@@ -61,7 +61,8 @@ const (
 
 type cborEncDriver struct {
 	noBuiltInTypes
-	encNoSeparator
+	encDriverNoopContainerWriter
+	// encNoSeparator
 	e *Encoder
 	w encWriter
 	h *CborHandle
@@ -134,21 +135,41 @@ func (e *cborEncDriver) EncodeExt(rv interface{}, xtag uint64, ext Ext, en *Enco
 
 func (e *cborEncDriver) EncodeRawExt(re *RawExt, en *Encoder) {
 	e.encUint(uint64(re.Tag), cborBaseTag)
-	if re.Data != nil {
+	if false && re.Data != nil {
 		en.encode(re.Data)
-	} else if re.Value == nil {
-		e.EncodeNil()
-	} else {
+	} else if re.Value != nil {
 		en.encode(re.Value)
+	} else {
+		e.EncodeNil()
 	}
 }
 
-func (e *cborEncDriver) EncodeArrayStart(length int) {
-	e.encLen(cborBaseArray, length)
+func (e *cborEncDriver) WriteArrayStart(length int) {
+	if e.h.IndefiniteLength {
+		e.w.writen1(cborBdIndefiniteArray)
+	} else {
+		e.encLen(cborBaseArray, length)
+	}
 }
 
-func (e *cborEncDriver) EncodeMapStart(length int) {
-	e.encLen(cborBaseMap, length)
+func (e *cborEncDriver) WriteMapStart(length int) {
+	if e.h.IndefiniteLength {
+		e.w.writen1(cborBdIndefiniteMap)
+	} else {
+		e.encLen(cborBaseMap, length)
+	}
+}
+
+func (e *cborEncDriver) WriteMapEnd() {
+	if e.h.IndefiniteLength {
+		e.w.writen1(cborBdBreak)
+	}
+}
+
+func (e *cborEncDriver) WriteArrayEnd() {
+	if e.h.IndefiniteLength {
+		e.w.writen1(cborBdBreak)
+	}
 }
 
 func (e *cborEncDriver) EncodeString(c charEncoding, v string) {
@@ -180,7 +201,8 @@ type cborDecDriver struct {
 	bdRead bool
 	bd     byte
 	noBuiltInTypes
-	decNoSeparator
+	// decNoSeparator
+	decDriverNoopContainerReader
 }
 
 func (d *cborDecDriver) readNextBd() {
@@ -196,6 +218,9 @@ func (d *cborDecDriver) uncacheRead() {
 }
 
 func (d *cborDecDriver) ContainerType() (vt valueType) {
+	if !d.bdRead {
+		d.readNextBd()
+	}
 	if d.bd == cborBdNil {
 		return valueTypeNil
 	} else if d.bd == cborBdIndefiniteBytes || (d.bd >= cborBaseBytes && d.bd < cborBaseString) {
@@ -351,6 +376,9 @@ func (d *cborDecDriver) DecodeBool() (b bool) {
 }
 
 func (d *cborDecDriver) ReadMapStart() (length int) {
+	if !d.bdRead {
+		d.readNextBd()
+	}
 	d.bdRead = false
 	if d.bd == cborBdIndefiniteMap {
 		return -1
@@ -359,6 +387,9 @@ func (d *cborDecDriver) ReadMapStart() (length int) {
 }
 
 func (d *cborDecDriver) ReadArrayStart() (length int) {
+	if !d.bdRead {
+		d.readNextBd()
+	}
 	d.bdRead = false
 	if d.bd == cborBdIndefiniteArray {
 		return -1
@@ -398,7 +429,7 @@ func (d *cborDecDriver) decAppendIndefiniteBytes(bs []byte) []byte {
 	return bs
 }
 
-func (d *cborDecDriver) DecodeBytes(bs []byte, isstring, zerocopy bool) (bsOut []byte) {
+func (d *cborDecDriver) DecodeBytes(bs []byte, zerocopy bool) (bsOut []byte) {
 	if !d.bdRead {
 		d.readNextBd()
 	}
@@ -421,11 +452,15 @@ func (d *cborDecDriver) DecodeBytes(bs []byte, isstring, zerocopy bool) (bsOut [
 			bs = d.b[:]
 		}
 	}
-	return decByteSlice(d.r, clen, bs)
+	return decByteSlice(d.r, clen, d.d.h.MaxInitLen, bs)
 }
 
 func (d *cborDecDriver) DecodeString() (s string) {
-	return string(d.DecodeBytes(d.b[:], true, true))
+	return string(d.DecodeBytes(d.b[:], true))
+}
+
+func (d *cborDecDriver) DecodeStringAsBytes() (s []byte) {
+	return d.DecodeBytes(d.b[:], true)
 }
 
 func (d *cborDecDriver) DecodeExt(rv interface{}, xtag uint64, ext Ext) (realxtag uint64) {
@@ -456,7 +491,7 @@ func (d *cborDecDriver) DecodeNaked() {
 		d.readNextBd()
 	}
 
-	n := &d.d.n
+	n := d.d.n
 	var decodeFurther bool
 
 	switch d.bd {
@@ -476,7 +511,7 @@ func (d *cborDecDriver) DecodeNaked() {
 		n.f = d.DecodeFloat(false)
 	case cborBdIndefiniteBytes:
 		n.v = valueTypeBytes
-		n.l = d.DecodeBytes(nil, false, false)
+		n.l = d.DecodeBytes(nil, false)
 	case cborBdIndefiniteString:
 		n.v = valueTypeString
 		n.s = d.DecodeString()
@@ -501,7 +536,7 @@ func (d *cborDecDriver) DecodeNaked() {
 			n.i = d.DecodeInt(64)
 		case d.bd >= cborBaseBytes && d.bd < cborBaseString:
 			n.v = valueTypeBytes
-			n.l = d.DecodeBytes(nil, false, false)
+			n.l = d.DecodeBytes(nil, false)
 		case d.bd >= cborBaseString && d.bd < cborBaseArray:
 			n.v = valueTypeString
 			n.s = d.DecodeString()
@@ -564,7 +599,11 @@ func (d *cborDecDriver) DecodeNaked() {
 //
 type CborHandle struct {
 	binaryEncodingType
+	noElemSeparators
 	BasicHandle
+
+	// IndefiniteLength=true, means that we encode using indefinitelength
+	IndefiniteLength bool
 }
 
 func (h *CborHandle) SetInterfaceExt(rt reflect.Type, tag uint64, ext InterfaceExt) (err error) {
@@ -576,7 +615,7 @@ func (h *CborHandle) newEncDriver(e *Encoder) encDriver {
 }
 
 func (h *CborHandle) newDecDriver(d *Decoder) decDriver {
-	return &cborDecDriver{d: d, r: d.r, h: h, br: d.bytes}
+	return &cborDecDriver{d: d, h: h, r: d.r, br: d.bytes}
 }
 
 func (e *cborEncDriver) reset() {
@@ -584,7 +623,7 @@ func (e *cborEncDriver) reset() {
 }
 
 func (d *cborDecDriver) reset() {
-	d.r = d.d.r
+	d.r, d.br = d.d.r, d.d.bytes
 	d.bd, d.bdRead = 0, false
 }
 

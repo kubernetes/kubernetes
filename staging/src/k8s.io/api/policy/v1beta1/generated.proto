@@ -242,6 +242,12 @@ message PodSecurityPolicySpec {
   // runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
   optional RunAsUserStrategyOptions runAsUser = 11;
 
+  // RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
+  // If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
+  // RunAsGroup feature gate to be enabled.
+  // +optional
+  optional RunAsGroupStrategyOptions runAsGroup = 22;
+
   // supplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
   optional SupplementalGroupsStrategyOptions supplementalGroups = 12;
 
@@ -303,6 +309,17 @@ message PodSecurityPolicySpec {
   // This requires the ProcMountType feature flag to be enabled.
   // +optional
   repeated string allowedProcMountTypes = 21;
+}
+
+// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
+message RunAsGroupStrategyOptions {
+  // rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
+  optional string rule = 1;
+
+  // ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
+  // then supply a single range with the same start and end. Required for MustRunAs.
+  // +optional
+  repeated IDRange ranges = 2;
 }
 
 // RunAsUserStrategyOptions defines the strategy type and any options used to create the strategy.

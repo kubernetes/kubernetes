@@ -35,7 +35,7 @@ import (
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
@@ -129,7 +129,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
 		finalTolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{
 			{
-				Key:      algorithm.TaintNodeMemoryPressure,
+				Key:      schedulerapi.TaintNodeMemoryPressure,
 				Operator: api.TolerationOpExists,
 				Effect:   api.TaintEffectNoSchedule,
 			},

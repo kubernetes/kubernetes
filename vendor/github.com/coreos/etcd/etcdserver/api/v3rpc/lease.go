@@ -15,13 +15,13 @@
 package v3rpc
 
 import (
+	"context"
 	"io"
 
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/lease"
-	"golang.org/x/net/context"
 )
 
 type LeaseServer struct {
@@ -62,6 +62,21 @@ func (ls *LeaseServer) LeaseTimeToLive(ctx context.Context, rr *pb.LeaseTimeToLi
 			Header: &pb.ResponseHeader{},
 			ID:     rr.ID,
 			TTL:    -1,
+		}
+	}
+	ls.hdr.fill(resp.Header)
+	return resp, nil
+}
+
+func (ls *LeaseServer) LeaseLeases(ctx context.Context, rr *pb.LeaseLeasesRequest) (*pb.LeaseLeasesResponse, error) {
+	resp, err := ls.le.LeaseLeases(ctx, rr)
+	if err != nil && err != lease.ErrLeaseNotFound {
+		return nil, togRPCError(err)
+	}
+	if err == lease.ErrLeaseNotFound {
+		resp = &pb.LeaseLeasesResponse{
+			Header: &pb.ResponseHeader{},
+			Leases: []*pb.LeaseStatus{},
 		}
 	}
 	ls.hdr.fill(resp.Header)

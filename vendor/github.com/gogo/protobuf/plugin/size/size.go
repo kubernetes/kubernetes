@@ -652,7 +652,7 @@ func (p *size) Generate(file *generator.FileDescriptor) {
 			p.In()
 			p.P(`var l int`)
 			p.P(`_ = l`)
-			vanity.TurnOffNullableForNativeTypesWithoutDefaultsOnly(f)
+			vanity.TurnOffNullableForNativeTypes(f)
 			p.generateField(false, file, message, f, sizeName)
 			p.P(`return n`)
 			p.Out()

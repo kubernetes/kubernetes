@@ -29,9 +29,9 @@ import (
 	"github.com/golang/glog"
 )
 
-type FlockerUtil struct{}
+type flockerUtil struct{}
 
-func (util *FlockerUtil) DeleteVolume(d *flockerVolumeDeleter) error {
+func (util *flockerUtil) DeleteVolume(d *flockerVolumeDeleter) error {
 	var err error
 
 	if d.flockerClient == nil {
@@ -49,7 +49,7 @@ func (util *FlockerUtil) DeleteVolume(d *flockerVolumeDeleter) error {
 	return d.flockerClient.DeleteDataset(datasetUUID)
 }
 
-func (util *FlockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID string, volumeSizeGiB int, labels map[string]string, err error) {
+func (util *flockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID string, volumeSizeGiB int, labels map[string]string, err error) {
 
 	if c.flockerClient == nil {
 		c.flockerClient, err = c.plugin.newFlockerClient("")

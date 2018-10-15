@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 // PluginName indicates name of admission plugin.
@@ -40,14 +40,14 @@ var (
 			" that is added by default to every pod that does not already have such a toleration.")
 
 	notReadyToleration = api.Toleration{
-		Key:               algorithm.TaintNodeNotReady,
+		Key:               schedulerapi.TaintNodeNotReady,
 		Operator:          api.TolerationOpExists,
 		Effect:            api.TaintEffectNoExecute,
 		TolerationSeconds: defaultNotReadyTolerationSeconds,
 	}
 
 	unreachableToleration = api.Toleration{
-		Key:               algorithm.TaintNodeUnreachable,
+		Key:               schedulerapi.TaintNodeUnreachable,
 		Operator:          api.TolerationOpExists,
 		Effect:            api.TaintEffectNoExecute,
 		TolerationSeconds: defaultUnreachableTolerationSeconds,
@@ -101,12 +101,12 @@ func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 	toleratesNodeNotReady := false
 	toleratesNodeUnreachable := false
 	for _, toleration := range tolerations {
-		if (toleration.Key == algorithm.TaintNodeNotReady || len(toleration.Key) == 0) &&
+		if (toleration.Key == schedulerapi.TaintNodeNotReady || len(toleration.Key) == 0) &&
 			(toleration.Effect == api.TaintEffectNoExecute || len(toleration.Effect) == 0) {
 			toleratesNodeNotReady = true
 		}
 
-		if (toleration.Key == algorithm.TaintNodeUnreachable || len(toleration.Key) == 0) &&
+		if (toleration.Key == schedulerapi.TaintNodeUnreachable || len(toleration.Key) == 0) &&
 			(toleration.Effect == api.TaintEffectNoExecute || len(toleration.Effect) == 0) {
 			toleratesNodeUnreachable = true
 		}

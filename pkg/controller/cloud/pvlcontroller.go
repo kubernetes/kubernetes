@@ -239,7 +239,7 @@ func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolum
 			newVolume.Spec.NodeAffinity.Required = new(v1.NodeSelector)
 		}
 		if len(newVolume.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-			// Need atleast one term pre-allocated whose MatchExpressions can be appended to
+			// Need at least one term pre-allocated whose MatchExpressions can be appended to
 			newVolume.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
 		}
 		// Populate NodeAffinity with requirements if there are no conflicting keys found

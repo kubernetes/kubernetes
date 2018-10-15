@@ -55,7 +55,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
-        "//pkg/scheduler/algorithm:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/taints:go_default_library",

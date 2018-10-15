@@ -16,9 +16,9 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_auth_CONSUMERS",
     ],
     deps = [
-        "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
+        "//pkg/kubectl/util/templates:go_default_library",
         "//pkg/registry/rbac/reconciliation:go_default_library",
         "//staging/src/k8s.io/api/authorization/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",

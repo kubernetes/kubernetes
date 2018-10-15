@@ -97,6 +97,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app/cmd/phases/certs:all-srcs",
+        "//cmd/kubeadm/app/cmd/phases/workflow:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

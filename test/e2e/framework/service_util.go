@@ -1523,7 +1523,7 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, target
 		}
 		if shouldHold {
 			if !transitionState && !affinityHolds {
-				return true, fmt.Errorf("Affintity should hold but didn't.")
+				return true, fmt.Errorf("Affinity should hold but didn't.")
 			}
 			if trackerFulfilled && affinityHolds {
 				return true, nil
@@ -1540,9 +1540,9 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIp string, target
 				checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIpPort))
 			}
 			if shouldHold {
-				checkAffinityFailed(tracker, "Affintity should hold but didn't.")
+				checkAffinityFailed(tracker, "Affinity should hold but didn't.")
 			} else {
-				checkAffinityFailed(tracker, "Affintity shouldn't hold but did.")
+				checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
 			}
 			return true
 		}

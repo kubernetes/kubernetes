@@ -43,9 +43,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
@@ -381,7 +381,7 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 
 	return &RuntimeSorter{
 		field:   parsedField,
-		decoder: cmdutil.InternalVersionDecoder(),
+		decoder: legacyscheme.Codecs.UniversalDecoder(),
 		objects: objects,
 	}
 }

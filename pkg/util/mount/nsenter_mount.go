@@ -166,15 +166,22 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		glog.V(5).Infof("findmnt: directory %s does not exist", file)
 		return true, err
 	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+	resolvedFile, err := n.EvalHostSymlinks(file)
+	if err != nil {
+		return true, err
+	}
+
 	// Add --first-only option: since we are testing for the absence of a mountpoint, it is sufficient to get only
 	// the first of multiple possible mountpoints using --first-only.
 	// Also add fstype output to make sure that the output of target file will give the full path
 	// TODO: Need more refactoring for this function. Track the solution with issue #26996
-	args := []string{"-o", "target,fstype", "--noheadings", "--first-only", "--target", file}
+	args := []string{"-o", "target,fstype", "--noheadings", "--first-only", "--target", resolvedFile}
 	glog.V(5).Infof("nsenter findmnt args: %v", args)
 	out, err := n.ne.Exec("findmnt", args).CombinedOutput()
 	if err != nil {
-		glog.V(2).Infof("Failed findmnt command for path %s: %s %v", file, out, err)
+		glog.V(2).Infof("Failed findmnt command for path %s: %s %v", resolvedFile, out, err)
 		// Different operating systems behave differently for paths which are not mount points.
 		// On older versions (e.g. 2.20.1) we'd get error, on newer ones (e.g. 2.26.2) we'd get "/".
 		// It's safer to assume that it's not a mount point.
@@ -185,13 +192,13 @@ func (n *NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return false, err
 	}
 
-	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output for path %s: %v:", file, mountTarget)
+	glog.V(5).Infof("IsLikelyNotMountPoint findmnt output for path %s: %v:", resolvedFile, mountTarget)
 
-	if mountTarget == file {
-		glog.V(5).Infof("IsLikelyNotMountPoint: %s is a mount point", file)
+	if mountTarget == resolvedFile {
+		glog.V(5).Infof("IsLikelyNotMountPoint: %s is a mount point", resolvedFile)
 		return false, nil
 	}
-	glog.V(5).Infof("IsLikelyNotMountPoint: %s is not a mount point", file)
+	glog.V(5).Infof("IsLikelyNotMountPoint: %s is not a mount point", resolvedFile)
 	return true, nil
 }
 

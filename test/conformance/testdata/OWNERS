@@ -7,3 +7,6 @@ reviewers:
 approvers:
   - bgrant0607
   - smarterclayton
+labels:
+  - area/conformance
+  - sig/architecture
