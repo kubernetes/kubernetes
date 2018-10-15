@@ -80,7 +80,7 @@ ifeq ($(ARCH),amd64)
 else
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
+	sudo ../../third_party/multiarch/qemu-user-static/register/register.sh --reset
 	curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/$(QEMUVERSION)/x86_64_qemu-$(QEMUARCH)-static.tar.gz | tar -xz -C $(TEMP_DIR)
 	# Ensure we don't get surprised by umask settings
 	chmod 0755 $(TEMP_DIR)/qemu-$(QEMUARCH)-static
