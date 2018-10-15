@@ -126,6 +126,7 @@ func newDefaultComponentConfig() (*kubeschedulerconfig.KubeSchedulerConfiguratio
 	if err := kubeschedulerscheme.Scheme.Convert(&cfgv1alpha1, &cfg, nil); err != nil {
 		return nil, err
 	}
+	cfg.EnableProfiling = true
 	return &cfg, nil
 }
 

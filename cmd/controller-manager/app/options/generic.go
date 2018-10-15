@@ -52,8 +52,10 @@ func NewGenericControllerManagerConfigurationOptions(cfg kubectrlmgrconfig.Gener
 		ClientConnection:        cfg.ClientConnection,
 		ControllerStartInterval: cfg.ControllerStartInterval,
 		LeaderElection:          cfg.LeaderElection,
-		Debugging:               &DebuggingOptions{},
-		Controllers:             cfg.Controllers,
+		Debugging: &DebuggingOptions{
+			EnableProfiling: true,
+		},
+		Controllers: cfg.Controllers,
 	}
 
 	return o
