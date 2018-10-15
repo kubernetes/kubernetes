@@ -72,7 +72,7 @@ func TestLogDryRunAction(t *testing.T) {
 `),
 		},
 		{
-			action: core.NewPatchAction(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "default", "my-node", []byte(`{"spec":{"taints":[{"key": "foo", "value": "bar"}]}}`)),
+			action: core.NewPatchAction(schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "default", "my-node", "application/strategic-merge-patch+json", []byte(`{"spec":{"taints":[{"key": "foo", "value": "bar"}]}}`)),
 			expectedBytes: []byte(`[dryrun] Would perform action PATCH on resource "nodes" in API group "core/v1"
 [dryrun] Resource name: "my-node"
 [dryrun] Attached patch:

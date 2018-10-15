@@ -123,7 +123,7 @@ func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOpti
 // Patch applies the patch and returns the patched certificateSigningRequest.
 func (c *FakeCertificateSigningRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, data, subresources...), &v1beta1.CertificateSigningRequest{})
+		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, pt, data, subresources...), &v1beta1.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

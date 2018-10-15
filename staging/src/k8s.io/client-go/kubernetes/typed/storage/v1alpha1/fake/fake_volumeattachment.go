@@ -123,7 +123,7 @@ func (c *FakeVolumeAttachments) DeleteCollection(options *v1.DeleteOptions, list
 // Patch applies the patch and returns the patched volumeAttachment.
 func (c *FakeVolumeAttachments) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.VolumeAttachment, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, name, data, subresources...), &v1alpha1.VolumeAttachment{})
+		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, name, pt, data, subresources...), &v1alpha1.VolumeAttachment{})
 	if obj == nil {
 		return nil, err
 	}

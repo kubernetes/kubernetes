@@ -119,7 +119,7 @@ func (c *FakePodPresets) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched podPreset.
 func (c *FakePodPresets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PodPreset, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podpresetsResource, c.ns, name, data, subresources...), &v1alpha1.PodPreset{})
+		Invokes(testing.NewPatchSubresourceAction(podpresetsResource, c.ns, name, pt, data, subresources...), &v1alpha1.PodPreset{})
 
 	if obj == nil {
 		return nil, err

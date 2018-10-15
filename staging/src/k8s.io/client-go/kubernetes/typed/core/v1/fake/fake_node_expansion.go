@@ -18,12 +18,16 @@ package fake
 
 import (
 	"k8s.io/api/core/v1"
+	types "k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
 )
 
+// TODO: Should take a PatchType as an argument probably.
 func (c *FakeNodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
+	// TODO: Should be configurable to support additional patch strategies.
+	pt := types.StrategicMergePatchType
 	obj, err := c.Fake.Invokes(
-		core.NewRootPatchSubresourceAction(nodesResource, nodeName, data, "status"), &v1.Node{})
+		core.NewRootPatchSubresourceAction(nodesResource, nodeName, pt, data, "status"), &v1.Node{})
 	if obj == nil {
 		return nil, err
 	}

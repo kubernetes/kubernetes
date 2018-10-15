@@ -112,7 +112,7 @@ func (c *FakePodSecurityPolicies) DeleteCollection(options *v1.DeleteOptions, li
 // Patch applies the patch and returns the patched podSecurityPolicy.
 func (c *FakePodSecurityPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *policy.PodSecurityPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(podsecuritypoliciesResource, name, data, subresources...), &policy.PodSecurityPolicy{})
+		Invokes(testing.NewRootPatchSubresourceAction(podsecuritypoliciesResource, name, pt, data, subresources...), &policy.PodSecurityPolicy{})
 	if obj == nil {
 		return nil, err
 	}

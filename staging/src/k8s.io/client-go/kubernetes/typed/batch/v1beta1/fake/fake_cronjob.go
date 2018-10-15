@@ -131,7 +131,7 @@ func (c *FakeCronJobs) DeleteCollection(options *v1.DeleteOptions, listOptions v
 // Patch applies the patch and returns the patched cronJob.
 func (c *FakeCronJobs) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CronJob, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, data, subresources...), &v1beta1.CronJob{})
+		Invokes(testing.NewPatchSubresourceAction(cronjobsResource, c.ns, name, pt, data, subresources...), &v1beta1.CronJob{})
 
 	if obj == nil {
 		return nil, err
