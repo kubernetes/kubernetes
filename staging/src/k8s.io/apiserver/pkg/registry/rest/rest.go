@@ -101,6 +101,27 @@ type Lister interface {
 	List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
+// ListerWithOptions is an object that can retrieve resources that match the provided field
+// and label criteria and takes additional options on the list request.
+type ListerWithOptions interface {
+	// NewList returns an empty object that can be used with the List call.
+	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
+	NewList() runtime.Object
+
+	// List selects resources in the storage which match to the selector. 'options' can be nil.
+	// The extraOptions object passed to it is of the same type returned by the NewListOptions
+	// method.
+	List(ctx context.Context, options *metainternalversion.ListOptions, extraOptions runtime.Object) (runtime.Object, error)
+
+	// NewListOptions returns an empty options object that will be used to pass extra options
+	// to the List method. It may return a bool and a string, if true, the
+	// value of the request path below the list will be included as the named
+	// string in the serialization of the runtime object. E.g., returning "path"
+	// will convert the trailing request scheme value to "path" in the map[string][]string
+	// passed to the converter.
+	NewListOptions() (runtime.Object, bool, string)
+}
+
 // Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
 // if export is generally supported for that type. Errors can still be returned during the actual Export when certain
 // instances of the type are not exportable.

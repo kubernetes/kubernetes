@@ -216,6 +216,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	creater, isCreater := storage.(rest.Creater)
 	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
 	lister, isLister := storage.(rest.Lister)
+	listerWithOptions, isListerWithOptions := storage.(rest.ListerWithOptions)
 	getter, isGetter := storage.(rest.Getter)
 	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
 	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
@@ -242,7 +243,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isCreater = true
 	}
 
-	var versionedList interface{}
+	var (
+		versionedList             interface{}
+		versionedListOptions      runtime.Object
+		versionedListExtraOptions runtime.Object
+		listSubpath               bool
+	)
 	if isLister {
 		list := lister.NewList()
 		listGVKs, _, err := a.group.Typer.ObjectKinds(list)
@@ -254,11 +260,44 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, err
 		}
 		versionedList = indirectArbitraryPointer(versionedListPtr)
-	}
 
-	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
-	if err != nil {
-		return nil, err
+		versionedListOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if isListerWithOptions {
+		list := listerWithOptions.NewList()
+		listGVKs, _, err := a.group.Typer.ObjectKinds(list)
+		if err != nil {
+			return nil, err
+		}
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVKs[0].Kind))
+		if err != nil {
+			return nil, err
+		}
+		versionedList = indirectArbitraryPointer(versionedListPtr)
+
+		versionedListOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
+		if err != nil {
+			return nil, err
+		}
+
+		var listOptions runtime.Object
+		listOptions, listSubpath, _ = listerWithOptions.NewListOptions()
+		listOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(listOptions)
+		if err != nil {
+			return nil, err
+		}
+		listOptionsInternalKind := listOptionsInternalKinds[0]
+		versionedListExtraOptions, err = a.group.Creater.New(a.group.GroupVersion.WithKind(listOptionsInternalKind.Kind))
+		if err != nil {
+			versionedListExtraOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(listOptionsInternalKind.Kind))
+			if err != nil {
+				return nil, err
+			}
+		}
+		isLister = true
 	}
 	versionedCreateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("CreateOptions"))
 	if err != nil {
@@ -388,6 +427,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
 		// Add actions at the resource path: /api/apiVersion/resource
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
+		if listSubpath {
+			actions = appendIf(actions, action{"LIST", resourcePath + "/{path:*}", resourceParams, namer, false}, isLister)
+		}
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
 		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
 		// DEPRECATED in 1.11
@@ -436,6 +478,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
+		if listSubpath {
+			actions = appendIf(actions, action{"LIST", resourcePath + "/{path:*}", resourceParams, namer, false}, isLister)
+		}
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer, false}, isCreater)
 		actions = appendIf(actions, action{"DELETECOLLECTION", resourcePath, resourceParams, namer, false}, isCollectionDeleter)
 		// DEPRECATED in 1.11
@@ -605,11 +650,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		case "LIST": // List all resources of a kind.
+			var handler restful.RouteFunction
+			if isListerWithOptions {
+				handler = restfulListResourceWithOptions(listerWithOptions, watcher, reqScope, false, a.minRequestTimeout)
+			} else {
+				handler = restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout)
+			}
 			doc := "list objects of kind " + kind
 			if isSubresource {
 				doc = "list " + subresource + " of objects of kind " + kind
 			}
-			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
+			handler = metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, handler)
 			if a.enableAPIResponseCompression {
 				handler = genericfilters.RestfulWithCompression(handler)
 			}
@@ -622,6 +673,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Writes(versionedList)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return nil, err
+			}
+			if isListerWithOptions {
+				if err := addObjectParams(ws, route, versionedListExtraOptions); err != nil {
+					return nil, err
+				}
 			}
 			switch {
 			case isLister && isWatcher:
@@ -1024,6 +1080,12 @@ func isVowel(c rune) bool {
 func restfulListResource(r rest.Lister, rw rest.Watcher, scope handlers.RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		handlers.ListResource(r, rw, scope, forceWatch, minRequestTimeout)(res.ResponseWriter, req.Request)
+	}
+}
+
+func restfulListResourceWithOptions(r rest.ListerWithOptions, rw rest.Watcher, scope handlers.RequestScope, forceWatch bool, minRequestTimeout time.Duration) restful.RouteFunction {
+	return func(req *restful.Request, res *restful.Response) {
+		handlers.ListResourceWithOptions(r, rw, scope, forceWatch, minRequestTimeout)(res.ResponseWriter, req.Request)
 	}
 }
 

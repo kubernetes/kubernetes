@@ -163,7 +163,27 @@ func getRequestOptions(req *http.Request, scope RequestScope, into runtime.Objec
 	return scope.ParameterCodec.DecodeParameters(query, scope.Kind.GroupVersion(), into)
 }
 
+// TODO: support the ability to watch for resource with options
+func ListResourceWithOptions(r rest.ListerWithOptions, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
+	list := func(w http.ResponseWriter, req *http.Request, ctx context.Context, opts *metainternalversion.ListOptions) (runtime.Object, error) {
+		extraOpts, subpath, subpathKey := r.NewListOptions()
+		if err := getRequestOptions(req, scope, extraOpts, subpath, subpathKey, false); err != nil {
+			err = errors.NewBadRequest(err.Error())
+			return nil, err
+		}
+		return r.List(ctx, opts, extraOpts)
+	}
+	return listResource(list, rw, scope, forceWatch, minRequestTimeout)
+}
+
 func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
+	list := func(w http.ResponseWriter, req *http.Request, ctx context.Context, opts *metainternalversion.ListOptions) (runtime.Object, error) {
+		return r.List(ctx, opts)
+	}
+	return listResource(list, rw, scope, forceWatch, minRequestTimeout)
+}
+
+func listResource(list func(http.ResponseWriter, *http.Request, context.Context, *metainternalversion.ListOptions) (runtime.Object, error), rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("List " + req.URL.Path)
@@ -265,7 +285,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		// Log only long List requests (ignore Watch).
 		defer trace.LogIfLong(500 * time.Millisecond)
 		trace.Step("About to List from storage")
-		result, err := r.List(ctx, &opts)
+		result, err := list(w, req, ctx, &opts)
 		if err != nil {
 			scope.err(err, w, req)
 			return
