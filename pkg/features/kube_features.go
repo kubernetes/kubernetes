@@ -387,6 +387,18 @@ const (
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources utilfeature.Feature = "KubeletPodResources"
+
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the in-tree storage to CSI Plugin migration feature.
+	CSIMigration utilfeature.Feature = "CSIMigration"
+
+	// owner: @davidz627
+	// alpha: v1.14
+	//
+	// Enables the GCE PD in-tree driver to GCE CSI Driver migration feature.
+	CSIMigrationGCE utilfeature.Feature = "CSIMigrationGCE"
 )
 
 func init() {
@@ -439,6 +451,8 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
+	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
+	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},

@@ -1168,6 +1168,10 @@ func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
 	return true
 }
 
+func (plugin *mockVolumePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *mockVolumePlugin) RequiresRemount() bool {
 	return false
 }
