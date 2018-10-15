@@ -224,6 +224,14 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 		CPUConstraint:    schedulerCPU,
 		MemoryConstraint: schedulerMem,
 	}
+	constraints["coredns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	constraints["kubedns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
 	return constraints
 }
 
