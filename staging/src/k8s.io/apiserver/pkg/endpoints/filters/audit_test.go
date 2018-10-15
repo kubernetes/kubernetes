@@ -817,7 +817,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 				t.Errorf("[%s] expected Audit-ID http header returned, but not returned", test.desc)
 				continue
 			}
-			// if get Audit-ID returned, it should be the same same with the requested one
+			// if get Audit-ID returned, it should be the same with the requested one
 			if test.requestHeader != "" && resp.Header.Get("Audit-ID") != test.requestHeader {
 				t.Errorf("[%s] returned audit http header is not the same with the requested http header, expected: %s, get %s", test.desc, test.requestHeader, resp.Header.Get("Audit-ID"))
 			}
