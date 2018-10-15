@@ -163,7 +163,7 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 
 			// Get gRPC client service with endpoint.
 			timeout := kmsPluginConnectionTimeout
-			if provider.KMS.Timeout.Duration != 0 {
+			if provider.KMS != nil && provider.KMS.Timeout.Duration != 0 {
 				timeout = provider.KMS.Timeout.Duration
 			}
 			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, timeout)
