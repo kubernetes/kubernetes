@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -134,6 +135,41 @@ func (in *Unstructured) DeepCopy() *Unstructured {
 	*out = *in
 	out.Object = runtime.DeepCopyJSON(in.Object)
 	return out
+}
+
+// GetFieldValue returns the value at the given
+// path if it's a string, else error. E.g.:
+//   u.GetFieldValue("Kind") == "Deployment"
+//   u.GetFieldValue("spec.ports.port") == "8080"
+func (in *Unstructured) GetFieldValue(path string) (string, error) {
+	v, err := getFieldValue(in.Object, strings.Split(path, "."))
+	if err != nil {
+		return "", fmt.Errorf("'%s': %v", path, err)
+	}
+	return v, nil
+}
+
+func getFieldValue(
+	m map[string]interface{}, path []string) (string, error) {
+	if len(path) == 0 {
+		return "", errors.New("not found")
+	}
+	if len(path) == 1 {
+		if v, found := m[path[0]]; found {
+			if s, ok := v.(string); ok {
+				return s, nil
+			}
+			return "", errors.New("value not a string")
+		}
+		return "", errors.New("not found")
+	}
+	v := m[path[0]]
+	switch tv := v.(type) {
+	case map[string]interface{}:
+		return getFieldValue(tv, path[1:])
+	default:
+		return "", fmt.Errorf("unexpected type %#v", tv)
+	}
 }
 
 func (u *Unstructured) setNestedField(value interface{}, fields ...string) {

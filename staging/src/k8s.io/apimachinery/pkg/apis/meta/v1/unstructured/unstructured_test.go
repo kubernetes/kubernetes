@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
@@ -159,4 +158,71 @@ func setObjectMetaUsingAccessors(u, uCopy *unstructured.Unstructured) {
 	uCopy.SetInitializers(u.GetInitializers())
 	uCopy.SetFinalizers(u.GetFinalizers())
 	uCopy.SetClusterName(u.GetClusterName())
+}
+
+func TestGetFieldValue(t *testing.T) {
+	u := &unstructured.Unstructured{}
+	u.SetUnstructuredContent(map[string]interface{}{
+		"Kind": "Service",
+		"metadata": map[string]interface{}{
+			"labels": map[string]string{
+				"app": "application-name",
+			},
+			"name": "service-name",
+		},
+		"spec": map[string]interface{}{
+			"ports": map[string]interface{}{
+				"port": "80",
+			},
+		},
+	})
+
+	tests := []struct {
+		pathToField   string
+		expectedValue string
+		errorExpected bool
+		errorMsg      string
+	}{
+		{
+			pathToField:   "Kind",
+			expectedValue: "Service",
+			errorExpected: false,
+		},
+		{
+			pathToField:   "metadata.name",
+			expectedValue: "service-name",
+			errorExpected: false,
+		},
+		{
+			pathToField:   "metadata.non-existing-field",
+			errorExpected: true,
+			errorMsg:      "'metadata.non-existing-field': not found",
+		},
+		{
+			pathToField:   "spec.ports.port",
+			expectedValue: "80",
+			errorExpected: false,
+		},
+		{
+			pathToField:   "spec.ports",
+			errorExpected: true,
+			errorMsg:      "'spec.ports': value not a string",
+		},
+	}
+
+	for _, test := range tests {
+		s, err := u.GetFieldValue(test.pathToField)
+		if test.errorExpected {
+			if err == nil {
+				t.Fatalf("should return error, but no error returned")
+			}
+			if err.Error() != test.errorMsg {
+				t.Fatalf("expected err '%s', got '%v'", test.errorMsg, err)
+			}
+			continue
+		}
+		if test.expectedValue != s {
+			t.Fatalf("Got:%s expected:%s", s, test.expectedValue)
+		}
+	}
 }
