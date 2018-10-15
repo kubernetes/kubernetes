@@ -17,16 +17,16 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"time"
 
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 // cacheRecord holds the three return values of the authenticator.Token AuthenticateToken method
 type cacheRecord struct {
-	user user.Info
+	resp *authenticator.Response
 	ok   bool
 	err  error
 }
@@ -64,19 +64,21 @@ func newWithClock(authenticator authenticator.Token, successTTL, failureTTL time
 }
 
 // AuthenticateToken implements authenticator.Token
-func (a *cachedTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	// TODO(mikedanese): The key needs to incorporate any relevant data in the
+	// context.
 	if record, ok := a.cache.get(token); ok {
-		return record.user, record.ok, record.err
+		return record.resp, record.ok, record.err
 	}
 
-	user, ok, err := a.authenticator.AuthenticateToken(token)
+	resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
 
 	switch {
 	case ok && a.successTTL > 0:
-		a.cache.set(token, &cacheRecord{user: user, ok: ok, err: err}, a.successTTL)
+		a.cache.set(token, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
 	case !ok && a.failureTTL > 0:
-		a.cache.set(token, &cacheRecord{user: user, ok: ok, err: err}, a.failureTTL)
+		a.cache.set(token, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
 	}
 
-	return user, ok, err
+	return resp, ok, err
 }

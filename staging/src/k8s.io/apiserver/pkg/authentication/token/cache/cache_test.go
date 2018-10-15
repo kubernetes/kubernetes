@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apiserver/pkg/authentication/user"
-
 	"github.com/pborman/uuid"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func TestSimpleCache(t *testing.T) {
@@ -71,8 +71,8 @@ func testCache(cache cache, t *testing.T) {
 		t.Errorf("Expected null, false, got %#v, %v", result, ok)
 	}
 
-	record1 := &cacheRecord{user: &user.DefaultInfo{Name: "bob"}}
-	record2 := &cacheRecord{user: &user.DefaultInfo{Name: "alice"}}
+	record1 := &cacheRecord{resp: &authenticator.Response{User: &user.DefaultInfo{Name: "bob"}}}
+	record2 := &cacheRecord{resp: &authenticator.Response{User: &user.DefaultInfo{Name: "alice"}}}
 
 	// when empty, record is stored
 	cache.set("foo", record1, time.Hour)

@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
-	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
-
 	"github.com/golang/glog"
 	"gopkg.in/square/go-jose.v2/jwt"
+
+	"k8s.io/api/core/v1"
+	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 )
 
 func LegacyClaims(serviceAccount v1.ServiceAccount, secret v1.Secret) (*jwt.Claims, interface{}) {

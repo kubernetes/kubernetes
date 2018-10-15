@@ -296,7 +296,8 @@ func (c *claimsTest) run(t *testing.T) {
 		t.Fatalf("serialize token: %v", err)
 	}
 
-	got, ok, err := a.AuthenticateToken(token)
+	got, ok, err := a.AuthenticateToken(context.Background(), token)
+
 	if err != nil {
 		if !c.wantErr {
 			t.Fatalf("authenticate token: %v", err)
@@ -318,7 +319,7 @@ func (c *claimsTest) run(t *testing.T) {
 		t.Fatalf("expected authenticator to skip token")
 	}
 
-	gotUser := got.(*user.DefaultInfo)
+	gotUser := got.User.(*user.DefaultInfo)
 	if !reflect.DeepEqual(gotUser, c.want) {
 		t.Fatalf("wanted user=%#v, got=%#v", c.want, gotUser)
 	}

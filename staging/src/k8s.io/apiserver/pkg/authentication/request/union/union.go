@@ -21,7 +21,6 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests
@@ -51,20 +50,20 @@ func NewFailOnError(authRequestHandlers ...authenticator.Request) authenticator.
 }
 
 // AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.
-func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	var errlist []error
 	for _, currAuthRequestHandler := range authHandler.Handlers {
-		info, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
+		resp, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
 		if err != nil {
 			if authHandler.FailOnError {
-				return info, ok, err
+				return resp, ok, err
 			}
 			errlist = append(errlist, err)
 			continue
 		}
 
 		if ok {
-			return info, ok, err
+			return resp, ok, err
 		}
 	}
 

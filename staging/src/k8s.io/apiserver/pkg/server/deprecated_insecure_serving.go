@@ -23,6 +23,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
 )
@@ -77,9 +78,11 @@ func (s *DeprecatedInsecureServingInfo) NewLoopbackClientConfig() (*rest.Config,
 // but allows apiserver code to stop special-casing a nil user to skip authorization checks.
 type InsecureSuperuser struct{}
 
-func (InsecureSuperuser) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
-	return &user.DefaultInfo{
-		Name:   "system:unsecured",
-		Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
+func (InsecureSuperuser) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name:   "system:unsecured",
+			Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
+		},
 	}, true, nil
 }

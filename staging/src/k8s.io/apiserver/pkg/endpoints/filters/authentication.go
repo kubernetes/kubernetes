@@ -59,7 +59,7 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		if len(apiAuds) > 0 {
 			req = req.WithContext(genericapirequest.WithAudiences(req.Context(), apiAuds))
 		}
-		user, ok, err := auth.AuthenticateRequest(req)
+		resp, ok, err := auth.AuthenticateRequest(req)
 		if err != nil || !ok {
 			if err != nil {
 				glog.Errorf("Unable to authenticate the request due to an error: %v", err)
@@ -68,12 +68,15 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 			return
 		}
 
+		// TODO(mikedanese): verify the response audience matches one of apiAuds if
+		// non-empty
+
 		// authorization header is not required anymore in case of a successful authentication.
 		req.Header.Del("Authorization")
 
-		req = req.WithContext(genericapirequest.WithUser(req.Context(), user))
+		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 
-		authenticatedUserCounter.WithLabelValues(compressUsername(user.GetName())).Inc()
+		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
 
 		handler.ServeHTTP(w, req)
 	})
