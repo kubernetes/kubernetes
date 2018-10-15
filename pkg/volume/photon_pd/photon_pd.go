@@ -74,6 +74,10 @@ func (plugin *photonPersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.PhotonPersistentDisk != nil)
 }
 
+func (plugin *photonPersistentDiskPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *photonPersistentDiskPlugin) RequiresRemount() bool {
 	return false
 }

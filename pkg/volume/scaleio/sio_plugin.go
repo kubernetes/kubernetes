@@ -71,6 +71,10 @@ func (p *sioPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.ScaleIO != nil)
 }
 
+func (plugin *sioPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (p *sioPlugin) RequiresRemount() bool {
 	return false
 }

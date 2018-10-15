@@ -301,6 +301,10 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
+func (plugin *FakeVolumePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *FakeVolumePlugin) RequiresRemount() bool {
 	return false
 }
@@ -505,6 +509,10 @@ func (plugin *FakeFileVolumePlugin) GetVolumeName(spec *Spec) (string, error) {
 
 func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
+}
+
+func (plugin *FakeFileVolumePlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *FakeFileVolumePlugin) RequiresRemount() bool {

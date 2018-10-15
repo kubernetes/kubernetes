@@ -81,7 +81,7 @@ func (c *csiMountMgr) GetPath() string {
 
 func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) string {
 	specVolID := kstrings.EscapeQualifiedNameForDisk(specVolumeID)
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(csiPluginName), specVolID)
+	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(CSIPluginName), specVolID)
 }
 
 // volume.Mounter methods

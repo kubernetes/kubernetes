@@ -45,7 +45,8 @@ import (
 )
 
 const (
-	csiPluginName = "kubernetes.io/csi"
+	// CSIPluginName is the name of the in-tree CSI Plugin
+	CSIPluginName = "kubernetes.io/csi"
 
 	// TODO (vladimirvivien) implement a more dynamic way to discover
 	// the unix domain socket path for each installed csi driver.
@@ -181,7 +182,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 }
 
 func (p *csiPlugin) GetPluginName() string {
-	return csiPluginName
+	return CSIPluginName
 }
 
 // GetvolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle
@@ -201,6 +202,10 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	// TODO (vladimirvivien) CanSupport should also take into account
 	// the availability/registration of specified Driver in the volume source
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
+}
+
+func (p *csiPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (p *csiPlugin) RequiresRemount() bool {
