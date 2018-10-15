@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 QEMU_BIN_DIR=${QEMU_BIN_DIR:-/usr/bin}
 
@@ -28,4 +28,4 @@ if [ "${1}" = "--reset" ]; then
     )
 fi
 
-exec /qemu-binfmt-conf.sh --qemu-path="${QEMU_BIN_DIR}" $@
+exec $(dirname "${BASH_SOURCE}")/qemu-binfmt-conf.sh --qemu-path="${QEMU_BIN_DIR}" $@
