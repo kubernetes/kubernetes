@@ -286,6 +286,7 @@ filegroup(
         "//vendor/github.com/kr/fs:all-srcs",
         "//vendor/github.com/kr/pretty:all-srcs",
         "//vendor/github.com/kr/text:all-srcs",
+        "//vendor/github.com/kubernetes-csi/kubernetes-csi-migration-library:all-srcs",
         "//vendor/github.com/kubernetes/repo-infra/kazel:all-srcs",
         "//vendor/github.com/lib/pq:all-srcs",
         "//vendor/github.com/libopenstorage/openstorage/api:all-srcs",
