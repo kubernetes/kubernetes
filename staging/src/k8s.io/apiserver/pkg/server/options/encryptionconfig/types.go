@@ -86,5 +86,15 @@ type KMSConfig struct {
 	// the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string `json:"endpoint"`
 	// Timeout for gRPC calls to kms-plugin (ex. 5s).
-	Timeout metav1.Duration `json:"timeout"`
+	// Default (5s) is defined in a const (kmsPluginConnectionTimeout) in config.go.
+	// How to select a good timeout value:
+	// 1. Check kube-apiserver.log. If you see errors originating from grpc_service.go  (in the format of
+	// "failed to create connection to unix socket"), this may imply that kms-plugin is being started after the
+	// kube-apiserver - this typically leads to crash-looping of kube-apiserver, which is eventually resolved when
+	// kms-plugin is finally loaded.
+	// Based on the time of the first reported error and the successful startup-up of kube-apiserver,
+	// you should arrive at the appropriate timeout value for your environment.
+	// 2. Interactions between the envelope service and kms-plugin (both latencies and failures) are instrumented via
+	// prometheus metrics. See k8s.io/apiserver/pkg/storage/value/metrics.go for details.
+	Timeout metav1.Duration `json:"timeout,omitempty"`
 }
