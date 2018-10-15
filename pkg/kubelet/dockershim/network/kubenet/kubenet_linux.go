@@ -485,6 +485,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 	defer plugin.mu.Unlock()
 	// Assuming the ip of pod does not change. Try to retrieve ip from kubenet map first.
 	if podIP, ok := plugin.podIPs[id]; ok {
+		glog.V(3).Infof("get pod ip %s from plugin", podIP)
 		return &network.PodNetworkStatus{IP: net.ParseIP(podIP)}, nil
 	}
 
@@ -500,6 +501,7 @@ func (plugin *kubenetNetworkPlugin) GetPodNetworkStatus(namespace string, name s
 		return nil, err
 	}
 
+	glog.V(3).Infof("get pod ip %s from nsenter", ip)
 	plugin.podIPs[id] = ip.String()
 	return &network.PodNetworkStatus{IP: ip}, nil
 }

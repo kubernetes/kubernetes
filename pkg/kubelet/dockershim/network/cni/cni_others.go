@@ -20,8 +20,10 @@ package cni
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/containernetworking/cni/libcni"
+	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 )
@@ -60,6 +62,12 @@ func (plugin *cniNetworkPlugin) platformInit() error {
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+
+	podIP := plugin.GetPodIP(id)
+	if podIP != "" {
+		glog.V(3).Infof("get pod ip %s from plugin", podIP)
+		return &network.PodNetworkStatus{IP: net.ParseIP(podIP)}, nil
+	}
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
@@ -73,5 +81,7 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, err
 	}
 
+	glog.V(3).Infof("get pod ip %s from nsenter", ip)
+	plugin.SetPodIP(id, ip.String())
 	return &network.PodNetworkStatus{IP: ip}, nil
 }
