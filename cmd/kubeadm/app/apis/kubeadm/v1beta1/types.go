@@ -35,7 +35,7 @@ type InitConfiguration struct {
 	ClusterConfiguration `json:"-"`
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
-	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
+	// After that, the information in the fields IS NOT uploaded to the `kubeadm-config` ConfigMap
 	// that is used by `kubeadm upgrade` for instance. These fields must be omitempty.
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
@@ -70,7 +70,7 @@ type ClusterConfiguration struct {
 	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
 	// the BindPort is used.
 	// Possible usages are:
-	// e.g. In an cluster with more than one control plane instances, this field should be
+	// e.g. In a cluster with more than one control plane instances, this field should be
 	// assigned the address of the external load balancer in front of the
 	// control plane instances.
 	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
