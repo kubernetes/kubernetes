@@ -403,6 +403,13 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "add", "next", "next", "next"},
 			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-3", "node-8", "node-4"},
 		},
+		{
+			name:           "remove zone and add new to ensure exhausted is reset correctly",
+			nodesToAdd:     append(allNodes[3:5], allNodes[6:8]...),
+			nodesToRemove:  allNodes[3:5],
+			operations:     []string{"add", "add", "next", "next", "remove", "add", "add", "next", "next", "remove", "next", "next"},
+			expectedOutput: []string{"node-3", "node-4", "node-6", "node-7", "node-6", "node-7"},
+		},
 	}
 
 	for _, test := range tests {
