@@ -950,17 +950,15 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 
 	addIPv6Checks := false
 	if cfg.Discovery.BootstrapToken != nil {
-		for _, server := range cfg.Discovery.BootstrapToken.APIServerEndpoints {
-			ipstr, _, err := net.SplitHostPort(server)
-			if err == nil {
-				checks = append(checks,
-					HTTPProxyCheck{Proto: "https", Host: ipstr},
-				)
-				if !addIPv6Checks {
-					if ip := net.ParseIP(ipstr); ip != nil {
-						if ip.To4() == nil && ip.To16() != nil {
-							addIPv6Checks = true
-						}
+		ipstr, _, err := net.SplitHostPort(cfg.Discovery.BootstrapToken.APIServerEndpoint)
+		if err == nil {
+			checks = append(checks,
+				HTTPProxyCheck{Proto: "https", Host: ipstr},
+			)
+			if !addIPv6Checks {
+				if ip := net.ParseIP(ipstr); ip != nil {
+					if ip.To4() == nil && ip.To16() != nil {
+						addIPv6Checks = true
 					}
 				}
 			}

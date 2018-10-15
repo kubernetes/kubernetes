@@ -177,9 +177,14 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 				cfg.Discovery.File = fd
 			} else {
 				cfg.Discovery.BootstrapToken = btd
-				cfg.Discovery.BootstrapToken.APIServerEndpoints = args
 				if len(cfg.Discovery.BootstrapToken.Token) == 0 {
 					cfg.Discovery.BootstrapToken.Token = token
+				}
+				if len(args) > 0 {
+					if len(cfgPath) == 0 && len(args) > 1 {
+						glog.Warningf("[join] WARNING: More than one API server endpoint supplied on command line %v. Using the first one.", args)
+					}
+					cfg.Discovery.BootstrapToken.APIServerEndpoint = args[0]
 				}
 			}
 

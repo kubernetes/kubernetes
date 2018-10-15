@@ -40,9 +40,11 @@ func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinCon
 		}
 	} else {
 		out.Discovery.BootstrapToken = &kubeadm.BootstrapTokenDiscovery{
-			APIServerEndpoints:       in.DiscoveryTokenAPIServers,
 			CACertHashes:             in.DiscoveryTokenCACertHashes,
 			UnsafeSkipCAVerification: in.DiscoveryTokenUnsafeSkipCAVerification,
+		}
+		if len(in.DiscoveryTokenAPIServers) != 0 {
+			out.Discovery.BootstrapToken.APIServerEndpoint = in.DiscoveryTokenAPIServers[0]
 		}
 		if len(in.DiscoveryToken) != 0 {
 			out.Discovery.BootstrapToken.Token = in.DiscoveryToken
@@ -64,7 +66,7 @@ func Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kubeadm
 
 	if in.Discovery.BootstrapToken != nil {
 		out.DiscoveryToken = in.Discovery.BootstrapToken.Token
-		out.DiscoveryTokenAPIServers = in.Discovery.BootstrapToken.APIServerEndpoints
+		out.DiscoveryTokenAPIServers = []string{in.Discovery.BootstrapToken.APIServerEndpoint}
 		out.DiscoveryTokenCACertHashes = in.Discovery.BootstrapToken.CACertHashes
 		out.DiscoveryTokenUnsafeSkipCAVerification = in.Discovery.BootstrapToken.UnsafeSkipCAVerification
 
