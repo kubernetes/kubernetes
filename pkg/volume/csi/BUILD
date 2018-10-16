@@ -14,6 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
+        "//pkg/kubelet/util/pluginwatcher:go_default_library",
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi/nodeinfomanager:go_default_library",
@@ -73,7 +74,6 @@ go_test(
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/fake:go_default_library",
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi:go_default_library",
-        "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

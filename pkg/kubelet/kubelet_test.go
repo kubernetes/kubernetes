@@ -2306,7 +2306,7 @@ func TestCSIPluginHandlerRegistration(t *testing.T) {
 		t.Errorf("Expected CSIPlugin to have been registered")
 	}
 
-	if _, ok := csiPluginHandler.(*csi.RegistrationHandler); !ok {
+	if _, ok := csiPluginHandler.(*csi.Plugin); !ok {
 		t.Errorf("Expected registration handler to be a CSI Registration handler")
 	}
 }
