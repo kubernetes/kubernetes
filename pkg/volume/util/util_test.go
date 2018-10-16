@@ -44,7 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-var nodeLabels map[string]string = map[string]string{
+var nodeLabels = map[string]string{
 	"test-key1": "test-value1",
 	"test-key2": "test-value2",
 }

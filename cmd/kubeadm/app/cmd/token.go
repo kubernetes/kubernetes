@@ -211,10 +211,8 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-	err := phaseutil.SetKubernetesVersion(client, cfg)
-	if err != nil {
-		return err
-	}
+	phaseutil.SetKubernetesVersion(cfg)
+
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	glog.V(1).Infoln("[token] loading configurations")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)

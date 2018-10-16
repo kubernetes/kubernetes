@@ -253,7 +253,7 @@ func getLogsAction(namespace string, opts *corev1.PodLogOptions) testclient.Acti
 	action.Verb = "get"
 	action.Namespace = namespace
 	action.Resource = podsResource
-	action.Subresource = "logs"
+	action.Subresource = "log"
 	action.Value = opts
 	return action
 }

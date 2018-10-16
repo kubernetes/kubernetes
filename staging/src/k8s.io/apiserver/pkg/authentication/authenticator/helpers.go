@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2018 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcdtest
+package authenticator
 
-import (
-	"os"
-	"path"
-)
-
-// Returns the prefix set via the ETCD_PREFIX environment variable (if any).
-func PathPrefix() string {
-	pref := os.Getenv("ETCD_PREFIX")
-	if pref == "" {
-		pref = "registry"
-	}
-	return path.Join("/", pref)
-}
-
-// Adds the ETCD_PREFIX to the provided key
-func AddPrefix(in string) string {
-	return path.Join(PathPrefix(), in)
-}
+// Audiences is a container for the Audiences of a token.
+type Audiences []string

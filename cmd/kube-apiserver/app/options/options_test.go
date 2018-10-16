@@ -111,7 +111,7 @@ func TestAddFlags(t *testing.T) {
 		"--proxy-client-cert-file=/var/run/kubernetes/proxy.crt",
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
 		"--request-timeout=2m",
-		"--storage-backend=etcd2",
+		"--storage-backend=etcd3",
 	}
 	fs.Parse(args)
 
@@ -141,15 +141,14 @@ func TestAddFlags(t *testing.T) {
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
 			StorageConfig: storagebackend.Config{
-				Type:                     "etcd2",
-				ServerList:               nil,
-				Prefix:                   "/registry",
-				DeserializationCacheSize: 0,
-				KeyFile:                  "/var/run/kubernetes/etcd.key",
-				CAFile:                   "/var/run/kubernetes/etcdca.crt",
-				CertFile:                 "/var/run/kubernetes/etcdce.crt",
-				CompactionInterval:       storagebackend.DefaultCompactInterval,
-				CountMetricPollPeriod:    time.Minute,
+				Type:                  "etcd3",
+				ServerList:            nil,
+				Prefix:                "/registry",
+				KeyFile:               "/var/run/kubernetes/etcd.key",
+				CAFile:                "/var/run/kubernetes/etcdca.crt",
+				CertFile:              "/var/run/kubernetes/etcdce.crt",
+				CompactionInterval:    storagebackend.DefaultCompactInterval,
+				CountMetricPollPeriod: time.Minute,
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,

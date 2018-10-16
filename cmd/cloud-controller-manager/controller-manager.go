@@ -39,7 +39,7 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 
 	command := app.NewCloudControllerManagerCommand()
 

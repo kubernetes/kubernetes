@@ -123,7 +123,7 @@ func (c *FakeNamespaces) DeleteCollection(options *v1.DeleteOptions, listOptions
 // Patch applies the patch and returns the patched namespace.
 func (c *FakeNamespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, data, subresources...), &core.Namespace{})
+		Invokes(testing.NewRootPatchSubresourceAction(namespacesResource, name, pt, data, subresources...), &core.Namespace{})
 	if obj == nil {
 		return nil, err
 	}

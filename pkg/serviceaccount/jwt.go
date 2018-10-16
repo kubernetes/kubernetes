@@ -125,7 +125,7 @@ type jwtTokenAuthenticator struct {
 	validator Validator
 }
 
-// Validator is called by the JWT token authentictaor to apply domain specific
+// Validator is called by the JWT token authenticator to apply domain specific
 // validation to a token and extract user information.
 type Validator interface {
 	// Validate validates a token and returns user information or an error.

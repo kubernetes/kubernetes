@@ -1111,7 +1111,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 
 		outOfRangeNodePort := 0
-		rand.Seed(time.Now().UTC().UnixNano())
+		rand.Seed(time.Now().UnixNano())
 		for {
 			outOfRangeNodePort = 1 + rand.Intn(65535)
 			if !framework.ServiceNodePortRange.Contains(outOfRangeNodePort) {

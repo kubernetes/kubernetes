@@ -79,7 +79,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
 
-		mathrand.Seed(time.Now().UTC().UnixNano())
+		mathrand.Seed(time.Now().UnixNano())
 	})
 
 	Context("schedule pods each with a PD, delete pod and verify detach [Slow]", func() {

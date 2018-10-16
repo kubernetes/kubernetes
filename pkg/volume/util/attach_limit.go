@@ -33,7 +33,7 @@ const (
 	// Amazon recommends no more than 40; the system root volume uses at least one.
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
 	DefaultMaxEBSVolumes = 39
-	// DefaultMaxEBSM5VolumeLimit is default EBS volume limit on m5 and c5 instances
+	// DefaultMaxEBSNitroVolumeLimit is default EBS volume limit on m5 and c5 instances
 	DefaultMaxEBSNitroVolumeLimit = 25
 	// AzureVolumeLimitKey stores resource name that will store volume limits for Azure
 	AzureVolumeLimitKey = "attachable-volumes-azure-disk"

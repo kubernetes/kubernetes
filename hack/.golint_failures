@@ -411,8 +411,6 @@ pkg/volume/cephfs
 pkg/volume/configmap
 pkg/volume/csi/fake
 pkg/volume/empty_dir
-pkg/volume/fc
-pkg/volume/flocker
 pkg/volume/git_repo
 pkg/volume/host_path
 pkg/volume/iscsi
@@ -425,7 +423,6 @@ pkg/volume/scaleio
 pkg/volume/secret
 pkg/volume/storageos
 pkg/volume/testing
-pkg/volume/util
 pkg/volume/util/fs
 pkg/volume/util/recyclerclient
 pkg/volume/util/volumepathhandler
