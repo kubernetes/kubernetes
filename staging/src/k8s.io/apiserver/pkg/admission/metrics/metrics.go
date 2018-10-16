@@ -112,17 +112,17 @@ func newAdmissionMetrics() *AdmissionMetrics {
 	// Admission metrics for a step of the admission flow. The entire admission flow is broken down into a series of steps
 	// Each step is identified by a distinct type label value.
 	step := newMetricSet("step",
-		[]string{"type", "operation", "group", "version", "resource", "subresource", "rejected"},
+		[]string{"type", "operation", "rejected"},
 		"Admission sub-step %s, broken out for each operation and API resource and step type (validate or admit).", true)
 
 	// Built-in admission controller metrics. Each admission controller is identified by name.
 	controller := newMetricSet("controller",
-		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
+		[]string{"name", "type", "operation", "rejected"},
 		"Admission controller %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	// Admission webhook metrics. Each webhook is identified by name.
 	webhook := newMetricSet("webhook",
-		[]string{"name", "type", "operation", "group", "version", "resource", "subresource", "rejected"},
+		[]string{"name", "type", "operation", "rejected"},
 		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
 	step.mustRegister()
@@ -139,20 +139,17 @@ func (m *AdmissionMetrics) reset() {
 
 // ObserveAdmissionStep records admission related metrics for a admission step, identified by step type.
 func (m *AdmissionMetrics) ObserveAdmissionStep(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	gvr := attr.GetResource()
-	m.step.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.step.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 // ObserveAdmissionController records admission related metrics for a built-in admission controller, identified by it's plugin handler name.
 func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	gvr := attr.GetResource()
-	m.controller.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.controller.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 // ObserveWebhook records admission related metrics for a admission webhook.
 func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
-	gvr := attr.GetResource()
-	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), gvr.Group, gvr.Version, gvr.Resource, attr.GetSubresource(), strconv.FormatBool(rejected))...)
+	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
 }
 
 type metricSet struct {
