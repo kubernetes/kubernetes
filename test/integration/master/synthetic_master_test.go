@@ -367,18 +367,19 @@ func TestConstructBody(t *testing.T) {
 	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
 
 	requests := []struct {
-		val   string
-		size  int
-		field string
+		val				string
+		size			int
+		field			string
+		expectedSize	int
 	}{
-		{labelString, 1, "labels"},
-		{labelString, Deployment1_5MegabyteSize, "labels"},
-		{labelString, DeploymentTwoMegabyteSize, "labels"},
-		{labelString, 1, "annotations"},
-		{labelString, Deployment1_5MegabyteSize, "annotations"},
-		{finalizerString, 1, "finalizers"},
-		{finalizerString, Deployment1_5MegabyteSize, "finalizers"},
-		{finalizerString, DeploymentTwoMegabyteSize, "finalizers"},
+		{labelString, 1, "labels", baseLabelSize + factor*1},
+		{labelString, Deployment1_5MegabyteSize, "labels", baseLabelSize + factor*Deployment1_5MegabyteSize},
+		{labelString, DeploymentTwoMegabyteSize, "labels", baseLabelSize + factor*DeploymentTwoMegabyteSize},
+		{labelString, 1, "annotations", baseAnnotationsSize + factor*1},
+		{labelString, Deployment1_5MegabyteSize, "annotations", baseAnnotationsSize + factor*Deployment1_5MegabyteSize},
+		{finalizerString, 1, "finalizers", baseFinalizersSize + factor*1},
+		{finalizerString, Deployment1_5MegabyteSize, "finalizers", baseFinalizersSize + factor*Deployment1_5MegabyteSize},
+		{finalizerString, DeploymentTwoMegabyteSize, "finalizers", baseFinalizersSize + factor*DeploymentTwoMegabyteSize},
 	}
 
 	for _, r := range requests {
@@ -388,23 +389,9 @@ func TestConstructBody(t *testing.T) {
 
 			if err != nil {
 				t.Errorf("could not encode deployment object: %s", err.Error())
-			} else {
-				var expectedSize int
-				switch r.field {
-				case "labels":
-					expectedSize = baseLabelSize + factor*r.size
-				case "annotations":
-					expectedSize = baseAnnotationsSize + factor*r.size
-				case "finalizers":
-					expectedSize = baseFinalizersSize + factor*r.size
-				default:
-					t.Fatalf("Unexpected field: %s passed to test", r.field)
+			} else if len(data) != r.expectedSize {
+					t.Errorf("expected size %d; got %d", r.expectedSize, len(data))
 				}
-
-				if len(data) != expectedSize {
-					t.Errorf("expected size %d; got %d", expectedSize, len(data))
-				}
-			}
 		})
 	}
 }
