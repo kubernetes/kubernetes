@@ -367,10 +367,10 @@ func TestConstructBody(t *testing.T) {
 	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
 
 	requests := []struct {
-		val				string
-		size			int
-		field			string
-		expectedSize	int
+		val          string
+		size         int
+		field        string
+		expectedSize int
 	}{
 		{labelString, 1, "labels", baseLabelSize + factor*1},
 		{labelString, Deployment1_5MegabyteSize, "labels", baseLabelSize + factor*Deployment1_5MegabyteSize},
@@ -390,8 +390,8 @@ func TestConstructBody(t *testing.T) {
 			if err != nil {
 				t.Errorf("could not encode deployment object: %s", err.Error())
 			} else if len(data) != r.expectedSize {
-					t.Errorf("expected size %d; got %d", r.expectedSize, len(data))
-				}
+				t.Errorf("expected size %d; got %d", r.expectedSize, len(data))
+			}
 		})
 	}
 }
