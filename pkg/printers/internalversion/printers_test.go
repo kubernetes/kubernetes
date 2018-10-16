@@ -57,11 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
-func init() {
-	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &TestPrintType{})
-	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &TestPrintType{})
-}
-
 var testData = TestStruct{
 	TypeMeta:   metav1.TypeMeta{APIVersion: "foo/bar", Kind: "TestStruct"},
 	Key:        "testValue",
