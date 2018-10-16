@@ -140,12 +140,10 @@ func TestValidatePodDisruptionBudgetUpdate(t *testing.T) {
 			generations: []int64{int64(2), int64(3)},
 			specs: []policy.PodDisruptionBudgetSpec{
 				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c2,
+					MinAvailable: &c1,
 				},
 				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c2,
+					MinAvailable: &c1,
 				},
 			},
 			status: []policy.PodDisruptionBudgetStatus{
@@ -163,7 +161,7 @@ func TestValidatePodDisruptionBudgetUpdate(t *testing.T) {
 			ok: true,
 		},
 		{
-			name:        "only update pdb spec",
+			name:        "update pdb spec causing clash",
 			generations: []int64{int64(2), int64(3)},
 			specs: []policy.PodDisruptionBudgetSpec{
 				{
@@ -192,7 +190,6 @@ func TestValidatePodDisruptionBudgetUpdate(t *testing.T) {
 					MaxUnavailable: &c2,
 				},
 				{
-					MinAvailable:   &c1,
 					MaxUnavailable: &c3,
 				},
 			},
@@ -208,7 +205,7 @@ func TestValidatePodDisruptionBudgetUpdate(t *testing.T) {
 					DesiredHealthy:        3,
 				},
 			},
-			ok: false,
+			ok: true,
 		},
 	}
 
@@ -219,9 +216,9 @@ func TestValidatePodDisruptionBudgetUpdate(t *testing.T) {
 
 		pdb.Spec = tc.specs[1]
 		pdb.Generation = tc.generations[1]
-		oldPdb.Status = tc.status[1]
+		pdb.Status = tc.status[1]
 
-		errs := ValidatePodDisruptionBudgetUpdate(oldPdb, pdb)
+		errs := ValidatePodDisruptionBudgetUpdate(pdb, oldPdb)
 		if tc.ok && len(errs) > 0 {
 			t.Errorf("[%d:%s] unexpected errors: %v", i, tc.name, errs)
 		} else if !tc.ok && len(errs) == 0 {
