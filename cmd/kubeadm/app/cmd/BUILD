@@ -27,6 +27,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/phases:go_default_library",
+        "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
         "//cmd/kubeadm/app/cmd/upgrade:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/componentconfigs:go_default_library",
