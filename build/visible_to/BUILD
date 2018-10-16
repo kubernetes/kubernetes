@@ -391,7 +391,7 @@ package_group(
     name = "pkg_kubectl_util_CONSUMERS",
     packages = [
         "//pkg/kubectl",
-        "//pkg/kubectl/cmd",
+        "//pkg/kubectl/cmd/...",
         "//pkg/kubectl/generate",
         "//pkg/kubectl/generate/versioned",
         "//pkg/kubectl/proxy",
