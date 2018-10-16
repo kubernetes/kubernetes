@@ -74,7 +74,7 @@ message Event {
   optional string userAgent = 18;
 
   // Object reference this request is targeted at.
-  // Does not apply for List-type requests, or non-resource requests.
+  // Does not apply for non-resource requests.
   // +optional
   optional ObjectReference objectRef = 11;
 

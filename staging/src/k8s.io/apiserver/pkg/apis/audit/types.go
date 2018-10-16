@@ -104,7 +104,7 @@ type Event struct {
 	// +optional
 	UserAgent string
 	// Object reference this request is targeted at.
-	// Does not apply for List-type requests, or non-resource requests.
+	// Does not apply for non-resource requests.
 	// +optional
 	ObjectRef *ObjectReference
 	// The response status, populated even when the ResponseObject is not a Status type.
