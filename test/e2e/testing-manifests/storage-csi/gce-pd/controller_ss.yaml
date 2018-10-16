@@ -13,6 +13,7 @@ spec:
       labels:
         app: csi-gce-pd-driver
     spec:
+      serviceAccountName: csi-controller
       containers:
         - name: csi-external-provisioner
           imagePullPolicy: Always

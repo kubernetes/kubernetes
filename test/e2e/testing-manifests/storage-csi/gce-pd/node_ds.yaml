@@ -12,6 +12,7 @@ spec:
       labels:
         app: csi-gce-driver
     spec:
+      serviceAccountName: csi-driver-registrar
       containers:
         - name: csi-driver-registrar
           imagePullPolicy: Always
