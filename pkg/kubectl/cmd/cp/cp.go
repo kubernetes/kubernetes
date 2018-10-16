@@ -311,7 +311,7 @@ func stripPathShortcuts(p string) string {
 	}
 
 	// trim leftover {".", ".."}
-	if (newPath == "." || newPath == "..") {
+	if newPath == "." || newPath == ".." {
 		newPath = ""
 	}
 
