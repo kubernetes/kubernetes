@@ -379,10 +379,16 @@ func TestAddNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 			name:         "empty node",
 			driverName:   "com.example.csi/driver1",
 			existingNode: generateNode(nil /* nodeIDs */, nil /* labels */, nil /*capacity*/),
-			inputNodeID:  "com.example.csi/csi-node1",
+			inputTopology: &csi.Topology{
+				Segments: map[string]string{
+					"com.example.csi/zone": "zoneA",
+				},
+			},
+			inputNodeID: "com.example.csi/csi-node1",
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1": "com.example.csi/csi-node1",
 			},
+			expectedLabels: map[string]string{"com.example.csi/zone": "zoneA"},
 		},
 		{
 			name:       "pre-existing node info from the same driver",
@@ -392,10 +398,16 @@ func TestAddNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 					"com.example.csi/driver1": "com.example.csi/csi-node1",
 				},
 				nil /* labels */, nil /*capacity*/),
+			inputTopology: &csi.Topology{
+				Segments: map[string]string{
+					"com.example.csi/zone": "zoneA",
+				},
+			},
 			inputNodeID: "com.example.csi/csi-node1",
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1": "com.example.csi/csi-node1",
 			},
+			expectedLabels: map[string]string{"com.example.csi/zone": "zoneA"},
 		},
 		{
 			name:       "pre-existing node info from different driver",
@@ -405,11 +417,17 @@ func TestAddNodeInfo_CSINodeInfoDisabled(t *testing.T) {
 					"net.example.storage/other-driver": "net.example.storage/test-node",
 				},
 				nil /* labels */, nil /*capacity*/),
+			inputTopology: &csi.Topology{
+				Segments: map[string]string{
+					"com.example.csi/zone": "zoneA",
+				},
+			},
 			inputNodeID: "com.example.csi/csi-node1",
 			expectedNodeIDMap: map[string]string{
 				"com.example.csi/driver1":          "com.example.csi/csi-node1",
 				"net.example.storage/other-driver": "net.example.storage/test-node",
 			},
+			expectedLabels: map[string]string{"com.example.csi/zone": "zoneA"},
 		},
 	}
 
@@ -718,12 +736,12 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 			}
 		}
 
-		if csiNodeInfoEnabled {
-			// Topology labels
-			if !helper.Semantic.DeepEqual(node.Labels, tc.expectedLabels) {
-				t.Errorf("expected topology labels to be %v; got: %v", tc.expectedLabels, node.Labels)
-			}
+		// Topology labels should be set even if csiNodeInfoEnabled is false
+		if !helper.Semantic.DeepEqual(node.Labels, tc.expectedLabels) {
+			t.Errorf("expected topology labels to be %v; got: %v", tc.expectedLabels, node.Labels)
+		}
 
+		if csiNodeInfoEnabled {
 			/* CSINodeInfo validation */
 			nodeInfo, err := csiClient.Csi().CSINodeInfos().Get(nodeName, metav1.GetOptions{})
 			if tc.expectNoNodeInfo && errors.IsNotFound(err) {
