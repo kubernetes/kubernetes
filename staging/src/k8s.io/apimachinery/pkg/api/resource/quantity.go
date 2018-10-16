@@ -76,7 +76,7 @@ import (
 // form, or don't diff.)
 //
 // This format is intended to make it difficult to use these numbers without
-// writing some sort of special handling code in the hopes that that will
+// writing some sort of special handling code in the hopes that will
 // cause implementors to also use a fixed point implementation.
 //
 // +protobuf=true
