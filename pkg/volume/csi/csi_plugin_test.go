@@ -48,7 +48,7 @@ import (
 )
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*CSIPlugin, string) {
+func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*Plugin, string) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -75,9 +75,9 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecs
 		t.Fatalf("can't find plugin %v", PluginName)
 	}
 
-	csiPlug, ok := plug.(*CSIPlugin)
+	csiPlug, ok := plug.(*Plugin)
 	if !ok {
-		t.Fatalf("cannot assert plugin to be type CSIPlugin")
+		t.Fatalf("cannot assert plugin to be type Plugin")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
@@ -612,7 +612,7 @@ func TestRegisterPlugin(t *testing.T) {
 	}
 }
 
-func TestCSIPluginInit(t *testing.T) {
+func TestPluginInit(t *testing.T) {
 	testcases := map[string]struct {
 		expectedErrMsg  string
 		registryEnabled bool
@@ -623,7 +623,7 @@ func TestCSIPluginInit(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			plugin := CSIPlugin{}
+			plugin := Plugin{}
 
 			csiClient := fakecsi.NewSimpleClientset(
 				getCSIDriver("fake csi driver name", nil, nil),
