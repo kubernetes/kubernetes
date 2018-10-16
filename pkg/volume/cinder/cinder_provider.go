@@ -35,7 +35,7 @@ func init() {
 	openstack.RegisterMetrics()
 
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
-		cinder, err := NewCinder(config)
+		cinder, err := newCinder(config)
 		if err != nil {
 			return nil, err
 		}
@@ -43,7 +43,7 @@ func init() {
 	})
 }
 
-func NewCinder(config io.Reader) (*Cinder, error) {
+func newCinder(config io.Reader) (*cinder, error) {
 	cfg, err := openstack.ReadConfig(config)
 	if err != nil {
 		return nil, err
@@ -52,93 +52,93 @@ func NewCinder(config io.Reader) (*Cinder, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Cinder{
+	return &cinder{
 		os: os,
 	}, nil
 }
 
-type Cinder struct {
+type cinder struct {
 	os cindervolume.BlockStorageProvider
 }
 
-func (cinder Cinder) AttachDisk(instanceID, volumeID string) (string, error) {
+func (cinder cinder) AttachDisk(instanceID, volumeID string) (string, error) {
 	return cinder.os.AttachDisk(instanceID, volumeID)
 }
 
-func (cinder Cinder) DetachDisk(instanceID, volumeID string) error {
+func (cinder cinder) DetachDisk(instanceID, volumeID string) error {
 	return cinder.os.DetachDisk(instanceID, volumeID)
 }
 
-func (cinder Cinder) DeleteVolume(volumeID string) error {
+func (cinder cinder) DeleteVolume(volumeID string) error {
 	return cinder.os.DeleteVolume(volumeID)
 }
 
-func (cinder Cinder) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
+func (cinder cinder) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
 	return cinder.os.CreateVolume(name, size, vtype, availability, tags)
 }
 
-func (cinder Cinder) GetDevicePath(volumeID string) (string, error) {
+func (cinder cinder) GetDevicePath(volumeID string) (string, error) {
 	return cinder.os.GetDevicePath(volumeID)
 }
 
-func (cinder Cinder) InstanceID() (string, error) {
+func (cinder cinder) InstanceID() (string, error) {
 	return cinder.os.InstanceID()
 }
 
-func (cinder Cinder) GetAttachmentDiskPath(instanceID, volumeID string) (string, error) {
+func (cinder cinder) GetAttachmentDiskPath(instanceID, volumeID string) (string, error) {
 	return cinder.os.GetAttachmentDiskPath(instanceID, volumeID)
 }
 
-func (cinder Cinder) OperationPending(diskName string) (bool, string, error) {
+func (cinder cinder) OperationPending(diskName string) (bool, string, error) {
 	return cinder.os.OperationPending(diskName)
 }
 
-func (cinder Cinder) DiskIsAttached(instanceID, volumeID string) (bool, error) {
+func (cinder cinder) DiskIsAttached(instanceID, volumeID string) (bool, error) {
 	return cinder.os.DiskIsAttached(instanceID, volumeID)
 }
 
-func (cinder Cinder) DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error) {
+func (cinder cinder) DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error) {
 	return cinder.os.DiskIsAttachedByName(nodeName, volumeID)
 }
 
-func (cinder Cinder) DisksAreAttachedByName(nodeName types.NodeName, volumeIDs []string) (map[string]bool, error) {
+func (cinder cinder) DisksAreAttachedByName(nodeName types.NodeName, volumeIDs []string) (map[string]bool, error) {
 	return cinder.os.DisksAreAttachedByName(nodeName, volumeIDs)
 }
 
-func (cinder Cinder) ShouldTrustDevicePath() bool {
+func (cinder cinder) ShouldTrustDevicePath() bool {
 	return cinder.os.ShouldTrustDevicePath()
 }
 
-func (cinder Cinder) Instances() (cloudprovider.Instances, bool) {
+func (cinder cinder) Instances() (cloudprovider.Instances, bool) {
 	return cinder.os.Instances()
 }
 
-func (cinder Cinder) ExpandVolume(volumeID string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
+func (cinder cinder) ExpandVolume(volumeID string, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	return cinder.os.ExpandVolume(volumeID, oldSize, newSize)
 }
 
-func (cinder Cinder) Clusters() (cloudprovider.Clusters, bool) {
+func (cinder cinder) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
-func (cinder Cinder) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
+func (cinder cinder) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
 
-func (cinder Cinder) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+func (cinder cinder) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return nil, false
 }
 
-func (cinder Cinder) Zones() (cloudprovider.Zones, bool) {
+func (cinder cinder) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-func (cinder Cinder) Routes() (cloudprovider.Routes, bool) {
+func (cinder cinder) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
-func (cinder Cinder) ProviderName() string {
+func (cinder cinder) ProviderName() string {
 	return ProviderName
 }
 
-func (cinder Cinder) HasClusterID() bool {
+func (cinder cinder) HasClusterID() bool {
 	return true
 }
