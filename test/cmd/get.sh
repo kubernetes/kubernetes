@@ -162,7 +162,7 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" 'valid-pod:'
 
   ## check --allow-missing-template-keys=false results in an error for a missing key with jsonpath
-  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' "${kube_flags[@]}")
+  output_message=$(! kubectl get pod valid-pod --allow-missing-template-keys=false -o jsonpath='{.missing}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'missing is not found'
 
   ## check --allow-missing-template-keys=false results in an error for a missing key with go
