@@ -162,7 +162,7 @@ type NodeRegistrationOptions struct {
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
-	// Flags have higher higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 }
 
