@@ -18,10 +18,12 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // cacheRecord holds the three return values of the authenticator.Token AuthenticateToken method
@@ -59,15 +61,16 @@ func newWithClock(authenticator authenticator.Token, successTTL, failureTTL time
 		authenticator: authenticator,
 		successTTL:    successTTL,
 		failureTTL:    failureTTL,
-		cache:         newStripedCache(32, fnvKeyFunc, func() cache { return newSimpleCache(128, clock) }),
+		cache:         newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock) }),
 	}
 }
 
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-	// TODO(mikedanese): The key needs to incorporate any relevant data in the
-	// context.
-	if record, ok := a.cache.get(token); ok {
+	auds, _ := request.AudiencesFrom(ctx)
+
+	key := keyFunc(auds, token)
+	if record, ok := a.cache.get(key); ok {
 		return record.resp, record.ok, record.err
 	}
 
@@ -75,10 +78,14 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 
 	switch {
 	case ok && a.successTTL > 0:
-		a.cache.set(token, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
+		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
 	case !ok && a.failureTTL > 0:
-		a.cache.set(token, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
+		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
 	}
 
 	return resp, ok, err
+}
+
+func keyFunc(auds []string, token string) string {
+	return fmt.Sprintf("%#v|%v", auds, token)
 }

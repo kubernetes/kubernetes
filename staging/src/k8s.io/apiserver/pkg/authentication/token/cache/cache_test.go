@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/pborman/uuid"
+
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -36,11 +37,11 @@ func BenchmarkSimpleCache(b *testing.B) {
 }
 
 func TestStripedCache(t *testing.T) {
-	testCache(newStripedCache(32, fnvKeyFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), t)
+	testCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), t)
 }
 
 func BenchmarkStripedCache(b *testing.B) {
-	benchmarkCache(newStripedCache(32, fnvKeyFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), b)
+	benchmarkCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), b)
 }
 
 func benchmarkCache(cache cache, b *testing.B) {

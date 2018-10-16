@@ -25,6 +25,7 @@ import (
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestCachedTokenAuthenticator(t *testing.T) {
@@ -102,5 +103,26 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 	a.AuthenticateToken(context.Background(), "usertoken3")
 	if !reflect.DeepEqual(calledWithToken, []string{"usertoken1", "usertoken2", "usertoken3"}) {
 		t.Errorf("Expected token calls, got %v", calledWithToken)
+	}
+}
+
+func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
+	resultUsers := make(map[string]user.Info)
+	fakeAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+		auds, _ := request.AudiencesFrom(ctx)
+		return &authenticator.Response{User: resultUsers[auds[0]+token]}, true, nil
+	})
+	fakeClock := utilclock.NewFakeClock(time.Now())
+
+	a := newWithClock(fakeAuth, time.Minute, 0, fakeClock)
+
+	resultUsers["audAusertoken1"] = &user.DefaultInfo{Name: "user1"}
+	resultUsers["audBusertoken1"] = &user.DefaultInfo{Name: "user1-different"}
+
+	if u, ok, _ := a.AuthenticateToken(request.WithAudiences(context.Background(), []string{"audA"}), "usertoken1"); !ok || u.User.GetName() != "user1" {
+		t.Errorf("Expected user1")
+	}
+	if u, ok, _ := a.AuthenticateToken(request.WithAudiences(context.Background(), []string{"audB"}), "usertoken1"); !ok || u.User.GetName() != "user1-different" {
+		t.Errorf("Expected user1-different")
 	}
 }
