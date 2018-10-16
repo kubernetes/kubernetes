@@ -1,57 +1,57 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ingress-{{ juju_application }}-nginx
+  name: ingress-nginx-{{ juju_application }}
   labels:
     cdk-{{ juju_application }}-ingress: "true"
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: nginx-configuration
-  namespace: ingress-{{ juju_application }}-nginx
+  name: nginx-configuration-{{ juju_application }}
+  namespace: ingress-nginx-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: tcp-services
-  namespace: ingress-{{ juju_application }}-nginx
+  name: tcp-services-{{ juju_application }}
+  namespace: ingress-nginx-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 ---
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: udp-services
-  namespace: ingress-{{ juju_application }}-nginx
+  name: udp-services-{{ juju_application }}
+  namespace: ingress-nginx-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: nginx-ingress-{{ juju_application }}-serviceaccount
-  namespace: ingress-{{ juju_application }}-nginx
+  name: nginx-ingress-serviceaccount-{{ juju_application }}
+  namespace: ingress-nginx-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
-  name: nginx-ingress-{{ juju_application }}-clusterrole
+  name: nginx-ingress-clusterrole-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 rules:
   - apiGroups:
@@ -104,10 +104,10 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
-  name: nginx-ingress-{{ juju_application }}-role
+  name: nginx-ingress-role-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 rules:
   - apiGroups:
@@ -148,62 +148,62 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
-  name: nginx-ingress-role-nisa-{{ juju_application }}-binding
+  name: nginx-ingress-role-nisa-binding-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: nginx-ingress-{{ juju_application }}-role
+  name: nginx-ingress-role-{{ juju_application }}
 subjects:
   - kind: ServiceAccount
-    name: nginx-ingress-{{ juju_application }}-serviceaccount
-    namespace: ingress-{{ juju_application }}-nginx
+    name: nginx-ingress-serviceaccount-{{ juju_application }}
+    namespace: ingress-nginx-{{ juju_application }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: nginx-ingress-clusterrole-nisa-{{ juju_application }}-binding
+  name: nginx-ingress-clusterrole-nisa-binding-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: nginx-ingress-{{ juju_application }}-clusterrole
+  name: nginx-ingress-clusterrole-{{ juju_application }}
 subjects:
   - kind: ServiceAccount
-    name: nginx-ingress-{{ juju_application }}-serviceaccount
-    namespace: ingress-{{ juju_application }}-nginx
+    name: nginx-ingress-serviceaccount-{{ juju_application }}
+    namespace: ingress-nginx-{{ juju_application }}
 ---
 apiVersion: {{ daemonset_api_version }}
 kind: DaemonSet
 metadata:
-  name: nginx-ingress-{{ juju_application }}-controller
-  namespace: ingress-{{ juju_application }}-nginx
+  name: nginx-ingress-controller-{{ juju_application }}
+  namespace: ingress-nginx-{{ juju_application }}
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+    app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
     juju-application: nginx-ingress-{{ juju_application }}
     cdk-{{ juju_application }}-ingress: "true"
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: ingress-nginx
-      app.kubernetes.io/part-of: ingress-nginx
+      app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+      app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: ingress-nginx
-        app.kubernetes.io/part-of: ingress-nginx
+        app.kubernetes.io/name: ingress-nginx-{{ juju_application }}
+        app.kubernetes.io/part-of: ingress-nginx-{{ juju_application }}
       annotations:
         prometheus.io/port: "10254"
         prometheus.io/scrape: "true"
     spec:
-      serviceAccountName: nginx-ingress-{{ juju_application }}-serviceaccount
+      serviceAccountName: nginx-ingress-serviceaccount-{{ juju_application }}
       nodeSelector:
         juju-application: {{ juju_application }}
       terminationGracePeriodSeconds: 60
@@ -245,7 +245,7 @@ spec:
             containerPort: 443
         args:
         - /nginx-ingress-controller
-        - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
+        - --default-backend-service=$(POD_NAMESPACE)/default-http-backend-{{ juju_application }}
         - --configmap=$(POD_NAMESPACE)/nginx-configuration
         - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services
         - --udp-services-configmap=$(POD_NAMESPACE)/udp-services

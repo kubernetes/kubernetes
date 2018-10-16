@@ -101,23 +101,7 @@ def upgrade_charm():
 
     # Remove the RC for nginx ingress if it exists
     if hookenv.config().get('ingress'):
-        kubectl_success('delete', 'rc', 'nginx-ingress-controller')
-
-        # these moved into a different namespace for 1.12
-        kubectl_success('delete', 'rc', 'default-http-backend')
-        kubectl_success('delete', 'svc', 'default-http-backend')
-        kubectl_success('delete', 'serviceaccount',
-                        'nginx-ingress-{}-serviceaccount'.format(
-                            hookenv.service_name()))
-        kubectl_success('delete', 'clusterrolebinding',
-                        'nginx-ingress-clusterrole-nisa-{}-binding'.format(
-                            hookenv.service_name()))
-        kubectl_success('delete', 'configmap',
-                        'nginx-load-balancer-{}-conf'.format(
-                            hookenv.service_name()))
-        kubectl_success('delete', 'ds',
-                        'nginx-ingress-{}-controller'.format(
-                            hookenv.service_name()))
+        set_state('kubernetes-worker.remove-old-ingress')
 
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
@@ -135,6 +119,28 @@ def upgrade_charm():
     remove_state('kubernetes-worker.ingress.available')
     remove_state('worker.auth.bootstrapped')
     set_state('kubernetes-worker.restart-needed')
+
+
+@when('kubernetes-worker.remove-old-ingress')
+def remove_old_ingress():
+    kubectl_success('delete', 'rc', 'nginx-ingress-controller')
+
+    # these moved into a different namespace for 1.12
+    kubectl_success('delete', 'rc', 'default-http-backend')
+    kubectl_success('delete', 'svc', 'default-http-backend')
+    kubectl_success('delete', 'serviceaccount',
+                    'nginx-ingress-{}-serviceaccount'.format(
+                        hookenv.service_name()))
+    kubectl_success('delete', 'clusterrolebinding',
+                    'nginx-ingress-clusterrole-nisa-{}-binding'.format(
+                        hookenv.service_name()))
+    kubectl_success('delete', 'configmap',
+                    'nginx-load-balancer-{}-conf'.format(
+                        hookenv.service_name()))
+    kubectl_success('delete', 'ds',
+                    'nginx-ingress-{}-controller'.format(
+                        hookenv.service_name()))
+    remove_state('kubernetes-worker.remove-old-ingress')
 
 
 def set_upgrade_needed():
