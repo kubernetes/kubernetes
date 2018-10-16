@@ -190,7 +190,8 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.Authorization.RemoteKubeConfigFileOptional = true
 	s.Authorization.AlwaysAllowPaths = []string{"/healthz"}
 
-	s.SecureServing.ServerCert.CertDirectory = "/var/run/kubernetes"
+	// Set the PairName but leave certificate directory blank to generate in-memory by default
+	s.SecureServing.ServerCert.CertDirectory = ""
 	s.SecureServing.ServerCert.PairName = "kube-controller-manager"
 	s.SecureServing.BindPort = ports.KubeControllerManagerPort
 

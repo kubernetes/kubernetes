@@ -78,7 +78,7 @@ func TestDefaultFlags(t *testing.T) {
 			BindPort:    10258,
 			BindAddress: net.ParseIP("0.0.0.0"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
-				CertDirectory: "/var/run/kubernetes",
+				CertDirectory: "",
 				PairName:      "cloud-controller-manager",
 			},
 			HTTP2MaxStreamsPerConnection: 0,
