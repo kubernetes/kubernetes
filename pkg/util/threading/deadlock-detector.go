@@ -100,7 +100,7 @@ func (d *deadlockDetector) runOnce() bool {
 	ch := make(chan bool, 1)
 	go func() {
 		d.lock.Lock()
-		d.lock.Unlock()
+		defer d.lock.Unlock()
 
 		ch <- true
 	}()
