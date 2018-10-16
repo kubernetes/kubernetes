@@ -333,6 +333,11 @@ type PersistentVolumeSpec struct {
 	// This field influences the scheduling of pods that use this volume.
 	// +optional
 	NodeAffinity *VolumeNodeAffinity `json:"nodeAffinity,omitempty" protobuf:"bytes,9,opt,name=nodeAffinity"`
+	// NamespaceSelector defines namespaces that can use the persistentvolume,
+	// If empty, all pvc can use the pv;
+	// If not empty, only pvc belongs to these namespaces can use the pv;
+	// +optional
+	NamespaceSelector []string `json:"namespaceSelector,omitempty" protobuf:"bytes,7,opt,name=namespaceSelector"`
 }
 
 // VolumeNodeAffinity defines constraints that limit what nodes this volume can be accessed from.

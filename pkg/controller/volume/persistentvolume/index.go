@@ -19,6 +19,7 @@ package persistentvolume
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -171,6 +172,20 @@ func findMatchingVolume(
 		// check if PV's DeletionTimeStamp is set, if so, skip this volume.
 		if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 			if volume.ObjectMeta.DeletionTimestamp != nil {
+				continue
+			}
+		}
+
+		// Check volume limit for namespaces
+		if len(volume.Spec.NamespaceSelector) != 0 {
+			nsMatched := false
+			for _, ns := range volume.Spec.NamespaceSelector {
+				if strings.TrimSpace(ns) == claim.Namespace {
+					nsMatched = true
+					break
+				}
+			}
+			if !nsMatched {
 				continue
 			}
 		}
