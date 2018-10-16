@@ -411,6 +411,7 @@ pkg/volume/azure_dd
 pkg/volume/azure_file
 pkg/volume/cephfs
 pkg/volume/configmap
+pkg/volume/csi
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/host_path

@@ -190,7 +190,7 @@ func (p *Plugin) GetPluginName() string {
 	return PluginName
 }
 
-// GetvolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle
+// GetVolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle
 // That string value is used in Detach() to extract driver name and volumeName.
 func (p *Plugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	csi, err := getCSISourceFromSpec(spec)
