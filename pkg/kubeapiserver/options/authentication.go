@@ -29,7 +29,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
@@ -283,8 +283,8 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticator.AuthenticatorConfig {
+	ret := kubeauthenticator.AuthenticatorConfig{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
 	}
@@ -367,6 +367,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 	}
 
 	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+	c.Authentication.APIAudiences = o.ServiceAccounts.APIAudiences
 
 	return nil
 }

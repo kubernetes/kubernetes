@@ -7,7 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["interfaces.go"],
+    srcs = [
+        "helpers.go",
+        "interfaces.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/authenticator",
     importpath = "k8s.io/apiserver/pkg/authentication/authenticator",
     deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
