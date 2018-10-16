@@ -48,7 +48,7 @@ import (
 )
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*csiPlugin, string) {
+func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*CSIPlugin, string) {
 	err := utilfeature.DefaultFeatureGate.Set("CSIBlockVolume=true")
 	if err != nil {
 		t.Fatalf("Failed to enable feature gate for CSIBlockVolume: %v", err)
@@ -75,14 +75,14 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecs
 	plugMgr := &volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
-	plug, err := plugMgr.FindPluginByName(csiPluginName)
+	plug, err := plugMgr.FindPluginByName(PluginName)
 	if err != nil {
-		t.Fatalf("can't find plugin %v", csiPluginName)
+		t.Fatalf("can't find plugin %v", PluginName)
 	}
 
-	csiPlug, ok := plug.(*csiPlugin)
+	csiPlug, ok := plug.(*CSIPlugin)
 	if !ok {
-		t.Fatalf("cannot assert plugin to be type csiPlugin")
+		t.Fatalf("cannot assert plugin to be type CSIPlugin")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
@@ -558,26 +558,25 @@ func TestRegisterPlugin(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			registrationHandler := &RegistrationHandler{}
-
 			nodeServer := &fake.FakeNodeServer{}
 			nodeServer.NodeGetInfoReturns(tc.nodeGetInfoResponse, tc.nodeGetInfoErr)
 
 			nodeInfoManager := &fake.FakeNodeInfoManager{}
 			nodeInfoManager.AddNodeInfoReturns(tc.addNodeInfoErr)
 
+			registrationHandler := &RegistrationHandler{
+				csiDrivers: &csiDriversStore{
+					driversMap: map[string]csiDriver{},
+				},
+				nim: nodeInfoManager,
+			}
+
 			driverStarter, driverStopper := newCsiDriverServer(t, tc.sockPath, nodeServer)
 			go driverStarter()
 			defer driverStopper()
 
-			// TODO: globals!
-			csiDrivers = csiDriversStore{
-				driversMap: map[string]csiDriver{},
-			}
-			nim = nodeInfoManager
-
 			err := registrationHandler.RegisterPlugin("some driver name", tc.sockPath)
-			checkErr(t, err, tc.expectedRegisterPluginErrMsg)
+			checkErrWithMessage(t, err, tc.expectedRegisterPluginErrMsg)
 
 			if a, e := nodeInfoManager.AddNodeInfoCallCount(), tc.expectedNimAddCalls; e != a {
 				t.Errorf("Expected nim.AddNodeInfo to be called %d times, got called %d times", e, a)
@@ -586,8 +585,7 @@ func TestRegisterPlugin(t *testing.T) {
 				t.Errorf("Expected nim.RemoveNodeInfo to be called %d times, got called %d times", e, a)
 			}
 
-			// TODO: globals!
-			driversEntry, foundDriver := csiDrivers.driversMap["some driver name"]
+			driversEntry, foundDriver := registrationHandler.csiDrivers.driversMap["some driver name"]
 			if foundDriver != tc.expectedDriverEntry {
 				if foundDriver {
 					t.Errorf("Expected to find the driver registered")
@@ -610,7 +608,7 @@ func TestCSIPluginInit(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			plugin := csiPlugin{}
+			plugin := CSIPlugin{}
 
 			csiClient := fakecsi.NewSimpleClientset(
 				getCSIDriver("fake csi driver name", nil, nil),
@@ -630,16 +628,16 @@ func TestCSIPluginInit(t *testing.T) {
 			}
 
 			err := plugin.Init(volumeHost)
-			checkErr(t, err, tc.expectedErrMsg)
+			checkErrWithMessage(t, err, tc.expectedErrMsg)
 
 			if plugin.host != volumeHost {
 				t.Errorf("Expected plugin.host to be the volume host")
 			}
 
-			if csiDrivers.driversMap == nil {
+			if plugin.RegistrationHandler.csiDrivers.driversMap == nil {
 				t.Errorf("Expected csiDrivers to be initialized")
 			}
-			if nim == nil {
+			if plugin.RegistrationHandler.nim == nil {
 				t.Errorf("Expected nodeInfoManager to be initialized")
 			}
 
@@ -682,7 +680,7 @@ func waitForInformerSync(t *testing.T, informer cache.SharedInformer) {
 	}
 }
 
-func checkErr(t *testing.T, actualErr error, expectedErrMsg string) {
+func checkErrWithMessage(t *testing.T, actualErr error, expectedErrMsg string) {
 	t.Helper()
 	if expectedErrMsg == "" {
 		if actualErr != nil {

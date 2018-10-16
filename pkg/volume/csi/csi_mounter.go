@@ -57,7 +57,7 @@ var (
 type csiMountMgr struct {
 	csiClient    csiClient
 	k8s          kubernetes.Interface
-	plugin       *csiPlugin
+	plugin       *CSIPlugin
 	driverName   string
 	volumeID     string
 	specVolumeID string
@@ -81,7 +81,7 @@ func (c *csiMountMgr) GetPath() string {
 
 func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) string {
 	specVolID := kstrings.EscapeQualifiedNameForDisk(specVolumeID)
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(csiPluginName), specVolID)
+	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(PluginName), specVolID)
 }
 
 // volume.Mounter methods
@@ -361,7 +361,7 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check
-func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
+func isDirMounted(plug *CSIPlugin, dir string) (bool, error) {
 	mounter := plug.host.GetMounter(plug.GetPluginName())
 	notMnt, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
@@ -372,7 +372,7 @@ func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 }
 
 // removeMountDir cleans the mount dir when dir is not mounted and removed the volume data file in dir
-func removeMountDir(plug *csiPlugin, mountPath string) error {
+func removeMountDir(plug *CSIPlugin, mountPath string) error {
 	glog.V(4).Info(log("removing mount path [%s]", mountPath))
 	if pathExists, pathErr := util.PathExists(mountPath); pathErr != nil {
 		glog.Error(log("failed while checking mount path stat [%s]", pathErr))

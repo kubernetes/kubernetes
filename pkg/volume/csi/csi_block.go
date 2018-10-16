@@ -35,7 +35,7 @@ import (
 type csiBlockMapper struct {
 	k8s        kubernetes.Interface
 	csiClient  csiClient
-	plugin     *csiPlugin
+	plugin     *CSIPlugin
 	driverName string
 	specName   string
 	volumeID   string
@@ -58,7 +58,7 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // GetPodDeviceMapPath returns pod's device file which will be mapped to a volume
 // returns: pods/{podUid}/volumeDevices/kubernetes.io~csi/{volumeID}/dev, {volumeID}
 func (m *csiBlockMapper) GetPodDeviceMapPath() (string, string) {
-	path := filepath.Join(m.plugin.host.GetPodVolumeDeviceDir(m.podUID, csiPluginName), m.specName, "dev")
+	path := filepath.Join(m.plugin.host.GetPodVolumeDeviceDir(m.podUID, PluginName), m.specName, "dev")
 	specName := m.specName
 	glog.V(4).Infof(log("blockMapper.GetPodDeviceMapPath [path=%s; name=%s]", path, specName))
 	return path, specName

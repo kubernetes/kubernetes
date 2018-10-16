@@ -195,8 +195,7 @@ func TestClientNodeGetInfo(t *testing.T) {
 
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
-			driverName: "Fake Driver Name",
-			nodeClientCreator: func(driverName string) (csipb.NodeClient, io.Closer, error) {
+			nodeClientCreator: func() (csipb.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				nodeClient.SetNodeGetInfoResp(&csipb.NodeGetInfoResponse{
@@ -249,8 +248,7 @@ func TestClientNodePublishVolume(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
-			driverName: "Fake Driver Name",
-			nodeClientCreator: func(driverName string) (csipb.NodeClient, io.Closer, error) {
+			nodeClientCreator: func() (csipb.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -295,8 +293,7 @@ func TestClientNodeUnpublishVolume(t *testing.T) {
 		t.Logf("test case: %s", tc.name)
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
-			driverName: "Fake Driver Name",
-			nodeClientCreator: func(driverName string) (csipb.NodeClient, io.Closer, error) {
+			nodeClientCreator: func() (csipb.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -333,8 +330,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 		t.Logf("Running test case: %s", tc.name)
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
-			driverName: "Fake Driver Name",
-			nodeClientCreator: func(driverName string) (csipb.NodeClient, io.Closer, error) {
+			nodeClientCreator: func() (csipb.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
@@ -377,8 +373,7 @@ func TestClientNodeUnstageVolume(t *testing.T) {
 		t.Logf("Running test case: %s", tc.name)
 		fakeCloser := fake.NewCloser(t)
 		client := &csiDriverClient{
-			driverName: "Fake Driver Name",
-			nodeClientCreator: func(driverName string) (csipb.NodeClient, io.Closer, error) {
+			nodeClientCreator: func() (csipb.NodeClient, io.Closer, error) {
 				nodeClient := fake.NewNodeClient(false /* stagingCapable */)
 				nodeClient.SetNextError(tc.err)
 				return nodeClient, fakeCloser, nil
