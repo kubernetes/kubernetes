@@ -61,7 +61,7 @@ const (
 	csiResyncPeriod = time.Minute
 )
 
-type CSIPlugin struct {
+type Plugin struct {
 	RegistrationHandler *RegistrationHandler
 	csiDrivers          *csiDriversStore
 	host                volume.VolumeHost
@@ -72,7 +72,7 @@ type CSIPlugin struct {
 
 // ProbeVolumePlugins returns implemented plugins
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	p := &CSIPlugin{
+	p := &Plugin{
 		host:         nil,
 		blockEnabled: utilfeature.DefaultFeatureGate.Enabled(features.CSIBlockVolume),
 	}
@@ -80,7 +80,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 }
 
 // volume.VolumePlugin methods
-var _ volume.VolumePlugin = &CSIPlugin{}
+var _ volume.VolumePlugin = &Plugin{}
 
 type csiDriver struct {
 	driverName     string
@@ -162,7 +162,7 @@ func (h *RegistrationHandler) unregisterDriver(driverName string) {
 	}
 }
 
-func (p *CSIPlugin) Init(host volume.VolumeHost) error {
+func (p *Plugin) Init(host volume.VolumeHost) error {
 	p.csiDrivers = &csiDriversStore{driversMap: map[string]csiDriver{}}
 	p.RegistrationHandler = &RegistrationHandler{
 		csiDrivers: p.csiDrivers,
@@ -186,13 +186,13 @@ func (p *CSIPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (p *CSIPlugin) GetPluginName() string {
+func (p *Plugin) GetPluginName() string {
 	return PluginName
 }
 
 // GetvolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle
 // That string value is used in Detach() to extract driver name and volumeName.
-func (p *CSIPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+func (p *Plugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	csi, err := getCSISourceFromSpec(spec)
 	if err != nil {
 		glog.Error(log("plugin.GetVolumeName failed to extract volume source from spec: %v", err))
@@ -203,17 +203,17 @@ func (p *CSIPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	return fmt.Sprintf("%s%s%s", csi.Driver, volNameSep, csi.VolumeHandle), nil
 }
 
-func (p *CSIPlugin) CanSupport(spec *volume.Spec) bool {
+func (p *Plugin) CanSupport(spec *volume.Spec) bool {
 	// TODO (vladimirvivien) CanSupport should also take into account
 	// the availability/registration of specified Driver in the volume source
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
 }
 
-func (p *CSIPlugin) RequiresRemount() bool {
+func (p *Plugin) RequiresRemount() bool {
 	return false
 }
 
-func (p *CSIPlugin) NewMounter(
+func (p *Plugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
 	_ volume.VolumeOptions) (volume.Mounter, error) {
@@ -282,7 +282,7 @@ func (p *CSIPlugin) NewMounter(
 	return mounter, nil
 }
 
-func (p *CSIPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
+func (p *Plugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
 	glog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
 
 	unmounter := &csiMountMgr{
@@ -306,7 +306,7 @@ func (p *CSIPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmo
 	return unmounter, nil
 }
 
-func (p *CSIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (p *Plugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	glog.V(4).Info(log("plugin.ConstructVolumeSpec [pv.Name=%v, path=%v]", volumeName, mountPath))
 
 	volData, err := loadVolumeData(mountPath, volDataFileName)
@@ -336,22 +336,22 @@ func (p *CSIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 	return volume.NewSpecFromPersistentVolume(pv, false), nil
 }
 
-func (p *CSIPlugin) SupportsMountOption() bool {
+func (p *Plugin) SupportsMountOption() bool {
 	// TODO (vladimirvivien) use CSI VolumeCapability.MountVolume.mount_flags
 	// to probe for the result for this method
 	return false
 }
 
-func (p *CSIPlugin) SupportsBulkVolumeVerification() bool {
+func (p *Plugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
 // volume.AttachableVolumePlugin methods
-var _ volume.AttachableVolumePlugin = &CSIPlugin{}
+var _ volume.AttachableVolumePlugin = &Plugin{}
 
-var _ volume.DeviceMountableVolumePlugin = &CSIPlugin{}
+var _ volume.DeviceMountableVolumePlugin = &Plugin{}
 
-func (p *CSIPlugin) NewAttacher() (volume.Attacher, error) {
+func (p *Plugin) NewAttacher() (volume.Attacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
 		glog.Error(log("unable to get kubernetes client from host"))
@@ -365,11 +365,11 @@ func (p *CSIPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
-func (p *CSIPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+func (p *Plugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 	return p.NewAttacher()
 }
 
-func (p *CSIPlugin) NewDetacher() (volume.Detacher, error) {
+func (p *Plugin) NewDetacher() (volume.Detacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
 		glog.Error(log("unable to get kubernetes client from host"))
@@ -383,19 +383,19 @@ func (p *CSIPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (p *CSIPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+func (p *Plugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return p.NewDetacher()
 }
 
-func (p *CSIPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+func (p *Plugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	m := p.host.GetMounter(p.GetPluginName())
 	return m.GetMountRefs(deviceMountPath)
 }
 
 // BlockVolumePlugin methods
-var _ volume.BlockVolumePlugin = &CSIPlugin{}
+var _ volume.BlockVolumePlugin = &Plugin{}
 
-func (p *CSIPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+func (p *Plugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
 	if !p.blockEnabled {
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
@@ -462,7 +462,7 @@ func (p *CSIPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	return mapper, nil
 }
 
-func (p *CSIPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
+func (p *Plugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
 	if !p.blockEnabled {
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
@@ -488,7 +488,7 @@ func (p *CSIPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 	return unmapper, nil
 }
 
-func (p *CSIPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapPath string) (*volume.Spec, error) {
+func (p *Plugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapPath string) (*volume.Spec, error) {
 	if !p.blockEnabled {
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
@@ -523,7 +523,7 @@ func (p *CSIPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapP
 	return volume.NewSpecFromPersistentVolume(pv, false), nil
 }
 
-func (p *CSIPlugin) skipAttach(driver string) (bool, error) {
+func (p *Plugin) skipAttach(driver string) (bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return false, nil
 	}
@@ -544,7 +544,7 @@ func (p *CSIPlugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *CSIPlugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+func (p *Plugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
 	skip, err := p.skipAttach(driver)
 	if err != nil {
 		return nil, err

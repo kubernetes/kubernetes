@@ -46,7 +46,7 @@ const (
 )
 
 type csiAttacher struct {
-	plugin        *CSIPlugin
+	plugin        *Plugin
 	k8s           kubernetes.Interface
 	waitSleepTime time.Duration
 
@@ -585,7 +585,7 @@ func getAttachmentName(volName, csiDriverName, nodeName string) string {
 	return fmt.Sprintf("csi-%x", result)
 }
 
-func makeDeviceMountPath(plugin *CSIPlugin, spec *volume.Spec) (string, error) {
+func makeDeviceMountPath(plugin *Plugin, spec *volume.Spec) (string, error) {
 	if spec == nil {
 		return "", fmt.Errorf("makeDeviceMountPath failed, spec is nil")
 	}

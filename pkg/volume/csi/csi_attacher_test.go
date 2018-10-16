@@ -896,7 +896,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 }
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestWatchPlugin(t *testing.T, csiClient *fakecsi.Clientset) (*CSIPlugin, *watch.RaceFreeFakeWatcher, string, *fakeclient.Clientset) {
+func newTestWatchPlugin(t *testing.T, csiClient *fakecsi.Clientset) (*Plugin, *watch.RaceFreeFakeWatcher, string, *fakeclient.Clientset) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -924,9 +924,9 @@ func newTestWatchPlugin(t *testing.T, csiClient *fakecsi.Clientset) (*CSIPlugin,
 		t.Fatalf("can't find plugin %v", PluginName)
 	}
 
-	csiPlug, ok := plug.(*CSIPlugin)
+	csiPlug, ok := plug.(*Plugin)
 	if !ok {
-		t.Fatalf("cannot assert plugin to be type CSIPlugin")
+		t.Fatalf("cannot assert plugin to be type Plugin")
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
