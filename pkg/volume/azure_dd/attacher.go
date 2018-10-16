@@ -164,13 +164,22 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 	nodeName := types.NodeName(a.plugin.host.GetHostName())
 	diskName := volumeSource.DiskName
 
-	glog.V(5).Infof("azureDisk - WaitForAttach: begin to GetDiskLun by diskName(%s), DataDiskURI(%s), nodeName(%s), devicePath(%s)",
-		diskName, volumeSource.DataDiskURI, nodeName, devicePath)
-	lun, err := diskController.GetDiskLun(diskName, volumeSource.DataDiskURI, nodeName)
-	if err != nil {
-		return "", err
+	var lun int32
+	if runtime.GOOS == "windows" {
+		glog.V(2).Infof("azureDisk - WaitForAttach: begin to GetDiskLun by diskName(%s), DataDiskURI(%s), nodeName(%s), devicePath(%s)",
+			diskName, volumeSource.DataDiskURI, nodeName, devicePath)
+		lun, err = diskController.GetDiskLun(diskName, volumeSource.DataDiskURI, nodeName)
+		if err != nil {
+			return "", err
+		}
+		glog.V(2).Infof("azureDisk - WaitForAttach: GetDiskLun succeeded, got lun(%v)", lun)
+	} else {
+		lun, err = getDiskLUN(devicePath)
+		if err != nil {
+			return "", err
+		}
 	}
-	glog.V(5).Infof("azureDisk - WaitForAttach: GetDiskLun succeeded, got lun(%v)", lun)
+
 	exec := a.plugin.host.GetExec(a.plugin.GetPluginName())
 
 	io := &osIOHandler{}
