@@ -50,6 +50,8 @@ import (
 const (
 	// ControllerStartJitter is the jitter value used when starting controller managers.
 	ControllerStartJitter = 1.0
+	// ConfigzName is the name used for register cloud-controller manager /configz, same with GroupName.
+	ConfigzName = "cloudcontrollermanager.config.k8s.io"
 )
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -123,7 +125,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	}
 
 	// setup /configz endpoint
-	if cz, err := configz.New("componentconfig"); err == nil {
+	if cz, err := configz.New(ConfigzName); err == nil {
 		cz.Set(c.ComponentConfig)
 	} else {
 		glog.Errorf("unable to register configz: %c", err)

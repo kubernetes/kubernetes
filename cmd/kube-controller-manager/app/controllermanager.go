@@ -64,6 +64,8 @@ import (
 const (
 	// Jitter used when starting controller managers
 	ControllerStartJitter = 1.0
+	// ConfigzName is the name used for register kube-controller manager /configz, same with GroupName.
+	ConfigzName = "kubecontrollermanager.config.k8s.io"
 )
 
 type ControllerLoopMode int
@@ -142,7 +144,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	glog.Infof("Version: %+v", version.Get())
 
-	if cfgz, err := configz.New("componentconfig"); err == nil {
+	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
 	} else {
 		glog.Errorf("unable to register configz: %c", err)
