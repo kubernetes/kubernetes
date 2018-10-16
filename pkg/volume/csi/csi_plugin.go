@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -25,10 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"context"
-
 	"github.com/golang/glog"
-
 	api "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +38,7 @@ import (
 	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
 	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
 )
@@ -62,12 +61,22 @@ const (
 )
 
 type Plugin struct {
-	RegistrationHandler *RegistrationHandler
-	csiDrivers          *csiDriversStore
-	host                volume.VolumeHost
-	blockEnabled        bool
-	csiDriverLister     csilister.CSIDriverLister
-	csiDriverInformer   csiinformer.CSIDriverInformer
+	csiDrivers        *csiDriversStore
+	nim               nodeinfomanager.Interface
+	host              volume.VolumeHost
+	blockEnabled      bool
+	csiDriverLister   csilister.CSIDriverLister
+	csiDriverInformer csiinformer.CSIDriverInformer
+}
+
+type csiDriver struct {
+	driverName     string
+	driverEndpoint string
+}
+
+type csiDriversStore struct {
+	driversMap map[string]csiDriver
+	sync.RWMutex
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -82,25 +91,9 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 // volume.VolumePlugin methods
 var _ volume.VolumePlugin = &Plugin{}
 
-type csiDriver struct {
-	driverName     string
-	driverEndpoint string
-}
-
-type csiDriversStore struct {
-	driversMap map[string]csiDriver
-	sync.RWMutex
-}
-
-// RegistrationHandler is the handler which is fed to the pluginwatcher API.
-type RegistrationHandler struct {
-	csiDrivers *csiDriversStore
-	nim        nodeinfomanager.Interface
-}
-
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+func (p *Plugin) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	glog.Infof(log("Trying to register a new plugin with name: %s endpoint: %s versions: %s",
 		pluginName, endpoint, strings.Join(versions, ",")))
 
@@ -108,7 +101,7 @@ func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string,
 }
 
 // RegisterPlugin is called when a plugin can be registered
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string) error {
+func (p *Plugin) RegisterPlugin(pluginName string, endpoint string) error {
 	glog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
 	func() {
@@ -118,26 +111,26 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 		// It's not necessary to lock the entire RegistrationCallback() function because only the CSI
 		// client depends on this driver map, and the CSI client does not depend on node information
 		// updated in the rest of the function.
-		h.csiDrivers.Lock()
-		defer h.csiDrivers.Unlock()
-		h.csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
+		p.csiDrivers.Lock()
+		defer p.csiDrivers.Unlock()
+		p.csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
 	}()
 
 	// Get node info from the driver.
-	csi := newCsiDriverClient(h.csiDrivers, pluginName)
+	csi := newCsiDriverClient(p.csiDrivers, pluginName)
 	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
 	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
 	if err != nil {
-		h.unregisterDriver(pluginName)
+		p.unregisterDriver(pluginName)
 		return fmt.Errorf("error during CSI NodeGetInfo() call: %v", err)
 	}
 
-	err = h.nim.AddNodeInfo(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
+	err = p.nim.AddNodeInfo(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology)
 	if err != nil {
-		h.unregisterDriver(pluginName)
+		p.unregisterDriver(pluginName)
 		return fmt.Errorf("error updating CSI node info in the cluster: %v", err)
 	}
 
@@ -147,27 +140,26 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string)
 // DeRegisterPlugin is called when a plugin removed it's socket, signaling
 // it is no longer available
 // TODO: Handle DeRegistration
-func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
+func (p *Plugin) DeRegisterPlugin(pluginName string) {
 }
 
-func (h *RegistrationHandler) unregisterDriver(driverName string) {
+func (p *Plugin) unregisterDriver(driverName string) {
 	func() {
-		h.csiDrivers.Lock()
-		defer h.csiDrivers.Unlock()
-		delete(h.csiDrivers.driversMap, driverName)
+		p.csiDrivers.Lock()
+		defer p.csiDrivers.Unlock()
+		delete(p.csiDrivers.driversMap, driverName)
 	}()
 
-	if err := h.nim.RemoveNodeInfo(driverName); err != nil {
+	if err := p.nim.RemoveNodeInfo(driverName); err != nil {
 		glog.Errorf("Error unregistering CSI driver: %v", err)
 	}
 }
 
+var _ pluginwatcher.PluginHandler = &Plugin{}
+
 func (p *Plugin) Init(host volume.VolumeHost) error {
 	p.csiDrivers = &csiDriversStore{driversMap: map[string]csiDriver{}}
-	p.RegistrationHandler = &RegistrationHandler{
-		csiDrivers: p.csiDrivers,
-		nim:        nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host),
-	}
+	p.nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
 	p.host = host
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {

@@ -564,7 +564,7 @@ func TestRegisterPlugin(t *testing.T) {
 			nodeInfoManager := &fake.FakeNodeInfoManager{}
 			nodeInfoManager.AddNodeInfoReturns(tc.addNodeInfoErr)
 
-			registrationHandler := &RegistrationHandler{
+			registrationHandler := &Plugin{
 				csiDrivers: &csiDriversStore{
 					driversMap: map[string]csiDriver{},
 				},
@@ -634,10 +634,10 @@ func TestPluginInit(t *testing.T) {
 				t.Errorf("Expected plugin.host to be the volume host")
 			}
 
-			if plugin.RegistrationHandler.csiDrivers.driversMap == nil {
+			if plugin.csiDrivers.driversMap == nil {
 				t.Errorf("Expected csiDrivers to be initialized")
 			}
-			if plugin.RegistrationHandler.nim == nil {
+			if plugin.nim == nil {
 				t.Errorf("Expected nodeInfoManager to be initialized")
 			}
 

@@ -1380,7 +1380,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		// Adding Registration Callback function for CSI Plugins
 		kl.pluginWatcher.AddHandler(
 			pluginwatcherapi.CSIPlugin,
-			pluginwatcher.PluginHandler(csiPlugin.(*csi.Plugin).RegistrationHandler),
+			pluginwatcher.PluginHandler(csiPlugin.(*csi.Plugin)),
 		)
 
 		// Adding Registration Callback function for Device Manager
