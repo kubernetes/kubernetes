@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
+	auditdynamic "k8s.io/apiserver/plugin/pkg/audit/dynamic"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -240,6 +241,9 @@ func TestAddFlags(t *testing.T) {
 				},
 				InitialBackoff:     2 * time.Second,
 				GroupVersionString: "audit.k8s.io/v1alpha1",
+			},
+			DynamicOptions: apiserveroptions.AuditDynamicOptions{
+				BatchConfig: auditdynamic.NewDefaultWebhookBatchConfig(),
 			},
 			PolicyFile: "/policy",
 		},
