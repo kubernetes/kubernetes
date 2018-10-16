@@ -345,7 +345,11 @@ func NewNodeLifecycleController(
 	nc.podInformerSynced = podInformer.Informer().HasSynced
 
 	if nc.runTaintManager {
-		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient)
+		podLister := podInformer.Lister()
+		podGetter := func(name, namespace string) (*v1.Pod, error) { return podLister.Pods(namespace).Get(name) }
+		nodeLister := nodeInformer.Lister()
+		nodeGetter := func(name string) (*v1.Node, error) { return nodeLister.Get(name) }
+		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient, podGetter, nodeGetter)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
