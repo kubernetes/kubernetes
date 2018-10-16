@@ -27,7 +27,14 @@ var rng = struct {
 	sync.Mutex
 	rand *rand.Rand
 }{
-	rand: rand.New(rand.NewSource(time.Now().UTC().UnixNano())),
+	rand: rand.New(rand.NewSource(time.Now().UnixNano())),
+}
+
+// Int returns a non-negative pseudo-random int.
+func Int() int {
+	rng.Lock()
+	defer rng.Unlock()
+	return rng.rand.Int()
 }
 
 // Intn generates an integer in range [0,max).

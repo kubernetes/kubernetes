@@ -20,7 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -47,21 +47,21 @@ func getTestTaint() v1.Taint {
 
 // Creates a defaut pod for this test, with argument saying if the Pod should have
 // toleration for Taits used in this test.
-func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, ns string) *v1.Pod {
+func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, podLabel, ns string) *v1.Pod {
 	grace := int64(1)
 	if !hasToleration {
 		return &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:                       podName,
 				Namespace:                  ns,
-				Labels:                     map[string]string{"name": podName},
+				Labels:                     map[string]string{"group": podLabel},
 				DeletionGracePeriodSeconds: &grace,
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
 					{
 						Name:  "pause",
-						Image: "kubernetes/pause",
+						Image: "k8s.gcr.io/pause:3.1",
 					},
 				},
 			},
@@ -72,7 +72,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				ObjectMeta: metav1.ObjectMeta{
 					Name:                       podName,
 					Namespace:                  ns,
-					Labels:                     map[string]string{"name": podName},
+					Labels:                     map[string]string{"group": podLabel},
 					DeletionGracePeriodSeconds: &grace,
 					// default - tolerate forever
 				},
@@ -80,7 +80,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 					Containers: []v1.Container{
 						{
 							Name:  "pause",
-							Image: "kubernetes/pause",
+							Image: "k8s.gcr.io/pause:3.1",
 						},
 					},
 					Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
@@ -92,14 +92,14 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				ObjectMeta: metav1.ObjectMeta{
 					Name:                       podName,
 					Namespace:                  ns,
-					Labels:                     map[string]string{"name": podName},
+					Labels:                     map[string]string{"group": podLabel},
 					DeletionGracePeriodSeconds: &grace,
 				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
 							Name:  "pause",
-							Image: "kubernetes/pause",
+							Image: "k8s.gcr.io/pause:3.1",
 						},
 					},
 					// default - tolerate forever
@@ -112,23 +112,29 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 
 // Creates and starts a controller (informer) that watches updates on a pod in given namespace with given name. It puts a new
 // struct into observedDeletion channel for every deletion it sees.
-func createTestController(cs clientset.Interface, observedDeletions chan struct{}, stopCh chan struct{}, podName, ns string) {
+func createTestController(cs clientset.Interface, observedDeletions chan string, stopCh chan struct{}, podLabel, ns string) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"group": podLabel}).String()
 				obj, err := cs.CoreV1().Pods(ns).List(options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				options.FieldSelector = fields.SelectorFromSet(fields.Set{"metadata.name": podName}).String()
+				options.LabelSelector = labels.SelectorFromSet(labels.Set{"group": podLabel}).String()
 				return cs.CoreV1().Pods(ns).Watch(options)
 			},
 		},
 		&v1.Pod{},
 		0,
 		cache.ResourceEventHandlerFuncs{
-			DeleteFunc: func(oldObj interface{}) { observedDeletions <- struct{}{} },
+			DeleteFunc: func(oldObj interface{}) {
+				if delPod, ok := oldObj.(*v1.Pod); ok {
+					observedDeletions <- delPod.Name
+				} else {
+					observedDeletions <- ""
+				}
+			},
 		},
 	)
 	framework.Logf("Starting informer...")
@@ -145,10 +151,10 @@ const (
 // - lack of eviction of tolerating pods from a tainted node,
 // - delayed eviction of short-tolerating pod from a tainted node,
 // - lack of eviction of short-tolerating pod after taint removal.
-var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
+var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 	var cs clientset.Interface
 	var ns string
-	f := framework.NewDefaultFramework("taint-control")
+	f := framework.NewDefaultFramework("taint-single-pod")
 
 	BeforeEach(func() {
 		cs = f.ClientSet
@@ -165,12 +171,12 @@ var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 3. See if pod will get evicted
 	It("evicts pods from tainted nodes", func() {
 		podName := "taint-eviction-1"
-		pod := createPodForTaintsTest(false, 0, podName, ns)
-		observedDeletions := make(chan struct{}, 100)
+		pod := createPodForTaintsTest(false, 0, podName, podName, ns)
+		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		By("Staring pod...")
+		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
@@ -197,12 +203,12 @@ var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 3. See if pod won't get evicted
 	It("doesn't evict pod with tolerations from tainted nodes", func() {
 		podName := "taint-eviction-2"
-		pod := createPodForTaintsTest(true, 0, podName, ns)
-		observedDeletions := make(chan struct{}, 100)
+		pod := createPodForTaintsTest(true, 0, podName, podName, ns)
+		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		By("Staring pod...")
+		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
@@ -230,12 +236,12 @@ var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 4. See if pod will get evicted after toleration time runs out
 	It("eventually evict pod with finite tolerations from tainted nodes", func() {
 		podName := "taint-eviction-3"
-		pod := createPodForTaintsTest(true, KubeletPodDeletionDelaySeconds+2*AdditionalWaitPerDeleteSeconds, podName, ns)
-		observedDeletions := make(chan struct{}, 100)
+		pod := createPodForTaintsTest(true, KubeletPodDeletionDelaySeconds+2*AdditionalWaitPerDeleteSeconds, podName, podName, ns)
+		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		By("Staring pod...")
+		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
@@ -274,12 +280,12 @@ var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 	// 5. See if Pod won't be evicted.
 	It("removing taint cancels eviction", func() {
 		podName := "taint-eviction-4"
-		pod := createPodForTaintsTest(true, 2*AdditionalWaitPerDeleteSeconds, podName, ns)
-		observedDeletions := make(chan struct{}, 100)
+		pod := createPodForTaintsTest(true, 2*AdditionalWaitPerDeleteSeconds, podName, podName, ns)
+		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})
 		createTestController(cs, observedDeletions, stopCh, podName, ns)
 
-		By("Staring pod...")
+		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
@@ -315,6 +321,122 @@ var _ = SIGDescribe("NoExecuteTaintManager [Serial]", func() {
 			framework.Logf("Pod wasn't evicted. Test successful")
 		case <-observedDeletions:
 			framework.Failf("Pod was evicted despite toleration")
+		}
+	})
+})
+
+var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
+	var cs clientset.Interface
+	var ns string
+	f := framework.NewDefaultFramework("taint-multiple-pods")
+
+	BeforeEach(func() {
+		cs = f.ClientSet
+		ns = f.Namespace.Name
+
+		framework.WaitForAllNodesHealthy(cs, time.Minute)
+
+		err := framework.CheckTestingNSDeletedExcept(cs, ns)
+		framework.ExpectNoError(err)
+	})
+
+	// 1. Run two pods; one with toleration, one without toleration
+	// 2. Taint the nodes running those pods with a no-execute taint
+	// 3. See if pod-without-toleration get evicted, and pod-with-toleration is kept
+	It("only evicts pods without tolerations from tainted nodes", func() {
+		podGroup := "taint-eviction-a"
+		observedDeletions := make(chan string, 100)
+		stopCh := make(chan struct{})
+		createTestController(cs, observedDeletions, stopCh, podGroup, ns)
+
+		pod1 := createPodForTaintsTest(false, 0, podGroup+"1", podGroup, ns)
+		pod2 := createPodForTaintsTest(true, 0, podGroup+"2", podGroup, ns)
+
+		By("Starting pods...")
+		nodeName1, err := testutils.RunPodAndGetNodeName(cs, pod1, 2*time.Minute)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName1)
+		nodeName2, err := testutils.RunPodAndGetNodeName(cs, pod2, 2*time.Minute)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName2)
+
+		By("Trying to apply a taint on the Nodes")
+		testTaint := getTestTaint()
+		framework.AddOrUpdateTaintOnNode(cs, nodeName1, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName1, &testTaint)
+		defer framework.RemoveTaintOffNode(cs, nodeName1, testTaint)
+		if nodeName2 != nodeName1 {
+			framework.AddOrUpdateTaintOnNode(cs, nodeName2, testTaint)
+			framework.ExpectNodeHasTaint(cs, nodeName2, &testTaint)
+			defer framework.RemoveTaintOffNode(cs, nodeName2, testTaint)
+		}
+
+		// Wait a bit
+		By("Waiting for Pod1 to be deleted")
+		timeoutChannel := time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+AdditionalWaitPerDeleteSeconds) * time.Second).C
+		var evicted int
+		for {
+			select {
+			case <-timeoutChannel:
+				if evicted == 0 {
+					framework.Failf("Failed to evict Pod1.")
+				} else if evicted == 2 {
+					framework.Failf("Pod1 is evicted. But unexpected Pod2 also get evicted.")
+				}
+				return
+			case podName := <-observedDeletions:
+				evicted++
+				if podName == podGroup+"1" {
+					framework.Logf("Noticed Pod %q gets evicted.", podName)
+				} else if podName == podGroup+"2" {
+					framework.Failf("Unexepected Pod %q gets evicted.", podName)
+					return
+				}
+			}
+		}
+	})
+
+	// 1. Run two pods both with toleration; one with tolerationSeconds=5, the other with 25
+	// 2. Taint the nodes running those pods with a no-execute taint
+	// 3. See if both pods get evicted in between [5, 25] seconds
+	It("evicts pods with minTolerationSeconds", func() {
+		podGroup := "taint-eviction-b"
+		observedDeletions := make(chan string, 100)
+		stopCh := make(chan struct{})
+		createTestController(cs, observedDeletions, stopCh, podGroup, ns)
+
+		pod1 := createPodForTaintsTest(true, AdditionalWaitPerDeleteSeconds, podGroup+"1", podGroup, ns)
+		pod2 := createPodForTaintsTest(true, 5*AdditionalWaitPerDeleteSeconds, podGroup+"2", podGroup, ns)
+
+		By("Starting pods...")
+		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod1, 2*time.Minute)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName)
+		// ensure pod2 lands on the same node as pod1
+		pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
+		_, err = testutils.RunPodAndGetNodeName(cs, pod2, 2*time.Minute)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName)
+
+		By("Trying to apply a taint on the Node")
+		testTaint := getTestTaint()
+		framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
+		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
+		defer framework.RemoveTaintOffNode(cs, nodeName, testTaint)
+
+		// Wait a bit
+		By("Waiting for Pod1 and Pod2 to be deleted")
+		timeoutChannel := time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+3*AdditionalWaitPerDeleteSeconds) * time.Second).C
+		var evicted int
+		for evicted != 2 {
+			select {
+			case <-timeoutChannel:
+				framework.Failf("Failed to evict all Pods. %d pod(s) is not evicted.", 2-evicted)
+				return
+			case podName := <-observedDeletions:
+				framework.Logf("Noticed Pod %q gets evicted.", podName)
+				evicted++
+			}
 		}
 	})
 })

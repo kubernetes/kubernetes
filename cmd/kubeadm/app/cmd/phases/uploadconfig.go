@@ -70,8 +70,7 @@ func NewCmdUploadConfig() *cobra.Command {
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			err = SetKubernetesVersion(client, cfg)
-			kubeadmutil.CheckErr(err)
+			SetKubernetesVersion(cfg)
 
 			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 			kubeadmutil.CheckErr(err)

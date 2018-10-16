@@ -699,27 +699,6 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		}
 	}
 
-	if s.Etcd.StorageConfig.DeserializationCacheSize == 0 {
-		// When size of cache is not explicitly set, estimate its size based on
-		// target memory usage.
-		glog.V(2).Infof("Initializing deserialization cache size based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
-
-		// This is the heuristics that from memory capacity is trying to infer
-		// the maximum number of nodes in the cluster and set cache sizes based
-		// on that value.
-		// From our documentation, we officially recommend 120GB machines for
-		// 2000 nodes, and we scale from that point. Thus we assume ~60MB of
-		// capacity per node.
-		// TODO: We may consider deciding that some percentage of memory will
-		// be used for the deserialization cache and divide it by the max object
-		// size to compute its size. We may even go further and measure
-		// collective sizes of the objects in the cache.
-		clusterSize := s.GenericServerRunOptions.TargetRAMMB / 60
-		s.Etcd.StorageConfig.DeserializationCacheSize = 25 * clusterSize
-		if s.Etcd.StorageConfig.DeserializationCacheSize < 1000 {
-			s.Etcd.StorageConfig.DeserializationCacheSize = 1000
-		}
-	}
 	if s.Etcd.EnableWatchCache {
 		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
 		sizes := cachesize.NewHeuristicWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)

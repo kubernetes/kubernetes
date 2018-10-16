@@ -145,19 +145,6 @@ func CreateCertAndKeyFilesWithCA(certSpec *KubeadmCert, caCertSpec *KubeadmCert,
 	return certSpec.CreateFromCA(cfg, caCert, caKey)
 }
 
-func newCertAndKeyFromSpec(certSpec *KubeadmCert, cfg *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
-	certConfig, err := certSpec.GetConfig(cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating certificate %s: %v", certSpec.Name, err)
-	}
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, certConfig)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failure while creating %s key and certificate: %v", certSpec.Name, err)
-	}
-
-	return cert, key, err
-}
-
 // LoadCertificateAuthority tries to load a CA in the given directory with the given name.
 func LoadCertificateAuthority(pkiDir string, baseName string) (*x509.Certificate, *rsa.PrivateKey, error) {
 	// Checks if certificate authority exists in the PKI directory

@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conversion.go",
+        "crdfinder.go",
         "factory.go",
         "factory_client_access.go",
         "generator.go",
@@ -17,9 +18,9 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/kubectl:go_default_library",
-        "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/validation:go_default_library",
+        "//pkg/kubectl/util/templates:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
@@ -34,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
@@ -57,7 +59,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["helpers_test.go"],
+    srcs = [
+        "crdfinder_test.go",
+        "helpers_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubectl/scheme:go_default_library",

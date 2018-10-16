@@ -8,7 +8,7 @@ extraField:
   addedData: "foo"
 kind: StorageClass
 metadata:
-  creationTimestamp: 2017-02-13T02:04:04Z
+  creationTimestamp: "2017-02-13T02:04:04Z"
   labels:
     label1: value1
     label2: value2

@@ -32,7 +32,7 @@ const (
 
 // Config is configuration for creating a storage backend.
 type Config struct {
-	// Type defines the type of storage backend, e.g. "etcd2", etcd3". Default ("") is "etcd3".
+	// Type defines the type of storage backend. Default ("") is "etcd3".
 	Type string
 	// Prefix is the prefix to all keys passed to storage.Interface methods.
 	Prefix string
@@ -47,10 +47,6 @@ type Config struct {
 	// resource type not wishing to allow paging, and is not intended for end users to
 	// set.
 	Paging bool
-	// DeserializationCacheSize is the size of cache of deserialized objects.
-	// Currently this is only supported in etcd2.
-	// We will drop the cache once using protobuf.
-	DeserializationCacheSize int
 
 	Codec runtime.Codec
 	// Transformer allows the value to be transformed prior to persisting into etcd.
@@ -66,11 +62,8 @@ type Config struct {
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 	return &Config{
-		Prefix: prefix,
-		// Default cache size to 0 - if unset, its size will be set based on target
-		// memory usage.
-		DeserializationCacheSize: 0,
-		Codec:                    codec,
-		CompactionInterval:       DefaultCompactInterval,
+		Prefix:             prefix,
+		Codec:              codec,
+		CompactionInterval: DefaultCompactInterval,
 	}
 }

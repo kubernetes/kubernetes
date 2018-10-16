@@ -124,7 +124,7 @@ func (c *FakeClusterTestTypes) DeleteCollection(options *v1.DeleteOptions, listO
 // Patch applies the patch and returns the patched clusterTestType.
 func (c *FakeClusterTestTypes) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *examplev1.ClusterTestType, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, name, data, subresources...), &examplev1.ClusterTestType{})
+		Invokes(testing.NewRootPatchSubresourceAction(clustertesttypesResource, name, pt, data, subresources...), &examplev1.ClusterTestType{})
 	if obj == nil {
 		return nil, err
 	}

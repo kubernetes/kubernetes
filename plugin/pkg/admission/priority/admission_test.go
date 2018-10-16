@@ -177,52 +177,64 @@ func TestDefaultPriority(t *testing.T) {
 	updatedDefaultClass1.GlobalDefault = false
 
 	tests := []struct {
-		name                  string
-		classesBefore         []*scheduling.PriorityClass
-		classesAfter          []*scheduling.PriorityClass
-		attributes            admission.Attributes
-		expectedDefaultBefore int32
-		expectedDefaultAfter  int32
+		name                      string
+		classesBefore             []*scheduling.PriorityClass
+		classesAfter              []*scheduling.PriorityClass
+		attributes                admission.Attributes
+		expectedDefaultBefore     int32
+		expectedDefaultNameBefore string
+		expectedDefaultAfter      int32
+		expectedDefaultNameAfter  string
 	}{
 		{
-			name:                  "simple resolution with a default class",
-			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
-			classesAfter:          []*scheduling.PriorityClass{defaultClass1},
-			attributes:            nil,
-			expectedDefaultBefore: defaultClass1.Value,
-			expectedDefaultAfter:  defaultClass1.Value,
+			name:                      "simple resolution with a default class",
+			classesBefore:             []*scheduling.PriorityClass{defaultClass1},
+			classesAfter:              []*scheduling.PriorityClass{defaultClass1},
+			attributes:                nil,
+			expectedDefaultBefore:     defaultClass1.Value,
+			expectedDefaultNameBefore: defaultClass1.Name,
+			expectedDefaultAfter:      defaultClass1.Value,
+			expectedDefaultNameAfter:  defaultClass1.Name,
 		},
 		{
-			name:                  "add a default class",
-			classesBefore:         []*scheduling.PriorityClass{nondefaultClass1},
-			classesAfter:          []*scheduling.PriorityClass{nondefaultClass1, defaultClass1},
-			attributes:            admission.NewAttributesRecord(defaultClass1, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Create, false, nil),
-			expectedDefaultBefore: scheduling.DefaultPriorityWhenNoDefaultClassExists,
-			expectedDefaultAfter:  defaultClass1.Value,
+			name:                      "add a default class",
+			classesBefore:             []*scheduling.PriorityClass{nondefaultClass1},
+			classesAfter:              []*scheduling.PriorityClass{nondefaultClass1, defaultClass1},
+			attributes:                admission.NewAttributesRecord(defaultClass1, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Create, false, nil),
+			expectedDefaultBefore:     scheduling.DefaultPriorityWhenNoDefaultClassExists,
+			expectedDefaultNameBefore: "",
+			expectedDefaultAfter:      defaultClass1.Value,
+			expectedDefaultNameAfter:  defaultClass1.Name,
 		},
 		{
-			name:                  "multiple default classes resolves to the minimum value among them",
-			classesBefore:         []*scheduling.PriorityClass{defaultClass1, defaultClass2},
-			classesAfter:          []*scheduling.PriorityClass{defaultClass2},
-			attributes:            admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
-			expectedDefaultBefore: defaultClass1.Value,
-			expectedDefaultAfter:  defaultClass2.Value,
+			name:                      "multiple default classes resolves to the minimum value among them",
+			classesBefore:             []*scheduling.PriorityClass{defaultClass1, defaultClass2},
+			classesAfter:              []*scheduling.PriorityClass{defaultClass2},
+			attributes:                admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
+			expectedDefaultBefore:     defaultClass1.Value,
+			expectedDefaultNameBefore: defaultClass1.Name,
+			expectedDefaultAfter:      defaultClass2.Value,
+			expectedDefaultNameAfter:  defaultClass2.Name,
 		},
 		{
-			name:                  "delete default priority class",
-			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
-			classesAfter:          []*scheduling.PriorityClass{},
-			attributes:            admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
-			expectedDefaultBefore: defaultClass1.Value,
-			expectedDefaultAfter:  scheduling.DefaultPriorityWhenNoDefaultClassExists,
+			name:                      "delete default priority class",
+			classesBefore:             []*scheduling.PriorityClass{defaultClass1},
+			classesAfter:              []*scheduling.PriorityClass{},
+			attributes:                admission.NewAttributesRecord(nil, nil, pcKind, "", defaultClass1.Name, pcResource, "", admission.Delete, false, nil),
+			expectedDefaultBefore:     defaultClass1.Value,
+			expectedDefaultNameBefore: defaultClass1.Name,
+			expectedDefaultAfter:      scheduling.DefaultPriorityWhenNoDefaultClassExists,
+			expectedDefaultNameAfter:  "",
 		},
 		{
-			name:                  "update default class and remove its global default",
-			classesBefore:         []*scheduling.PriorityClass{defaultClass1},
-			classesAfter:          []*scheduling.PriorityClass{&updatedDefaultClass1},
-			attributes:            admission.NewAttributesRecord(&updatedDefaultClass1, defaultClass1, pcKind, "", defaultClass1.Name, pcResource, "", admission.Update, false, nil),
-			expectedDefaultBefore: defaultClass1.Value,
-			expectedDefaultAfter:  scheduling.DefaultPriorityWhenNoDefaultClassExists,
+			name:                      "update default class and remove its global default",
+			classesBefore:             []*scheduling.PriorityClass{defaultClass1},
+			classesAfter:              []*scheduling.PriorityClass{&updatedDefaultClass1},
+			attributes:                admission.NewAttributesRecord(&updatedDefaultClass1, defaultClass1, pcKind, "", defaultClass1.Name, pcResource, "", admission.Update, false, nil),
+			expectedDefaultBefore:     defaultClass1.Value,
+			expectedDefaultNameBefore: defaultClass1.Name,
+			expectedDefaultAfter:      scheduling.DefaultPriorityWhenNoDefaultClassExists,
+			expectedDefaultNameAfter:  "",
 		},
 	}
 
@@ -232,12 +244,14 @@ func TestDefaultPriority(t *testing.T) {
 		if err := addPriorityClasses(ctrl, test.classesBefore); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
 		}
-		defaultPriority, err := ctrl.getDefaultPriority()
+		pcName, defaultPriority, err := ctrl.getDefaultPriority()
 		if err != nil {
 			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
 		}
-		if err == nil && defaultPriority != test.expectedDefaultBefore {
-			t.Errorf("Test %q: expected default priority %d, but got %d", test.name, test.expectedDefaultBefore, defaultPriority)
+		if err == nil &&
+			(defaultPriority != test.expectedDefaultBefore || pcName != test.expectedDefaultNameBefore) {
+			t.Errorf("Test %q: expected default priority %s(%d), but got %s(%d)",
+				test.name, test.expectedDefaultNameBefore, test.expectedDefaultBefore, pcName, defaultPriority)
 		}
 		if test.attributes != nil {
 			err := ctrl.Validate(test.attributes)
@@ -248,12 +262,14 @@ func TestDefaultPriority(t *testing.T) {
 		if err := addPriorityClasses(ctrl, test.classesAfter); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
 		}
-		defaultPriority, err = ctrl.getDefaultPriority()
+		pcName, defaultPriority, err = ctrl.getDefaultPriority()
 		if err != nil {
 			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
 		}
-		if err == nil && defaultPriority != test.expectedDefaultAfter {
-			t.Errorf("Test %q: expected default priority %d, but got %d", test.name, test.expectedDefaultAfter, defaultPriority)
+		if err == nil &&
+			(defaultPriority != test.expectedDefaultAfter || pcName != test.expectedDefaultNameAfter) {
+			t.Errorf("Test %q: expected default priority %s(%d), but got %s(%d)",
+				test.name, test.expectedDefaultNameAfter, test.expectedDefaultAfter, pcName, defaultPriority)
 		}
 	}
 }

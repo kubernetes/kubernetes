@@ -182,7 +182,6 @@ pkg/kubectl/cmd/run
 pkg/kubectl/cmd/scale
 pkg/kubectl/cmd/set
 pkg/kubectl/cmd/taint
-pkg/kubectl/cmd/templates
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/top
 pkg/kubectl/cmd/util
@@ -194,6 +193,7 @@ pkg/kubectl/cmd/wait
 pkg/kubectl/metricsutil
 pkg/kubectl/util
 pkg/kubectl/util/slice
+pkg/kubectl/util/templates
 pkg/kubelet
 pkg/kubelet/apis
 pkg/kubelet/apis/config
@@ -354,7 +354,6 @@ pkg/registry/rbac/rolebinding
 pkg/registry/rbac/rolebinding/policybased
 pkg/registry/rbac/validation
 pkg/registry/registrytest
-pkg/registry/scheduling/priorityclass/storage
 pkg/registry/scheduling/rest
 pkg/registry/settings/podpreset/storage
 pkg/registry/settings/rest
@@ -397,12 +396,10 @@ pkg/util/removeall
 pkg/util/resourcecontainer
 pkg/util/rlimit
 pkg/util/selinux
-pkg/util/strings
 pkg/util/sysctl
 pkg/util/sysctl/testing
 pkg/util/system
 pkg/util/taints
-pkg/util/term
 pkg/util/threading
 pkg/util/tolerations
 pkg/util/workqueue/prometheus
@@ -414,8 +411,6 @@ pkg/volume/cephfs
 pkg/volume/configmap
 pkg/volume/csi/fake
 pkg/volume/empty_dir
-pkg/volume/fc
-pkg/volume/flocker
 pkg/volume/git_repo
 pkg/volume/host_path
 pkg/volume/iscsi
@@ -428,7 +423,6 @@ pkg/volume/scaleio
 pkg/volume/secret
 pkg/volume/storageos
 pkg/volume/testing
-pkg/volume/util
 pkg/volume/util/fs
 pkg/volume/util/recyclerclient
 pkg/volume/util/volumepathhandler

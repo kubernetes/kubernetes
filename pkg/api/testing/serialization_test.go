@@ -244,6 +244,29 @@ func TestEncodePtr(t *testing.T) {
 	}
 }
 
+func TestDecodeTimeStampWithoutQuotes(t *testing.T) {
+	testYAML := []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: 2018-08-30T14:10:58Z
+  name: test
+spec:
+  containers: null
+status: {}`)
+	if obj, err := runtime.Decode(testapi.Default.Codec(), testYAML); err != nil {
+		t.Fatalf("unable to decode yaml: %v", err)
+	} else {
+		if obj2, ok := obj.(*api.Pod); !ok {
+			t.Fatalf("Got wrong type")
+		} else {
+			if obj2.ObjectMeta.CreationTimestamp.UnixNano() != parseTimeOrDie("2018-08-30T14:10:58Z").UnixNano() {
+				t.Fatalf("Time stamps do not match")
+			}
+		}
+	}
+}
+
 // TestBadJSONRejection establishes that a JSON object without a kind or with
 // an unknown kind will not be decoded without error.
 func TestBadJSONRejection(t *testing.T) {

@@ -31,6 +31,7 @@ import (
 
 	"github.com/golang/glog"
 
+	coordv1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -39,10 +40,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	coordinformers "k8s.io/client-go/informers/coordination/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	coordlisters "k8s.io/client-go/listers/coordination/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
@@ -54,7 +58,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/features"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
@@ -69,14 +74,14 @@ func init() {
 var (
 	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
 	UnreachableTaintTemplate = &v1.Taint{
-		Key:    algorithm.TaintNodeUnreachable,
+		Key:    schedulerapi.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	// NotReadyTaintTemplate is the taint for when a node is not ready for
 	// executing pods
 	NotReadyTaintTemplate = &v1.Taint{
-		Key:    algorithm.TaintNodeNotReady,
+		Key:    schedulerapi.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
@@ -86,34 +91,34 @@ var (
 	// for certain NodeConditionType, there are multiple {ConditionStatus,TaintKey} pairs
 	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]map[v1.ConditionStatus]string{
 		v1.NodeReady: {
-			v1.ConditionFalse:   algorithm.TaintNodeNotReady,
-			v1.ConditionUnknown: algorithm.TaintNodeUnreachable,
+			v1.ConditionFalse:   schedulerapi.TaintNodeNotReady,
+			v1.ConditionUnknown: schedulerapi.TaintNodeUnreachable,
 		},
 		v1.NodeMemoryPressure: {
-			v1.ConditionTrue: algorithm.TaintNodeMemoryPressure,
+			v1.ConditionTrue: schedulerapi.TaintNodeMemoryPressure,
 		},
 		v1.NodeOutOfDisk: {
-			v1.ConditionTrue: algorithm.TaintNodeOutOfDisk,
+			v1.ConditionTrue: schedulerapi.TaintNodeOutOfDisk,
 		},
 		v1.NodeDiskPressure: {
-			v1.ConditionTrue: algorithm.TaintNodeDiskPressure,
+			v1.ConditionTrue: schedulerapi.TaintNodeDiskPressure,
 		},
 		v1.NodeNetworkUnavailable: {
-			v1.ConditionTrue: algorithm.TaintNodeNetworkUnavailable,
+			v1.ConditionTrue: schedulerapi.TaintNodeNetworkUnavailable,
 		},
 		v1.NodePIDPressure: {
-			v1.ConditionTrue: algorithm.TaintNodePIDPressure,
+			v1.ConditionTrue: schedulerapi.TaintNodePIDPressure,
 		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
-		algorithm.TaintNodeNotReady:           v1.NodeReady,
-		algorithm.TaintNodeUnreachable:        v1.NodeReady,
-		algorithm.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
-		algorithm.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
-		algorithm.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
-		algorithm.TaintNodeDiskPressure:       v1.NodeDiskPressure,
-		algorithm.TaintNodePIDPressure:        v1.NodePIDPressure,
+		schedulerapi.TaintNodeNotReady:           v1.NodeReady,
+		schedulerapi.TaintNodeUnreachable:        v1.NodeReady,
+		schedulerapi.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
+		schedulerapi.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
+		schedulerapi.TaintNodeOutOfDisk:          v1.NodeOutOfDisk,
+		schedulerapi.TaintNodeDiskPressure:       v1.NodeDiskPressure,
+		schedulerapi.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
 )
 
@@ -136,6 +141,7 @@ type nodeHealthData struct {
 	probeTimestamp           metav1.Time
 	readyTransitionTimestamp metav1.Time
 	status                   *v1.NodeStatus
+	lease                    *coordv1beta1.Lease
 }
 
 // Controller is the controller that manages node's life cycle.
@@ -172,6 +178,8 @@ type Controller struct {
 	daemonSetStore          extensionslisters.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
+	leaseLister                 coordlisters.LeaseLister
+	leaseInformerSynced         cache.InformerSynced
 	nodeLister                  corelisters.NodeLister
 	nodeInformerSynced          cache.InformerSynced
 	nodeExistsInCloudProvider   func(types.NodeName) (bool, error)
@@ -190,19 +198,23 @@ type Controller struct {
 	nodeStartupGracePeriod time.Duration
 
 	// Controller will not proactively sync node health, but will monitor node
-	// health signal updated from kubelet. If it doesn't receive update for this
-	// amount of time, it will start posting "NodeReady==ConditionUnknown". The
-	// amount of time before which Controller start evicting pods is controlled
-	// via flag 'pod-eviction-timeout'.
+	// health signal updated from kubelet. There are 2 kinds of node healthiness
+	// signals: NodeStatus and NodeLease. NodeLease signal is generated only when
+	// NodeLease feature is enabled. If it doesn't receive update for this amount
+	// of time, it will start posting "NodeReady==ConditionUnknown". The amount of
+	// time before which Controller start evicting pods is controlled via flag
+	// 'pod-eviction-timeout'.
 	// Note: be cautious when changing the constant, it must work with
-	// nodeStatusUpdateFrequency in kubelet. There are several constraints:
-	// 1. nodeMonitorGracePeriod must be N times more than
-	//    nodeStatusUpdateFrequency, where N means number of retries allowed for
-	//    kubelet to post node health signal. It is pointless to make
-	//    nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since
-	//    there will only be fresh values from Kubelet at an interval of
-	//    nodeStatusUpdateFrequency. The constant must be less than
-	//    podEvictionTimeout.
+	// nodeStatusUpdateFrequency in kubelet and renewInterval in NodeLease
+	// controller. The node health signal update frequency is the minimal of the
+	// two.
+	// There are several constraints:
+	// 1. nodeMonitorGracePeriod must be N times more than  the node health signal
+	//    update frequency, where N means number of retries allowed for kubelet to
+	//    post node status/lease. It is pointless to make nodeMonitorGracePeriod
+	//    be less than the node health signal update frequency, since there will
+	//    only be fresh values from Kubelet at an interval of node health signal
+	//    update frequency. The constant must be less than podEvictionTimeout.
 	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger
 	//    value takes longer for user to see up-to-date node health.
 	nodeMonitorGracePeriod time.Duration
@@ -229,7 +241,9 @@ type Controller struct {
 }
 
 // NewNodeLifecycleController returns a new taint controller.
-func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
+func NewNodeLifecycleController(
+	leaseInformer coordinformers.LeaseInformer,
+	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
 	daemonSetInformer extensionsinformers.DaemonSetInformer,
 	cloud cloudprovider.Interface,
@@ -373,6 +387,9 @@ func NewNodeLifecycleController(podInformer coreinformers.PodInformer,
 		}),
 	})
 
+	nc.leaseLister = leaseInformer.Lister()
+	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
+
 	nc.nodeLister = nodeInformer.Lister()
 	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
 
@@ -389,7 +406,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting node controller")
 	defer glog.Infof("Shutting down node controller")
 
-	if !controller.WaitForCacheSync("taint", stopCh, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !controller.WaitForCacheSync("taint", stopCh, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
 	}
 
@@ -438,21 +455,21 @@ func (nc *Controller) doFixDeprecatedTaintKeyPass(node *v1.Node) error {
 	taintsToDel := []*v1.Taint{}
 
 	for _, taint := range node.Spec.Taints {
-		if taint.Key == algorithm.DeprecatedTaintNodeNotReady {
+		if taint.Key == schedulerapi.DeprecatedTaintNodeNotReady {
 			tDel := taint
 			taintsToDel = append(taintsToDel, &tDel)
 
 			tAdd := taint
-			tAdd.Key = algorithm.TaintNodeNotReady
+			tAdd.Key = schedulerapi.TaintNodeNotReady
 			taintsToAdd = append(taintsToAdd, &tAdd)
 		}
 
-		if taint.Key == algorithm.DeprecatedTaintNodeUnreachable {
+		if taint.Key == schedulerapi.DeprecatedTaintNodeUnreachable {
 			tDel := taint
 			taintsToDel = append(taintsToDel, &tDel)
 
 			tAdd := taint
-			tAdd.Key = algorithm.TaintNodeUnreachable
+			tAdd.Key = schedulerapi.TaintNodeUnreachable
 			taintsToAdd = append(taintsToAdd, &tAdd)
 		}
 	}
@@ -513,7 +530,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	if node.Spec.Unschedulable {
 		// If unschedulable, append related taint.
 		taints = append(taints, v1.Taint{
-			Key:    algorithm.TaintNodeUnschedulable,
+			Key:    schedulerapi.TaintNodeUnschedulable,
 			Effect: v1.TaintEffectNoSchedule,
 		})
 	}
@@ -525,7 +542,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 			return false
 		}
 		// Find unschedulable taint of node.
-		if t.Key == algorithm.TaintNodeUnschedulable {
+		if t.Key == schedulerapi.TaintNodeUnschedulable {
 			return true
 		}
 		// Find node condition taints of node.
@@ -811,7 +828,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 	_, currentReadyCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 	if currentReadyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
-		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
+		// A fake ready condition is created, where LastHeartbeatTime and LastTransitionTime is set
 		// to node.CreationTimestamp to avoid handle the corner case.
 		observedReadyCondition = v1.NodeCondition{
 			Type:               v1.NodeReady,
@@ -820,10 +837,14 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 			LastTransitionTime: node.CreationTimestamp,
 		}
 		gracePeriod = nc.nodeStartupGracePeriod
-		nc.nodeHealthMap[node.Name] = &nodeHealthData{
-			status:                   &node.Status,
-			probeTimestamp:           node.CreationTimestamp,
-			readyTransitionTimestamp: node.CreationTimestamp,
+		if _, found := nc.nodeHealthMap[node.Name]; found {
+			nc.nodeHealthMap[node.Name].status = &node.Status
+		} else {
+			nc.nodeHealthMap[node.Name] = &nodeHealthData{
+				status:                   &node.Status,
+				probeTimestamp:           node.CreationTimestamp,
+				readyTransitionTimestamp: node.CreationTimestamp,
+			}
 		}
 	} else {
 		// If ready condition is not nil, make a copy of it, since we may modify it in place later.
@@ -847,8 +868,10 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 	//   - currently only correct Ready State transition outside of Node Controller is marking it ready by Kubelet, we don't check
 	//     if that's the case, but it does not seem necessary.
 	var savedCondition *v1.NodeCondition
+	var savedLease *coordv1beta1.Lease
 	if found {
 		_, savedCondition = v1node.GetNodeCondition(savedNodeHealth.status, v1.NodeReady)
+		savedLease = savedNodeHealth.lease
 	}
 	_, observedCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 	if !found {
@@ -894,11 +917,23 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 			readyTransitionTimestamp: transitionTime,
 		}
 	}
+	var observedLease *coordv1beta1.Lease
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+		// Always update the probe time if node lease is renewed.
+		// Note: If kubelet never posted the node status, but continues renewing the
+		// heartbeat leases, the node controller will assume the node is healthy and
+		// take no action.
+		observedLease, _ = nc.leaseLister.Leases(v1.NamespaceNodeLease).Get(node.Name)
+		if observedLease != nil && (savedLease == nil || savedLease.Spec.RenewTime.Before(observedLease.Spec.RenewTime)) {
+			savedNodeHealth.lease = observedLease
+			savedNodeHealth.probeTimestamp = nc.now()
+		}
+	}
 	nc.nodeHealthMap[node.Name] = savedNodeHealth
 
 	if nc.now().After(savedNodeHealth.probeTimestamp.Add(gracePeriod)) {
-		// NodeReady condition was last set longer ago than gracePeriod, so update it to Unknown
-		// (regardless of its current value) in the master.
+		// NodeReady condition or lease was last set longer ago than gracePeriod, so
+		// update it to Unknown (regardless of its current value) in the master.
 		if currentReadyCondition == nil {
 			glog.V(2).Infof("node %v is never updated by kubelet", node.Name)
 			node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
@@ -967,6 +1002,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 				status:                   &node.Status,
 				probeTimestamp:           nc.nodeHealthMap[node.Name].probeTimestamp,
 				readyTransitionTimestamp: nc.now(),
+				lease:                    observedLease,
 			}
 			return gracePeriod, observedReadyCondition, currentReadyCondition, nil
 		}

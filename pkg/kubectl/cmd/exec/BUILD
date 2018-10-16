@@ -6,10 +6,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/exec",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
+        "//pkg/kubectl/util/templates:go_default_library",
         "//pkg/kubectl/util/term:go_default_library",
         "//pkg/util/interrupt:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -56,16 +56,16 @@ func TestJoinQualifiedName(t *testing.T) {
 
 func TestShortenString(t *testing.T) {
 	testCases := []struct {
-		input   string
-		out_len int
-		output  string
+		input  string
+		outLen int
+		output string
 	}{
 		{"kubernetes.io", 5, "kuber"},
 		{"blah", 34, "blah"},
 		{"kubernetes.io", 13, "kubernetes.io"},
 	}
 	for i, tc := range testCases {
-		res := ShortenString(tc.input, tc.out_len)
+		res := ShortenString(tc.input, tc.outLen)
 		if res != tc.output {
 			t.Errorf("case[%d]: expected %q, got %q", i, tc.output, res)
 		}

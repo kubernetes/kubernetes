@@ -954,7 +954,7 @@ def enable_gpu():
     if get_version('kubelet') < (1, 9):
         hookenv.status_set(
             'active',
-            'Upgrade to snap channel >= 1.9/stable to enable GPU suppport.'
+            'Upgrade to snap channel >= 1.9/stable to enable GPU support.'
         )
         return
 

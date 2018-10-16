@@ -142,7 +142,7 @@ func newProxyServer(
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, kernelHandler, ipsetInterface, iptables.LinuxKernelCompatTester{})
 	nodeIP := net.ParseIP(config.BindAddress)
 	if nodeIP.IsUnspecified() {
-		nodeIP = getNodeIP(client, hostname)
+		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")

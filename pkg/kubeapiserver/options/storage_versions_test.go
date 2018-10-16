@@ -25,13 +25,11 @@ import (
 
 func TestGenerateStorageVersionMap(t *testing.T) {
 	testCases := []struct {
-		legacyVersion   string
 		storageVersions string
 		defaultVersions string
 		expectedMap     map[string]schema.GroupVersion
 	}{
 		{
-			legacyVersion:   "v1",
 			storageVersions: "v1,extensions/v1beta1",
 			expectedMap: map[string]schema.GroupVersion{
 				"":           {Version: "v1"},
@@ -39,7 +37,6 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			},
 		},
 		{
-			legacyVersion:   "",
 			storageVersions: "extensions/v1beta1,v1",
 			expectedMap: map[string]schema.GroupVersion{
 				"":           {Version: "v1"},
@@ -47,7 +44,6 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			},
 		},
 		{
-			legacyVersion:   "",
 			storageVersions: "autoscaling=extensions/v1beta1,v1",
 			defaultVersions: "extensions/v1beta1,v1,autoscaling/v1",
 			expectedMap: map[string]schema.GroupVersion{
@@ -57,7 +53,6 @@ func TestGenerateStorageVersionMap(t *testing.T) {
 			},
 		},
 		{
-			legacyVersion:   "",
 			storageVersions: "",
 			expectedMap:     map[string]schema.GroupVersion{},
 		},

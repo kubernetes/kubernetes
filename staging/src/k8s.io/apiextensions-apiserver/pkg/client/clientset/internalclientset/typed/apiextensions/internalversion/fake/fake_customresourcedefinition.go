@@ -123,7 +123,7 @@ func (c *FakeCustomResourceDefinitions) DeleteCollection(options *v1.DeleteOptio
 // Patch applies the patch and returns the patched customResourceDefinition.
 func (c *FakeCustomResourceDefinitions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiextensions.CustomResourceDefinition, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, name, data, subresources...), &apiextensions.CustomResourceDefinition{})
+		Invokes(testing.NewRootPatchSubresourceAction(customresourcedefinitionsResource, name, pt, data, subresources...), &apiextensions.CustomResourceDefinition{})
 	if obj == nil {
 		return nil, err
 	}

@@ -119,7 +119,7 @@ func (c *FakeNetworkPolicies) DeleteCollection(options *v1.DeleteOptions, listOp
 // Patch applies the patch and returns the patched networkPolicy.
 func (c *FakeNetworkPolicies) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *networking.NetworkPolicy, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, data, subresources...), &networking.NetworkPolicy{})
+		Invokes(testing.NewPatchSubresourceAction(networkpoliciesResource, c.ns, name, pt, data, subresources...), &networking.NetworkPolicy{})
 
 	if obj == nil {
 		return nil, err

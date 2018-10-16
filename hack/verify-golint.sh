@@ -25,7 +25,7 @@ kube::golang::verify_go_version
 
 if ! which golint > /dev/null; then
   echo 'Can not find golint, install with:'
-  echo 'go get -u github.com/golang/lint/golint'
+  echo 'go get -u golang.org/x/lint/golint'
   exit 1
 fi
 

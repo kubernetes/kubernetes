@@ -341,7 +341,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	// Initialize the new etcd client if it wasn't pre-initialized
 	if newEtcdClient == nil {
 		client, err := etcdutil.NewFromStaticPod(
-			[]string{"localhost:2379"},
+			[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
 			constants.GetStaticPodDirectory(),
 			cfg.CertificatesDir,
 		)
@@ -417,7 +417,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 		} else {
 			// etcd Static Pod
 			client, err := etcdutil.NewFromStaticPod(
-				[]string{"localhost:2379"},
+				[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
 				constants.GetStaticPodDirectory(),
 				cfg.CertificatesDir,
 			)

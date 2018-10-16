@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func NewRootGetAction(resource schema.GroupVersionResource, name string) GetActionImpl {
@@ -152,45 +153,49 @@ func NewUpdateAction(resource schema.GroupVersionResource, namespace string, obj
 	return action
 }
 
-func NewRootPatchAction(resource schema.GroupVersionResource, name string, patch []byte) PatchActionImpl {
+func NewRootPatchAction(resource schema.GroupVersionResource, name string, pt types.PatchType, patch []byte) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
 	action.Name = name
+	action.PatchType = pt
 	action.Patch = patch
 
 	return action
 }
 
-func NewPatchAction(resource schema.GroupVersionResource, namespace string, name string, patch []byte) PatchActionImpl {
+func NewPatchAction(resource schema.GroupVersionResource, namespace string, name string, pt types.PatchType, patch []byte) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
 	action.Namespace = namespace
 	action.Name = name
+	action.PatchType = pt
 	action.Patch = patch
 
 	return action
 }
 
-func NewRootPatchSubresourceAction(resource schema.GroupVersionResource, name string, patch []byte, subresources ...string) PatchActionImpl {
+func NewRootPatchSubresourceAction(resource schema.GroupVersionResource, name string, pt types.PatchType, patch []byte, subresources ...string) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
 	action.Subresource = path.Join(subresources...)
 	action.Name = name
+	action.PatchType = pt
 	action.Patch = patch
 
 	return action
 }
 
-func NewPatchSubresourceAction(resource schema.GroupVersionResource, namespace, name string, patch []byte, subresources ...string) PatchActionImpl {
+func NewPatchSubresourceAction(resource schema.GroupVersionResource, namespace, name string, pt types.PatchType, patch []byte, subresources ...string) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
 	action.Subresource = path.Join(subresources...)
 	action.Namespace = namespace
 	action.Name = name
+	action.PatchType = pt
 	action.Patch = patch
 
 	return action
@@ -396,6 +401,7 @@ type DeleteCollectionAction interface {
 type PatchAction interface {
 	Action
 	GetName() string
+	GetPatchType() types.PatchType
 	GetPatch() []byte
 }
 
@@ -537,8 +543,9 @@ func (a UpdateActionImpl) DeepCopy() Action {
 
 type PatchActionImpl struct {
 	ActionImpl
-	Name  string
-	Patch []byte
+	Name      string
+	PatchType types.PatchType
+	Patch     []byte
 }
 
 func (a PatchActionImpl) GetName() string {
@@ -549,12 +556,17 @@ func (a PatchActionImpl) GetPatch() []byte {
 	return a.Patch
 }
 
+func (a PatchActionImpl) GetPatchType() types.PatchType {
+	return a.PatchType
+}
+
 func (a PatchActionImpl) DeepCopy() Action {
 	patch := make([]byte, len(a.Patch))
 	copy(patch, a.Patch)
 	return PatchActionImpl{
 		ActionImpl: a.ActionImpl.DeepCopy().(ActionImpl),
 		Name:       a.Name,
+		PatchType:  a.PatchType,
 		Patch:      patch,
 	}
 }

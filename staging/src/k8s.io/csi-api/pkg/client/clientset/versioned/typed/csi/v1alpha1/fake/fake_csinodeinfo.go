@@ -112,7 +112,7 @@ func (c *FakeCSINodeInfos) DeleteCollection(options *v1.DeleteOptions, listOptio
 // Patch applies the patch and returns the patched cSINodeInfo.
 func (c *FakeCSINodeInfos) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.CSINodeInfo, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(csinodeinfosResource, name, data, subresources...), &v1alpha1.CSINodeInfo{})
+		Invokes(testing.NewRootPatchSubresourceAction(csinodeinfosResource, name, pt, data, subresources...), &v1alpha1.CSINodeInfo{})
 	if obj == nil {
 		return nil, err
 	}

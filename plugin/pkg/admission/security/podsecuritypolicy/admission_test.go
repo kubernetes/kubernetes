@@ -1907,6 +1907,9 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 						RunAsUser: policy.RunAsUserStrategyOptions{
 							Rule: policy.RunAsUserStrategyRunAsAny,
 						},
+						RunAsGroup: &policy.RunAsGroupStrategyOptions{
+							Rule: policy.RunAsGroupStrategyRunAsAny,
+						},
 						FSGroup: policy.FSGroupStrategyOptions{
 							Rule: policy.FSGroupStrategyRunAsAny,
 						},
@@ -1929,6 +1932,9 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 						},
 						RunAsUser: policy.RunAsUserStrategyOptions{
 							Rule: policy.RunAsUserStrategyMustRunAs,
+						},
+						RunAsGroup: &policy.RunAsGroupStrategyOptions{
+							Rule: policy.RunAsGroupStrategyRunAsAny,
 						},
 						FSGroup: policy.FSGroupStrategyOptions{
 							Rule: policy.FSGroupStrategyRunAsAny,
@@ -2343,6 +2349,12 @@ func restrictivePSP() *policy.PodSecurityPolicy {
 					{Min: int64(999), Max: int64(999)},
 				},
 			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Ranges: []policy.IDRange{
+					{Min: int64(999), Max: int64(999)},
+				},
+			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyMustRunAs,
 				SELinuxOptions: &kapi.SELinuxOptions{
@@ -2381,6 +2393,9 @@ func permissivePSP() *policy.PodSecurityPolicy {
 			AllowedCapabilities:      []kapi.Capability{policy.AllowAllCapabilities},
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyRunAsAny,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyRunAsAny,
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
