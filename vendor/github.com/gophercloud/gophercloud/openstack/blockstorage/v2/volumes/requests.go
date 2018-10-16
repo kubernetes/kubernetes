@@ -98,6 +98,19 @@ type ListOpts struct {
 	// TenantID will filter by a specific tenant/project ID.
 	// Setting AllTenants is required for this.
 	TenantID string `q:"project_id"`
+
+	// Comma-separated list of sort keys and optional sort directions in the
+	// form of <key>[:<direction>].
+	Sort string `q:"sort"`
+
+	// Requests a page size of items.
+	Limit int `q:"limit"`
+
+	// Used in conjunction with limit to return a slice of items.
+	Offset int `q:"offset"`
+
+	// The ID of the last-seen item.
+	Marker string `q:"marker"`
 }
 
 // ToVolumeListQuery formats a ListOpts into a query string.
@@ -118,7 +131,7 @@ func List(client *gophercloud.ServiceClient, opts ListOptsBuilder) pagination.Pa
 	}
 
 	return pagination.NewPager(client, url, func(r pagination.PageResult) pagination.Page {
-		return VolumePage{pagination.SinglePageBase(r)}
+		return VolumePage{pagination.LinkedPageBase{PageResult: r}}
 	})
 }
 
@@ -161,7 +174,12 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
-	pages, err := List(client, nil).AllPages()
+
+	listOpts := ListOpts{
+		Name: name,
+	}
+
+	pages, err := List(client, listOpts).AllPages()
 	if err != nil {
 		return "", err
 	}

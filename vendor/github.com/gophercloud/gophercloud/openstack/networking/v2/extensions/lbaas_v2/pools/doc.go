@@ -13,7 +13,7 @@ Example to List Pools
 		panic(err)
 	}
 
-	allPools, err := pools.ExtractMonitors(allPages)
+	allPools, err := pools.ExtractPools(allPages)
 	if err != nil {
 		panic(err)
 	}

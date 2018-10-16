@@ -28,7 +28,6 @@ type CreateOptsBuilder interface {
 
 // CreateOpts specifies parameters of a new interface attachment.
 type CreateOpts struct {
-
 	// PortID is the ID of the port for which you want to create an interface.
 	// The NetworkID and PortID parameters are mutually exclusive.
 	// If you do not specify the PortID parameter, the OpenStack Networking API
@@ -43,6 +42,7 @@ type CreateOpts struct {
 
 	// Slice of FixedIPs. If you request a specific FixedIP address without a
 	// NetworkID, the request returns a Bad Request (400) response code.
+	// Note: this uses the FixedIP struct, but only the IPAddress field can be used.
 	FixedIPs []FixedIP `json:"fixed_ips,omitempty"`
 }
 

@@ -437,6 +437,8 @@ filegroup(
         "//vendor/gopkg.in/square/go-jose.v2:all-srcs",
         "//vendor/gopkg.in/warnings.v0:all-srcs",
         "//vendor/gopkg.in/yaml.v2:all-srcs",
+        "//vendor/k8s.io/cloud-provider-openstack/pkg/cloudprovider/providers/openstack:all-srcs",
+        "//vendor/k8s.io/cloud-provider-openstack/pkg/volume/cinder:all-srcs",
         "//vendor/k8s.io/gengo/args:all-srcs",
         "//vendor/k8s.io/gengo/examples/deepcopy-gen/generators:all-srcs",
         "//vendor/k8s.io/gengo/examples/defaulter-gen/generators:all-srcs",

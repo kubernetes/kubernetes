@@ -295,7 +295,11 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 						seeker.Seek(0, 0)
 					}
 				}
+				// make a new call to request with a nil reauth func in order to avoid infinite loop
+				reauthFunc := client.ReauthFunc
+				client.ReauthFunc = nil
 				resp, err = client.Request(method, url, options)
+				client.ReauthFunc = reauthFunc
 				if err != nil {
 					switch err.(type) {
 					case *ErrUnexpectedResponseCode:
@@ -378,7 +382,7 @@ func defaultOkCodes(method string) []int {
 	case method == "PUT":
 		return []int{201, 202}
 	case method == "PATCH":
-		return []int{200, 204}
+		return []int{200, 202, 204}
 	case method == "DELETE":
 		return []int{202, 204}
 	}

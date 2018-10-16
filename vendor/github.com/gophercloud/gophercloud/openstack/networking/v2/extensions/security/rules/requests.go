@@ -88,6 +88,9 @@ type CreateOpts struct {
 	// group rule is applied.
 	Direction RuleDirection `json:"direction" required:"true"`
 
+	// String description of each rule, optional
+	Description string `json:"description,omitempty"`
+
 	// Must be "IPv4" or "IPv6", and addresses represented in CIDR must match the
 	// ingress or egress rules.
 	EtherType RuleEtherType `json:"ethertype" required:"true"`

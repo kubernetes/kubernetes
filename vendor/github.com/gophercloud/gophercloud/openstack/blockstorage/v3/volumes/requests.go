@@ -38,6 +38,8 @@ type CreateOpts struct {
 	ImageID string `json:"imageRef,omitempty"`
 	// The associated volume type
 	VolumeType string `json:"volume_type,omitempty"`
+	// Multiattach denotes if the volume is multi-attach capable.
+	Multiattach bool `json:"multiattach,omitempty"`
 }
 
 // ToVolumeCreateMap assembles a request body based on the contents of a
@@ -174,7 +176,12 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
-	pages, err := List(client, nil).AllPages()
+
+	listOpts := ListOpts{
+		Name: name,
+	}
+
+	pages, err := List(client, listOpts).AllPages()
 	if err != nil {
 		return "", err
 	}

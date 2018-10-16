@@ -54,6 +54,10 @@ type Listener struct {
 
 	// Pools are the pools which are part of this listener.
 	Pools []pools.Pool `json:"pools"`
+
+	// The provisioning status of the listener.
+	// This value is ACTIVE, PENDING_* or ERROR.
+	ProvisioningStatus string `json:"provisioning_status"`
 }
 
 // ListenerPage is the page returned by a pager when traversing over a
