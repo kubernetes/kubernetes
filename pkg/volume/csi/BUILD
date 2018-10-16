@@ -33,6 +33,8 @@ go_library(
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 
@@ -71,6 +73,8 @@ go_test(
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/fake:go_default_library",
         "//vendor/github.com/container-storage-interface/spec/lib/go/csi/v0:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 
