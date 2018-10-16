@@ -113,7 +113,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Verifying statefulset set proper service name")
 			framework.ExpectNoError(sst.CheckServiceName(ss, headlessSvcName))
 
-			cmd := "echo $(hostname) > /data/hostname; sync;"
+			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(sst.ExecInStatefulPods(ss, cmd))
 
