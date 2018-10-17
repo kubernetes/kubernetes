@@ -142,6 +142,9 @@ func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) 
 	if !found {
 		return nil
 	}
+	if cstat.Network == nil {
+		return nil
+	}
 
 	iStats := statsapi.NetworkStats{
 		Time: metav1.NewTime(cstat.Timestamp),

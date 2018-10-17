@@ -5,6 +5,8 @@ go_library(
     srcs = [
         "cadvisor_stats_provider.go",
         "cri_stats_provider.go",
+        "cri_stats_provider_unsupported.go",
+        "cri_stats_provider_windows.go",
         "helper.go",
         "log_metrics_provider.go",
         "stats_provider.go",

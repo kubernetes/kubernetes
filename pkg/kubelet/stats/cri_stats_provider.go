@@ -106,9 +106,14 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
+	criContainerStats, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
+	}
+
+	criPodSandboxStats, err := p.listPodSandboxStats()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list all pod sandbox stats: %v", err)
 	}
 
 	containers = removeTerminatedContainer(containers)
@@ -124,7 +129,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	}
 	caInfos := getCRICadvisorStats(allInfos)
 
-	for _, stats := range resp {
+	for _, stats := range criContainerStats {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
 		if !found {
@@ -147,7 +152,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
 		// Fill available stats for full set of required pod stats
 		cs := p.makeContainerStats(stats, container, &rootFsInfo, fsIDtoInfo, podSandbox.GetMetadata().GetUid())
-		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs)
+		p.addPodNetworkStats(ps, podSandboxID, caInfos, cs, criPodSandboxStats[podSandboxID])
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
@@ -272,11 +277,21 @@ func (p *criStatsProvider) addPodNetworkStats(
 	podSandboxID string,
 	caInfos map[string]cadvisorapiv2.ContainerInfo,
 	cs *statsapi.ContainerStats,
+	sbs *statsapi.PodStats,
 ) {
 	caPodSandbox, found := caInfos[podSandboxID]
 	// try get network stats from cadvisor first.
 	if found {
-		ps.Network = cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
+		networkStats := cadvisorInfoToNetworkStats(ps.PodRef.Name, &caPodSandbox)
+		if networkStats != nil {
+			ps.Network = networkStats
+			return
+		}
+	}
+
+	// Not found from cadvisor, get from CRI pod sandbox stats.
+	if sbs != nil && sbs.Network != nil {
+		ps.Network = sbs.Network
 		return
 	}
 
