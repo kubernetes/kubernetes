@@ -151,6 +151,8 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,R
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ReplicationControllerConfiguration,ConcurrentRCSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ResourceQuotaControllerConfiguration,ConcurrentResourceQuotaSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,ResourceQuotaControllerConfiguration,ResourceQuotaSyncPeriod
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ServiceAccountKeyFile
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ConcurrentServiceAccountSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ConcurrentSATokenSyncs
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,RootCAFile
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,SAControllerConfiguration,ServiceAccountKeyFile

@@ -1054,6 +1054,7 @@ func Convert_config_ResourceQuotaControllerConfiguration_To_v1alpha1_ResourceQuo
 
 func autoConvert_v1alpha1_SAControllerConfiguration_To_config_SAControllerConfiguration(in *v1alpha1.SAControllerConfiguration, out *config.SAControllerConfiguration, s conversion.Scope) error {
 	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
+	out.ConcurrentServiceAccountSyncs = in.ConcurrentServiceAccountSyncs
 	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
 	out.RootCAFile = in.RootCAFile
 	return nil
@@ -1066,6 +1067,7 @@ func Convert_v1alpha1_SAControllerConfiguration_To_config_SAControllerConfigurat
 
 func autoConvert_config_SAControllerConfiguration_To_v1alpha1_SAControllerConfiguration(in *config.SAControllerConfiguration, out *v1alpha1.SAControllerConfiguration, s conversion.Scope) error {
 	out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
+	out.ConcurrentServiceAccountSyncs = in.ConcurrentServiceAccountSyncs
 	out.ConcurrentSATokenSyncs = in.ConcurrentSATokenSyncs
 	out.RootCAFile = in.RootCAFile
 	return nil

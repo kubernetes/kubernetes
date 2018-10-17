@@ -239,6 +239,15 @@ func SetDefaults_ResourceQuotaControllerConfiguration(obj *kubectrlmgrconfigv1al
 	}
 }
 
+func SetDefaults_SAControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.SAControllerConfiguration) {
+	if obj.ConcurrentSATokenSyncs == 0 {
+		obj.ConcurrentSATokenSyncs = 5
+	}
+	if obj.ConcurrentServiceAccountSyncs == 0 {
+		obj.ConcurrentServiceAccountSyncs = 1
+	}
+}
+
 func SetDefaults_PersistentVolumeRecyclerConfiguration(obj *kubectrlmgrconfigv1alpha1.PersistentVolumeRecyclerConfiguration) {
 	if obj.MaximumRetry == 0 {
 		obj.MaximumRetry = 3

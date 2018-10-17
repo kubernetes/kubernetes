@@ -24,9 +24,10 @@ import (
 
 // SAControllerOptions holds the ServiceAccountController options.
 type SAControllerOptions struct {
-	ServiceAccountKeyFile  string
-	ConcurrentSATokenSyncs int32
-	RootCAFile             string
+	ServiceAccountKeyFile         string
+	ConcurrentServiceAccountSyncs int32
+	ConcurrentSATokenSyncs        int32
+	RootCAFile                    string
 }
 
 // AddFlags adds flags related to ServiceAccountController for controller manager to the specified FlagSet
@@ -36,6 +37,7 @@ func (o *SAControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.StringVar(&o.ServiceAccountKeyFile, "service-account-private-key-file", o.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
+	fs.Int32Var(&o.ConcurrentServiceAccountSyncs, "concurrent-serviceaccount-syncs", o.ConcurrentServiceAccountSyncs, "The number of service account objects that are allowed to sync concurrently. Larger number = more responsive service account generation, but more CPU (and network) load")
 	fs.Int32Var(&o.ConcurrentSATokenSyncs, "concurrent-serviceaccount-token-syncs", o.ConcurrentSATokenSyncs, "The number of service account token objects that are allowed to sync concurrently. Larger number = more responsive token generation, but more CPU (and network) load")
 	fs.StringVar(&o.RootCAFile, "root-ca-file", o.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 }
@@ -47,6 +49,7 @@ func (o *SAControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.SAControllerConfigu
 	}
 
 	cfg.ServiceAccountKeyFile = o.ServiceAccountKeyFile
+	cfg.ConcurrentServiceAccountSyncs = o.ConcurrentServiceAccountSyncs
 	cfg.ConcurrentSATokenSyncs = o.ConcurrentSATokenSyncs
 	cfg.RootCAFile = o.RootCAFile
 

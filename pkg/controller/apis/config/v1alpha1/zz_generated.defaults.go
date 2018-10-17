@@ -53,5 +53,6 @@ func SetObjectDefaults_KubeControllerManagerConfiguration(in *v1alpha1.KubeContr
 	SetDefaults_ReplicaSetControllerConfiguration(&in.ReplicaSetController)
 	SetDefaults_ReplicationControllerConfiguration(&in.ReplicationController)
 	SetDefaults_ResourceQuotaControllerConfiguration(&in.ResourceQuotaController)
+	SetDefaults_SAControllerConfiguration(&in.SAController)
 	SetDefaults_ServiceControllerConfiguration(&in.ServiceController)
 }
