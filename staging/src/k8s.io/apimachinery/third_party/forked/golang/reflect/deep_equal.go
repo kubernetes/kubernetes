@@ -174,6 +174,8 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			}
 		}
 		return true
+	case reflect.String:
+		return v1.String() == v2.String()
 	case reflect.Interface:
 		if v1.IsNil() || v2.IsNil() {
 			return v1.IsNil() == v2.IsNil()
