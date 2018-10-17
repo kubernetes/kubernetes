@@ -1,0 +1,12 @@
+_obj/
+*_testmain.go
+clientid.dat
+clientsecret.dat
+/google-api-go-generator/google-api-go-generator
+
+*.6
+*.8
+*~
+*.out
+*.test
+*.exe
