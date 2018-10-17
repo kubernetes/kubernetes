@@ -106,7 +106,7 @@ func TestHugePageSizeFromResourceName(t *testing.T) {
 			if err != nil && !tc.expectErr {
 				t.Errorf("[%v]did not expect error but got: %v", i, err)
 			}
-			if v != tc.expectVal {
+			if !reflect.DeepEqual(v, tc.expectVal) {
 				t.Errorf("Got %v but expected %v", v, tc.expectVal)
 			}
 		})
