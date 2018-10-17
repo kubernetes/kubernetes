@@ -22,7 +22,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 )
 
 type TestClusterValues struct {

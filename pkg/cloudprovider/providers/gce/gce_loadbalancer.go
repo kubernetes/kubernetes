@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 )
 

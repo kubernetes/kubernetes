@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 )
 
 const (

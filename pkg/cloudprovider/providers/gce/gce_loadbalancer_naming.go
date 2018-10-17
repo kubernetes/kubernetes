@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 )
 
 // Internal Load Balancer

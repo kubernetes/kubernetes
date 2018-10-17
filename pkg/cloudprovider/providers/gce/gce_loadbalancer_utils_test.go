@@ -35,7 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	v1_service "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
