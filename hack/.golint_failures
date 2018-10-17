@@ -409,7 +409,6 @@ pkg/volume/azure_file
 pkg/volume/cephfs
 pkg/volume/configmap
 pkg/volume/csi/fake
-pkg/volume/empty_dir
 pkg/volume/git_repo
 pkg/volume/host_path
 pkg/volume/iscsi

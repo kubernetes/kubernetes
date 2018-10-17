@@ -1,3 +1,5 @@
+// +build !linux
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -14,6 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package empty_dir contains the internal representation of emptyDir
-// volumes.
-package empty_dir // import "k8s.io/kubernetes/pkg/volume/empty_dir"
+package emptydir
+
+import (
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/util/mount"
+)
+
+// realMountDetector pretends to implement mediumer.
+type realMountDetector struct {
+	mounter mount.Interface
+}
+
+func (m *realMountDetector) GetMountMedium(path string) (v1.StorageMedium, bool, error) {
+	return v1.StorageMediumDefault, false, nil
+}
