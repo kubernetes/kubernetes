@@ -112,13 +112,14 @@ func (t *dnsTestCommon) runDig(dnsName, target string) []string {
 		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP)
 	case "kube-dns":
 		cmd = append(cmd, "@"+t.dnsPod.Status.PodIP, "-p", "10053")
+	case "ptr-record":
+		cmd = append(cmd, "-x")
 	case "cluster-dns":
+	case "cluster-dns-ipv6":
+		cmd = append(cmd, "AAAA")
 		break
 	default:
 		panic(fmt.Errorf("invalid target: " + target))
-	}
-	if strings.HasSuffix(dnsName, "in-addr.arpa") || strings.HasSuffix(dnsName, "in-addr.arpa.") {
-		cmd = append(cmd, []string{"-t", "ptr"}...)
 	}
 	cmd = append(cmd, dnsName)
 
@@ -327,7 +328,7 @@ func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
 	t.createDNSPodFromObj(generateDNSServerPod(aRecords))
 }
 
-func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
+func (t *dnsTestCommon) createDNSServerWithPtrRecord(isIPv6 bool) {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Pod",
@@ -345,13 +346,22 @@ func (t *dnsTestCommon) createDNSServerWithPtrRecord() {
 						"-u", "root",
 						"-k",
 						"--log-facility", "-",
-						"--host-record=my.test,192.0.2.123",
 						"-q",
 					},
 				},
 			},
 			DNSPolicy: "Default",
 		},
+	}
+
+	if isIPv6 {
+		pod.Spec.Containers[0].Command = append(
+			pod.Spec.Containers[0].Command,
+			fmt.Sprintf("--host-record=my.test,2001:db8::29"))
+	} else {
+		pod.Spec.Containers[0].Command = append(
+			pod.Spec.Containers[0].Command,
+			fmt.Sprintf("--host-record=my.test,192.0.2.123"))
 	}
 
 	t.createDNSPodFromObj(pod)
