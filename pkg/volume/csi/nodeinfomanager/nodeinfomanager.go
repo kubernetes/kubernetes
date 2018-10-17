@@ -91,9 +91,7 @@ func (nim *nodeInfoManager) AddNodeInfo(driverName string, driverNodeID string, 
 		updateNodeIDInNode(driverName, driverNodeID),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		nodeUpdateFuncs = append(nodeUpdateFuncs, updateTopologyLabels(topology))
-	}
+	nodeUpdateFuncs = append(nodeUpdateFuncs, updateTopologyLabels(topology))
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 		nodeUpdateFuncs = append(nodeUpdateFuncs, updateMaxAttachLimit(driverName, maxAttachLimit))
