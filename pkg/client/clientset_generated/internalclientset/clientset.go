@@ -24,6 +24,7 @@ import (
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion"
 	appsinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion"
+	auditregistrationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/auditregistration/internalversion"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/internalversion"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/internalversion"
 	autoscalinginternalversion "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/internalversion"
@@ -46,6 +47,7 @@ type Interface interface {
 	Admissionregistration() admissionregistrationinternalversion.AdmissionregistrationInterface
 	Core() coreinternalversion.CoreInterface
 	Apps() appsinternalversion.AppsInterface
+	Auditregistration() auditregistrationinternalversion.AuditregistrationInterface
 	Authentication() authenticationinternalversion.AuthenticationInterface
 	Authorization() authorizationinternalversion.AuthorizationInterface
 	Autoscaling() autoscalinginternalversion.AutoscalingInterface
@@ -69,6 +71,7 @@ type Clientset struct {
 	admissionregistration *admissionregistrationinternalversion.AdmissionregistrationClient
 	core                  *coreinternalversion.CoreClient
 	apps                  *appsinternalversion.AppsClient
+	auditregistration     *auditregistrationinternalversion.AuditregistrationClient
 	authentication        *authenticationinternalversion.AuthenticationClient
 	authorization         *authorizationinternalversion.AuthorizationClient
 	autoscaling           *autoscalinginternalversion.AutoscalingClient
@@ -98,6 +101,11 @@ func (c *Clientset) Core() coreinternalversion.CoreInterface {
 // Apps retrieves the AppsClient
 func (c *Clientset) Apps() appsinternalversion.AppsInterface {
 	return c.apps
+}
+
+// Auditregistration retrieves the AuditregistrationClient
+func (c *Clientset) Auditregistration() auditregistrationinternalversion.AuditregistrationInterface {
+	return c.auditregistration
 }
 
 // Authentication retrieves the AuthenticationClient
@@ -198,6 +206,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.auditregistration, err = auditregistrationinternalversion.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.authentication, err = authenticationinternalversion.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -269,6 +281,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.admissionregistration = admissionregistrationinternalversion.NewForConfigOrDie(c)
 	cs.core = coreinternalversion.NewForConfigOrDie(c)
 	cs.apps = appsinternalversion.NewForConfigOrDie(c)
+	cs.auditregistration = auditregistrationinternalversion.NewForConfigOrDie(c)
 	cs.authentication = authenticationinternalversion.NewForConfigOrDie(c)
 	cs.authorization = authorizationinternalversion.NewForConfigOrDie(c)
 	cs.autoscaling = autoscalinginternalversion.NewForConfigOrDie(c)
@@ -294,6 +307,7 @@ func New(c rest.Interface) *Clientset {
 	cs.admissionregistration = admissionregistrationinternalversion.New(c)
 	cs.core = coreinternalversion.New(c)
 	cs.apps = appsinternalversion.New(c)
+	cs.auditregistration = auditregistrationinternalversion.New(c)
 	cs.authentication = authenticationinternalversion.New(c)
 	cs.authorization = authorizationinternalversion.New(c)
 	cs.autoscaling = autoscalinginternalversion.New(c)

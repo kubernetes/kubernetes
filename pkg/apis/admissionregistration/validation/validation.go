@@ -240,6 +240,7 @@ func validateWebhookClientConfig(fldPath *field.Path, cc *admissionregistration.
 	return allErrors
 }
 
+// note: this has copy/paste inheritance in auditregistration
 func validateWebhookService(fldPath *field.Path, svc *admissionregistration.ServiceReference) field.ErrorList {
 	var allErrors field.ErrorList
 
