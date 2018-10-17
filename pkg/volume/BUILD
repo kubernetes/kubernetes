@@ -77,7 +77,7 @@ filegroup(
         "//pkg/volume/configmap:all-srcs",
         "//pkg/volume/csi:all-srcs",
         "//pkg/volume/downwardapi:all-srcs",
-        "//pkg/volume/empty_dir:all-srcs",
+        "//pkg/volume/emptydir:all-srcs",
         "//pkg/volume/fc:all-srcs",
         "//pkg/volume/flexvolume:all-srcs",
         "//pkg/volume/flocker:all-srcs",

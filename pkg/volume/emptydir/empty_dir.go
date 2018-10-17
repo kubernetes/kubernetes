@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package empty_dir
+package emptydir
 
 import (
 	"fmt"
@@ -40,7 +40,7 @@ import (
 // http://issue.k8s.io/2630
 const perm os.FileMode = 0777
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{
 		&emptyDirPlugin{nil},
@@ -184,7 +184,7 @@ func (ed *emptyDir) GetAttributes() volume.Attributes {
 // Checks prior to mount operations to verify that the required components (binaries, etc.)
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
-func (b *emptyDir) CanMount() error {
+func (ed *emptyDir) CanMount() error {
 	return nil
 }
 
@@ -311,7 +311,7 @@ func getPageSizeMountOptionFromPod(pod *v1.Pod) (string, error) {
 	}
 
 	if !pageSizeFound {
-		return "", fmt.Errorf("hugePages storage requested, but there is no resource request for huge pages.")
+		return "", fmt.Errorf("hugePages storage requested, but there is no resource request for huge pages")
 	}
 
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil

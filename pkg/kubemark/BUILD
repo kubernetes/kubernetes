@@ -33,7 +33,7 @@ go_library(
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/sysctl:go_default_library",
-        "//pkg/volume/empty_dir:go_default_library",
+        "//pkg/volume/emptydir:go_default_library",
         "//pkg/volume/secret:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

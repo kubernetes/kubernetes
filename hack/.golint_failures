@@ -89,7 +89,6 @@ pkg/apis/storage/v1beta1
 pkg/apis/storage/v1beta1/util
 pkg/auth/authorizer/abac
 pkg/capabilities
-pkg/cloudprovider/providers/aws
 pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/gce
 pkg/cloudprovider/providers/gce/cloud
@@ -409,7 +408,6 @@ pkg/volume/azure_file
 pkg/volume/cephfs
 pkg/volume/configmap
 pkg/volume/csi/fake
-pkg/volume/empty_dir
 pkg/volume/git_repo
 pkg/volume/host_path
 pkg/volume/iscsi

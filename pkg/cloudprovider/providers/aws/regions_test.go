@@ -73,7 +73,7 @@ func TestRecognizesNewRegion(t *testing.T) {
 		t.Fatalf("region already valid: %q", region)
 	}
 
-	awsServices := NewFakeAWSServices(TestClusterId).WithAz(region + "a")
+	awsServices := NewFakeAWSServices(TestClusterID).WithAz(region + "a")
 	_, err := newAWSCloud(CloudConfig{}, awsServices)
 	if err != nil {
 		t.Errorf("error building AWS cloud: %v", err)

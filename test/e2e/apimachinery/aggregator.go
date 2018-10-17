@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	rbacv1beta1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
@@ -45,7 +46,7 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var serverAggregatorVersion = utilversion.MustParseSemantic("v1.7.0")
+var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
 
 var _ = SIGDescribe("Aggregator", func() {
 	var ns string
@@ -71,12 +72,12 @@ var _ = SIGDescribe("Aggregator", func() {
 		aggrclient = f.AggregatorClient
 	})
 
-	It("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
+	It("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Make sure the relevant provider supports Agggregator
 		framework.SkipUnlessServerVersionGTE(serverAggregatorVersion, f.ClientSet.Discovery())
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		// Testing a 1.7 version of the sample-apiserver
+		// Testing a 1.10 version of the sample-apiserver
 		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 })
@@ -91,9 +92,11 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.CoreV1().ServiceAccounts(namespace).Delete("sample-apiserver", nil)
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete("wardler-auth-reader", nil)
 	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":auth-delegator", nil)
+	_ = client.RbacV1beta1().ClusterRoles().Delete("sample-apiserver-reader", nil)
+	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":sample-apiserver-reader", nil)
 }
 
-// A basic test if the sample-apiserver code from 1.7 and compiled against 1.7
+// A basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
 func TestSampleAPIServer(f *framework.Framework, image string) {
 	By("Registering the sample API server.")
@@ -121,6 +124,37 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	}
 	_, err := client.CoreV1().Secrets(namespace).Create(secret)
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
+
+	// kubectl create -f clusterrole.yaml
+	_, err = client.RbacV1beta1().ClusterRoles().Create(&rbacv1beta1.ClusterRole{
+		// role for listing ValidatingWebhookConfiguration/MutatingWebhookConfiguration/Namespaces
+		ObjectMeta: metav1.ObjectMeta{Name: "sample-apiserver-reader"},
+		Rules: []rbacv1beta1.PolicyRule{
+			rbacv1beta1helpers.NewRule("list").Groups("").Resources("namespaces").RuleOrDie(),
+			rbacv1beta1helpers.NewRule("list").Groups("admissionregistration.k8s.io").Resources("*").RuleOrDie(),
+		},
+	})
+	framework.ExpectNoError(err, "creating cluster role %s", "sample-apiserver-reader")
+
+	_, err = client.RbacV1beta1().ClusterRoleBindings().Create(&rbacv1beta1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "wardler:" + namespace + ":sample-apiserver-reader",
+		},
+		RoleRef: rbacv1beta1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "sample-apiserver-reader",
+		},
+		Subjects: []rbacv1beta1.Subject{
+			{
+				APIGroup:  "",
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespace,
+			},
+		},
+	})
+	framework.ExpectNoError(err, "creating cluster role binding %s", "wardler:"+namespace+":sample-apiserver-reader")
 
 	// kubectl create -f authDelegator.yaml
 	_, err = client.RbacV1beta1().ClusterRoleBindings().Create(&rbacv1beta1.ClusterRoleBinding{

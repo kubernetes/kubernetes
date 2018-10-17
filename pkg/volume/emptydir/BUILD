@@ -14,7 +14,7 @@ go_library(
         "empty_dir_linux.go",
         "empty_dir_unsupported.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/empty_dir",
+    importpath = "k8s.io/kubernetes/pkg/volume/emptydir",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/util/mount:go_default_library",
