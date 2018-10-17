@@ -144,6 +144,12 @@ def check_for_upgrade_needed():
         # minor change, just for consistency
         remove_state('kubernetes-master.cloud-request-sent')
         set_state('kubernetes-master.cloud.request-sent')
+    if is_state('ceph-storage.configured'):
+        # this is a local kubernetes-master flag, but named in a
+        # way that it seems like an interface flag. Further, it could
+        # easily interfere with an interface flag.
+        remove_state('ceph-storage.configured')
+        set_state('kubernetes-master.ceph.configured')
 
     migrate_from_pre_snaps()
     maybe_install_kube_proxy()
@@ -786,7 +792,7 @@ def regenerate_cdk_addons():
 
 
 @when_any('kubernetes-master.components.started',
-          'ceph-storage.configured',
+          'kubernetes-master.ceph.configured',
           'keystone-credentials.available.auth')
 @when('leadership.is_leader')
 def configure_cdk_addons():
@@ -800,20 +806,19 @@ def configure_cdk_addons():
     dbEnabled = str(hookenv.config('enable-dashboard-addons')).lower()
     dnsEnabled = str(hookenv.config('enable-kube-dns')).lower()
     metricsEnabled = str(hookenv.config('enable-metrics')).lower()
-    if (is_state('ceph-storage.configured') and
+    default_storage = ''
+    ceph = {}
+    if (is_state('kubernetes-master.ceph.configured') and
             get_version('kube-apiserver') >= (1, 10)):
         cephEnabled = "true"
-    else:
-        cephEnabled = "false"
-    ceph_ep = endpoint_from_flag('ceph-storage.available')
-    ceph = {}
-    default_storage = ''
-    if ceph_ep and ceph_ep.key():
+        ceph_ep = endpoint_from_flag('ceph-storage.available')
         b64_ceph_key = base64.b64encode(ceph_ep.key().encode('utf-8'))
         ceph['admin_key'] = b64_ceph_key.decode('ascii')
         ceph['kubernetes_key'] = b64_ceph_key.decode('ascii')
         ceph['mon_hosts'] = ceph_ep.mon_hosts()
         default_storage = hookenv.config('default-storage')
+    else:
+        cephEnabled = "false"
 
     keystone = {}
     ks = endpoint_from_flag('keystone-credentials.available.auth')
@@ -916,23 +921,32 @@ def ceph_state_control(ceph_admin):
 
     # Re-execute the rendering if the data has changed.
     if data_changed('ceph-config', ceph_relation_data):
-        remove_state('ceph-storage.configured')
+        remove_state('kubernetes-master.ceph.configured')
 
 
 @when('ceph-storage.available')
-@when_not('ceph-storage.configured')
-def ceph_storage(ceph_admin):
+@when_not('kubernetes-master.ceph.configured')
+def ceph_storage():
     '''Ceph on kubernetes will require a few things - namely a ceph
     configuration, and the ceph secret key file used for authentication.
     This method will install the client package, and render the requisit files
     in order to consume the ceph-storage relation.'''
 
-    # deprecated in 1.10 in favor of using CSI
+    ceph_admin = endpoint_from_flag('ceph-storage.available')
+
+    # deprecated in 1.10 in favor of using CSI instead of dumping the config
+    # to ceph. Also be sure to note that we don't set kubernetes-master.ceph.configured
+    # until ceph is up and has provided us a key.
     if get_version('kube-apiserver') >= (1, 10):
         # this is actually false, but by setting this flag we won't keep
         # running this function for no reason. Also note that we watch this
         # flag to run cdk-addons.apply.
-        set_state('ceph-storage.configured')
+        if not ceph_admin.key():
+            # We didn't have a key, and cannot proceed. Do not set state and
+            # allow this method to re-execute
+            return
+
+        set_state('kubernetes-master.ceph.configured')
         return
 
     ceph_context = {
@@ -991,7 +1005,7 @@ def ceph_storage(ceph_admin):
     # backend that will allow other modules to hook into this and verify we
     # have performed the necessary pre-req steps to interface with a ceph
     # deployment.
-    set_state('ceph-storage.configured')
+    set_state('kubernetes-master.ceph.configured')
 
 
 @when('nrpe-external-master.available')
