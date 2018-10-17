@@ -112,3 +112,66 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 	}
 	return containerStats, nil
 }
+
+// ListPodSandboxStats returns stats of all running PodSandboxes. Only for Windows.
+func (ds *dockerService) ListPodSandboxStats(ctx context.Context, r *runtimeapi.ListPodSandboxStatsRequest) (*runtimeapi.ListPodSandboxStatsResponse, error) {
+	listFilter := &runtimeapi.PodSandboxFilter{
+		State: &runtimeapi.PodSandboxStateValue{State: runtimeapi.PodSandboxState_SANDBOX_READY},
+	}
+	if r.Filter != nil {
+		listFilter.Id = r.Filter.Id
+		listFilter.LabelSelector = r.Filter.LabelSelector
+	}
+	sandboxResp, err := ds.ListPodSandbox(ctx, &runtimeapi.ListPodSandboxRequest{
+		Filter: listFilter,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var stats []*runtimeapi.PodSandboxStats
+	for _, sandbox := range sandboxResp.Items {
+		sandboxStats, err := ds.getPodSandboxStats(sandbox)
+		if err != nil {
+			return nil, err
+		}
+
+		stats = append(stats, sandboxStats)
+	}
+
+	return &runtimeapi.ListPodSandboxStatsResponse{Stats: stats}, nil
+}
+
+func (ds *dockerService) getPodSandboxStats(sandbox *runtimeapi.PodSandbox) (*runtimeapi.PodSandboxStats, error) {
+	containerID := sandbox.Id
+	statsJSON, err := ds.client.GetContainerStats(containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	timestamp := time.Now().UnixNano()
+	sandboxStat := &runtimeapi.PodSandboxStats{
+		Id:       sandbox.Id,
+		Metadata: sandbox.Metadata,
+		Network: &runtimeapi.NetworkUsage{
+			Timestamp:  timestamp,
+			Interfaces: make([]*runtimeapi.InterfaceStats, 0),
+		},
+	}
+	for name, stat := range statsJSON.Networks {
+		criInterfaceStat := &runtimeapi.InterfaceStats{
+			Name:     name,
+			RxBytes:  &runtimeapi.UInt64Value{Value: stat.RxBytes},
+			RxErrors: &runtimeapi.UInt64Value{Value: stat.RxErrors},
+			TxBytes:  &runtimeapi.UInt64Value{Value: stat.TxBytes},
+			TxErrors: &runtimeapi.UInt64Value{Value: stat.TxErrors},
+		}
+		// TODO(feiskyer): add support of multiple interfaces for getting default interface.
+		if len(statsJSON.Networks) == 1 {
+			sandboxStat.Network.Default = criInterfaceStat
+		}
+		sandboxStat.Network.Interfaces = append(sandboxStat.Network.Interfaces, criInterfaceStat)
+	}
+
+	return sandboxStat, nil
+}

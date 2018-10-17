@@ -34,3 +34,8 @@ func (ds *dockerService) ContainerStats(_ context.Context, r *runtimeapi.Contain
 func (ds *dockerService) ListContainerStats(_ context.Context, r *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
+// ListPodSandboxStats returns stats of all running PodSandboxes. Only for Windows.
+func (ds *dockerService) ListPodSandboxStats(ctx context.Context, r *runtimeapi.ListPodSandboxStatsRequest) (*runtimeapi.ListPodSandboxStatsResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
