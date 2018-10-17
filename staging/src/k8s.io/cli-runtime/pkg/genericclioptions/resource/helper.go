@@ -146,19 +146,7 @@ func (m *Helper) createResource(c RESTClient, resource, namespace string, obj ru
 		Do().
 		Get()
 }
-<<<<<<< HEAD:pkg/kubectl/genericclioptions/resource/helper.go
-func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error) {
-	req := m.RESTClient.Patch(pt).
-		NamespaceIfScoped(namespace, m.NamespaceScoped).
-		Resource(m.Resource).
-		Name(name).
-		Body(data)
-	if m.dryRun {
-		req.Param("dry-run", strconv.FormatBool(true))
-	}
 
-	return req.Do().Get()
-=======
 func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.UpdateOptions) (runtime.Object, error) {
 	if options == nil {
 		options = &metav1.UpdateOptions{}
@@ -171,7 +159,6 @@ func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, 
 		Body(data).
 		Do().
 		Get()
->>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1:staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource/helper.go
 }
 
 func (m *Helper) Replace(namespace, name string, overwrite bool, obj runtime.Object) (runtime.Object, error) {

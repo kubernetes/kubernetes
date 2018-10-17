@@ -30,18 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/apply/parse"
-	"k8s.io/apimachinery/pkg/apply/strategy"
 	"k8s.io/apimachinery/pkg/runtime"
-<<<<<<< HEAD
-	"k8s.io/client-go/dynamic"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
-=======
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -49,7 +38,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
->>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/utils/exec"
 )
@@ -237,17 +225,10 @@ type Object interface {
 // InfoObject is an implementation of the Object interface. It gets all
 // the information from the Info object.
 type InfoObject struct {
-<<<<<<< HEAD
-	Remote    runtime.Unstructured
-	Info      *resource.Info
-	Encoder   runtime.Encoder
-	Resources openapi.Resources
-=======
 	LocalObj runtime.Object
 	Info     *resource.Info
 	Encoder  runtime.Encoder
 	OpenAPI  openapi.Resources
->>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 }
 
 var _ Object = &InfoObject{}
@@ -287,43 +268,8 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		openapiSchema: obj.OpenAPI,
 	}
 
-<<<<<<< HEAD
-	last, err := obj.Last()
-	if err != nil {
-		return nil, err
-	}
-
-	if live == nil || last == nil {
-		return local, nil // We probably don't have a live version, merged is local.
-	}
-
-	model := obj.Resources.LookupResource(obj.Info.Object.GetObjectKind().GroupVersionKind())
-	elmt, err := parse.CreateElement(last, local, live, model)
-	if err != nil {
-		return nil, err
-	}
-	result, err := elmt.Merge(strategy.Create(strategy.Options{}))
-	return result.MergedResult.(map[string]interface{}), err
-}
-
-func (obj InfoObject) Last() (map[string]interface{}, error) {
-	if obj.Remote == nil {
-		return nil, nil // No object is live, return empty
-	}
-	accessor, err := meta.Accessor(obj.Remote)
-	if err != nil {
-		return nil, err
-	}
-	annots := accessor.GetAnnotations()
-	if annots == nil {
-		return nil, nil // Not an error, just empty.
-	}
-
-	return obj.toMap([]byte(annots[api.LastAppliedConfigAnnotation]))
-=======
 	_, result, err := patcher.patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
 	return result, err
->>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 }
 
 func (obj InfoObject) Name() string {
@@ -377,13 +323,8 @@ func (d *Differ) TearDown() {
 // RunDiff uses the factory to parse file arguments, find the version to
 // diff, and find each Info object for each files, and runs against the
 // differ.
-<<<<<<< HEAD
-func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, to string) error {
-	resources, err := f.OpenAPISchema()
-=======
 func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 	schema, err := f.OpenAPISchema()
->>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 	if err != nil {
 		return err
 	}
@@ -425,17 +366,10 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		}
 
 		obj := InfoObject{
-<<<<<<< HEAD
-			Remote:    remote,
-			Info:      info,
-			Resources: resources,
-			Encoder:   cmdutil.InternalVersionJSONEncoder(),
-=======
 			LocalObj: local,
 			Info:     info,
 			Encoder:  scheme.DefaultJSONEncoder(),
 			OpenAPI:  schema,
->>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 		}
 
 		return differ.Diff(obj, printer)

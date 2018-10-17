@@ -138,6 +138,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name,
 			scope.Resource,
 			scope.Subresource,
+			dryrun.IsDryRun(options.DryRun),
 			admission.Create,
 			userInfo)
 		staticUpdateAttributes := admission.NewAttributesRecord(
@@ -148,8 +149,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			name,
 			scope.Resource,
 			scope.Subresource,
+			dryrun.IsDryRun(options.DryRun),
 			admission.Update,
-<<<<<<< HEAD
 			userInfo)
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -163,28 +164,6 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			Subresource:     scope.Subresource,
 			Namespace:       namespace,
 			Name:            name,
-=======
-			dryrun.IsDryRun(options.DryRun),
-			userInfo,
-		)
-		admissionCheck := func(updatedObject runtime.Object, currentObject runtime.Object) error {
-			// if we allow create-on-patch, we have this TODO: call the mutating admission chain with the CREATE verb instead of UPDATE
-			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
-				return mutatingAdmission.Admit(admission.NewAttributesRecord(
-					updatedObject,
-					currentObject,
-					scope.Kind,
-					namespace,
-					name,
-					scope.Resource,
-					scope.Subresource,
-					admission.Update,
-					dryrun.IsDryRun(options.DryRun),
-					userInfo,
-				))
-			}
-			return nil
->>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 		}
 
 		p := patcher{
@@ -444,7 +423,7 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 
 func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation) admission.Attributes {
 	userInfo, _ := request.UserFrom(ctx)
-	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, userInfo)
+	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, dryrun.IsDryRun(p.options.DryRun), operation, userInfo)
 }
 
 // applyAdmission is called every time GuaranteedUpdate asks for the updated object,

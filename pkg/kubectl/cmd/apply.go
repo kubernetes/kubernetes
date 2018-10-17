@@ -353,6 +353,11 @@ func (o *ApplyOptions) Run() error {
 		}
 
 		if o.ServerSideApply {
+			options := metav1.UpdateOptions{}
+			if o.ServerDryRun {
+				options.DryRun = []string{metav1.DryRunAll}
+			}
+
 			// Send the full object to be applied on the server side.
 			data, err := runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
 			if err != nil {
@@ -360,7 +365,7 @@ func (o *ApplyOptions) Run() error {
 			}
 			obj, err := resource.NewHelper(info.Client, info.Mapping).
 				DryRun(o.DryRun).
-				Patch(info.Namespace, info.Name, types.ApplyPatchType, data)
+				Patch(info.Namespace, info.Name, types.ApplyPatchType, data, &options)
 			if err == nil {
 				info.Refresh(obj, true)
 				metadata, err := meta.Accessor(info.Object)
