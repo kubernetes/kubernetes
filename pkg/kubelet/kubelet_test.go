@@ -1432,6 +1432,8 @@ func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {
 	status, found := kubelet.statusManager.GetPodStatus(pods[0].UID)
 	assert.True(t, found, "expected to found status for pod %q", pods[0].UID)
 	assert.Equal(t, v1.PodFailed, status.Phase)
+	// check pod status contains ContainerStatuses, etc.
+	assert.NotNil(t, status.ContainerStatuses)
 }
 
 func TestSyncPodsDoesNotSetPodsThatDidNotRunTooLongToFailed(t *testing.T) {
