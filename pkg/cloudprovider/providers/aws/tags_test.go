@@ -23,14 +23,14 @@ import (
 )
 
 func TestFilterTags(t *testing.T) {
-	awsServices := NewFakeAWSServices(TestClusterId)
+	awsServices := NewFakeAWSServices(TestClusterID)
 	c, err := newAWSCloud(CloudConfig{}, awsServices)
 	if err != nil {
 		t.Errorf("Error building aws cloud: %v", err)
 		return
 	}
 
-	if c.tagging.ClusterID != TestClusterId {
+	if c.tagging.ClusterID != TestClusterID {
 		t.Errorf("unexpected ClusterID: %v", c.tagging.ClusterID)
 	}
 }
@@ -116,7 +116,7 @@ func TestFindClusterID(t *testing.T) {
 }
 
 func TestHasClusterTag(t *testing.T) {
-	awsServices := NewFakeAWSServices(TestClusterId)
+	awsServices := NewFakeAWSServices(TestClusterID)
 	c, err := newAWSCloud(CloudConfig{}, awsServices)
 	if err != nil {
 		t.Errorf("Error building aws cloud: %v", err)
@@ -131,7 +131,7 @@ func TestHasClusterTag(t *testing.T) {
 		},
 		{
 			Tags: map[string]string{
-				TagNameKubernetesClusterLegacy: TestClusterId,
+				TagNameKubernetesClusterLegacy: TestClusterID,
 			},
 			Expected: true,
 		},
@@ -143,26 +143,26 @@ func TestHasClusterTag(t *testing.T) {
 		},
 		{
 			Tags: map[string]string{
-				TagNameKubernetesClusterPrefix + TestClusterId: "owned",
+				TagNameKubernetesClusterPrefix + TestClusterID: "owned",
 			},
 			Expected: true,
 		},
 		{
 			Tags: map[string]string{
-				TagNameKubernetesClusterPrefix + TestClusterId: "",
+				TagNameKubernetesClusterPrefix + TestClusterID: "",
 			},
 			Expected: true,
 		},
 		{
 			Tags: map[string]string{
 				TagNameKubernetesClusterLegacy:                 "a",
-				TagNameKubernetesClusterPrefix + TestClusterId: "shared",
+				TagNameKubernetesClusterPrefix + TestClusterID: "shared",
 			},
 			Expected: true,
 		},
 		{
 			Tags: map[string]string{
-				TagNameKubernetesClusterPrefix + TestClusterId: "shared",
+				TagNameKubernetesClusterPrefix + TestClusterID: "shared",
 				TagNameKubernetesClusterPrefix + "b":           "shared",
 			},
 			Expected: true,
