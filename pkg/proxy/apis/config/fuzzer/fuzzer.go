@@ -34,7 +34,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		func(obj *kubeproxyconfig.KubeProxyConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			obj.BindAddress = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
-			obj.ClientConnection.ContentType = c.RandString()
 			obj.Conntrack.MaxPerCore = utilpointer.Int32Ptr(c.Int31())
 			obj.Conntrack.Min = utilpointer.Int32Ptr(c.Int31())
 			obj.Conntrack.TCPCloseWaitTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
