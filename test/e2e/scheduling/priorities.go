@@ -29,6 +29,8 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -254,6 +256,49 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 	})
+	It("Pod should be preferably scheduled to nodes which satisfy its limits", func() {
+		var podwithLargeRequestedResource *v1.ResourceRequirements = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("3000Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+			},
+		}
+		// Update one node to have large allocatable.
+		lastNode := nodeList.Items[len(nodeList.Items)-1]
+		nodeName := lastNode.Name
+		nodeOriginalMemory, found := lastNode.Status.Allocatable[v1.ResourceMemory]
+		Expect(found).To(Equal(true))
+		nodeOriginalMemoryVal := nodeOriginalMemory.Value()
+		err := updateMemoryOfNode(cs, nodeName, int64(10000))
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			// Resize the node back to its original memory.
+			if err := updateMemoryOfNode(cs, nodeName, nodeOriginalMemoryVal); err != nil {
+				framework.Logf("Failed to revert node memory with %v", err)
+			}
+		}()
+		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
+		framework.ExpectNoError(err)
+		// After the above we should see 50% of node to be available which is 5000MiB for large node.
+		By("Create a pod with unusual large limits")
+		podWithLargeLimits := "with-large-limits"
+
+		pod := createPausePod(f, pausePodConfig{
+			Name:      podWithLargeLimits,
+			Resources: podwithLargeRequestedResource,
+		})
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+
+		By("Pod should preferably scheduled to nodes which satisfy its limits")
+		// The pod should land onto large node(which has 5000MiB free) which satisfies the pod limits which is 3000MiB.
+		podHighLimits, err := cs.CoreV1().Pods(ns).Get(podWithLargeLimits, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(podHighLimits.Spec.NodeName).To(Equal(nodeName))
+	})
 })
 
 // createBalancedPodForNodes creates a pod per node that asks for enough resources to make all nodes have the same mem/cpu usage ratio.
@@ -398,4 +443,25 @@ func addRandomTaitToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 	framework.AddOrUpdateTaintOnNode(cs, nodeName, testTaint)
 	framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 	return &testTaint
+}
+
+// updateMemoryOfNode updates the memory of given node with the given value
+func updateMemoryOfNode(c clientset.Interface, nodeName string, memory int64) error {
+	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	oldData, err := json.Marshal(node)
+	if err != nil {
+		return err
+	}
+	node.Status.Allocatable[v1.ResourceMemory] = *resource.NewQuantity(memory, resource.BinarySI)
+	newData, err := json.Marshal(node)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+	if err != nil {
+		return err
+	}
+	_, err = c.CoreV1().Nodes().Patch(string(node.Name), types.StrategicMergePatchType, patchBytes)
+	return err
 }
