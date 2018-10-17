@@ -44,9 +44,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -619,53 +616,6 @@ func ShouldIncludeUninitialized(cmd *cobra.Command, includeUninitialized bool) b
 	return shouldIncludeUninitialized
 }
 
-// DescriberFunc gives a way to display the specified RESTMapping type
-type DescriberFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error)
-
-// DescriberFn gives a way to easily override the function for unit testing if needed
-var DescriberFn DescriberFunc = describer
-
-// Returns a Describer for displaying the specified RESTMapping type or an error.
-func describer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error) {
-	clientConfig, err := restClientGetter.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-	// try to get a describer
-	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientConfig); ok {
-		return describer, nil
-	}
-	// if this is a kind we don't have a describer for yet, go generic if possible
-	if genericDescriber, genericErr := genericDescriber(restClientGetter, mapping); genericErr == nil {
-		return genericDescriber, nil
-	}
-	// otherwise return an unregistered error
-	return nil, fmt.Errorf("no description has been implemented for %s", mapping.GroupVersionKind.String())
-}
-
-// helper function to make a generic describer, or return an error
-func genericDescriber(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error) {
-	clientConfig, err := restClientGetter.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// used to fetch the resource
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// used to get events for the resource
-	clientSet, err := internalclientset.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	eventsClient := clientSet.Core()
-	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
-}
-
 // ScaleClientFunc provides a ScalesGetter
 type ScaleClientFunc func(genericclioptions.RESTClientGetter) (scale.ScalesGetter, error)
 
@@ -696,4 +646,13 @@ func scaleClient(restClientGetter genericclioptions.RESTClientGetter) (scale.Sca
 	}
 
 	return scale.New(restClient, mapper, dynamic.LegacyAPIPathResolverFunc, resolver), nil
+}
+
+func Warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
+	fmt.Fprintf(cmdErr, "WARNING: New generator %q specified, "+
+		"but it isn't available. "+
+		"Falling back to %q.\n",
+		newGeneratorName,
+		oldGeneratorName,
+	)
 }

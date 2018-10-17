@@ -29,6 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	describeversioned "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/printers"
@@ -138,7 +139,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.BuilderArgs = args
 
 	o.Describer = func(mapping *meta.RESTMapping) (printers.Describer, error) {
-		return cmdutil.DescriberFn(f, mapping)
+		return describeversioned.DescriberFn(f, mapping)
 	}
 
 	o.NewBuilder = f.NewBuilder
