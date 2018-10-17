@@ -52,6 +52,8 @@ requires:
     interface: vsphere-integration
   azure:
     interface: azure-integration
+  keystone-credentials:
+    interface: keystone-credentials
 resources:
   kubectl:
     type: file

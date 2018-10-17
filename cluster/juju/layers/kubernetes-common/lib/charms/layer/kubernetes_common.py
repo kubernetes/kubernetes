@@ -301,22 +301,29 @@ def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
     if keystone:
         # create keystone user
         cmd = 'kubectl config --kubeconfig={0} ' \
-              'set-credentials keystone_user'.format(kubeconfig)
+              'set-credentials keystone-user'.format(kubeconfig)
+        check_call(split(cmd))
+        # create keystone context
+        cmd = 'kubectl config --kubeconfig={0} ' \
+              'set-context --cluster={1} ' \
+              '--user=keystone-user keystone'.format(kubeconfig, cluster)
+        check_call(split(cmd))
+        # use keystone context
+        cmd = 'kubectl config --kubeconfig={0} ' \
+              'use-context keystone'.format(kubeconfig)
         check_call(split(cmd))
         # manually add exec command until kubectl can do it for us
         with open(kubeconfig, "r") as f:
             content = f.read()
-            content = content.replace("user: {}", """user:
-      exec:
-        command: "/snap/bin/client-keystone-auth"
-        apiVersion: "client.authentication.k8s.io/v1alpha1"
+            content = content.replace("""- name: keystone-user
+  user: {}""", """- name: keystone-user
+  user:
+    exec:
+      command: "/snap/bin/client-keystone-auth"
+      apiVersion: "client.authentication.k8s.io/v1beta1"
 """)
         with open(kubeconfig, "w") as f:
             f.write(content)
-        # create keystone context
-        cmd = 'kubectl config set-context --cluster={0} ' \
-              '--user={1} juju-keystone'.format(kubeconfig, cluster)
-        check_call(split(cmd))
 
 
 def parse_extra_args(config_key):
@@ -476,4 +483,3 @@ def configure_kube_proxy(configure_prefix, api_servers, cluster_cidr):
 
     configure_kubernetes_service(configure_prefix, 'kube-proxy',
                                  kube_proxy_opts, 'proxy-extra-args')
-
