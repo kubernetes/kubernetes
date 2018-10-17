@@ -81,7 +81,7 @@ type nodeClientCreator func() (
 	err error,
 )
 
-func newCsiDriverClient(drivers *csiDriversStore, driverName string) *csiDriverClient {
+func newCsiDriverClient(drivers *driverEndpoints, driverName string) *csiDriverClient {
 	// newNodeClient creates a new NodeClient with the internally used gRPC
 	// connection set up. It also returns a closer which must to be called to close
 	// the gRPC connection when the NodeClient is not used anymore.
@@ -298,20 +298,18 @@ func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.Nod
 	return resp.GetCapabilities(), nil
 }
 
-func newGrpcConn(drivers *csiDriversStore, driverName string) (*grpc.ClientConn, error) {
+func newGrpcConn(drivers *driverEndpoints, driverName string) (*grpc.ClientConn, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
 	}
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
 	// TODO once KubeletPluginsWatcher graduates to beta, remove FeatureGate check
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		drivers.RLock()
-		driver, ok := drivers.driversMap[driverName]
-		drivers.RUnlock()
+		var ok bool
+		addr, ok = drivers.Get(driverName)
 		if !ok {
 			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 		}
-		addr = driver.driverEndpoint
 	}
 	network := "unix"
 	glog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))

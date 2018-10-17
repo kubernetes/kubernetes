@@ -565,10 +565,8 @@ func TestRegisterPlugin(t *testing.T) {
 			nodeInfoManager.AddNodeInfoReturns(tc.addNodeInfoErr)
 
 			registrationHandler := &Plugin{
-				csiDrivers: &csiDriversStore{
-					driversMap: map[string]csiDriver{},
-				},
-				nim: nodeInfoManager,
+				drivers: newDriverEndpoints(),
+				nim:     nodeInfoManager,
 			}
 
 			driverStarter, driverStopper := newCsiDriverServer(t, tc.sockPath, nodeServer)
@@ -585,7 +583,7 @@ func TestRegisterPlugin(t *testing.T) {
 				t.Errorf("Expected nim.RemoveNodeInfo to be called %d times, got called %d times", e, a)
 			}
 
-			driversEntry, foundDriver := registrationHandler.csiDrivers.driversMap["some driver name"]
+			driversEntry, foundDriver := registrationHandler.drivers.Get("some driver name")
 			if foundDriver != tc.expectedDriverEntry {
 				if foundDriver {
 					t.Errorf("Expected to find the driver registered")
@@ -634,7 +632,7 @@ func TestPluginInit(t *testing.T) {
 				t.Errorf("Expected plugin.host to be the volume host")
 			}
 
-			if plugin.csiDrivers.driversMap == nil {
+			if plugin.drivers == nil {
 				t.Errorf("Expected csiDrivers to be initialized")
 			}
 			if plugin.nim == nil {

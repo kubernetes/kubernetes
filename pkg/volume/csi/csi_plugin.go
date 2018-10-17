@@ -61,7 +61,7 @@ const (
 )
 
 type Plugin struct {
-	csiDrivers        *csiDriversStore
+	drivers           *driverEndpoints
 	nim               nodeinfomanager.Interface
 	host              volume.VolumeHost
 	blockEnabled      bool
@@ -69,14 +69,32 @@ type Plugin struct {
 	csiDriverInformer csiinformer.CSIDriverInformer
 }
 
-type csiDriver struct {
-	driverName     string
-	driverEndpoint string
+type driverEndpoints struct {
+	internal map[string]string
+	sync.RWMutex
 }
 
-type csiDriversStore struct {
-	driversMap map[string]csiDriver
-	sync.RWMutex
+func newDriverEndpoints() *driverEndpoints {
+	return &driverEndpoints{internal: make(map[string]string)}
+}
+
+func (e *driverEndpoints) Set(pluginName, pluginEndpoint string) {
+	e.Lock()
+	defer e.Unlock()
+	e.internal[pluginName] = pluginEndpoint
+}
+
+func (e *driverEndpoints) Delete(pluginName string) {
+	e.Lock()
+	defer e.Unlock()
+	delete(e.internal, pluginName)
+}
+
+func (e *driverEndpoints) Get(pluginName string) (string, bool) {
+	e.RLock()
+	defer e.RUnlock()
+	v, ok := e.internal[pluginName]
+	return v, ok
 }
 
 // ProbeVolumePlugins returns implemented plugins
@@ -104,20 +122,10 @@ func (p *Plugin) ValidatePlugin(pluginName string, endpoint string, versions []s
 func (p *Plugin) RegisterPlugin(pluginName string, endpoint string) error {
 	glog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
-	func() {
-		// Storing endpoint of newly registered CSI driver into the map, where CSI driver name will be the key
-		// all other CSI components will be able to get the actual socket of CSI drivers by its name.
-
-		// It's not necessary to lock the entire RegistrationCallback() function because only the CSI
-		// client depends on this driver map, and the CSI client does not depend on node information
-		// updated in the rest of the function.
-		p.csiDrivers.Lock()
-		defer p.csiDrivers.Unlock()
-		p.csiDrivers.driversMap[pluginName] = csiDriver{driverName: pluginName, driverEndpoint: endpoint}
-	}()
+	p.drivers.Set(pluginName, endpoint)
 
 	// Get node info from the driver.
-	csi := newCsiDriverClient(p.csiDrivers, pluginName)
+	csi := newCsiDriverClient(p.drivers, pluginName)
 	// TODO (verult) retry with exponential backoff, possibly added in csi client library.
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
@@ -144,11 +152,7 @@ func (p *Plugin) DeRegisterPlugin(pluginName string) {
 }
 
 func (p *Plugin) unregisterDriver(driverName string) {
-	func() {
-		p.csiDrivers.Lock()
-		defer p.csiDrivers.Unlock()
-		delete(p.csiDrivers.driversMap, driverName)
-	}()
+	p.drivers.Delete(driverName)
 
 	if err := p.nim.RemoveNodeInfo(driverName); err != nil {
 		glog.Errorf("Error unregistering CSI driver: %v", err)
@@ -158,7 +162,7 @@ func (p *Plugin) unregisterDriver(driverName string) {
 var _ pluginwatcher.PluginHandler = &Plugin{}
 
 func (p *Plugin) Init(host volume.VolumeHost) error {
-	p.csiDrivers = &csiDriversStore{driversMap: map[string]csiDriver{}}
+	p.drivers = newDriverEndpoints()
 	p.nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host)
 	p.host = host
 
@@ -224,7 +228,7 @@ func (p *Plugin) NewMounter(
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
-	csi := newCsiDriverClient(p.csiDrivers, pvSource.Driver)
+	csi := newCsiDriverClient(p.drivers, pvSource.Driver)
 
 	mounter := &csiMountMgr{
 		plugin:       p,
@@ -293,7 +297,7 @@ func (p *Plugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmount
 	}
 	unmounter.driverName = data[volDataKey.driverName]
 	unmounter.volumeID = data[volDataKey.volHandle]
-	unmounter.csiClient = newCsiDriverClient(p.csiDrivers, unmounter.driverName)
+	unmounter.csiClient = newCsiDriverClient(p.drivers, unmounter.driverName)
 
 	return unmounter, nil
 }
@@ -402,7 +406,7 @@ func (p *Plugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts v
 	}
 
 	glog.V(4).Info(log("setting up block mapper for [volume=%v,driver=%v]", pvSource.VolumeHandle, pvSource.Driver))
-	client := newCsiDriverClient(p.csiDrivers, pvSource.Driver)
+	client := newCsiDriverClient(p.drivers, pvSource.Driver)
 
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
@@ -475,7 +479,7 @@ func (p *Plugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volum
 	}
 	unmapper.driverName = data[volDataKey.driverName]
 	unmapper.volumeID = data[volDataKey.volHandle]
-	unmapper.csiClient = newCsiDriverClient(p.csiDrivers, unmapper.driverName)
+	unmapper.csiClient = newCsiDriverClient(p.drivers, unmapper.driverName)
 
 	return unmapper, nil
 }
