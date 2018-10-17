@@ -27,7 +27,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -35,11 +34,11 @@ import (
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describerFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describerFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describerFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("non-default")
 	defer tf.Cleanup()
@@ -67,11 +66,11 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describerFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describerFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describerFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
@@ -99,11 +98,11 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describerFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describerFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describerFn = d.describerFor
 
 	_, _, rc := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -140,11 +139,11 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describerFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describerFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describerFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -167,11 +166,11 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describerFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describerFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describerFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -193,11 +192,11 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describerFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describerFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describerFn = d.describerFor
 
 	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
