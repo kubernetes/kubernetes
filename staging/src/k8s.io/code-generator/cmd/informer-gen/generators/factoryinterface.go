@@ -76,6 +76,7 @@ func (g *factoryInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 }
 
 var externalSharedInformerFactoryInterface = `
+// NewInformerFunc takes {{.clientSetPackage|raw}} and {{.timeDuration|raw}} to return a SharedIndexInformer.
 type NewInformerFunc func({{.clientSetPackage|raw}}, {{.timeDuration|raw}}) cache.SharedIndexInformer
 
 // SharedInformerFactory a small interface to allow for adding an informer without an import cycle
@@ -84,5 +85,6 @@ type SharedInformerFactory interface {
 	InformerFor(obj {{.runtimeObject|raw}}, newFunc NewInformerFunc) {{.cacheSharedIndexInformer|raw}}
 }
 
+// TweakListOptionsFunc is a function that transforms a {{.v1ListOptions|raw}}.
 type TweakListOptionsFunc func(*{{.v1ListOptions|raw}})
 `
