@@ -162,6 +162,13 @@ func NewConfigFactory(
 				switch t := obj.(type) {
 				case *v1.Pod:
 					return assignedNonTerminatedPod(t)
+				case cache.DeletedFinalStateUnknown:
+					if pod, ok := t.Obj.(*v1.Pod); ok {
+						return assignedNonTerminatedPod(pod)
+					} else {
+						runtime.HandleError(fmt.Errorf("unable to convert object %T to *v1.Pod in %T", obj, c))
+						return false
+					}
 				default:
 					runtime.HandleError(fmt.Errorf("unable to handle object in %T: %T", c, obj))
 					return false
