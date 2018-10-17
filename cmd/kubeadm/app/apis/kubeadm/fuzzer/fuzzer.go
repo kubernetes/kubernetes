@@ -133,7 +133,9 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CACertPath = "foo"
 	obj.ClusterName = "bar"
-	obj.DiscoveryTimeout = &metav1.Duration{Duration: 1234}
-	obj.DiscoveryToken = "baz"
-	obj.TLSBootstrapToken = "qux"
+	obj.Discovery = kubeadm.Discovery{
+		BootstrapToken:    &kubeadm.BootstrapTokenDiscovery{Token: "baz"},
+		TLSBootstrapToken: "qux",
+		Timeout:           &metav1.Duration{Duration: 1234},
+	}
 }
