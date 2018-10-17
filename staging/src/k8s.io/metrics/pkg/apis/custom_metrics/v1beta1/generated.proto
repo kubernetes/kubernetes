@@ -26,10 +26,21 @@ import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
+
+// MetricListOptions is used to select metrics by their label selectors
+message MetricListOptions {
+  // A selector to restrict the list of returned objects by their labels.
+  // Defaults to everything.
+  // +optional
+  optional string labelSelector = 1;
+
+  // A selector to restrict the list of returned metrics by their labels
+  // +optional
+  optional string metricLabelSelector = 2;
+}
 
 // a metric value for some object
 message MetricValue {
@@ -50,6 +61,13 @@ message MetricValue {
 
   // the value of the metric for this
   optional k8s.io.apimachinery.pkg.api.resource.Quantity value = 5;
+
+  // selector represents the label selector that could be used to select
+  // this metric, and will generally just be the selector passed in to
+  // the query used to fetch this metric.
+  // When left blank, only the metric's Name will be used to gather metrics.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 6;
 }
 
 // a list of values for a given metric for some set of objects

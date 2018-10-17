@@ -24,7 +24,6 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-        "//pkg/kubectl/genericclioptions:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
@@ -44,7 +43,11 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+<<<<<<< HEAD
         "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
+=======
+        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+>>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",

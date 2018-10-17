@@ -320,7 +320,7 @@ func (jm *JobController) deletePod(obj interface{}) {
 }
 
 func (jm *JobController) updateJob(old, cur interface{}) {
-	oldJob := cur.(*batch.Job)
+	oldJob := old.(*batch.Job)
 	curJob := cur.(*batch.Job)
 
 	// never return error
@@ -865,17 +865,4 @@ func filterPods(pods []*v1.Pod, phase v1.PodPhase) int {
 		}
 	}
 	return result
-}
-
-// byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []batch.Job
-
-func (o byCreationTimestamp) Len() int      { return len(o) }
-func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }

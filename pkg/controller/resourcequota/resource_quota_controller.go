@@ -39,10 +39,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/quota"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
 )
 
 // NamespacedResourcesFunc knows how to discover namespaced resources.
@@ -161,11 +159,14 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) (*Resou
 
 		rq.quotaMonitor = qm
 
-		// do initial quota monitor setup
+		// do initial quota monitor setup.  If we have a discovery failure here, it's ok. We'll discover more resources when a later sync happens.
 		resources, err := GetQuotableResources(options.DiscoveryFunc)
-		if err != nil {
+		if discovery.IsGroupDiscoveryFailedError(err) {
+			utilruntime.HandleError(fmt.Errorf("initial discovery check failure, continuing and counting on future sync update: %v", err))
+		} else if err != nil {
 			return nil, err
 		}
+
 		if err = qm.SyncMonitors(resources); err != nil {
 			utilruntime.HandleError(fmt.Errorf("initial monitor sync has error: %v", err))
 		}
@@ -223,7 +224,7 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	// if we declared a constraint that has no usage (which this controller can calculate, prioritize it)
 	for constraint := range resourceQuota.Status.Hard {
 		if _, usageFound := resourceQuota.Status.Used[constraint]; !usageFound {
-			matchedResources := []api.ResourceName{api.ResourceName(constraint)}
+			matchedResources := []v1.ResourceName{v1.ResourceName(constraint)}
 			for _, evaluator := range rq.registry.List() {
 				if intersection := evaluator.MatchingResources(matchedResources); len(intersection) > 0 {
 					rq.missingUsageQueue.Add(key)
@@ -317,25 +318,20 @@ func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err err
 }
 
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
-func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.ResourceQuota) (err error) {
+func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota *v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
-	dirty := !apiequality.Semantic.DeepEqual(v1ResourceQuota.Spec.Hard, v1ResourceQuota.Status.Hard)
-
-	resourceQuota := api.ResourceQuota{}
-	if err := k8s_api_v1.Convert_v1_ResourceQuota_To_core_ResourceQuota(v1ResourceQuota, &resourceQuota, nil); err != nil {
-		return err
-	}
+	dirty := !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard)
 
 	// dirty tracks if the usage status differs from the previous sync,
 	// if so, we send a new usage with latest status
 	// if this is our first sync, it will be dirty by default, since we need track usage
-	dirty = dirty || (resourceQuota.Status.Hard == nil || resourceQuota.Status.Used == nil)
+	dirty = dirty || resourceQuota.Status.Hard == nil || resourceQuota.Status.Used == nil
 
-	used := api.ResourceList{}
+	used := v1.ResourceList{}
 	if resourceQuota.Status.Used != nil {
-		used = quota.Add(api.ResourceList{}, resourceQuota.Status.Used)
+		used = quota.Add(v1.ResourceList{}, resourceQuota.Status.Used)
 	}
-	hardLimits := quota.Add(api.ResourceList{}, resourceQuota.Spec.Hard)
+	hardLimits := quota.Add(v1.ResourceList{}, resourceQuota.Spec.Hard)
 
 	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector)
 	if err != nil {
@@ -351,14 +347,14 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
-	usage := api.ResourceQuota{
+	usage := v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            resourceQuota.Name,
 			Namespace:       resourceQuota.Namespace,
 			ResourceVersion: resourceQuota.ResourceVersion,
 			Labels:          resourceQuota.Labels,
 			Annotations:     resourceQuota.Annotations},
-		Status: api.ResourceQuotaStatus{
+		Status: v1.ResourceQuotaStatus{
 			Hard: hardLimits,
 			Used: used,
 		},
@@ -368,11 +364,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(v1ResourceQuota *v1.Resourc
 
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
-		v1Usage := &v1.ResourceQuota{}
-		if err := k8s_api_v1.Convert_core_ResourceQuota_To_v1_ResourceQuota(&usage, v1Usage, nil); err != nil {
-			return err
-		}
-		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(v1Usage)
+		_, err = rq.rqClient.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 		return err
 	}
 	return nil
@@ -403,12 +395,7 @@ func (rq *ResourceQuotaController) replenishQuota(groupResource schema.GroupReso
 	// only queue those quotas that are tracking a resource associated with this kind.
 	for i := range resourceQuotas {
 		resourceQuota := resourceQuotas[i]
-		internalResourceQuota := &api.ResourceQuota{}
-		if err := k8s_api_v1.Convert_v1_ResourceQuota_To_core_ResourceQuota(resourceQuota, internalResourceQuota, nil); err != nil {
-			glog.Error(err)
-			continue
-		}
-		resourceQuotaResources := quota.ResourceNames(internalResourceQuota.Status.Hard)
+		resourceQuotaResources := quota.ResourceNames(resourceQuota.Status.Hard)
 		if intersection := evaluator.MatchingResources(resourceQuotaResources); len(intersection) > 0 {
 			// TODO: make this support targeted replenishment to a specific kind, right now it does a full recalc on that quota.
 			rq.enqueueResourceQuota(resourceQuota)
@@ -425,7 +412,16 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 		newResources, err := GetQuotableResources(discoveryFunc)
 		if err != nil {
 			utilruntime.HandleError(err)
-			return
+
+			if discovery.IsGroupDiscoveryFailedError(err) && len(newResources) > 0 {
+				// In partial discovery cases, don't remove any existing informers, just add new ones
+				for k, v := range oldResources {
+					newResources[k] = v
+				}
+			} else {
+				// short circuit in non-discovery error cases or if discovery returned zero resources
+				return
+			}
 		}
 
 		// Decide whether discovery has reported a change.
@@ -470,15 +466,18 @@ func (rq *ResourceQuotaController) resyncMonitors(resources map[schema.GroupVers
 
 // GetQuotableResources returns all resources that the quota system should recognize.
 // It requires a resource supports the following verbs: 'create','list','delete'
+// This function may return both results and an error.  If that happens, it means that the discovery calls were only
+// partially successful.  A decision about whether to proceed or not is left to the caller.
 func GetQuotableResources(discoveryFunc NamespacedResourcesFunc) (map[schema.GroupVersionResource]struct{}, error) {
-	possibleResources, err := discoveryFunc()
-	if err != nil {
-		return nil, fmt.Errorf("failed to discover resources: %v", err)
+	possibleResources, discoveryErr := discoveryFunc()
+	if discoveryErr != nil && len(possibleResources) == 0 {
+		return nil, fmt.Errorf("failed to discover resources: %v", discoveryErr)
 	}
 	quotableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"create", "list", "watch", "delete"}}, possibleResources)
 	quotableGroupVersionResources, err := discovery.GroupVersionResources(quotableResources)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse resources: %v", err)
 	}
-	return quotableGroupVersionResources, nil
+	// return the original discovery error (if any) in addition to the list
+	return quotableGroupVersionResources, discoveryErr
 }

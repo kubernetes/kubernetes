@@ -26,13 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -91,11 +91,11 @@ func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastApp
 func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSetLastAppliedOptions(ioStreams)
 	cmd := &cobra.Command{
-		Use: "set-last-applied -f FILENAME",
+		Use:                   "set-last-applied -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
-		Long:    applySetLastAppliedLong,
-		Example: applySetLastAppliedExample,
+		Short:                 i18n.T("Set the last-applied-configuration annotation on a live object to match the contents of a file."),
+		Long:                  applySetLastAppliedLong,
+		Example:               applySetLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Validate())
@@ -200,7 +200,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 				return err
 			}
 			helper := resource.NewHelper(client, mapping)
-			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch)
+			finalObj, err = helper.Patch(o.namespace, info.Name, patch.PatchType, patch.Patch, nil)
 			if err != nil {
 				return err
 			}

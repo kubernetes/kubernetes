@@ -108,7 +108,7 @@ func TestTableGet(t *testing.T) {
 	t.Logf("table crd created: %#v", crd)
 
 	crClient := newNamespacedCustomResourceClient("", dynamicClient, crd)
-	foo, err := crClient.Create(newTableInstance("foo"))
+	foo, err := crClient.Create(newTableInstance("foo"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unable to create noxu instance: %v", err)
 	}

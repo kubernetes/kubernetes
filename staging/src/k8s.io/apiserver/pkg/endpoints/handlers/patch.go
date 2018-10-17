@@ -42,7 +42,10 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
@@ -53,8 +56,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		trace := utiltrace.New("Patch " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		if isDryRun(req.URL) {
-			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
 		}
 
@@ -146,6 +149,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.Resource,
 			scope.Subresource,
 			admission.Update,
+<<<<<<< HEAD
 			userInfo)
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
 		createAuthorizerAttributes := authorizer.AttributesRecord{
@@ -159,6 +163,28 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			Subresource:     scope.Subresource,
 			Namespace:       namespace,
 			Name:            name,
+=======
+			dryrun.IsDryRun(options.DryRun),
+			userInfo,
+		)
+		admissionCheck := func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			// if we allow create-on-patch, we have this TODO: call the mutating admission chain with the CREATE verb instead of UPDATE
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
+				return mutatingAdmission.Admit(admission.NewAttributesRecord(
+					updatedObject,
+					currentObject,
+					scope.Kind,
+					namespace,
+					name,
+					scope.Resource,
+					scope.Subresource,
+					admission.Update,
+					dryrun.IsDryRun(options.DryRun),
+					userInfo,
+				))
+			}
+			return nil
+>>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 		}
 
 		p := patcher{
@@ -281,7 +307,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	// Apply the patch.
 	patchedObjJS, err := p.applyJSPatch(currentObjJS)
 	if err != nil {
-		return nil, interpretPatchError(err)
+		return nil, err
 	}
 
 	// Construct the resulting typed, unversioned object.
@@ -304,9 +330,13 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(p.patchBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewBadRequest(err.Error())
 		}
-		return patchObj.Apply(versionedJS)
+		patchedJS, err := patchObj.Apply(versionedJS)
+		if err != nil {
+			return nil, errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
+		}
+		return patchedJS, nil
 	case types.MergePatchType:
 		return jsonpatch.MergePatch(versionedJS, p.patchBytes)
 	default:
@@ -481,7 +511,7 @@ func applyPatchToObject(
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
-		return interpretPatchError(err)
+		return interpretStrategicMergePatchError(err)
 	}
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
@@ -494,8 +524,8 @@ func applyPatchToObject(
 	return nil
 }
 
-// interpretPatchError interprets the error type and returns an error with appropriate HTTP code.
-func interpretPatchError(err error) error {
+// interpretStrategicMergePatchError interprets the error type and returns an error with appropriate HTTP code.
+func interpretStrategicMergePatchError(err error) error {
 	switch err {
 	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
 		return errors.NewBadRequest(err.Error())

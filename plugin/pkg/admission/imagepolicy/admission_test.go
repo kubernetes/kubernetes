@@ -192,66 +192,68 @@ current-context: default
 
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
-		err := func() error {
-			tempfile, err := ioutil.TempFile("", "")
-			if err != nil {
+		t.Run(tt.msg, func(t *testing.T) {
+			err := func() error {
+				tempfile, err := ioutil.TempFile("", "")
+				if err != nil {
+					return err
+				}
+				p := tempfile.Name()
+				defer os.Remove(p)
+
+				tmpl, err := template.New("test").Parse(tt.kubeConfigTmpl)
+				if err != nil {
+					return fmt.Errorf("failed to parse test template: %v", err)
+				}
+				if err := tmpl.Execute(tempfile, data); err != nil {
+					return fmt.Errorf("failed to execute test template: %v", err)
+				}
+
+				tempconfigfile, err := ioutil.TempFile("", "")
+				if err != nil {
+					return err
+				}
+				pc := tempconfigfile.Name()
+				defer os.Remove(pc)
+
+				configTmpl, err := template.New("testconfig").Parse(defaultConfigTmplJSON)
+				if err != nil {
+					return fmt.Errorf("failed to parse test template: %v", err)
+				}
+				dataConfig := struct {
+					KubeConfig   string
+					AllowTTL     int
+					DenyTTL      int
+					RetryBackoff int
+					DefaultAllow bool
+				}{
+					KubeConfig:   p,
+					AllowTTL:     500,
+					DenyTTL:      500,
+					RetryBackoff: 500,
+					DefaultAllow: true,
+				}
+				if err := configTmpl.Execute(tempconfigfile, dataConfig); err != nil {
+					return fmt.Errorf("failed to execute test template: %v", err)
+				}
+
+				// Create a new admission controller
+				configFile, err := os.Open(pc)
+				if err != nil {
+					return fmt.Errorf("failed to read test config: %v", err)
+				}
+				defer configFile.Close()
+
+				_, err = NewImagePolicyWebhook(configFile)
 				return err
+			}()
+			if err != nil && !tt.wantErr {
+				t.Errorf("failed to load plugin from config %q: %v", tt.msg, err)
 			}
-			p := tempfile.Name()
-			defer os.Remove(p)
-
-			tmpl, err := template.New("test").Parse(tt.kubeConfigTmpl)
-			if err != nil {
-				return fmt.Errorf("failed to parse test template: %v", err)
+			if err == nil && tt.wantErr {
+				t.Errorf("wanted an error when loading config, did not get one: %q", tt.msg)
 			}
-			if err := tmpl.Execute(tempfile, data); err != nil {
-				return fmt.Errorf("failed to execute test template: %v", err)
-			}
-
-			tempconfigfile, err := ioutil.TempFile("", "")
-			if err != nil {
-				return err
-			}
-			pc := tempconfigfile.Name()
-			defer os.Remove(pc)
-
-			configTmpl, err := template.New("testconfig").Parse(defaultConfigTmplJSON)
-			if err != nil {
-				return fmt.Errorf("failed to parse test template: %v", err)
-			}
-			dataConfig := struct {
-				KubeConfig   string
-				AllowTTL     int
-				DenyTTL      int
-				RetryBackoff int
-				DefaultAllow bool
-			}{
-				KubeConfig:   p,
-				AllowTTL:     500,
-				DenyTTL:      500,
-				RetryBackoff: 500,
-				DefaultAllow: true,
-			}
-			if err := configTmpl.Execute(tempconfigfile, dataConfig); err != nil {
-				return fmt.Errorf("failed to execute test template: %v", err)
-			}
-
-			// Create a new admission controller
-			configFile, err := os.Open(pc)
-			if err != nil {
-				return fmt.Errorf("failed to read test config: %v", err)
-			}
-			defer configFile.Close()
-
-			_, err = NewImagePolicyWebhook(configFile)
-			return err
-		}()
-		if err != nil && !tt.wantErr {
-			t.Errorf("failed to load plugin from config %q: %v", tt.msg, err)
-		}
-		if err == nil && tt.wantErr {
-			t.Errorf("wanted an error when loading config, did not get one: %q", tt.msg)
-		}
+		})
 	}
 }
 
@@ -294,8 +296,9 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 		}
 		s.Review(&review)
 		type status struct {
-			Allowed bool   `json:"allowed"`
-			Reason  string `json:"reason"`
+			Allowed          bool              `json:"allowed"`
+			Reason           string            `json:"reason"`
+			AuditAnnotations map[string]string `json:"auditAnnotations"`
 		}
 		resp := struct {
 			APIVersion string `json:"apiVersion"`
@@ -304,7 +307,11 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 		}{
 			APIVersion: v1alpha1.SchemeGroupVersion.String(),
 			Kind:       "ImageReview",
-			Status:     status{review.Status.Allowed, review.Status.Reason},
+			Status: status{
+				review.Status.Allowed,
+				review.Status.Reason,
+				review.Status.AuditAnnotations,
+			},
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -318,8 +325,9 @@ func NewTestServer(s Service, cert, key, caCert []byte) (*httptest.Server, error
 
 // A service that can be set to allow all or deny all authorization requests.
 type mockService struct {
-	allow      bool
-	statusCode int
+	allow          bool
+	statusCode     int
+	outAnnotations map[string]string
 }
 
 func (m *mockService) Review(r *v1alpha1.ImageReview) {
@@ -339,6 +347,8 @@ func (m *mockService) Review(r *v1alpha1.ImageReview) {
 	if !r.Status.Allowed {
 		r.Status.Reason = "not allowed"
 	}
+
+	r.Status.AuditAnnotations = m.outAnnotations
 }
 func (m *mockService) Allow()              { m.allow = true }
 func (m *mockService) Deny()               { m.allow = false }
@@ -455,7 +465,7 @@ func TestTLSConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
-		func() {
+		t.Run(tt.test, func(t *testing.T) {
 			service := new(mockService)
 			service.statusCode = 200
 
@@ -472,7 +482,7 @@ func TestTLSConfig(t *testing.T) {
 				return
 			}
 			pod := goodPod(strconv.Itoa(rand.Intn(1000)))
-			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			// Allow all and see if we get an error.
 			service.Allow()
@@ -502,7 +512,7 @@ func TestTLSConfig(t *testing.T) {
 			if err := wh.Validate(attr); err == nil {
 				t.Errorf("%s: incorrectly admitted with DenyAll policy", tt.test)
 			}
-		}()
+		})
 	}
 }
 
@@ -561,7 +571,7 @@ func TestWebhookCache(t *testing.T) {
 		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
 	}
 
-	attr := admission.NewAttributesRecord(goodPod("test"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+	attr := admission.NewAttributesRecord(goodPod("test"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 	serv.allow = true
 
@@ -573,7 +583,7 @@ func TestWebhookCache(t *testing.T) {
 		{statusCode: 200, expectedErr: false, expectedAuthorized: true, expectedCached: false},
 		{statusCode: 500, expectedErr: false, expectedAuthorized: true, expectedCached: true},
 	}
-	attr = admission.NewAttributesRecord(goodPod("test2"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+	attr = admission.NewAttributesRecord(goodPod("test2"), nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 	testWebhookCacheCases(t, serv, wh, attr, tests)
 }
@@ -730,7 +740,7 @@ func TestContainerCombinations(t *testing.T) {
 	}
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
-		func() {
+		t.Run(tt.test, func(t *testing.T) {
 			service := new(mockService)
 			service.statusCode = 200
 
@@ -747,7 +757,7 @@ func TestContainerCombinations(t *testing.T) {
 				return
 			}
 
-			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			err = wh.Validate(attr)
 			if tt.wantAllowed {
@@ -769,27 +779,41 @@ func TestContainerCombinations(t *testing.T) {
 				t.Errorf("%s: failed to admit: %v", tt.test, err)
 				return
 			}
-		}()
+		})
 	}
+}
+
+// fakeAttributes decorate kadmission.Attributes. It's used to trace the added annotations.
+type fakeAttributes struct {
+	admission.Attributes
+	annotations map[string]string
+}
+
+func (f fakeAttributes) AddAnnotation(k, v string) error {
+	f.annotations[k] = v
+	return f.Attributes.AddAnnotation(k, v)
 }
 
 func TestDefaultAllow(t *testing.T) {
 	tests := []struct {
 		test                               string
 		pod                                *api.Pod
-		wantAllowed, wantErr, defaultAllow bool
+		defaultAllow                       bool
+		wantAllowed, wantErr, wantFailOpen bool
 	}{
 		{
 			test:         "DefaultAllow = true, backend unreachable, bad image",
 			pod:          goodPod("bad"),
 			defaultAllow: true,
 			wantAllowed:  true,
+			wantFailOpen: true,
 		},
 		{
 			test:         "DefaultAllow = true, backend unreachable, good image",
 			pod:          goodPod("good"),
 			defaultAllow: true,
 			wantAllowed:  true,
+			wantFailOpen: true,
 		},
 		{
 			test:         "DefaultAllow = false, backend unreachable, good image",
@@ -797,6 +821,7 @@ func TestDefaultAllow(t *testing.T) {
 			defaultAllow: false,
 			wantAllowed:  false,
 			wantErr:      true,
+			wantFailOpen: false,
 		},
 		{
 			test:         "DefaultAllow = false, backend unreachable, bad image",
@@ -804,11 +829,12 @@ func TestDefaultAllow(t *testing.T) {
 			defaultAllow: false,
 			wantAllowed:  false,
 			wantErr:      true,
+			wantFailOpen: false,
 		},
 	}
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
-		func() {
+		t.Run(tt.test, func(t *testing.T) {
 			service := new(mockService)
 			service.statusCode = 500
 
@@ -825,7 +851,9 @@ func TestDefaultAllow(t *testing.T) {
 				return
 			}
 
-			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+			annotations := make(map[string]string)
+			attr = &fakeAttributes{attr, annotations}
 
 			err = wh.Validate(attr)
 			if tt.wantAllowed {
@@ -847,7 +875,23 @@ func TestDefaultAllow(t *testing.T) {
 				t.Errorf("%s: failed to admit: %v", tt.test, err)
 				return
 			}
-		}()
+			podAnnotations := tt.pod.GetAnnotations()
+			if tt.wantFailOpen {
+				if podAnnotations == nil || podAnnotations[api.ImagePolicyFailedOpenKey] != "true" {
+					t.Errorf("missing expected fail open pod annotation")
+				}
+				if annotations[AuditKeyPrefix+ImagePolicyFailedOpenKeySuffix] != "true" {
+					t.Errorf("missing expected fail open attributes annotation")
+				}
+			} else {
+				if podAnnotations != nil && podAnnotations[api.ImagePolicyFailedOpenKey] == "true" {
+					t.Errorf("found unexpected fail open pod annotation")
+				}
+				if annotations[AuditKeyPrefix+ImagePolicyFailedOpenKeySuffix] == "true" {
+					t.Errorf("found unexpected fail open attributes annotation")
+				}
+			}
+		})
 	}
 }
 
@@ -886,9 +930,9 @@ func TestAnnotationFiltering(t *testing.T) {
 			annotations: map[string]string{
 				"my.image-policy.k8s.io/test":     "test",
 				"other.image-policy.k8s.io/test2": "annotation",
-				"test":    "test",
-				"another": "another",
-				"":        "",
+				"test":                            "test",
+				"another":                         "another",
+				"":                                "",
 			},
 			outAnnotations: map[string]string{
 				"my.image-policy.k8s.io/test":     "test",
@@ -898,7 +942,7 @@ func TestAnnotationFiltering(t *testing.T) {
 	}
 	for _, tt := range tests {
 		// Use a closure so defer statements trigger between loop iterations.
-		func() {
+		t.Run(tt.test, func(t *testing.T) {
 			service := new(annotationService)
 
 			server, err := NewTestServer(service, serverCert, serverKey, caCert)
@@ -917,7 +961,7 @@ func TestAnnotationFiltering(t *testing.T) {
 			pod := goodPod("test")
 			pod.Annotations = tt.annotations
 
-			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
+			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
 
 			err = wh.Validate(attr)
 			if err != nil {
@@ -928,7 +972,94 @@ func TestAnnotationFiltering(t *testing.T) {
 				t.Errorf("expected annotations sent to webhook: %v to match expected: %v", service.Annotations(), tt.outAnnotations)
 			}
 
-		}()
+		})
+	}
+}
+
+func TestReturnedAnnotationAdd(t *testing.T) {
+	tests := []struct {
+		test                string
+		pod                 *api.Pod
+		verifierAnnotations map[string]string
+		expectedAnnotations map[string]string
+	}{
+		{
+			test: "Add valid response annotations",
+			pod:  goodPod("good"),
+			verifierAnnotations: map[string]string{
+				"foo-test": "true",
+				"bar-test": "false",
+			},
+			expectedAnnotations: map[string]string{
+				"imagepolicywebhook.image-policy.k8s.io/foo-test": "true",
+				"imagepolicywebhook.image-policy.k8s.io/bar-test": "false",
+			},
+		},
+		{
+			test:                "No returned annotations are ignored",
+			pod:                 goodPod("good"),
+			verifierAnnotations: map[string]string{},
+			expectedAnnotations: map[string]string{},
+		},
+		{
+			test:                "Handles nil annotations",
+			pod:                 goodPod("good"),
+			verifierAnnotations: nil,
+			expectedAnnotations: map[string]string{},
+		},
+		{
+			test: "Adds annotations for bad request",
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ServiceAccountName: "default",
+					SecurityContext:    &api.PodSecurityContext{},
+					Containers: []api.Container{
+						{
+							Image:           "bad",
+							SecurityContext: &api.SecurityContext{},
+						},
+					},
+				},
+			},
+			verifierAnnotations: map[string]string{
+				"foo-test": "false",
+			},
+			expectedAnnotations: map[string]string{
+				"imagepolicywebhook.image-policy.k8s.io/foo-test": "false",
+			},
+		},
+	}
+	for _, tt := range tests {
+		// Use a closure so defer statements trigger between loop iterations.
+		t.Run(tt.test, func(t *testing.T) {
+			service := new(mockService)
+			service.statusCode = 200
+			service.outAnnotations = tt.verifierAnnotations
+
+			server, err := NewTestServer(service, serverCert, serverKey, caCert)
+			if err != nil {
+				t.Errorf("%s: failed to create server: %v", tt.test, err)
+				return
+			}
+			defer server.Close()
+
+			wh, err := newImagePolicyWebhook(server.URL, clientCert, clientKey, caCert, 0, true)
+			if err != nil {
+				t.Errorf("%s: failed to create client: %v", tt.test, err)
+				return
+			}
+
+			pod := tt.pod
+
+			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, false, &user.DefaultInfo{})
+			annotations := make(map[string]string)
+			attr = &fakeAttributes{attr, annotations}
+
+			err = wh.Validate(attr)
+			if !reflect.DeepEqual(annotations, tt.expectedAnnotations) {
+				t.Errorf("got audit annotations: %v; want: %v", annotations, tt.expectedAnnotations)
+			}
+		})
 	}
 }
 

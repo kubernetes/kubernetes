@@ -78,7 +78,6 @@ func (k *KernelValidator) Validate(spec SysSpec) (error, error) {
 
 // validateKernelVersion validates the kernel version.
 func (k *KernelValidator) validateKernelVersion(kSpec KernelSpec) error {
-	glog.Infof("Validating kernel version")
 	versionRegexps := kSpec.Versions
 	for _, versionRegexp := range versionRegexps {
 		r := regexp.MustCompile(versionRegexp)
@@ -93,7 +92,6 @@ func (k *KernelValidator) validateKernelVersion(kSpec KernelSpec) error {
 
 // validateKernelConfig validates the kernel configurations.
 func (k *KernelValidator) validateKernelConfig(kSpec KernelSpec) error {
-	glog.Infof("Validating kernel config")
 	allConfig, err := k.getKernelConfig()
 	if err != nil {
 		return fmt.Errorf("failed to parse kernel config: %v", err)
@@ -181,6 +179,7 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 		"/usr/src/linux/.config",
 		"/usr/lib/modules/" + k.kernelRelease + "/config",
 		"/usr/lib/ostree-boot/config-" + k.kernelRelease,
+		"/usr/lib/kernel/config-" + k.kernelRelease,
 	}
 	configsModule := "configs"
 	modprobeCmd := "modprobe"

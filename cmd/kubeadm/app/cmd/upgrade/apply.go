@@ -24,9 +24,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -38,7 +39,6 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -70,16 +70,16 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		applyPlanFlags:   apf,
 		imagePullTimeout: defaultImagePullTimeout,
 		etcdUpgrade:      true,
-		criSocket:        kubeadmapiv1alpha3.DefaultCRISocket,
+		criSocket:        kubeadmapiv1beta1.DefaultCRISocket,
 	}
 
 	cmd := &cobra.Command{
-		Use: "apply [version]",
+		Use:                   "apply [version]",
 		DisableFlagsInUseLine: true,
-		Short: "Upgrade your Kubernetes cluster to the specified version.",
+		Short:                 "Upgrade your Kubernetes cluster to the specified version.",
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
-			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, flags.skipPreFlight)
+			flags.ignorePreflightErrorsSet, err = validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
 			// Ensure the user is root
@@ -90,7 +90,8 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 			// If the version is specified in config file, pick up that value.
 			if flags.cfgPath != "" {
 				glog.V(1).Infof("fetching configuration from file %s", flags.cfgPath)
-				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1alpha3.InitConfiguration{})
+				// Note that cfg isn't preserved here, it's just an one-off to populate flags.newK8sVersionStr based on --config
+				cfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(flags.cfgPath, &kubeadmapiv1beta1.InitConfiguration{})
 				kubeadmutil.CheckErr(err)
 
 				if cfg.KubernetesVersion != "" {
@@ -160,7 +161,7 @@ func RunApply(flags *applyFlags) error {
 
 	// Validate requested and validate actual version
 	glog.V(1).Infof("[upgrade/apply] validating requested and actual version")
-	if err := configutil.NormalizeKubernetesVersion(upgradeVars.cfg); err != nil {
+	if err := configutil.NormalizeKubernetesVersion(&upgradeVars.cfg.ClusterConfiguration); err != nil {
 		return err
 	}
 
@@ -192,7 +193,7 @@ func RunApply(flags *applyFlags) error {
 	// Use a prepuller implementation based on creating DaemonSets
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
 	glog.V(1).Infof("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, upgradeVars.cfg)
+	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, &upgradeVars.cfg.ClusterConfiguration)
 	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout); err != nil {
 		return fmt.Errorf("[upgrade/prepull] Failed prepulled the images for the control plane components error: %v", err)
 	}

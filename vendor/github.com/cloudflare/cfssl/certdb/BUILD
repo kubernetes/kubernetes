@@ -17,7 +17,11 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//vendor/github.com/cloudflare/cfssl/certdb/dbconf:all-srcs",
+        "//vendor/github.com/cloudflare/cfssl/certdb/sql:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

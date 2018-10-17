@@ -23,7 +23,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
@@ -45,7 +45,7 @@ var (
 		`)
 )
 
-// NewCmdEtcd return main command for Etcd phase
+// NewCmdEtcd returns main command for Etcd phase
 func NewCmdEtcd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "etcd",
@@ -61,14 +61,7 @@ func NewCmdEtcd() *cobra.Command {
 // getEtcdSubCommands returns sub commands for etcd phase
 func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Command {
 
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{}
-
-	// This is used for unit testing only...
-	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
-	// By setting this explicitly for tests workarounds that
-	if defaultKubernetesVersion != "" {
-		cfg.KubernetesVersion = defaultKubernetesVersion
-	}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -96,7 +89,7 @@ func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Comman
 		Short:   properties.short,
 		Long:    properties.long,
 		Example: properties.examples,
-		Run:     runCmdPhase(properties.cmdFunc, &outDir, &cfgPath, cfg),
+		Run:     runCmdPhase(properties.cmdFunc, &outDir, &cfgPath, cfg, defaultKubernetesVersion),
 	}
 
 	// Add flags to the command

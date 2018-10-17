@@ -27,12 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -91,11 +90,11 @@ func NewSubjectOptions(streams genericclioptions.IOStreams) *SubjectOptions {
 func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSubjectOptions(streams)
 	cmd := &cobra.Command{
-		Use: "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
+		Use:                   "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
-		Long:    subject_long,
-		Example: subject_example,
+		Short:                 i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
+		Long:                  subject_long,
+		Example:               subject_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -183,7 +182,7 @@ func (o *SubjectOptions) Validate() error {
 		}
 
 		for _, info := range o.Infos {
-			_, ok := info.Object.(*rbac.ClusterRoleBinding)
+			_, ok := info.Object.(*rbacv1.ClusterRoleBinding)
 			if ok && tokens[0] == "" {
 				return fmt.Errorf("serviceaccount must be <namespace>:<name>, namespace must be specified")
 			}
@@ -198,16 +197,16 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
 			subject := rbacv1.Subject{
-				Kind:     rbac.UserKind,
-				APIGroup: rbac.GroupName,
+				Kind:     rbacv1.UserKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     user,
 			}
 			subjects = append(subjects, subject)
 		}
 		for _, group := range sets.NewString(o.Groups...).List() {
 			subject := rbacv1.Subject{
-				Kind:     rbac.GroupKind,
-				APIGroup: rbac.GroupName,
+				Kind:     rbacv1.GroupKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     group,
 			}
 			subjects = append(subjects, subject)
@@ -220,7 +219,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 				namespace = o.namespace
 			}
 			subject := rbacv1.Subject{
-				Kind:      rbac.ServiceAccountKind,
+				Kind:      rbacv1.ServiceAccountKind,
 				Namespace: namespace,
 				Name:      name,
 			}
@@ -256,7 +255,7 @@ func (o *SubjectOptions) Run(fn updateSubjects) error {
 			continue
 		}
 
-		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		actual, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch subjects to rolebinding: %v\n", err))
 			continue

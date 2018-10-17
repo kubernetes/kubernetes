@@ -45,7 +45,7 @@ func NewSimpleDynamicClient(scheme *runtime.Scheme, objects ...runtime.Object) *
 		}
 	}
 
-	cs := &FakeDynamicClient{}
+	cs := &FakeDynamicClient{scheme: scheme}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -86,7 +86,7 @@ func (c *dynamicResourceClient) Namespace(ns string) dynamic.ResourceInterface {
 	return &ret
 }
 
-func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, opts metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {
@@ -132,7 +132,7 @@ func (c *dynamicResourceClient) Create(obj *unstructured.Unstructured, subresour
 	return ret, err
 }
 
-func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {
@@ -168,7 +168,7 @@ func (c *dynamicResourceClient) Update(obj *unstructured.Unstructured, subresour
 	return ret, err
 }
 
-func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) UpdateStatus(obj *unstructured.Unstructured, opts metav1.UpdateOptions) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {
@@ -331,7 +331,7 @@ func (c *dynamicResourceClient) Watch(opts metav1.ListOptions) (watch.Interface,
 	panic("math broke")
 }
 
-func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*unstructured.Unstructured, error) {
+func (c *dynamicResourceClient) Patch(name string, pt types.PatchType, data []byte, opts metav1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
 	var uncastRet runtime.Object
 	var err error
 	switch {

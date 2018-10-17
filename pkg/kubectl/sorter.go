@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/jsonpath"
@@ -111,12 +112,7 @@ func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput stri
 	// Note that this requires empty fields to be considered later, when sorting.
 	var fieldFoundOnce bool
 	for _, obj := range objs {
-		var values [][]reflect.Value
-		if unstructured, ok := obj.(*unstructured.Unstructured); ok {
-			values, err = parser.FindResults(unstructured.Object)
-		} else {
-			values, err = parser.FindResults(reflect.ValueOf(obj).Elem().Interface())
-		}
+		values, err := findJSONPathResults(parser, obj)
 		if err != nil {
 			return nil, err
 		}
@@ -274,20 +270,12 @@ func (r *RuntimeSort) Less(i, j int) bool {
 		panic(err)
 	}
 
-	if unstructured, ok := iObj.(*unstructured.Unstructured); ok {
-		iValues, err = parser.FindResults(unstructured.Object)
-	} else {
-		iValues, err = parser.FindResults(reflect.ValueOf(iObj).Elem().Interface())
-	}
+	iValues, err = findJSONPathResults(parser, iObj)
 	if err != nil {
 		glog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, r.field, err)
 	}
 
-	if unstructured, ok := jObj.(*unstructured.Unstructured); ok {
-		jValues, err = parser.FindResults(unstructured.Object)
-	} else {
-		jValues, err = parser.FindResults(reflect.ValueOf(jObj).Elem().Interface())
-	}
+	jValues, err = findJSONPathResults(parser, jObj)
 	if err != nil {
 		glog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, r.field, err)
 	}
@@ -315,4 +303,78 @@ func (r *RuntimeSort) OriginalPosition(ix int) int {
 		return -1
 	}
 	return r.origPosition[ix]
+}
+
+type TableSorter struct {
+	field string
+	obj   *metav1beta1.Table
+}
+
+func (t *TableSorter) Len() int {
+	return len(t.obj.Rows)
+}
+
+func (t *TableSorter) Swap(i, j int) {
+	t.obj.Rows[i], t.obj.Rows[j] = t.obj.Rows[j], t.obj.Rows[i]
+}
+
+func (t *TableSorter) Less(i, j int) bool {
+	iObj := t.obj.Rows[i].Object.Object
+	jObj := t.obj.Rows[j].Object.Object
+
+	var iValues [][]reflect.Value
+	var jValues [][]reflect.Value
+	var err error
+
+	parser := jsonpath.New("sorting").AllowMissingKeys(true)
+	err = parser.Parse(t.field)
+	if err != nil {
+		glog.Fatalf("sorting error: %v\n", err)
+	}
+
+	// TODO(juanvallejo): this is expensive for very large sets.
+	// To improve runtime complexity, build an array which contains all
+	// resolved fields, and sort that instead.
+	iValues, err = findJSONPathResults(parser, iObj)
+	if err != nil {
+		glog.Fatalf("Failed to get i values for %#v using %s (%#v)", iObj, t.field, err)
+	}
+
+	jValues, err = findJSONPathResults(parser, jObj)
+	if err != nil {
+		glog.Fatalf("Failed to get j values for %#v using %s (%v)", jObj, t.field, err)
+	}
+
+	if len(iValues) == 0 || len(iValues[0]) == 0 || len(jValues) == 0 || len(jValues[0]) == 0 {
+		glog.Fatalf("couldn't find any field with path %q in the list of objects", t.field)
+	}
+
+	iField := iValues[0][0]
+	jField := jValues[0][0]
+
+	less, err := isLess(iField, jField)
+	if err != nil {
+		glog.Fatalf("Field %s in %T is an unsortable type: %s, err: %v", t.field, iObj, iField.Kind().String(), err)
+	}
+	return less
+}
+
+func (t *TableSorter) Sort() error {
+	sort.Sort(t)
+	return nil
+}
+
+func NewTableSorter(table *metav1beta1.Table, field string) *TableSorter {
+	return &TableSorter{
+		obj:   table,
+		field: field,
+	}
+}
+
+func findJSONPathResults(parser *jsonpath.JSONPath, from runtime.Object) ([][]reflect.Value, error) {
+	if unstructuredObj, ok := from.(*unstructured.Unstructured); ok {
+		return parser.FindResults(unstructuredObj.Object)
+	}
+
+	return parser.FindResults(reflect.ValueOf(from).Elem().Interface())
 }

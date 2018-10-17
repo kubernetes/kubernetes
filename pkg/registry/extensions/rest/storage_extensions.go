@@ -47,17 +47,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	return apiGroupInfo, true
 }
 
-type RollbackREST struct {
-	*deploymentstore.RollbackREST
-}
-
-// override RollbackREST.ProducesObject
-func (r *RollbackREST) ProducesObject(verb string) interface{} {
-	return extensionsapiv1beta1.DeploymentStatus{}
-}
-
-var _ = rest.StorageMetadata(&RollbackREST{})
-
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 
@@ -76,7 +65,7 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
 	storage["deployments"] = deploymentStorage.Deployment.WithCategories(nil)
 	storage["deployments/status"] = deploymentStorage.Status
-	storage["deployments/rollback"] = &RollbackREST{deploymentStorage.Rollback}
+	storage["deployments/rollback"] = deploymentStorage.Rollback
 	storage["deployments/scale"] = deploymentStorage.Scale
 	// ingresses
 	ingressStorage, ingressStatusStorage := ingressstore.NewREST(restOptionsGetter)

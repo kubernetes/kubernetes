@@ -67,7 +67,7 @@ const (
 )
 
 var (
-	TimeoutError = fmt.Errorf("Timeout")
+	errTimeout = fmt.Errorf("Timeout")
 )
 
 // DriverCall implements the basic contract between FlexVolume and its driver.
@@ -92,10 +92,12 @@ func (plugin *flexVolumePlugin) NewDriverCallWithTimeout(command string, timeout
 	}
 }
 
+// Append appends arg into driver call argument list
 func (dc *DriverCall) Append(arg string) {
 	dc.args = append(dc.args, arg)
 }
 
+// AppendSpec appends volume spec to driver call argument list
 func (dc *DriverCall) AppendSpec(spec *volume.Spec, host volume.VolumeHost, extraOptions map[string]string) error {
 	optionsForDriver, err := NewOptionsForDriver(spec, host, extraOptions)
 	if err != nil {
@@ -111,6 +113,7 @@ func (dc *DriverCall) AppendSpec(spec *volume.Spec, host volume.VolumeHost, extr
 	return nil
 }
 
+// Run executes the driver call
 func (dc *DriverCall) Run() (*DriverStatus, error) {
 	if dc.plugin.isUnsupported(dc.Command) {
 		return nil, errors.New(StatusNotSupported)
@@ -131,7 +134,7 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 	output, execErr := cmd.CombinedOutput()
 	if execErr != nil {
 		if timeout {
-			return nil, TimeoutError
+			return nil, errTimeout
 		}
 		_, err := handleCmdResponse(dc.Command, output)
 		if err == nil {
@@ -160,6 +163,7 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 // OptionsForDriver represents the spec given to the driver.
 type OptionsForDriver map[string]string
 
+// NewOptionsForDriver create driver options given volume spec
 func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions map[string]string) (OptionsForDriver, error) {
 
 	volSourceFSType, err := getFSType(spec)
@@ -219,15 +223,20 @@ type DriverStatus struct {
 	Capabilities *DriverCapabilities `json:",omitempty"`
 }
 
+// DriverCapabilities represents what driver can do
 type DriverCapabilities struct {
-	Attach         bool `json:"attach"`
-	SELinuxRelabel bool `json:"selinuxRelabel"`
+	Attach          bool `json:"attach"`
+	SELinuxRelabel  bool `json:"selinuxRelabel"`
+	SupportsMetrics bool `json:"supportsMetrics"`
+	FSGroup         bool `json:"fsGroup"`
 }
 
 func defaultCapabilities() *DriverCapabilities {
 	return &DriverCapabilities{
-		Attach:         true,
-		SELinuxRelabel: true,
+		Attach:          true,
+		SELinuxRelabel:  true,
+		SupportsMetrics: false,
+		FSGroup:         true,
 	}
 }
 

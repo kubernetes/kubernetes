@@ -32,6 +32,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -951,8 +952,13 @@ func getTestCloud() (az *Cloud) {
 			RouteTableName:               "rt",
 			PrimaryAvailabilitySetName:   "as",
 			MaximumLoadBalancerRuleCount: 250,
-			VMType: vmTypeStandard,
+			VMType:                       vmTypeStandard,
 		},
+		nodeZones:          map[string]sets.String{},
+		nodeInformerSynced: func() bool { return true },
+		nodeResourceGroups: map[string]string{},
+		unmanagedNodes:     sets.NewString(),
+		routeCIDRs:         map[string]string{},
 	}
 	az.DisksClient = newFakeDisksClient()
 	az.InterfacesClient = newFakeAzureInterfacesClient()
@@ -1062,7 +1068,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 		az.InterfacesClient.CreateOrUpdate(ctx, az.Config.ResourceGroup, nicName, newNIC)
 
 		// create vm
-		asID := az.getAvailabilitySetID(asName)
+		asID := az.getAvailabilitySetID(az.Config.ResourceGroup, asName)
 		newVM := compute.VirtualMachine{
 			Name:     &vmName,
 			Location: &az.Config.Location,
@@ -1160,7 +1166,7 @@ func getTestSecurityGroup(az *Cloud, services ...v1.Service) *network.SecurityGr
 		for _, port := range service.Spec.Ports {
 			sources := getServiceSourceRanges(&service)
 			for _, src := range sources {
-				ruleName := getSecurityRuleName(&service, port, src)
+				ruleName := az.getSecurityRuleName(&service, port, src)
 				rules = append(rules, network.SecurityRule{
 					Name: to.StringPtr(ruleName),
 					SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
@@ -1191,6 +1197,7 @@ func getTestSecurityGroup(az *Cloud, services ...v1.Service) *network.SecurityGr
 }
 
 func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, services ...v1.Service) {
+	az := getTestCloud()
 	expectedRuleCount := 0
 	expectedFrontendIPCount := 0
 	expectedProbeCount := 0
@@ -1199,14 +1206,14 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 		if len(svc.Spec.Ports) > 0 {
 			expectedFrontendIPCount++
 			expectedFrontendIP := ExpectedFrontendIPInfo{
-				Name:   getFrontendIPConfigName(&svc, subnet(&svc)),
+				Name:   az.getFrontendIPConfigName(&svc, subnet(&svc)),
 				Subnet: subnet(&svc),
 			}
 			expectedFrontendIPs = append(expectedFrontendIPs, expectedFrontendIP)
 		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := getLoadBalancerRuleName(&svc, wantedRule, subnet(&svc))
+			wantedRuleName := az.getLoadBalancerRuleName(&svc, wantedRule, subnet(&svc))
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -1397,12 +1404,13 @@ func securityRuleMatches(serviceSourceRange string, servicePort v1.ServicePort, 
 }
 
 func validateSecurityGroup(t *testing.T, securityGroup *network.SecurityGroup, services ...v1.Service) {
+	az := getTestCloud()
 	seenRules := make(map[string]string)
 	for _, svc := range services {
 		for _, wantedRule := range svc.Spec.Ports {
 			sources := getServiceSourceRanges(&svc)
 			for _, source := range sources {
-				wantedRuleName := getSecurityRuleName(&svc, wantedRule, source)
+				wantedRuleName := az.getSecurityRuleName(&svc, wantedRule, source)
 				seenRules[wantedRuleName] = wantedRuleName
 				foundRule := false
 				for _, actualRule := range *securityGroup.SecurityRules {
@@ -1710,8 +1718,8 @@ func TestGetZone(t *testing.T) {
 		mux.Handle("/v1/InstanceInfo/FD", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, test.faultDomain)
 		}))
-		mux.Handle("/instance/compute/zone", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, test.zone)
+		mux.Handle("/instance/compute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, fmt.Sprintf("{\"zone\":\"%s\"}", test.zone))
 		}))
 		go func() {
 			http.Serve(listener, mux)
@@ -1960,8 +1968,8 @@ func TestIfServiceSpecifiesSharedRuleAndRuleExistsThenTheServicesPortAndAddressA
 				SourceAddressPrefix:      to.StringPtr("Internet"),
 				DestinationPortRange:     to.StringPtr("80"),
 				DestinationAddressPrefix: to.StringPtr("192.168.33.44"),
-				Access:    network.SecurityRuleAccessAllow,
-				Direction: network.SecurityRuleDirectionInbound,
+				Access:                   network.SecurityRuleAccessAllow,
+				Direction:                network.SecurityRuleDirectionInbound,
 			},
 		},
 	}
@@ -2568,8 +2576,8 @@ func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
 
 	expectedRuleName13 := "shared-TCP-4444-Internet"
 	expectedRuleName2 := "shared-TCP-8888-Internet"
-	expectedRuleName4 := getSecurityRuleName(&svc4, v1.ServicePort{Port: 4444, Protocol: v1.ProtocolTCP}, "Internet")
-	expectedRuleName5 := getSecurityRuleName(&svc5, v1.ServicePort{Port: 8888, Protocol: v1.ProtocolTCP}, "Internet")
+	expectedRuleName4 := az.getSecurityRuleName(&svc4, v1.ServicePort{Port: 4444, Protocol: v1.ProtocolTCP}, "Internet")
+	expectedRuleName5 := az.getSecurityRuleName(&svc5, v1.ServicePort{Port: 8888, Protocol: v1.ProtocolTCP}, "Internet")
 
 	sg := getTestSecurityGroup(az)
 
@@ -2764,5 +2772,102 @@ func TestGetResourceGroupFromDiskURI(t *testing.T) {
 		} else {
 			assert.Nil(t, err, "Expect error is nil during getResourceGroupFromDiskURI(%s)", test.diskURL)
 		}
+	}
+}
+
+func TestGetResourceGroups(t *testing.T) {
+	tests := []struct {
+		name               string
+		nodeResourceGroups map[string]string
+		expected           sets.String
+		informerSynced     bool
+		expectError        bool
+	}{
+		{
+			name:               "cloud provider configured RG should be returned by default",
+			nodeResourceGroups: map[string]string{},
+			informerSynced:     true,
+			expected:           sets.NewString("rg"),
+		},
+		{
+			name:               "cloud provider configured RG and node RGs should be returned",
+			nodeResourceGroups: map[string]string{"node1": "rg1", "node2": "rg2"},
+			informerSynced:     true,
+			expected:           sets.NewString("rg", "rg1", "rg2"),
+		},
+		{
+			name:               "error should be returned if informer hasn't synced yet",
+			nodeResourceGroups: map[string]string{"node1": "rg1", "node2": "rg2"},
+			informerSynced:     false,
+			expectError:        true,
+		},
+	}
+
+	az := getTestCloud()
+	for _, test := range tests {
+		az.nodeResourceGroups = test.nodeResourceGroups
+		if test.informerSynced {
+			az.nodeInformerSynced = func() bool { return true }
+		} else {
+			az.nodeInformerSynced = func() bool { return false }
+		}
+		actual, err := az.GetResourceGroups()
+		if test.expectError {
+			assert.NotNil(t, err, test.name)
+			continue
+		}
+
+		assert.Nil(t, err, test.name)
+		assert.Equal(t, test.expected, actual, test.name)
+	}
+}
+
+func TestGetNodeResourceGroup(t *testing.T) {
+	tests := []struct {
+		name               string
+		nodeResourceGroups map[string]string
+		node               string
+		expected           string
+		informerSynced     bool
+		expectError        bool
+	}{
+		{
+			name:               "cloud provider configured RG should be returned by default",
+			nodeResourceGroups: map[string]string{},
+			informerSynced:     true,
+			node:               "node1",
+			expected:           "rg",
+		},
+		{
+			name:               "node RGs should be returned",
+			nodeResourceGroups: map[string]string{"node1": "rg1", "node2": "rg2"},
+			informerSynced:     true,
+			node:               "node1",
+			expected:           "rg1",
+		},
+		{
+			name:               "error should be returned if informer hasn't synced yet",
+			nodeResourceGroups: map[string]string{"node1": "rg1", "node2": "rg2"},
+			informerSynced:     false,
+			expectError:        true,
+		},
+	}
+
+	az := getTestCloud()
+	for _, test := range tests {
+		az.nodeResourceGroups = test.nodeResourceGroups
+		if test.informerSynced {
+			az.nodeInformerSynced = func() bool { return true }
+		} else {
+			az.nodeInformerSynced = func() bool { return false }
+		}
+		actual, err := az.GetNodeResourceGroup(test.node)
+		if test.expectError {
+			assert.NotNil(t, err, test.name)
+			continue
+		}
+
+		assert.Nil(t, err, test.name)
+		assert.Equal(t, test.expected, actual, test.name)
 	}
 }

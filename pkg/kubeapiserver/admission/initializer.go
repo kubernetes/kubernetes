@@ -19,12 +19,11 @@ package admission
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
-	webhookconfig "k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	"k8s.io/kubernetes/pkg/quota"
+	quota "k8s.io/kubernetes/pkg/quota/v1"
 )
 
 // TODO add a `WantsToRun` which takes a stopCh.  Might make it generic.
@@ -60,14 +59,13 @@ type WantsQuotaConfiguration interface {
 // PluginInitializer is used for initialization of the Kubernetes specific admission plugins.
 type PluginInitializer struct {
 	internalClient                    internalclientset.Interface
-	externalClient                    clientset.Interface
 	informers                         informers.SharedInformerFactory
 	authorizer                        authorizer.Authorizer
 	cloudConfig                       []byte
 	restMapper                        meta.RESTMapper
 	quotaConfiguration                quota.Configuration
-	serviceResolver                   webhookconfig.ServiceResolver
-	authenticationInfoResolverWrapper webhookconfig.AuthenticationInfoResolverWrapper
+	serviceResolver                   webhook.ServiceResolver
+	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}

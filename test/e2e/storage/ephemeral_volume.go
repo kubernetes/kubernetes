@@ -27,9 +27,16 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+)
+
+var (
+	volumePath = "/test-volume"
+	volumeName = "test-volume"
+	mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 )
 
 var _ = utils.SIGDescribe("Ephemeralstorage", func() {

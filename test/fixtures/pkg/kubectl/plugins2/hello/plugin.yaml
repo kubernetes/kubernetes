@@ -1,7 +1,0 @@
-name: hello
-shortDesc: "The hello plugin"
-longDesc: >
-  The hello plugin is a new
-  plugin used by test-cmd
-  to test multiple plugin locations.
-command: ./hello.sh

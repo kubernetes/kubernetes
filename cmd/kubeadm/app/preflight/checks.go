@@ -41,6 +41,7 @@ import (
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
-	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	utilsexec "k8s.io/utils/exec"
 )
@@ -501,7 +501,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
-// SystemVerificationCheck defines struct used for for running the system verification node check in test/e2e_node/system
+// SystemVerificationCheck defines struct used for running the system verification node check in test/e2e_node/system
 type SystemVerificationCheck struct {
 	IsDocker bool
 }
@@ -829,14 +829,15 @@ func (ImagePullCheck) Name() string {
 // Check pulls images required by kubeadm. This is a mutating check
 func (ipc ImagePullCheck) Check() (warnings, errors []error) {
 	for _, image := range ipc.imageList {
-		glog.V(1).Infoln("pulling ", image)
 		ret, err := ipc.runtime.ImageExists(image)
 		if ret && err == nil {
+			glog.V(1).Infof("image exists: %s", image)
 			continue
 		}
 		if err != nil {
 			errors = append(errors, fmt.Errorf("failed to check if image %s exists: %v", image, err))
 		}
+		glog.V(1).Infof("pulling %s", image)
 		if err := ipc.runtime.PullImage(image); err != nil {
 			errors = append(errors, fmt.Errorf("failed to pull image %s: %v", image, err))
 		}
@@ -854,15 +855,15 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
-		PortOpenCheck{port: int(cfg.API.BindPort)},
+		FirewalldCheck{ports: []int{int(cfg.APIEndpoint.BindPort), 10250}},
+		PortOpenCheck{port: int(cfg.APIEndpoint.BindPort)},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestsDir)},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress},
+		HTTPProxyCheck{Proto: "https", Host: cfg.APIEndpoint.AdvertiseAddress},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
@@ -897,7 +898,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 		checks = append(checks, ExternalEtcdVersionCheck{Etcd: cfg.Etcd})
 	}
 
-	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
+	if ip := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress); ip != nil {
 		if ip.To4() == nil && ip.To16() != nil {
 			checks = append(checks,
 				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
@@ -917,12 +918,14 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 
 	checks := []Checker{
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
-		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)},
 		ipvsutil.RequiredIPVSKernelModulesAvailableCheck{Executor: execer},
 	}
 	checks = addCommonChecks(execer, cfg, checks)
+	if !cfg.ControlPlane {
+		checks = append(checks, FileAvailableCheck{Path: cfg.CACertPath})
+	}
 
 	addIPv6Checks := false
 	for _, server := range cfg.DiscoveryTokenAPIServers {
@@ -1011,7 +1014,7 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 	}
 
 	checks := []Checker{
-		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(cfg)},
+		ImagePullCheck{runtime: containerRuntime, imageList: images.GetAllImages(&cfg.ClusterConfiguration)},
 	}
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }

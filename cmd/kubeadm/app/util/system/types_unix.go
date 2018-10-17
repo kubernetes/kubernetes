@@ -62,7 +62,7 @@ var DefaultSysSpec = SysSpec{
 	Cgroups: []string{"cpu", "cpuacct", "cpuset", "devices", "freezer", "memory"},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
-			Version:     []string{`1\.1[1-3]\..*`, `17\.03\..*`}, // Requires [1.11, 17.03]
+			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.06\..*`},
 			GraphDriver: []string{"aufs", "overlay", "overlay2", "devicemapper", "zfs"},
 		},
 	},

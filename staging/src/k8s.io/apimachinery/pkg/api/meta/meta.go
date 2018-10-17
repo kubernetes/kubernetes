@@ -132,6 +132,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				CreationTimestamp:          m.GetCreationTimestamp(),
 				DeletionTimestamp:          m.GetDeletionTimestamp(),
 				DeletionGracePeriodSeconds: m.GetDeletionGracePeriodSeconds(),
+<<<<<<< HEAD
 				Labels:          m.GetLabels(),
 				Annotations:     m.GetAnnotations(),
 				OwnerReferences: m.GetOwnerReferences(),
@@ -139,6 +140,14 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				ClusterName:     m.GetClusterName(),
 				Initializers:    m.GetInitializers(),
 				LastApplied:     m.GetLastApplied(),
+=======
+				Labels:                     m.GetLabels(),
+				Annotations:                m.GetAnnotations(),
+				OwnerReferences:            m.GetOwnerReferences(),
+				Finalizers:                 m.GetFinalizers(),
+				ClusterName:                m.GetClusterName(),
+				Initializers:               m.GetInitializers(),
+>>>>>>> 33adf367f9df6a9712ace1719d9d39033b83abbb~1
 			},
 		}
 	}

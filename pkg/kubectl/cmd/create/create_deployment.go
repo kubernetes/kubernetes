@@ -19,10 +19,10 @@ package create
 import (
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -48,7 +48,7 @@ func NewCmdCreateDeployment(f cmdutil.Factory, ioStreams genericclioptions.IOStr
 	}
 
 	cmd := &cobra.Command{
-		Use: "deployment NAME --image=image [--dry-run]",
+		Use:                   "deployment NAME --image=image [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"deploy"},
 		Short:                 i18n.T("Create a deployment with the specified name."),
@@ -117,7 +117,7 @@ func (o *DeploymentOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}

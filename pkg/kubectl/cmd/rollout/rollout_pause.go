@@ -23,21 +23,20 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-// PauseConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
+// PauseOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
-type PauseConfig struct {
+type PauseOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
@@ -67,7 +66,7 @@ var (
 )
 
 func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &PauseConfig{
+	o := &PauseOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("paused").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
 	}
@@ -75,22 +74,15 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	validArgs := []string{"deployment"}
 
 	cmd := &cobra.Command{
-		Use: "pause RESOURCE",
+		Use:                   "pause RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark the provided resource as paused"),
-		Long:    pause_long,
-		Example: pause_example,
+		Short:                 i18n.T("Mark the provided resource as paused"),
+		Long:                  pause_long,
+		Example:               pause_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			allErrs := []error{}
-			err := o.Complete(f, cmd, args)
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			err = o.RunPause()
-			if err != nil {
-				allErrs = append(allErrs, err)
-			}
-			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.RunPause())
 		},
 		ValidArgs: validArgs,
 	}
@@ -102,15 +94,12 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-func (o *PauseConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
-		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
-	}
-
+func (o *PauseOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Pauser = polymorphichelpers.ObjectPauserFn
 
 	var err error
-	if o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
 		return err
 	}
 
@@ -125,9 +114,16 @@ func (o *PauseConfig) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	return nil
 }
 
-func (o PauseConfig) RunPause() error {
+func (o *PauseOptions) Validate() error {
+	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
+		return fmt.Errorf("required resource not specified")
+	}
+	return nil
+}
+
+func (o PauseOptions) RunPause() error {
 	r := o.Builder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, &o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.Resources...).
@@ -150,7 +146,7 @@ func (o PauseConfig) RunPause() error {
 		allErrs = append(allErrs, err)
 	}
 
-	for _, patch := range set.CalculatePatches(infos, cmdutil.InternalVersionJSONEncoder(), set.PatchFn(o.Pauser)) {
+	for _, patch := range set.CalculatePatches(infos, scheme.DefaultJSONEncoder(), set.PatchFn(o.Pauser)) {
 		info := patch.Info
 
 		if patch.Err != nil {
@@ -174,7 +170,7 @@ func (o PauseConfig) RunPause() error {
 			continue
 		}
 
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch: %v", err))
 			continue

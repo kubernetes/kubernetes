@@ -21,33 +21,25 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 // attachablePodForObject returns the pod to which to attach given an object.
-func attachablePodForObject(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*api.Pod, error) {
+func attachablePodForObject(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*corev1.Pod, error) {
 	switch t := object.(type) {
-	case *api.Pod:
-		return t, nil
 	case *corev1.Pod:
-		internalPod := &api.Pod{}
-		err := apiv1.Convert_v1_Pod_To_core_Pod(t, internalPod, nil)
-		return internalPod, err
-
+		return t, nil
 	}
 
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
 	}
-	clientset, err := internalclientset.NewForConfig(clientConfig)
+	clientset, err := corev1client.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +48,7 @@ func attachablePodForObject(restClientGetter genericclioptions.RESTClientGetter,
 	if err != nil {
 		return nil, fmt.Errorf("cannot attach to %T: %v", object, err)
 	}
-	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
+	sortBy := func(pods []*corev1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+	pod, _, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	return pod, err
 }

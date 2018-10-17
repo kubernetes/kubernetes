@@ -340,21 +340,169 @@ func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
 }
 
 func TestURLTemplate(t *testing.T) {
-	uri, _ := url.Parse("http://localhost")
-	r := NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0)
-	r.Prefix("pre1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0")
-	full := r.URL()
-	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
-		t.Errorf("unexpected initial URL: %s", full)
+	uri, _ := url.Parse("http://localhost/some/base/url/path")
+	testCases := []struct {
+		Request          *Request
+		ExpectedFullURL  string
+		ExpectedFinalURL string
+	}{
+		{
+			// non dynamic client
+			Request: NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("api", "v1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1/nm?p0=v0",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D",
+		},
+		{
+			// non dynamic client with wrong api group
+			Request: NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("pre1", "v1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/v1/namespaces/ns/r1/nm?p0=v0",
+			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name)
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/api/v1/namespaces/ns/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/g1/v1/namespaces/ns/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/namespaces/ns/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with NO name)
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/api/v1/namespaces/ns/r1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with NO name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/g1/v1/namespaces/ns/r1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/namespaces/ns/r1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/namespaces/%7Bnamespace%7D/r1",
+		},
+		{
+			// dynamic client with core group + resourceResource (with name)
+			// /api/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/api/v1/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/g1/v1/r1/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/r1/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/r1/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME/$SUBRESOURCE
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/%7Bname%7D/finalize",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with NO name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%SUBRESOURCE
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/finalize",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with NO name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%SUBRESOURCE
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/status"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/status",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/status",
+		},
+		{
+			// dynamic client with named group + namespace + resourceResource (with no name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D/finalize",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/status"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/status",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D/status",
+		},
+		{
+			// dynamic client with named group + resourceResource (with name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D",
+		},
+		{
+			// dynamic client with named group + resourceResource (with no name)
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/apis/namespaces/namespaces/namespaces"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces",
+		},
+		{
+			// dynamic client with wrong api group + namespace + resourceResource (with name) + subresource
+			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME/$SUBRESOURCE
+			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+				Prefix("/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
+			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
+		},
 	}
-	actualURL := r.finalURLTemplate()
-	actual := actualURL.String()
-	expected := "http://localhost/pre1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D"
-	if actual != expected {
-		t.Errorf("unexpected URL template: %s %s", actual, expected)
-	}
-	if r.URL().String() != full.String() {
-		t.Errorf("creating URL template changed request: %s -> %s", full.String(), r.URL().String())
+	for i, testCase := range testCases {
+		r := testCase.Request
+		full := r.URL()
+		if full.String() != testCase.ExpectedFullURL {
+			t.Errorf("%d: unexpected initial URL: %s %s", i, full, testCase.ExpectedFullURL)
+		}
+		actualURL := r.finalURLTemplate()
+		actual := actualURL.String()
+		if actual != testCase.ExpectedFinalURL {
+			t.Errorf("%d: unexpected URL template: %s %s", i, actual, testCase.ExpectedFinalURL)
+		}
+		if r.URL().String() != full.String() {
+			t.Errorf("%d, creating URL template changed request: %s -> %s", i, full.String(), r.URL().String())
+		}
 	}
 }
 

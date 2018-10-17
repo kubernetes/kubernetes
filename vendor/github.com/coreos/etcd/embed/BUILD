@@ -31,6 +31,7 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/netutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/runtime:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/srv:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/tlsutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/etcd/rafthttp:go_default_library",

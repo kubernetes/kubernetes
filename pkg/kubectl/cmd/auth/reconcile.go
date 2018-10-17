@@ -26,13 +26,13 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/registry/rbac/reconciliation"
 )
@@ -78,11 +78,11 @@ func NewCmdReconcile(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	o := NewReconcileOptions(streams)
 
 	cmd := &cobra.Command{
-		Use: "reconcile -f FILENAME",
+		Use:                   "reconcile -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:   "Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects",
-		Long:    reconcileLong,
-		Example: reconcileExample,
+		Short:                 "Reconciles rules for RBAC Role, RoleBinding, ClusterRole, and ClusterRole binding objects",
+		Long:                  reconcileLong,
+		Example:               reconcileExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd, f, args))
 			cmdutil.CheckErr(o.Validate())
@@ -182,7 +182,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
 				Confirm:                !o.DryRun,
 				RemoveExtraPermissions: o.RemoveExtraPermissions,
-				Role: reconciliation.RoleRuleOwner{Role: t},
+				Role:                   reconciliation.RoleRuleOwner{Role: t},
 				Client: reconciliation.RoleModifier{
 					NamespaceClient: o.NamespaceClient.Namespaces(),
 					Client:          o.RBACClient,
@@ -198,7 +198,7 @@ func (o *ReconcileOptions) RunReconcile() error {
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
 				Confirm:                !o.DryRun,
 				RemoveExtraPermissions: o.RemoveExtraPermissions,
-				Role: reconciliation.ClusterRoleRuleOwner{ClusterRole: t},
+				Role:                   reconciliation.ClusterRoleRuleOwner{ClusterRole: t},
 				Client: reconciliation.ClusterRoleModifier{
 					Client: o.RBACClient.ClusterRoles(),
 				},

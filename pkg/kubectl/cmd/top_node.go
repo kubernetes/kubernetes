@@ -24,11 +24,11 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -40,7 +40,8 @@ import (
 type TopNodeOptions struct {
 	ResourceName    string
 	Selector        string
-	NodeClient      corev1.CoreV1Interface
+	NoHeaders       bool
+	NodeClient      corev1client.CoreV1Interface
 	HeapsterOptions HeapsterTopOptions
 	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
@@ -99,11 +100,11 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	}
 
 	cmd := &cobra.Command{
-		Use: "node [NAME | -l label]",
+		Use:                   "node [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
-		Long:    topNodeLong,
-		Example: topNodeExample,
+		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
+		Long:                  topNodeLong,
+		Example:               topNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, cmd, args); err != nil {
 				cmdutil.CheckErr(err)
@@ -118,6 +119,8 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		Aliases: []string{"nodes", "no"},
 	}
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
+
 	o.HeapsterOptions.Bind(cmd.Flags())
 	return cmd
 }
@@ -216,7 +219,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		allocatable[n.Name] = n.Status.Allocatable
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable)
+	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders)
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {

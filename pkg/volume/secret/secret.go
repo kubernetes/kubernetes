@@ -202,13 +202,6 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		}
 	}
 
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
-		return err
-	}
-	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
-		return err
-	}
-
 	totalBytes := totalSecretBytes(secret)
 	glog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
 		b.pod.Namespace,
@@ -220,6 +213,29 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
+
+	setupSuccess := false
+	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+		return err
+	}
+	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
+		return err
+	}
+
+	defer func() {
+		// Clean up directories if setup fails
+		if !setupSuccess {
+			unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
+			if unmountCreateErr != nil {
+				glog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
+				return
+			}
+			tearDownErr := unmounter.TearDown()
+			if tearDownErr != nil {
+				glog.Errorf("error tearing down volume %s with : %v", b.volName, tearDownErr)
+			}
+		}
+	}()
 
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
 	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
@@ -239,6 +255,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
+	setupSuccess = true
 	return nil
 }
 

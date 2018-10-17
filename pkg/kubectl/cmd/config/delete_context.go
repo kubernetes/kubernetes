@@ -35,11 +35,11 @@ var (
 
 func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "delete-context NAME",
+		Use:                   "delete-context NAME",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Delete the specified context from the kubeconfig"),
-		Long:    "Delete the specified context from the kubeconfig",
-		Example: delete_context_example,
+		Short:                 i18n.T("Delete the specified context from the kubeconfig"),
+		Long:                  "Delete the specified context from the kubeconfig",
+		Example:               delete_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := runDeleteContext(out, errOut, configAccess, cmd)
 			cmdutil.CheckErr(err)

@@ -40,9 +40,15 @@ import (
 )
 
 const (
-	nodeUpdateChannelSize = 10
-	podUpdateChannelSize  = 1
-	retries               = 5
+	// TODO (k82cn): Figure out a reasonable number of workers/channels and propagate
+	// the number of workers up making it a paramater of Run() function.
+
+	// NodeUpdateChannelSize defines the size of channel for node update events.
+	NodeUpdateChannelSize = 10
+	// UpdateWorkerSize defines the size of workers for node update or/and pod update.
+	UpdateWorkerSize     = 8
+	podUpdateChannelSize = 1
+	retries              = 5
 )
 
 // Needed to make workqueue work
@@ -204,11 +210,8 @@ func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 	glog.V(0).Infof("Starting NoExecuteTaintManager")
 
-	// TODO: Figure out a reasonable number of workers and propagate the
-	// number of workers up making it a paramater of Run() function.
-	workers := 8
-	for i := 0; i < workers; i++ {
-		tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan *nodeUpdateItem, nodeUpdateChannelSize))
+	for i := 0; i < UpdateWorkerSize; i++ {
+		tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan *nodeUpdateItem, NodeUpdateChannelSize))
 		tc.podUpdateChannels = append(tc.podUpdateChannels, make(chan *podUpdateItem, podUpdateChannelSize))
 	}
 
@@ -221,11 +224,11 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 				break
 			}
 			nodeUpdate := item.(*nodeUpdateItem)
-			hash := hash(nodeUpdate.name(), workers)
+			hash := hash(nodeUpdate.name(), UpdateWorkerSize)
 			select {
 			case <-stopCh:
 				tc.nodeUpdateQueue.Done(item)
-				break
+				return
 			case tc.nodeUpdateChannels[hash] <- nodeUpdate:
 			}
 			tc.nodeUpdateQueue.Done(item)
@@ -239,11 +242,11 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 				break
 			}
 			podUpdate := item.(*podUpdateItem)
-			hash := hash(podUpdate.nodeName(), workers)
+			hash := hash(podUpdate.nodeName(), UpdateWorkerSize)
 			select {
 			case <-stopCh:
 				tc.podUpdateQueue.Done(item)
-				break
+				return
 			case tc.podUpdateChannels[hash] <- podUpdate:
 			}
 			tc.podUpdateQueue.Done(item)
@@ -251,8 +254,8 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 	}(stopCh)
 
 	wg := sync.WaitGroup{}
-	wg.Add(workers)
-	for i := 0; i < workers; i++ {
+	wg.Add(UpdateWorkerSize)
+	for i := 0; i < UpdateWorkerSize; i++ {
 		go tc.worker(i, wg.Done, stopCh)
 	}
 	wg.Wait()

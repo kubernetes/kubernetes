@@ -22,23 +22,16 @@ import (
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
-
-// This init should be removed after switching this command and its tests to user external types.
-func init() {
-	utilruntime.Must(api.AddToScheme(scheme.Scheme))
-}
 
 func TestRunExposeService(t *testing.T) {
 	tests := []struct {
@@ -60,19 +53,19 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/baz",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
 							TargetPort: intstr.FromInt(14),
 						},
@@ -91,19 +84,19 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/baz",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
 							TargetPort: intstr.FromInt(14),
 						},
@@ -122,20 +115,20 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/default/services/mayor",
 				"POST": "/namespaces/default/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "mayor", Namespace: "default", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"run": "this"},
 				},
 			},
 			// No --name flag specified below. Service will use the rc's name passed via the 'default-name' parameter
 			flags: map[string]string{"selector": "run=this", "port": "80", "labels": "runas=amayor"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "mayor", Namespace: "", Labels: map[string]string{"runas": "amayor"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
 							TargetPort: intstr.FromInt(80),
 						},
@@ -154,25 +147,25 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/baz",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "type": "LoadBalancer", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
 							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector: map[string]string{"func": "stream"},
-					Type:     api.ServiceTypeLoadBalancer,
+					Type:     corev1.ServiceTypeLoadBalancer,
 				},
 			},
 			status: 200,
@@ -185,26 +178,26 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/baz",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "type": "LoadBalancer", "session-affinity": "ClientIP", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
 							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector:        map[string]string{"func": "stream"},
-					Type:            api.ServiceTypeLoadBalancer,
-					SessionAffinity: api.ServiceAffinityClientIP,
+					Type:            corev1.ServiceTypeLoadBalancer,
+					SessionAffinity: corev1.ServiceAffinityClientIP,
 				},
 			},
 			status: 200,
@@ -217,19 +210,19 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/baz",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
 							TargetPort: intstr.FromInt(14),
 						},
@@ -249,25 +242,25 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/baz",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
 							TargetPort: intstr.FromInt(14),
 						},
 					},
 					Selector:  map[string]string{"func": "stream"},
-					ClusterIP: api.ClusterIPNone,
+					ClusterIP: corev1.ClusterIPNone,
 				},
 			},
 			expected: "service/foo exposed",
@@ -281,19 +274,19 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/baz",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports:     []api.ServicePort{},
+				Spec: corev1.ServiceSpec{
+					Ports:     []corev1.ServicePort{},
 					Selector:  map[string]string{"func": "stream"},
-					ClusterIP: api.ClusterIPNone,
+					ClusterIP: corev1.ClusterIPNone,
 				},
 			},
 			expected: "service/foo exposed",
@@ -307,19 +300,19 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/redis-master",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "redis-master", Namespace: "test", ResourceVersion: "12"},
-				Spec: api.ServiceSpec{
+				Spec: corev1.ServiceSpec{
 					Selector: map[string]string{"app": "go"},
 				},
 			},
 			flags: map[string]string{"filename": "../../../test/e2e/testing-manifests/guestbook/redis-master-service.yaml", "selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"svc": "test"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       14,
 							TargetPort: intstr.FromInt(14),
 						},
@@ -337,16 +330,16 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/pods/a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Pod{
+			input: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 			},
 			flags: map[string]string{"selector": "svc=frompod", "port": "90", "labels": "svc=frompod", "generator": "service/v2"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters", Namespace: "", Labels: map[string]string{"svc": "frompod"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       90,
 							TargetPort: intstr.FromInt(90),
 						},
@@ -365,17 +358,17 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/foo",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
 							TargetPort: intstr.FromInt(80),
 						},
 						{
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       443,
 							TargetPort: intstr.FromInt(443),
 						},
@@ -383,19 +376,19 @@ func TestRunExposeService(t *testing.T) {
 				},
 			},
 			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
 							Name:       "port-1",
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
 							TargetPort: intstr.FromInt(80),
 						},
 						{
 							Name:       "port-2",
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       443,
 							TargetPort: intstr.FromInt(443),
 						},
@@ -413,56 +406,193 @@ func TestRunExposeService(t *testing.T) {
 				"GET":  "/namespaces/test/services/foo",
 				"POST": "/namespaces/test/services",
 			},
-			input: &api.Service{
+			input: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
 							TargetPort: intstr.FromInt(80),
 						},
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       8080,
 							TargetPort: intstr.FromInt(8080),
 						},
 						{
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
+						},
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       8082,
+							TargetPort: intstr.FromInt(8082),
 						},
 					},
 				},
 			},
 			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "true"},
-			output: &api.Service{
+			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
-				Spec: api.ServiceSpec{
-					Ports: []api.ServicePort{
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
 						{
 							Name:       "port-1",
-							Protocol:   api.ProtocolTCP,
+							Protocol:   corev1.ProtocolTCP,
 							Port:       80,
 							TargetPort: intstr.FromInt(80),
 						},
 						{
 							Name:       "port-2",
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       8080,
 							TargetPort: intstr.FromInt(8080),
 						},
 						{
 							Name:       "port-3",
-							Protocol:   api.ProtocolUDP,
+							Protocol:   corev1.ProtocolUDP,
 							Port:       8081,
 							TargetPort: intstr.FromInt(8081),
+						},
+						{
+							Name:       "port-4",
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       8082,
+							TargetPort: intstr.FromInt(8082),
 						},
 					},
 					Selector: map[string]string{"svc": "fromfoo"},
 				},
 			},
 			status: 200,
+		},
+		{
+			name: "expose-service-from-service-no-selector-defined-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			expected: "service/foo exposed",
+			status:   200,
+		},
+		{
+			name: "expose-service-from-service-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector: map[string]string{"func": "stream"},
+				},
+			},
+			expected: "service/foo exposed",
+			status:   200,
+		},
+		{
+			name: "expose-service-cluster-ip-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "true"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector:  map[string]string{"func": "stream"},
+					ClusterIP: "10.10.10.10",
+				},
+			},
+			expected: "service /foo exposed",
+			status:   200,
+		},
+		{
+			name: "expose-headless-service-sctp",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "SCTP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolSCTP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector:  map[string]string{"func": "stream"},
+					ClusterIP: corev1.ClusterIPNone,
+				},
+			},
+			expected: "service/foo exposed",
+			status:   200,
 		},
 	}
 
@@ -471,8 +601,8 @@ func TestRunExposeService(t *testing.T) {
 			tf := cmdtesting.NewTestFactory().WithNamespace(test.ns)
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         schema.GroupVersion{Version: "v1"},

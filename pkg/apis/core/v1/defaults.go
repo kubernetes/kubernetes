@@ -93,6 +93,7 @@ func SetDefaults_Container(obj *v1.Container) {
 		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
 	}
 }
+
 func SetDefaults_Service(obj *v1.Service) {
 	if obj.Spec.SessionAffinity == "" {
 		obj.Spec.SessionAffinity = v1.ServiceAffinityNone
@@ -180,6 +181,10 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	}
 	if obj.SchedulerName == "" {
 		obj.SchedulerName = v1.DefaultSchedulerName
+	}
+	if obj.EnableServiceLinks == nil {
+		enableServiceLinks := v1.DefaultEnableServiceLinks
+		obj.EnableServiceLinks = &enableServiceLinks
 	}
 }
 func SetDefaults_Probe(obj *v1.Probe) {

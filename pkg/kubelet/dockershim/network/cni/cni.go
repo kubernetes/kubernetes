@@ -26,7 +26,7 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -50,6 +50,7 @@ type cniNetworkPlugin struct {
 	nsenterPath string
 	confDir     string
 	binDirs     []string
+	podCidr     string
 }
 
 type cniNetwork struct {
@@ -81,6 +82,11 @@ type cniBandwidthEntry struct {
 	// EgressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If egressBurst is set, egressRate must also be set
 	// NOTE: it's not used for now and default to 0.
 	EgressBurst int `json:"egressBurst,omitempty"`
+}
+
+// cniIpRange maps to the standard CNI ip range Capability
+type cniIpRange struct {
+	Subnet string `json:"subnet"`
 }
 
 func SplitDirs(dirs string) []string {
@@ -152,6 +158,8 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 			continue
 		}
 
+		glog.V(4).Infof("Using CNI configuration file %s", confFile)
+
 		network := &cniNetwork{
 			name:          confList.Name,
 			NetworkConfig: confList,
@@ -199,7 +207,41 @@ func (plugin *cniNetworkPlugin) checkInitialized() error {
 	if plugin.getDefaultNetwork() == nil {
 		return errors.New("cni config uninitialized")
 	}
+
+	// If the CNI configuration has the ipRanges capability, we need a PodCIDR assigned
+	for _, p := range plugin.getDefaultNetwork().NetworkConfig.Plugins {
+		if p.Network.Capabilities["ipRanges"] {
+			if plugin.podCidr == "" {
+				return errors.New("no PodCIDR set")
+			}
+			break
+		}
+	}
 	return nil
+}
+
+// Event handles any change events. The only event ever sent is the PodCIDR change.
+// No network plugins support changing an already-set PodCIDR
+func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{}) {
+	if name != network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE {
+		return
+	}
+
+	plugin.Lock()
+	defer plugin.Unlock()
+
+	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
+	if !ok {
+		glog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
+		return
+	}
+
+	if plugin.podCidr != "" {
+		glog.Warningf("Ignoring subsequent pod CIDR update to %s", podCIDR)
+		return
+	}
+
+	plugin.podCidr = podCIDR
 }
 
 func (plugin *cniNetworkPlugin) Name() string {
@@ -226,17 +268,11 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 	// Windows doesn't have loNetwork. It comes only with Linux
 	if plugin.loNetwork != nil {
 		if _, err = plugin.addToNetwork(plugin.loNetwork, name, namespace, id, netnsPath, annotations); err != nil {
-			glog.Errorf("Error while adding to cni lo network: %s", err)
 			return err
 		}
 	}
 
 	_, err = plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, annotations)
-	if err != nil {
-		glog.Errorf("Error while adding to cni network: %s", err)
-		return err
-	}
-
 	return err
 }
 
@@ -254,6 +290,10 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
 }
 
+func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
+	return fmt.Sprintf("%s_%s/%s", namespace, name, id.ID)
+}
+
 func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations)
 	if err != nil {
@@ -261,14 +301,15 @@ func (plugin *cniNetworkPlugin) addToNetwork(network *cniNetwork, podName string
 		return nil, err
 	}
 
+	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to add CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
+	glog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	res, err := cniNet.AddNetworkList(netConf, rt)
 	if err != nil {
-		glog.Errorf("Error adding network: %v", err)
+		glog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return nil, err
 	}
-
+	glog.V(4).Infof("Added %s to network %s: %v", pdesc, netConf.Name, res)
 	return res, nil
 }
 
@@ -279,22 +320,21 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 		return err
 	}
 
+	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	glog.V(4).Infof("About to del CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
+	glog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
 	err = cniNet.DelNetworkList(netConf, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
-		glog.Errorf("Error deleting network: %v", err)
+		glog.Errorf("Error deleting %s from network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return err
 	}
+	glog.V(4).Infof("Deleted %s from network %s/%s", pdesc, netConf.Plugins[0].Network.Type, netConf.Name)
 	return nil
 }
 
 func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) (*libcni.RuntimeConf, error) {
-	glog.V(4).Infof("Got netns path %v", podNetnsPath)
-	glog.V(4).Infof("Using podns path %v", podNs)
-
 	rt := &libcni.RuntimeConf{
 		ContainerID: podSandboxID.ID,
 		NetNS:       podNetnsPath,
@@ -345,6 +385,9 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 		}
 		rt.CapabilityArgs["bandwidth"] = bandwidthParam
 	}
+
+	// Set the PodCIDR
+	rt.CapabilityArgs["ipRanges"] = [][]cniIpRange{{{Subnet: plugin.podCidr}}}
 
 	return rt, nil
 }

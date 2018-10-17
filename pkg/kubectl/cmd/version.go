@@ -25,10 +25,10 @@ import (
 	"github.com/spf13/cobra"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -74,10 +74,9 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	cmd.Flags().BoolVarP(&o.ClientOnly, "client", "c", o.ClientOnly, "Client version only (no server required).")
-	cmd.Flags().BoolVarP(&o.Short, "short", "", o.Short, "Print just the version number.")
+	cmd.Flags().BoolVar(&o.ClientOnly, "client", o.ClientOnly, "Client version only (no server required).")
+	cmd.Flags().BoolVar(&o.Short, "short", o.Short, "Print just the version number.")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "One of 'yaml' or 'json'.")
-	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 

@@ -23,11 +23,11 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -69,11 +69,11 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	options := NewViewLastAppliedOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
+		Use:                   "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("View latest last-applied-configuration annotations of a resource/object"),
-		Long:    applyViewLastAppliedLong,
-		Example: applyViewLastAppliedExample,
+		Short:                 i18n.T("View latest last-applied-configuration annotations of a resource/object"),
+		Long:                  applyViewLastAppliedLong,
+		Example:               applyViewLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(cmd, f, args))
 			cmdutil.CheckErr(options.Validate(cmd))

@@ -20,10 +20,18 @@ import "github.com/spf13/pflag"
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
 func AddKubeConfigFlag(fs *pflag.FlagSet, kubeConfigFile *string) {
-	fs.StringVar(kubeConfigFile, "kubeconfig", *kubeConfigFile, "The KubeConfig file to use when talking to the cluster")
+	fs.StringVar(kubeConfigFile, "kubeconfig", *kubeConfigFile, "The KubeConfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing KubeConfig file.")
 }
 
 // AddConfigFlag adds the --config flag to the given flagset
 func AddConfigFlag(fs *pflag.FlagSet, cfgPath *string) {
 	fs.StringVar(cfgPath, "config", *cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+}
+
+// AddIgnorePreflightErrorsFlag adds the --ignore-preflight-errors flag to the given flagset
+func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]string) {
+	fs.StringSliceVar(
+		ignorePreflightErrors, "ignore-preflight-errors", *ignorePreflightErrors,
+		"A list of checks whose errors will be shown as warnings. Example: 'IsPrivilegedUser,Swap'. Value 'all' ignores errors from all checks.",
+	)
 }

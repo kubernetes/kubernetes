@@ -258,8 +258,8 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		history := NewHistory(client, informer.Lister())
 
 		var collisionCount int32
-		for i := range test.existing {
-			_, err := history.CreateControllerRevision(test.existing[i].parent, test.existing[i].revision, &collisionCount)
+		for _, item := range test.existing {
+			_, err := client.AppsV1().ControllerRevisions(item.parent.GetNamespace()).Create(item.revision)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -280,12 +280,12 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 				t.Errorf("%s: on name collision wanted new name %s got %s", test.name, expectedName, created.Name)
 			}
 
-			// Second name collision should have incremented collisionCount to 2
+			// Second name collision will be caused by an identical revision, so no need to do anything
 			_, err = history.CreateControllerRevision(test.parent, test.revision, &collisionCount)
 			if err != nil {
 				t.Errorf("%s: %s", test.name, err)
 			}
-			if collisionCount != 2 {
+			if collisionCount != 1 {
 				t.Errorf("%s: on second name collision wanted collisionCount 1 got %d", test.name, collisionCount)
 			}
 		}
@@ -302,7 +302,16 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+
+	// Create a new revision with the same name and hash label as an existing revision, but with
+	// a different template. This could happen as a result of a hash collision, but in this test
+	// this situation is created by setting name and hash label to values known to be in use by
+	// an existing revision.
+	modTemplate := ss1.Spec.Template.DeepCopy()
+	modTemplate.Labels["foo"] = "not_bar"
+	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(modTemplate), 2, ss1.Status.CollisionCount)
+	ss1Rev2.Name = ss1Rev1.Name
+	ss1Rev2.Labels[ControllerRevisionHashLabel] = ss1Rev1.Labels[ControllerRevisionHashLabel]
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +356,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 			}{
 				{
 					parent:   ss1,
-					revision: ss1Rev1,
+					revision: ss1Rev2,
 				},
 			},
 			rename: true,

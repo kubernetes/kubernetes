@@ -19,25 +19,34 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
-	"k8s.io/kubernetes/pkg/util/node"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // SetJoinDynamicDefaults checks and sets configuration values for the JoinConfiguration object
 func SetJoinDynamicDefaults(cfg *kubeadmapi.JoinConfiguration) error {
-	cfg.NodeRegistration.Name = node.GetHostname(cfg.NodeRegistration.Name)
+
+	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, cfg.ControlPlane); err != nil {
+		return err
+	}
+
+	if err := SetAPIEndpointDynamicDefaults(&cfg.APIEndpoint); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // NodeConfigFileAndDefaultsToInternalConfig
-func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1alpha3.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
+func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *kubeadmapiv1beta1.JoinConfiguration) (*kubeadmapi.JoinConfiguration, error) {
 	internalcfg := &kubeadmapi.JoinConfiguration{}
 
 	if cfgPath != "" {
@@ -54,7 +63,23 @@ func NodeConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedc
 			return nil, err
 		}
 
-		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), b, internalcfg); err != nil {
+		gvkmap, err := kubeadmutil.SplitYAMLDocuments(b)
+		if err != nil {
+			return nil, err
+		}
+
+		joinBytes := []byte{}
+		for gvk, bytes := range gvkmap {
+			if gvk.Kind == constants.JoinConfigurationKind {
+				joinBytes = bytes
+			}
+		}
+
+		if len(joinBytes) == 0 {
+			return nil, fmt.Errorf("no %s found in config file %q", constants.JoinConfigurationKind, cfgPath)
+		}
+
+		if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), joinBytes, internalcfg); err != nil {
 			return nil, err
 		}
 	} else {

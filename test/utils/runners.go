@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -138,6 +139,9 @@ type RCConfig struct {
 
 	// Node selector for pods in the RC.
 	NodeSelector map[string]string
+
+	// Tolerations for pods in the RC.
+	Tolerations []v1.Toleration
 
 	// Ports to declare in the container (map of name to containerPort).
 	Ports map[string]int
@@ -563,6 +567,7 @@ func (config *RCConfig) create() error {
 					},
 					DNSPolicy:                     *config.DNSPolicy,
 					NodeSelector:                  config.NodeSelector,
+					Tolerations:                   config.Tolerations,
 					TerminationGracePeriodSeconds: &one,
 					PriorityClassName:             config.PriorityClassName,
 				},
@@ -603,6 +608,9 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 		for k, v := range config.NodeSelector {
 			template.Spec.NodeSelector[k] = v
 		}
+	}
+	if config.Tolerations != nil {
+		template.Spec.Tolerations = append([]v1.Toleration{}, config.Tolerations...)
 	}
 	if config.Ports != nil {
 		for k, v := range config.Ports {
@@ -1054,9 +1062,9 @@ func CreatePod(client clientset.Interface, namespace string, podCount int, podTe
 	}
 
 	if podCount < 30 {
-		workqueue.Parallelize(podCount, podCount, createPodFunc)
+		workqueue.ParallelizeUntil(context.TODO(), podCount, podCount, createPodFunc)
 	} else {
-		workqueue.Parallelize(30, podCount, createPodFunc)
+		workqueue.ParallelizeUntil(context.TODO(), 30, podCount, createPodFunc)
 	}
 	return createError
 }

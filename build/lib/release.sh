@@ -193,17 +193,46 @@ function kube::release::package_node_tarballs() {
   done
 }
 
+# Package up all of the server binaries in docker images
+function kube::release::build_server_images() {
+  # Clean out any old images
+  rm -rf "${RELEASE_IMAGES}"
+  local platform
+  for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
+    local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local arch=$(basename "${platform}")
+    kube::log::status "Building images: $platform_tag"
+
+    local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
+    rm -rf "${release_stage}"
+    mkdir -p "${release_stage}/server/bin"
+
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_SERVER_IMAGE_BINARIES array.
+    cp "${KUBE_SERVER_IMAGE_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/server/bin/"
+
+    # if we are building hyperkube, we also need to copy that binary
+    if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
+      cp "${LOCAL_OUTPUT_BINPATH}/${platform}/hyperkube" "${release_stage}/server/bin"
+    fi
+
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
+  done
+}
+
 # Package up all of the server binaries
 function kube::release::package_server_tarballs() {
+  kube::release::build_server_images
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local arch=$(basename "${platform}")
     kube::log::status "Building tarball: server $platform_tag"
 
+    # NOTE: this directory was setup in kube::release::build_server_images
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
-    rm -rf "${release_stage}"
-    mkdir -p "${release_stage}/server/bin"
     mkdir -p "${release_stage}/addons"
 
     # This fancy expression will expand to prepend a path
@@ -211,8 +240,6 @@ function kube::release::package_server_tarballs() {
     # KUBE_SERVER_BINARIES array.
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
-
-    kube::release::create_docker_images_for_server "${release_stage}/server/bin" "${arch}"
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
@@ -328,8 +355,16 @@ function kube::release::create_docker_images_for_server() {
         rm -rf "${docker_build_path}"
         mkdir -p "${docker_build_path}"
         ln "${binary_dir}/${binary_name}" "${docker_build_path}/${binary_name}"
-        printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > "${docker_file_path}"
-
+        ln "${KUBE_ROOT}/build/nsswitch.conf" "${docker_build_path}/nsswitch.conf"
+        chmod 0644 "${docker_build_path}/nsswitch.conf"
+        cat <<EOF > "${docker_file_path}"
+FROM ${base_image}
+COPY ${binary_name} /usr/local/bin/${binary_name}
+EOF
+        # ensure /etc/nsswitch.conf exists so go's resolver respects /etc/hosts
+        if [[ "${base_image}" =~ busybox ]]; then
+          echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
+        fi
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
         "${DOCKER[@]}" tag "${docker_image_tag}" "${deprecated_image_tag}" >/dev/null
         "${DOCKER[@]}" save "${docker_image_tag}" "${deprecated_image_tag}" > "${binary_dir}/${binary_name}.tar"
@@ -382,14 +417,11 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/cluster-autoscaler.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd.manifest" "${dst_dir}"
   cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
-  cp "${src_dir}/kms-plugin-container.manifest" "${dst_dir}"
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
-  cp "${src_dir}/rescheduler.manifest" "${dst_dir}/"
-  cp "${src_dir}/e2e-image-puller.manifest" "${dst_dir}/"
   cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
   local internal_manifest
   for internal_manifest in $(ls "${src_dir}" | grep "^internal-*"); do

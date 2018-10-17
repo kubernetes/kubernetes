@@ -10,3 +10,5 @@ reviewers:
 - liggitt
 - sttts
 - cheftako
+labels:
+- sig/api-machinery

@@ -31,9 +31,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,15 +44,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
@@ -152,8 +149,8 @@ func TestCordon(t *testing.T) {
 			tf := cmdtesting.NewTestFactory()
 			defer tf.Cleanup()
 
-			codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := legacyscheme.Codecs
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			ns := scheme.Codecs
 
 			new_node := &corev1.Node{}
 			updated := false
@@ -239,15 +236,14 @@ func TestDrain(t *testing.T) {
 	labels := make(map[string]string)
 	labels["my_key"] = "my_value"
 
-	rc := api.ReplicationController{
+	rc := corev1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "rc",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("replicationcontrollers", "rc"),
 		},
-		Spec: api.ReplicationControllerSpec{
+		Spec: corev1.ReplicationControllerSpec{
 			Selector: labels,
 		},
 	}
@@ -258,7 +254,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -275,14 +270,13 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	ds := extensions.DaemonSet{
+	ds := extensionsv1beta1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "ds",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          testapi.Default.SelfLink("daemonsets", "ds"),
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: extensionsv1beta1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -293,7 +287,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "extensions/v1beta1",
@@ -309,13 +302,36 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
+	ds_terminated_pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			Labels:            labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "extensions/v1beta1",
+					Kind:               "DaemonSet",
+					Name:               "ds",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node",
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+		},
+	}
+
 	ds_pod_with_emptyDir := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "extensions/v1beta1",
@@ -343,21 +359,19 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 		},
 		Spec: corev1.PodSpec{
 			NodeName: "node",
 		},
 	}
 
-	job := batch.Job{
+	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "job",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          testapi.Default.SelfLink("jobs", "job"),
 		},
-		Spec: batch.JobSpec{
+		Spec: batchv1.JobSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -368,7 +382,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -379,17 +392,55 @@ func TestDrain(t *testing.T) {
 				},
 			},
 		},
+		Spec: corev1.PodSpec{
+			NodeName: "node",
+			Volumes: []corev1.Volume{
+				{
+					Name:         "scratch",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""}},
+				},
+			},
+		},
 	}
 
-	rs := extensions.ReplicaSet{
+	terminated_job_pod_with_local_storage := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			Labels:            labels,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "v1",
+					Kind:               "Job",
+					Name:               "job",
+					BlockOwnerDeletion: boolptr(true),
+					Controller:         boolptr(true),
+				},
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node",
+			Volumes: []corev1.Volume{
+				{
+					Name:         "scratch",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""}},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodSucceeded,
+		},
+	}
+
+	rs := extensionsv1beta1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "rs",
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("replicasets", "rs"),
 		},
-		Spec: extensions.ReplicaSetSpec{
+		Spec: extensionsv1beta1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: labels},
 		},
 	}
@@ -400,7 +451,6 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
-			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -445,14 +495,34 @@ func TestDrain(t *testing.T) {
 			},
 		},
 	}
+	emptydir_terminated_pod := corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+			Labels:            labels,
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node",
+			Volumes: []corev1.Volume{
+				{
+					Name:         "scratch",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""}},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodFailed,
+		},
+	}
 
 	tests := []struct {
 		description   string
 		node          *corev1.Node
 		expected      *corev1.Node
 		pods          []corev1.Pod
-		rcs           []api.ReplicationController
-		replicaSets   []extensions.ReplicaSet
+		rcs           []corev1.ReplicationController
+		replicaSets   []extensionsv1beta1.ReplicaSet
 		args          []string
 		expectWarning string
 		expectFatal   bool
@@ -463,7 +533,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{rc_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -473,17 +543,27 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{ds_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  true,
 			expectDelete: false,
+		},
+		{
+			description:  "DS-managed terminated pod",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []corev1.Pod{ds_terminated_pod},
+			rcs:          []corev1.ReplicationController{rc},
+			args:         []string{"node"},
+			expectFatal:  false,
+			expectDelete: true,
 		},
 		{
 			description:  "orphaned DS-managed pod",
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{orphaned_ds_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node"},
 			expectFatal:  true,
 			expectDelete: false,
@@ -493,7 +573,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{orphaned_ds_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node", "--force"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -503,7 +583,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{ds_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node", "--ignore-daemonsets"},
 			expectFatal:  false,
 			expectDelete: false,
@@ -513,18 +593,28 @@ func TestDrain(t *testing.T) {
 			node:          node,
 			expected:      cordoned_node,
 			pods:          []corev1.Pod{ds_pod_with_emptyDir},
-			rcs:           []api.ReplicationController{rc},
+			rcs:           []corev1.ReplicationController{rc},
 			args:          []string{"node", "--ignore-daemonsets"},
 			expectWarning: "WARNING: Ignoring DaemonSet-managed pods: bar\n",
 			expectFatal:   false,
 			expectDelete:  false,
 		},
 		{
-			description:  "Job-managed pod",
+			description:  "Job-managed pod with local storage",
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{job_pod},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
+			args:         []string{"node", "--force", "--delete-local-data=true"},
+			expectFatal:  false,
+			expectDelete: true,
+		},
+		{
+			description:  "Job-managed terminated pod",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []corev1.Pod{terminated_job_pod_with_local_storage},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -534,7 +624,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{rs_pod},
-			replicaSets:  []extensions.ReplicaSet{rs},
+			replicaSets:  []extensionsv1beta1.ReplicaSet{rs},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -544,7 +634,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{naked_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node"},
 			expectFatal:  true,
 			expectDelete: false,
@@ -554,7 +644,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{naked_pod},
-			rcs:          []api.ReplicationController{},
+			rcs:          []corev1.ReplicationController{},
 			args:         []string{"node", "--force"},
 			expectFatal:  false,
 			expectDelete: true,
@@ -567,6 +657,16 @@ func TestDrain(t *testing.T) {
 			args:         []string{"node", "--force"},
 			expectFatal:  true,
 			expectDelete: false,
+		},
+		{
+			description:  "terminated pod with emptyDir",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []corev1.Pod{emptydir_terminated_pod},
+			rcs:          []corev1.ReplicationController{rc},
+			args:         []string{"node"},
+			expectFatal:  false,
+			expectDelete: true,
 		},
 		{
 			description:  "pod with EmptyDir and --delete-local-data",
@@ -582,7 +682,7 @@ func TestDrain(t *testing.T) {
 			node:         node,
 			expected:     cordoned_node,
 			pods:         []corev1.Pod{},
-			rcs:          []api.ReplicationController{rc},
+			rcs:          []corev1.ReplicationController{rc},
 			args:         []string{"node"},
 			expectFatal:  false,
 			expectDelete: false,
@@ -606,8 +706,8 @@ func TestDrain(t *testing.T) {
 				tf := cmdtesting.NewTestFactory()
 				defer tf.Cleanup()
 
-				codec := legacyscheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-				ns := legacyscheme.Codecs
+				codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+				ns := scheme.Codecs
 
 				tf.Client = &fake.RESTClient{
 					GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
@@ -650,13 +750,13 @@ func TestDrain(t *testing.T) {
 						case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
 							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.rcs[0])}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &ds)}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &extensions.DaemonSet{})}, nil
+							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &extensionsv1beta1.DaemonSet{})}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Batch.Codec(), &job)}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(testapi.Extensions.Codec(), &test.replicaSets[0])}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &test.replicaSets[0])}, nil
 						case m.isFor("GET", "/namespaces/default/pods/bar"):
 							return &http.Response{StatusCode: 404, Header: defaultHeader(), Body: objBody(codec, &corev1.Pod{})}, nil
 						case m.isFor("GET", "/pods"):
@@ -671,7 +771,7 @@ func TestDrain(t *testing.T) {
 							}
 							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.PodList{Items: test.pods})}, nil
 						case m.isFor("GET", "/replicationcontrollers"):
-							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationControllerList{Items: test.rcs})}, nil
+							return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
 						case m.isFor("PATCH", "/nodes/node"):
 							data, err := ioutil.ReadAll(req.Body)
 							if err != nil {
@@ -698,7 +798,7 @@ func TestDrain(t *testing.T) {
 							return &http.Response{StatusCode: 204, Header: defaultHeader(), Body: objBody(codec, &test.pods[0])}, nil
 						case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
 							evicted = true
-							return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: policyObjBody(&policyv1beta1.Eviction{})}, nil
+							return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &policyv1beta1.Eviction{})}, nil
 						default:
 							t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 							return nil, nil

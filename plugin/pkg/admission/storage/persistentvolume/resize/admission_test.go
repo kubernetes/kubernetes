@@ -72,9 +72,6 @@ func TestPVCResizeAdmission(t *testing.T) {
 		return strings.Contains(err.Error(), "only dynamically provisioned pvc can be resized and "+
 			"the storageclass that provisions the pvc must support resize")
 	}
-	expectVolumePluginError := func(err error) bool {
-		return strings.Contains(err.Error(), "volume plugin does not support resize")
-	}
 	tests := []struct {
 		name        string
 		resource    schema.GroupVersionResource
@@ -114,37 +111,6 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 			},
 			checkError: expectNoError,
-		},
-		{
-			name:     "pvc-resize, update, volume plugin error",
-			resource: api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-			oldObj: &api.PersistentVolumeClaim{
-				Spec: api.PersistentVolumeClaimSpec{
-					VolumeName: "volume2",
-					Resources: api.ResourceRequirements{
-						Requests: getResourceList("1Gi"),
-					},
-					StorageClassName: &goldClassName,
-				},
-				Status: api.PersistentVolumeClaimStatus{
-					Capacity: getResourceList("1Gi"),
-					Phase:    api.ClaimBound,
-				},
-			},
-			newObj: &api.PersistentVolumeClaim{
-				Spec: api.PersistentVolumeClaimSpec{
-					VolumeName: "volume2",
-					Resources: api.ResourceRequirements{
-						Requests: getResourceList("2Gi"),
-					},
-					StorageClassName: &goldClassName,
-				},
-				Status: api.PersistentVolumeClaimStatus{
-					Capacity: getResourceList("2Gi"),
-					Phase:    api.ClaimBound,
-				},
-			},
-			checkError: expectVolumePluginError,
 		},
 		{
 			name:     "pvc-resize, update, dynamically provisioned error",
@@ -290,18 +256,9 @@ func TestPVCResizeAdmission(t *testing.T) {
 			StorageClassName: goldClassName,
 		},
 	}
-	pv2 := &api.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{Name: "volume2"},
-		Spec: api.PersistentVolumeSpec{
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{},
-			},
-			StorageClassName: goldClassName,
-		},
-	}
 
 	pvs := []*api.PersistentVolume{}
-	pvs = append(pvs, pv1, pv2)
+	pvs = append(pvs, pv1)
 
 	for _, pv := range pvs {
 		err := informerFactory.Core().InternalVersion().PersistentVolumes().Informer().GetStore().Add(pv)
@@ -321,7 +278,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 
 	for _, tc := range tests {
 		operation := admission.Update
-		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, nil)
+		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, nil)
 
 		err := ctrl.Validate(attributes)
 		fmt.Println(tc.name)

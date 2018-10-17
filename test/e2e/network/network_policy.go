@@ -556,7 +556,7 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("%s-container", podName),
-					Image: "busybox",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Args: []string{
 						"/bin/sh",
 						"-c",

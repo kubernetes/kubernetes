@@ -188,7 +188,8 @@ func (s *watchableStore) Restore(b backend.Backend) error {
 	}
 
 	for wa := range s.synced.watchers {
-		s.unsynced.watchers.add(wa)
+		wa.restore = true
+		s.unsynced.add(wa)
 	}
 	s.synced = newWatcherGroup()
 	return nil
@@ -478,6 +479,14 @@ type watcher struct {
 
 	// compacted is set when the watcher is removed because of compaction
 	compacted bool
+
+	// restore is true when the watcher is being restored from leader snapshot
+	// which means that this watcher has just been moved from "synced" to "unsynced"
+	// watcher group, possibly with a future revision when it was first added
+	// to the synced watcher
+	// "unsynced" watcher revision must always be <= current revision,
+	// except when the watcher were to be moved from "synced" watcher group
+	restore bool
 
 	// minRev is the minimum revision update the watcher will accept
 	minRev int64

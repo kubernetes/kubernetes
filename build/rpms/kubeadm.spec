@@ -19,10 +19,17 @@ install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/
 install -m 755 -d %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/
 install -m 755 -d %{buildroot}%{_sysconfdir}/sysconfig/
 install -p -m 755 -t %{buildroot}%{_bindir} {kubeadm}
-install -p -m 755 -t %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/ {10-kubeadm.conf}
-install -p -m 755 -T {kubelet.env} %{buildroot}%{_sysconfdir}/sysconfig/kubelet
+install -p -m 644 -t %{buildroot}%{_sysconfdir}/systemd/system/kubelet.service.d/ {10-kubeadm.conf}
+install -p -m 644 -T {kubelet.env} %{buildroot}%{_sysconfdir}/sysconfig/kubelet
+mkdir -p %{buildroot}%{_libexecdir}/modules-load.d
+mkdir -p %{buildroot}%{_sysctldir}
+install -p -m 0644 -t %{buildroot}%{_libexecdir}/modules-load.d/ {kubeadm.conf}
+install -p -m 0644 -t %{buildroot}%{_sysctldir} %{50-kubeadm.conf}
 
 %files
 %{_bindir}/kubeadm
 %{_sysconfdir}/systemd/system/kubelet.service.d/10-kubeadm.conf
 %{_sysconfdir}/sysconfig/kubelet
+%dir %{_libexecdir}/modules-load.d
+%{_libexecdir}/modules-load.d/kubeadm.conf
+%{_sysctldir}/50-kubeadm.conf

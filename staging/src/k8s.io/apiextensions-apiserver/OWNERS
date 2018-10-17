@@ -7,3 +7,5 @@ approvers:
 - deads2k
 - lavalamp
 - sttts
+labels:
+- sig/api-machinery

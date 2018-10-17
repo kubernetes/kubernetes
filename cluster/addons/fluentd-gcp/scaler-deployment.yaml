@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp-scaler
-    version: v0.3.0
+    version: v0.5.0
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
@@ -19,10 +19,10 @@ spec:
       serviceAccountName: fluentd-gcp-scaler
       containers:
       - name: fluentd-gcp-scaler
-        image: k8s.gcr.io/fluentd-gcp-scaler:0.3
+        image: k8s.gcr.io/fluentd-gcp-scaler:0.5
         command:
           - /scaler.sh
-          - --ds-name=fluentd-gcp-v3.0.0
+          - --ds-name=fluentd-gcp-{{ fluentd_gcp_yaml_version }}
           - --scaling-policy=fluentd-gcp-scaling-policy
         env:
         # Defaults, used if no overrides are found in fluentd-gcp-scaling-policy

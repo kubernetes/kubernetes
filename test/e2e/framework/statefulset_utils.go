@@ -64,7 +64,7 @@ func CreateStatefulSetService(name string, labels map[string]string) *v1.Service
 		},
 	}
 	headlessService.Spec.Ports = []v1.ServicePort{
-		{Port: 80, Name: "http", Protocol: "TCP"},
+		{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 	}
 	headlessService.Spec.ClusterIP = "None"
 	return headlessService
@@ -810,7 +810,7 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Containers: []v1.Container{
 						{
 							Name:         "nginx",
-							Image:        imageutils.GetE2EImage(imageutils.NginxSlim),
+							Image:        imageutils.GetE2EImage(imageutils.Nginx),
 							VolumeMounts: mounts,
 						},
 					},

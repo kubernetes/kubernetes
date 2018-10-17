@@ -96,6 +96,9 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	}
 
 	// Step 2: Create the sandbox container.
+	if r.GetRuntimeHandler() != "" {
+		return nil, fmt.Errorf("RuntimeHandler %q not supported", r.GetRuntimeHandler())
+	}
 	createConfig, err := ds.makeSandboxDockerConfig(config, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make sandbox docker config for pod %q: %v", config.Metadata.Name, err)
@@ -538,6 +541,21 @@ func (ds *dockerService) ListPodSandbox(_ context.Context, r *runtimeapi.ListPod
 	return &runtimeapi.ListPodSandboxResponse{Items: result}, nil
 }
 
+// applySandboxLinuxOptions applies LinuxPodSandboxConfig to dockercontainer.HostConfig and dockercontainer.ContainerCreateConfig.
+func (ds *dockerService) applySandboxLinuxOptions(hc *dockercontainer.HostConfig, lc *runtimeapi.LinuxPodSandboxConfig, createConfig *dockertypes.ContainerCreateConfig, image string, separator rune) error {
+	if lc == nil {
+		return nil
+	}
+	// Apply security context.
+	if err := applySandboxSecurityContext(lc, createConfig.Config, hc, ds.network, separator); err != nil {
+		return err
+	}
+
+	// Set sysctls.
+	hc.Sysctls = lc.Sysctls
+	return nil
+}
+
 func (ds *dockerService) applySandboxResources(hc *dockercontainer.HostConfig, lc *runtimeapi.LinuxPodSandboxConfig) error {
 	hc.Resources = dockercontainer.Resources{
 		MemorySwap: DefaultMemorySwap(),
@@ -578,8 +596,8 @@ func (ds *dockerService) makeSandboxDockerConfig(c *runtimeapi.PodSandboxConfig,
 		HostConfig: hc,
 	}
 
-	// Apply platform-specific options.
-	if err := ds.applySandboxPlatformOptions(hc, c, createConfig, image, securityOptSeparator); err != nil {
+	// Apply linux-specific options.
+	if err := ds.applySandboxLinuxOptions(hc, c.GetLinux(), createConfig, image, securityOptSeparator); err != nil {
 		return nil, err
 	}
 
@@ -657,6 +675,8 @@ func toCheckpointProtocol(protocol runtimeapi.Protocol) Protocol {
 		return protocolTCP
 	case runtimeapi.Protocol_UDP:
 		return protocolUDP
+	case runtimeapi.Protocol_SCTP:
+		return protocolSCTP
 	}
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return protocolTCP

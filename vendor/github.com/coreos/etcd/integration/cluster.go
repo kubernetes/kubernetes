@@ -45,6 +45,7 @@ import (
 	"github.com/coreos/etcd/etcdserver/api/v3rpc"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/pkg/testutil"
+	"github.com/coreos/etcd/pkg/tlsutil"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/coreos/etcd/pkg/types"
 	"github.com/coreos/etcd/rafthttp"
@@ -562,6 +563,7 @@ func mustNewMember(t *testing.T, mcfg memberConfig) *member {
 		m.ServerConfig.PeerTLSInfo = *m.PeerTLSInfo
 	}
 	m.ElectionTicks = electionTicks
+	m.InitialElectionTickAdvance = true
 	m.TickMs = uint(tickDuration / time.Millisecond)
 	m.QuotaBackendBytes = mcfg.quotaBackendBytes
 	m.MaxRequestBytes = mcfg.maxRequestBytes
@@ -695,10 +697,16 @@ func (m *member) Launch() error {
 		if m.PeerTLSInfo == nil {
 			hs.Start()
 		} else {
-			hs.TLS, err = m.PeerTLSInfo.ServerConfig()
+			info := m.PeerTLSInfo
+			hs.TLS, err = info.ServerConfig()
 			if err != nil {
 				return err
 			}
+			tlsCert, err := tlsutil.NewCert(info.CertFile, info.KeyFile, nil)
+			if err != nil {
+				return err
+			}
+			hs.TLS.Certificates = []tls.Certificate{*tlsCert}
 			hs.StartTLS()
 		}
 		m.hss = append(m.hss, hs)
@@ -711,10 +719,45 @@ func (m *member) Launch() error {
 		if m.ClientTLSInfo == nil {
 			hs.Start()
 		} else {
-			hs.TLS, err = m.ClientTLSInfo.ServerConfig()
+			info := m.ClientTLSInfo
+			hs.TLS, err = info.ServerConfig()
 			if err != nil {
 				return err
 			}
+
+			// baseConfig is called on initial TLS handshake start.
+			//
+			// Previously,
+			// 1. Server has non-empty (*tls.Config).Certificates on client hello
+			// 2. Server calls (*tls.Config).GetCertificate iff:
+			//    - Server's (*tls.Config).Certificates is not empty, or
+			//    - Client supplies SNI; non-empty (*tls.ClientHelloInfo).ServerName
+			//
+			// When (*tls.Config).Certificates is always populated on initial handshake,
+			// client is expected to provide a valid matching SNI to pass the TLS
+			// verification, thus trigger server (*tls.Config).GetCertificate to reload
+			// TLS assets. However, a cert whose SAN field does not include domain names
+			// but only IP addresses, has empty (*tls.ClientHelloInfo).ServerName, thus
+			// it was never able to trigger TLS reload on initial handshake; first
+			// ceritifcate object was being used, never being updated.
+			//
+			// Now, (*tls.Config).Certificates is created empty on initial TLS client
+			// handshake, in order to trigger (*tls.Config).GetCertificate and populate
+			// rest of the certificates on every new TLS connection, even when client
+			// SNI is empty (e.g. cert only includes IPs).
+			//
+			// This introduces another problem with "httptest.Server":
+			// when server initial certificates are empty, certificates
+			// are overwritten by Go's internal test certs, which have
+			// different SAN fields (e.g. example.com). To work around,
+			// re-overwrite (*tls.Config).Certificates before starting
+			// test server.
+			tlsCert, err := tlsutil.NewCert(info.CertFile, info.KeyFile, nil)
+			if err != nil {
+				return err
+			}
+			hs.TLS.Certificates = []tls.Certificate{*tlsCert}
+
 			hs.StartTLS()
 		}
 		m.hss = append(m.hss, hs)

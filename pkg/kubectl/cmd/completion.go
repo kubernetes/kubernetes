@@ -67,6 +67,8 @@ var (
 
 
 		# Installing bash completion on Linux
+		## If bash-completion is not installed on Linux, please install the 'bash-completion' package
+		## via your distribution's package manager.
 		## Load the kubectl completion code for bash into the current shell
 		    source <(kubectl completion bash)
 		## Write bash completion code to a file and source if from .bash_profile
@@ -97,11 +99,11 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use: "completion SHELL",
+		Use:                   "completion SHELL",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
-		Long:    completion_long,
-		Example: completion_example,
+		Short:                 i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
+		Long:                  completion_long,
+		Example:               completion_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCompletion(out, boilerPlate, cmd, args)
 			cmdutil.CheckErr(err)

@@ -63,6 +63,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.nodeName",
 				"spec.restartPolicy",
 				"spec.schedulerName",
+				"spec.serviceAccountName",
 				"status.phase",
 				"status.podIP",
 				"status.nominatedNodeName":
@@ -379,6 +380,11 @@ func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.AllowPrivilegeEscalation = in.AllowPrivilegeEscalation
+	if in.ProcMount != nil {
+		pm := string(*in.ProcMount)
+		pmt := v1.ProcMountType(pm)
+		out.ProcMount = &pmt
+	}
 	return nil
 }
 

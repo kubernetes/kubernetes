@@ -19,10 +19,10 @@ package create
 import (
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -51,7 +51,7 @@ func NewCmdCreatePodDisruptionBudget(f cmdutil.Factory, ioStreams genericcliopti
 	}
 
 	cmd := &cobra.Command{
-		Use: "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
+		Use:                   "poddisruptionbudget NAME --selector=SELECTOR --min-available=N [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"pdb"},
 		Short:                 i18n.T("Create a pod disruption budget with the specified name."),

@@ -118,6 +118,11 @@ func (t *tokenSimple) genTokenPrefix() (string, error) {
 
 func (t *tokenSimple) assignSimpleTokenToUser(username, token string) {
 	t.simpleTokensMu.Lock()
+	defer t.simpleTokensMu.Unlock()
+	if t.simpleTokenKeeper == nil {
+		return
+	}
+
 	_, ok := t.simpleTokens[token]
 	if ok {
 		plog.Panicf("token %s is alredy used", token)
@@ -125,7 +130,6 @@ func (t *tokenSimple) assignSimpleTokenToUser(username, token string) {
 
 	t.simpleTokens[token] = username
 	t.simpleTokenKeeper.addSimpleToken(token)
-	t.simpleTokensMu.Unlock()
 }
 
 func (t *tokenSimple) invalidateUser(username string) {

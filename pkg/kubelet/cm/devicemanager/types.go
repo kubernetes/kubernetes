@@ -53,7 +53,7 @@ type Manager interface {
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
 	GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
-	GetWatcherCallback() watcher.RegisterCallbackFn
+	GetWatcherHandler() watcher.PluginHandler
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
@@ -75,22 +75,14 @@ const (
 	errFailedToDialDevicePlugin = "failed to dial device plugin:"
 	// errUnsupportedVersion is the error raised when the device plugin uses an API version not
 	// supported by the Kubelet registry
-	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported versions are %q"
-	// errDevicePluginAlreadyExists is the error raised when a device plugin with the
-	// same Resource Name tries to register itself
-	errDevicePluginAlreadyExists = "another device plugin already registered this Resource Name"
+	errUnsupportedVersion = "requested API version %q is not supported by kubelet. Supported version is %q"
 	// errInvalidResourceName is the error raised when a device plugin is registering
 	// itself with an invalid ResourceName
 	errInvalidResourceName = "the ResourceName %q is invalid"
-	// errEmptyResourceName is the error raised when the resource name field is empty
-	errEmptyResourceName = "invalid Empty ResourceName"
 	// errEndpointStopped indicates that the endpoint has been stopped
 	errEndpointStopped = "endpoint %v has been stopped"
-
 	// errBadSocket is the error raised when the registry socket path is not absolute
 	errBadSocket = "bad socketPath, must be an absolute path:"
-	// errRemoveSocket is the error raised when the registry could not remove the existing socket
-	errRemoveSocket = "failed to remove socket while starting device plugin registry, with error"
 	// errListenSocket is the error raised when the registry could not listen on the socket
 	errListenSocket = "failed to listen to socket while starting device plugin registry, with error"
 	// errListAndWatch is the error raised when ListAndWatch ended unsuccessfully

@@ -25,7 +25,7 @@ import (
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 // NodeAddresses returns the addresses of the specified instance.
@@ -67,6 +67,10 @@ func (cs *CSCloud) nodeAddresses(instance *cloudstack.VirtualMachine) ([]v1.Node
 
 	addresses := []v1.NodeAddress{
 		{Type: v1.NodeInternalIP, Address: instance.Nic[0].Ipaddress},
+	}
+
+	if instance.Hostname != "" {
+		addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: instance.Hostname})
 	}
 
 	if instance.Publicip != "" {

@@ -18,10 +18,11 @@ package constants
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -38,7 +39,7 @@ func TestGetStaticPodDirectory(t *testing.T) {
 }
 
 func TestGetAdminKubeConfigPath(t *testing.T) {
-	expected := "/etc/kubernetes/admin.conf"
+	expected := filepath.Join(KubernetesDir, AdminKubeConfigFileName)
 	actual := GetAdminKubeConfigPath()
 
 	if actual != expected {
@@ -169,7 +170,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		},
 		{
 			kubernetesVersion: "1.12.1",
-			expectedVersion:   version.MustParseSemantic("3.2.18"),
+			expectedVersion:   version.MustParseSemantic("3.2.24"),
 			expectedError:     nil,
 		},
 	}

@@ -43,14 +43,12 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/metrics"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -363,7 +361,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// Root client
 	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
 	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
-	internalRootClientset := internalclientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
+	externalRootClientset := kubernetes.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
@@ -418,9 +416,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
 	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
-	serviceAccountAdmission.SetInternalKubeClientSet(internalRootClientset)
-	internalInformers := internalinformers.NewSharedInformerFactory(internalRootClientset, controller.NoResyncPeriodFunc())
-	serviceAccountAdmission.SetInternalKubeInformerFactory(internalInformers)
+	serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
+	externalInformers := informers.NewSharedInformerFactory(externalRootClientset, controller.NoResyncPeriodFunc())
+	serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
 	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
 
 	masterConfig := framework.NewMasterConfig()
@@ -437,19 +435,21 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		apiServer.Close()
 	}
 
-	metrics.UnregisterMetricAndUntrackRateLimiterUsage("serviceaccount_tokens_controller")
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)
+	if err != nil {
+		return rootClientset, clientConfig, stop, err
+	}
 	tokenController, err := serviceaccountcontroller.NewTokensController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
 		rootClientset,
-		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)},
+		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: tokenGenerator},
 	)
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
 	}
 	go tokenController.Run(1, stopCh)
 
-	metrics.UnregisterMetricAndUntrackRateLimiterUsage("serviceaccount_controller")
 	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Namespaces(),
@@ -460,7 +460,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		return rootClientset, clientConfig, stop, err
 	}
 	informers.Start(stopCh)
-	internalInformers.Start(stopCh)
+	externalInformers.Start(stopCh)
 	go serviceAccountController.Run(5, stopCh)
 
 	return rootClientset, clientConfig, stop, nil

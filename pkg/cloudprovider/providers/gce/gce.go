@@ -49,7 +49,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -178,6 +178,9 @@ type ConfigGlobal struct {
 	// ApiEndpoint is the GCE compute API endpoint to use. If this is blank,
 	// then the default endpoint is used.
 	ApiEndpoint string `gcfg:"api-endpoint"`
+	// ContainerApiEndpoint is the GCE container API endpoint to use. If this is blank,
+	// then the default endpoint is used.
+	ContainerApiEndpoint string `gcfg:"container-api-endpoint"`
 	// LocalZone specifies the GCE zone that gce cloud client instance is
 	// located in (i.e. where the controller will be running). If this is
 	// blank, then the local zone will be discovered via the metadata server.
@@ -194,22 +197,23 @@ type ConfigFile struct {
 
 // CloudConfig includes all the necessary configuration for creating GCECloud
 type CloudConfig struct {
-	ApiEndpoint        string
-	ProjectID          string
-	NetworkProjectID   string
-	Region             string
-	Zone               string
-	ManagedZones       []string
-	NetworkName        string
-	NetworkURL         string
-	SubnetworkName     string
-	SubnetworkURL      string
-	SecondaryRangeName string
-	NodeTags           []string
-	NodeInstancePrefix string
-	TokenSource        oauth2.TokenSource
-	UseMetadataServer  bool
-	AlphaFeatureGate   *AlphaFeatureGate
+	ApiEndpoint          string
+	ContainerApiEndpoint string
+	ProjectID            string
+	NetworkProjectID     string
+	Region               string
+	Zone                 string
+	ManagedZones         []string
+	NetworkName          string
+	NetworkURL           string
+	SubnetworkName       string
+	SubnetworkURL        string
+	SecondaryRangeName   string
+	NodeTags             []string
+	NodeInstancePrefix   string
+	TokenSource          oauth2.TokenSource
+	UseMetadataServer    bool
+	AlphaFeatureGate     *AlphaFeatureGate
 }
 
 func init() {
@@ -236,6 +240,11 @@ func (g *GCECloud) ComputeServices() *Services {
 // Compute returns the generated stubs for the compute API.
 func (g *GCECloud) Compute() cloud.Cloud {
 	return g.c
+}
+
+// ContainerService returns the container service.
+func (g *GCECloud) ContainerService() *container.Service {
+	return g.containerService
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -276,6 +285,10 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 	if configFile != nil {
 		if configFile.Global.ApiEndpoint != "" {
 			cloudConfig.ApiEndpoint = configFile.Global.ApiEndpoint
+		}
+
+		if configFile.Global.ContainerApiEndpoint != "" {
+			cloudConfig.ContainerApiEndpoint = configFile.Global.ContainerApiEndpoint
 		}
 
 		if configFile.Global.TokenURL != "" {
@@ -419,6 +432,9 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		return nil, err
 	}
 	containerService.UserAgent = userAgent
+	if config.ContainerApiEndpoint != "" {
+		containerService.BasePath = config.ContainerApiEndpoint
+	}
 
 	tpuService, err := newTPUService(client)
 	if err != nil {
@@ -585,7 +601,7 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 
 // Initialize takes in a clientBuilder and spawns a goroutine for watching the clusterid configmap.
 // This must be called before utilizing the funcs of gce.ClusterID
-func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
+func (gce *GCECloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {
 	gce.clientBuilder = clientBuilder
 	gce.client = clientBuilder.ClientOrDie("cloud-provider")
 

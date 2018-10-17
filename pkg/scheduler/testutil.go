@@ -25,23 +25,13 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/core"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // FakeConfigurator is an implementation for test.
 type FakeConfigurator struct {
 	Config *Config
-}
-
-// GetPriorityFunctionConfigs is not implemented yet.
-func (fc *FakeConfigurator) GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-// GetPriorityMetadataProducer is not implemented yet.
-func (fc *FakeConfigurator) GetPriorityMetadataProducer() (algorithm.PriorityMetadataProducer, error) {
-	return nil, fmt.Errorf("not implemented")
 }
 
 // GetPredicateMetadataProducer is not implemented yet.
@@ -59,13 +49,8 @@ func (fc *FakeConfigurator) GetHardPodAffinitySymmetricWeight() int32 {
 	panic("not implemented")
 }
 
-// GetSchedulerName is not implemented yet.
-func (fc *FakeConfigurator) GetSchedulerName() string {
-	panic("not implemented")
-}
-
 // MakeDefaultErrorFunc is not implemented yet.
-func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error) {
+func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return nil
 }
 

@@ -36,9 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
 	"k8s.io/client-go/tools/clientcmd"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 )
 
 const (
@@ -173,17 +173,18 @@ func TestRunCreateToken(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		bts, err := kubeadmapiv1alpha3.NewBootstrapTokenString(tc.token)
+		bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tc.token)
 		if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
 			t.Fatalf("token couldn't be parsed for testing: %v", err)
 		}
 
-		cfg := &kubeadmapiv1alpha3.InitConfiguration{
-
-			// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-			// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			KubernetesVersion: "v1.10.0",
-			BootstrapTokens: []kubeadmapiv1alpha3.BootstrapToken{
+		cfg := &kubeadmapiv1beta1.InitConfiguration{
+			ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+				// KubernetesVersion is not used, but we set this explicitly to avoid
+				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+				KubernetesVersion: "v1.11.0",
+			},
+			BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
 				{
 					Token:  bts,
 					TTL:    &metav1.Duration{Duration: 0},

@@ -119,6 +119,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	stopCh := make(chan struct{})
 	closeFn := func() {
+		m.GenericAPIServer.RunPreShutdownHooks()
 		close(stopCh)
 		s.Close()
 	}
@@ -177,8 +178,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		glog.Fatal(err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
-	m, err = masterConfig.Complete(sharedInformers).New(genericapiserver.NewEmptyDelegate())
+	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
+	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		closeFn()
 		glog.Fatalf("error in bringing up the master: %v", err)

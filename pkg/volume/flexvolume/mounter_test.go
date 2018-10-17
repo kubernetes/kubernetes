@@ -44,7 +44,7 @@ func TestSetUpAt(t *testing.T) {
 	plugin.runner = fakeRunner(
 		// first call without fsGroup
 		assertDriverCall(t, successOutput(), mountCmd, rootDir+"/mount-dir",
-			specJson(plugin, spec, map[string]string{
+			specJSON(plugin, spec, map[string]string{
 				optionKeyPodName:            "my-pod",
 				optionKeyPodNamespace:       "my-ns",
 				optionKeyPodUID:             "my-uid",
@@ -53,7 +53,7 @@ func TestSetUpAt(t *testing.T) {
 
 		// second test has fsGroup
 		assertDriverCall(t, notSupportedOutput(), mountCmd, rootDir+"/mount-dir",
-			specJson(plugin, spec, map[string]string{
+			specJSON(plugin, spec, map[string]string{
 				optionFSGroup:               "42",
 				optionKeyPodName:            "my-pod",
 				optionKeyPodNamespace:       "my-ns",
@@ -61,7 +61,7 @@ func TestSetUpAt(t *testing.T) {
 				optionKeyServiceAccountName: "my-sa",
 			})),
 		assertDriverCall(t, fakeVolumeNameOutput("sdx"), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
+			specJSON(plugin, spec, nil)),
 	)
 
 	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)

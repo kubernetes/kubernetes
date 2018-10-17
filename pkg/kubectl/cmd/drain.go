@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -43,12 +41,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/printers"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
@@ -65,12 +62,10 @@ type DrainOptions struct {
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
-	backOff            clockwork.Clock
 	DeleteLocalData    bool
 	Selector           string
 	PodSelector        string
 	nodeInfos          []*resource.Info
-	typer              runtime.ObjectTyper
 
 	genericclioptions.IOStreams
 }
@@ -114,11 +109,11 @@ func NewCmdCordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use: "cordon NODE",
+		Use:                   "cordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark node as unschedulable"),
-		Long:    cordon_long,
-		Example: cordon_example,
+		Short:                 i18n.T("Mark node as unschedulable"),
+		Long:                  cordon_long,
+		Example:               cordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(true))
@@ -145,11 +140,11 @@ func NewCmdUncordon(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *c
 	}
 
 	cmd := &cobra.Command{
-		Use: "uncordon NODE",
+		Use:                   "uncordon NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Mark node as schedulable"),
-		Long:    uncordon_long,
-		Example: uncordon_example,
+		Short:                 i18n.T("Mark node as schedulable"),
+		Long:                  uncordon_long,
+		Example:               uncordon_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunCordonOrUncordon(false))
@@ -199,7 +194,6 @@ func NewDrainOptions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 		PrintFlags: genericclioptions.NewPrintFlags("drained").WithTypeSetter(scheme.Scheme),
 
 		IOStreams:          ioStreams,
-		backOff:            clockwork.NewRealClock(),
 		GracePeriodSeconds: -1,
 	}
 }
@@ -208,11 +202,11 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	options := NewDrainOptions(f, ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "drain NODE",
+		Use:                   "drain NODE",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Drain node in preparation for maintenance"),
-		Long:    drain_long,
-		Example: drain_example,
+		Short:                 i18n.T("Drain node in preparation for maintenance"),
+		Long:                  drain_long,
+		Example:               drain_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.RunDrain())
@@ -284,7 +278,7 @@ func (o *DrainOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 
 	builder := f.NewBuilder().
-		WithScheme(legacyscheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceNames("nodes", args...).
 		SingleResourceType().
@@ -403,8 +397,7 @@ func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fata
 
 func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) {
 	// Note that we return false in cases where the pod is DaemonSet managed,
-	// regardless of flags.  We never delete them, the only question is whether
-	// their presence constitutes an error.
+	// regardless of flags.
 	//
 	// The exception is for pods that are orphaned (the referencing
 	// management resource - including DaemonSet - is not found).
@@ -413,12 +406,17 @@ func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) 
 	if controllerRef == nil || controllerRef.Kind != "DaemonSet" {
 		return true, nil, nil
 	}
+	// Any finished pod can be removed.
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		return true, nil, nil
+	}
 
 	if _, err := o.client.ExtensionsV1beta1().DaemonSets(pod.Namespace).Get(controllerRef.Name, metav1.GetOptions{}); err != nil {
 		// remove orphaned pods with a warning if --force is used
 		if apierrors.IsNotFound(err) && o.Force {
 			return true, &warning{err.Error()}, nil
 		}
+
 		return false, nil, &fatal{err.Error()}
 	}
 
@@ -450,9 +448,14 @@ func (o *DrainOptions) localStorageFilter(pod corev1.Pod) (bool, *warning, *fata
 	if !hasLocalStorage(pod) {
 		return true, nil, nil
 	}
+	// Any finished pod can be removed.
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+		return true, nil, nil
+	}
 	if !o.DeleteLocalData {
 		return false, nil, &fatal{kLocalStorageFatal}
 	}
+
 	return true, &warning{kLocalStorageWarning}, nil
 }
 
@@ -723,7 +726,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 
 	for _, nodeInfo := range o.nodeInfos {
 		if nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
-			obj, err := legacyscheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
+			obj, err := scheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
 				fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 				continue
@@ -760,7 +763,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
-					_, err = helper.Patch(o.Namespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
+					_, err = helper.Patch(o.Namespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes, nil)
 					if err != nil {
 						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
 						continue

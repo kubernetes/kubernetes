@@ -76,7 +76,7 @@ func TestFinalization(t *testing.T) {
 	// object will be deleted as part of the finalizer update.
 	for {
 		gottenNoxuInstance.SetFinalizers(nil)
-		_, err = noxuResourceClient.Update(gottenNoxuInstance)
+		_, err = noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
 		if err == nil {
 			break
 		}
@@ -137,7 +137,7 @@ func TestFinalizationAndDeletion(t *testing.T) {
 	// Update the CR to remove the finalizer.
 	for {
 		gottenNoxuInstance.SetFinalizers(nil)
-		_, err = noxuResourceClient.Update(gottenNoxuInstance)
+		_, err = noxuResourceClient.Update(gottenNoxuInstance, metav1.UpdateOptions{})
 		if err == nil {
 			break
 		}

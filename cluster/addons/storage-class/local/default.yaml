@@ -6,5 +6,5 @@ metadata:
   annotations:
     storageclass.beta.kubernetes.io/is-default-class: "true"
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
 provisioner: kubernetes.io/host-path

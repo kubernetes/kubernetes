@@ -17,7 +17,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/cloudprovider:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume/util/fs:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
@@ -30,6 +29,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
@@ -68,7 +69,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/aws_ebs:all-srcs",
+        "//pkg/volume/awsebs:all-srcs",
         "//pkg/volume/azure_dd:all-srcs",
         "//pkg/volume/azure_file:all-srcs",
         "//pkg/volume/cephfs:all-srcs",
@@ -80,7 +81,7 @@ filegroup(
         "//pkg/volume/fc:all-srcs",
         "//pkg/volume/flexvolume:all-srcs",
         "//pkg/volume/flocker:all-srcs",
-        "//pkg/volume/gce_pd:all-srcs",
+        "//pkg/volume/gcepd:all-srcs",
         "//pkg/volume/git_repo:all-srcs",
         "//pkg/volume/glusterfs:all-srcs",
         "//pkg/volume/host_path:all-srcs",

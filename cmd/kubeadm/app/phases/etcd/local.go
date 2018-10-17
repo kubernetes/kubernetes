@@ -37,6 +37,9 @@ const (
 
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
 func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.InitConfiguration) error {
+	if cfg.ClusterConfiguration.Etcd.External != nil {
+		return fmt.Errorf("etcd static pod manifest cannot be generated for cluster using external etcd")
+	}
 	glog.V(1).Infoln("creating local etcd static pod manifest file")
 	// gets etcd StaticPodSpec, actualized for the current InitConfiguration
 	spec := GetEtcdPodSpec(cfg)
@@ -60,7 +63,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.InitConfiguration) v1.Pod {
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:            kubeadmconstants.Etcd,
 		Command:         getEtcdCommand(cfg),
-		Image:           images.GetEtcdImage(cfg),
+		Image:           images.GetEtcdImage(&cfg.ClusterConfiguration),
 		ImagePullPolicy: v1.PullIfNotPresent,
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts: []v1.VolumeMount{

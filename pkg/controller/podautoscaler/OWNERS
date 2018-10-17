@@ -11,3 +11,5 @@ approvers:
 - piosz
 - jszczepkowski
 - MaciekPytel
+labels:
+- sig/autoscaling

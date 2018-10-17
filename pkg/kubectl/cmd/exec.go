@@ -24,15 +24,15 @@ import (
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/term"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -72,11 +72,11 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
-		Use: "exec POD [-c CONTAINER] -- COMMAND [args...]",
+		Use:                   "exec POD [-c CONTAINER] -- COMMAND [args...]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Execute a command in a container"),
-		Long:    "Execute a command in a container.",
-		Example: exec_example,
+		Short:                 i18n.T("Execute a command in a container"),
+		Long:                  "Execute a command in a container.",
+		Example:               exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))
@@ -186,11 +186,11 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	}
 	p.Config = config
 
-	clientset, err := f.ClientSet()
+	clientset, err := f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
-	p.PodClient = clientset.Core()
+	p.PodClient = clientset.CoreV1()
 
 	return nil
 }
@@ -271,7 +271,7 @@ func (p *ExecOptions) Run() error {
 		return err
 	}
 
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 		return fmt.Errorf("cannot exec into a container in a completed pod; current phase is %s", pod.Status.Phase)
 	}
 
@@ -313,14 +313,14 @@ func (p *ExecOptions) Run() error {
 			Namespace(pod.Namespace).
 			SubResource("exec").
 			Param("container", containerName)
-		req.VersionedParams(&api.PodExecOptions{
+		req.VersionedParams(&corev1.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.ErrOut != nil,
 			TTY:       t.Raw,
-		}, legacyscheme.ParameterCodec)
+		}, scheme.ParameterCodec)
 
 		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}

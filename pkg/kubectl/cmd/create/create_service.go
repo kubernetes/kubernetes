@@ -20,10 +20,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -71,11 +71,11 @@ func NewCmdCreateServiceClusterIP(f cmdutil.Factory, ioStreams genericclioptions
 	}
 
 	cmd := &cobra.Command{
-		Use: "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
+		Use:                   "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a ClusterIP service."),
-		Long:    serviceClusterIPLong,
-		Example: serviceClusterIPExample,
+		Short:                 i18n.T("Create a ClusterIP service."),
+		Long:                  serviceClusterIPLong,
+		Example:               serviceClusterIPExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Run())
@@ -143,11 +143,11 @@ func NewCmdCreateServiceNodePort(f cmdutil.Factory, ioStreams genericclioptions.
 	}
 
 	cmd := &cobra.Command{
-		Use: "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
+		Use:                   "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a NodePort service."),
-		Long:    serviceNodePortLong,
-		Example: serviceNodePortExample,
+		Short:                 i18n.T("Create a NodePort service."),
+		Long:                  serviceNodePortLong,
+		Example:               serviceNodePortExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Run())
@@ -212,11 +212,11 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, ioStreams genericcliopti
 	}
 
 	cmd := &cobra.Command{
-		Use: "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
+		Use:                   "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create a LoadBalancer service."),
-		Long:    serviceLoadBalancerLong,
-		Example: serviceLoadBalancerExample,
+		Short:                 i18n.T("Create a LoadBalancer service."),
+		Long:                  serviceLoadBalancerLong,
+		Example:               serviceLoadBalancerExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Run())
@@ -283,11 +283,11 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, ioStreams genericcliopti
 	}
 
 	cmd := &cobra.Command{
-		Use: "externalname NAME --external-name external.name [--dry-run]",
+		Use:                   "externalname NAME --external-name external.name [--dry-run]",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Create an ExternalName service."),
-		Long:    serviceExternalNameLong,
-		Example: serviceExternalNameExample,
+		Short:                 i18n.T("Create an ExternalName service."),
+		Long:                  serviceExternalNameLong,
+		Example:               serviceExternalNameExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Run())

@@ -182,9 +182,11 @@ func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	// TODO(yguo0905): Support returning stats of multiple image filesystems.
 	for _, fs := range resp {
 		s := &statsapi.FsStats{
-			Time:       metav1.NewTime(time.Unix(0, fs.Timestamp)),
-			UsedBytes:  &fs.UsedBytes.Value,
-			InodesUsed: &fs.InodesUsed.Value,
+			Time:      metav1.NewTime(time.Unix(0, fs.Timestamp)),
+			UsedBytes: &fs.UsedBytes.Value,
+		}
+		if fs.InodesUsed != nil {
+			s.InodesUsed = &fs.InodesUsed.Value
 		}
 		imageFsInfo := p.getFsInfo(fs.GetFsId())
 		if imageFsInfo != nil {

@@ -23,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
-	"strconv"
 )
 
 var (
@@ -241,6 +240,31 @@ func scanOneLun(hostNumber int, lunNumber int) error {
 	return nil
 }
 
+func waitForMultiPathToExist(devicePaths []string, maxRetries int, deviceUtil volumeutil.DeviceUtil) string {
+	if 0 == len(devicePaths) {
+		return ""
+	}
+
+	for i := 0; i < maxRetries; i++ {
+		for _, path := range devicePaths {
+			// There shouldnt be any empty device paths. However adding this check
+			// for safer side to avoid the possibility of an empty entry.
+			if path == "" {
+				continue
+			}
+			// check if the dev is using mpio and if so mount it via the dm-XX device
+			if mappedDevicePath := deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
+				return mappedDevicePath
+			}
+		}
+		if i == maxRetries-1 {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	return ""
+}
+
 // AttachDisk returns devicePath of volume if attach succeeded otherwise returns error
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var devicePath string
@@ -381,19 +405,21 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 		glog.Errorf("iscsi: last error occurred during iscsi init:\n%v", lastErr)
 	}
 
-	//Make sure we use a valid devicepath to find mpio device.
-	devicePath = devicePaths[0]
-	for _, path := range devicePaths {
-		// There shouldnt be any empty device paths. However adding this check
-		// for safer side to avoid the possibility of an empty entry.
-		if path == "" {
-			continue
-		}
-		// check if the dev is using mpio and if so mount it via the dm-XX device
-		if mappedDevicePath := b.deviceUtil.FindMultipathDeviceForDevice(path); mappedDevicePath != "" {
-			devicePath = mappedDevicePath
-			break
-		}
+	// Try to find a multipath device for the volume
+	if 1 < len(bkpPortal) {
+		// If the PV has 2 or more portals, wait up to 10 seconds for the multipath
+		// device to appear
+		devicePath = waitForMultiPathToExist(devicePaths, 10, b.deviceUtil)
+	} else {
+		// For PVs with 1 portal, just try one time to find the multipath device. This
+		// avoids a long pause when the multipath device will never get created, and
+		// matches legacy behavior.
+		devicePath = waitForMultiPathToExist(devicePaths, 1, b.deviceUtil)
+	}
+
+	// When no multipath device is found, just use the first (and presumably only) device
+	if devicePath == "" {
+		devicePath = devicePaths[0]
 	}
 
 	glog.V(5).Infof("iscsi: AttachDisk devicePath: %s", devicePath)
@@ -526,10 +552,18 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
 		return nil
 	}
-	if err := c.mounter.Unmount(mntPath); err != nil {
-		glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+
+	notMnt, err := c.mounter.IsLikelyNotMountPoint(mntPath)
+	if err != nil {
 		return err
 	}
+	if !notMnt {
+		if err := c.mounter.Unmount(mntPath); err != nil {
+			glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+			return err
+		}
+	}
+
 	// if device is no longer used, see if need to logout the target
 	device, prefix, err := extractDeviceAndPrefix(mntPath)
 	if err != nil {
@@ -641,31 +675,10 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	if mappedDevicePath := c.deviceUtil.FindMultipathDeviceForDevice(devicePath); mappedDevicePath != "" {
 		devicePath = mappedDevicePath
 	}
-	// Get loopback device which takes fd lock for devicePath before detaching a volume from node.
-	// TODO: This is a workaround for issue #54108
-	// Currently local attach plugins such as FC, iSCSI, RBD can't obtain devicePath during
-	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
-	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
-	// local attach plugins needs to remove loopback device during TearDownDevice().
-	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
-	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, devicePath)
-	if err != nil {
-		if err.Error() != volumepathhandler.ErrDeviceNotFound {
-			return fmt.Errorf("failed to get loopback for device: %v, err: %v", devicePath, err)
-		}
-		glog.Warningf("iscsi: loopback for device: %s not found", device)
-	}
 	// Detach a volume from kubelet node
 	err = util.detachISCSIDisk(c.exec, portals, iqn, iface, volName, initiatorName, found)
 	if err != nil {
 		return fmt.Errorf("failed to finish detachISCSIDisk, err: %v", err)
-	}
-	if len(loop) != 0 {
-		// The volume was successfully detached from node. We can safely remove the loopback.
-		err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
-		if err != nil {
-			return fmt.Errorf("failed to remove loopback :%v, err: %v", loop, err)
-		}
 	}
 	return nil
 }

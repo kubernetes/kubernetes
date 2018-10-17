@@ -3,6 +3,7 @@ reviewers:
   - jbeda
   - mikedanese
   - roberthbailey
+  - spiffxp
   - zmerlynn
 approvers:
   - eparis
@@ -10,3 +11,5 @@ approvers:
   - mikedanese
   - roberthbailey
   - zmerlynn
+labels:
+- sig/cluster-lifecycle

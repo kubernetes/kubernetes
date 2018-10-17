@@ -25,139 +25,179 @@ import (
 func TestGetMasterEndpoint(t *testing.T) {
 	var tests = []struct {
 		name             string
-		api              *kubeadmapi.API
+		cfg              *kubeadmapi.InitConfiguration
 		expectedEndpoint string
 		expectedError    bool
 	}{
 		{
 			name: "use ControlPlaneEndpoint (dns) if fully defined",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "cp.k8s.io:1234",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "cp.k8s.io:1234",
+				},
 			},
 			expectedEndpoint: "https://cp.k8s.io:1234",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv4) if fully defined",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1.2.3.4:1234",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1.2.3.4:1234",
+				},
 			},
 			expectedEndpoint: "https://1.2.3.4:1234",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv6) if fully defined",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "[2001:db8::1]:1234",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "[2001:db8::1]:1234",
+				},
 			},
 			expectedEndpoint: "https://[2001:db8::1]:1234",
 		},
 		{
 			name: "use ControlPlaneEndpoint (dns) + BindPort if ControlPlaneEndpoint defined without port",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "cp.k8s.io",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+
+					ControlPlaneEndpoint: "cp.k8s.io",
+				},
 			},
 			expectedEndpoint: "https://cp.k8s.io:4567",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv4) + BindPort if ControlPlaneEndpoint defined without port",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1.2.3.4",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1.2.3.4",
+				},
 			},
 			expectedEndpoint: "https://1.2.3.4:4567",
 		},
 		{
 			name: "use ControlPlaneEndpoint (ipv6) + BindPort if ControlPlaneEndpoint defined without port",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "2001:db8::1",
-				BindPort:             4567,
-				AdvertiseAddress:     "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+
+					ControlPlaneEndpoint: "2001:db8::1",
+				},
 			},
 			expectedEndpoint: "https://[2001:db8::1]:4567",
 		},
 		{
 			name: "use AdvertiseAddress (ipv4) + BindPort if ControlPlaneEndpoint is not defined",
-			api: &kubeadmapi.API{
-				BindPort:         4567,
-				AdvertiseAddress: "4.5.6.7",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "4.5.6.7",
+				},
 			},
 			expectedEndpoint: "https://4.5.6.7:4567",
 		},
 		{
 			name: "use AdvertiseAddress (ipv6) + BindPort if ControlPlaneEndpoint is not defined",
-			api: &kubeadmapi.API{
-				BindPort:         4567,
-				AdvertiseAddress: "2001:db8::1",
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort:         4567,
+					AdvertiseAddress: "2001:db8::1",
+				},
 			},
 			expectedEndpoint: "https://[2001:db8::1]:4567",
 		},
 		{
 			name: "fail if invalid BindPort",
-			api: &kubeadmapi.API{
-				BindPort: 0,
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					BindPort: 0,
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (dns)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "bad!!.cp.k8s.io",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "bad!!.cp.k8s.io",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (ip4)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1..0",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1..0",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (ip6)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "1200::AB00:1234::2552:7777:1313",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid ControlPlaneEndpoint (port)",
-			api: &kubeadmapi.API{
-				ControlPlaneEndpoint: "cp.k8s.io:0",
-				BindPort:             4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ControlPlaneEndpoint: "cp.k8s.io:0",
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid AdvertiseAddress (ip4)",
-			api: &kubeadmapi.API{
-				AdvertiseAddress: "1..0",
-				BindPort:         4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1..0",
+					BindPort:         4567,
+				},
 			},
 			expectedError: true,
 		},
 		{
 			name: "fail if invalid AdvertiseAddress (ip6)",
-			api: &kubeadmapi.API{
-				AdvertiseAddress: "1200::AB00:1234::2552:7777:1313",
-				BindPort:         4567,
+			cfg: &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1200::AB00:1234::2552:7777:1313",
+					BindPort:         4567,
+				},
 			},
 			expectedError: true,
 		},
 	}
 
 	for _, rt := range tests {
-		actualEndpoint, actualError := GetMasterEndpoint(rt.api)
+		actualEndpoint, actualError := GetMasterEndpoint(rt.cfg)
 
 		if (actualError != nil) && !rt.expectedError {
 			t.Errorf("%s unexpected failure: %v", rt.name, actualError)
@@ -328,7 +368,7 @@ func TestParsePort(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actualPort, actualError := parsePort(rt.port)
+		actualPort, actualError := ParsePort(rt.port)
 
 		if (actualError != nil) && !rt.expectedError {
 			t.Errorf("%s unexpected failure: %v", rt.name, actualError)

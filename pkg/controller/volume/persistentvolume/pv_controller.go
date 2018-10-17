@@ -37,8 +37,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/workqueue"
+	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	"k8s.io/kubernetes/pkg/features"
@@ -123,6 +123,8 @@ const annBindCompleted = "pv.kubernetes.io/bind-completed"
 // the binding (PV->PVC or PVC->PV) was installed by the controller.  The
 // absence of this annotation means the binding was done by the user (i.e.
 // pre-bound). Value of this annotation does not matter.
+// External PV binders must bind PV the same way as PV controller, otherwise PV
+// controller may not handle it correctly.
 const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 
 // This annotation is added to a PV that has been dynamically provisioned by
@@ -138,7 +140,7 @@ const annStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 
 // This annotation is added to a PVC that has been triggered by scheduler to
 // be dynamically provisioned. Its value is the name of the selected node.
-const annSelectedNode = "volume.alpha.kubernetes.io/selected-node"
+const annSelectedNode = "volume.kubernetes.io/selected-node"
 
 // If the provisioner name in a storage class is set to "kubernetes.io/no-provisioner",
 // then dynamic provisioning is not supported by the storage.
@@ -288,14 +290,12 @@ func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentV
 		return false, nil
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-		// When feature DynamicProvisioningScheduling enabled,
-		// Scheduler signal to the PV controller to start dynamic
-		// provisioning by setting the "annSelectedNode" annotation
-		// in the PVC
-		if _, ok := claim.Annotations[annSelectedNode]; ok {
-			return false, nil
-		}
+	// When feature VolumeScheduling enabled,
+	// Scheduler signal to the PV controller to start dynamic
+	// provisioning by setting the "annSelectedNode" annotation
+	// in the PVC
+	if _, ok := claim.Annotations[annSelectedNode]; ok {
+		return false, nil
 	}
 
 	className := v1helper.GetPersistentVolumeClaimClass(claim)
@@ -544,6 +544,30 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 		obj, found, err := ctrl.claims.GetByKey(claimName)
 		if err != nil {
 			return err
+		}
+		if !found && metav1.HasAnnotation(volume.ObjectMeta, annBoundByController) {
+			// If PV is bound by external PV binder (e.g. kube-scheduler), it's
+			// possible on heavy load that corresponding PVC is not synced to
+			// controller local cache yet. So we need to double-check PVC in
+			//   1) informer cache
+			//   2) apiserver if not found in informer cache
+			// to make sure we will not reclaim a PV wrongly.
+			// Note that only non-released and non-failed volumes will be
+			// updated to Released state when PVC does not eixst.
+			if volume.Status.Phase != v1.VolumeReleased && volume.Status.Phase != v1.VolumeFailed {
+				obj, err = ctrl.claimLister.PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name)
+				if err != nil && !apierrs.IsNotFound(err) {
+					return err
+				}
+				found = !apierrs.IsNotFound(err)
+				if !found {
+					obj, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+					if err != nil && !apierrs.IsNotFound(err) {
+						return err
+					}
+					found = !apierrs.IsNotFound(err)
+				}
+			}
 		}
 		if !found {
 			glog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s not found", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
@@ -1451,25 +1475,22 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	}
 
 	var selectedNode *v1.Node = nil
-	var allowedTopologies []v1.TopologySelectorTerm = nil
-	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-		if nodeName, ok := claim.Annotations[annSelectedNode]; ok {
-			selectedNode, err = ctrl.NodeLister.Get(nodeName)
-			if err != nil {
-				strerr := fmt.Sprintf("Failed to get target node: %v", err)
-				glog.V(3).Infof("unexpected error getting target node %q for claim %q: %v", nodeName, claimToClaimKey(claim), err)
-				ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
-				return pluginName, err
-			}
+	if nodeName, ok := claim.Annotations[annSelectedNode]; ok {
+		selectedNode, err = ctrl.NodeLister.Get(nodeName)
+		if err != nil {
+			strerr := fmt.Sprintf("Failed to get target node: %v", err)
+			glog.V(3).Infof("unexpected error getting target node %q for claim %q: %v", nodeName, claimToClaimKey(claim), err)
+			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+			return pluginName, err
 		}
-		allowedTopologies = storageClass.AllowedTopologies
 	}
+	allowedTopologies := storageClass.AllowedTopologies
 
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
 	volume, err = provisioner.Provision(selectedNode, allowedTopologies)
 	opComplete(&err)
 	if err != nil {
-		// Other places of failure have nothing to do with DynamicProvisioningScheduling,
+		// Other places of failure have nothing to do with VolumeScheduling,
 		// so just let controller retry in the next sync. We'll only call func
 		// rescheduleProvisioning here when the underlying provisioning actually failed.
 		ctrl.rescheduleProvisioning(claim)

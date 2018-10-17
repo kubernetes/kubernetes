@@ -7,3 +7,6 @@ approvers:
 - yujuhong
 reviewers:
 - sig-node-reviewers
+labels:
+- area/kubelet
+- sig/node

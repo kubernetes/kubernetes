@@ -73,12 +73,11 @@ func CreateInitKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration)
 	)
 }
 
-// CreateJoinMasterKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
-// join --master workflow, plus the admin kubeconfig file to be deployed on the new master; the
-// kubelet.conf file must not be created when joining master nodes because it will be created and signed by
-// the kubelet TLS bootstrap process.
+// CreateJoinControlPlaneKubeConfigFiles will create and write to disk the kubeconfig files required by kubeadm
+// join --control-plane workflow, plus the admin kubeconfig file used by the administrator and kubeadm itself; the
+// kubelet.conf file must not be created because it will be created and signed by the kubelet TLS bootstrap process.
 // If any kubeconfig files already exists, it used only if evaluated equal; otherwise an error is returned.
-func CreateJoinMasterKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateJoinControlPlaneKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 	return createKubeConfigFiles(
 		outDir,
 		cfg,
@@ -157,7 +156,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		return nil, fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +174,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 		kubeadmconstants.KubeletKubeConfigFileName: {
 			CACert:     caCert,
 			APIServer:  masterEndpoint,
-			ClientName: fmt.Sprintf("system:node:%s", cfg.NodeRegistration.Name),
+			ClientName: fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
 			ClientCertAuth: &clientCertAuth{
 				CAKey:         caKey,
 				Organizations: []string{kubeadmconstants.NodesGroup},
@@ -223,7 +222,7 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 		Organization: spec.ClientCertAuth.Organizations,
 		Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
-	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, clientCertConfig)
+	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, &clientCertConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failure while creating %s client certificate: %v", spec.ClientName, err)
 	}
@@ -294,7 +293,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
 	if err != nil {
 		return err
 	}
@@ -321,7 +320,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %v", err)
 	}
 
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(&cfg.API)
+	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
 	if err != nil {
 		return err
 	}

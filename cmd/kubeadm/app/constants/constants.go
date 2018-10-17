@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
+	"k8s.io/apimachinery/pkg/util/version"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 // KubernetesDir is the directory kubernetes owns for storing various configuration files
@@ -154,6 +154,8 @@ const (
 	MastersGroup = "system:masters"
 	// NodesGroup defines the well-known group for all nodes.
 	NodesGroup = "system:nodes"
+	// NodesUserPrefix defines the user name prefix as requested by the Node authorizer.
+	NodesUserPrefix = "system:node:"
 	// NodesClusterRoleBinding defines the well-known ClusterRoleBinding which binds the too permissive system:node
 	// ClusterRole to the system:nodes group. Since kubeadm is using the Node Authorizer, this ClusterRoleBinding's
 	// system:nodes group subject is removed if present.
@@ -186,11 +188,20 @@ const (
 	// init/join time for use later. kubeadm annotates the node object with this information
 	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
 
-	// InitConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
-	InitConfigurationConfigMap = "kubeadm-config"
+	// KubeadmConfigConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
+	KubeadmConfigConfigMap = "kubeadm-config"
 
-	// InitConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
-	InitConfigurationConfigMapKey = "InitConfiguration"
+	// ClusterConfigurationConfigMapKey specifies in what ConfigMap key the cluster configuration should be stored
+	ClusterConfigurationConfigMapKey = "ClusterConfiguration"
+
+	// ClusterStatusConfigMapKey specifies in what ConfigMap key the cluster status should be stored
+	ClusterStatusConfigMapKey = "ClusterStatus"
+
+	// KubeProxyConfigMap specifies in what ConfigMap in the kube-system namespace the kube-proxy configuration should be stored
+	KubeProxyConfigMap = "kube-proxy"
+
+	// KubeProxyConfigMapKey specifies in what ConfigMap key the component config of kube-proxy should be stored
+	KubeProxyConfigMapKey = "config.conf"
 
 	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
@@ -221,11 +232,17 @@ const (
 	// KubeletEnvFileVariableName specifies the shell script variable name "kubeadm init" should write a value to in KubeletEnvFile
 	KubeletEnvFileVariableName = "KUBELET_KUBEADM_ARGS"
 
+	// KubeletHealthzPort is the port of the kubelet healthz endpoint
+	KubeletHealthzPort = 10248
+
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.2.17"
+	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.2.18"
+	DefaultEtcdVersion = "3.2.24"
+
+	// PauseVersion indicates the default pause image version for kubeadm
+	PauseVersion = "3.1"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -280,28 +297,26 @@ const (
 	LeaseEndpointReconcilerType = "lease"
 
 	// KubeDNSVersion is the version of kube-dns to be deployed if it is used
-	KubeDNSVersion = "1.14.10"
+	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.1.3"
+	CoreDNSVersion = "1.2.2"
+
+	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
+	ClusterConfigurationKind = "ClusterConfiguration"
 
 	// InitConfigurationKind is the string kind value for the InitConfiguration struct
 	InitConfigurationKind = "InitConfiguration"
 
-	// MasterConfigurationKind is the string kind value for the v1alpha2-named MasterConfiguration struct
-	// In v1alpha3 and higher, this struct is now named InitConfiguration
-	MasterConfigurationKind = "MasterConfiguration"
-
 	// JoinConfigurationKind is the string kind value for the JoinConfiguration struct
 	JoinConfigurationKind = "JoinConfiguration"
-
-	// NodeConfigurationKind is the string kind value for the v1alpha2-named NodeConfiguration struct
-	// In v1alpha3 and higher, this struct is now named JoinConfiguration
-	NodeConfigurationKind = "NodeConfiguration"
 
 	// YAMLDocumentSeparator is the separator for YAML documents
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
+
+	// DefaultAPIServerBindAddress is the default bind address for the API Server
+	DefaultAPIServerBindAddress = "0.0.0.0"
 )
 
 var (
@@ -327,16 +342,16 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.10.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.11.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.10.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.11.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
 		10: "3.1.12",
 		11: "3.2.18",
-		12: "3.2.18",
+		12: "3.2.24",
 	}
 )
 
@@ -450,4 +465,9 @@ func GetDNSVersion(dnsType string) string {
 	default:
 		return KubeDNSVersion
 	}
+}
+
+// GetKubeletConfigMapName returns the right ConfigMap name for the right branch of k8s
+func GetKubeletConfigMapName(k8sVersion *version.Version) string {
+	return fmt.Sprintf("%s%d.%d", KubeletBaseConfigurationConfigMapPrefix, k8sVersion.Major(), k8sVersion.Minor())
 }

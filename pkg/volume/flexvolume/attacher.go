@@ -31,6 +31,8 @@ type flexVolumeAttacher struct {
 
 var _ volume.Attacher = &flexVolumeAttacher{}
 
+var _ volume.DeviceMounter = &flexVolumeAttacher{}
+
 // Attach is part of the volume.Attacher interface
 func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName types.NodeName) (string, error) {
 
@@ -89,9 +91,8 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 		// plugin does not implement attach interface.
 		if devicePath != "" {
 			return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
-		} else {
-			return nil
 		}
+		return nil
 	}
 	return err
 }

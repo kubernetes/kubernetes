@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -59,7 +60,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -201,19 +201,22 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 
-	// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-	swapData, err := ioutil.ReadFile("/proc/swaps")
-	if err != nil {
-		return nil, err
-	}
-	swapData = bytes.TrimSpace(swapData) // extra trailing \n
-	swapLines := strings.Split(string(swapData), "\n")
+	if failSwapOn {
+		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
+		swapData, err := ioutil.ReadFile("/proc/swaps")
+		if err != nil {
+			return nil, err
+		}
+		swapData = bytes.TrimSpace(swapData) // extra trailing \n
+		swapLines := strings.Split(string(swapData), "\n")
 
-	// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-	// error out unless --fail-swap-on is set to false.
-	if failSwapOn && len(swapLines) > 1 {
-		return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
+		// error out unless --fail-swap-on is set to false.
+		if len(swapLines) > 1 {
+			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+		}
 	}
+
 	var capacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
@@ -304,6 +307,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			cgroupManager:     cm.cgroupManager,
 			podPidsLimit:      cm.ExperimentalPodPidsLimit,
 			enforceCPULimits:  cm.EnforceCPULimits,
+			cpuCFSQuotaPeriod: uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
 		}
 	}
 	return &podContainerManagerNoop{
@@ -601,8 +605,8 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	return nil
 }
 
-func (cm *containerManagerImpl) GetPluginRegistrationHandlerCallback() pluginwatcher.RegisterCallbackFn {
-	return cm.deviceManager.GetWatcherCallback()
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+	return cm.deviceManager.GetWatcherHandler()
 }
 
 // TODO: move the GetResources logic to PodContainerManager.

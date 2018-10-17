@@ -21,7 +21,6 @@ type Rule struct {
 	OifName           string
 	SuppressIfgroup   int
 	SuppressPrefixlen int
-	Invert            bool
 }
 
 func (r Rule) String() string {

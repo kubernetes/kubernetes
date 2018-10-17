@@ -23,10 +23,18 @@ import (
 
 	"k8s.io/api/core/v1"
 
+	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"crypto/sha256"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -46,22 +54,25 @@ type csiTestDriver interface {
 
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
 	"hostPath": initCSIHostpath,
-	// Feature tag to skip test in CI, pending fix of #62237
-	"[Feature: GCE PD CSI Plugin] gcePD": initCSIgcePD,
+	"gcePD":    initCSIgcePD,
 }
 
 var _ = utils.SIGDescribe("CSI Volumes", func() {
 	f := framework.NewDefaultFramework("csi-mock-plugin")
 
 	var (
-		cs     clientset.Interface
-		ns     *v1.Namespace
-		node   v1.Node
-		config framework.VolumeTestConfig
+		cs        clientset.Interface
+		crdclient apiextensionsclient.Interface
+		csics     csiclient.Interface
+		ns        *v1.Namespace
+		node      v1.Node
+		config    framework.VolumeTestConfig
 	)
 
 	BeforeEach(func() {
 		cs = f.ClientSet
+		crdclient = f.APIExtensionsClientSet
+		csics = f.CSIClientSet
 		ns = f.Namespace
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		node = nodes.Items[rand.Intn(len(nodes.Items))]
@@ -73,6 +84,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			WaitForCompletion: true,
 		}
 		csiDriverRegistrarClusterRole(config)
+		createCSICRDs(crdclient)
 	})
 
 	for driverName, initCSIDriver := range csiTestDrivers {
@@ -102,7 +114,182 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			})
 		})
 	}
+
+	// Use [Serial], because there can be only one CSIDriver for csi-hostpath driver.
+	Context("CSI attach test using HostPath driver [Serial][Feature:CSISkipAttach]", func() {
+		var (
+			driver csiTestDriver
+		)
+		BeforeEach(func() {
+			driver = initCSIHostpath(f, config)
+			driver.createCSIDriver()
+		})
+
+		AfterEach(func() {
+			driver.cleanupCSIDriver()
+		})
+
+		tests := []struct {
+			name                   string
+			driverAttachable       bool
+			driverExists           bool
+			expectVolumeAttachment bool
+		}{
+			{
+				name:                   "non-attachable volume does not need VolumeAttachment",
+				driverAttachable:       false,
+				driverExists:           true,
+				expectVolumeAttachment: false,
+			},
+			{
+				name:                   "attachable volume needs VolumeAttachment",
+				driverAttachable:       true,
+				driverExists:           true,
+				expectVolumeAttachment: true,
+			},
+			{
+				name:                   "volume with no CSI driver needs VolumeAttachment",
+				driverExists:           false,
+				expectVolumeAttachment: true,
+			},
+		}
+
+		for _, t := range tests {
+			test := t
+			It(test.name, func() {
+				if test.driverExists {
+					driver := createCSIDriver(csics, test.driverAttachable)
+					if driver != nil {
+						defer csics.CsiV1alpha1().CSIDrivers().Delete(driver.Name, nil)
+					}
+				}
+
+				By("Creating pod")
+				t := driver.createStorageClassTest(node)
+				class, claim, pod := startPausePod(cs, t, ns.Name)
+				if class != nil {
+					defer cs.StorageV1().StorageClasses().Delete(class.Name, nil)
+				}
+				if claim != nil {
+					defer cs.CoreV1().PersistentVolumeClaims(ns.Name).Delete(claim.Name, nil)
+				}
+				if pod != nil {
+					// Fully delete (=unmount) the pod before deleting CSI driver
+					defer framework.DeletePodWithWait(f, cs, pod)
+				}
+				if pod == nil {
+					return
+				}
+
+				err := framework.WaitForPodNameRunningInNamespace(cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "Failed to start pod: %v", err)
+
+				By("Checking if VolumeAttachment was created for the pod")
+				// Check that VolumeAttachment does not exist
+				handle := getVolumeHandle(cs, claim)
+				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, t.provisioner, node.Name)))
+				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+				_, err = cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
+				if err != nil {
+					if errors.IsNotFound(err) {
+						if test.expectVolumeAttachment {
+							framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
+						}
+					} else {
+						framework.ExpectNoError(err, "Failed to find VolumeAttachment")
+					}
+				}
+				if !test.expectVolumeAttachment {
+					Expect(err).To(HaveOccurred(), "Unexpected VolumeAttachment found")
+				}
+			})
+		}
+	})
 })
+
+func createCSIDriver(csics csiclient.Interface, attachable bool) *csiv1alpha1.CSIDriver {
+	By("Creating CSIDriver instance")
+	driver := &csiv1alpha1.CSIDriver{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "csi-hostpath",
+		},
+		Spec: csiv1alpha1.CSIDriverSpec{
+			AttachRequired: &attachable,
+		},
+	}
+	driver, err := csics.CsiV1alpha1().CSIDrivers().Create(driver)
+	framework.ExpectNoError(err, "Failed to create CSIDriver: %v", err)
+	return driver
+}
+
+func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) string {
+	// re-get the claim to the latest state with bound volume
+	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+	if err != nil {
+		framework.ExpectNoError(err, "Cannot get PVC")
+		return ""
+	}
+	pvName := claim.Spec.VolumeName
+	pv, err := cs.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
+	if err != nil {
+		framework.ExpectNoError(err, "Cannot get PV")
+		return ""
+	}
+	if pv.Spec.CSI == nil {
+		Expect(pv.Spec.CSI).NotTo(BeNil())
+		return ""
+	}
+	return pv.Spec.CSI.VolumeHandle
+}
+
+func startPausePod(cs clientset.Interface, t storageClassTest, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	class := newStorageClass(t, ns, "")
+	class, err := cs.StorageV1().StorageClasses().Create(class)
+	framework.ExpectNoError(err, "Failed to create class : %v", err)
+	claim := newClaim(t, ns, "")
+	claim.Spec.StorageClassName = &class.Name
+	claim, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(claim)
+	framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pvc-volume-tester-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "volume-tester",
+					Image: imageutils.GetE2EImage(imageutils.Pause),
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "my-volume",
+							MountPath: "/mnt/test",
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name: "my-volume",
+					VolumeSource: v1.VolumeSource{
+						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+							ClaimName: claim.Name,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if len(t.nodeName) != 0 {
+		pod.Spec.NodeName = t.nodeName
+	}
+	pod, err = cs.CoreV1().Pods(ns).Create(pod)
+	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	return class, claim, pod
+}
 
 type hostpathCSIDriver struct {
 	combinedClusterRoleNames []string
@@ -142,6 +329,8 @@ func (h *hostpathCSIDriver) createCSIDriver() {
 	config := h.config
 	h.serviceAccount = csiServiceAccount(cs, config, "hostpath", false)
 	csiClusterRoleBindings(cs, config, false, h.serviceAccount, h.combinedClusterRoleNames)
+	role := csiControllerRole(cs, config, false)
+	csiControllerRoleBinding(cs, config, false, role, h.serviceAccount)
 	csiHostPathPod(cs, config, false, f, h.serviceAccount)
 }
 
@@ -152,6 +341,8 @@ func (h *hostpathCSIDriver) cleanupCSIDriver() {
 	config := h.config
 	csiHostPathPod(cs, config, true, f, h.serviceAccount)
 	csiClusterRoleBindings(cs, config, true, h.serviceAccount, h.combinedClusterRoleNames)
+	role := csiControllerRole(cs, config, true)
+	csiControllerRoleBinding(cs, config, true, role, h.serviceAccount)
 	csiServiceAccount(cs, config, "hostpath", true)
 }
 
@@ -168,9 +359,11 @@ type gcePDCSIDriver struct {
 func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
 	cs := f.ClientSet
 	framework.SkipUnlessProviderIs("gce", "gke")
-	// Currently you will need to manually add the required GCP Credentials as a secret "cloud-sa"
-	// kubectl create generic cloud-sa --from-file=PATH/TO/cloud-sa.json --namespace={{config.Namespace}}
-	// TODO(#62561): Inject the necessary credentials automatically to the driver containers in e2e test
+	framework.SkipIfMultizone(cs)
+
+	// TODO(#62561): Use credentials through external pod identity when that goes GA instead of downloading keys.
+	createGCESecrets(cs, config)
+
 	framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
 
 	return &gcePDCSIDriver{
@@ -187,13 +380,10 @@ func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csi
 }
 
 func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
-	nodeZone, ok := node.GetLabels()[kubeletapis.LabelZoneFailureDomain]
-	Expect(ok).To(BeTrue(), "Could not get label %v from node %v", kubeletapis.LabelZoneFailureDomain, node.GetName())
-
 	return storageClassTest{
-		name:         "csi-gce-pd",
-		provisioner:  "csi-gce-pd",
-		parameters:   map[string]string{"type": "pd-standard", "zone": nodeZone},
+		name:         "com.google.csi.gcepd",
+		provisioner:  "com.google.csi.gcepd",
+		parameters:   map[string]string{"type": "pd-standard"},
 		claimSize:    "5Gi",
 		expectedSize: "5Gi",
 		nodeName:     node.Name,
@@ -209,6 +399,10 @@ func (g *gcePDCSIDriver) createCSIDriver() {
 	g.nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false /* teardown */)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, false /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, false, /* teardown */
+		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
+	role := csiControllerRole(cs, config, false)
+	csiControllerRoleBinding(cs, config, false, role, g.controllerServiceAccount)
 	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 }
 
@@ -220,6 +414,10 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
 	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
+	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, true, /* teardown */
+		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
+	role := csiControllerRole(cs, config, true)
+	csiControllerRoleBinding(cs, config, true, role, g.controllerServiceAccount)
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
 	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
 }

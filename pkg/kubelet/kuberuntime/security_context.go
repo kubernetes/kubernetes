@@ -30,7 +30,10 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	effectiveSc := securitycontext.DetermineEffectiveSecurityContext(pod, container)
 	synthesized := convertToRuntimeSecurityContext(effectiveSc)
 	if synthesized == nil {
-		synthesized = &runtimeapi.LinuxContainerSecurityContext{}
+		synthesized = &runtimeapi.LinuxContainerSecurityContext{
+			MaskedPaths:   securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount),
+			ReadonlyPaths: securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount),
+		}
 	}
 
 	// set SeccompProfilePath.
@@ -66,6 +69,9 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 	}
 
 	synthesized.NoNewPrivs = securitycontext.AddNoNewPrivileges(effectiveSc)
+
+	synthesized.MaskedPaths = securitycontext.ConvertToRuntimeMaskedPaths(effectiveSc.ProcMount)
+	synthesized.ReadonlyPaths = securitycontext.ConvertToRuntimeReadonlyPaths(effectiveSc.ProcMount)
 
 	return synthesized
 }

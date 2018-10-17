@@ -87,6 +87,14 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if _, err := tls.X509KeyPair(tlsCrt, tlsKey); err != nil {
+		return nil, fmt.Errorf("failed to load key pair %v", err)
+	}
+	// TODO: Add more validation.
+	// 1. If the certificate contains intermediates, it is a valid chain.
+	// 2. Format etc.
+
 	secret := &v1.Secret{}
 	secret.Name = s.Name
 	secret.Type = v1.SecretTypeTLS
@@ -125,7 +133,7 @@ func (s SecretForTLSGeneratorV1) ParamNames() []GeneratorParam {
 // validate validates required fields are set to support structured generation
 func (s SecretForTLSGeneratorV1) validate() error {
 	// TODO: This is not strictly necessary. We can generate a self signed cert
-	// if no key/cert is given. The only requiredment is that we either get both
+	// if no key/cert is given. The only requirement is that we either get both
 	// or none. See test/e2e/ingress_utils for self signed cert generation.
 	if len(s.Key) == 0 {
 		return fmt.Errorf("key must be specified")
@@ -133,11 +141,5 @@ func (s SecretForTLSGeneratorV1) validate() error {
 	if len(s.Cert) == 0 {
 		return fmt.Errorf("certificate must be specified")
 	}
-	if _, err := tls.LoadX509KeyPair(s.Cert, s.Key); err != nil {
-		return fmt.Errorf("failed to load key pair %v", err)
-	}
-	// TODO: Add more validation.
-	// 1. If the certificate contains intermediates, it is a valid chain.
-	// 2. Format etc.
 	return nil
 }

@@ -42,7 +42,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
-	ginkgo.It("should ingest logs", func() {
+	ginkgo.It("should ingest logs [Feature:StackdriverLogging]", func() {
 		withLogProviderForScope(f, podsScope, func(p *sdLogProvider) {
 			ginkgo.By("Checking ingesting text logs", func() {
 				pod, err := utils.StartAndReturnSelf(utils.NewRepeatingLoggingPod("synthlogger-1", "hey"), f)
@@ -138,7 +138,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 		})
 	})
 
-	ginkgo.It("should ingest events", func() {
+	ginkgo.It("should ingest events [Feature:StackdriverLogging]", func() {
 		eventCreationInterval := 10 * time.Second
 
 		withLogProviderForScope(f, eventsScope, func(p *sdLogProvider) {

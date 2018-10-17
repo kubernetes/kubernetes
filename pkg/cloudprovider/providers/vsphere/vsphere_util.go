@@ -19,24 +19,23 @@ package vsphere
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/vim25"
-
-	"fmt"
-
 	"github.com/vmware/govmomi/vim25/mo"
-	"io/ioutil"
+
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
-	"k8s.io/kubernetes/pkg/util/version"
-	"path/filepath"
 )
 
 const (
@@ -79,18 +78,6 @@ func getVSphereConfig() (*VSphereConfig, error) {
 		return nil, err
 	}
 	return &cfg, nil
-}
-
-func getVSphereConn(cfg *VSphereConfig) *vclib.VSphereConnection {
-	vSphereConn := &vclib.VSphereConnection{
-		Username:          cfg.Global.User,
-		Password:          cfg.Global.Password,
-		Hostname:          cfg.Global.VCenterIP,
-		Insecure:          cfg.Global.InsecureFlag,
-		RoundTripperCount: cfg.Global.RoundTripperCount,
-		Port:              cfg.Global.VCenterPort,
-	}
-	return vSphereConn
 }
 
 // Returns the accessible datastores for the given node VM.
@@ -298,11 +285,15 @@ func (vs *VSphere) cleanUpDummyVMs(dummyVMPrefix string) {
 			continue
 		}
 		// A write lock is acquired to make sure the cleanUp routine doesn't delete any VM's created by ongoing PVC requests.
-		defer cleanUpDummyVMLock.Lock()
-		err = diskmanagers.CleanUpDummyVMs(ctx, vmFolder, dc)
-		if err != nil {
-			glog.V(4).Infof("Unable to clean up dummy VM's in the kubernetes cluster: %q. err: %+v", vs.cfg.Workspace.Folder, err)
+		cleanUpDummyVMs := func() {
+			cleanUpDummyVMLock.Lock()
+			defer cleanUpDummyVMLock.Unlock()
+			err = diskmanagers.CleanUpDummyVMs(ctx, vmFolder, dc)
+			if err != nil {
+				glog.V(4).Infof("Unable to clean up dummy VM's in the kubernetes cluster: %q. err: %+v", vs.cfg.Workspace.Folder, err)
+			}
 		}
+		cleanUpDummyVMs()
 	}
 }
 

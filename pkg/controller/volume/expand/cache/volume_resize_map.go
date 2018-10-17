@@ -28,7 +28,6 @@ import (
 	commontypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -78,7 +77,7 @@ func (pvcr *PVCWithResizeRequest) UniquePVCKey() types.UniquePVCName {
 
 // QualifiedName returns namespace and name combination of the PVC
 func (pvcr *PVCWithResizeRequest) QualifiedName() string {
-	return strings.JoinQualifiedName(pvcr.PVC.Namespace, pvcr.PVC.Name)
+	return util.GetPersistentVolumeClaimQualifiedName(pvcr.PVC)
 }
 
 // NewVolumeResizeMap returns new VolumeResizeMap which acts as a cache

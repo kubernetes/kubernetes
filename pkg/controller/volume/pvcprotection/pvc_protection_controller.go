@@ -57,8 +57,8 @@ type Controller struct {
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
 func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
 	e := &Controller{
-		client: cl,
-		queue:  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		client:                              cl,
+		queue:                               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
 		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -219,11 +219,6 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 			// pretty sure it won't be scheduled in parallel to this check.
 			// Therefore this pod does not block the PVC from deletion.
 			glog.V(4).Infof("Skipping unscheduled pod %s when checking PVC %s/%s", pod.Name, pvc.Namespace, pvc.Name)
-			continue
-		}
-		if volumeutil.IsPodTerminated(pod, pod.Status) {
-			// This pod is being unmounted/detached or is already
-			// unmounted/detached. It does not block the PVC from deletion.
 			continue
 		}
 		for _, volume := range pod.Spec.Volumes {

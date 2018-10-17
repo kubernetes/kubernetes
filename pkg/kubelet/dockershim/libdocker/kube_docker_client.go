@@ -205,7 +205,7 @@ func (d *kubeDockerClient) inspectImageRaw(ref string) (*dockertypes.ImageInspec
 		return nil, ctxErr
 	}
 	if err != nil {
-		if dockerapi.IsErrImageNotFound(err) {
+		if dockerapi.IsErrNotFound(err) {
 			err = ImageNotFoundError{ID: ref}
 		}
 		return nil, err
@@ -318,10 +318,10 @@ type progressReporter struct {
 // newProgressReporter creates a new progressReporter for specific image with specified reporting interval
 func newProgressReporter(image string, cancel context.CancelFunc, imagePullProgressDeadline time.Duration) *progressReporter {
 	return &progressReporter{
-		progress: newProgress(),
-		image:    image,
-		cancel:   cancel,
-		stopCh:   make(chan struct{}),
+		progress:                  newProgress(),
+		image:                     image,
+		cancel:                    cancel,
+		stopCh:                    make(chan struct{}),
 		imagePullProgressDeadline: imagePullProgressDeadline,
 	}
 }
@@ -469,7 +469,7 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 		}
 		return err
 	}
-	resp, err := d.client.ContainerExecAttach(ctx, startExec, dockertypes.ExecConfig{
+	resp, err := d.client.ContainerExecAttach(ctx, startExec, dockertypes.ExecStartCheck{
 		Detach: opts.Detach,
 		Tty:    opts.Tty,
 	})

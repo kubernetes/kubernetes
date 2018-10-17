@@ -137,6 +137,11 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "no-new-privileges")
 	}
 
+	if !hostConfig.Privileged {
+		hostConfig.MaskedPaths = sc.MaskedPaths
+		hostConfig.ReadonlyPaths = sc.ReadonlyPaths
+	}
+
 	return nil
 }
 

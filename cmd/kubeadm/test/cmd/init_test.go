@@ -23,9 +23,10 @@ import (
 )
 
 func runKubeadmInit(args ...string) (string, string, error) {
+	kubeadmPath := getKubeadmPath()
 	kubeadmArgs := []string{"init", "--dry-run", "--ignore-preflight-errors=all"}
 	kubeadmArgs = append(kubeadmArgs, args...)
-	return RunCmd(*kubeadmPath, kubeadmArgs...)
+	return RunCmd(kubeadmPath, kubeadmArgs...)
 }
 
 func TestCmdInitToken(t *testing.T) {
@@ -89,8 +90,8 @@ func TestCmdInitKubernetesVersion(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "invalid version string is detected",
-			args:     "--kubernetes-version=foobar",
+			name:     "invalid semantic version string is detected",
+			args:     "--kubernetes-version=v1.1",
 			expected: false,
 		},
 		{
@@ -143,9 +144,9 @@ func TestCmdInitConfig(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "can load v1alpha2 config",
+			name:     "can't load v1alpha2 config",
 			args:     "--config=testdata/init/v1alpha2.yaml",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "can load v1alpha3 config",
@@ -153,8 +154,18 @@ func TestCmdInitConfig(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "don't allow mixed arguments",
+			name:     "can load v1beta1 config",
+			args:     "--config=testdata/init/v1beta1.yaml",
+			expected: true,
+		},
+		{
+			name:     "don't allow mixed arguments v1alpha3",
 			args:     "--kubernetes-version=1.11.0 --config=testdata/init/v1alpha3.yaml",
+			expected: false,
+		},
+		{
+			name:     "don't allow mixed arguments v1beta1",
+			args:     "--kubernetes-version=1.11.0 --config=testdata/init/v1beta1.yaml",
 			expected: false,
 		},
 	}

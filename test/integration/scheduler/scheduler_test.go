@@ -20,19 +20,13 @@ package scheduler
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -45,11 +39,11 @@ import (
 	schedulerapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -140,6 +134,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
+				"MaxCSIVolumeCountPred",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"NoDiskConflict",
@@ -154,6 +149,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
 				"TaintTolerationPriority",
+				"ImageLocalityPriority",
 			),
 		},
 		{
@@ -173,7 +169,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		configPolicyName := fmt.Sprintf("scheduler-custom-policy-config-%d", i)
 		policyConfigMap := v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-			Data:       map[string]string{componentconfig.SchedulerPolicyConfigMapKey: test.policy},
+			Data:       map[string]string{kubeschedulerconfig.SchedulerPolicyConfigMapKey: test.policy},
 		}
 
 		policyConfigMap.APIVersion = "v1"
@@ -182,18 +178,20 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		eventBroadcaster := record.NewBroadcaster()
 		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
+		defaultBindTimeout := int64(30)
 		ss := &schedulerappconfig.Config{
-			ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+			ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 				HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 				SchedulerName:                  v1.DefaultSchedulerName,
-				AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
-					Policy: &componentconfig.SchedulerPolicySource{
-						ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+				AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{
+					Policy: &kubeschedulerconfig.SchedulerPolicySource{
+						ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
 							Namespace: policyConfigMap.Namespace,
 							Name:      policyConfigMap.Name,
 						},
 					},
 				},
+				BindTimeoutSeconds: &defaultBindTimeout,
 			},
 			Client:          clientSet,
 			InformerFactory: informerFactory,
@@ -243,18 +241,20 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 
+	defaultBindTimeout := int64(30)
 	ss := &schedulerappconfig.Config{
-		ComponentConfig: componentconfig.KubeSchedulerConfiguration{
+		ComponentConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
 			SchedulerName: v1.DefaultSchedulerName,
-			AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
-				Policy: &componentconfig.SchedulerPolicySource{
-					ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+			AlgorithmSource: kubeschedulerconfig.SchedulerAlgorithmSource{
+				Policy: &kubeschedulerconfig.SchedulerPolicySource{
+					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
 						Namespace: "non-existent-config",
 						Name:      "non-existent-config",
 					},
 				},
 			},
 			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			BindTimeoutSeconds:             &defaultBindTimeout,
 		},
 		Client:          clientSet,
 		InformerFactory: informerFactory,
@@ -662,95 +662,6 @@ func TestAllocatable(t *testing.T) {
 		t.Errorf("Test allocatable awareness: %s Pod got scheduled unexpectedly, %v", testAllocPod2.Name, err)
 	} else {
 		t.Logf("Test allocatable awareness: %s Pod not scheduled as expected", testAllocPod2.Name)
-	}
-}
-
-// TestPDBCache verifies that scheduler cache works as expected when handling
-// PodDisruptionBudget.
-func TestPDBCache(t *testing.T) {
-	context := initTest(t, "pdbcache")
-	defer cleanupTest(t, context)
-
-	intstrMin := intstr.FromInt(4)
-	pdb := &policy.PodDisruptionBudget{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: context.ns.Name,
-			Name:      "test-pdb",
-			UID:       types.UID("test-pdb-uid"),
-			Labels:    map[string]string{"tkey1": "tval1", "tkey2": "tval2"},
-		},
-		Spec: policy.PodDisruptionBudgetSpec{
-			MinAvailable: &intstrMin,
-			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"tkey": "tvalue"}},
-		},
-	}
-
-	createdPDB, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).Create(pdb)
-	if err != nil {
-		t.Errorf("Failed to create PDB: %v", err)
-	}
-	// Wait for PDB to show up in the scheduler's cache.
-	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
-		if err != nil {
-			t.Errorf("Error while polling for PDB: %v", err)
-			return false, err
-		}
-		return len(cachedPDBs) > 0, err
-	}); err != nil {
-		t.Fatalf("No PDB was added to the cache: %v", err)
-	}
-	// Read PDB from the cache and compare it.
-	cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
-	if len(cachedPDBs) != 1 {
-		t.Fatalf("Expected to have 1 pdb in cache, but found %d.", len(cachedPDBs))
-	}
-	if !reflect.DeepEqual(createdPDB, cachedPDBs[0]) {
-		t.Errorf("Got different PDB than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(createdPDB, cachedPDBs[0]))
-	}
-
-	// Update PDB and change its labels.
-	pdbCopy := *cachedPDBs[0]
-	pdbCopy.Labels = map[string]string{}
-	updatedPDB, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).Update(&pdbCopy)
-	if err != nil {
-		t.Errorf("Failed to update PDB: %v", err)
-	}
-	// Wait for PDB to be updated in the scheduler's cache.
-	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
-		if err != nil {
-			t.Errorf("Error while polling for PDB: %v", err)
-			return false, err
-		}
-		return len(cachedPDBs[0].Labels) == 0, err
-	}); err != nil {
-		t.Fatalf("No PDB was updated in the cache: %v", err)
-	}
-	// Read PDB from the cache and compare it.
-	cachedPDBs, err = context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
-	if len(cachedPDBs) != 1 {
-		t.Errorf("Expected to have 1 pdb in cache, but found %d.", len(cachedPDBs))
-	}
-	if !reflect.DeepEqual(updatedPDB, cachedPDBs[0]) {
-		t.Errorf("Got different PDB than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(updatedPDB, cachedPDBs[0]))
-	}
-
-	// Delete PDB.
-	err = context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).Delete(pdb.Name, &metav1.DeleteOptions{})
-	if err != nil {
-		t.Errorf("Failed to delete PDB: %v", err)
-	}
-	// Wait for PDB to be deleted from the scheduler's cache.
-	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
-		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
-		if err != nil {
-			t.Errorf("Error while polling for PDB: %v", err)
-			return false, err
-		}
-		return len(cachedPDBs) == 0, err
-	}); err != nil {
-		t.Errorf("No PDB was deleted from the cache: %v", err)
 	}
 }
 

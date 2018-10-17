@@ -21,13 +21,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
-        "//pkg/kubeapiserver/server:go_default_library",
         "//plugin/pkg/admission/admit:go_default_library",
         "//plugin/pkg/admission/alwayspullimages:go_default_library",
         "//plugin/pkg/admission/antiaffinity:go_default_library",
@@ -91,12 +89,17 @@ go_test(
     name = "go_default_test",
     srcs = [
         "admission_test.go",
+        "authentication_test.go",
         "authorization_test.go",
         "storage_versions_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/kubeapiserver/authenticator:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
     ],
 )

@@ -19,10 +19,10 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 )
 
 var (
@@ -59,11 +59,11 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
+		Use:                   "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
-		Short:   "Edit latest last-applied-configuration annotations of a resource/object",
-		Long:    applyEditLastAppliedLong,
-		Example: applyEditLastAppliedExample,
+		Short:                 "Edit latest last-applied-configuration annotations of a resource/object",
+		Long:                  applyEditLastAppliedLong,
+		Example:               applyEditLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.Complete(f, args, cmd); err != nil {
 				cmdutil.CheckErr(err)

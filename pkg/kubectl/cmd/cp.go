@@ -27,11 +27,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"bytes"
@@ -70,7 +70,7 @@ type CopyOptions struct {
 	Namespace string
 
 	ClientConfig *restclient.Config
-	Clientset    internalclientset.Interface
+	Clientset    kubernetes.Interface
 
 	genericclioptions.IOStreams
 }
@@ -86,11 +86,11 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 	o := NewCopyOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use: "cp <file-spec-src> <file-spec-dest>",
+		Use:                   "cp <file-spec-src> <file-spec-dest>",
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Copy files and directories to and from containers."),
-		Long:    "Copy files and directories to and from containers.",
-		Example: cpExample,
+		Short:                 i18n.T("Copy files and directories to and from containers."),
+		Long:                  "Copy files and directories to and from containers.",
+		Example:               cpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.Run(args))
@@ -144,7 +144,7 @@ func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	o.Clientset, err = f.ClientSet()
+	o.Clientset, err = f.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
