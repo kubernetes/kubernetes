@@ -35,7 +35,7 @@ type InitConfiguration struct {
 	ClusterConfiguration `json:"-"`
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
-	// After that, the information in the fields ARE NOT uploaded to the `kubeadm-config` ConfigMap
+	// After that, the information in the fields IS NOT uploaded to the `kubeadm-config` ConfigMap
 	// that is used by `kubeadm upgrade` for instance. These fields must be omitempty.
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
@@ -70,7 +70,7 @@ type ClusterConfiguration struct {
 	// are used; in case the ControlPlaneEndpoint is specified but without a TCP port,
 	// the BindPort is used.
 	// Possible usages are:
-	// e.g. In an cluster with more than one control plane instances, this field should be
+	// e.g. In a cluster with more than one control plane instances, this field should be
 	// assigned the address of the external load balancer in front of the
 	// control plane instances.
 	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
@@ -258,41 +258,12 @@ type JoinConfiguration struct {
 	// secure comunications between node and master.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
 	CACertPath string `json:"caCertPath"`
-	// DiscoveryFile is a file or url to a kubeconfig file from which to
-	// load cluster information.
-	DiscoveryFile string `json:"discoveryFile"`
-	// DiscoveryToken is a token used to validate cluster information
-	// fetched from the master.
-	DiscoveryToken string `json:"discoveryToken"`
-	// DiscoveryTokenAPIServers is a set of IPs to API servers from which info
-	// will be fetched. Currently we only pay attention to one API server but
-	// hope to support >1 in the future.
-	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers,omitempty"`
-	// DiscoveryTimeout modifies the discovery timeout
-	DiscoveryTimeout *metav1.Duration `json:"discoveryTimeout,omitempty"`
-	// TLSBootstrapToken is a token used for TLS bootstrapping.
-	// Defaults to Token.
-	TLSBootstrapToken string `json:"tlsBootstrapToken"`
-	// Token is used for both discovery and TLS bootstrapping.
-	Token string `json:"token"`
+
+	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
+	Discovery Discovery `json:"discovery"`
 
 	// ClusterName is the name for the cluster in kubeconfig.
 	ClusterName string `json:"clusterName,omitempty"`
-
-	// DiscoveryTokenCACertHashes specifies a set of public key pins to verify
-	// when token-based discovery is used. The root CA found during discovery
-	// must match one of these values. Specifying an empty set disables root CA
-	// pinning, which can be unsafe. Each hash is specified as "<type>:<value>",
-	// where the only currently supported type is "sha256". This is a hex-encoded
-	// SHA-256 hash of the Subject Public Key Info (SPKI) object in DER-encoded
-	// ASN.1. These hashes can be calculated using, for example, OpenSSL:
-	// openssl x509 -pubkey -in ca.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
-	DiscoveryTokenCACertHashes []string `json:"discoveryTokenCACertHashes,omitempty"`
-
-	// DiscoveryTokenUnsafeSkipCAVerification allows token-based discovery
-	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
-	// the security of kubeadm since other nodes can impersonate the master.
-	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
 
 	// ControlPlane flag specifies that the joining node should host an additional
 	// control plane instance.
@@ -303,6 +274,58 @@ type JoinConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+}
+
+// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
+type Discovery struct {
+	// BootstrapToken is used to set the options for bootstrap token based discovery
+	// BootstrapToken and File are mutually exclusive
+	BootstrapToken *BootstrapTokenDiscovery `json:"bootstrapToken,omitempty"`
+
+	// File is used to specify a file or URL to a kubeconfig file from which to load cluster information
+	// BootstrapToken and File are mutually exclusive
+	File *FileDiscovery `json:"file,omitempty"`
+
+	// TLSBootstrapToken is a token used for TLS bootstrapping.
+	// If .BootstrapToken is set, this field is defaulted to .BootstrapToken.Token, but can be overridden.
+	// If .File is set, this field **must be set** in case the KubeConfigFile does not contain any other authentication information
+	TLSBootstrapToken string `json:"tlsBootstrapToken"`
+
+	// Timeout modifies the discovery timeout
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
+}
+
+// BootstrapTokenDiscovery is used to set the options for bootstrap token based discovery
+type BootstrapTokenDiscovery struct {
+	// Token is a token used to validate cluster information
+	// fetched from the master.
+	Token string `json:"token"`
+
+	// APIServerEndpoints is a set of IPs or domain names to API servers from which info
+	// will be fetched. Currently we only pay attention to one API server but
+	// hope to support >1 in the future.
+	APIServerEndpoints []string `json:"apiServerEndpoints,omitempty"`
+
+	// CACertHashes specifies a set of public key pins to verify
+	// when token-based discovery is used. The root CA found during discovery
+	// must match one of these values. Specifying an empty set disables root CA
+	// pinning, which can be unsafe. Each hash is specified as "<type>:<value>",
+	// where the only currently supported type is "sha256". This is a hex-encoded
+	// SHA-256 hash of the Subject Public Key Info (SPKI) object in DER-encoded
+	// ASN.1. These hashes can be calculated using, for example, OpenSSL:
+	// openssl x509 -pubkey -in ca.crt openssl rsa -pubin -outform der 2>&/dev/null | openssl dgst -sha256 -hex
+	CACertHashes []string `json:"caCertHashes,omitempty"`
+
+	// UnsafeSkipCAVerification allows token-based discovery
+	// without CA verification via CACertHashes. This can weaken
+	// the security of kubeadm since other nodes can impersonate the master.
+	UnsafeSkipCAVerification bool `json:"unsafeSkipCAVerification"`
+}
+
+// FileDiscovery is used to specify a file or URL to a kubeconfig file from which to load cluster information
+type FileDiscovery struct {
+	// KubeConfigPath is used to specify the actual file path or URL to the kubeconfig file from which to load cluster information
+	KubeConfigPath string `json:"kubeConfigPath"`
 }
 
 // HostPathMount contains elements describing volumes that are mounted from the

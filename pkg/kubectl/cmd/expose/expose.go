@@ -34,11 +34,13 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -90,7 +92,7 @@ type ExposeServiceOptions struct {
 	DryRun           bool
 	EnforceNamespace bool
 
-	Generators                func(string) map[string]kubectl.Generator
+	Generators                func(string) map[string]generate.Generator
 	CanBeExposed              polymorphichelpers.CanBeExposedFunc
 	MapBasedSelectorForObject func(runtime.Object) (string, error)
 	PortsForObject            polymorphichelpers.PortsForObjectFunc
@@ -187,7 +189,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 		return err
 	}
 
-	o.Generators = cmdutil.GeneratorFn
+	o.Generators = generateversioned.GeneratorFn
 	o.Builder = f.NewBuilder()
 	o.CanBeExposed = polymorphichelpers.CanBeExposedFn
 	o.MapBasedSelectorForObject = polymorphichelpers.MapBasedSelectorForObjectFn
@@ -240,7 +242,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 
-		params := kubectl.MakeParams(cmd, names)
+		params := generate.MakeParams(cmd, names)
 		name := info.Name
 		if len(name) > validation.DNS1035LabelMaxLength {
 			name = name[:validation.DNS1035LabelMaxLength]
@@ -249,7 +251,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 		// For objects that need a pod selector, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --selector
-		if s, found := params["selector"]; found && kubectl.IsZero(s) {
+		if s, found := params["selector"]; found && generate.IsZero(s) {
 			s, err := o.MapBasedSelectorForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
@@ -261,7 +263,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 		// For objects that need a port, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --port
-		if port, found := params["port"]; found && kubectl.IsZero(port) {
+		if port, found := params["port"]; found && generate.IsZero(port) {
 			ports, err := o.PortsForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
@@ -285,23 +287,23 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
 			}
-			if protocols := kubectl.MakeProtocols(protocolsMap); !kubectl.IsZero(protocols) {
+			if protocols := generate.MakeProtocols(protocolsMap); !generate.IsZero(protocols) {
 				params["protocols"] = protocols
 			}
 		}
 
-		if kubectl.IsZero(params["labels"]) {
+		if generate.IsZero(params["labels"]) {
 			labels, err := meta.NewAccessor().Labels(info.Object)
 			if err != nil {
 				return err
 			}
-			params["labels"] = kubectl.MakeLabels(labels)
+			params["labels"] = generate.MakeLabels(labels)
 		}
-		if err = kubectl.ValidateParams(names, params); err != nil {
+		if err = generate.ValidateParams(names, params); err != nil {
 			return err
 		}
 		// Check for invalid flags used against the present generator.
-		if err := kubectl.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
+		if err := generate.EnsureFlagsValid(cmd, generators, generatorName); err != nil {
 			return err
 		}
 

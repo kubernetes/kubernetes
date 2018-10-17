@@ -60,6 +60,8 @@ func Compare(cmp Cmp, result string, v interface{}) Cmp {
 		cmp.TargetUnion = &pb.Compare_CreateRevision{CreateRevision: mustInt64(v)}
 	case pb.Compare_MOD:
 		cmp.TargetUnion = &pb.Compare_ModRevision{ModRevision: mustInt64(v)}
+	case pb.Compare_LEASE:
+		cmp.TargetUnion = &pb.Compare_Lease{Lease: mustInt64orLeaseID(v)}
 	default:
 		panic("Unknown compare type")
 	}
@@ -82,6 +84,12 @@ func ModRevision(key string) Cmp {
 	return Cmp{Key: []byte(key), Target: pb.Compare_MOD}
 }
 
+// LeaseValue compares a key's LeaseID to a value of your choosing. The empty
+// LeaseID is 0, otherwise known as `NoLease`.
+func LeaseValue(key string) Cmp {
+	return Cmp{Key: []byte(key), Target: pb.Compare_LEASE}
+}
+
 // KeyBytes returns the byte slice holding with the comparison key.
 func (cmp *Cmp) KeyBytes() []byte { return cmp.Key }
 
@@ -98,6 +106,18 @@ func (cmp *Cmp) ValueBytes() []byte {
 
 // WithValueBytes sets the byte slice for the comparison's value.
 func (cmp *Cmp) WithValueBytes(v []byte) { cmp.TargetUnion.(*pb.Compare_Value).Value = v }
+
+// WithRange sets the comparison to scan the range [key, end).
+func (cmp Cmp) WithRange(end string) Cmp {
+	cmp.RangeEnd = []byte(end)
+	return cmp
+}
+
+// WithPrefix sets the comparison to scan all keys prefixed by the key.
+func (cmp Cmp) WithPrefix() Cmp {
+	cmp.RangeEnd = getPrefix(cmp.Key)
+	return cmp
+}
 
 // mustInt64 panics if val isn't an int or int64. It returns an int64 otherwise.
 func mustInt64(val interface{}) int64 {

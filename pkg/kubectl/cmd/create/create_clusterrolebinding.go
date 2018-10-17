@@ -20,10 +20,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -61,12 +62,12 @@ func NewCmdCreateClusterRoleBinding(f cmdutil.Factory, ioStreams genericclioptio
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.ClusterRoleBindingV1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.ClusterRoleBindingV1GeneratorName)
 	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this ClusterRoleBinding should reference"))
 	cmd.MarkFlagCustom("clusterrole", "__kubectl_get_resource_clusterrole")
-	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the role")
-	cmd.Flags().StringArray("group", []string{}, "Groups to bind to the role")
-	cmd.Flags().StringArray("serviceaccount", []string{}, "Service accounts to bind to the role, in the format <namespace>:<name>")
+	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the clusterrole")
+	cmd.Flags().StringArray("group", []string{}, "Groups to bind to the clusterrole")
+	cmd.Flags().StringArray("serviceaccount", []string{}, "Service accounts to bind to the clusterrole, in the format <namespace>:<name>")
 	return cmd
 }
 
@@ -76,10 +77,10 @@ func (o *ClusterRoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command,
 		return err
 	}
 
-	var generator kubectl.StructuredGenerator
+	var generator generate.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case cmdutil.ClusterRoleBindingV1GeneratorName:
-		generator = &kubectl.ClusterRoleBindingGeneratorV1{
+	case generateversioned.ClusterRoleBindingV1GeneratorName:
+		generator = &generateversioned.ClusterRoleBindingGeneratorV1{
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
 			Users:           cmdutil.GetFlagStringArray(cmd, "user"),

@@ -7,6 +7,7 @@ load(
 
 go_library(
     name = "go_default_library",
+    testonly = 1,
     srcs = ["tokentest.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest",
     importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest",

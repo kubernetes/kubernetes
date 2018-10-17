@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	/*
 		Release : v1.9
 		Testname: Pod liveness probe, using local file, restart
-		Description: Create a Pod with liveness probe that that uses ExecAction handler to cat /temp/health file. The Container deletes the file /temp/health after 10 second, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
+		Description: Create a Pod with liveness probe that uses ExecAction handler to cat /temp/health file. The Container deletes the file /temp/health after 10 second, triggering liveness probe to fail. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
 	framework.ConformanceIt("should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance]", func() {
 		runLivenessTest(f, &v1.Pod{

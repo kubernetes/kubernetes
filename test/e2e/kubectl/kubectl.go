@@ -79,6 +79,8 @@ const (
 	simplePodPort            = 80
 	pausePodSelector         = "name=pause"
 	pausePodName             = "pause"
+	busyboxPodSelector       = "app=busybox1"
+	busyboxPodName           = "busybox1"
 	runJobTimeout            = 5 * time.Minute
 	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
 	redisControllerFilename  = "redis-master-controller.json.in"
@@ -1074,6 +1076,46 @@ metadata:
 			output = framework.RunKubectlOrDie("get", "pod", pausePodName, "-L", labelName, nsFlag)
 			if strings.Contains(output, labelValue) {
 				framework.Failf("Failed removing label " + labelName + " of the pod " + pausePodName)
+			}
+		})
+	})
+
+	framework.KubeDescribe("Kubectl copy", func() {
+		var podYaml string
+		var nsFlag string
+		BeforeEach(func() {
+			By("creating the pod")
+			nsFlag = fmt.Sprintf("--namespace=%v", ns)
+			podYaml = substituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
+			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
+			Expect(framework.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(BeTrue())
+		})
+		AfterEach(func() {
+			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
+		})
+
+		/*
+			Release : v1.12
+			Testname: Kubectl, copy
+			Description: When a Pod is running, copy a known file from it to a temporary local destination.
+		*/
+		It("should copy a file from a running Pod", func() {
+			remoteContents := "foobar\n"
+			podSource := fmt.Sprintf("%s:/root/foo/bar/foo.bar", busyboxPodName)
+			tempDestination, err := ioutil.TempFile(os.TempDir(), "copy-foobar")
+			if err != nil {
+				framework.Failf("Failed creating temporary destination file: %v", err)
+			}
+
+			By("specifying a remote filepath " + podSource + " on the pod")
+			framework.RunKubectlOrDie("cp", podSource, tempDestination.Name(), nsFlag)
+			By("verifying that the contents of the remote file " + podSource + " have been copied to a local file " + tempDestination.Name())
+			localData, err := ioutil.ReadAll(tempDestination)
+			if err != nil {
+				framework.Failf("Failed reading temporary local file: %v", err)
+			}
+			if string(localData) != remoteContents {
+				framework.Failf("Failed copying remote file contents. Expected %s but got %s", remoteContents, string(localData))
 			}
 		})
 	})

@@ -22,9 +22,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/polymorphichelpers",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/kubectl:go_default_library",
+        "//pkg/kubectl/generate:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
+        "//pkg/kubectl/util/podutils:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",
@@ -63,7 +64,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/controller:go_default_library",
+        "//pkg/kubectl/util/podutils:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta2:go_default_library",

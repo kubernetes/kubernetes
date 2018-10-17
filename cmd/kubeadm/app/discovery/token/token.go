@@ -44,21 +44,21 @@ const BootstrapUser = "token-bootstrap-client"
 // It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if cfg.DiscoveryTokenCACertHashes is not empty)
 // validating the cluster CA against a set of pinned public keys
 func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
-	token, err := kubeadmapi.NewBootstrapTokenString(cfg.DiscoveryToken)
+	token, err := kubeadmapi.NewBootstrapTokenString(cfg.Discovery.BootstrapToken.Token)
 	if err != nil {
 		return nil, err
 	}
 
 	// Load the cfg.DiscoveryTokenCACertHashes into a pubkeypin.Set
 	pubKeyPins := pubkeypin.NewSet()
-	err = pubKeyPins.Allow(cfg.DiscoveryTokenCACertHashes...)
+	err = pubKeyPins.Allow(cfg.Discovery.BootstrapToken.CACertHashes...)
 	if err != nil {
 		return nil, err
 	}
 
 	// The function below runs for every endpoint, and all endpoints races with each other.
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
-	baseKubeConfig, err := runForEndpointsAndReturnFirst(cfg.DiscoveryTokenAPIServers, cfg.DiscoveryTimeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
+	baseKubeConfig, err := runForEndpointsAndReturnFirst(cfg.Discovery.BootstrapToken.APIServerEndpoints, cfg.Discovery.Timeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
 
 		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, cfg.ClusterName)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster

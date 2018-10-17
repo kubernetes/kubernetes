@@ -45,22 +45,27 @@ func (gce *GCECloud) ListClusters(ctx context.Context) ([]string, error) {
 }
 
 func (gce *GCECloud) GetManagedClusters(ctx context.Context) ([]*container.Cluster, error) {
-	var location string
-	if len(gce.managedZones) > 1 {
-		// Multiple managed zones means this is a regional cluster
-		// so use the regional location and not the zone.
-		location = gce.region
-	} else if len(gce.managedZones) == 1 {
-		location = gce.managedZones[0]
+	managedClusters := []*container.Cluster{}
+
+	if gce.regional {
+		var err error
+		managedClusters, err = gce.getClustersInLocation(gce.region)
+		if err != nil {
+			return nil, err
+		}
+	} else if len(gce.managedZones) >= 1 {
+		for _, zone := range gce.managedZones {
+			clusters, err := gce.getClustersInLocation(zone)
+			if err != nil {
+				return nil, err
+			}
+			managedClusters = append(managedClusters, clusters...)
+		}
 	} else {
 		return nil, errors.New(fmt.Sprintf("no zones associated with this cluster(%s)", gce.ProjectID()))
 	}
-	clusters, err := gce.getClustersInLocation(location)
-	if err != nil {
-		return nil, err
-	}
 
-	return clusters, nil
+	return managedClusters, nil
 }
 
 func (gce *GCECloud) Master(ctx context.Context, clusterName string) (string, error) {

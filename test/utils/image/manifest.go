@@ -83,7 +83,7 @@ var (
 	sampleRegistry        = registry.SampleRegistry
 
 	AdmissionWebhook         = ImageConfig{e2eRegistry, "webhook", "1.13v1"}
-	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.0"}
+	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.10"}
 	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0"}
 	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29"}
 	CheckMetadataConcealment = ImageConfig{e2eRegistry, "metadata-concealment", "1.0"}
@@ -105,7 +105,7 @@ var (
 	MounttestUser            = ImageConfig{e2eRegistry, "mounttest-user", "1.0"}
 	Nautilus                 = ImageConfig{e2eRegistry, "nautilus", "1.0"}
 	Net                      = ImageConfig{e2eRegistry, "net", "1.0"}
-	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.0"}
+	Netexec                  = ImageConfig{e2eRegistry, "netexec", "1.1"}
 	Nettest                  = ImageConfig{e2eRegistry, "nettest", "1.0"}
 	Nginx                    = ImageConfig{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	NginxNew                 = ImageConfig{dockerLibraryRegistry, "nginx", "1.15-alpine"}

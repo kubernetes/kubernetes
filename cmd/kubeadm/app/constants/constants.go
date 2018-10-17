@@ -81,12 +81,18 @@ const (
 	// EtcdServerKeyName defines etcd's server key name
 	EtcdServerKeyName = "etcd/server.key"
 
+	// EtcdListenClientPort defines the port etcd listen on for client traffic
+	EtcdListenClientPort = 2379
+
 	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
 	EtcdPeerCertAndKeyBaseName = "etcd/peer"
 	// EtcdPeerCertName defines etcd's peer certificate name
 	EtcdPeerCertName = "etcd/peer.crt"
 	// EtcdPeerKeyName defines etcd's peer key name
 	EtcdPeerKeyName = "etcd/peer.key"
+
+	// EtcdListenPeerPort defines the port etcd listen on for peer traffic
+	EtcdListenPeerPort = 2380
 
 	// EtcdHealthcheckClientCertAndKeyBaseName defines etcd's healthcheck client certificate and key base name
 	EtcdHealthcheckClientCertAndKeyBaseName = "etcd/healthcheck-client"

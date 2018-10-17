@@ -55,7 +55,7 @@ func (fp *filePipeline) Open() (f *fileutil.LockedFile, err error) {
 	case f = <-fp.filec:
 	case err = <-fp.errc:
 	}
-	return
+	return f, err
 }
 
 func (fp *filePipeline) Close() error {

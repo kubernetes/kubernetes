@@ -26,7 +26,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -43,14 +42,16 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	oapi "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
@@ -61,8 +62,8 @@ type ApplyOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
-	DeleteFlags   *DeleteFlags
-	DeleteOptions *DeleteOptions
+	DeleteFlags   *delete.DeleteFlags
+	DeleteOptions *delete.DeleteOptions
 
 	ServerSideApply            bool
 	Selector                   string
@@ -77,11 +78,12 @@ type ApplyOptions struct {
 	PruneWhitelist             []string
 	ShouldIncludeUninitialized bool
 
-	Validator     validation.Schema
-	Builder       *resource.Builder
-	Mapper        meta.RESTMapper
-	DynamicClient dynamic.Interface
-	OpenAPISchema openapi.Resources
+	Validator       validation.Schema
+	Builder         *resource.Builder
+	Mapper          meta.RESTMapper
+	DynamicClient   dynamic.Interface
+	DiscoveryClient discovery.DiscoveryInterface
+	OpenAPISchema   openapi.Resources
 
 	Namespace        string
 	EnforceNamespace bool
@@ -128,7 +130,7 @@ var (
 func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 	return &ApplyOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: NewDeleteFlags("that contains the configuration to apply"),
+		DeleteFlags: delete.NewDeleteFlags("that contains the configuration to apply"),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,
@@ -210,6 +212,11 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
 	o.RecordFlags.Complete(cmd)
 	o.Recorder, err = o.RecordFlags.ToRecorder()
+	if err != nil {
+		return err
+	}
+
+	o.DiscoveryClient, err = f.ToDiscoveryClient()
 	if err != nil {
 		return err
 	}
@@ -304,6 +311,11 @@ func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
 	if o.OpenApiPatch {
 		openapiSchema = o.OpenAPISchema
+	}
+
+	dryRunVerifier := &DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(o.DynamicClient)),
+		OpenAPIGetter: o.DiscoveryClient,
 	}
 
 	// include the uninitialized objects by default if --prune is true
@@ -406,6 +418,13 @@ func (o *ApplyOptions) Run() error {
 			if !errors.IsNotFound(err) {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("retrieving current configuration of:\n%s\nfrom server for:", info.String()), info.Source, err)
 			}
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if o.ServerDryRun {
+				if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return err
+				}
+			}
+
 			// Create the resource if it doesn't exist
 			// First, update the annotation used by kubectl apply
 			if err := kubectl.CreateApplyAnnotation(info.Object, unstructured.UnstructuredJSONScheme); err != nil {
@@ -456,21 +475,21 @@ func (o *ApplyOptions) Run() error {
 			}
 
 			helper := resource.NewHelper(info.Client, info.Mapping)
-			patcher := &patcher{
-				mapping:       info.Mapping,
-				helper:        helper,
-				dynamicClient: o.DynamicClient,
-				overwrite:     o.Overwrite,
-				backOff:       clockwork.NewRealClock(),
-				force:         o.DeleteOptions.ForceDeletion,
-				cascade:       o.DeleteOptions.Cascade,
-				timeout:       o.DeleteOptions.Timeout,
-				gracePeriod:   o.DeleteOptions.GracePeriod,
-				serverDryRun:  o.ServerDryRun,
-				openapiSchema: openapiSchema,
+			patcher := &Patcher{
+				Mapping:       info.Mapping,
+				Helper:        helper,
+				DynamicClient: o.DynamicClient,
+				Overwrite:     o.Overwrite,
+				BackOff:       clockwork.NewRealClock(),
+				Force:         o.DeleteOptions.ForceDeletion,
+				Cascade:       o.DeleteOptions.Cascade,
+				Timeout:       o.DeleteOptions.Timeout,
+				GracePeriod:   o.DeleteOptions.GracePeriod,
+				ServerDryRun:  o.ServerDryRun,
+				OpenapiSchema: openapiSchema,
 			}
 
-			patchBytes, patchedObject, err := patcher.patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
+			patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
 			if err != nil {
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
@@ -715,28 +734,67 @@ func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Inte
 	return c.Resource(mapping.Resource).Namespace(namespace).Delete(name, options)
 }
 
-func (p *patcher) delete(namespace, name string) error {
-	return runDelete(namespace, name, p.mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.serverDryRun)
+func (p *Patcher) delete(namespace, name string) error {
+	return runDelete(namespace, name, p.Mapping, p.DynamicClient, p.Cascade, p.GracePeriod, p.ServerDryRun)
 }
 
-type patcher struct {
-	mapping       *meta.RESTMapping
-	helper        *resource.Helper
-	dynamicClient dynamic.Interface
+type Patcher struct {
+	Mapping       *meta.RESTMapping
+	Helper        *resource.Helper
+	DynamicClient dynamic.Interface
 
-	overwrite bool
-	backOff   clockwork.Clock
+	Overwrite bool
+	BackOff   clockwork.Clock
 
-	force        bool
-	cascade      bool
-	timeout      time.Duration
-	gracePeriod  int
-	serverDryRun bool
+	Force        bool
+	Cascade      bool
+	Timeout      time.Duration
+	GracePeriod  int
+	ServerDryRun bool
 
-	openapiSchema openapi.Resources
+	OpenapiSchema openapi.Resources
 }
 
-func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+// DryRunVerifier verifies if a given group-version-kind supports DryRun
+// against the current server. Sending dryRun requests to apiserver that
+// don't support it will result in objects being unwillingly persisted.
+//
+// It reads the OpenAPI to see if the given GVK supports dryRun. If the
+// GVK can not be found, we assume that CRDs will have the same level of
+// support as "namespaces", and non-CRDs will not be supported. We
+// delay the check for CRDs as much as possible though, since it
+// requires an extra round-trip to the server.
+type DryRunVerifier struct {
+	Finder        cmdutil.CRDFinder
+	OpenAPIGetter discovery.OpenAPISchemaInterface
+}
+
+// HasSupport verifies if the given gvk supports DryRun. An error is
+// returned if it doesn't.
+func (v *DryRunVerifier) HasSupport(gvk schema.GroupVersionKind) error {
+	oapi, err := v.OpenAPIGetter.OpenAPISchema()
+	if err != nil {
+		return fmt.Errorf("failed to download openapi: %v", err)
+	}
+	supports, err := openapi.SupportsDryRun(oapi, gvk)
+	if err != nil {
+		// We assume that we couldn't find the type, then check for namespace:
+		supports, _ = openapi.SupportsDryRun(oapi, schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"})
+		// If namespace supports dryRun, then we will support dryRun for CRDs only.
+		if supports {
+			supports, err = v.Finder.HasCRD(gvk.GroupKind())
+			if err != nil {
+				return fmt.Errorf("failed to check CRD: %v", err)
+			}
+		}
+	}
+	if !supports {
+		return fmt.Errorf("%v doesn't support dry-run", gvk)
+	}
+	return nil
+}
+
+func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
@@ -757,7 +815,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 
 	// Create the versioned struct from the type defined in the restmapping
 	// (which is the API version we'll be submitting the patch to)
-	versionedObject, err := scheme.Scheme.New(p.mapping.GroupVersionKind)
+	versionedObject, err := scheme.Scheme.New(p.Mapping.GroupVersionKind)
 	switch {
 	case runtime.IsNotRegisteredError(err):
 		// fall back to generic JSON merge patch
@@ -772,17 +830,17 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 			return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
 		}
 	case err != nil:
-		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.mapping.GroupVersionKind), source, err)
+		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting instance of versioned object for %v:", p.Mapping.GroupVersionKind), source, err)
 	case err == nil:
 		// Compute a three way strategic merge patch to send to server.
 		patchType = types.StrategicMergePatchType
 
 		// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
 		// Otherwise, fall back to baked-in types.
-		if p.openapiSchema != nil {
-			if schema = p.openapiSchema.LookupResource(p.mapping.GroupVersionKind); schema != nil {
+		if p.OpenapiSchema != nil {
+			if schema = p.OpenapiSchema.LookupResource(p.Mapping.GroupVersionKind); schema != nil {
 				lookupPatchMeta = strategicpatch.PatchMetaFromOpenAPI{Schema: schema}
-				if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.overwrite); err != nil {
+				if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
 					fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
 				} else {
 					patchType = types.StrategicMergePatchType
@@ -796,7 +854,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 			if err != nil {
 				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
 			}
-			patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.overwrite)
+			patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite)
 			if err != nil {
 				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
 			}
@@ -808,40 +866,40 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	}
 
 	options := metav1.UpdateOptions{}
-	if p.serverDryRun {
+	if p.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
 
-	patchedObj, err := p.helper.Patch(namespace, name, patchType, patch, &options)
+	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, &options)
 	return patch, patchedObj, err
 }
 
-func (p *patcher) patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
 	patchBytes, patchObject, err := p.patchSimple(current, modified, source, namespace, name, errOut)
 	for i := 1; i <= maxPatchRetry && errors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
-			p.backOff.Sleep(backOffPeriod)
+			p.BackOff.Sleep(backOffPeriod)
 		}
-		current, getErr = p.helper.Get(namespace, name, false)
+		current, getErr = p.Helper.Get(namespace, name, false)
 		if getErr != nil {
 			return nil, nil, getErr
 		}
 		patchBytes, patchObject, err = p.patchSimple(current, modified, source, namespace, name, errOut)
 	}
-	if err != nil && (errors.IsConflict(err) || errors.IsInvalid(err)) && p.force {
+	if err != nil && (errors.IsConflict(err) || errors.IsInvalid(err)) && p.Force {
 		patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
 	}
 	return patchBytes, patchObject, err
 }
 
-func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
+func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
 	if err := p.delete(namespace, name); err != nil {
 		return modified, nil, err
 	}
 	// TODO: use wait
-	if err := wait.PollImmediate(1*time.Second, p.timeout, func() (bool, error) {
-		if _, err := p.helper.Get(namespace, name, false); !errors.IsNotFound(err) {
+	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
+		if _, err := p.Helper.Get(namespace, name, false); !errors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil
@@ -853,14 +911,14 @@ func (p *patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		return modified, nil, err
 	}
 	options := metav1.CreateOptions{}
-	if p.serverDryRun {
+	if p.ServerDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
-	createdObject, err := p.helper.Create(namespace, true, versionedObject, &options)
+	createdObject, err := p.Helper.Create(namespace, true, versionedObject, &options)
 	if err != nil {
 		// restore the original object if we fail to create the new one
 		// but still propagate and advertise error to user
-		recreated, recreateErr := p.helper.Create(namespace, true, original, &options)
+		recreated, recreateErr := p.Helper.Create(namespace, true, original, &options)
 		if recreateErr != nil {
 			err = fmt.Errorf("An error occurred force-replacing the existing object with the newly provided one:\n\n%v.\n\nAdditionally, an error occurred attempting to restore the original object:\n\n%v\n", err, recreateErr)
 		} else {

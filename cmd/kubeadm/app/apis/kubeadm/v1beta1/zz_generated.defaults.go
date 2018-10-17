@@ -56,5 +56,9 @@ func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
 	SetDefaults_JoinConfiguration(in)
 	SetDefaults_NodeRegistrationOptions(&in.NodeRegistration)
+	SetDefaults_Discovery(&in.Discovery)
+	if in.Discovery.File != nil {
+		SetDefaults_FileDiscovery(in.Discovery.File)
+	}
 	SetDefaults_APIEndpoint(&in.APIEndpoint)
 }

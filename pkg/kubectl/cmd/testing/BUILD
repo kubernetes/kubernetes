@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "fake.go",
+        "util.go",
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testing",
@@ -15,6 +16,7 @@ go_library(
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

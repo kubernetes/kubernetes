@@ -29,7 +29,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/volume:go_default_library",
-        "//pkg/volume/empty_dir:go_default_library",
+        "//pkg/volume/emptydir:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

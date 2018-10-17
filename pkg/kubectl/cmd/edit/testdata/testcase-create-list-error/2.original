@@ -5,7 +5,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  creationTimestamp: 2017-02-03T06:44:43Z
+  creationTimestamp: "2017-02-03T06:44:43Z"
   labels:
     app: svc2
   name: svc2

@@ -61,6 +61,7 @@ type AtomicWriter struct {
 	logContext string
 }
 
+// FileProjection contains file Data and access Mode
 type FileProjection struct {
 	Data []byte
 	Mode int32
@@ -172,9 +173,8 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	if err = w.writePayloadToDir(cleanPayload, tsDir); err != nil {
 		glog.Errorf("%s: error writing payload to ts data directory %s: %v", w.logContext, tsDir, err)
 		return err
-	} else {
-		glog.V(4).Infof("%s: performed write of new data to ts data directory: %s", w.logContext, tsDir)
 	}
+	glog.V(4).Infof("%s: performed write of new data to ts data directory: %s", w.logContext, tsDir)
 
 	// (7)
 	if err = w.createUserVisibleFiles(cleanPayload); err != nil {
@@ -222,7 +222,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection) error {
 	return nil
 }
 
-// validatePayload returns an error if any path in the payload  returns a copy of the payload with the paths cleaned.
+// validatePayload returns an error if any path in the payload returns a copy of the payload with the paths cleaned.
 func validatePayload(payload map[string]FileProjection) (map[string]FileProjection, error) {
 	cleanPayload := make(map[string]FileProjection)
 	for k, content := range payload {

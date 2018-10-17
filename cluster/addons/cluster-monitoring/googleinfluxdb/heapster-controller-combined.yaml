@@ -116,7 +116,7 @@ spec:
             # Specifies the smallest cluster (defined in number of nodes)
             # resources will be scaled to.
             - --minClusterSize={{ heapster_min_cluster_size }}
-        - image: k8s.gcr.io/addon-resizer:1.8.2
+        - image: k8s.gcr.io/addon-resizer:1.8.3
           name: eventer-nanny
           resources:
             limits:

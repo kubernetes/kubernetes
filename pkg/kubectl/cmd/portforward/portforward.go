@@ -36,11 +36,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
@@ -50,6 +50,7 @@ type PortForwardOptions struct {
 	RESTClient    *restclient.RESTClient
 	Config        *restclient.Config
 	PodClient     corev1client.PodsGetter
+	Address       []string
 	Ports         []string
 	PortForwarder portForwarder
 	StopChannel   chan struct{}
@@ -79,6 +80,12 @@ var (
 		# Listen on port 8888 locally, forwarding to 5000 in the pod
 		kubectl port-forward pod/mypod 8888:5000
 
+		# Listen on port 8888 on all addresses, forwarding to 5000 in the pod
+		kubectl port-forward --address 0.0.0.0 pod/mypod 8888:5000
+
+		# Listen on port 8888 on localhost and selected IP, forwarding to 5000 in the pod
+		kubectl port-forward --address localhost,10.19.21.23 pod/mypod 8888:5000
+
 		# Listen on a random port locally, forwarding to 5000 in the pod
 		kubectl port-forward pod/mypod :5000`))
 )
@@ -95,7 +102,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	cmd := &cobra.Command{
-		Use:                   "port-forward TYPE/NAME [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
+		Use:                   "port-forward TYPE/NAME [options] [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Forward one or more local ports to a pod"),
 		Long:                  portforwardLong,
@@ -113,6 +120,7 @@ func NewCmdPortForward(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodPortForwardWaitTimeout)
+	cmd.Flags().StringSliceVar(&opts.Address, "address", []string{"localhost"}, "Addresses to listen on (comma separated)")
 	// TODO support UID
 	return cmd
 }
@@ -131,11 +139,22 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 		return err
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
 	if err != nil {
 		return err
 	}
 	return fw.ForwardPorts()
+}
+
+// splitPort splits port string which is in form of [LOCAL PORT]:REMOTE PORT
+// and returns local and remote ports separately
+func splitPort(port string) (local, remote string) {
+	parts := strings.Split(port, ":")
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+
+	return parts[0], parts[0]
 }
 
 // Translates service port to target port
@@ -145,29 +164,61 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod corev1.Pod) ([]string, error) {
 	var translated []string
 	for _, port := range ports {
-		// port is in the form of [LOCAL PORT]:REMOTE PORT
-		parts := strings.Split(port, ":")
-		input := parts[0]
-		if len(parts) == 2 {
-			input = parts[1]
-		}
-		portnum, err := strconv.Atoi(input)
+		localPort, remotePort := splitPort(port)
+
+		portnum, err := strconv.Atoi(remotePort)
 		if err != nil {
-			return ports, err
+			svcPort, err := util.LookupServicePortNumberByName(svc, remotePort)
+			if err != nil {
+				return nil, err
+			}
+			portnum = int(svcPort)
+
+			if localPort == remotePort {
+				localPort = strconv.Itoa(portnum)
+			}
 		}
 		containerPort, err := util.LookupContainerPortNumberByServicePort(svc, pod, int32(portnum))
 		if err != nil {
 			// can't resolve a named port, or Service did not declare this port, return an error
 			return nil, err
+		}
+
+		if int32(portnum) != containerPort {
+			translated = append(translated, fmt.Sprintf("%s:%d", localPort, containerPort))
 		} else {
-			if int32(portnum) != containerPort {
-				translated = append(translated, fmt.Sprintf("%s:%d", parts[0], containerPort))
-			} else {
-				translated = append(translated, port)
-			}
+			translated = append(translated, port)
 		}
 	}
 	return translated, nil
+}
+
+// convertPodNamedPortToNumber converts named ports into port numbers
+// It returns an error when a named port can't be found in the pod containers
+func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, error) {
+	var converted []string
+	for _, port := range ports {
+		localPort, remotePort := splitPort(port)
+
+		containerPortStr := remotePort
+		_, err := strconv.Atoi(remotePort)
+		if err != nil {
+			containerPort, err := util.LookupContainerPortNumberByName(pod, remotePort)
+			if err != nil {
+				return nil, err
+			}
+
+			containerPortStr = strconv.Itoa(int(containerPort))
+		}
+
+		if localPort != remotePort {
+			converted = append(converted, fmt.Sprintf("%s:%s", localPort, containerPortStr))
+		} else {
+			converted = append(converted, containerPortStr)
+		}
+	}
+
+	return converted, nil
 }
 
 // Complete completes all the required options for port-forward cmd.
@@ -215,7 +266,10 @@ func (o *PortForwardOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 			return err
 		}
 	default:
-		o.Ports = args[1:]
+		o.Ports, err = convertPodNamedPortToNumber(args[1:], *forwardablePod)
+		if err != nil {
+			return err
+		}
 	}
 
 	clientset, err := f.KubernetesClientSet()

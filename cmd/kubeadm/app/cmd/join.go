@@ -159,6 +159,10 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapiv1beta1.JoinConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
 
+	fd := &kubeadmapiv1beta1.FileDiscovery{}
+	btd := &kubeadmapiv1beta1.BootstrapTokenDiscovery{}
+
+	var token string
 	var cfgPath string
 	var featureGatesString string
 	var ignorePreflightErrors []string
@@ -168,22 +172,37 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
-			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, args, cfgPath, featureGatesString, ignorePreflightErrors)
+
+			if len(fd.KubeConfigPath) != 0 {
+				cfg.Discovery.File = fd
+			} else {
+				cfg.Discovery.BootstrapToken = btd
+				cfg.Discovery.BootstrapToken.APIServerEndpoints = args
+				if len(cfg.Discovery.BootstrapToken.Token) == 0 {
+					cfg.Discovery.BootstrapToken.Token = token
+				}
+			}
+
+			if len(cfg.Discovery.TLSBootstrapToken) == 0 {
+				cfg.Discovery.TLSBootstrapToken = token
+			}
+
+			j, err := NewValidJoin(cmd.PersistentFlags(), cfg, cfgPath, featureGatesString, ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(j.Run(out))
 		},
 	}
 
-	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
+	AddJoinConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString, &token)
+	AddJoinBootstrapTokenDiscoveryFlags(cmd.PersistentFlags(), btd)
+	AddJoinFileDiscoveryFlags(cmd.PersistentFlags(), fd)
 	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &ignorePreflightErrors)
 
 	return cmd
 }
 
 // NewValidJoin validates the command line that are passed to the cobra command
-func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, args []string, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
-	cfg.DiscoveryTokenAPIServers = args
-
+func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, cfgPath, featureGatesString string, ignorePreflightErrors []string) (*Join, error) {
 	var err error
 	if cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString); err != nil {
 		return nil, err
@@ -198,32 +217,17 @@ func NewValidJoin(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguratio
 		return nil, err
 	}
 
-	return NewJoin(cfgPath, args, cfg, ignorePreflightErrorsSet)
+	return NewJoin(cfgPath, cfg, ignorePreflightErrorsSet)
 }
 
 // AddJoinConfigFlags adds join flags bound to the config to the specified flagset
-func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, featureGatesString *string) {
-	flagSet.StringVar(
-		&cfg.DiscoveryFile, "discovery-file", "",
-		"A file or url from which to load cluster information.")
-	flagSet.StringVar(
-		&cfg.DiscoveryToken, "discovery-token", "",
-		"A token used to validate cluster information fetched from the api server.")
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfiguration, featureGatesString *string, token *string) {
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
 		"Specify the node name.")
 	flagSet.StringVar(
-		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
-		"A token used for TLS bootstrapping.")
-	flagSet.StringSliceVar(
-		&cfg.DiscoveryTokenCACertHashes, "discovery-token-ca-cert-hash", []string{},
-		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
-	flagSet.BoolVar(
-		&cfg.DiscoveryTokenUnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
-		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
-	flagSet.StringVar(
-		&cfg.Token, "token", "",
-		"Use this token for both discovery-token and tls-bootstrap-token.")
+		token, "token", "",
+		"Use this token for both discovery-token and tls-bootstrap-token when those values are not provided.")
 	flagSet.StringVar(
 		featureGatesString, "feature-gates", *featureGatesString,
 		"A set of key=value pairs that describe feature gates for various features. "+
@@ -245,6 +249,26 @@ func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.JoinConfig
 	)
 }
 
+// AddJoinBootstrapTokenDiscoveryFlags adds bootstrap token specific discovery flags to the specified flagset
+func AddJoinBootstrapTokenDiscoveryFlags(flagSet *flag.FlagSet, btd *kubeadmapiv1beta1.BootstrapTokenDiscovery) {
+	flagSet.StringVar(
+		&btd.Token, "discovery-token", "",
+		"A token used to validate cluster information fetched from the API server.")
+	flagSet.StringSliceVar(
+		&btd.CACertHashes, "discovery-token-ca-cert-hash", []string{},
+		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
+	flagSet.BoolVar(
+		&btd.UnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
+		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
+}
+
+// AddJoinFileDiscoveryFlags adds file discovery flags to the specified flagset
+func AddJoinFileDiscoveryFlags(flagSet *flag.FlagSet, fd *kubeadmapiv1beta1.FileDiscovery) {
+	flagSet.StringVar(
+		&fd.KubeConfigPath, "discovery-file", "",
+		"A file or URL from which to load cluster information.")
+}
+
 // AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
 func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, ignorePreflightErrors *[]string) {
 	flagSet.StringVar(
@@ -264,7 +288,7 @@ type Join struct {
 }
 
 // NewJoin instantiates Join struct with given arguments
-func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
+func NewJoin(cfgPath string, defaultcfg *kubeadmapiv1beta1.JoinConfiguration, ignorePreflightErrors sets.String) (*Join, error) {
 
 	if defaultcfg.NodeRegistration.Name == "" {
 		glog.V(1).Infoln("[join] found NodeName empty; using OS hostname as NodeName")
@@ -274,7 +298,7 @@ func NewJoin(cfgPath string, args []string, defaultcfg *kubeadmapiv1beta1.JoinCo
 		glog.V(1).Infoln("[join] found advertiseAddress empty; using default interface's IP address as advertiseAddress")
 	}
 
-	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
+	internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig(cfgPath, defaultcfg)
 	if err != nil {
 		return nil, err
 	}

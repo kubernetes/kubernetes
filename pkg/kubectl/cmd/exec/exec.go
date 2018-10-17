@@ -30,10 +30,10 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/util/term"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
@@ -212,7 +212,7 @@ func (p *ExecOptions) Validate() error {
 	return nil
 }
 
-func (o *StreamOptions) setupTTY() term.TTY {
+func (o *StreamOptions) SetupTTY() term.TTY {
 	t := term.TTY{
 		Parent: o.InterruptParent,
 		Out:    o.Out,
@@ -288,7 +288,7 @@ func (p *ExecOptions) Run() error {
 	}
 
 	// ensure we can recover the terminal while attached
-	t := p.setupTTY()
+	t := p.SetupTTY()
 
 	var sizeQueue remotecommand.TerminalSizeQueue
 	if t.Raw {

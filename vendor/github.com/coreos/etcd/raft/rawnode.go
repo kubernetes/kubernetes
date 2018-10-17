@@ -175,6 +175,8 @@ func (rn *RawNode) ApplyConfChange(cc pb.ConfChange) *pb.ConfState {
 	switch cc.Type {
 	case pb.ConfChangeAddNode:
 		rn.raft.addNode(cc.NodeID)
+	case pb.ConfChangeAddLearnerNode:
+		rn.raft.addLearner(cc.NodeID)
 	case pb.ConfChangeRemoveNode:
 		rn.raft.removeNode(cc.NodeID)
 	case pb.ConfChangeUpdateNode:
@@ -191,7 +193,7 @@ func (rn *RawNode) Step(m pb.Message) error {
 	if IsLocalMsg(m.Type) {
 		return ErrStepLocalMsg
 	}
-	if _, ok := rn.raft.prs[m.From]; ok || !IsResponseMsg(m.Type) {
+	if pr := rn.raft.getProgress(m.From); pr != nil || !IsResponseMsg(m.Type) {
 		return rn.raft.Step(m)
 	}
 	return ErrStepPeerNotFound

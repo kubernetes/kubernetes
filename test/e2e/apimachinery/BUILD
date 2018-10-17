@@ -26,7 +26,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/apimachinery",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
+        "//pkg/apis/rbac/v1beta1:go_default_library",
         "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
@@ -56,7 +56,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",

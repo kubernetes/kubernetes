@@ -112,7 +112,7 @@ func (c *FakeInitializerConfigurations) DeleteCollection(options *v1.DeleteOptio
 // Patch applies the patch and returns the patched initializerConfiguration.
 func (c *FakeInitializerConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.InitializerConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(initializerconfigurationsResource, name, data, subresources...), &v1alpha1.InitializerConfiguration{})
+		Invokes(testing.NewRootPatchSubresourceAction(initializerconfigurationsResource, name, pt, data, subresources...), &v1alpha1.InitializerConfiguration{})
 	if obj == nil {
 		return nil, err
 	}

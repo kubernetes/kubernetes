@@ -49,7 +49,7 @@ var _ volume.DeviceMountableVolumePlugin = &fcPlugin{}
 func (plugin *fcPlugin) NewAttacher() (volume.Attacher, error) {
 	return &fcAttacher{
 		host:    plugin.host,
-		manager: &FCUtil{},
+		manager: &fcUtil{},
 	}, nil
 }
 
@@ -142,7 +142,7 @@ var _ volume.DeviceUnmounter = &fcDetacher{}
 func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	return &fcDetacher{
 		mounter: plugin.host.GetMounter(plugin.GetPluginName()),
-		manager: &FCUtil{},
+		manager: &fcUtil{},
 	}, nil
 }
 

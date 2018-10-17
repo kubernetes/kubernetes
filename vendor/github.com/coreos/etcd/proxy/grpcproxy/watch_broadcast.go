@@ -15,9 +15,8 @@
 package grpcproxy
 
 import (
+	"context"
 	"sync"
-
-	"golang.org/x/net/context"
 
 	"github.com/coreos/etcd/clientv3"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
@@ -58,6 +57,8 @@ func newWatchBroadcast(wp *watchProxy, w *watcher, update func(*watchBroadcast))
 			clientv3.WithPrevKV(),
 			clientv3.WithCreatedNotify(),
 		}
+
+		cctx = withClientAuthToken(cctx, w.wps.stream.Context())
 
 		wch := wp.cw.Watch(cctx, w.wr.key, opts...)
 

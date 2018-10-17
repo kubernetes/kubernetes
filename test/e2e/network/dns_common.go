@@ -495,7 +495,7 @@ func assertFilesExist(fileNames []string, fileDir string, pod *v1.Pod, client cl
 func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client clientset.Interface, check bool, expected string) {
 	var failed []string
 
-	framework.ExpectNoError(wait.Poll(time.Second*10, time.Second*600, func() (bool, error) {
+	framework.ExpectNoError(wait.PollImmediate(time.Second*5, time.Second*600, func() (bool, error) {
 		failed = []string{}
 
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)

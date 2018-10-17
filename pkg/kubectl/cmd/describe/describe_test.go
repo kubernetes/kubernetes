@@ -24,9 +24,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -34,19 +35,19 @@ import (
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory().WithNamespace("non-default")
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -66,19 +67,19 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 	_, _, codec := cmdtesting.NewExternalScheme()
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalNamespacedType("", "", "foo", "non-default"))},
 	}
 	tf.WithNamespace("non-default")
 
@@ -98,23 +99,23 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
-	_, _, rc := testData()
+	_, _, rc := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -125,7 +126,7 @@ func TestDescribeObject(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDescribe("kubectl", tf, streams)
-	cmd.Flags().Set("filename", "../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {
@@ -139,20 +140,20 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
@@ -166,20 +167,20 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())
@@ -192,20 +193,20 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	oldFn := cmdutil.DescriberFn
+	oldFn := describe.DescriberFn
 	defer func() {
-		cmdutil.DescriberFn = oldFn
+		describe.DescriberFn = oldFn
 	}()
-	cmdutil.DescriberFn = d.describerFor
+	describe.DescriberFn = d.describerFor
 
-	pods, _, _ := testData()
+	pods, _, _ := cmdtesting.TestData()
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
 	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: unstructuredSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)},
 	}
 
 	cmd := NewCmdDescribe("kubectl", tf, genericclioptions.NewTestIOStreamsDiscard())

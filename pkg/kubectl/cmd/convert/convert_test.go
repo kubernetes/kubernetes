@@ -43,7 +43,7 @@ func TestConvertObject(t *testing.T) {
 	testcases := []testcase{
 		{
 			name:          "apps deployment to extensions deployment",
-			file:          "../../../test/fixtures/pkg/kubectl/cmd/convert/appsdeployment.yaml",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/appsdeployment.yaml",
 			outputVersion: "extensions/v1beta1",
 			fields: []checkField{
 				{
@@ -53,7 +53,7 @@ func TestConvertObject(t *testing.T) {
 		},
 		{
 			name:          "extensions deployment to apps deployment",
-			file:          "../../../test/fixtures/pkg/kubectl/cmd/convert/extensionsdeployment.yaml",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/extensionsdeployment.yaml",
 			outputVersion: "apps/v1beta2",
 			fields: []checkField{
 				{
@@ -63,7 +63,7 @@ func TestConvertObject(t *testing.T) {
 		},
 		{
 			name:          "v1 HPA to v2beta1 HPA",
-			file:          "../../../test/fixtures/pkg/kubectl/cmd/convert/v1HPA.yaml",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/v1HPA.yaml",
 			outputVersion: "autoscaling/v2beta1",
 			fields: []checkField{
 				{
@@ -79,7 +79,7 @@ func TestConvertObject(t *testing.T) {
 		},
 		{
 			name:          "v2beta1 HPA to v1 HPA",
-			file:          "../../../test/fixtures/pkg/kubectl/cmd/convert/v2beta1HPA.yaml",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/v2beta1HPA.yaml",
 			outputVersion: "autoscaling/v1",
 			fields: []checkField{
 				{

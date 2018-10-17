@@ -42,7 +42,7 @@ const (
 )
 
 func TestTopSubcommandsExist(t *testing.T) {
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 
 	f := cmdtesting.NewTestFactory()
 	defer f.Cleanup()

@@ -29,6 +29,7 @@ readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
 KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
+KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 
 # Validate a ci version
 #
@@ -289,15 +290,28 @@ function kube::release::build_hyperkube_image() {
   if [[ -n "${save_dir}" ]]; then
     "${DOCKER[@]}" save "${hyperkube_tag}" > "${save_dir}/hyperkube-${arch}.tar"
   fi
-  if [[ -z "${KUBE_DOCKER_IMAGE_TAG-}" || -z "${KUBE_DOCKER_REGISTRY-}" ]]; then
-    # not a release
-    kube::log::status "Deleting hyperkube image ${hyperkube_tag}"
-    "${DOCKER[@]}" rmi "${hyperkube_tag}" &>/dev/null || true
-  fi
+  kube::log::status "Deleting hyperkube image ${hyperkube_tag}"
+  "${DOCKER[@]}" rmi "${hyperkube_tag}" &>/dev/null || true
 }
 
-# This will take binaries that run on master and creates Docker images
-# that wrap the binary in them. (One docker image per binary)
+function kube::release::build_conformance_image() {
+  local -r arch="$1"
+  local -r registry="$2"
+  local -r version="$3"
+  local -r save_dir="${4-}"
+  kube::log::status "Building conformance image for arch: ${arch}"
+  ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
+    make -C cluster/images/conformance/ build >/dev/null
+
+  local conformance_tag="${registry}/conformance-${arch}:${version}"
+  if [[ -n "${save_dir}" ]]; then
+    "${DOCKER[@]}" save "${conformance_tag}" > "${save_dir}/conformance-${arch}.tar"
+  fi
+  kube::log::status "Deleting conformance image ${conformance_tag}"
+  "${DOCKER[@]}" rmi "${conformance_tag}" &>/dev/null || true
+}
+
+# This builds all the release docker images (One docker image per binary)
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
 #  $2 - arch, architecture for which we are building docker images.
@@ -312,10 +326,6 @@ function kube::release::create_docker_images_for_server() {
     mkdir -p "${images_dir}"
 
     local -r docker_registry="k8s.gcr.io"
-    # TODO(thockin): Remove all traces of this after 1.11 release.
-    # The following is the old non-indirected registry name.  To ease the
-    # transition to the new name (above), we are double-tagging saved images.
-    local -r deprecated_registry="gcr.io/google_containers"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -336,17 +346,14 @@ function kube::release::create_docker_images_for_server() {
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_image_tag="${docker_registry}"
-      local deprecated_image_tag="${deprecated_registry}"
       if [[ ${arch} == "amd64" ]]; then
         # If we are building a amd64 docker image, preserve the original
         # image name
         docker_image_tag+="/${binary_name}:${docker_tag}"
-        deprecated_image_tag+="/${binary_name}:${docker_tag}"
       else
         # If we are building a docker image for another architecture,
         # append the arch in the image tag
         docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-        deprecated_image_tag+="/${binary_name}-${arch}:${docker_tag}"
       fi
 
 
@@ -366,8 +373,7 @@ EOF
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
-        "${DOCKER[@]}" tag "${docker_image_tag}" "${deprecated_image_tag}" >/dev/null
-        "${DOCKER[@]}" save "${docker_image_tag}" "${deprecated_image_tag}" > "${binary_dir}/${binary_name}.tar"
+        "${DOCKER[@]}" save "${docker_image_tag}" > "${binary_dir}/${binary_name}.tar"
         echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
@@ -386,13 +392,16 @@ EOF
           # not a release
           kube::log::status "Deleting docker image ${docker_image_tag}"
           "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
-          "${DOCKER[@]}" rmi "${deprecated_image_tag}" &>/dev/null || true
         fi
       ) &
     done
 
     if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
       kube::release::build_hyperkube_image "${arch}" "${docker_registry}" \
+        "${docker_tag}" "${images_dir}" &
+    fi
+    if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
+      kube::release::build_conformance_image "${arch}" "${docker_registry}" \
         "${docker_tag}" "${images_dir}" &
     fi
 

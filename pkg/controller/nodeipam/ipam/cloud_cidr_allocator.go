@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
@@ -117,7 +117,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 			}
 			// Even if PodCIDR is assigned, but NetworkUnavailable condition is
 			// set to true, we need to process the node to set the condition.
-			networkUnavailableTaint := &v1.Taint{Key: algorithm.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
+			networkUnavailableTaint := &v1.Taint{Key: schedulerapi.TaintNodeNetworkUnavailable, Effect: v1.TaintEffectNoSchedule}
 			_, cond := v1node.GetNodeCondition(&newNode.Status, v1.NodeNetworkUnavailable)
 			if cond == nil || cond.Status != v1.ConditionFalse || utiltaints.TaintExists(newNode.Spec.Taints, networkUnavailableTaint) {
 				return ca.AllocateOrOccupyCIDR(newNode)

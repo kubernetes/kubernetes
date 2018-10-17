@@ -49,7 +49,7 @@ const (
 
 // TODO support other ports besides 80
 var (
-	portForwardRegexp = regexp.MustCompile("Forwarding from 127.0.0.1:([0-9]+) -> 80")
+	portForwardRegexp = regexp.MustCompile("Forwarding from (127.0.0.1|\\[::1\\]):([0-9]+) -> 80")
 )
 
 func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bindAddress string) *v1.Pod {
@@ -178,11 +178,11 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	}
 	portForwardOutput := string(buf[:n])
 	match := portForwardRegexp.FindStringSubmatch(portForwardOutput)
-	if len(match) != 2 {
+	if len(match) != 3 {
 		framework.Failf("Failed to parse kubectl port-forward output: %s", portForwardOutput)
 	}
 
-	listenPort, err := strconv.Atoi(match[1])
+	listenPort, err := strconv.Atoi(match[2])
 	if err != nil {
 		framework.Failf("Error converting %s to an int: %v", match[1], err)
 	}

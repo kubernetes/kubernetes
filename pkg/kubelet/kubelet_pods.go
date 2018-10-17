@@ -1323,18 +1323,17 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
 	glog.V(3).Infof("Generating status for %q", format.Pod(pod))
 
+	s := kl.convertStatusToAPIStatus(pod, podStatus)
+
 	// check if an internal module has requested the pod is evicted.
 	for _, podSyncHandler := range kl.PodSyncHandlers {
 		if result := podSyncHandler.ShouldEvict(pod); result.Evict {
-			return v1.PodStatus{
-				Phase:   v1.PodFailed,
-				Reason:  result.Reason,
-				Message: result.Message,
-			}
+			s.Phase = v1.PodFailed
+			s.Reason = result.Reason
+			s.Message = result.Message
+			return *s
 		}
 	}
-
-	s := kl.convertStatusToAPIStatus(pod, podStatus)
 
 	// Assume info is ready to process
 	spec := &pod.Spec

@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -168,8 +167,7 @@ func (a *Verifier) verifySubject(subject pkix.Name) error {
 	if a.allowedCommonNames.Has(subject.CommonName) {
 		return nil
 	}
-	glog.Warningf("x509: subject with cn=%s is not in the allowed list: %v", subject.CommonName, a.allowedCommonNames.List())
-	return fmt.Errorf("x509: subject with cn=%s is not allowed", subject.CommonName)
+	return fmt.Errorf("x509: subject with cn=%s is not in the allowed list", subject.CommonName)
 }
 
 // DefaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,

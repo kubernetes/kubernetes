@@ -29,6 +29,6 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_testdata_edit_CONSUMERS",
+        "//build/visible_to:pkg_kubectl_cmd_edit_testdata_CONSUMERS",
     ],
 )

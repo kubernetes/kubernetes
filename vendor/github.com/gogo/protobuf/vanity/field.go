@@ -72,6 +72,13 @@ func TurnOffNullable(field *descriptor.FieldDescriptorProto) {
 	SetBoolFieldOption(gogoproto.E_Nullable, false)(field)
 }
 
+func TurnOffNullableForNativeTypes(field *descriptor.FieldDescriptorProto) {
+	if field.IsRepeated() || field.IsMessage() {
+		return
+	}
+	SetBoolFieldOption(gogoproto.E_Nullable, false)(field)
+}
+
 func TurnOffNullableForNativeTypesWithoutDefaultsOnly(field *descriptor.FieldDescriptorProto) {
 	if field.IsRepeated() || field.IsMessage() {
 		return

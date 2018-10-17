@@ -29,11 +29,13 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -73,7 +75,7 @@ type AutoscaleOptions struct {
 	dryRun           bool
 	builder          *resource.Builder
 	canBeAutoscaled  polymorphichelpers.CanBeAutoscaledFunc
-	generatorFunc    func(string, *meta.RESTMapping) (kubectl.StructuredGenerator, error)
+	generatorFunc    func(string, *meta.RESTMapping) (generate.StructuredGenerator, error)
 
 	HPAClient autoscalingv1client.HorizontalPodAutoscalersGetter
 
@@ -114,7 +116,7 @@ func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.Flags().StringVar(&o.Generator, "generator", cmdutil.HorizontalPodAutoscalerV1GeneratorName, i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
+	cmd.Flags().StringVar(&o.Generator, "generator", generateversioned.HorizontalPodAutoscalerV1GeneratorName, i18n.T("The name of the API generator to use. Currently there is only 1 generator."))
 	cmd.Flags().Int32Var(&o.Min, "min", -1, "The lower limit for the number of pods that can be set by the autoscaler. If it's not specified or negative, the server will apply a default value.")
 	cmd.Flags().Int32Var(&o.Max, "max", -1, "The upper limit for the number of pods that can be set by the autoscaler. Required.")
 	cmd.MarkFlagRequired("max")
@@ -147,10 +149,10 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.HPAClient = kubeClient.AutoscalingV1()
 
 	// get the generator
-	o.generatorFunc = func(name string, mapping *meta.RESTMapping) (kubectl.StructuredGenerator, error) {
+	o.generatorFunc = func(name string, mapping *meta.RESTMapping) (generate.StructuredGenerator, error) {
 		switch o.Generator {
-		case cmdutil.HorizontalPodAutoscalerV1GeneratorName:
-			return &kubectl.HorizontalPodAutoscalerGeneratorV1{
+		case generateversioned.HorizontalPodAutoscalerV1GeneratorName:
+			return &generateversioned.HorizontalPodAutoscalerGeneratorV1{
 				Name:               name,
 				MinReplicas:        o.Min,
 				MaxReplicas:        o.Max,

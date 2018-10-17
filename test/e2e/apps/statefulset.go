@@ -113,7 +113,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Verifying statefulset set proper service name")
 			framework.ExpectNoError(sst.CheckServiceName(ss, headlessSvcName))
 
-			cmd := "echo $(hostname) > /data/hostname; sync;"
+			cmd := "echo $(hostname) | dd of=/data/hostname conv=fsync"
 			By("Running " + cmd + " in all stateful pods")
 			framework.ExpectNoError(sst.ExecInStatefulPods(ss, cmd))
 
@@ -744,7 +744,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), framework.StatefulPodTimeout)
 			defer cancel()
-			// we need to get UID from pod in any state and wait until stateful set controller will remove pod atleast once
+			// we need to get UID from pod in any state and wait until stateful set controller will remove pod at least once
 			_, err = watchtools.UntilWithoutRetry(ctx, w, func(event watch.Event) (bool, error) {
 				pod := event.Object.(*v1.Pod)
 				switch event.Type {

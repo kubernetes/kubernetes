@@ -879,7 +879,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 	if cfg.Etcd.Local != nil {
 		// Only do etcd related checks when no external endpoints were specified
 		checks = append(checks,
-			PortOpenCheck{port: 2379},
+			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort},
 			DirAvailableCheck{Path: cfg.Etcd.Local.DataDir},
 		)
 	}
@@ -928,16 +928,18 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 	}
 
 	addIPv6Checks := false
-	for _, server := range cfg.DiscoveryTokenAPIServers {
-		ipstr, _, err := net.SplitHostPort(server)
-		if err == nil {
-			checks = append(checks,
-				HTTPProxyCheck{Proto: "https", Host: ipstr},
-			)
-			if !addIPv6Checks {
-				if ip := net.ParseIP(ipstr); ip != nil {
-					if ip.To4() == nil && ip.To16() != nil {
-						addIPv6Checks = true
+	if cfg.Discovery.BootstrapToken != nil {
+		for _, server := range cfg.Discovery.BootstrapToken.APIServerEndpoints {
+			ipstr, _, err := net.SplitHostPort(server)
+			if err == nil {
+				checks = append(checks,
+					HTTPProxyCheck{Proto: "https", Host: ipstr},
+				)
+				if !addIPv6Checks {
+					if ip := net.ParseIP(ipstr); ip != nil {
+						if ip.To4() == nil && ip.To16() != nil {
+							addIPv6Checks = true
+						}
 					}
 				}
 			}

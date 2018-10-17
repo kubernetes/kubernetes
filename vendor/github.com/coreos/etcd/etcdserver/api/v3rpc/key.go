@@ -16,30 +16,32 @@
 package v3rpc
 
 import (
-	"sort"
+	"context"
 
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
+	"github.com/coreos/etcd/pkg/adt"
+
 	"github.com/coreos/pkg/capnslog"
-	"golang.org/x/net/context"
 )
 
 var (
 	plog = capnslog.NewPackageLogger("github.com/coreos/etcd", "etcdserver/api/v3rpc")
-
-	// Max operations per txn list. For example, Txn.Success can have at most 128 operations,
-	// and Txn.Failure can have at most 128 operations.
-	MaxOpsPerTxn = 128
 )
 
 type kvServer struct {
 	hdr header
 	kv  etcdserver.RaftKV
+	// maxTxnOps is the max operations per txn.
+	// e.g suppose maxTxnOps = 128.
+	// Txn.Success can have at most 128 operations,
+	// and Txn.Failure can have at most 128 operations.
+	maxTxnOps uint
 }
 
 func NewKVServer(s *etcdserver.EtcdServer) pb.KVServer {
-	return &kvServer{hdr: newHeader(s), kv: s}
+	return &kvServer{hdr: newHeader(s), kv: s, maxTxnOps: s.Cfg.MaxTxnOps}
 }
 
 func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResponse, error) {
@@ -52,9 +54,6 @@ func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResp
 		return nil, togRPCError(err)
 	}
 
-	if resp.Header == nil {
-		plog.Panic("unexpected nil resp.Header")
-	}
 	s.hdr.fill(resp.Header)
 	return resp, nil
 }
@@ -69,9 +68,6 @@ func (s *kvServer) Put(ctx context.Context, r *pb.PutRequest) (*pb.PutResponse, 
 		return nil, togRPCError(err)
 	}
 
-	if resp.Header == nil {
-		plog.Panic("unexpected nil resp.Header")
-	}
 	s.hdr.fill(resp.Header)
 	return resp, nil
 }
@@ -86,15 +82,19 @@ func (s *kvServer) DeleteRange(ctx context.Context, r *pb.DeleteRangeRequest) (*
 		return nil, togRPCError(err)
 	}
 
-	if resp.Header == nil {
-		plog.Panic("unexpected nil resp.Header")
-	}
 	s.hdr.fill(resp.Header)
 	return resp, nil
 }
 
 func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, error) {
-	if err := checkTxnRequest(r); err != nil {
+	if err := checkTxnRequest(r, int(s.maxTxnOps)); err != nil {
+		return nil, err
+	}
+	// check for forbidden put/del overlaps after checking request to avoid quadratic blowup
+	if _, _, err := checkIntervals(r.Success); err != nil {
+		return nil, err
+	}
+	if _, _, err := checkIntervals(r.Failure); err != nil {
 		return nil, err
 	}
 
@@ -103,9 +103,6 @@ func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, 
 		return nil, togRPCError(err)
 	}
 
-	if resp.Header == nil {
-		plog.Panic("unexpected nil resp.Header")
-	}
 	s.hdr.fill(resp.Header)
 	return resp, nil
 }
@@ -116,9 +113,6 @@ func (s *kvServer) Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.Co
 		return nil, togRPCError(err)
 	}
 
-	if resp.Header == nil {
-		plog.Panic("unexpected nil resp.Header")
-	}
 	s.hdr.fill(resp.Header)
 	return resp, nil
 }
@@ -150,8 +144,15 @@ func checkDeleteRequest(r *pb.DeleteRangeRequest) error {
 	return nil
 }
 
-func checkTxnRequest(r *pb.TxnRequest) error {
-	if len(r.Compare) > MaxOpsPerTxn || len(r.Success) > MaxOpsPerTxn || len(r.Failure) > MaxOpsPerTxn {
+func checkTxnRequest(r *pb.TxnRequest, maxTxnOps int) error {
+	opc := len(r.Compare)
+	if opc < len(r.Success) {
+		opc = len(r.Success)
+	}
+	if opc < len(r.Failure) {
+		opc = len(r.Failure)
+	}
+	if opc > maxTxnOps {
 		return rpctypes.ErrGRPCTooManyOps
 	}
 
@@ -160,58 +161,29 @@ func checkTxnRequest(r *pb.TxnRequest) error {
 			return rpctypes.ErrGRPCEmptyKey
 		}
 	}
-
 	for _, u := range r.Success {
-		if err := checkRequestOp(u); err != nil {
+		if err := checkRequestOp(u, maxTxnOps-opc); err != nil {
 			return err
 		}
 	}
-	if err := checkRequestDupKeys(r.Success); err != nil {
-		return err
+	for _, u := range r.Failure {
+		if err := checkRequestOp(u, maxTxnOps-opc); err != nil {
+			return err
+		}
 	}
 
-	for _, u := range r.Failure {
-		if err := checkRequestOp(u); err != nil {
-			return err
-		}
-	}
-	return checkRequestDupKeys(r.Failure)
+	return nil
 }
 
-// checkRequestDupKeys gives rpctypes.ErrGRPCDuplicateKey if the same key is modified twice
-func checkRequestDupKeys(reqs []*pb.RequestOp) error {
-	// check put overlap
-	keys := make(map[string]struct{})
-	for _, requ := range reqs {
-		tv, ok := requ.Request.(*pb.RequestOp_RequestPut)
-		if !ok {
-			continue
-		}
-		preq := tv.RequestPut
-		if preq == nil {
-			continue
-		}
-		if _, ok := keys[string(preq.Key)]; ok {
-			return rpctypes.ErrGRPCDuplicateKey
-		}
-		keys[string(preq.Key)] = struct{}{}
-	}
+// checkIntervals tests whether puts and deletes overlap for a list of ops. If
+// there is an overlap, returns an error. If no overlap, return put and delete
+// sets for recursive evaluation.
+func checkIntervals(reqs []*pb.RequestOp) (map[string]struct{}, adt.IntervalTree, error) {
+	var dels adt.IntervalTree
 
-	// no need to check deletes if no puts; delete overlaps are permitted
-	if len(keys) == 0 {
-		return nil
-	}
-
-	// sort keys for range checking
-	sortedKeys := []string{}
-	for k := range keys {
-		sortedKeys = append(sortedKeys, k)
-	}
-	sort.Strings(sortedKeys)
-
-	// check put overlap with deletes
-	for _, requ := range reqs {
-		tv, ok := requ.Request.(*pb.RequestOp_RequestDeleteRange)
+	// collect deletes from this level; build first to check lower level overlapped puts
+	for _, req := range reqs {
+		tv, ok := req.Request.(*pb.RequestOp_RequestDeleteRange)
 		if !ok {
 			continue
 		}
@@ -219,41 +191,87 @@ func checkRequestDupKeys(reqs []*pb.RequestOp) error {
 		if dreq == nil {
 			continue
 		}
-		if dreq.RangeEnd == nil {
-			if _, found := keys[string(dreq.Key)]; found {
-				return rpctypes.ErrGRPCDuplicateKey
-			}
+		var iv adt.Interval
+		if len(dreq.RangeEnd) != 0 {
+			iv = adt.NewStringAffineInterval(string(dreq.Key), string(dreq.RangeEnd))
 		} else {
-			lo := sort.SearchStrings(sortedKeys, string(dreq.Key))
-			hi := sort.SearchStrings(sortedKeys, string(dreq.RangeEnd))
-			if lo != hi {
-				// element between lo and hi => overlap
-				return rpctypes.ErrGRPCDuplicateKey
-			}
+			iv = adt.NewStringAffinePoint(string(dreq.Key))
 		}
+		dels.Insert(iv, struct{}{})
 	}
 
-	return nil
+	// collect children puts/deletes
+	puts := make(map[string]struct{})
+	for _, req := range reqs {
+		tv, ok := req.Request.(*pb.RequestOp_RequestTxn)
+		if !ok {
+			continue
+		}
+		putsThen, delsThen, err := checkIntervals(tv.RequestTxn.Success)
+		if err != nil {
+			return nil, dels, err
+		}
+		putsElse, delsElse, err := checkIntervals(tv.RequestTxn.Failure)
+		if err != nil {
+			return nil, dels, err
+		}
+		for k := range putsThen {
+			if _, ok := puts[k]; ok {
+				return nil, dels, rpctypes.ErrGRPCDuplicateKey
+			}
+			if dels.Intersects(adt.NewStringAffinePoint(k)) {
+				return nil, dels, rpctypes.ErrGRPCDuplicateKey
+			}
+			puts[k] = struct{}{}
+		}
+		for k := range putsElse {
+			if _, ok := puts[k]; ok {
+				// if key is from putsThen, overlap is OK since
+				// either then/else are mutually exclusive
+				if _, isSafe := putsThen[k]; !isSafe {
+					return nil, dels, rpctypes.ErrGRPCDuplicateKey
+				}
+			}
+			if dels.Intersects(adt.NewStringAffinePoint(k)) {
+				return nil, dels, rpctypes.ErrGRPCDuplicateKey
+			}
+			puts[k] = struct{}{}
+		}
+		dels.Union(delsThen, adt.NewStringAffineInterval("\x00", ""))
+		dels.Union(delsElse, adt.NewStringAffineInterval("\x00", ""))
+	}
+
+	// collect and check this level's puts
+	for _, req := range reqs {
+		tv, ok := req.Request.(*pb.RequestOp_RequestPut)
+		if !ok || tv.RequestPut == nil {
+			continue
+		}
+		k := string(tv.RequestPut.Key)
+		if _, ok := puts[k]; ok {
+			return nil, dels, rpctypes.ErrGRPCDuplicateKey
+		}
+		if dels.Intersects(adt.NewStringAffinePoint(k)) {
+			return nil, dels, rpctypes.ErrGRPCDuplicateKey
+		}
+		puts[k] = struct{}{}
+	}
+	return puts, dels, nil
 }
 
-func checkRequestOp(u *pb.RequestOp) error {
+func checkRequestOp(u *pb.RequestOp, maxTxnOps int) error {
 	// TODO: ensure only one of the field is set.
 	switch uv := u.Request.(type) {
 	case *pb.RequestOp_RequestRange:
-		if uv.RequestRange != nil {
-			return checkRangeRequest(uv.RequestRange)
-		}
+		return checkRangeRequest(uv.RequestRange)
 	case *pb.RequestOp_RequestPut:
-		if uv.RequestPut != nil {
-			return checkPutRequest(uv.RequestPut)
-		}
+		return checkPutRequest(uv.RequestPut)
 	case *pb.RequestOp_RequestDeleteRange:
-		if uv.RequestDeleteRange != nil {
-			return checkDeleteRequest(uv.RequestDeleteRange)
-		}
+		return checkDeleteRequest(uv.RequestDeleteRange)
+	case *pb.RequestOp_RequestTxn:
+		return checkTxnRequest(uv.RequestTxn, maxTxnOps)
 	default:
 		// empty op / nil entry
 		return rpctypes.ErrGRPCKeyNotFound
 	}
-	return nil
 }

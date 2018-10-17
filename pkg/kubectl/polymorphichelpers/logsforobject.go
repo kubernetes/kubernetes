@@ -29,7 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 )
 
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
@@ -99,7 +99,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
 	}
 
-	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
+	sortBy := func(pods []*v1.Pod) sort.Interface { return podutils.ByLogging(pods) }
 	pod, numPods, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	if err != nil {
 		return nil, err

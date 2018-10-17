@@ -19,7 +19,7 @@ package util
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // SuggestApiResources returns a suggestion to use the "api-resources" command

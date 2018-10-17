@@ -119,7 +119,7 @@ func (c *FakePodTemplates) DeleteCollection(options *v1.DeleteOptions, listOptio
 // Patch applies the patch and returns the patched podTemplate.
 func (c *FakePodTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.PodTemplate, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, data, subresources...), &corev1.PodTemplate{})
+		Invokes(testing.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, pt, data, subresources...), &corev1.PodTemplate{})
 
 	if obj == nil {
 		return nil, err

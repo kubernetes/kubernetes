@@ -60,6 +60,7 @@ type StrategyFactory interface {
 // ProviderStrategies is a holder for all strategies that the provider requires to be populated.
 type ProviderStrategies struct {
 	RunAsUserStrategy         user.RunAsUserStrategy
+	RunAsGroupStrategy        group.GroupStrategy
 	SELinuxStrategy           selinux.SELinuxStrategy
 	AppArmorStrategy          apparmor.Strategy
 	FSGroupStrategy           group.GroupStrategy

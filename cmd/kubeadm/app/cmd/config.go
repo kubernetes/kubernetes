@@ -194,10 +194,14 @@ func getDefaultInitConfigBytes(kind string) ([]byte, error) {
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.NodeConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.JoinConfiguration{
-		Token:                                  sillyToken.Token.String(),
-		DiscoveryTokenAPIServers:               []string{"kube-apiserver:6443"},
-		DiscoveryTokenUnsafeSkipCAVerification: true, // TODO: DiscoveryTokenUnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+	internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.JoinConfiguration{
+		Discovery: kubeadmapiv1beta1.Discovery{
+			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
+				Token:                    sillyToken.Token.String(),
+				APIServerEndpoints:       []string{"kube-apiserver:6443"},
+				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
+			},
+		},
 	})
 	if err != nil {
 		return []byte{}, err
@@ -391,10 +395,7 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 func uploadConfiguration(client clientset.Interface, cfgPath string, defaultcfg *kubeadmapiv1beta1.InitConfiguration) error {
 	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
 	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-	err := phaseutil.SetKubernetesVersion(client, defaultcfg)
-	if err != nil {
-		return err
-	}
+	phaseutil.SetKubernetesVersion(defaultcfg)
 
 	// Default both statically and dynamically, convert to internal API type, and validate everything
 	// First argument is unset here as we shouldn't load a config file from disk

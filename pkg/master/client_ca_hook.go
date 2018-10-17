@@ -19,6 +19,7 @@ package master
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -131,7 +132,9 @@ func writeConfigMap(client coreclient.ConfigMapsGetter, name string, data map[st
 		return err
 	}
 
-	existing.Data = data
-	_, err = client.ConfigMaps(metav1.NamespaceSystem).Update(existing)
+	if !reflect.DeepEqual(existing.Data, data) {
+		existing.Data = data
+		_, err = client.ConfigMaps(metav1.NamespaceSystem).Update(existing)
+	}
 	return err
 }

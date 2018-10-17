@@ -142,7 +142,7 @@ func TestTopPod(t *testing.T) {
 			containers:   true,
 		},
 	}
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Logf("Running test case: %s", testCase.name)
@@ -183,15 +183,15 @@ func TestTopPod(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
 					case p == "/api":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 					case p == "/apis":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
 					case p == testCase.expectedPath && m == "GET" && (testCase.expectedQuery == "" || q == testCase.expectedQuery):
 						body, err := marshallBody(response)
 						if err != nil {
 							t.Errorf("%s: unexpected error: %v", testCase.name, err)
 						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
 							testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
@@ -199,7 +199,7 @@ func TestTopPod(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 			cmd := NewCmdTopPod(tf, nil, streams)
@@ -284,7 +284,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 			containers:   true,
 		},
 	}
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			metricsList := testV1beta1PodMetricsData()
@@ -330,9 +330,9 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p := req.URL.Path; {
 					case p == "/api":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 					case p == "/apis":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
 							testCase.name, req, req.URL)
@@ -340,7 +340,7 @@ func TestTopPodWithMetricsServer(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 			cmd := NewCmdTopPod(tf, nil, streams)
@@ -487,7 +487,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 			containers:   true,
 		},
 	}
-	initTestErrorHandler(t)
+	cmdtesting.InitTestErrorHandler(t)
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Logf("Running test case: %s", testCase.name)
@@ -528,15 +528,15 @@ func TestTopPodCustomDefaults(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
 					case p == "/api":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 					case p == "/apis":
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(apisbody)))}, nil
 					case p == testCase.expectedPath && m == "GET" && (testCase.expectedQuery == "" || q == testCase.expectedQuery):
 						body, err := marshallBody(response)
 						if err != nil {
 							t.Errorf("%s: unexpected error: %v", testCase.name, err)
 						}
-						return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v\nExpected path: %#v\nExpected query: %#v",
 							testCase.name, req, req.URL, testCase.expectedPath, testCase.expectedQuery)
@@ -544,7 +544,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 					}
 				}),
 			}
-			tf.ClientConfigVal = defaultClientConfig()
+			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 			opts := &TopPodOptions{

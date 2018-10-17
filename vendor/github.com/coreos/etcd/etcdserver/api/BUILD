@@ -32,6 +32,7 @@ filegroup(
         ":package-srcs",
         "//vendor/github.com/coreos/etcd/etcdserver/api/etcdhttp:all-srcs",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v2http:all-srcs",
+        "//vendor/github.com/coreos/etcd/etcdserver/api/v2v3:all-srcs",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3client:all-srcs",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3election:all-srcs",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3lock:all-srcs",

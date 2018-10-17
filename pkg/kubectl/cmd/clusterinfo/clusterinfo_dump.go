@@ -31,11 +31,16 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
+)
+
+const (
+	defaultPodLogsTimeout = 20 * time.Second
+	timeout               = 5 * time.Minute
 )
 
 type ClusterInfoDumpOptions struct {

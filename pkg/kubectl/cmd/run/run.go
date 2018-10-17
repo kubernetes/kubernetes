@@ -39,11 +39,17 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/attach"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/delete"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/logs"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	uexec "k8s.io/utils/exec"
 )
@@ -92,16 +98,23 @@ var (
 		kubectl run pi --schedule="0/5 * * * ?" --image=perl --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(2000)'`))
 )
 
+const (
+	defaultPodAttachTimeout = 60 * time.Second
+)
+
+var metadataAccessor = meta.NewAccessor()
+
 type RunObject struct {
 	Object  runtime.Object
 	Mapping *meta.RESTMapping
 }
 
 type RunOptions struct {
-	PrintFlags    *genericclioptions.PrintFlags
-	DeleteFlags   *DeleteFlags
-	DeleteOptions *DeleteOptions
-	RecordFlags   *genericclioptions.RecordFlags
+	PrintFlags  *genericclioptions.PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
+
+	DeleteFlags   *delete.DeleteFlags
+	DeleteOptions *delete.DeleteOptions
 
 	DryRun bool
 
@@ -128,7 +141,7 @@ type RunOptions struct {
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		DeleteFlags: NewDeleteFlags("to use to replace the resource."),
+		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -298,20 +311,20 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	generatorName := o.Generator
 	if len(o.Schedule) != 0 && len(generatorName) == 0 {
-		generatorName = cmdutil.CronJobV1Beta1GeneratorName
+		generatorName = generateversioned.CronJobV1Beta1GeneratorName
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case corev1.RestartPolicyAlways:
-			generatorName = cmdutil.DeploymentAppsV1Beta1GeneratorName
+			generatorName = generateversioned.DeploymentAppsV1Beta1GeneratorName
 		case corev1.RestartPolicyOnFailure:
-			generatorName = cmdutil.JobV1GeneratorName
+			generatorName = generateversioned.JobV1GeneratorName
 		case corev1.RestartPolicyNever:
-			generatorName = cmdutil.RunPodV1GeneratorName
+			generatorName = generateversioned.RunPodV1GeneratorName
 		}
 
 		// Falling back because the generator was not provided and the default one could be unavailable.
-		generatorNameTemp, err := cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.ErrOut)
+		generatorNameTemp, err := generateversioned.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.ErrOut)
 		if err != nil {
 			return err
 		}
@@ -325,17 +338,17 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	// start deprecating all generators except for 'run-pod/v1' which will be
 	// the only supported on a route to simple kubectl run which should mimic
 	// docker run
-	if generatorName != cmdutil.RunPodV1GeneratorName {
+	if generatorName != generateversioned.RunPodV1GeneratorName {
 		fmt.Fprintf(o.ErrOut, "kubectl run --generator=%s is DEPRECATED and will be removed in a future version. Use kubectl create instead.\n", generatorName)
 	}
 
-	generators := cmdutil.GeneratorFn("run")
+	generators := generateversioned.GeneratorFn("run")
 	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
 	}
 	names := generator.ParamNames()
-	params := kubectl.MakeParams(cmd, names)
+	params := generate.MakeParams(cmd, names)
 	params["name"] = args[0]
 	if len(args) > 1 {
 		params["args"] = args[1:]
@@ -369,8 +382,8 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			defer o.removeCreatedObjects(f, createdObjects)
 		}
 
-		opts := &AttachOptions{
-			StreamOptions: StreamOptions{
+		opts := &attach.AttachOptions{
+			StreamOptions: exec.StreamOptions{
 				IOStreams: o.IOStreams,
 				Stdin:     o.Interactive,
 				TTY:       o.TTY,
@@ -379,14 +392,14 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			GetPodTimeout: timeout,
 			CommandName:   cmd.Parent().CommandPath() + " attach",
 
-			Attach: &DefaultRemoteAttach{},
+			Attach: &attach.DefaultRemoteAttach{},
 		}
 		config, err := f.ToRESTConfig()
 		if err != nil {
 			return err
 		}
 		opts.Config = config
-		opts.AttachFunc = defaultAttachFunc
+		opts.AttachFunc = attach.DefaultAttachFunc
 
 		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
@@ -504,7 +517,7 @@ func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitConditio
 	return result, err
 }
 
-func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *AttachOptions) error {
+func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, name string, opts *attach.AttachOptions) error {
 	pod, err := waitForPod(podClient, ns, name, kubectl.PodRunningAndReady)
 	if err != nil && err != kubectl.ErrPodCompleted {
 		return err
@@ -519,7 +532,7 @@ func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, n
 	opts.Namespace = ns
 
 	if opts.AttachFunc == nil {
-		opts.AttachFunc = defaultAttachFunc
+		opts.AttachFunc = attach.DefaultAttachFunc
 	}
 
 	if err := opts.Run(); err != nil {
@@ -530,7 +543,7 @@ func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, n
 }
 
 // logOpts logs output from opts to the pods log.
-func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *AttachOptions) error {
+func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Pod, opts *attach.AttachOptions) error {
 	ctrName, err := opts.GetContainerName(pod)
 	if err != nil {
 		return err
@@ -541,7 +554,7 @@ func logOpts(restClientGetter genericclioptions.RESTClientGetter, pod *corev1.Po
 		return err
 	}
 	for _, request := range requests {
-		if err := DefaultConsumeRequest(request, opts.Out); err != nil {
+		if err := logs.DefaultConsumeRequest(request, opts.Out); err != nil {
 			return err
 		}
 	}
@@ -581,7 +594,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 }
 
 func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
-	generators := cmdutil.GeneratorFn("expose")
+	generators := generateversioned.GeneratorFn("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
 		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)
@@ -626,8 +639,8 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 	return runObject, nil
 }
 
-func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
-	err := kubectl.ValidateParams(names, params)
+func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
+	err := generate.ValidateParams(names, params)
 	if err != nil {
 		return nil, err
 	}

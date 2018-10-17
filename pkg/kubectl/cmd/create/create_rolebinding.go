@@ -20,10 +20,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -61,7 +62,7 @@ func NewCmdCreateRoleBinding(f cmdutil.Factory, ioStreams genericclioptions.IOSt
 
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddValidateFlags(cmd)
-	cmdutil.AddGeneratorFlags(cmd, cmdutil.RoleBindingV1GeneratorName)
+	cmdutil.AddGeneratorFlags(cmd, generateversioned.RoleBindingV1GeneratorName)
 	cmd.Flags().String("clusterrole", "", i18n.T("ClusterRole this RoleBinding should reference"))
 	cmd.Flags().String("role", "", i18n.T("Role this RoleBinding should reference"))
 	cmd.Flags().StringArray("user", []string{}, "Usernames to bind to the role")
@@ -76,10 +77,10 @@ func (o *RoleBindingOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		return err
 	}
 
-	var generator kubectl.StructuredGenerator
+	var generator generate.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
-	case cmdutil.RoleBindingV1GeneratorName:
-		generator = &kubectl.RoleBindingGeneratorV1{
+	case generateversioned.RoleBindingV1GeneratorName:
+		generator = &generateversioned.RoleBindingGeneratorV1{
 			Name:            name,
 			ClusterRole:     cmdutil.GetFlagString(cmd, "clusterrole"),
 			Role:            cmdutil.GetFlagString(cmd, "role"),

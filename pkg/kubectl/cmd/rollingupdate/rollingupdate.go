@@ -36,11 +36,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
@@ -72,10 +72,10 @@ var (
 		kubectl rolling-update frontend-v1 frontend-v2 --rollback`))
 )
 
-var (
-	updatePeriod, _ = time.ParseDuration("1m0s")
-	timeout, _      = time.ParseDuration("5m0s")
-	pollInterval, _ = time.ParseDuration("3s")
+const (
+	updatePeriod = 1 * time.Minute
+	timeout      = 5 * time.Minute
+	pollInterval = 3 * time.Second
 )
 
 type RollingUpdateOptions struct {

@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 )
 
 // attachablePodForObject returns the pod to which to attach given an object.
@@ -48,7 +48,7 @@ func attachablePodForObject(restClientGetter genericclioptions.RESTClientGetter,
 	if err != nil {
 		return nil, fmt.Errorf("cannot attach to %T: %v", object, err)
 	}
-	sortBy := func(pods []*corev1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+	sortBy := func(pods []*corev1.Pod) sort.Interface { return sort.Reverse(podutils.ActivePods(pods)) }
 	pod, _, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	return pod, err
 }

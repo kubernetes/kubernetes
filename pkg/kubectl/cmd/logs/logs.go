@@ -30,12 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 const (
@@ -73,6 +73,10 @@ var (
 
 	selectorTail    int64 = 10
 	logsUsageErrStr       = fmt.Sprintf("expected '%s'.\nPOD or TYPE/NAME is a required argument for the logs command", logsUsageStr)
+)
+
+const (
+	defaultPodLogsTimeout = 20 * time.Second
 )
 
 type LogsOptions struct {
@@ -126,7 +130,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Example:               logsExample,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			if len(os.Args) > 1 && os.Args[1] == "log" {
-				printDeprecationWarning(o.ErrOut, "logs", "log")
+				fmt.Fprintf(o.ErrOut, "%s is DEPRECATED and will be removed in a future version. Use %s instead.\n", "log", "logs")
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {

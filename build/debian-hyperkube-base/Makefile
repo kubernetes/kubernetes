@@ -19,7 +19,7 @@
 
 REGISTRY?=staging-k8s.gcr.io
 IMAGE?=$(REGISTRY)/debian-hyperkube-base
-TAG=0.10.2
+TAG=0.11.0
 ARCH?=amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 CACHEBUST?=1

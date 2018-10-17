@@ -510,11 +510,13 @@ run_rs_tests() {
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  #TODO(mortent): Remove this workaround when ReplicaSet bug described in issue #69376 is fixed
+  local replicaset_name="frontend-no-cascade"
+  sed -r 's/^(\s*)(name\s*:\s*frontend\s*$)/\1name: '"${replicaset_name}"'/' hack/testdata/frontend-replicaset.yaml | kubectl create "${kube_flags[@]}" -f -
   # wait for all 3 pods to be set up
   kube::test::wait_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{$pod_container_name_field}}:{{end}}" 'php-redis:php-redis:php-redis:'
   kube::log::status "Deleting rs"
-  kubectl delete rs frontend "${kube_flags[@]}" --cascade=false
+  kubectl delete rs "${replicaset_name}" "${kube_flags[@]}" --cascade=false
   # Wait for the rs to be deleted.
   kube::test::wait_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
   # Post-condition: All 3 pods still remain from frontend replica set

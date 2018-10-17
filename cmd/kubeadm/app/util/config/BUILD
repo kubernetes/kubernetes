@@ -11,8 +11,8 @@ go_library(
     srcs = [
         "cluster.go",
         "common.go",
-        "masterconfig.go",
-        "nodeconfig.go",
+        "initconfiguration.go",
+        "joinconfiguration.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/config",
     deps = [
@@ -43,8 +43,8 @@ go_test(
     srcs = [
         "cluster_test.go",
         "common_test.go",
-        "masterconfig_test.go",
-        "nodeconfig_test.go",
+        "initconfiguration_test.go",
+        "joinconfiguration_test.go",
     ],
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],

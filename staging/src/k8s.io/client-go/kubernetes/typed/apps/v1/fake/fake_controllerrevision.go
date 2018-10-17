@@ -119,7 +119,7 @@ func (c *FakeControllerRevisions) DeleteCollection(options *v1.DeleteOptions, li
 // Patch applies the patch and returns the patched controllerRevision.
 func (c *FakeControllerRevisions) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *appsv1.ControllerRevision, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, data, subresources...), &appsv1.ControllerRevision{})
+		Invokes(testing.NewPatchSubresourceAction(controllerrevisionsResource, c.ns, name, pt, data, subresources...), &appsv1.ControllerRevision{})
 
 	if obj == nil {
 		return nil, err

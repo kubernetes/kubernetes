@@ -26,7 +26,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -34,11 +33,12 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
 	"k8s.io/kubernetes/pkg/kubectl"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/utils/exec"
 )
 
@@ -49,7 +49,7 @@ var (
 
 		Output is always YAML.
 
-		KUBERNETES_EXTERNAL_DIFF environment variable can be used to select your own
+		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
 		diff command. By default, the "diff" command available in your path will be
 		run with "-u" (unicode) and "-N" (treat new files as empty) options.`))
 	diffExample = templates.Examples(i18n.T(`
@@ -97,7 +97,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 }
 
 // DiffProgram finds and run the diff program. The value of
-// KUBERNETES_EXTERNAL_DIFF environment variable will be used a diff
+// KUBECTL_EXTERNAL_DIFF environment variable will be used a diff
 // program. By default, `diff(1)` will be used.
 type DiffProgram struct {
 	Exec exec.Interface
@@ -106,7 +106,7 @@ type DiffProgram struct {
 
 func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
 	diff := ""
-	if envDiff := os.Getenv("KUBERNETES_EXTERNAL_DIFF"); envDiff != "" {
+	if envDiff := os.Getenv("KUBECTL_EXTERNAL_DIFF"); envDiff != "" {
 		diff = envDiff
 	} else {
 		diff = "diff"
@@ -122,8 +122,7 @@ func (d *DiffProgram) getCommand(args ...string) exec.Cmd {
 
 // Run runs the detected diff program. `from` and `to` are the directory to diff.
 func (d *DiffProgram) Run(from, to string) error {
-	d.getCommand(from, to).Run() // Ignore diff return code
-	return nil
+	return d.getCommand(from, to).Run()
 }
 
 // Printer is used to print an object.
@@ -259,16 +258,16 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 
 	// This is using the patcher from apply, to keep the same behavior.
 	// We plan on replacing this with server-side apply when it becomes available.
-	patcher := &patcher{
-		mapping:       obj.Info.Mapping,
-		helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
-		overwrite:     true,
-		backOff:       clockwork.NewRealClock(),
-		serverDryRun:  true,
-		openapiSchema: obj.OpenAPI,
+	patcher := &apply.Patcher{
+		Mapping:       obj.Info.Mapping,
+		Helper:        resource.NewHelper(obj.Info.Client, obj.Info.Mapping),
+		Overwrite:     true,
+		BackOff:       clockwork.NewRealClock(),
+		ServerDryRun:  true,
+		OpenapiSchema: obj.OpenAPI,
 	}
 
-	_, result, err := patcher.patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
+	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, nil)
 	return result, err
 }
 
@@ -329,6 +328,21 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		return err
 	}
 
+	discovery, err := f.ToDiscoveryClient()
+	if err != nil {
+		return err
+	}
+
+	dynamic, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	dryRunVerifier := &apply.DryRunVerifier{
+		Finder:        cmdutil.NewCRDFinder(cmdutil.CRDFromDynamic(dynamic)),
+		OpenAPIGetter: discovery,
+	}
+
 	differ, err := NewDiffer("LIVE", "MERGED")
 	if err != nil {
 		return err
@@ -357,6 +371,10 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 			return err
 		}
 
+		if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+			return err
+		}
+
 		local := info.Object.DeepCopyObject()
 		if err := info.Get(); err != nil {
 			if !errors.IsNotFound(err) {
@@ -378,8 +396,5 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions) error {
 		return err
 	}
 
-	// Error ignore on purpose. diff(1) for example, returns an error if there is any diff.
-	_ = differ.Run(diff)
-
-	return nil
+	return differ.Run(diff)
 }
