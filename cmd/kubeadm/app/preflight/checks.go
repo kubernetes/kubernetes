@@ -991,7 +991,6 @@ func addCommonChecks(execer utilsexec.Interface, cfg kubeadmapi.CommonConfigurat
 	}
 	checks = append(checks,
 		SystemVerificationCheck{IsDocker: isDocker},
-		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.GetNodeName()},
 		KubeletVersionCheck{KubernetesVersion: cfg.GetKubernetesVersion(), exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
