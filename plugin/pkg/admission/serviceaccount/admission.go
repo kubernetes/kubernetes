@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,6 +40,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	publisher "k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -60,6 +62,32 @@ const (
 
 	// PluginName is the name of this admission plugin
 	PluginName = "ServiceAccount"
+)
+
+var (
+	configMapProjectedVolume = &api.ConfigMapProjection{
+		LocalObjectReference: api.LocalObjectReference{
+			Name: publisher.RootCACertConfigMapName,
+		},
+		Items: []api.KeyToPath{
+			{
+				Key:  "ca.crt",
+				Path: "ca.crt",
+			},
+		},
+	}
+
+	downwardAPIProjectedVolume = &api.DownwardAPIProjection{
+		Items: []api.DownwardAPIVolumeFile{
+			{
+				Path: "namespace",
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: "v1",
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+	}
 )
 
 // Register registers a plugin
@@ -86,6 +114,7 @@ type serviceAccount struct {
 
 	serviceAccountLister corev1listers.ServiceAccountLister
 	secretLister         corev1listers.SecretLister
+	configMapLister      corev1listers.ConfigMapLister
 
 	generateName func(string) string
 
@@ -130,8 +159,13 @@ func (a *serviceAccount) SetExternalKubeInformerFactory(f informers.SharedInform
 	secretInformer := f.Core().V1().Secrets()
 	a.secretLister = secretInformer.Lister()
 
+	cmInformer := f.Core().V1().ConfigMaps()
+	a.configMapLister = cmInformer.Lister()
+
 	a.SetReadyFunc(func() bool {
-		return serviceAccountInformer.Informer().HasSynced() && secretInformer.Informer().HasSynced()
+		return serviceAccountInformer.Informer().HasSynced() &&
+			secretInformer.Informer().HasSynced() &&
+			cmInformer.Informer().HasSynced()
 	})
 }
 
@@ -186,6 +220,21 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 				return err
 			}
 			return admission.NewForbidden(a, err)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TokenRequestProjection) {
+			hasTokenVolumeBounded := false
+			for _, vol := range pod.Spec.Volumes {
+				if vol.Projected != nil {
+					for _, pro := range vol.Projected.Sources {
+						if pro.ServiceAccountToken != nil {
+							hasTokenVolumeBounded = true
+						}
+					}
+				}
+			}
+			if hasTokenVolumeBounded {
+				s.mountServiceAccountTokenProjection(pod)
+			}
 		}
 	}
 	if len(pod.Spec.ImagePullSecrets) == 0 {
@@ -529,30 +578,10 @@ func (s *serviceAccount) createVolume(tokenVolumeName, secretName string) api.Vo
 							},
 						},
 						{
-							ConfigMap: &api.ConfigMapProjection{
-								LocalObjectReference: api.LocalObjectReference{
-									Name: "kube-root-ca.crt",
-								},
-								Items: []api.KeyToPath{
-									{
-										Key:  "ca.crt",
-										Path: "ca.crt",
-									},
-								},
-							},
+							ConfigMap: configMapProjectedVolume.DeepCopy(),
 						},
 						{
-							DownwardAPI: &api.DownwardAPIProjection{
-								Items: []api.DownwardAPIVolumeFile{
-									{
-										Path: "namespace",
-										FieldRef: &api.ObjectFieldSelector{
-											APIVersion: "v1",
-											FieldPath:  "metadata.namespace",
-										},
-									},
-								},
-							},
+							DownwardAPI: downwardAPIProjectedVolume.DeepCopy(),
 						},
 					},
 				},
@@ -567,4 +596,118 @@ func (s *serviceAccount) createVolume(tokenVolumeName, secretName string) api.Vo
 			},
 		},
 	}
+}
+
+func (s *serviceAccount) mountServiceAccountTokenProjection(pod *api.Pod) {
+	tokenVolume := make(map[string]api.Volume)
+	for _, vol := range pod.Spec.Volumes {
+		if vol.Projected != nil {
+			for _, pro := range vol.Projected.Sources {
+				if pro.ServiceAccountToken != nil {
+					if match(vol.Projected, configMapProjectedVolume, downwardAPIProjectedVolume) {
+						tokenVolume[vol.Name] = vol
+					} else {
+						tokenVolume[vol.Name] = api.Volume{
+							Name: s.generateName(fmt.Sprintf("%s-projection-", vol.Name)),
+							VolumeSource: api.VolumeSource{
+								Projected: &api.ProjectedVolumeSource{
+									Sources: []api.VolumeProjection{
+										{
+											ServiceAccountToken: pro.ServiceAccountToken.DeepCopy(),
+										},
+										{
+											ConfigMap: configMapProjectedVolume.DeepCopy(),
+										},
+										{
+											DownwardAPI: downwardAPIProjectedVolume.DeepCopy(),
+										},
+									},
+								},
+							},
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	tokenVolumesToAppend := sets.NewString()
+	for i := range pod.Spec.InitContainers {
+		volName := mountProjectionVolume(tokenVolume, &pod.Spec.InitContainers[i])
+		if volName != "" && !tokenVolumesToAppend.Has(volName) {
+			tokenVolumesToAppend.Insert(volName)
+		}
+	}
+
+	for i := range pod.Spec.Containers {
+		volName := mountProjectionVolume(tokenVolume, &pod.Spec.Containers[i])
+		if volName != "" && !tokenVolumesToAppend.Has(volName) {
+			tokenVolumesToAppend.Insert(volName)
+		}
+	}
+
+	for _, volName := range tokenVolumesToAppend.List() {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, tokenVolume[volName])
+	}
+}
+
+// tokenProjectionVolumes stores all the token projected volume in Pod which container belongs with
+// Return value of this function indicates the volume we need to append to pod
+// Empty string means no need to append
+func mountProjectionVolume(tokenProjectionVolumes map[string]api.Volume, container *api.Container) string {
+	volumeToAppend := ""
+	for _, volumeMount := range container.VolumeMounts {
+		if volumeMount.MountPath == DefaultAPITokenMountPath {
+			// The path we want to mount on has been occupied, give up mounting.
+			return volumeToAppend
+		}
+		vol, exist := tokenProjectionVolumes[volumeMount.Name]
+		if !exist {
+			continue
+		}
+		container.VolumeMounts = append(container.VolumeMounts,
+			api.VolumeMount{
+				Name:      vol.Name,
+				ReadOnly:  true,
+				MountPath: DefaultAPITokenMountPath,
+			})
+
+		// This indicates the projected volume is newly-created in mountServiceAccountTokenProjection()
+		// We need to insert it into pod
+		if vol.Name != volumeMount.Name {
+			volumeToAppend = volumeMount.Name
+		}
+		return volumeToAppend
+	}
+	return volumeToAppend
+}
+
+// For each token projected volume, we need to mount a projected volume which
+// contains 1.ca.crt 2.namespace 3.token on DefaultAPITokenMountPath.
+// The match function compares the projected volume the pod has and the projected
+// volume we want to mount. If they are exactly the same, there's no need to append
+// a new one, just use the projected volume pod already has.
+func match(pro *api.ProjectedVolumeSource, cmProjection *api.ConfigMapProjection, nsProjection *api.DownwardAPIProjection) bool {
+	if len(pro.Sources) != 3 {
+		return false
+	}
+	cmMatch := false
+	nsMatch := false
+	for _, s := range pro.Sources {
+		if s.ServiceAccountToken != nil {
+			continue
+		} else if s.ConfigMap != nil {
+			if apiequality.Semantic.DeepEqual(s.ConfigMap, cmProjection) {
+				cmMatch = true
+			}
+		} else if s.DownwardAPI != nil {
+			if apiequality.Semantic.DeepEqual(s.DownwardAPI, nsProjection) {
+				nsMatch = true
+			}
+		} else {
+			return false
+		}
+	}
+	return cmMatch && nsMatch
 }
