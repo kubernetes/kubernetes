@@ -36,6 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/constobj"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -393,7 +394,9 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
 		//glog.Warningf("DeconstDeepCopyObject to ensure that object is not const-wrapped")
-		objVal.Set(reflect.ValueOf(elem.Object.DeconstDeepCopyObject()).Elem())
+		// TODO: This is bad; we shouldn't be assuming that we don't change the object
+		// But ... for benchmarking purposes, we want to compare like with like
+		objVal.Set(reflect.ValueOf(constobj.DeconstifyForTest(elem.Object)).Elem())
 	} else {
 		objVal.Set(reflect.Zero(objVal.Type()))
 		if !ignoreNotFound {
@@ -531,7 +534,9 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		}
 		if filter(elem.Key, elem.Labels, elem.Fields, elem.Uninitialized) {
 			//glog.Warningf("DeepCopyObject to ensure that object is not const-wrapped")
-			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object.DeconstDeepCopyObject()).Elem()))
+			// TODO: This is bad; we shouldn't be assuming that we don't change the object
+			// But ... for benchmarking purposes, we want to compare like with like
+			listVal.Set(reflect.Append(listVal, reflect.ValueOf(constobj.DeconstifyForTest(elem.Object)).Elem()))
 		}
 	}
 	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
