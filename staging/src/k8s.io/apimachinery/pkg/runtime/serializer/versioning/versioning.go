@@ -103,7 +103,8 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 
 	// if we specify a target, use generic conversion.
 	if into != nil {
-		if into == obj {
+		_, isUnstructured := obj.(runtime.Unstructured)
+		if into == obj && !isUnstructured {
 			if isVersioned {
 				return versioned, gvk, nil
 			}
