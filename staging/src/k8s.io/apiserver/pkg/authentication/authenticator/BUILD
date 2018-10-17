@@ -5,6 +5,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "audagnostic.go",
         "audiences.go",
         "interfaces.go",
     ],
@@ -28,6 +29,13 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["audiences_test.go"],
+    srcs = [
+        "audagnostic_test.go",
+        "audiences_test.go",
+    ],
     embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+    ],
 )
