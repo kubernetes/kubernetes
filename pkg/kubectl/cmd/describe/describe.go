@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 var (
@@ -138,7 +139,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.BuilderArgs = args
 
 	o.Describer = func(mapping *meta.RESTMapping) (printers.Describer, error) {
-		return cmdutil.DescriberFn(f, mapping)
+		return describerFn(f, mapping)
 	}
 
 	o.NewBuilder = f.NewBuilder
@@ -247,4 +248,28 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 		return originalError
 	}
 	return nil
+}
+
+// DescriberFunc gives a way to display the specified RESTMapping type
+type describerFunc func(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error)
+
+// describerFn gives a way to easily override the function for unit testing if needed
+var describerFn describerFunc = describer
+
+// Returns a Describer for displaying the specified RESTMapping type or an error.
+func describer(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error) {
+	clientConfig, err := restClientGetter.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+	// try to get a describer
+	if describer, ok := printersinternal.DescriberFor(mapping.GroupVersionKind.GroupKind(), clientConfig); ok {
+		return describer, nil
+	}
+	// if this is a kind we don't have a describer for yet, go generic if possible
+	if genericDescriber, ok := printersinternal.GenericDescriberFor(mapping, clientConfig); ok {
+		return genericDescriber, nil
+	}
+	// otherwise return an unregistered error
+	return nil, fmt.Errorf("no description has been implemented for %s", mapping.GroupVersionKind.String())
 }
