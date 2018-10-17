@@ -12,12 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: build test
+all: gen build test
+
+.PHONY: gen
+gen:
+	go run pkg/cloud/gen/main.go > pkg/cloud/gen.go
+	go run pkg/cloud/gen/main.go -mode test > pkg/cloud/gen_test.go
 
 .PHONY: build
-build:
+build: gen
 	go build ./...
 
 .PHONY: test
 test:
 	go test ./...
+	# We cannot use golint currently due to errors in the GCP API naming.
+	# golint ./...
+	go vet ./...
