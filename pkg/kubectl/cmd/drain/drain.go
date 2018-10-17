@@ -728,24 +728,24 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 		if nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
 			obj, err := scheme.Scheme.ConvertToVersion(nodeInfo.Object, nodeInfo.Mapping.GroupVersionKind.GroupVersion())
 			if err != nil {
-				fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+				fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
 				continue
 			}
 			oldData, err := json.Marshal(obj)
 			if err != nil {
-				fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+				fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
 				continue
 			}
 			node, ok := obj.(*corev1.Node)
 			if !ok {
-				fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: unexpected Type%T, expected Node", cordonOrUncordon, nodeInfo.Name, obj)
+				fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: unexpected Type%T, expected Node\n", cordonOrUncordon, nodeInfo.Name, obj)
 				continue
 			}
 			unsched := node.Spec.Unschedulable
 			if unsched == desired {
 				printObj, err := o.ToPrinter(already(desired))
 				if err != nil {
-					fmt.Printf("error: %v", err)
+					fmt.Fprintf(o.ErrOut, "error: %v\n", err)
 					continue
 				}
 				printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
@@ -755,23 +755,23 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 					node.Spec.Unschedulable = desired
 					newData, err := json.Marshal(obj)
 					if err != nil {
-						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
 					patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
 					if err != nil {
-						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
 					_, err = helper.Patch(o.Namespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes, nil)
 					if err != nil {
-						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v\n", cordonOrUncordon, nodeInfo.Name, err)
 						continue
 					}
 				}
 				printObj, err := o.ToPrinter(changed(desired))
 				if err != nil {
-					fmt.Fprintf(o.ErrOut, "%v", err)
+					fmt.Fprintf(o.ErrOut, "%v\n", err)
 					continue
 				}
 				printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
@@ -779,7 +779,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 		} else {
 			printObj, err := o.ToPrinter("skipped")
 			if err != nil {
-				fmt.Fprintf(o.ErrOut, "%v", err)
+				fmt.Fprintf(o.ErrOut, "%v\n", err)
 				continue
 			}
 			printObj(cmdutil.AsDefaultVersionedOrOriginal(nodeInfo.Object, nodeInfo.Mapping), o.Out)
