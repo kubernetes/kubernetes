@@ -21,6 +21,7 @@ includes:
   - 'interface:openstack-integration'
   - 'interface:vsphere-integration'
   - 'interface:azure-integration'
+  - 'interface:keystone-credentials'
 options:
   basic:
     packages:

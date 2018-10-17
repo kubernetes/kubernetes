@@ -162,3 +162,87 @@ options:
     description: |
       The storage class to make the default storage class. Allowed values are "auto",
       "none", "ceph-xfs", "ceph-ext4". Note: Only works in Kubernetes >= 1.10
+  keystone-policy:
+    default: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: k8s-auth-policy
+        namespace: kube-system
+        labels:
+          k8s-app: k8s-keystone-auth
+      data:
+        policies: |
+          [
+            {
+             "resource": {
+                "verbs": ["get", "list", "watch"],
+                "resources": ["*"],
+                "version": "*",
+                "namespace": "*"
+              },
+              "match": [
+                {
+                  "type": "role",
+                  "values": ["k8s-viewers"]
+                },
+                {
+                  "type": "project",
+                  "values": ["k8s"]
+                }
+              ]
+            },
+            {
+             "resource": {
+                "verbs": ["*"],
+                "resources": ["*"],
+                "version": "*",
+                "namespace": "default"
+              },
+              "match": [
+                {
+                  "type": "role",
+                  "values": ["k8s-users"]
+                },
+                {
+                  "type": "project",
+                  "values": ["k8s"]
+                }
+              ]
+            },
+            {
+             "resource": {
+                "verbs": ["*"],
+                "resources": ["*"],
+                "version": "*",
+                "namespace": "*"
+              },
+              "match": [
+                {
+                  "type": "role",
+                  "values": ["k8s-admins"]
+                },
+                {
+                  "type": "project",
+                  "values": ["k8s"]
+                }
+              ]
+            }
+          ]
+    type: string
+    description: |
+      Policy for Keystone authentication. This is used when a Keystone charm is
+      related to kubernetes-master in order to provide authentication and authorization
+      for Keystone users on the Kubernetes cluster.
+  enable-keystone-authorization:
+    type: boolean
+    default: false
+    description: |
+      If true and the Keystone charm is related, users will authorize against
+      the Keystone server. Note that if related, users will always authenticate
+      against Keystone.
+  keystone-ssl-ca:
+    type: string
+    description: |
+      Path to Keystone certificate authority for securing communications to Keystone.
+    default: ""
