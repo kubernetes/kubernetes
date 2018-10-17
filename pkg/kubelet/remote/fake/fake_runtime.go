@@ -294,3 +294,13 @@ func (f *RemoteRuntime) ReopenContainerLog(ctx context.Context, req *kubeapi.Reo
 
 	return &kubeapi.ReopenContainerLogResponse{}, nil
 }
+
+// ListPodSandboxStats returns stats of all running PodSandboxes.
+func (f *RemoteRuntime) ListPodSandboxStats(ctx context.Context, req *kubeapi.ListPodSandboxStatsRequest) (*kubeapi.ListPodSandboxStatsResponse, error) {
+	stats, err := f.RuntimeService.ListPodSandboxStats(req.Filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ListPodSandboxStatsResponse{Stats: stats}, nil
+}

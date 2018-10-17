@@ -53,10 +53,11 @@ type FakeRuntimeService struct {
 	Called []string
 	Errors map[string][]error
 
-	FakeStatus         *runtimeapi.RuntimeStatus
-	Containers         map[string]*FakeContainer
-	Sandboxes          map[string]*FakePodSandbox
-	FakeContainerStats map[string]*runtimeapi.ContainerStats
+	FakeStatus          *runtimeapi.RuntimeStatus
+	Containers          map[string]*FakeContainer
+	Sandboxes           map[string]*FakePodSandbox
+	FakeContainerStats  map[string]*runtimeapi.ContainerStats
+	FakePodSandboxStats map[string]*runtimeapi.PodSandboxStats
 }
 
 func (r *FakeRuntimeService) GetContainerID(sandboxID, name string, attempt uint32) (string, error) {
@@ -125,11 +126,12 @@ func (r *FakeRuntimeService) popError(f string) error {
 
 func NewFakeRuntimeService() *FakeRuntimeService {
 	return &FakeRuntimeService{
-		Called:             make([]string, 0),
-		Errors:             make(map[string][]error),
-		Containers:         make(map[string]*FakeContainer),
-		Sandboxes:          make(map[string]*FakePodSandbox),
-		FakeContainerStats: make(map[string]*runtimeapi.ContainerStats),
+		Called:              make([]string, 0),
+		Errors:              make(map[string][]error),
+		Containers:          make(map[string]*FakeContainer),
+		Sandboxes:           make(map[string]*FakePodSandbox),
+		FakeContainerStats:  make(map[string]*runtimeapi.ContainerStats),
+		FakePodSandboxStats: make(map[string]*runtimeapi.PodSandboxStats),
 	}
 }
 
@@ -495,4 +497,40 @@ func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
 	}
 
 	return nil
+}
+
+func (r *FakeRuntimeService) SetPodSandboxStats(sandboxStats []*runtimeapi.PodSandboxStats) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.FakePodSandboxStats = make(map[string]*runtimeapi.PodSandboxStats)
+	for _, s := range sandboxStats {
+		r.FakePodSandboxStats[s.Id] = s
+	}
+}
+
+func (r *FakeRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ListPodSandboxStats")
+
+	var result []*runtimeapi.PodSandboxStats
+	for _, c := range r.Containers {
+		if filter != nil {
+			if filter.Id != "" && filter.Id != c.Id {
+				continue
+			}
+			if filter.LabelSelector != nil && !filterInLabels(filter.LabelSelector, c.GetLabels()) {
+				continue
+			}
+		}
+		s, found := r.FakePodSandboxStats[c.Id]
+		if !found {
+			continue
+		}
+		result = append(result, s)
+	}
+
+	return result, nil
 }

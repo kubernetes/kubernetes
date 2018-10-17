@@ -301,3 +301,12 @@ func (in instrumentedImageManagerService) ImageFsInfo() ([]*runtimeapi.Filesyste
 	recordError(operation, err)
 	return fsInfo, nil
 }
+
+func (in instrumentedRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+	const operation = "list_podsandbox_stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListPodSandboxStats(filter)
+	recordError(operation, err)
+	return out, err
+}

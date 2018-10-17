@@ -492,3 +492,20 @@ func (r *RemoteRuntimeService) ReopenContainerLog(containerID string) error {
 	}
 	return nil
 }
+
+func (r *RemoteRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+	// Do not set timeout, because network stats collection takes time.
+	// TODO(feiskyer): Should we assume runtime should cache the result, and set timeout here?
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	resp, err := r.runtimeClient.ListPodSandboxStats(ctx, &runtimeapi.ListPodSandboxStatsRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		glog.Errorf("ListPodSandboxStats with filter %+v from runtime service failed: %v", filter, err)
+		return nil, err
+	}
+
+	return resp.GetStats(), nil
+}
