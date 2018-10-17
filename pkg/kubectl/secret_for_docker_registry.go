@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
@@ -146,16 +145,35 @@ func (s SecretForDockerRegistryGeneratorV1) validate() error {
 	return nil
 }
 
+// dockerConfig represents the config file used by the docker CLI.
+// This config that represents the credentials that should be used
+// when pulling images from specific image repositories.
+type dockerConfig map[string]dockerConfigEntry
+
+// dockerConfigJson represents ~/.docker/config.json file info
+// see https://github.com/docker/docker/pull/12009
+type dockerConfigJson struct {
+	Auths dockerConfig `json:"auths"`
+	// +optional
+	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`
+}
+
+type dockerConfigEntry struct {
+	Username string
+	Password string
+	Email    string
+}
+
 // handleDockerCfgJsonContent serializes a ~/.docker/config.json file
 func handleDockerCfgJsonContent(username, password, email, server string) ([]byte, error) {
-	dockercfgAuth := credentialprovider.DockerConfigEntry{
+	dockercfgAuth := dockerConfigEntry{
 		Username: username,
 		Password: password,
 		Email:    email,
 	}
 
-	dockerCfgJson := credentialprovider.DockerConfigJson{
-		Auths: map[string]credentialprovider.DockerConfigEntry{server: dockercfgAuth},
+	dockerCfgJson := dockerConfigJson{
+		Auths: map[string]dockerConfigEntry{server: dockercfgAuth},
 	}
 
 	return json.Marshal(dockerCfgJson)
