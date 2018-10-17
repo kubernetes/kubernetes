@@ -85,6 +85,8 @@ service RuntimeService {
     rpc ContainerStats(ContainerStatsRequest) returns (ContainerStatsResponse) {}
     // ListContainerStats returns stats of all running containers.
     rpc ListContainerStats(ListContainerStatsRequest) returns (ListContainerStatsResponse) {}
+    // ListPodSandboxStats returns stats of all running PodSandboxes. Only for Windows.
+    rpc ListPodSandboxStats(ListPodSandboxStatsRequest) returns (ListPodSandboxStatsResponse) {}
 
     // UpdateRuntimeConfig updates the runtime configuration based on the given request.
     rpc UpdateRuntimeConfig(UpdateRuntimeConfigRequest) returns (UpdateRuntimeConfigResponse) {}
@@ -1247,4 +1249,59 @@ message ReopenContainerLogRequest {
 }
 
 message ReopenContainerLogResponse{
+}
+
+message ListPodSandboxStatsRequest{
+    // Filter for the list request.
+    PodSandboxStatsFilter filter = 1;
+}
+
+// PodSandboxStatsFilter is used to filter PodSandboxes.
+// All those fields are combined with 'AND'
+message PodSandboxStatsFilter {
+    // ID of the sandbox.
+    string id = 1;
+    // LabelSelector to select matches.
+    // Only api.MatchLabels is supported for now and the requirements
+    // are ANDed. MatchExpressions is not supported yet.
+    map<string, string> label_selector = 2;
+}
+
+message ListPodSandboxStatsResponse {
+    // Stats of the PodSandbox.
+    repeated PodSandboxStats stats = 1;
+}
+
+// PodSandboxStats provides the resource usage statistics for a PodSandbox.
+message PodSandboxStats {
+    // ID of the sandbox.
+    string id = 1;
+    // Metadata of the sandbox.
+    PodSandboxMetadata metadata = 2;
+    // Usage of the network interfaces.
+    NetworkUsage network = 3;
+}
+
+// NetworkUsage provides the network usage information.
+message NetworkUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // Stats for the default interface, if found.
+    InterfaceStats default = 2;
+    // Stats of all interfaces.
+    repeated InterfaceStats interfaces = 3;
+}
+
+// InterfaceStats contains resource value data about network interface.
+message InterfaceStats {
+    // The name of the interface
+    string name = 1;
+    // Cumulative count of bytes received.
+    UInt64Value rx_bytes = 2;
+    // Cumulative count of receive errors encountered.
+    UInt64Value rx_errors = 3;
+    // Cumulative count of bytes transmitted.
+    UInt64Value tx_bytes = 4;
+    // Cumulative count of transmit errors encountered.
+    UInt64Value tx_errors = 5;
 }
