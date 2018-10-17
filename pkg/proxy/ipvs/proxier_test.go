@@ -2708,6 +2708,7 @@ func Test_syncService(t *testing.T) {
 		ipset := ipsettest.NewFake(testIPSetVersion)
 		proxier := NewFakeProxier(ipt, ipvs, ipset, nil)
 
+		proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 		if testCases[i].oldVirtualServer != nil {
 			if err := proxier.ipvs.AddVirtualServer(testCases[i].oldVirtualServer); err != nil {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
@@ -2904,5 +2905,111 @@ func TestCleanLegacyService(t *testing.T) {
 		if vs.Port == 58 {
 			t.Errorf("Expected ipvs5 to be removed after cleanup. It still remains")
 		}
+	}
+}
+
+func TestCleanLegacyBindAddr(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+
+	// All ipvs service addresses that were bound to ipvs0 in the latest sync loop.
+	activeBindAddrs := map[string]bool{"1.2.3.4": true, "1002:ab8::2:1": true}
+	// All service addresses that were bound to ipvs0 in system
+	currentBindAddrs := []string{"1.2.3.4", "1.2.3.5", "1.2.3.6", "1002:ab8::2:1", "1002:ab8::2:2"}
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+
+	for i := range currentBindAddrs {
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+	}
+	fp.cleanLegacyBindAddr(activeBindAddrs, currentBindAddrs)
+
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	// should only remain "1.2.3.4" and "1002:ab8::2:1"
+	if len(remainingAddrs) != 2 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 2, len(remainingAddrs))
+	}
+
+	// check that address "1.2.3.4" and "1002:ab8::2:1" remain
+	remainingAddrsMap := make(map[string]bool)
+	for i := range remainingAddrs {
+		remainingAddrsMap[remainingAddrs[i]] = true
+	}
+	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
+		t.Errorf("Expected remainingAddrsMap %v, got %v", activeBindAddrs, remainingAddrsMap)
+	}
+}
+
+func TestMultiPortServiceBindAddr(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil)
+
+	service1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port1", "TCP", 1234, 0, 0)
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port2", "TCP", 1235, 0, 0)
+	})
+	service2 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port1", "TCP", 1234, 0, 0)
+	})
+	service3 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.16.55.4"
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port1", "TCP", 1234, 0, 0)
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port2", "TCP", 1235, 0, 0)
+		svc.Spec.Ports = addTestPort(svc.Spec.Ports, "port3", "UDP", 1236, 0, 0)
+	})
+
+	fp.servicesSynced = true
+	fp.endpointsSynced = true
+
+	// first, add multi-port service1
+	fp.OnServiceAdd(service1)
+	fp.syncProxyRules()
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	// should only remain address "172.16.55.4"
+	if len(remainingAddrs) != 1 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
+	}
+	if remainingAddrs[0] != "172.16.55.4" {
+		t.Errorf("Expected remaining address should be %s, got %s", "172.16.55.4", remainingAddrs[0])
+	}
+
+	// update multi-port service1 to single-port service2
+	fp.OnServiceUpdate(service1, service2)
+	fp.syncProxyRules()
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	// should still only remain address "172.16.55.4"
+	if len(remainingAddrs) != 1 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
+	} else if remainingAddrs[0] != "172.16.55.4" {
+		t.Errorf("Expected remaining address should be %s, got %s", "172.16.55.4", remainingAddrs[0])
+	}
+
+	// update single-port service2 to multi-port service3
+	fp.OnServiceUpdate(service2, service3)
+	fp.syncProxyRules()
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	// should still only remain address "172.16.55.4"
+	if len(remainingAddrs) != 1 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
+	} else if remainingAddrs[0] != "172.16.55.4" {
+		t.Errorf("Expected remaining address should be %s, got %s", "172.16.55.4", remainingAddrs[0])
+	}
+
+	// delete multi-port service3
+	fp.OnServiceDelete(service3)
+	fp.syncProxyRules()
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	// all addresses should be unbound
+	if len(remainingAddrs) != 0 {
+		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 0, len(remainingAddrs))
 	}
 }
