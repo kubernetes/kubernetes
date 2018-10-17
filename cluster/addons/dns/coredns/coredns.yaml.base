@@ -112,6 +112,8 @@ spec:
           effect: NoSchedule
         - key: "CriticalAddonsOnly"
           operator: "Exists"
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       containers:
       - name: coredns
         image: k8s.gcr.io/coredns:1.2.4
