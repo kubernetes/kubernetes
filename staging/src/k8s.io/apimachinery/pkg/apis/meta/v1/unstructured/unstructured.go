@@ -398,11 +398,15 @@ func (u *Unstructured) SetClusterName(clusterName string) {
 	u.setNestedField(clusterName, "metadata", "clusterName")
 }
 
-func (u *Unstructured) GetLastApplied() map[string]string {
-	val, _, _ := NestedStringMap(u.Object, "metadata", "lastApplied")
-	return val
+func (u *Unstructured) GetManagedFields() map[string]metav1.VersionedFieldSet {
+	unstructuredManagedFields, _, _ := NestedStringMap(u.Object, "metadata", "managedFields")
+	managedFields := make(map[string]metav1.VersionedFieldSet, len(unstructuredManagedFields))
+	// TODO: convert from unstructured
+	return managedFields
 }
 
-func (u *Unstructured) SetLastApplied(lastApplied map[string]string) {
-	u.setNestedMap(lastApplied, "metadata", "lastApplied")
+func (u *Unstructured) SetManagedFields(managedFields map[string]metav1.VersionedFieldSet) {
+	unstructuredManagedFields := make(map[string]string, len(managedFields))
+	// TODO: convert to unstructured
+	u.setNestedMap(unstructuredManagedFields, "metadata", "managedFields")
 }

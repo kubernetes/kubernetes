@@ -250,14 +250,79 @@ type ObjectMeta struct {
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 
-	// LastApplied is a map of workflow-id to last applied
-	// configuration. A workflow can be the user's name, a
+	// ManagedFields is a map of workflow-id to the set of fields
+	// that are managed by that workflow. This is mostly for internal
+	// housekeeping, and users typically shouldn't need to set or
+	// understand this field. A workflow can be the user's name, a
 	// controller's name, or the name of a specific apply path like
-	// "ci-cd". It keeps track of the ownership of fields. The last
-	// applied configuration is always in the same version as the
-	// parent object. It's used to keep track of the intent of the
-	// workflow-id that submitted that configuration.
-	LastApplied map[string]string `json:"lastApplied,omitempty" protobuf:"bytes,17,rep,name=lastApplied"`
+	// "ci-cd". The set of fields is always in the version that the
+	// workflow used when modifying the object.
+	//
+	// An example value of this field for a deployment with a
+	// single container managed by a user:
+	// {
+	//     "user-workflow-id": {
+	//         "apiVersion": "extensions/v1beta",
+	//         "fields": {
+	//             "children": [{
+	//                 "pathElement": {
+	//                     "fieldName": "spec"
+	//                 },
+	//                 "set": {
+	//                     "children": [{
+	//                         "pathElement": {
+	//                             "fieldName": "template"
+	//                         },
+	//                         "set": {
+	//                             "children": [{
+	//                                 "pathElement": {
+	//                                     "fieldName": "spec"
+	//                                 },
+	//                                 "set": {
+	//                                     "children": [{
+	//                                         "pathElement": {
+	//                                             "fieldName": "containers"
+	//                                         },
+	//                                         "set": {
+	//                                             "members": [{
+	//                                                 "key": [{
+	//                                                     "name": "name",
+	//                                                     "value": {
+	//                                                         "stringValue": "my-container"
+	//                                                     }
+	//                                                 }]
+	//                                             }],
+	//                                             "children": [{
+	//                                                 "pathElement": {
+	//                                                     "key": [{
+	//                                                         "name": "name",
+	//                                                         "value": {
+	//                                                             "stringValue": "my-container"
+	//                                                         }
+	//                                                     }]
+	//                                                 },
+	//                                                 "set": {
+	//                                                     "members": [{
+	//                                                         "fieldName": "name"
+	//                                                     },
+	//                                                     {
+	//                                                         "fieldName": "image"
+	//                                                     }]
+	//                                                 }
+	//                                             }]
+	//                                         }
+	//                                     }]
+	//                                 }
+	//                             }]
+	//                         }
+	//                     }]
+	//                 }
+	//             }]
+	//         }
+	//     }
+	// }
+	// +optional
+	ManagedFields map[string]VersionedFieldSet `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
 
 // Initializers tracks the progress of initialization.
@@ -1005,3 +1070,86 @@ const (
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
+
+// VersionedFieldSet is a pair of a FieldSet and the group version of the resource
+// that the fieldset applies to.
+type VersionedFieldSet struct {
+	// APIVersion defines the version of this resource that this field set
+	// applies to. The format is "group/version" just like the top-level
+	// APIVersion field. It is necessary to track the version of a field
+	// set because it cannot be automatically converted.
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
+	// Fields identifies a set of fields.
+	Fields FieldSet `json:"fields,omitempty" protobuf:"bytes,2,opt,name=fields,casttype=FieldSet"`
+}
+
+// FieldSet stores a set of fields in a data structure like a Trie.
+// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+type FieldSet struct {
+	// Members lists fields that are part of the set.
+	Members []FieldPathElement `json:"members" protobuf:"bytes,1,rep,name=members"`
+	// Children lists child fields which themselves have children that are
+	// members of the set. Appearance in this list does not imply membership,
+	// although it does imply some descendant field is a member.
+	// Note: this is a tree, not an arbitrary graph.
+	Children []FieldSetNode `json:"children" protobuf:"bytes,2,rep,name=children"`
+}
+
+// FieldPathElement describes how to select a child field given a containing object.
+type FieldPathElement struct {
+	// Exactly one of the following fields should be non-nil.
+	// FieldName selects a single field from a map (reminder: this is also
+	// how structs are represented). The containing object must be a map.
+	// +optional
+	FieldName *string `json:"fieldName,omitempty" protobuf:"bytes,1,opt,name=fieldName"`
+	// Key selects the list element which has fields matching those given.
+	// The containing object must be an associative list with map typed
+	// elements.
+	// +optional
+	Key []FieldNameValuePair `json:"key,omitempty" protobuf:"bytes,2,rep,name=key"`
+	// Value selects the list element with the given value. The containing
+	// object must be an associative list with a primitive typed element
+	// (i.e., a set).
+	// +optional
+	Value *FieldValue `json:"value,omitempty" protobuf:"bytes,3,opt,name=value,casttype=FieldValue"`
+	// Index selects a list element by its index number. The containing
+	// object must be an atomic list.
+	// +optional
+	Index *int32 `json:"index,omitempty" protobuf:"varint,4,opt,name=index"`
+}
+
+// FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing
+// nested set membership.
+type FieldSetNode struct {
+	// PathElement identifies which field this node expresses child membership for.
+	PathElement FieldPathElement `json:"pathElement" protobuf:"bytes,1,opt,name=pathElement,casttype=FieldPathElement"`
+	// Set identifies which child fields of this node are part of the FieldSet.
+	Set *FieldSet `json:"set" protobuf:"bytes,2,opt,name=set,casttype=FieldSet"`
+}
+
+// FieldNameValuePair is an individual key-value pair.
+type FieldNameValuePair struct {
+	// Name is the field's name.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// Value is the field's value.
+	Value FieldValue `json:"value" protobuf:"bytes,2,opt,name=value,casttype=FieldValue"`
+}
+
+// FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.
+type FieldValue struct {
+	// Exactly one of the following fields should be set.
+	// FloatValue is a primitive float value.
+	// +optional
+	FloatValue *float64 `json:"floatValue,omitempty" protobuf:"bytes,1,opt,name=floatValue"`
+	// IntValue is a primitive int value.
+	// +optional
+	IntValue *int32 `json:"intValue,omitempty" protobuf:"varint,2,opt,name=intValue"`
+	// StringValue is a primitive string value.
+	// +optional
+	StringValue *string `json:"stringValue,omitempty" protobuf:"bytes,3,opt,name=stringValue"`
+	// BooleanValue is a primitive boolean value.
+	// +optional
+	BooleanValue *bool `json:"booleanValue,omitempty" protobuf:"varint,4,opt,name=booleanValue"`
+	// Null represents an explicit `"foo" = null`
+	Null bool `json:"null" protobuf:"varint,5,opt,name=null"`
+}

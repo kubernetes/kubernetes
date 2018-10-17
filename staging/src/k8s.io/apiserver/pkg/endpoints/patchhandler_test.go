@@ -139,8 +139,8 @@ func TestPatchApply(t *testing.T) {
 	if simpleStorage.updated.Other != "bar" {
 		t.Errorf(`Merge should have kept initial "bar" value for Other: %v`, simpleStorage.updated.Other)
 	}
-	if simpleStorage.updated.ObjectMeta.LastApplied["default"] == "" {
-		t.Errorf(`Expected lastApplied field to be set, but is empty`)
+	if _, ok := simpleStorage.updated.ObjectMeta.ManagedFields["default"]; !ok {
+		t.Errorf(`Expected managedFields field to be set, but is empty`)
 	}
 }
 
@@ -177,17 +177,18 @@ func TestApplyAddsGVK(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected response %#v", response)
 	}
+	// TODO: Need to fix this
 	expected := `{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`
-	if simpleStorage.updated.ObjectMeta.LastApplied["default"] != expected {
+	if simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion != expected {
 		t.Errorf(
-			`Expected lastApplied field to be %q, got %q`,
+			`Expected managedFields field to be %q, got %q`,
 			expected,
-			simpleStorage.updated.ObjectMeta.LastApplied["default"],
+			simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion,
 		)
 	}
 }
 
-func TestApplyCreatesWithLastApplied(t *testing.T) {
+func TestApplyCreatesWithManagedFields(t *testing.T) {
 	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.ServerSideApply) + "=true"); err != nil {
 		t.Fatal(err)
 	}
@@ -212,12 +213,13 @@ func TestApplyCreatesWithLastApplied(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected response %#v", response)
 	}
+	// TODO: Need to fix this
 	expected := `{"apiVersion":"test.group/version","kind":"Simple","labels":{"test":"yes"},"metadata":{"name":"id"}}`
-	if simpleStorage.updated.ObjectMeta.LastApplied["default"] != expected {
+	if simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion != expected {
 		t.Errorf(
-			`Expected lastApplied field to be %q, got %q`,
+			`Expected managedFields field to be %q, got %q`,
 			expected,
-			simpleStorage.updated.ObjectMeta.LastApplied["default"],
+			simpleStorage.updated.ObjectMeta.ManagedFields["default"].APIVersion,
 		)
 	}
 }

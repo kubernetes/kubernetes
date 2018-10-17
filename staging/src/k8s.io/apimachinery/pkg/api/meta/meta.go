@@ -138,7 +138,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				Finalizers:      m.GetFinalizers(),
 				ClusterName:     m.GetClusterName(),
 				Initializers:    m.GetInitializers(),
-				LastApplied:     m.GetLastApplied(),
+				ManagedFields:   m.GetManagedFields(),
 			},
 		}
 	}
