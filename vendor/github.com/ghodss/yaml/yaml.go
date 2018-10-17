@@ -32,9 +32,20 @@ type JSONOpt func(*json.Decoder) *json.Decoder
 
 // Unmarshal converts YAML to JSON then uses JSON to unmarshal into an object,
 // optionally configuring the behavior of the JSON unmarshal.
+// For strict decoding, use UnmarshalStrict.
 func Unmarshal(y []byte, o interface{}, opts ...JSONOpt) error {
+	return unmarshal(y, o, yaml.Unmarshal, opts...)
+}
+
+// UnmarshalStrict is like Unmarshal but enables strict YAML decoding,
+// returning an error on any duplicate field names.
+func UnmarshalStrict(y []byte, o interface{}, opts ...JSONOpt) error {
+	return unmarshal(y, o, yaml.UnmarshalStrict, opts...)
+}
+
+func unmarshal(y []byte, o interface{}, yamlUnmarshal func([]byte, interface{}) error, opts ...JSONOpt) error {
 	vo := reflect.ValueOf(o)
-	j, err := yamlToJSON(y, &vo, yaml.Unmarshal)
+	j, err := yamlToJSON(y, &vo, yamlUnmarshal)
 	if err != nil {
 		return fmt.Errorf("error converting YAML to JSON: %v", err)
 	}

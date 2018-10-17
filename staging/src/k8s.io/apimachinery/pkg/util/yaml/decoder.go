@@ -69,7 +69,7 @@ func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 	}
 
 	if len(bytes) != 0 {
-		err := yaml.Unmarshal(bytes, into)
+		err := yaml.UnmarshalStrict(bytes, into)
 		if err != nil {
 			return YAMLSyntaxError{err}
 		}
