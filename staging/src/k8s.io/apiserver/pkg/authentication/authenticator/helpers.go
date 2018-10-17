@@ -18,3 +18,25 @@ package authenticator
 
 // Audiences is a container for the Audiences of a token.
 type Audiences []string
+
+// Has checks if Audiences contains a specific audiences.
+func (a Audiences) Has(taud string) bool {
+	for _, aud := range a {
+		if aud == taud {
+			return true
+		}
+	}
+	return false
+}
+
+// Intersect intersects Audiences with a target Audiences and returns all
+// elements in both.
+func (a Audiences) Intersect(tauds Audiences) Audiences {
+	selected := Audiences{}
+	for _, taud := range tauds {
+		if a.Has(taud) {
+			selected = append(selected, taud)
+		}
+	}
+	return selected
+}
