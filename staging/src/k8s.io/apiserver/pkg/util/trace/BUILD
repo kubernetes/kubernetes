@@ -10,7 +10,10 @@ go_library(
     srcs = ["trace.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/util/trace",
     importpath = "k8s.io/apiserver/pkg/util/trace",
-    deps = ["//vendor/github.com/golang/glog:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
+    ],
 )
 
 filegroup(

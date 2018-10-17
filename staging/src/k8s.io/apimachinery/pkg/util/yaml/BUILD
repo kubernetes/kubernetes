@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["decoder_test.go"],
     embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library"],
 )
 
 go_library(

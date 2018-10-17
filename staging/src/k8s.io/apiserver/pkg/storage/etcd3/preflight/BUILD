@@ -11,6 +11,7 @@ go_library(
     srcs = ["checks.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd3/preflight",
     importpath = "k8s.io/apiserver/pkg/storage/etcd3/preflight",
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library"],
 )
 
 go_test(

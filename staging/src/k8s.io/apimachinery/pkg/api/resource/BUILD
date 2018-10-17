@@ -18,6 +18,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/gopkg.in/inf.v0:go_default_library",
     ],

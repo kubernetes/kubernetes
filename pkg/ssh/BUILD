@@ -23,6 +23,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/ssh",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

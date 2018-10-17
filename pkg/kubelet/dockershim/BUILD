@@ -58,6 +58,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
