@@ -388,7 +388,12 @@ func NewNodeLifecycleController(
 	})
 
 	nc.leaseLister = leaseInformer.Lister()
-	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+		nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
+	} else {
+		// Always indicate that lease is synced to prevent syncing lease.
+		nc.leaseInformerSynced = func() bool { return true }
+	}
 
 	nc.nodeLister = nodeInformer.Lister()
 	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
