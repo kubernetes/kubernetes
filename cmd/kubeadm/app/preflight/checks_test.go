@@ -254,13 +254,21 @@ func TestRunJoinNodeChecks(t *testing.T) {
 		},
 		{
 			cfg: &kubeadmapi.JoinConfiguration{
-				DiscoveryTokenAPIServers: []string{"192.168.1.15"},
+				Discovery: kubeadmapi.Discovery{
+					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
+						APIServerEndpoints: []string{"192.168.1.15"},
+					},
+				},
 			},
 			expected: false,
 		},
 		{
 			cfg: &kubeadmapi.JoinConfiguration{
-				DiscoveryTokenAPIServers: []string{"2001:1234::1:15"},
+				Discovery: kubeadmapi.Discovery{
+					BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
+						APIServerEndpoints: []string{"2001:1234::1:15"},
+					},
+				},
 			},
 			expected: false,
 		},

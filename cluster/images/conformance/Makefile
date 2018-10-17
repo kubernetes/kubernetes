@@ -25,7 +25,7 @@ KUBECTL_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/kubec
 E2E_TEST_BIN?=$(shell pwd)/../../../$(OUT_DIR)/dockerized/bin/linux/$(ARCH)/e2e.test
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
-BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.10.2
+BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.11.0
 TEMP_DIR:=$(shell mktemp -d -t conformanceXXXXXX)
 
 all: build
@@ -48,10 +48,6 @@ endif
 
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
-ifneq ($(ARCH),amd64)
-	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-endif
 	docker build --pull -t ${REGISTRY}/conformance-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
 

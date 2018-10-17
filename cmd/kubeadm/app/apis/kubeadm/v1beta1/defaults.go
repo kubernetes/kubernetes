@@ -120,35 +120,47 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
 	}
-	if len(obj.TLSBootstrapToken) == 0 {
-		obj.TLSBootstrapToken = obj.Token
-	}
-	if len(obj.DiscoveryToken) == 0 && len(obj.DiscoveryFile) == 0 {
-		obj.DiscoveryToken = obj.Token
-	}
-	// Make sure file URLs become paths
-	if len(obj.DiscoveryFile) != 0 {
-		u, err := url.Parse(obj.DiscoveryFile)
-		if err == nil && u.Scheme == "file" {
-			obj.DiscoveryFile = u.Path
-		}
-	}
-	if obj.DiscoveryTimeout == nil {
-		obj.DiscoveryTimeout = &metav1.Duration{
-			Duration: DefaultDiscoveryTimeout,
-		}
-	}
+
 	if obj.ClusterName == "" {
 		obj.ClusterName = DefaultClusterName
 	}
 
 	SetDefaults_NodeRegistrationOptions(&obj.NodeRegistration)
 	SetDefaults_APIEndpoint(&obj.APIEndpoint)
+	SetDefaults_Discovery(&obj.Discovery)
 }
 
 func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
 	if obj.CRISocket == "" {
 		obj.CRISocket = DefaultCRISocket
+	}
+}
+
+// SetDefaults_Discovery assigns default values for the discovery process
+func SetDefaults_Discovery(obj *Discovery) {
+	if len(obj.TLSBootstrapToken) == 0 && obj.BootstrapToken != nil {
+		obj.TLSBootstrapToken = obj.BootstrapToken.Token
+	}
+
+	if obj.Timeout == nil {
+		obj.Timeout = &metav1.Duration{
+			Duration: DefaultDiscoveryTimeout,
+		}
+	}
+
+	if obj.File != nil {
+		SetDefaults_FileDiscovery(obj.File)
+	}
+}
+
+// SetDefaults_FileDiscovery assigns default values for file based discovery
+func SetDefaults_FileDiscovery(obj *FileDiscovery) {
+	// Make sure file URL becomes path
+	if len(obj.KubeConfigPath) != 0 {
+		u, err := url.Parse(obj.KubeConfigPath)
+		if err == nil && u.Scheme == "file" {
+			obj.KubeConfigPath = u.Path
+		}
 	}
 }
 

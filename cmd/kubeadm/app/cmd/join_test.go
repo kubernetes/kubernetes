@@ -70,7 +70,6 @@ func TestNewValidJoin(t *testing.T) {
 
 	testCases := []struct {
 		name                  string
-		args                  []string
 		skipPreFlight         bool
 		cfgPath               string
 		configToWrite         string
@@ -163,7 +162,7 @@ func TestNewValidJoin(t *testing.T) {
 			}
 		}
 
-		join, err := NewValidJoin(cmd.PersistentFlags(), cfg, tc.args, tc.cfgPath, tc.featureGatesString, tc.ignorePreflightErrors)
+		join, err := NewValidJoin(cmd.PersistentFlags(), cfg, tc.cfgPath, tc.featureGatesString, tc.ignorePreflightErrors)
 
 		if tc.nodeConfig != nil {
 			join.cfg = tc.nodeConfig

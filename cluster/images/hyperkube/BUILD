@@ -7,23 +7,6 @@ container_image(
         "//cmd/hyperkube",
     ],
     stamp = True,
-    symlinks = {
-        "/%s" % path: "/hyperkube"
-        for path in [
-            "/apiserver",
-            "/controller-manager",
-            "/kubectl",
-            "/kubelet",
-            "/proxy",
-            "/scheduler",
-            "/usr/local/bin/kube-apiserver",
-            "/usr/local/bin/kube-controller-manager",
-            "/usr/local/bin/kubectl",
-            "/usr/local/bin/kubelet",
-            "/usr/local/bin/kube-proxy",
-            "/usr/local/bin/kube-scheduler",
-        ]
-    },
 )
 
 container_bundle(
