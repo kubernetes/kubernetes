@@ -44,6 +44,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/logs"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generate"
+	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -309,20 +311,20 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	generatorName := o.Generator
 	if len(o.Schedule) != 0 && len(generatorName) == 0 {
-		generatorName = cmdutil.CronJobV1Beta1GeneratorName
+		generatorName = generateversioned.CronJobV1Beta1GeneratorName
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case corev1.RestartPolicyAlways:
-			generatorName = cmdutil.DeploymentAppsV1Beta1GeneratorName
+			generatorName = generateversioned.DeploymentAppsV1Beta1GeneratorName
 		case corev1.RestartPolicyOnFailure:
-			generatorName = cmdutil.JobV1GeneratorName
+			generatorName = generateversioned.JobV1GeneratorName
 		case corev1.RestartPolicyNever:
-			generatorName = cmdutil.RunPodV1GeneratorName
+			generatorName = generateversioned.RunPodV1GeneratorName
 		}
 
 		// Falling back because the generator was not provided and the default one could be unavailable.
-		generatorNameTemp, err := cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.ErrOut)
+		generatorNameTemp, err := generateversioned.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), o.ErrOut)
 		if err != nil {
 			return err
 		}
@@ -336,17 +338,17 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	// start deprecating all generators except for 'run-pod/v1' which will be
 	// the only supported on a route to simple kubectl run which should mimic
 	// docker run
-	if generatorName != cmdutil.RunPodV1GeneratorName {
+	if generatorName != generateversioned.RunPodV1GeneratorName {
 		fmt.Fprintf(o.ErrOut, "kubectl run --generator=%s is DEPRECATED and will be removed in a future version. Use kubectl create instead.\n", generatorName)
 	}
 
-	generators := cmdutil.GeneratorFn("run")
+	generators := generateversioned.GeneratorFn("run")
 	generator, found := generators[generatorName]
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "generator %q not found", generatorName)
 	}
 	names := generator.ParamNames()
-	params := kubectl.MakeParams(cmd, names)
+	params := generate.MakeParams(cmd, names)
 	params["name"] = args[0]
 	if len(args) > 1 {
 		params["args"] = args[1:]
@@ -592,7 +594,7 @@ func verifyImagePullPolicy(cmd *cobra.Command) error {
 }
 
 func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serviceGenerator string, paramsIn map[string]interface{}, namespace string) (*RunObject, error) {
-	generators := cmdutil.GeneratorFn("expose")
+	generators := generateversioned.GeneratorFn("expose")
 	generator, found := generators[serviceGenerator]
 	if !found {
 		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)
@@ -637,8 +639,8 @@ func (o *RunOptions) generateService(f cmdutil.Factory, cmd *cobra.Command, serv
 	return runObject, nil
 }
 
-func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator kubectl.Generator, names []kubectl.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
-	err := kubectl.ValidateParams(names, params)
+func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command, generator generate.Generator, names []generate.GeneratorParam, params map[string]interface{}, overrides, namespace string) (*RunObject, error) {
+	err := generate.ValidateParams(names, params)
 	if err != nil {
 		return nil, err
 	}
