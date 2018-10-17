@@ -197,6 +197,87 @@ message ExportOptions {
   optional bool exact = 2;
 }
 
+// FieldNameValuePair is an individual key-value pair.
+message FieldNameValuePair {
+  // Name is the field's name.
+  optional string name = 1;
+
+  // Value is the field's value.
+  optional FieldValue value = 2;
+}
+
+// FieldPathElement describes how to select a child field given a containing object.
+message FieldPathElement {
+  // Exactly one of the following fields should be non-nil.
+  // FieldName selects a single field from a map (reminder: this is also
+  // how structs are represented). The containing object must be a map.
+  // +optional
+  optional string fieldName = 1;
+
+  // Key selects the list element which has fields matching those given.
+  // The containing object must be an associative list with map typed
+  // elements.
+  // +optional
+  repeated FieldNameValuePair key = 2;
+
+  // Value selects the list element with the given value. The containing
+  // object must be an associative list with a primitive typed element
+  // (i.e., a set).
+  // +optional
+  optional FieldValue value = 3;
+
+  // Index selects a list element by its index number. The containing
+  // object must be an atomic list.
+  // +optional
+  optional int32 index = 4;
+}
+
+// FieldSet stores a set of fields in a data structure like a Trie.
+// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+message FieldSet {
+  // Members lists fields that are part of the set.
+  repeated FieldPathElement members = 1;
+
+  // Children lists child fields which themselves have children that are
+  // members of the set. Appearance in this list does not imply membership,
+  // although it does imply some descendant field is a member.
+  // Note: this is a tree, not an arbitrary graph.
+  repeated FieldSetNode children = 2;
+}
+
+// FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing
+// nested set membership.
+message FieldSetNode {
+  // PathElement identifies which field this node expresses child membership for.
+  optional FieldPathElement pathElement = 1;
+
+  // Set identifies which child fields of this node are part of the FieldSet.
+  optional FieldSet set = 2;
+}
+
+// FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.
+message FieldValue {
+  // Exactly one of the following fields should be set.
+  // FloatValue is a primitive float value.
+  // +optional
+  optional double floatValue = 1;
+
+  // IntValue is a primitive int value.
+  // +optional
+  optional int32 intValue = 2;
+
+  // StringValue is a primitive string value.
+  // +optional
+  optional string stringValue = 3;
+
+  // BooleanValue is a primitive boolean value.
+  // +optional
+  optional bool booleanValue = 4;
+
+  // Null represents an explicit `"foo" = null`
+  optional bool null = 5;
+}
+
 // GetOptions is the standard query options to the standard REST get call.
 message GetOptions {
   // When specified:
@@ -612,14 +693,79 @@ message ObjectMeta {
   // +optional
   optional string clusterName = 15;
 
-  // LastApplied is a map of workflow-id to last applied
-  // configuration. A workflow can be the user's name, a
+  // ManagedFields is a map of workflow-id to the set of fields
+  // that are managed by that workflow. This is mostly for internal
+  // housekeeping, and users typically shouldn't need to set or
+  // understand this field. A workflow can be the user's name, a
   // controller's name, or the name of a specific apply path like
-  // "ci-cd". It keeps track of the ownership of fields. The last
-  // applied configuration is always in the same version as the
-  // parent object. It's used to keep track of the intent of the
-  // workflow-id that submitted that configuration.
-  map<string, string> lastApplied = 17;
+  // "ci-cd". The set of fields is always in the version that the
+  // workflow used when modifying the object.
+  // 
+  // An example value of this field for a deployment with a
+  // single container managed by a user:
+  // {
+  //     "user-workflow-id": {
+  //         "apiVersion": "extensions/v1beta",
+  //         "fields": {
+  //             "children": [{
+  //                 "pathElement": {
+  //                     "fieldName": "spec"
+  //                 },
+  //                 "set": {
+  //                     "children": [{
+  //                         "pathElement": {
+  //                             "fieldName": "template"
+  //                         },
+  //                         "set": {
+  //                             "children": [{
+  //                                 "pathElement": {
+  //                                     "fieldName": "spec"
+  //                                 },
+  //                                 "set": {
+  //                                     "children": [{
+  //                                         "pathElement": {
+  //                                             "fieldName": "containers"
+  //                                         },
+  //                                         "set": {
+  //                                             "members": [{
+  //                                                 "key": [{
+  //                                                     "name": "name",
+  //                                                     "value": {
+  //                                                         "stringValue": "my-container"
+  //                                                     }
+  //                                                 }]
+  //                                             }],
+  //                                             "children": [{
+  //                                                 "pathElement": {
+  //                                                     "key": [{
+  //                                                         "name": "name",
+  //                                                         "value": {
+  //                                                             "stringValue": "my-container"
+  //                                                         }
+  //                                                     }]
+  //                                                 },
+  //                                                 "set": {
+  //                                                     "members": [{
+  //                                                         "fieldName": "name"
+  //                                                     },
+  //                                                     {
+  //                                                         "fieldName": "image"
+  //                                                     }]
+  //                                                 }
+  //                                             }]
+  //                                         }
+  //                                     }]
+  //                                 }
+  //                             }]
+  //                         }
+  //                     }]
+  //                 }
+  //             }]
+  //         }
+  //     }
+  // }
+  // +optional
+  map<string, VersionedFieldSet> managedFields = 17;
 }
 
 // OwnerReference contains enough information to let you identify an owning
@@ -862,6 +1008,19 @@ message Verbs {
   // items, if empty, will result in an empty slice
 
   repeated string items = 1;
+}
+
+// VersionedFieldSet is a pair of a FieldSet and the group version of the resource
+// that the fieldset applies to.
+message VersionedFieldSet {
+  // APIVersion defines the version of this resource that this field set
+  // applies to. The format is "group/version" just like the top-level
+  // APIVersion field. It is necessary to track the version of a field
+  // set because it cannot be automatically converted.
+  optional string apiVersion = 1;
+
+  // Fields identifies a set of fields.
+  optional FieldSet fields = 2;
 }
 
 // Event represents a single event to a watched resource.

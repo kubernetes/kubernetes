@@ -118,6 +118,61 @@ func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
 }
 
+var map_FieldNameValuePair = map[string]string{
+	"":      "FieldNameValuePair is an individual key-value pair.",
+	"name":  "Name is the field's name.",
+	"value": "Value is the field's value.",
+}
+
+func (FieldNameValuePair) SwaggerDoc() map[string]string {
+	return map_FieldNameValuePair
+}
+
+var map_FieldPathElement = map[string]string{
+	"":          "FieldPathElement describes how to select a child field given a containing object.",
+	"fieldName": "Exactly one of the following fields should be non-nil. FieldName selects a single field from a map (reminder: this is also how structs are represented). The containing object must be a map.",
+	"key":       "Key selects the list element which has fields matching those given. The containing object must be an associative list with map typed elements.",
+	"value":     "Value selects the list element with the given value. The containing object must be an associative list with a primitive typed element (i.e., a set).",
+	"index":     "Index selects a list element by its index number. The containing object must be an atomic list.",
+}
+
+func (FieldPathElement) SwaggerDoc() map[string]string {
+	return map_FieldPathElement
+}
+
+var map_FieldSet = map[string]string{
+	"":         "FieldSet stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
+	"members":  "Members lists fields that are part of the set.",
+	"children": "Children lists child fields which themselves have children that are members of the set. Appearance in this list does not imply membership, although it does imply some descendant field is a member. Note: this is a tree, not an arbitrary graph.",
+}
+
+func (FieldSet) SwaggerDoc() map[string]string {
+	return map_FieldSet
+}
+
+var map_FieldSetNode = map[string]string{
+	"":            "FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing nested set membership.",
+	"pathElement": "PathElement identifies which field this node expresses child membership for.",
+	"set":         "Set identifies which child fields of this node are part of the FieldSet.",
+}
+
+func (FieldSetNode) SwaggerDoc() map[string]string {
+	return map_FieldSetNode
+}
+
+var map_FieldValue = map[string]string{
+	"":             "FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.",
+	"floatValue":   "Exactly one of the following fields should be set. FloatValue is a primitive float value.",
+	"intValue":     "IntValue is a primitive int value.",
+	"stringValue":  "StringValue is a primitive string value.",
+	"booleanValue": "BooleanValue is a primitive boolean value.",
+	"null":         "Null represents an explicit `\"foo\" = null`",
+}
+
+func (FieldValue) SwaggerDoc() map[string]string {
+	return map_FieldValue
+}
+
 var map_GetOptions = map[string]string{
 	"":                     "GetOptions is the standard query options to the standard REST get call.",
 	"resourceVersion":      "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
@@ -233,7 +288,7 @@ var map_ObjectMeta = map[string]string{
 	"initializers":               "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.",
 	"finalizers":                 "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
 	"clusterName":                "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
-	"lastApplied":                "LastApplied is a map of workflow-id to last applied configuration. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". It keeps track of the ownership of fields. The last applied configuration is always in the same version as the parent object. It's used to keep track of the intent of the workflow-id that submitted that configuration.",
+	"managedFields":              "ManagedFields is a map of workflow-id to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.\n\nAn example value of this field for a deployment with a single container managed by a user: {\n    \"user-workflow-id\": {\n        \"apiVersion\": \"extensions/v1beta\",\n        \"fields\": {\n            \"children\": [{\n                \"pathElement\": {\n                    \"fieldName\": \"spec\"\n                },\n                \"set\": {\n                    \"children\": [{\n                        \"pathElement\": {\n                            \"fieldName\": \"template\"\n                        },\n                        \"set\": {\n                            \"children\": [{\n                                \"pathElement\": {\n                                    \"fieldName\": \"spec\"\n                                },\n                                \"set\": {\n                                    \"children\": [{\n                                        \"pathElement\": {\n                                            \"fieldName\": \"containers\"\n                                        },\n                                        \"set\": {\n                                            \"members\": [{\n                                                \"key\": [{\n                                                    \"name\": \"name\",\n                                                    \"value\": {\n                                                        \"stringValue\": \"my-container\"\n                                                    }\n                                                }]\n                                            }],\n                                            \"children\": [{\n                                                \"pathElement\": {\n                                                    \"key\": [{\n                                                        \"name\": \"name\",\n                                                        \"value\": {\n                                                            \"stringValue\": \"my-container\"\n                                                        }\n                                                    }]\n                                                },\n                                                \"set\": {\n                                                    \"members\": [{\n                                                        \"fieldName\": \"name\"\n                                                    },\n                                                    {\n                                                        \"fieldName\": \"image\"\n                                                    }]\n                                                }\n                                            }]\n                                        }\n                                    }]\n                                }\n                            }]\n                        }\n                    }]\n                }\n            }]\n        }\n    }\n}",
 }
 
 func (ObjectMeta) SwaggerDoc() map[string]string {
@@ -346,6 +401,16 @@ var map_UpdateOptions = map[string]string{
 
 func (UpdateOptions) SwaggerDoc() map[string]string {
 	return map_UpdateOptions
+}
+
+var map_VersionedFieldSet = map[string]string{
+	"":           "VersionedFieldSet is a pair of a FieldSet and the group version of the resource that the fieldset applies to.",
+	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
+	"fields":     "Fields identifies a set of fields.",
+}
+
+func (VersionedFieldSet) SwaggerDoc() map[string]string {
+	return map_VersionedFieldSet
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

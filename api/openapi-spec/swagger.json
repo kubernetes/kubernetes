@@ -88202,6 +88202,118 @@
      }
     ]
    },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.FieldNameValuePair": {
+    "description": "FieldNameValuePair is an individual key-value pair.",
+    "required": [
+     "name",
+     "value"
+    ],
+    "properties": {
+     "name": {
+      "description": "Name is the field's name.",
+      "type": "string"
+     },
+     "value": {
+      "description": "Value is the field's value.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldValue"
+     }
+    }
+   },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.FieldPathElement": {
+    "description": "FieldPathElement describes how to select a child field given a containing object.",
+    "properties": {
+     "fieldName": {
+      "description": "Exactly one of the following fields should be non-nil. FieldName selects a single field from a map (reminder: this is also how structs are represented). The containing object must be a map.",
+      "type": "string"
+     },
+     "index": {
+      "description": "Index selects a list element by its index number. The containing object must be an atomic list.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "key": {
+      "description": "Key selects the list element which has fields matching those given. The containing object must be an associative list with map typed elements.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldNameValuePair"
+      }
+     },
+     "value": {
+      "description": "Value selects the list element with the given value. The containing object must be an associative list with a primitive typed element (i.e., a set).",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldValue"
+     }
+    }
+   },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.FieldSet": {
+    "description": "FieldSet stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
+    "required": [
+     "members",
+     "children"
+    ],
+    "properties": {
+     "children": {
+      "description": "Children lists child fields which themselves have children that are members of the set. Appearance in this list does not imply membership, although it does imply some descendant field is a member. Note: this is a tree, not an arbitrary graph.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldSetNode"
+      }
+     },
+     "members": {
+      "description": "Members lists fields that are part of the set.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldPathElement"
+      }
+     }
+    }
+   },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.FieldSetNode": {
+    "description": "FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing nested set membership.",
+    "required": [
+     "pathElement",
+     "set"
+    ],
+    "properties": {
+     "pathElement": {
+      "description": "PathElement identifies which field this node expresses child membership for.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldPathElement"
+     },
+     "set": {
+      "description": "Set identifies which child fields of this node are part of the FieldSet.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldSet"
+     }
+    }
+   },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.FieldValue": {
+    "description": "FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.",
+    "required": [
+     "null"
+    ],
+    "properties": {
+     "booleanValue": {
+      "description": "BooleanValue is a primitive boolean value.",
+      "type": "boolean"
+     },
+     "floatValue": {
+      "description": "Exactly one of the following fields should be set. FloatValue is a primitive float value.",
+      "type": "number",
+      "format": "double"
+     },
+     "intValue": {
+      "description": "IntValue is a primitive int value.",
+      "type": "integer",
+      "format": "int32"
+     },
+     "null": {
+      "description": "Null represents an explicit `\"foo\" = null`",
+      "type": "boolean"
+     },
+     "stringValue": {
+      "description": "StringValue is a primitive string value.",
+      "type": "string"
+     }
+    }
+   },
    "io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery": {
     "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
     "required": [
@@ -88374,11 +88486,11 @@
        "type": "string"
       }
      },
-     "lastApplied": {
-      "description": "LastApplied is a map of workflow-id to last applied configuration. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". It keeps track of the ownership of fields. The last applied configuration is always in the same version as the parent object. It's used to keep track of the intent of the workflow-id that submitted that configuration.",
+     "managedFields": {
+      "description": "ManagedFields is a map of workflow-id to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.\n\nAn example value of this field for a deployment with a single container managed by a user: {\n    \"user-workflow-id\": {\n        \"apiVersion\": \"extensions/v1beta\",\n        \"fields\": {\n            \"children\": [{\n                \"pathElement\": {\n                    \"fieldName\": \"spec\"\n                },\n                \"set\": {\n                    \"children\": [{\n                        \"pathElement\": {\n                            \"fieldName\": \"template\"\n                        },\n                        \"set\": {\n                            \"children\": [{\n                                \"pathElement\": {\n                                    \"fieldName\": \"spec\"\n                                },\n                                \"set\": {\n                                    \"children\": [{\n                                        \"pathElement\": {\n                                            \"fieldName\": \"containers\"\n                                        },\n                                        \"set\": {\n                                            \"members\": [{\n                                                \"key\": [{\n                                                    \"name\": \"name\",\n                                                    \"value\": {\n                                                        \"stringValue\": \"my-container\"\n                                                    }\n                                                }]\n                                            }],\n                                            \"children\": [{\n                                                \"pathElement\": {\n                                                    \"key\": [{\n                                                        \"name\": \"name\",\n                                                        \"value\": {\n                                                            \"stringValue\": \"my-container\"\n                                                        }\n                                                    }]\n                                                },\n                                                \"set\": {\n                                                    \"members\": [{\n                                                        \"fieldName\": \"name\"\n                                                    },\n                                                    {\n                                                        \"fieldName\": \"image\"\n                                                    }]\n                                                }\n                                            }]\n                                        }\n                                    }]\n                                }\n                            }]\n                        }\n                    }]\n                }\n            }]\n        }\n    }\n}",
       "type": "object",
       "additionalProperties": {
-       "type": "string"
+       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.VersionedFieldSet"
       }
      },
      "name": {
@@ -88575,6 +88687,19 @@
     "description": "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
     "type": "string",
     "format": "date-time"
+   },
+   "io.k8s.apimachinery.pkg.apis.meta.v1.VersionedFieldSet": {
+    "description": "VersionedFieldSet is a pair of a FieldSet and the group version of the resource that the fieldset applies to.",
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
+      "type": "string"
+     },
+     "fields": {
+      "description": "Fields identifies a set of fields.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.FieldSet"
+     }
+    }
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent": {
     "description": "Event represents a single event to a watched resource.",
