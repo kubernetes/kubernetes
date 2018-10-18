@@ -26,6 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	admissionregistrationinternalversion "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	appsinternalversion "k8s.io/kubernetes/pkg/apis/apps"
+	auditregistrationinternalversion "k8s.io/kubernetes/pkg/apis/auditregistration"
 	authenticationinternalversion "k8s.io/kubernetes/pkg/apis/authentication"
 	authorizationinternalversion "k8s.io/kubernetes/pkg/apis/authorization"
 	autoscalinginternalversion "k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -50,6 +51,7 @@ var localSchemeBuilder = runtime.SchemeBuilder{
 	admissionregistrationinternalversion.AddToScheme,
 	coreinternalversion.AddToScheme,
 	appsinternalversion.AddToScheme,
+	auditregistrationinternalversion.AddToScheme,
 	authenticationinternalversion.AddToScheme,
 	authorizationinternalversion.AddToScheme,
 	autoscalinginternalversion.AddToScheme,

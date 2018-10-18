@@ -28,6 +28,7 @@ pkg/apis/apps/v1
 pkg/apis/apps/v1beta1
 pkg/apis/apps/v1beta2
 pkg/apis/apps/validation
+pkg/apis/auditregistration/v1alpha1
 pkg/apis/authentication
 pkg/apis/authentication/v1
 pkg/apis/authentication/v1beta1
@@ -284,6 +285,7 @@ pkg/registry/apps/replicaset/storage
 pkg/registry/apps/rest
 pkg/registry/apps/statefulset
 pkg/registry/apps/statefulset/storage
+pkg/registry/auditregistration/rest
 pkg/registry/authentication/rest
 pkg/registry/authentication/tokenreview
 pkg/registry/authorization/localsubjectaccessreview
@@ -452,6 +454,7 @@ staging/src/k8s.io/api/admissionregistration/v1beta1
 staging/src/k8s.io/api/apps/v1
 staging/src/k8s.io/api/apps/v1beta1
 staging/src/k8s.io/api/apps/v1beta2
+staging/src/k8s.io/api/auditregistration/v1alpha1
 staging/src/k8s.io/api/authentication/v1
 staging/src/k8s.io/api/authentication/v1beta1
 staging/src/k8s.io/api/authorization/v1
@@ -554,7 +557,6 @@ staging/src/k8s.io/apiserver/pkg/apis/audit
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1
-staging/src/k8s.io/apiserver/pkg/apis/audit/validation
 staging/src/k8s.io/apiserver/pkg/apis/config/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/example
 staging/src/k8s.io/apiserver/pkg/apis/example/v1
