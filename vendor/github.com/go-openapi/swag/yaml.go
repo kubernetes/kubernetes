@@ -42,6 +42,7 @@ func YAMLToJSON(data interface{}) (json.RawMessage, error) {
 	return json.RawMessage(b), err
 }
 
+// BytesToYAMLDoc converts a byte slice into a YAML document
 func BytesToYAMLDoc(data []byte) (interface{}, error) {
 	var canary map[interface{}]interface{} // validate this is an object and not a different type
 	if err := yaml.Unmarshal(data, &canary); err != nil {
@@ -55,14 +56,17 @@ func BytesToYAMLDoc(data []byte) (interface{}, error) {
 	return document, nil
 }
 
+// JSONMapSlice represent a JSON object, with the order of keys maintained
 type JSONMapSlice []JSONMapItem
 
+// MarshalJSON renders a JSONMapSlice as JSON
 func (s JSONMapSlice) MarshalJSON() ([]byte, error) {
 	w := &jwriter.Writer{Flags: jwriter.NilMapAsEmpty | jwriter.NilSliceAsEmpty}
 	s.MarshalEasyJSON(w)
 	return w.BuildBytes()
 }
 
+// MarshalEasyJSON renders a JSONMapSlice as JSON, using easyJSON
 func (s JSONMapSlice) MarshalEasyJSON(w *jwriter.Writer) {
 	w.RawByte('{')
 
@@ -78,11 +82,14 @@ func (s JSONMapSlice) MarshalEasyJSON(w *jwriter.Writer) {
 	w.RawByte('}')
 }
 
+// UnmarshalJSON makes a JSONMapSlice from JSON
 func (s *JSONMapSlice) UnmarshalJSON(data []byte) error {
 	l := jlexer.Lexer{Data: data}
 	s.UnmarshalEasyJSON(&l)
 	return l.Error()
 }
+
+// UnmarshalEasyJSON makes a JSONMapSlice from JSON, using easyJSON
 func (s *JSONMapSlice) UnmarshalEasyJSON(in *jlexer.Lexer) {
 	if in.IsNull() {
 		in.Skip()
@@ -99,23 +106,34 @@ func (s *JSONMapSlice) UnmarshalEasyJSON(in *jlexer.Lexer) {
 	*s = result
 }
 
+// JSONMapItem represents the value of a key in a JSON object held by JSONMapSlice
 type JSONMapItem struct {
 	Key   string
 	Value interface{}
 }
 
+// MarshalJSON renders a JSONMapItem as JSON
 func (s JSONMapItem) MarshalJSON() ([]byte, error) {
 	w := &jwriter.Writer{Flags: jwriter.NilMapAsEmpty | jwriter.NilSliceAsEmpty}
 	s.MarshalEasyJSON(w)
 	return w.BuildBytes()
 }
 
+// MarshalEasyJSON renders a JSONMapItem as JSON, using easyJSON
 func (s JSONMapItem) MarshalEasyJSON(w *jwriter.Writer) {
 	w.String(s.Key)
 	w.RawByte(':')
 	w.Raw(WriteJSON(s.Value))
 }
 
+// UnmarshalJSON makes a JSONMapItem from JSON
+func (s *JSONMapItem) UnmarshalJSON(data []byte) error {
+	l := jlexer.Lexer{Data: data}
+	s.UnmarshalEasyJSON(&l)
+	return l.Error()
+}
+
+// UnmarshalEasyJSON makes a JSONMapItem from JSON, using easyJSON
 func (s *JSONMapItem) UnmarshalEasyJSON(in *jlexer.Lexer) {
 	key := in.UnsafeString()
 	in.WantColon()
@@ -123,11 +141,6 @@ func (s *JSONMapItem) UnmarshalEasyJSON(in *jlexer.Lexer) {
 	in.WantComma()
 	s.Key = key
 	s.Value = value
-}
-func (s *JSONMapItem) UnmarshalJSON(data []byte) error {
-	l := jlexer.Lexer{Data: data}
-	s.UnmarshalEasyJSON(&l)
-	return l.Error()
 }
 
 func transformData(input interface{}) (out interface{}, err error) {
@@ -146,9 +159,9 @@ func transformData(input interface{}) (out interface{}, err error) {
 				return nil, fmt.Errorf("types don't match expect map key string or int got: %T", mi.Key)
 			}
 
-			v, err := transformData(mi.Value)
-			if err != nil {
-				return nil, err
+			v, ert := transformData(mi.Value)
+			if ert != nil {
+				return nil, ert
 			}
 			nmi.Value = v
 			o[i] = nmi
@@ -167,9 +180,9 @@ func transformData(input interface{}) (out interface{}, err error) {
 				return nil, fmt.Errorf("types don't match expect map key string or int got: %T", ke)
 			}
 
-			v, err := transformData(va)
-			if err != nil {
-				return nil, err
+			v, ert := transformData(va)
+			if ert != nil {
+				return nil, ert
 			}
 			nmi.Value = v
 			o = append(o, nmi)
@@ -201,7 +214,7 @@ func YAMLDoc(path string) (json.RawMessage, error) {
 		return nil, err
 	}
 
-	return json.RawMessage(data), nil
+	return data, nil
 }
 
 // YAMLData loads a yaml document from either http or a file
