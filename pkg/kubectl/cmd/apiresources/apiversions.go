@@ -56,14 +56,17 @@ func NewCmdApiVersions(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		Long:    "Print the supported API versions on the server, in the form of \"group/version\"",
 		Example: apiversionsExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.RunApiVersions())
 		},
 	}
 	return cmd
 }
 
-func (o *ApiVersionsOptions) Complete(f cmdutil.Factory) error {
+func (o *ApiVersionsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "unexpected args: %v", args)
+	}
 	var err error
 	o.discoveryClient, err = f.ToDiscoveryClient()
 	if err != nil {
