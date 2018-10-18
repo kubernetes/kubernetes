@@ -1320,7 +1320,6 @@ func TestForceApply(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestServerSideApply(t *testing.T) {
 	initTestErrorHandler(t)
 	svc := readServiceFromFile(t, filenameSVC)
@@ -1481,7 +1480,9 @@ func TestServerSideApplyIncompatibleServer(t *testing.T) {
 	actual := strings.TrimSpace(buf.String())
 	if expected != actual {
 		t.Fatalf("serverside apply expected output (%s), got (%s)", expected, actual)
-=======
+	}
+}
+
 func TestDryRunVerifier(t *testing.T) {
 	dryRunVerifier := DryRunVerifier{
 		Finder: cmdutil.NewCRDFinder(func() ([]schema.GroupKind, error) {
@@ -1551,6 +1552,5 @@ func TestDryRunVerifierNoOpenAPI(t *testing.T) {
 	err = dryRunVerifier.HasSupport(schema.GroupVersionKind{Group: "crd.com", Version: "v1", Kind: "MyCRD"})
 	if err == nil {
 		t.Fatalf("MyCRD doesn't support dry-run, yet no error found")
->>>>>>> upstream/master
 	}
 }

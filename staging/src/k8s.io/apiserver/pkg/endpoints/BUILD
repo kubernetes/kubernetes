@@ -53,10 +53,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-<<<<<<< HEAD
-=======
         "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
->>>>>>> upstream/master
         "//vendor/github.com/emicklei/go-restful:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
     ],

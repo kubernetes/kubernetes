@@ -365,13 +365,19 @@ func (o *ApplyOptions) Run() error {
 		}
 
 		if o.ServerSideApply {
+			// If server-dry-run is requested but the type doesn't support it, fail right away.
+			if o.ServerDryRun {
+				if err := dryRunVerifier.HasSupport(info.Mapping.GroupVersionKind); err != nil {
+					return err
+				}
+			}
 			options := metav1.UpdateOptions{}
 			if o.ServerDryRun {
 				options.DryRun = []string{metav1.DryRunAll}
 			}
 
 			// Send the full object to be applied on the server side.
-			data, err := runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}

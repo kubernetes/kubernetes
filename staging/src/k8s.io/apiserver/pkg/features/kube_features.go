@@ -103,10 +103,6 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
 	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
-<<<<<<< HEAD
-	DryRun:                  {Default: false, PreRelease: utilfeature.Alpha},
-	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
-=======
 	DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
->>>>>>> upstream/master
+	ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
 }

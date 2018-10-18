@@ -16,13 +16,10 @@ go_library(
         "//build/visible_to:pkg_kubectl_cmd_CONSUMERS",
     ],
     deps = [
-<<<<<<< HEAD
-=======
         "//pkg/kubectl/cmd/annotate:go_default_library",
         "//pkg/kubectl/cmd/apiresources:go_default_library",
         "//pkg/kubectl/cmd/apply:go_default_library",
         "//pkg/kubectl/cmd/attach:go_default_library",
->>>>>>> upstream/master
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/autoscale:go_default_library",
         "//pkg/kubectl/cmd/certificates:go_default_library",
@@ -51,25 +48,16 @@ go_library(
         "//pkg/kubectl/cmd/replace:go_default_library",
         "//pkg/kubectl/cmd/rollingupdate:go_default_library",
         "//pkg/kubectl/cmd/rollout:go_default_library",
-<<<<<<< HEAD
-=======
         "//pkg/kubectl/cmd/run:go_default_library",
         "//pkg/kubectl/cmd/scale:go_default_library",
->>>>>>> upstream/master
         "//pkg/kubectl/cmd/set:go_default_library",
         "//pkg/kubectl/cmd/taint:go_default_library",
         "//pkg/kubectl/cmd/top:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-<<<<<<< HEAD
-        "//pkg/kubectl/cmd/wait:go_default_library",
-        "//pkg/kubectl/util/i18n:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-=======
         "//pkg/kubectl/cmd/version:go_default_library",
         "//pkg/kubectl/cmd/wait:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/kubectl/util/templates:go_default_library",
->>>>>>> upstream/master
         "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
@@ -95,20 +83,12 @@ go_test(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
-<<<<<<< HEAD
-        "//pkg/kubectl/scheme:go_default_library",
-=======
->>>>>>> upstream/master
         "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers:go_default_library",
-<<<<<<< HEAD
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-=======
->>>>>>> upstream/master
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
@@ -160,10 +140,6 @@ filegroup(
         "//pkg/kubectl/cmd/scale:all-srcs",
         "//pkg/kubectl/cmd/set:all-srcs",
         "//pkg/kubectl/cmd/taint:all-srcs",
-<<<<<<< HEAD
-        "//pkg/kubectl/cmd/templates:all-srcs",
-=======
->>>>>>> upstream/master
         "//pkg/kubectl/cmd/testing:all-srcs",
         "//pkg/kubectl/cmd/top:all-srcs",
         "//pkg/kubectl/cmd/util:all-srcs",
