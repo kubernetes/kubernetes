@@ -168,7 +168,7 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 			ConcurrentResourceQuotaSyncs: componentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs,
 		},
 		SAController: &SAControllerOptions{
-			ConcurrentServiceAccountSyncs: componentConfig.SAController.ConcurrentSASyncs,
+			ConcurrentServiceAccountSyncs: componentConfig.SAController.ConcurrentServiceAccountSyncs,
 			ConcurrentSATokenSyncs:        componentConfig.SAController.ConcurrentSATokenSyncs,
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{
