@@ -837,6 +837,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		// Hence, we concatenate those two lists.
 		safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
 		sysctlsWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls)
+		klet.sysctlsWhitelist = sysctlsWhitelist
 		if err != nil {
 			return nil, err
 		}
@@ -1205,6 +1206,9 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// Sysctls white list
+	sysctlsWhitelist *sysctl.PatternWhitelist
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
