@@ -616,7 +616,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 
 		// csiClient works with CRDs that support json only
-		clientConfig.ContentType = "application/json"
 		csiClient, err := csiclientset.NewForConfig(clientConfig)
 		if err != nil {
 			glog.Warningf("Failed to create CSI API client: %v", err)
