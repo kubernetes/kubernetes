@@ -26,8 +26,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
-// TODO(mattmoyer): Move CreateNewTokens, UpdateOrCreateTokens out of this package to client-go for a generic abstraction and client for a Bootstrap Token
-
 // CreateNewTokens tries to create a token and fails if one with the same ID already exists
 func CreateNewTokens(client clientset.Interface, tokens []kubeadmapi.BootstrapToken) error {
 	return UpdateOrCreateTokens(client, true, tokens)
