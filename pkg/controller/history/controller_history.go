@@ -163,6 +163,9 @@ func (br byRevision) Len() int {
 }
 
 func (br byRevision) Less(i, j int) bool {
+	if br[i].Revision == br[j].Revision {
+		return br[i].Name < br[j].Name
+	}
 	return br[i].Revision < br[j].Revision
 }
 

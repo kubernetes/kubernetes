@@ -1571,21 +1571,28 @@ func TestSortControllerRevisions(t *testing.T) {
 	}
 	ss1Rev3.Namespace = ss1.Namespace
 
+	*ss1.Status.CollisionCount = int32(2)
+	ss1Rev4, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss1Rev4.Namespace = ss1.Namespace
+
 	tests := []testcase{
 		{
 			name:      "out of order",
-			revisions: []*apps.ControllerRevision{ss1Rev2, ss1Rev1, ss1Rev3},
-			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name},
+			revisions: []*apps.ControllerRevision{ss1Rev2, ss1Rev1, ss1Rev4, ss1Rev3},
+			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name, ss1Rev4.Name},
 		},
 		{
 			name:      "sorted",
-			revisions: []*apps.ControllerRevision{ss1Rev1, ss1Rev2, ss1Rev3},
-			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name},
+			revisions: []*apps.ControllerRevision{ss1Rev1, ss1Rev2, ss1Rev3, ss1Rev4},
+			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name, ss1Rev4.Name},
 		},
 		{
 			name:      "reversed",
-			revisions: []*apps.ControllerRevision{ss1Rev3, ss1Rev2, ss1Rev1},
-			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name},
+			revisions: []*apps.ControllerRevision{ss1Rev4, ss1Rev3, ss1Rev2, ss1Rev1},
+			want:      []string{ss1Rev1.Name, ss1Rev2.Name, ss1Rev3.Name, ss1Rev4.Name},
 		},
 		{
 			name:      "empty",
