@@ -108,6 +108,8 @@ ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-""}
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
+INSTALL_CLOUDPROVIDER_RBAC_RULES=${INSTALL_CLOUDPROVIDER_RBAC_RULES:-true}
+
 # START_MODE can be 'all', 'kubeletonly', or 'nokubelet'
 START_MODE=${START_MODE:-"all"}
 
@@ -950,6 +952,19 @@ function create_storage_class {
     fi
 }
 
+function create_cloudprovider_rbac_policy {
+    if [ -z "$CLOUD_PROVIDER" ]; then
+        RBAC_FILE=${KUBE_ROOT}/cluster/addons/rbac/local/rbac.yaml
+    else
+        RBAC_FILE=${KUBE_ROOT}/cluster/addons/rbac/${CLOUD_PROVIDER}/rbac.yaml
+    fi
+
+    if [ -e $RBAC_FILE ]; then
+        echo "Creating cloudprovider rbac policy for ${CLOUD_PROVIDER}"
+        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create -f $RBAC_FILE
+    fi
+}
+
 function print_success {
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   if [[ "${ENABLE_DAEMON}" = false ]]; then
@@ -1094,6 +1109,11 @@ fi
 if [[ "$DEFAULT_STORAGE_CLASS" = "true" ]]; then
   create_storage_class
 fi
+
+if [[ -n "${INSTALL_CLOUDPROVIDER_RBAC_RULES}" && "${AUTHORIZATION_MODE}" = *RBAC* ]]; then
+    create_cloudprovider_rbac_policy
+fi
+
 
 print_success
 
