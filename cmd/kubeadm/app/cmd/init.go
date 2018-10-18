@@ -418,17 +418,10 @@ func runInit(i *initData, out io.Writer) error {
 		return fmt.Errorf("error getting directories to use: %v", err)
 	}
 
-	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
-	// Try to stop the kubelet service so no race conditions occur when configuring it
-	if !i.dryRun {
-		glog.V(1).Infof("Stopping the kubelet")
-		kubeletphase.TryStopKubelet()
-	}
-
 	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
 	// as we handle that ourselves in the markmaster phase
 	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, kubeletDir); err != nil {
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, kubeletDir, kubeConfigDir); err != nil {
 		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
 	}
 
@@ -676,7 +669,7 @@ func createClient(cfg *kubeadmapi.InitConfiguration, dryRun bool) (clientset.Int
 
 // getDirectoriesToUse returns the (in order) certificates, kubeconfig and Static Pod manifest directories, followed by a possible error
 // This behaves differently when dry-running vs the normal flow
-func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, string, string, error) {
+func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (certsDirToWriteTo, kubeConfigDir, manifestDir, kubeletDir string, err error) {
 	if dryRun {
 		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
 		if err != nil {

@@ -171,7 +171,7 @@ func RunKubeletWriteEnvFile(cfgPath string) error {
 		return fmt.Errorf("couldn't read config file, no matching kind found")
 	}
 
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(nodeRegistrationObj, featureGates, registerWithTaints, constants.KubeletRunDirectory); err != nil {
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(nodeRegistrationObj, featureGates, registerWithTaints, constants.KubeletRunDirectory, constants.KubernetesDir); err != nil {
 		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
 	}
 	return nil

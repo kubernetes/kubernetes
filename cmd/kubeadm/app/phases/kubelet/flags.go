@@ -45,7 +45,7 @@ type kubeletFlagsOpts struct {
 
 // WriteKubeletDynamicEnvFile writes a environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
-func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir string) error {
+func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir, kubeConfigDir string) error {
 	hostName, err := nodeutil.GetHostname("")
 	if err != nil {
 		return err
@@ -61,8 +61,27 @@ func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeRegOpts.KubeletExtraArgs)
-	envFileContent := fmt.Sprintf("%s=%s\n", constants.KubeletEnvFileVariableName, strings.Join(argList, " "))
 
+	kubeConfigArgs := map[string]string{
+		"config": filepath.Join(kubeletDir, constants.KubeletConfigurationFileName),
+	}
+	kubeConfigArgsList := kubeadmutil.BuildArgumentListFromMap(kubeConfigArgs, map[string]string{})
+
+	kubeconfigArgs := map[string]string{
+		"bootstrap-kubeconfig": filepath.Join(kubeConfigDir, constants.KubeletBootstrapKubeConfigFileName),
+		"kubeconfig":           filepath.Join(kubeConfigDir, constants.KubeletKubeConfigFileName),
+	}
+	kubeconfigArgsList := kubeadmutil.BuildArgumentListFromMap(kubeconfigArgs, map[string]string{})
+
+	kubeadmFlags := strings.Join(argList, " ")
+	kubeconfigFlags := strings.Join(kubeConfigArgsList, " ")
+	configFlags := strings.Join(kubeconfigArgsList, " ")
+
+	envFileContent := strings.Join([]string{
+		fmt.Sprintf(`%s="%s"`, constants.KubeletKubeadmEnvFileVariableName, kubeadmFlags),
+		fmt.Sprintf(`%s="%s"`, constants.KubeletKubeconfigEnvFileVariableName, kubeconfigFlags),
+		fmt.Sprintf(`%s="%s"`, constants.KubeletConfigEnvFileVariableName, configFlags),
+	}, "\n")
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
