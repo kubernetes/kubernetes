@@ -20,6 +20,7 @@ filegroup(
         "//cluster/images/etcd/migrate:all-srcs",
         "//cluster/images/hyperkube:all-srcs",
         "//cluster/images/kubemark:all-srcs",
+        "//cluster/images/log2file:all-srcs",
     ],
     tags = ["automanaged"],
 )
