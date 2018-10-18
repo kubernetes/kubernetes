@@ -58,21 +58,10 @@ func (f *azureFileClient) createFileShare(accountName, accountKey, name string, 
 	if err != nil {
 		return err
 	}
-	// create a file share and set quota
-	// Note. Per https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Create-Share,
-	// setting x-ms-share-quota can set quota on the new share, but in reality, setting quota in CreateShare
-	// receives error "The metadata specified is invalid. It has characters that are not permitted."
-	// As a result,breaking into two API calls: create share and set quota
 	share := fileClient.GetShareReference(name)
+	share.Properties.Quota = sizeGiB
 	if err = share.Create(nil); err != nil {
 		return fmt.Errorf("failed to create file share, err: %v", err)
-	}
-	share.Properties.Quota = sizeGiB
-	if err = share.SetProperties(nil); err != nil {
-		if err := share.Delete(nil); err != nil {
-			glog.Errorf("Error deleting share: %v", err)
-		}
-		return fmt.Errorf("failed to set quota on file share %s, err: %v", name, err)
 	}
 	return nil
 }

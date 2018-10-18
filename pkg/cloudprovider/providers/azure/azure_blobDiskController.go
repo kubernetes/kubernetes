@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	azstorage "github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/glog"
@@ -80,7 +80,7 @@ func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error
 // If no storage account is given, search all the storage accounts associated with the resource group and pick one that
 // fits storage type and location.
 func (c *BlobDiskController) CreateVolume(blobName, accountName, accountType, location string, requestGB int) (string, string, int, error) {
-	account, key, err := c.common.cloud.ensureStorageAccount(accountName, accountType, c.common.resourceGroup, location, dedicatedDiskAccountNamePrefix)
+	account, key, err := c.common.cloud.ensureStorageAccount(accountName, accountType, string(defaultStorageAccountKind), c.common.resourceGroup, location, dedicatedDiskAccountNamePrefix)
 	if err != nil {
 		return "", "", 0, fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}
@@ -491,7 +491,7 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 		cp := storage.AccountCreateParameters{
 			Sku: &storage.Sku{Name: storageAccountType},
 			// switch to use StorageV2 as it's recommended according to https://docs.microsoft.com/en-us/azure/storage/common/storage-account-options
-			Kind:     storage.StorageV2,
+			Kind:     defaultStorageAccountKind,
 			Tags:     map[string]*string{"created-by": to.StringPtr("azure-dd")},
 			Location: &location}
 		ctx, cancel := getContextWithCancel()
