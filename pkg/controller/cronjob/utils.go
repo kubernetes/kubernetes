@@ -27,10 +27,7 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
@@ -175,27 +172,6 @@ func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*bat
 // getTimeHash returns Unix Epoch Time
 func getTimeHash(scheduledTime time.Time) int64 {
 	return scheduledTime.Unix()
-}
-
-// makeCreatedByRefJson makes a json string with an object reference for use in "created-by" annotation value
-func makeCreatedByRefJson(object runtime.Object) (string, error) {
-	createdByRef, err := ref.GetReference(legacyscheme.Scheme, object)
-	if err != nil {
-		return "", fmt.Errorf("unable to get controller reference: %v", err)
-	}
-
-	// TODO: this code was not safe previously - as soon as new code came along that switched to v2, old clients
-	//   would be broken upon reading it. This is explicitly hardcoded to v1 to guarantee predictable deployment.
-	//   We need to consistently handle this case of annotation versioning.
-	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
-
-	createdByRefJson, err := runtime.Encode(codec, &v1.SerializedReference{
-		Reference: *createdByRef,
-	})
-	if err != nil {
-		return "", fmt.Errorf("unable to serialize controller reference: %v", err)
-	}
-	return string(createdByRefJson), nil
 }
 
 func getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobConditionType) {

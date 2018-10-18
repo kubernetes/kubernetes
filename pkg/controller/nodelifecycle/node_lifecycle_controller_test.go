@@ -727,7 +727,6 @@ func TestPodStatusChange(t *testing.T) {
 	// Node created long time ago, node controller posted Unknown for a long period of time.
 	table := []struct {
 		fakeNodeHandler     *testutil.FakeNodeHandler
-		daemonSets          []extensions.DaemonSet
 		timeToPass          time.Duration
 		newNodeStatus       v1.NodeStatus
 		secondNodeNewStatus v1.NodeStatus
