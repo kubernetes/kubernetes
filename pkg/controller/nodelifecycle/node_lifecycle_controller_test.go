@@ -1820,7 +1820,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 			expectedPodStatusUpdate: false,
 		},
 	}
-
 	for i, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
 			nil,
@@ -2607,6 +2606,157 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 		if podStatusUpdated != item.expectedPodStatusUpdate {
 			t.Errorf("Case[%d] expect pod status updated to be %v, but got %v", i, item.expectedPodStatusUpdate, podStatusUpdated)
 		}
+	}
+}
+
+// TestApplyNoExecuteTaints, ensures we just have a NoExecute taint applied to node.
+// NodeController is just responsible for enqueuing the node to tainting queue from which taint manager picks up
+// and evicts the pods on the node.
+func TestApplyNoExecuteTaints(t *testing.T) {
+	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 10 * time.Minute
+
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			// Unreachable Taint with effect 'NoExecute' should be applied to this node.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionUnknown,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			// Because of the logic that prevents NC from evicting anything when all Nodes are NotReady
+			// we need second healthy node in tests.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node1",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+			// NotReady Taint with NoExecute effect should be applied to this node.
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node2",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelZoneRegion:        "region1",
+						kubeletapis.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionFalse,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+	}
+	healthyNodeNewStatus := v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
+				Type:               v1.NodeReady,
+				Status:             v1.ConditionTrue,
+				LastHeartbeatTime:  metav1.Date(2017, 1, 1, 12, 10, 0, 0, time.UTC),
+				LastTransitionTime: metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+	originalTaint := UnreachableTaintTemplate
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		nil,
+		fakeNodeHandler,
+		evictionTimeout,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		true)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	nodeController.recorder = testutil.NewFakeRecorder()
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	nodeController.doNoExecuteTaintingPass()
+	node0, err := fakeNodeHandler.Get("node0", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node0...")
+		return
+	}
+	if !taintutils.TaintExists(node0.Spec.Taints, UnreachableTaintTemplate) {
+		t.Errorf("Can't find taint %v in %v", originalTaint, node0.Spec.Taints)
+	}
+	node2, err := fakeNodeHandler.Get("node2", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node2...")
+		return
+	}
+	if !taintutils.TaintExists(node2.Spec.Taints, NotReadyTaintTemplate) {
+		t.Errorf("Can't find taint %v in %v", NotReadyTaintTemplate, node2.Spec.Taints)
+	}
+
+	// Make node3 healthy again.
+	node2.Status = healthyNodeNewStatus
+	_, err = fakeNodeHandler.UpdateStatus(node2)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if err := nodeController.monitorNodeHealth(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	nodeController.doNoExecuteTaintingPass()
+
+	node2, err = fakeNodeHandler.Get("node2", metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Can't get current node2...")
+		return
+	}
+	// We should not see any taint on the node(especially the Not-Ready taint with NoExecute effect).
+	if taintutils.TaintExists(node2.Spec.Taints, NotReadyTaintTemplate) || len(node2.Spec.Taints) > 0 {
+		t.Errorf("Found taint %v in %v, which should not be present", NotReadyTaintTemplate, node2.Spec.Taints)
 	}
 }
 
