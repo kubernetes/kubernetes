@@ -19,10 +19,8 @@ package storage
 import (
 	"fmt"
 	"math/rand"
-	"time"
 
 	"k8s.io/api/core/v1"
-
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -53,8 +51,8 @@ type csiTestDriver interface {
 }
 
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
-	"hostPath": initCSIHostpath,
-	"gcePD":    initCSIgcePD,
+	"hostPath":             initCSIHostpath,
+	"[Feature: CSI-gcePD]": initCSIgcePD,
 }
 
 var _ = utils.SIGDescribe("CSI Volumes", func() {
@@ -360,20 +358,7 @@ func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csi
 	cs := f.ClientSet
 	framework.SkipUnlessProviderIs("gce", "gke")
 	framework.SkipIfMultizone(cs)
-
-	// TODO(#62561): Use credentials through external pod identity when that goes GA instead of downloading keys.
-	createGCESecrets(cs, config)
-
-	framework.SkipUnlessSecretExistsAfterWait(cs, "cloud-sa", config.Namespace, 3*time.Minute)
-
 	return &gcePDCSIDriver{
-		nodeClusterRoles: []string{
-			csiDriverRegistrarClusterRoleName,
-		},
-		controllerClusterRoles: []string{
-			csiExternalAttacherClusterRoleName,
-			csiExternalProvisionerClusterRoleName,
-		},
 		f:      f,
 		config: config,
 	}
@@ -386,38 +371,11 @@ func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
 		parameters:   map[string]string{"type": "pd-standard"},
 		claimSize:    "5Gi",
 		expectedSize: "5Gi",
-		nodeName:     node.Name,
 	}
 }
 
 func (g *gcePDCSIDriver) createCSIDriver() {
-	By("deploying gce-pd driver")
-	f := g.f
-	cs := f.ClientSet
-	config := g.config
-	g.controllerServiceAccount = csiServiceAccount(cs, config, "gce-controller", false /* teardown */)
-	g.nodeServiceAccount = csiServiceAccount(cs, config, "gce-node", false /* teardown */)
-	csiClusterRoleBindings(cs, config, false /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
-	csiClusterRoleBindings(cs, config, false /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
-	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, false, /* teardown */
-		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
-	role := csiControllerRole(cs, config, false)
-	csiControllerRoleBinding(cs, config, false, role, g.controllerServiceAccount)
-	deployGCEPDCSIDriver(cs, config, false /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
 }
 
 func (g *gcePDCSIDriver) cleanupCSIDriver() {
-	By("uninstalling gce-pd driver")
-	f := g.f
-	cs := f.ClientSet
-	config := g.config
-	deployGCEPDCSIDriver(cs, config, true /* teardown */, f, g.nodeServiceAccount, g.controllerServiceAccount)
-	csiClusterRoleBindings(cs, config, true /* teardown */, g.controllerServiceAccount, g.controllerClusterRoles)
-	csiClusterRoleBindings(cs, config, true /* teardown */, g.nodeServiceAccount, g.nodeClusterRoles)
-	utils.PrivilegedTestPSPClusterRoleBinding(cs, config.Namespace, true, /* teardown */
-		[]string{g.controllerServiceAccount.Name, g.nodeServiceAccount.Name})
-	role := csiControllerRole(cs, config, true)
-	csiControllerRoleBinding(cs, config, true, role, g.controllerServiceAccount)
-	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
-	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
 }

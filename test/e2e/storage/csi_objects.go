@@ -22,10 +22,6 @@ package storage
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -552,65 +548,4 @@ func createCSICRDs(c apiextensionsclient.Interface) {
 		_, err = c.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
 		framework.ExpectNoError(err, "Failed to create CSI CRD %q: %v", crd.Name, err)
 	}
-}
-
-func shredFile(filePath string) {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		framework.Logf("File %v was not found, skipping shredding", filePath)
-		return
-	}
-	framework.Logf("Shredding file %v", filePath)
-	_, _, err := framework.RunCmd("shred", "--remove", filePath)
-	if err != nil {
-		framework.Logf("Failed to shred file %v: %v", filePath, err)
-	}
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		framework.Logf("File %v successfully shredded", filePath)
-		return
-	}
-	// Shred failed Try to remove the file for good meausure
-	err = os.Remove(filePath)
-	framework.ExpectNoError(err, "Failed to remove service account file %s", filePath)
-
-}
-
-// createGCESecrets downloads the GCP IAM Key for the default compute service account
-// and puts it in a secret for the GCE PD CSI Driver to consume
-func createGCESecrets(client clientset.Interface, config framework.VolumeTestConfig) {
-	saEnv := "E2E_GOOGLE_APPLICATION_CREDENTIALS"
-	saFile := fmt.Sprintf("/tmp/%s/cloud-sa.json", string(uuid.NewUUID()))
-
-	os.MkdirAll(path.Dir(saFile), 0750)
-	defer os.Remove(path.Dir(saFile))
-
-	premadeSAFile, ok := os.LookupEnv(saEnv)
-	if !ok {
-		framework.Logf("Could not find env var %v, please either create cloud-sa"+
-			" secret manually or rerun test after setting %v to the filepath of"+
-			" the GCP Service Account to give to the GCE Persistent Disk CSI Driver", saEnv, saEnv)
-		return
-	}
-
-	framework.Logf("Found CI service account key at %v", premadeSAFile)
-	// Need to copy it saFile
-	stdout, stderr, err := framework.RunCmd("cp", premadeSAFile, saFile)
-	framework.ExpectNoError(err, "error copying service account key: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
-	defer shredFile(saFile)
-	// Create Secret with this Service Account
-	fileBytes, err := ioutil.ReadFile(saFile)
-	framework.ExpectNoError(err, "Failed to read file %v", saFile)
-
-	s := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "cloud-sa",
-			Namespace: config.Namespace,
-		},
-		Type: v1.SecretTypeOpaque,
-		Data: map[string][]byte{
-			filepath.Base(saFile): fileBytes,
-		},
-	}
-
-	_, err = client.CoreV1().Secrets(config.Namespace).Create(s)
-	framework.ExpectNoError(err, "Failed to create Secret %v", s.GetName())
 }
