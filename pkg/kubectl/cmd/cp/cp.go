@@ -67,8 +67,9 @@ var (
 )
 
 type CopyOptions struct {
-	Container string
-	Namespace string
+	Container  string
+	Namespace  string
+	NoPreserve bool
 
 	ClientConfig *restclient.Config
 	Clientset    kubernetes.Interface
@@ -98,6 +99,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Container name. If omitted, the first container in the pod will be chosen")
+	cmd.Flags().BoolVarP(&o.NoPreserve, "no-preserve", "", false, "The copied file/directory's ownership and permissions will not be preserved in the container")
 
 	return cmd
 }
@@ -179,7 +181,7 @@ func (o *CopyOptions) Run(args []string) error {
 
 	if len(srcSpec.PodName) != 0 && len(destSpec.PodName) != 0 {
 		if _, err := os.Stat(args[0]); err == nil {
-			return o.copyToPod(fileSpec{File: args[0]}, destSpec)
+			return o.copyToPod(fileSpec{File: args[0]}, destSpec, &exec.ExecOptions{})
 		}
 		return fmt.Errorf("src doesn't exist in local filesystem")
 	}
@@ -188,7 +190,7 @@ func (o *CopyOptions) Run(args []string) error {
 		return o.copyFromPod(srcSpec, destSpec)
 	}
 	if len(destSpec.PodName) != 0 {
-		return o.copyToPod(srcSpec, destSpec)
+		return o.copyToPod(srcSpec, destSpec, &exec.ExecOptions{})
 	}
 	return fmt.Errorf("one of src or dest must be a remote file specification")
 }
@@ -216,7 +218,7 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 	return o.execute(options)
 }
 
-func (o *CopyOptions) copyToPod(src, dest fileSpec) error {
+func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) error {
 	if len(src.File) == 0 || len(dest.File) == 0 {
 		return errFileCannotBeEmpty
 	}
@@ -238,30 +240,33 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec) error {
 		err := makeTar(src.File, dest.File, writer)
 		cmdutil.CheckErr(err)
 	}()
+	var cmdArr []string
 
 	// TODO: Improve error messages by first testing if 'tar' is present in the container?
-	cmdArr := []string{"tar", "xf", "-"}
+	if o.NoPreserve {
+		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xf", "-"}
+	} else {
+		cmdArr = []string{"tar", "-xf", "-"}
+	}
 	destDir := path.Dir(dest.File)
 	if len(destDir) > 0 {
 		cmdArr = append(cmdArr, "-C", destDir)
 	}
 
-	options := &exec.ExecOptions{
-		StreamOptions: exec.StreamOptions{
-			IOStreams: genericclioptions.IOStreams{
-				In:     reader,
-				Out:    o.Out,
-				ErrOut: o.ErrOut,
-			},
-			Stdin: true,
-
-			Namespace: dest.PodNamespace,
-			PodName:   dest.PodName,
+	options.StreamOptions = exec.StreamOptions{
+		IOStreams: genericclioptions.IOStreams{
+			In:     reader,
+			Out:    o.Out,
+			ErrOut: o.ErrOut,
 		},
+		Stdin: true,
 
-		Command:  cmdArr,
-		Executor: &exec.DefaultRemoteExecutor{},
+		Namespace: dest.PodNamespace,
+		PodName:   dest.PodName,
 	}
+
+	options.Command = cmdArr
+	options.Executor = &exec.DefaultRemoteExecutor{}
 	return o.execute(options)
 }
 

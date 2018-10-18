@@ -48,6 +48,8 @@ type SingleContainerSummary struct {
 // we can't have int here, as JSON does not accept integer keys.
 type ResourceUsageSummary map[string][]SingleContainerSummary
 
+const NoCPUConstraint = math.MaxFloat64
+
 func (s *ResourceUsageSummary) PrintHumanReadable() string {
 	buf := &bytes.Buffer{}
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)

@@ -232,6 +232,8 @@ var _ = SIGDescribe("Load capacity", func() {
 				framework.ExpectNoError(CreateQuotas(f, namespaces, 2*totalPods, testPhaseDurations.StartPhase(115, "quota creation")))
 			}
 
+			f.AddonResourceConstraints = loadResourceConstraints()
+
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
 			if itArg.services {
@@ -427,6 +429,19 @@ func computePodCounts(total int) (int, int, int) {
 	total -= mediumGroupCount * mediumGroupSize
 	smallGroupCount := total / smallGroupSize
 	return smallGroupCount, mediumGroupCount, bigGroupCount
+}
+
+func loadResourceConstraints() map[string]framework.ResourceConstraint {
+	constraints := make(map[string]framework.ResourceConstraint)
+	constraints["coredns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	constraints["kubedns"] = framework.ResourceConstraint{
+		CPUConstraint:    framework.NoCPUConstraint,
+		MemoryConstraint: 170 * (1024 * 1024),
+	}
+	return constraints
 }
 
 func generateConfigs(
