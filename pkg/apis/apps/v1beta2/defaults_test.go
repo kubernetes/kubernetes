@@ -39,7 +39,6 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	maxUnavailable := intstr.FromInt(1)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
-	enableServiceLinks := v1.DefaultEnableServiceLinks
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
@@ -47,7 +46,6 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			SchedulerName:                 api.DefaultSchedulerName,
-			EnableServiceLinks:            &enableServiceLinks,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
@@ -60,7 +58,6 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			SchedulerName:                 api.DefaultSchedulerName,
-			EnableServiceLinks:            &enableServiceLinks,
 		},
 	}
 	tests := []struct {
@@ -178,7 +175,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	var defaultReplicas int32 = 1
 
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
-	enableServiceLinks := v1.DefaultEnableServiceLinks
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
@@ -186,7 +182,6 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			SchedulerName:                 api.DefaultSchedulerName,
-			EnableServiceLinks:            &enableServiceLinks,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
@@ -291,7 +286,6 @@ func TestSetDefaultDeployment(t *testing.T) {
 	defaultIntOrString := intstr.FromString("25%")
 	differentIntOrString := intstr.FromInt(5)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
-	enableServiceLinks := v1.DefaultEnableServiceLinks
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
 			DNSPolicy:                     v1.DNSClusterFirst,
@@ -299,7 +293,6 @@ func TestSetDefaultDeployment(t *testing.T) {
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
 			SchedulerName:                 api.DefaultSchedulerName,
-			EnableServiceLinks:            &enableServiceLinks,
 		},
 	}
 	tests := []struct {
