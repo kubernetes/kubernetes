@@ -24,14 +24,12 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -211,30 +209,6 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 		}
 	}
 	return result
-}
-
-// hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
-func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
-	if len(thresholds) == 0 {
-		return nil
-	}
-	ret := v1.ResourceList{}
-	for _, threshold := range thresholds {
-		if threshold.Operator != evictionapi.OpLessThan {
-			continue
-		}
-		switch threshold.Signal {
-		case evictionapi.SignalMemoryAvailable:
-			memoryCapacity := capacity[v1.ResourceMemory]
-			value := evictionapi.GetThresholdQuantity(threshold.Value, &memoryCapacity)
-			ret[v1.ResourceMemory] = *value
-		case evictionapi.SignalNodeFsAvailable:
-			storageCapacity := capacity[v1.ResourceEphemeralStorage]
-			value := evictionapi.GetThresholdQuantity(threshold.Value, &storageCapacity)
-			ret[v1.ResourceEphemeralStorage] = *value
-		}
-	}
-	return ret
 }
 
 // validateNodeAllocatable ensures that the user specified Node Allocatable Configuration doesn't reserve more than the node capacity.
