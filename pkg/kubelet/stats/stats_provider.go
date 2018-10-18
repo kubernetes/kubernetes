@@ -85,6 +85,7 @@ type StatsProvider struct {
 // containers managed by pods.
 type containerStatsProvider interface {
 	ListPodStats() ([]statsapi.PodStats, error)
+	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
 	ImageFsStats() (*statsapi.FsStats, error)
 	ImageFsDevice() (string, error)
 }
@@ -104,6 +105,18 @@ func (p *StatsProvider) GetCgroupStats(cgroupName string, updateStats bool) (*st
 	s := cadvisorInfoToContainerStats(cgroupName, info, nil, nil)
 	n := cadvisorInfoToNetworkStats(cgroupName, info)
 	return s, n, nil
+}
+
+// GetCgroupCPUAndMemoryStats returns the CPU and memory stats of the cgroup with the cgroupName. Note that
+// this function doesn't generate filesystem stats.
+func (p *StatsProvider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
+	info, err := getCgroupInfo(p.cadvisor, cgroupName, updateStats)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
+	}
+	// Rootfs and imagefs doesn't make sense for raw cgroup.
+	s := cadvisorInfoToContainerCPUAndMemoryStats(cgroupName, info)
+	return s, nil
 }
 
 // RootFsStats returns the stats of the node root filesystem.

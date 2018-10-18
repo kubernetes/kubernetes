@@ -43,6 +43,8 @@ type StatsProvider interface {
 	//
 	// ListPodStats returns the stats of all the containers managed by pods.
 	ListPodStats() ([]statsapi.PodStats, error)
+	// ListPodCPUAndMemoryStats returns the CPU and memory stats of all the containers managed by pods.
+	ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error)
 	// ImageFsStats returns the stats of the image filesystem.
 	ImageFsStats() (*statsapi.FsStats, error)
 
@@ -51,6 +53,9 @@ type StatsProvider interface {
 	// GetCgroupStats returns the stats and the networking usage of the cgroup
 	// with the specified cgroupName.
 	GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error)
+	// GetCgroupCPUAndMemoryStats returns the CPU and memory stats of the cgroup with the specified cgroupName.
+	GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error)
+
 	// RootFsStats returns the stats of the node root filesystem.
 	RootFsStats() (*statsapi.FsStats, error)
 
