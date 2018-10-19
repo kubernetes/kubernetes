@@ -367,7 +367,8 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (os *OpenStack) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
+func (os *OpenStack) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 // mapNodeNameToServerName maps a k8s NodeName to an OpenStack Server Name
 // This is a simple string cast.

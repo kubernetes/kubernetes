@@ -117,7 +117,8 @@ func newOVirtCloud(config io.Reader) (*OVirtCloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (v *OVirtCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
+func (v *OVirtCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 func (v *OVirtCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false

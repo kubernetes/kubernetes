@@ -241,7 +241,7 @@ func init() {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (vs *VSphere) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {
+func (vs *VSphere) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 }
 
 // Initialize Node Informers

@@ -202,7 +202,7 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 	}
 	if cloud != nil {
 		// Initialize the cloud provider with a reference to the clientBuilder
-		cloud.Initialize(c.ClientBuilder)
+		cloud.Initialize(c.ClientBuilder, stop)
 	}
 	// Start the CloudNodeController
 	nodeController := cloudcontrollers.NewCloudNodeController(

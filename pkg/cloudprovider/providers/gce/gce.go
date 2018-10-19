@@ -610,7 +610,7 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 
 // Initialize takes in a clientBuilder and spawns a goroutine for watching the clusterid configmap.
 // This must be called before utilizing the funcs of gce.ClusterID
-func (gce *GCECloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {
+func (gce *GCECloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 	gce.clientBuilder = clientBuilder
 	gce.client = clientBuilder.ClientOrDie("cloud-provider")
 
