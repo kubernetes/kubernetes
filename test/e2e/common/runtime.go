@@ -96,11 +96,6 @@ while true; do sleep 1; done
 						Container:     testContainer,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
-						PodSecurityContext: &v1.PodSecurityContext{
-							SELinuxOptions: &v1.SELinuxOptions{
-								Level: "s0",
-							},
-						},
 					}
 					terminateContainer.Create()
 					defer terminateContainer.Delete()
