@@ -33,15 +33,6 @@ import (
 )
 
 var (
-	podStats = []statsapi.PodStats{
-		{
-			PodRef:      statsapi.PodReference{Name: "test-pod", Namespace: "test-namespace", UID: "UID_test-pod"},
-			StartTime:   metav1.NewTime(time.Now()),
-			Containers:  []statsapi.ContainerStats{*getContainerStats()},
-			Network:     getNetworkStats(),
-			VolumeStats: []statsapi.VolumeStats{*getVolumeStats()},
-		},
-	}
 	imageFsStats = getFsStats()
 	rootFsStats  = getFsStats()
 	node         = &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
@@ -50,8 +41,23 @@ var (
 		SystemCgroupsName:  "/misc",
 		KubeletCgroupsName: "/kubelet",
 	}
-	cgroupRoot     = "/kubepods"
-	cgroupStatsMap = map[string]struct {
+	cgroupRoot  = "/kubepods"
+	rlimitStats = getRlimitStats()
+)
+
+func TestSummaryProviderGetStats(t *testing.T) {
+	assert := assert.New(t)
+
+	podStats := []statsapi.PodStats{
+		{
+			PodRef:      statsapi.PodReference{Name: "test-pod", Namespace: "test-namespace", UID: "UID_test-pod"},
+			StartTime:   metav1.NewTime(time.Now()),
+			Containers:  []statsapi.ContainerStats{*getContainerStats()},
+			Network:     getNetworkStats(),
+			VolumeStats: []statsapi.VolumeStats{*getVolumeStats()},
+		},
+	}
+	cgroupStatsMap := map[string]struct {
 		cs *statsapi.ContainerStats
 		ns *statsapi.NetworkStats
 	}{
@@ -61,11 +67,6 @@ var (
 		"/kubelet": {cs: getContainerStats(), ns: getNetworkStats()},
 		"/pods":    {cs: getContainerStats(), ns: getNetworkStats()},
 	}
-	rlimitStats = getRlimitStats()
-)
-
-func TestSummaryProviderGetStats(t *testing.T) {
-	assert := assert.New(t)
 
 	mockStatsProvider := new(statstest.StatsProvider)
 	mockStatsProvider.
@@ -133,20 +134,34 @@ func TestSummaryProviderGetStats(t *testing.T) {
 func TestSummaryProviderGetCPUAndMemoryStats(t *testing.T) {
 	assert := assert.New(t)
 
+	podStats := []statsapi.PodStats{
+		{
+			PodRef:     statsapi.PodReference{Name: "test-pod", Namespace: "test-namespace", UID: "UID_test-pod"},
+			StartTime:  metav1.NewTime(time.Now()),
+			Containers: []statsapi.ContainerStats{*getContainerStats()},
+		},
+	}
+	cgroupStatsMap := map[string]struct {
+		cs *statsapi.ContainerStats
+	}{
+		"/":        {cs: getVolumeCPUAndMemoryStats()},
+		"/runtime": {cs: getVolumeCPUAndMemoryStats()},
+		"/misc":    {cs: getVolumeCPUAndMemoryStats()},
+		"/kubelet": {cs: getVolumeCPUAndMemoryStats()},
+		"/pods":    {cs: getVolumeCPUAndMemoryStats()},
+	}
+
 	mockStatsProvider := new(statstest.StatsProvider)
 	mockStatsProvider.
 		On("GetNode").Return(node, nil).
 		On("GetNodeConfig").Return(nodeConfig).
 		On("GetPodCgroupRoot").Return(cgroupRoot).
-		On("ListPodStats").Return(podStats, nil).
-		On("ImageFsStats").Return(imageFsStats, nil).
-		On("RootFsStats").Return(rootFsStats, nil).
-		On("RlimitStats").Return(rlimitStats, nil).
-		On("GetCgroupStats", "/", false).Return(cgroupStatsMap["/"].cs, cgroupStatsMap["/"].ns, nil).
-		On("GetCgroupStats", "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, cgroupStatsMap["/runtime"].ns, nil).
-		On("GetCgroupStats", "/misc", false).Return(cgroupStatsMap["/misc"].cs, cgroupStatsMap["/misc"].ns, nil).
-		On("GetCgroupStats", "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, cgroupStatsMap["/kubelet"].ns, nil).
-		On("GetCgroupStats", "/kubepods", false).Return(cgroupStatsMap["/pods"].cs, cgroupStatsMap["/pods"].ns, nil)
+		On("ListPodCPUAndMemoryStats").Return(podStats, nil).
+		On("GetCgroupCPUAndMemoryStats", "/", false).Return(cgroupStatsMap["/"].cs, nil).
+		On("GetCgroupCPUAndMemoryStats", "/runtime", false).Return(cgroupStatsMap["/runtime"].cs, nil).
+		On("GetCgroupCPUAndMemoryStats", "/misc", false).Return(cgroupStatsMap["/misc"].cs, nil).
+		On("GetCgroupCPUAndMemoryStats", "/kubelet", false).Return(cgroupStatsMap["/kubelet"].cs, nil).
+		On("GetCgroupCPUAndMemoryStats", "/kubepods", false).Return(cgroupStatsMap["/pods"].cs, nil)
 
 	provider := NewSummaryProvider(mockStatsProvider)
 	summary, err := provider.GetCPUAndMemoryStats()
@@ -199,6 +214,15 @@ func getContainerStats() *statsapi.ContainerStats {
 	f := fuzz.New().NilChance(0)
 	v := &statsapi.ContainerStats{}
 	f.Fuzz(v)
+	return v
+}
+func getVolumeCPUAndMemoryStats() *statsapi.ContainerStats {
+	f := fuzz.New().NilChance(0)
+	v := &statsapi.ContainerStats{}
+	f.Fuzz(&v.Name)
+	f.Fuzz(&v.StartTime)
+	f.Fuzz(v.CPU)
+	f.Fuzz(v.Memory)
 	return v
 }
 

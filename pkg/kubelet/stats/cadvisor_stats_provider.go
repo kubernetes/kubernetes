@@ -145,6 +145,68 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	return result, nil
 }
 
+// ListPodCPUAndMemoryStats returns the cpu and memory stats of all the pod-managed containers.
+func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
+	infos, err := getCadvisorContainerInfo(p.cadvisor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
+	}
+	// removeTerminatedContainerInfo will also remove pod level cgroups, so save the infos into allInfos first
+	allInfos := infos
+	infos = removeTerminatedContainerInfo(infos)
+	// Map each container to a pod and update the PodStats with container data.
+	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
+	for key, cinfo := range infos {
+		// On systemd using devicemapper each mount into the container has an
+		// associated cgroup. We ignore them to ensure we do not get duplicate
+		// entries in our summary. For details on .mount units:
+		// http://man7.org/linux/man-pages/man5/systemd.mount.5.html
+		if strings.HasSuffix(key, ".mount") {
+			continue
+		}
+		// Build the Pod key if this container is managed by a Pod
+		if !isPodManagedContainer(&cinfo) {
+			continue
+		}
+		ref := buildPodRef(cinfo.Spec.Labels)
+
+		// Lookup the PodStats for the pod using the PodRef. If none exists,
+		// initialize a new entry.
+		podStats, found := podToStats[ref]
+		if !found {
+			podStats = &statsapi.PodStats{PodRef: ref}
+			podToStats[ref] = podStats
+		}
+
+		// Update the PodStats entry with the stats from the container by
+		// adding it to podStats.Containers.
+		containerName := kubetypes.GetContainerName(cinfo.Spec.Labels)
+		if containerName == leaky.PodInfraContainerName {
+			// Special case for infrastructure container which is hidden from
+			// the user and has network stats.
+			podStats.StartTime = metav1.NewTime(cinfo.Spec.CreationTime)
+		} else {
+			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerCPUAndMemoryStats(containerName, &cinfo))
+		}
+	}
+
+	// Add each PodStats to the result.
+	result := make([]statsapi.PodStats, 0, len(podToStats))
+	for _, podStats := range podToStats {
+		podUID := types.UID(podStats.PodRef.UID)
+		// Lookup the pod-level cgroup's CPU and memory stats
+		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
+		if podInfo != nil {
+			cpu, memory := cadvisorInfoToCPUandMemoryStats(podInfo)
+			podStats.CPU = cpu
+			podStats.Memory = memory
+		}
+		result = append(result, *podStats)
+	}
+
+	return result, nil
+}
+
 func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo) *statsapi.FsStats {
 	result := &statsapi.FsStats{
 		Time:           metav1.NewTime(rootFsInfo.Timestamp),
