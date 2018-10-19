@@ -126,7 +126,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Run: func(cmd *cobra.Command, args []string) {
 			o := deleteFlags.ToOptions(nil, streams)
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
-			cmdutil.CheckErr(o.Validate(cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunDelete())
 		},
 		SuggestFor: []string{"rm"},
@@ -194,9 +194,9 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	return nil
 }
 
-func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
+func (o *DeleteOptions) Validate() error {
 	if o.Output != "" && o.Output != "name" {
-		return cmdutil.UsageErrorf(cmd, "Unexpected -o output mode: %v. We only support '-o name'.", o.Output)
+		return fmt.Errorf("unexpected -o output mode: %v. We only support '-o name'.", o.Output)
 	}
 
 	if o.DeleteAll && len(o.LabelSelector) > 0 {
@@ -204,11 +204,6 @@ func (o *DeleteOptions) Validate(cmd *cobra.Command) error {
 	}
 	if o.DeleteAll && len(o.FieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
-	}
-
-	if o.GracePeriod == 0 && !o.ForceDeletion && !o.WaitForDeletion {
-		// With the explicit --wait flag we need extra validation for backward compatibility
-		return fmt.Errorf("--grace-period=0 must have either --force specified, or --wait to be set to true")
 	}
 
 	switch {
