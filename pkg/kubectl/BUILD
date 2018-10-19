@@ -62,10 +62,10 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
-        "//pkg/controller/deployment/util:go_default_library",
         "//pkg/kubectl/apps:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util:go_default_library",
+        "//pkg/kubectl/util/deployment:go_default_library",
         "//pkg/kubectl/util/podutils:go_default_library",
         "//pkg/kubectl/util/slice:go_default_library",
         "//pkg/printers:go_default_library",

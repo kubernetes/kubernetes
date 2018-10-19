@@ -35,8 +35,8 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/util"
+	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 )
 

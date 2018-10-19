@@ -23,8 +23,8 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 )
 
 // StatusViewer provides an interface for resources that have rollout status.
@@ -65,7 +65,7 @@ func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64
 	}
 
 	if revision > 0 {
-		deploymentRev, err := util.Revision(deployment)
+		deploymentRev, err := deploymentutil.Revision(deployment)
 		if err != nil {
 			return "", false, fmt.Errorf("cannot get the revision of deployment %q: %v", deployment.Name, err)
 		}
@@ -74,8 +74,8 @@ func (s *DeploymentStatusViewer) Status(obj runtime.Unstructured, revision int64
 		}
 	}
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
-		cond := util.GetDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
-		if cond != nil && cond.Reason == util.TimedOutReason {
+		cond := deploymentutil.GetDeploymentCondition(deployment.Status, appsv1.DeploymentProgressing)
+		if cond != nil && cond.Reason == deploymentutil.TimedOutReason {
 			return "", false, fmt.Errorf("deployment %q exceeded its progress deadline", deployment.Name)
 		}
 		if deployment.Spec.Replicas != nil && deployment.Status.UpdatedReplicas < *deployment.Spec.Replicas {

@@ -38,10 +38,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-
-	// kubectl should not be taking dependencies on logic in the controllers
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 const (
