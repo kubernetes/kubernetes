@@ -32,6 +32,11 @@ import (
 )
 
 type csiClient interface {
+	NodeGetInfo(ctx context.Context) (
+		nodeID string,
+		maxVolumePerNode int64,
+		accessibleTopology *csipb.Topology,
+		err error)
 	NodePublishVolume(
 		ctx context.Context,
 		volumeid string,
@@ -73,6 +78,24 @@ var _ csiClient = &csiDriverClient{}
 func newCsiDriverClient(driverName string) *csiDriverClient {
 	c := &csiDriverClient{driverName: driverName}
 	return c
+}
+
+func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
+	nodeID string,
+	maxVolumePerNode int64,
+	accessibleTopology *csipb.Topology,
+	err error) {
+	glog.V(4).Info(log("calling NodeGetInfo rpc"))
+
+	conn, err := newGrpcConn(c.driverName)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	defer conn.Close()
+	nodeClient := csipb.NewNodeClient(conn)
+
+	res, err := nodeClient.NodeGetInfo(ctx, &csipb.NodeGetInfoRequest{})
+	return res.GetNodeId(), res.GetMaxVolumesPerNode(), res.GetAccessibleTopology(), nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(

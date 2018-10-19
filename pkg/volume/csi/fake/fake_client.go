@@ -61,6 +61,7 @@ type NodeClient struct {
 	nodePublishedVolumes map[string]string
 	nodeStagedVolumes    map[string]string
 	stageUnstageSet      bool
+	nodeGetInfoResp      *csipb.NodeGetInfoResponse
 	nextErr              error
 }
 
@@ -76,6 +77,10 @@ func NewNodeClient(stageUnstageSet bool) *NodeClient {
 // SetNextError injects next expected error
 func (f *NodeClient) SetNextError(err error) {
 	f.nextErr = err
+}
+
+func (f *NodeClient) SetNodeGetInfoResp(resp *csipb.NodeGetInfoResponse) {
+	f.nodeGetInfoResp = resp
 }
 
 // GetNodePublishedVolumes returns node published volumes
@@ -177,6 +182,14 @@ func (f *NodeClient) NodeUnstageVolume(ctx context.Context, req *csipb.NodeUnsta
 // NodeGetId implements method
 func (f *NodeClient) NodeGetId(ctx context.Context, in *csipb.NodeGetIdRequest, opts ...grpc.CallOption) (*csipb.NodeGetIdResponse, error) {
 	return nil, nil
+}
+
+// NodeGetId implements csi method
+func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoRequest, opts ...grpc.CallOption) (*csipb.NodeGetInfoResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+	return f.nodeGetInfoResp, nil
 }
 
 // NodeGetCapabilities implements csi method
