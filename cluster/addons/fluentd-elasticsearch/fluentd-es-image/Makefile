@@ -16,7 +16,7 @@
 
 PREFIX = staging-k8s.gcr.io
 IMAGE = fluentd-elasticsearch
-TAG = v2.3.1
+TAG = v2.3.2
 
 build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
