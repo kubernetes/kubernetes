@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -385,7 +386,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				if disruptOp == deleteNode {
 					By("getting gce instances")
-					gceCloud, err := framework.GetGCECloud()
+					gceCloud, err := gce.GetGCECloud()
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
 					output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
@@ -476,7 +477,7 @@ func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName
 
 func detachPD(nodeName types.NodeName, pdName string) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		gceCloud, err := framework.GetGCECloud()
+		gceCloud, err := gce.GetGCECloud()
 		if err != nil {
 			return err
 		}
@@ -580,7 +581,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		framework.Logf("Waiting for GCE PD %q to detach from node %q.", diskName, nodeName)
-		gceCloud, err := framework.GetGCECloud()
+		gceCloud, err := gce.GetGCECloud()
 		if err != nil {
 			return err
 		}

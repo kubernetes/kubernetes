@@ -202,7 +202,7 @@ limitations under the License.
 // 	controlPlaneEndpoint: "10.100.0.1:6443"
 // 	apiServerExtraArgs:
 // 	  authorization-mode: "Node,RBAC"
-// 	controlManagerExtraArgs:
+// 	controllerManagerExtraArgs:
 // 	  node-cidr-mask-size: 20
 // 	schedulerExtraArgs:
 // 	  address: "10.100.0.1"
