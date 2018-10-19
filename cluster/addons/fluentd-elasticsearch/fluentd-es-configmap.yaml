@@ -1,7 +1,7 @@
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: fluentd-es-config-v0.1.5
+  name: fluentd-es-config-v0.1.6
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
@@ -418,6 +418,14 @@ data:
     # Enriches records with Kubernetes metadata
     <filter kubernetes.**>
       @type kubernetes_metadata
+    </filter>
+
+    # Concatenate multi-line logs
+    <filter **>
+      @type concat
+      key message
+      multiline_end_regexp /\n$/
+      separator ""
     </filter>
 
     <match **>
