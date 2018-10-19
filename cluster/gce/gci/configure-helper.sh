@@ -1273,10 +1273,12 @@ EOF
 # Create the log file and set its properties.
 #
 # $1 is the file to create.
+# $2: the log owner uid to set for the log file.
+# $3: the log owner gid to set for the log file.
 function prepare-log-file {
   touch $1
   chmod 644 $1
-  chown "${LOG_OWNER_USER:-root}":"${LOG_OWNER_GROUP:-root}" $1
+  chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" $1
 }
 
 # Prepares parameters for kube-proxy manifest.
