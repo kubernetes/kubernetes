@@ -633,10 +633,8 @@ func (dswp *desiredStateOfWorldPopulator) makeVolumeMap(containers []v1.Containe
 	volumeMountsMap := make(map[string]bool)
 
 	for _, container := range containers {
-		if container.VolumeMounts != nil {
-			for _, mount := range container.VolumeMounts {
-				volumeMountsMap[mount.Name] = true
-			}
+		for _, mount := range container.VolumeMounts {
+			volumeMountsMap[mount.Name] = true
 		}
 		// TODO: remove feature gate check after no longer needed
 		if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) &&

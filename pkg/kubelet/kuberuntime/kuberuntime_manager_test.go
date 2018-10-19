@@ -954,12 +954,10 @@ func getKillMap(pod *v1.Pod, status *kubecontainer.PodStatus, cIndexes []int) ma
 }
 
 func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
-	if actual.ContainersToKill != nil {
-		// Clear the message field since we don't need to verify the message.
-		for k, info := range actual.ContainersToKill {
-			info.message = ""
-			actual.ContainersToKill[k] = info
-		}
+	// Clear the message field since we don't need to verify the message.
+	for k, info := range actual.ContainersToKill {
+		info.message = ""
+		actual.ContainersToKill[k] = info
 	}
 	assert.Equal(t, expected, actual, desc)
 }
