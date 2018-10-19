@@ -142,10 +142,10 @@ func (o *createContextOptions) complete(cmd *cobra.Command) error {
 
 func (o createContextOptions) validate() error {
 	if len(o.name) == 0 && !o.currContext {
-		return errors.New("you must specify a non-empty context name or --current-context")
+		return errors.New("you must specify a non-empty context name or --current")
 	}
 	if len(o.name) > 0 && o.currContext {
-		return errors.New("you cannot specify a context name and --current-context")
+		return errors.New("you cannot specify both a context name and --current")
 	}
 
 	return nil
