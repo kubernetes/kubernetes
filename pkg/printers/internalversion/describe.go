@@ -1872,7 +1872,7 @@ type ReplicaSetDescriber struct {
 }
 
 func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	rsc := d.Extensions().ReplicaSets(namespace)
+	rsc := d.Apps().ReplicaSets(namespace)
 	pc := d.Core().Pods(namespace)
 
 	rs, err := rsc.Get(name, metav1.GetOptions{})
@@ -1895,7 +1895,7 @@ func (d *ReplicaSetDescriber) Describe(namespace, name string, describerSettings
 	return describeReplicaSet(rs, events, running, waiting, succeeded, failed, getPodErr)
 }
 
-func describeReplicaSet(rs *extensions.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
+func describeReplicaSet(rs *apps.ReplicaSet, events *api.EventList, running, waiting, succeeded, failed int, getPodErr error) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", rs.Name)
@@ -2085,7 +2085,7 @@ type DaemonSetDescriber struct {
 }
 
 func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	dc := d.Extensions().DaemonSets(namespace)
+	dc := d.Apps().DaemonSets(namespace)
 	pc := d.Core().Pods(namespace)
 
 	daemon, err := dc.Get(name, metav1.GetOptions{})
@@ -2110,7 +2110,7 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
 }
 
-func describeDaemonSet(daemon *extensions.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeDaemonSet(daemon *apps.DaemonSet, events *api.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
@@ -3224,8 +3224,8 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	if err != nil {
 		return "", err
 	}
-	internalDeployment := &extensions.Deployment{}
-	if err := legacyscheme.Scheme.Convert(d, internalDeployment, extensions.SchemeGroupVersion); err != nil {
+	internalDeployment := &apps.Deployment{}
+	if err := legacyscheme.Scheme.Convert(d, internalDeployment, apps.SchemeGroupVersion); err != nil {
 		return "", err
 	}
 
@@ -3237,7 +3237,7 @@ func (dd *DeploymentDescriber) Describe(namespace, name string, describerSetting
 	return describeDeployment(d, selector, internalDeployment, events, dd)
 }
 
-func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *extensions.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
+func describeDeployment(d *appsv1.Deployment, selector labels.Selector, internalDeployment *apps.Deployment, events *api.EventList, dd *DeploymentDescriber) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
