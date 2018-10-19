@@ -375,6 +375,36 @@ func TestPluginNewDetacher(t *testing.T) {
 	}
 }
 
+func TestPluginCanAttach(t *testing.T) {
+	tests := []struct {
+		name       string
+		driverName string
+		canAttach  bool
+	}{
+		{
+			name:       "attachable",
+			driverName: "attachble-driver",
+			canAttach:  true,
+		},
+	}
+
+	for _, test := range tests {
+		csiDriver := getCSIDriver(test.driverName, nil, &test.canAttach)
+		t.Run(test.name, func(t *testing.T) {
+			fakeCSIClient := fakecsi.NewSimpleClientset(csiDriver)
+			plug, tmpDir := newTestPlugin(t, nil, fakeCSIClient)
+			defer os.RemoveAll(tmpDir)
+			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driverName, "test-vol"), false)
+
+			pluginCanAttach := plug.CanAttach(spec)
+			if pluginCanAttach != test.canAttach {
+				t.Fatalf("expecting plugin.CanAttach %t got %t", test.canAttach, pluginCanAttach)
+				return
+			}
+		})
+	}
+}
+
 func TestPluginNewBlockMapper(t *testing.T) {
 	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 

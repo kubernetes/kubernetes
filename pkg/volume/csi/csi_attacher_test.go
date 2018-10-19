@@ -251,6 +251,16 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
 
+			pluginCanAttach := plug.CanAttach(spec)
+			if pluginCanAttach != test.expectVolumeAttachment {
+				t.Errorf("attacher.CanAttach does not match expected attachment status %t", test.expectVolumeAttachment)
+			}
+
+			if !pluginCanAttach {
+				t.Log("plugin is not attachable")
+				return
+			}
+
 			expectedAttachID := getAttachmentName("test-vol", test.driver, "node")
 			status := storage.VolumeAttachmentStatus{
 				Attached: true,
@@ -258,6 +268,7 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 			if test.expectVolumeAttachment {
 				go markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, expectedAttachID, status)
 			}
+
 			attachID, err := csiAttacher.Attach(spec, types.NodeName("node"))
 			if err != nil {
 				t.Errorf("Attach() failed: %s", err)
@@ -321,6 +332,13 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 			}
 			csiAttacher := attacher.(*csiAttacher)
 			spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, test.driver, "test-vol"), false)
+
+			pluginCanAttach := plug.CanAttach(spec)
+			if !pluginCanAttach {
+				t.Log("plugin is not attachable")
+				return
+			}
+
 			_, err = csiAttacher.WaitForAttach(spec, "", nil, time.Second)
 			if err != nil && !test.expectError {
 				t.Errorf("Unexpected error: %s", err)
