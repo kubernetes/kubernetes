@@ -1,3 +1,7 @@
+### Version 8.9  (Fri October 19 2018 Jeff Grafton <jgrafton@google.com>)
+ - Update to use debian-base:0.4.0.
+ - Update kubectl to v1.11.3.
+
 ### Version 8.8  (Mon October 1 2018 Zihong Zheng <zihongz@google.com>)
  - Update to use debian-base:0.3.2.
 
