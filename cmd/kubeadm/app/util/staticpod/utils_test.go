@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -614,6 +615,76 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 		if (actualErr != nil) != rt.expectErr {
 			t.Errorf(
 				"ReadStaticPodFromDisk failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
+				rt.description,
+				rt.expectErr,
+				(actualErr != nil),
+				actualErr,
+			)
+		}
+	}
+}
+
+func TestManifestFilesAreEqual(t *testing.T) {
+	var tests = []struct {
+		description    string
+		podYamls       []string
+		expectedResult bool
+		expectErr      bool
+	}{
+		{
+			description:    "manifests are equal",
+			podYamls:       []string{validPod, validPod},
+			expectedResult: true,
+			expectErr:      false,
+		},
+		{
+			description:    "manifests are not equal",
+			podYamls:       []string{validPod, validPod + "\n"},
+			expectedResult: false,
+			expectErr:      false,
+		},
+		{
+			description:    "first manifest doesn't exist",
+			podYamls:       []string{validPod, ""},
+			expectedResult: false,
+			expectErr:      true,
+		},
+		{
+			description:    "second manifest doesn't exist",
+			podYamls:       []string{"", validPod},
+			expectedResult: false,
+			expectErr:      true,
+		},
+	}
+
+	for _, rt := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		// write 2 manifests
+		for i := 0; i < 2; i++ {
+			if rt.podYamls[i] != "" {
+				manifestPath := filepath.Join(tmpdir, strconv.Itoa(i)+".yaml")
+				err := ioutil.WriteFile(manifestPath, []byte(rt.podYamls[i]), 0644)
+				if err != nil {
+					t.Fatalf("Failed to write manifest file\n%s\n\tfatal error: %v", rt.description, err)
+				}
+			}
+		}
+
+		// compare them
+		result, actualErr := ManifestFilesAreEqual(filepath.Join(tmpdir, "0.yaml"), filepath.Join(tmpdir, "1.yaml"))
+		if result != rt.expectedResult {
+			t.Errorf(
+				"ManifestFilesAreEqual failed\n%s\nexpected result: %t\nactual result: %t",
+				rt.description,
+				rt.expectedResult,
+				result,
+			)
+		}
+		if (actualErr != nil) != rt.expectErr {
+			t.Errorf(
+				"ManifestFilesAreEqual failed\n%s\n\texpected error: %t\n\tgot: %t\n\tactual error: %v",
 				rt.description,
 				rt.expectErr,
 				(actualErr != nil),
