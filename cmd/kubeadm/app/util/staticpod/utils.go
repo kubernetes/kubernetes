@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -147,6 +148,10 @@ func VolumeMapToSlice(volumes map[string]v1.Volume) []v1.Volume {
 		v = append(v, vol)
 	}
 
+	sort.Slice(v, func(i, j int) bool {
+		return strings.Compare(v[i].Name, v[j].Name) == -1
+	})
+
 	return v
 }
 
@@ -157,6 +162,10 @@ func VolumeMountMapToSlice(volumeMounts map[string]v1.VolumeMount) []v1.VolumeMo
 	for _, volMount := range volumeMounts {
 		v = append(v, volMount)
 	}
+
+	sort.Slice(v, func(i, j int) bool {
+		return strings.Compare(v[i].Name, v[j].Name) == -1
+	})
 
 	return v
 }
