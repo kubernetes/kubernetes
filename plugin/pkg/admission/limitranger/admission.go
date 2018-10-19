@@ -341,6 +341,9 @@ func maxConstraint(limitType string, resourceName string, enforced resource.Quan
 	if !limExists {
 		return fmt.Errorf("maximum %s usage per %s is %s.  No limit is specified.", resourceName, limitType, enforced.String())
 	}
+	if observedLimValue == 0 {
+		return fmt.Errorf("maximum %s usage per %s is %s, but limit is 0 (unbounded).", resourceName, limitType, enforced.String())
+	}
 	if observedLimValue > enforcedValue {
 		return fmt.Errorf("maximum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
 	}
