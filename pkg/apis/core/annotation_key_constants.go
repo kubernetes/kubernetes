@@ -83,9 +83,21 @@ const (
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
 
-	// EndpointsLastUpdateTriggerTime is the annotation key, set for endpoints objects, that
-	// represents the timestamp (in milliseconds) of the last change that triggered the endpoints
-	// object update. This annotation will be used to compute the in-cluster network programming SLI.
-	// See https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
-	EndpointsLastUpdateTriggerTime = "endpoints.kubernetes.io/last-update-trigger-time"
+	// EndpointsLastChangeTriggerTime is the annotation key, set for endpoints objects, that
+	// represents the timestamp (in milliseconds) of the last change, of some pod or service object,
+	// that triggered the endpoints object change. In other words, if a Pod / Service changed at time
+	// T0, that change was observed by endpoints controller at T1, and the Endpoints object was
+	// changed at T2, the EndpointsLastChangeTriggerTime would be set to T0.
+	//
+	// The "endpoints change trigger" here means any Pod or Service change that resulted in the
+	// Endpoints object change.
+	//
+	// Given the definition of the "endpoints change trigger", please note that this annotation will
+	// be set ONLY for endpoints object changes triggered by either Pod or Service change. If the
+	// Endpoints object changes due to other reasons, this annotation won't be set (or updated if it's
+	// already set).
+	//
+	// This annotation will be used to compute the in-cluster network programming latency SLI, see
+	// https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
+	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
 )
