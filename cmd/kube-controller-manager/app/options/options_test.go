@@ -59,6 +59,7 @@ func TestAddFlags(t *testing.T) {
 		"--concurrent-replicaset-syncs=10",
 		"--concurrent-resource-quota-syncs=10",
 		"--concurrent-service-syncs=2",
+		"--concurrent-serviceaccount-syncs=5",
 		"--concurrent-serviceaccount-token-syncs=10",
 		"--concurrent_rc_syncs=10",
 		"--configure-cloud-routes=false",
@@ -250,8 +251,9 @@ func TestAddFlags(t *testing.T) {
 			ConcurrentResourceQuotaSyncs: 10,
 		},
 		SAController: &SAControllerOptions{
-			ServiceAccountKeyFile:  "/service-account-private-key",
-			ConcurrentSATokenSyncs: 10,
+			ServiceAccountKeyFile:         "/service-account-private-key",
+			ConcurrentSATokenSyncs:        10,
+			ConcurrentServiceAccountSyncs: 5,
 		},
 		ServiceController: &cmoptions.ServiceControllerOptions{
 			ConcurrentServiceSyncs: 2,
