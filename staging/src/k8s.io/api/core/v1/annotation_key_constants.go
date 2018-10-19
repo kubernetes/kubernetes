@@ -79,9 +79,9 @@ const (
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
 
-	// EndpointsLastTriggerTime is the annotation key, set for endpoints objects, that represents the
-	// timestamp (in milliseconds) of the last change that triggered the endpoints object update.
-	// This annotation will be used to compute the in-cluster network programming SLI. See
-	// https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
-	EndpointsLastTriggerTime = "kubernetes.io/endpoints.last-trigger-time"
+	// EndpointsLastUpdateTriggerTime is the annotation key, set for endpoints objects, that
+	// represents the timestamp (in milliseconds) of the last change that triggered the endpoints
+	// object update. This annotation will be used to compute the in-cluster network programming SLI.
+	// See https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
+	EndpointsLastUpdateTriggerTime = "endpoints.kubernetes.io/last-update-trigger-time"
 )
