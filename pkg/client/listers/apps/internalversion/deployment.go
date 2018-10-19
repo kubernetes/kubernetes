@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 )
 
 // DeploymentLister helps list Deployments.
 type DeploymentLister interface {
 	// List lists all Deployments in the indexer.
-	List(selector labels.Selector) (ret []*extensions.Deployment, err error)
+	List(selector labels.Selector) (ret []*apps.Deployment, err error)
 	// Deployments returns an object that can list and get Deployments.
 	Deployments(namespace string) DeploymentNamespaceLister
 	DeploymentListerExpansion
@@ -45,9 +45,9 @@ func NewDeploymentLister(indexer cache.Indexer) DeploymentLister {
 }
 
 // List lists all Deployments in the indexer.
-func (s *deploymentLister) List(selector labels.Selector) (ret []*extensions.Deployment, err error) {
+func (s *deploymentLister) List(selector labels.Selector) (ret []*apps.Deployment, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*extensions.Deployment))
+		ret = append(ret, m.(*apps.Deployment))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *deploymentLister) Deployments(namespace string) DeploymentNamespaceList
 // DeploymentNamespaceLister helps list and get Deployments.
 type DeploymentNamespaceLister interface {
 	// List lists all Deployments in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*extensions.Deployment, err error)
+	List(selector labels.Selector) (ret []*apps.Deployment, err error)
 	// Get retrieves the Deployment from the indexer for a given namespace and name.
-	Get(name string) (*extensions.Deployment, error)
+	Get(name string) (*apps.Deployment, error)
 	DeploymentNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type deploymentNamespaceLister struct {
 }
 
 // List lists all Deployments in the indexer for a given namespace.
-func (s deploymentNamespaceLister) List(selector labels.Selector) (ret []*extensions.Deployment, err error) {
+func (s deploymentNamespaceLister) List(selector labels.Selector) (ret []*apps.Deployment, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*extensions.Deployment))
+		ret = append(ret, m.(*apps.Deployment))
 	})
 	return ret, err
 }
 
 // Get retrieves the Deployment from the indexer for a given namespace and name.
-func (s deploymentNamespaceLister) Get(name string) (*extensions.Deployment, error) {
+func (s deploymentNamespaceLister) Get(name string) (*apps.Deployment, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("deployment"), name)
+		return nil, errors.NewNotFound(apps.Resource("deployment"), name)
 	}
-	return obj.(*extensions.Deployment), nil
+	return obj.(*apps.Deployment), nil
 }

@@ -23,7 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -35,15 +35,15 @@ type DaemonSetsGetter interface {
 
 // DaemonSetInterface has methods to work with DaemonSet resources.
 type DaemonSetInterface interface {
-	Create(*extensions.DaemonSet) (*extensions.DaemonSet, error)
-	Update(*extensions.DaemonSet) (*extensions.DaemonSet, error)
-	UpdateStatus(*extensions.DaemonSet) (*extensions.DaemonSet, error)
+	Create(*apps.DaemonSet) (*apps.DaemonSet, error)
+	Update(*apps.DaemonSet) (*apps.DaemonSet, error)
+	UpdateStatus(*apps.DaemonSet) (*apps.DaemonSet, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*extensions.DaemonSet, error)
-	List(opts v1.ListOptions) (*extensions.DaemonSetList, error)
+	Get(name string, options v1.GetOptions) (*apps.DaemonSet, error)
+	List(opts v1.ListOptions) (*apps.DaemonSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.DaemonSet, err error)
 	DaemonSetExpansion
 }
 
@@ -54,7 +54,7 @@ type daemonSets struct {
 }
 
 // newDaemonSets returns a DaemonSets
-func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
+func newDaemonSets(c *AppsClient, namespace string) *daemonSets {
 	return &daemonSets{
 		client: c.RESTClient(),
 		ns:     namespace,
@@ -62,8 +62,8 @@ func newDaemonSets(c *ExtensionsClient, namespace string) *daemonSets {
 }
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *daemonSets) Get(name string, options v1.GetOptions) (result *extensions.DaemonSet, err error) {
-	result = &extensions.DaemonSet{}
+func (c *daemonSets) Get(name string, options v1.GetOptions) (result *apps.DaemonSet, err error) {
+	result = &apps.DaemonSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -75,8 +75,8 @@ func (c *daemonSets) Get(name string, options v1.GetOptions) (result *extensions
 }
 
 // List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *daemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList, err error) {
-	result = &extensions.DaemonSetList{}
+func (c *daemonSets) List(opts v1.ListOptions) (result *apps.DaemonSetList, err error) {
+	result = &apps.DaemonSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -97,8 +97,8 @@ func (c *daemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *daemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
-	result = &extensions.DaemonSet{}
+func (c *daemonSets) Create(daemonSet *apps.DaemonSet) (result *apps.DaemonSet, err error) {
+	result = &apps.DaemonSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -109,8 +109,8 @@ func (c *daemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions
 }
 
 // Update takes the representation of a daemonSet and updates it. Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *daemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
-	result = &extensions.DaemonSet{}
+func (c *daemonSets) Update(daemonSet *apps.DaemonSet) (result *apps.DaemonSet, err error) {
+	result = &apps.DaemonSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -124,8 +124,8 @@ func (c *daemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *daemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
-	result = &extensions.DaemonSet{}
+func (c *daemonSets) UpdateStatus(daemonSet *apps.DaemonSet) (result *apps.DaemonSet, err error) {
+	result = &apps.DaemonSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("daemonsets").
@@ -160,8 +160,8 @@ func (c *daemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Patch applies the patch and returns the patched daemonSet.
-func (c *daemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error) {
-	result = &extensions.DaemonSet{}
+func (c *daemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.DaemonSet, err error) {
+	result = &apps.DaemonSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("daemonsets").

@@ -8,11 +8,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "daemonset.go",
-        "deployment.go",
         "ingress.go",
         "interface.go",
-        "replicaset.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions/internalversion",
     deps = [

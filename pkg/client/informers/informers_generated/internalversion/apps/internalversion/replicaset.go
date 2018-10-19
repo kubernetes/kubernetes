@@ -25,65 +25,65 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
-	internalversion "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
+	internalversion "k8s.io/kubernetes/pkg/client/listers/apps/internalversion"
 )
 
-// DaemonSetInformer provides access to a shared informer and lister for
-// DaemonSets.
-type DaemonSetInformer interface {
+// ReplicaSetInformer provides access to a shared informer and lister for
+// ReplicaSets.
+type ReplicaSetInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() internalversion.DaemonSetLister
+	Lister() internalversion.ReplicaSetLister
 }
 
-type daemonSetInformer struct {
+type replicaSetInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewDaemonSetInformer constructs a new informer for DaemonSet type.
+// NewReplicaSetInformer constructs a new informer for ReplicaSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewDaemonSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredDaemonSetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewReplicaSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredReplicaSetInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredDaemonSetInformer constructs a new informer for DaemonSet type.
+// NewFilteredReplicaSetInformer constructs a new informer for ReplicaSet type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredDaemonSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredReplicaSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().DaemonSets(namespace).List(options)
+				return client.Apps().ReplicaSets(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().DaemonSets(namespace).Watch(options)
+				return client.Apps().ReplicaSets(namespace).Watch(options)
 			},
 		},
-		&extensions.DaemonSet{},
+		&apps.ReplicaSet{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *daemonSetInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredDaemonSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *replicaSetInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredReplicaSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.DaemonSet{}, f.defaultInformer)
+func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apps.ReplicaSet{}, f.defaultInformer)
 }
 
-func (f *daemonSetInformer) Lister() internalversion.DaemonSetLister {
-	return internalversion.NewDaemonSetLister(f.Informer().GetIndexer())
+func (f *replicaSetInformer) Lister() internalversion.ReplicaSetLister {
+	return internalversion.NewReplicaSetLister(f.Informer().GetIndexer())
 }

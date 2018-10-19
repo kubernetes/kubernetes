@@ -25,34 +25,34 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 )
 
 // FakeDaemonSets implements DaemonSetInterface
 type FakeDaemonSets struct {
-	Fake *FakeExtensions
+	Fake *FakeApps
 	ns   string
 }
 
-var daemonsetsResource = schema.GroupVersionResource{Group: "extensions", Version: "", Resource: "daemonsets"}
+var daemonsetsResource = schema.GroupVersionResource{Group: "apps", Version: "", Resource: "daemonsets"}
 
-var daemonsetsKind = schema.GroupVersionKind{Group: "extensions", Version: "", Kind: "DaemonSet"}
+var daemonsetsKind = schema.GroupVersionKind{Group: "apps", Version: "", Kind: "DaemonSet"}
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
-func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *extensions.DaemonSet, err error) {
+func (c *FakeDaemonSets) Get(name string, options v1.GetOptions) (result *apps.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(daemonsetsResource, c.ns, name), &extensions.DaemonSet{})
+		Invokes(testing.NewGetAction(daemonsetsResource, c.ns, name), &apps.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.DaemonSet), err
+	return obj.(*apps.DaemonSet), err
 }
 
 // List takes label and field selectors, and returns the list of DaemonSets that match those selectors.
-func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSetList, err error) {
+func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *apps.DaemonSetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(daemonsetsResource, daemonsetsKind, c.ns, opts), &extensions.DaemonSetList{})
+		Invokes(testing.NewListAction(daemonsetsResource, daemonsetsKind, c.ns, opts), &apps.DaemonSetList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeDaemonSets) List(opts v1.ListOptions) (result *extensions.DaemonSet
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &extensions.DaemonSetList{ListMeta: obj.(*extensions.DaemonSetList).ListMeta}
-	for _, item := range obj.(*extensions.DaemonSetList).Items {
+	list := &apps.DaemonSetList{ListMeta: obj.(*apps.DaemonSetList).ListMeta}
+	for _, item := range obj.(*apps.DaemonSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeDaemonSets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a daemonSet and creates it.  Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *FakeDaemonSets) Create(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
+func (c *FakeDaemonSets) Create(daemonSet *apps.DaemonSet) (result *apps.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(testing.NewCreateAction(daemonsetsResource, c.ns, daemonSet), &apps.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.DaemonSet), err
+	return obj.(*apps.DaemonSet), err
 }
 
 // Update takes the representation of a daemonSet and updates it. Returns the server's representation of the daemonSet, and an error, if there is any.
-func (c *FakeDaemonSets) Update(daemonSet *extensions.DaemonSet) (result *extensions.DaemonSet, err error) {
+func (c *FakeDaemonSets) Update(daemonSet *apps.DaemonSet) (result *apps.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(daemonsetsResource, c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(testing.NewUpdateAction(daemonsetsResource, c.ns, daemonSet), &apps.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.DaemonSet), err
+	return obj.(*apps.DaemonSet), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDaemonSets) UpdateStatus(daemonSet *extensions.DaemonSet) (*extensions.DaemonSet, error) {
+func (c *FakeDaemonSets) UpdateStatus(daemonSet *apps.DaemonSet) (*apps.DaemonSet, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(daemonsetsResource, "status", c.ns, daemonSet), &extensions.DaemonSet{})
+		Invokes(testing.NewUpdateSubresourceAction(daemonsetsResource, "status", c.ns, daemonSet), &apps.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.DaemonSet), err
+	return obj.(*apps.DaemonSet), err
 }
 
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
 func (c *FakeDaemonSets) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(daemonsetsResource, c.ns, name), &extensions.DaemonSet{})
+		Invokes(testing.NewDeleteAction(daemonsetsResource, c.ns, name), &apps.DaemonSet{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeDaemonSets) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeDaemonSets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(daemonsetsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &extensions.DaemonSetList{})
+	_, err := c.Fake.Invokes(action, &apps.DaemonSetList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched daemonSet.
-func (c *FakeDaemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.DaemonSet, err error) {
+func (c *FakeDaemonSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.DaemonSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, pt, data, subresources...), &extensions.DaemonSet{})
+		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, pt, data, subresources...), &apps.DaemonSet{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.DaemonSet), err
+	return obj.(*apps.DaemonSet), err
 }
