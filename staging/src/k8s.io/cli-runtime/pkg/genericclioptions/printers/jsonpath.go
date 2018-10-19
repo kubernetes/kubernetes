@@ -17,6 +17,7 @@ limitations under the License.
 package printers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -136,10 +137,11 @@ func (j *JSONPathPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	if err := j.JSONPath.Execute(w, queryObj); err != nil {
-		fmt.Fprintf(w, "Error executing template: %v. Printing more information for debugging the template:\n", err)
-		fmt.Fprintf(w, "\ttemplate was:\n\t\t%v\n", j.rawTemplate)
-		fmt.Fprintf(w, "\tobject given to jsonpath engine was:\n\t\t%#v\n\n", queryObj)
-		return fmt.Errorf("error executing jsonpath %q: %v\n", j.rawTemplate, err)
+		buf := bytes.NewBuffer(nil)
+		fmt.Fprintf(buf, "Error executing template: %v. Printing more information for debugging the template:\n", err)
+		fmt.Fprintf(buf, "\ttemplate was:\n\t\t%v\n", j.rawTemplate)
+		fmt.Fprintf(buf, "\tobject given to jsonpath engine was:\n\t\t%#v\n\n", queryObj)
+		return fmt.Errorf("error executing jsonpath %q: %v\n", j.rawTemplate, buf.String())
 	}
 	return nil
 }

@@ -555,7 +555,7 @@ kube::golang::build_some_binaries() {
 
         go test -c -o "$(kube::golang::outfile_for_binary "${package}" "${platform}")" \
           -covermode count \
-          -coverpkg k8s.io/... \
+          -coverpkg k8s.io/...,k8s.io/kubernetes/vendor/k8s.io/... \
           "${build_args[@]}" \
           -tags coverage \
           "${package}"

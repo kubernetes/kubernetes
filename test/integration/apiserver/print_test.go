@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1beta1"
@@ -130,11 +131,13 @@ var missingHanlders = sets.NewString(
 	"VolumeAttachment",
 	"PriorityClass",
 	"PodPreset",
+	"AuditSink",
 )
 
 func TestServerSidePrint(t *testing.T) {
 	s, _, closeFn := setup(t,
 		// additional groupversions needed for the test to run
+		auditregv1alpha1.SchemeGroupVersion,
 		batchv2alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		settingsv1alpha1.SchemeGroupVersion,

@@ -53,3 +53,30 @@ func (sp *summaryProviderImpl) GetSystemContainersStats(nodeConfig cm.NodeConfig
 
 	return stats
 }
+
+func (sp *summaryProviderImpl) GetSystemContainersCPUAndMemoryStats(nodeConfig cm.NodeConfig, podStats []statsapi.PodStats, updateStats bool) (stats []statsapi.ContainerStats) {
+	systemContainers := map[string]struct {
+		name             string
+		forceStatsUpdate bool
+	}{
+		statsapi.SystemContainerKubelet: {nodeConfig.KubeletCgroupsName, false},
+		statsapi.SystemContainerRuntime: {nodeConfig.RuntimeCgroupsName, false},
+		statsapi.SystemContainerMisc:    {nodeConfig.SystemCgroupsName, false},
+		statsapi.SystemContainerPods:    {sp.provider.GetPodCgroupRoot(), updateStats},
+	}
+	for sys, cont := range systemContainers {
+		// skip if cgroup name is undefined (not all system containers are required)
+		if cont.name == "" {
+			continue
+		}
+		s, err := sp.provider.GetCgroupCPUAndMemoryStats(cont.name, cont.forceStatsUpdate)
+		if err != nil {
+			glog.Errorf("Failed to get system container stats for %q: %v", cont.name, err)
+			continue
+		}
+		s.Name = sys
+		stats = append(stats, *s)
+	}
+
+	return stats
+}

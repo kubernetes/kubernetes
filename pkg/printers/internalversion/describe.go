@@ -195,8 +195,21 @@ func DescriberFor(kind schema.GroupKind, clientConfig *rest.Config) (printers.De
 
 // GenericDescriberFor returns a generic describer for the specified mapping
 // that uses only information available from runtime.Unstructured
-func GenericDescriberFor(mapping *meta.RESTMapping, dynamic dynamic.Interface, events coreclient.EventsGetter) printers.Describer {
-	return &genericDescriber{mapping, dynamic, events}
+func GenericDescriberFor(mapping *meta.RESTMapping, clientConfig *rest.Config) (printers.Describer, bool) {
+	// used to fetch the resource
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, false
+	}
+
+	// used to get events for the resource
+	clientSet, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, false
+	}
+	eventsClient := clientSet.Core()
+
+	return &genericDescriber{mapping, dynamicClient, eventsClient}, true
 }
 
 type genericDescriber struct {

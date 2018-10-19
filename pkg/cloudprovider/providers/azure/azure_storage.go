@@ -19,24 +19,26 @@ package azure
 import (
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/golang/glog"
 )
 
 const (
 	defaultStorageAccountType      = string(storage.StandardLRS)
+	defaultStorageAccountKind      = storage.StorageV2
 	fileShareAccountNamePrefix     = "f"
 	sharedDiskAccountNamePrefix    = "ds"
 	dedicatedDiskAccountNamePrefix = "dd"
 )
 
-// CreateFileShare creates a file share, using a matching storage account
-func (az *Cloud) CreateFileShare(shareName, accountName, accountType, resourceGroup, location string, requestGiB int) (string, string, error) {
+// CreateFileShare creates a file share, using a matching storage account type, account kind, etc.
+// storage account will be created if specified account is not found
+func (az *Cloud) CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, requestGiB int) (string, string, error) {
 	if resourceGroup == "" {
 		resourceGroup = az.resourceGroup
 	}
 
-	account, key, err := az.ensureStorageAccount(accountName, accountType, resourceGroup, location, fileShareAccountNamePrefix)
+	account, key, err := az.ensureStorageAccount(accountName, accountType, accountKind, resourceGroup, location, fileShareAccountNamePrefix)
 	if err != nil {
 		return "", "", fmt.Errorf("could not get storage key for storage account %s: %v", accountName, err)
 	}

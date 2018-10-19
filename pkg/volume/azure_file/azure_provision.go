@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +40,7 @@ var _ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
 // azure cloud provider should implement it
 type azureCloudProvider interface {
 	// create a file share
-	CreateFileShare(shareName, accountName, accountType, resourceGroup, location string, requestGiB int) (string, string, error)
+	CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, requestGiB int) (string, string, error)
 	// delete a file share
 	DeleteFileShare(accountName, accountKey, shareName string) error
 	// resize a file share
@@ -171,7 +173,12 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure file")
 	}
 
-	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, resourceGroup, location, requestGiB)
+	// when use azure file premium, account kind should be specified as FileStorage
+	accountKind := string(storage.StorageV2)
+	if strings.HasPrefix(strings.ToLower(sku), "premium") {
+		accountKind = string(storage.FileStorage)
+	}
+	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, accountKind, resourceGroup, location, requestGiB)
 	if err != nil {
 		return nil, err
 	}

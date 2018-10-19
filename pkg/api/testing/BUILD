@@ -19,6 +19,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration/fuzzer:go_default_library",
         "//pkg/apis/apps/fuzzer:go_default_library",
+        "//pkg/apis/auditregistration/fuzzer:go_default_library",
         "//pkg/apis/autoscaling/fuzzer:go_default_library",
         "//pkg/apis/batch/fuzzer:go_default_library",
         "//pkg/apis/certificates/fuzzer:go_default_library",

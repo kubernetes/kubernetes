@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -42,32 +40,9 @@ func Describer(restClientGetter genericclioptions.RESTClientGetter, mapping *met
 		return describer, nil
 	}
 	// if this is a kind we don't have a describer for yet, go generic if possible
-	if genericDescriber, genericErr := genericDescriber(restClientGetter, mapping); genericErr == nil {
+	if genericDescriber, ok := printersinternal.GenericDescriberFor(mapping, clientConfig); ok {
 		return genericDescriber, nil
 	}
 	// otherwise return an unregistered error
 	return nil, fmt.Errorf("no description has been implemented for %s", mapping.GroupVersionKind.String())
-}
-
-// helper function to make a generic describer, or return an error
-func genericDescriber(restClientGetter genericclioptions.RESTClientGetter, mapping *meta.RESTMapping) (printers.Describer, error) {
-	clientConfig, err := restClientGetter.ToRESTConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// used to fetch the resource
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// used to get events for the resource
-	clientSet, err := internalclientset.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	eventsClient := clientSet.Core()
-	return printersinternal.GenericDescriberFor(mapping, dynamicClient, eventsClient), nil
 }
