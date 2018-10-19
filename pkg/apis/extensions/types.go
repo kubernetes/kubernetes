@@ -29,7 +29,6 @@ support is experimental.
 package extensions
 
 import (
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -40,29 +39,6 @@ import (
 // Dummy definition
 type ReplicationControllerDummy struct {
 	metav1.TypeMeta
-}
-
-// Alpha-level support for Custom Metrics in HPA (as annotations).
-type CustomMetricTarget struct {
-	// Custom Metric name.
-	Name string
-	// Custom Metric value (average).
-	TargetValue resource.Quantity
-}
-
-type CustomMetricTargetList struct {
-	Items []CustomMetricTarget
-}
-
-type CustomMetricCurrentStatus struct {
-	// Custom Metric name.
-	Name string
-	// Custom Metric value (average).
-	CurrentValue resource.Quantity
-}
-
-type CustomMetricCurrentStatusList struct {
-	Items []CustomMetricCurrentStatus
 }
 
 // +genclient
