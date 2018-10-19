@@ -46,6 +46,7 @@ import (
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -332,7 +333,7 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 }
 
 func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
-	cloud, err := framework.GetGCECloud()
+	cloud, err := gce.GetGCECloud()
 	if err != nil {
 		return err
 	}
@@ -609,7 +610,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			allZones := sets.NewString()     // all zones in the project
 			managedZones := sets.NewString() // subset of allZones
 
-			gceCloud, err := framework.GetGCECloud()
+			gceCloud, err := gce.GetGCECloud()
 			Expect(err).NotTo(HaveOccurred())
 
 			// Get all k8s managed zones (same as zones with nodes in them for test)

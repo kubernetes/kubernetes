@@ -34,8 +34,6 @@ import (
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/logs"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -46,85 +44,17 @@ import (
 
 	// ensure auth plugins are loaded
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+
+	// ensure that cloud providers are loaded
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/aws"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/azure"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	_ "k8s.io/kubernetes/test/e2e/framework/providers/kubemark"
 )
 
 var (
 	cloudConfig = &framework.TestContext.CloudConfig
 )
-
-// setupProviderConfig validates and sets up cloudConfig based on framework.TestContext.Provider.
-func setupProviderConfig() error {
-	switch framework.TestContext.Provider {
-	case "":
-		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
-
-	case "gce", "gke":
-		framework.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
-		zone := framework.TestContext.CloudConfig.Zone
-		region := framework.TestContext.CloudConfig.Region
-
-		var err error
-		if region == "" {
-			region, err = gcecloud.GetGCERegion(zone)
-			if err != nil {
-				return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
-			}
-		}
-		managedZones := []string{} // Manage all zones in the region
-		if !framework.TestContext.CloudConfig.MultiZone {
-			managedZones = []string{zone}
-		}
-
-		gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
-			ApiEndpoint:        framework.TestContext.CloudConfig.ApiEndpoint,
-			ProjectID:          framework.TestContext.CloudConfig.ProjectID,
-			Region:             region,
-			Zone:               zone,
-			ManagedZones:       managedZones,
-			NetworkName:        "", // TODO: Change this to use framework.TestContext.CloudConfig.Network?
-			SubnetworkName:     "",
-			NodeTags:           nil,
-			NodeInstancePrefix: "",
-			TokenSource:        nil,
-			UseMetadataServer:  false,
-			AlphaFeatureGate:   gcecloud.NewAlphaFeatureGate([]string{}),
-		})
-
-		if err != nil {
-			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
-		}
-
-		cloudConfig.Provider = gceCloud
-
-		// Arbitrarily pick one of the zones we have nodes in
-		if cloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
-			zones, err := gceCloud.GetAllZonesFromCloudProvider()
-			if err != nil {
-				return err
-			}
-
-			cloudConfig.Zone, _ = zones.PopAny()
-		}
-
-	case "aws":
-		if cloudConfig.Zone == "" {
-			return fmt.Errorf("gce-zone must be specified for AWS")
-		}
-	case "azure":
-		if cloudConfig.ConfigFile == "" {
-			return fmt.Errorf("config-file must be specified for Azure")
-		}
-		config, err := os.Open(cloudConfig.ConfigFile)
-		if err != nil {
-			framework.Logf("Couldn't open cloud provider configuration %s: %#v",
-				cloudConfig.ConfigFile, err)
-		}
-		defer config.Close()
-		cloudConfig.Provider, err = azure.NewCloud(config)
-	}
-
-	return nil
-}
 
 // There are certain operations we only want to run once per overall test invocation
 // (such as deleting old namespaces, or verifying that all system pods are running.
@@ -136,10 +66,6 @@ func setupProviderConfig() error {
 // accepting the byte array.
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// Run only on Ginkgo node 1
-
-	if err := setupProviderConfig(); err != nil {
-		framework.Failf("Failed to setup provider config: %v", err)
-	}
 
 	switch framework.TestContext.Provider {
 	case "gce", "gke":
@@ -214,12 +140,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 }, func(data []byte) {
 	// Run on all Ginkgo nodes
-
-	if cloudConfig.Provider == nil {
-		if err := setupProviderConfig(); err != nil {
-			framework.Failf("Failed to setup provider config: %v", err)
-		}
-	}
 })
 
 // Similar to SynchronizedBeforeSuite, we want to run some operations only once (such as collecting cluster logs).
