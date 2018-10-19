@@ -331,6 +331,12 @@ rules:
   verbs:
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
 `
 	// CoreDNSClusterRoleBinding is the CoreDNS Clusterrolebinding manifest
 	CoreDNSClusterRoleBinding = `
