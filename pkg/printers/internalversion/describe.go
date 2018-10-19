@@ -681,6 +681,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), w, "")
 		if len(pod.Status.Conditions) > 0 {
 			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\n")
+			w.Write(LEVEL_1, "----\t------\n")
 			for _, c := range pod.Status.Conditions {
 				w.Write(LEVEL_1, "%v \t%v \n",
 					c.Type,
