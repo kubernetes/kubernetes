@@ -43,15 +43,17 @@ const (
 // the host's mount namespace.
 type NsenterMounter struct {
 	ne *nsenter.Nsenter
-	// rootDir is location of /var/lib/kubelet directory.
-	rootDir string
+	// sharedDir is a specially handled directory that is identically mounted in the container and the host.
+	// mounts here do not need to be remapped.
+	// For kubelet, this is often the /var/lib/kubelet directory.
+	sharedDir string
 }
 
 // NewNsenterMounter creates a new mounter for kubelet that runs as a container.
-func NewNsenterMounter(rootDir string, ne *nsenter.Nsenter) *NsenterMounter {
+func NewNsenterMounter(sharedDir string, ne *nsenter.Nsenter) *NsenterMounter {
 	return &NsenterMounter{
-		rootDir: rootDir,
-		ne:      ne,
+		sharedDir: sharedDir,
+		ne:        ne,
 	}
 }
 
@@ -326,13 +328,15 @@ func (mounter *NsenterMounter) SafeMakeDir(subdir string, base string, perm os.F
 	}
 	evaluatedBase = filepath.Clean(evaluatedBase)
 
-	rootDir := filepath.Clean(mounter.rootDir)
-	if PathWithinBase(evaluatedBase, rootDir) {
-		// Base is in /var/lib/kubelet. This directory is shared between the
-		// container with kubelet and the host. We don't need to add '/rootfs'.
-		// This is useful when /rootfs is mounted as read-only - we can still
-		// create subpaths for paths in /var/lib/kubelet.
-		return doSafeMakeDir(evaluatedSubdirPath, evaluatedBase, perm)
+	if mounter.sharedDir != "" {
+		sharedDir := filepath.Clean(mounter.sharedDir)
+		if PathWithinBase(evaluatedBase, sharedDir) {
+			// Base is in a directory that is shared between the container (e.g. kubelet) and the host.
+			// (This is often /var/lib/kubelet). We don't need to add '/rootfs'.
+			// This is useful when /rootfs is mounted as read-only - we can still
+			// create subpaths for paths in e.g. /var/lib/kubelet.
+			return doSafeMakeDir(evaluatedSubdirPath, evaluatedBase, perm)
+		}
 	}
 
 	// Base is somewhere on the host's filesystem. Add /rootfs and try to make
