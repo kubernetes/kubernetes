@@ -48,6 +48,7 @@ func newValidDaemonSet() *apps.DaemonSet {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: metav1.NamespaceDefault,
+			Labels:    map[string]string{"a": "b"},
 		},
 		Spec: apps.DaemonSetSpec{
 			UpdateStrategy: apps.DaemonSetUpdateStrategy{
