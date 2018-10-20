@@ -21,11 +21,13 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
+	"k8s.io/apimachinery/pkg/util/sets"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -35,13 +37,9 @@ import (
 )
 
 var (
-	masterPreflightLongDesc = normalizer.LongDesc(`
-		Run master pre-flight checks, functionally equivalent to what implemented by kubeadm init.
-		` + cmdutil.AlphaDisclaimer)
-
 	masterPreflightExample = normalizer.Examples(`
-		# Run master pre-flight checks.
-		kubeadm alpha phase preflight master
+		# Run master pre-flight checks using a config file.
+		kubeadm init phase preflight --config kubeadm-config.yml
 		`)
 
 	nodePreflightLongDesc = normalizer.LongDesc(`
@@ -55,6 +53,52 @@ var (
 
 	errorMissingConfigFlag = errors.New("the --config flag is mandatory")
 )
+
+// preflightMasterData defines the behavior that a runtime data struct passed to the PreflightMaster master phase
+// should have. Please note that we are using an interface in order to make this phase reusable in different workflows
+// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
+type preflightMasterData interface {
+	Cfg() *kubeadmapi.InitConfiguration
+	DryRun() bool
+	IgnorePreflightErrors() sets.String
+}
+
+// NewPreflightMasterPhase creates a kubeadm workflow phase that implements preflight checks for a new master node.
+func NewPreflightMasterPhase() workflow.Phase {
+	return workflow.Phase{
+		Name:    "preflight",
+		Short:   "Run master pre-flight checks",
+		Long:    "Run master pre-flight checks, functionally equivalent to what implemented by kubeadm init.",
+		Example: masterPreflightExample,
+		Run:     runPreflightMaster,
+	}
+}
+
+// runPreflightMaster executes preflight checks logic.
+func runPreflightMaster(c workflow.RunData) error {
+	data, ok := c.(preflightMasterData)
+	if !ok {
+		return fmt.Errorf("preflight phase invoked with an invalid data struct")
+	}
+
+	fmt.Println("[preflight] running pre-flight checks")
+	if err := preflight.RunInitMasterChecks(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
+		return nil
+	}
+
+	if !data.DryRun() {
+		fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
+		fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
+		fmt.Println("[preflight] You can also perform this action in beforehand using 'kubeadm config images pull'")
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("[preflight] Would pull the required images (like 'kubeadm config images pull')")
+	}
+
+	return nil
+}
 
 // NewCmdPreFlight calls cobra.Command for preflight checks
 func NewCmdPreFlight() *cobra.Command {
@@ -70,43 +114,7 @@ func NewCmdPreFlight() *cobra.Command {
 	options.AddConfigFlag(cmd.PersistentFlags(), &cfgPath)
 	options.AddIgnorePreflightErrorsFlag(cmd.PersistentFlags(), &ignorePreflightErrors)
 
-	cmd.AddCommand(NewCmdPreFlightMaster(&cfgPath, &ignorePreflightErrors))
 	cmd.AddCommand(NewCmdPreFlightNode(&cfgPath, &ignorePreflightErrors))
-
-	return cmd
-}
-
-// NewCmdPreFlightMaster calls cobra.Command for master preflight checks
-func NewCmdPreFlightMaster(cfgPath *string, ignorePreflightErrors *[]string) *cobra.Command {
-
-	cmd := &cobra.Command{
-		Use:     "master",
-		Short:   "Run master pre-flight checks",
-		Long:    masterPreflightLongDesc,
-		Example: masterPreflightExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(*cfgPath) == 0 {
-				kubeadmutil.CheckErr(errorMissingConfigFlag)
-			}
-			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(*ignorePreflightErrors)
-			kubeadmutil.CheckErr(err)
-
-			cfg := &kubeadmapiv1beta1.InitConfiguration{}
-			kubeadmscheme.Scheme.Default(cfg)
-
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-			err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
-			kubeadmutil.CheckErr(err)
-
-			fmt.Println("[preflight] running pre-flight checks")
-
-			err = preflight.RunInitMasterChecks(utilsexec.New(), internalcfg, ignorePreflightErrorsSet)
-			kubeadmutil.CheckErr(err)
-
-			fmt.Println("[preflight] pre-flight checks passed")
-		},
-	}
 
 	return cmd
 }
