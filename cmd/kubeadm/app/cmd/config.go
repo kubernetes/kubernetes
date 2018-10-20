@@ -50,8 +50,8 @@ import (
 )
 
 var (
-	// sillyToken is only set statically to make kubeadm not randomize the token on every run
-	sillyToken = kubeadmapiv1beta1.BootstrapToken{
+	// placeholderToken is only set statically to make kubeadm not randomize the token on every run
+	placeholderToken = kubeadmapiv1beta1.BootstrapToken{
 		Token: &kubeadmapiv1beta1.BootstrapTokenString{
 			ID:     "abcdef",
 			Secret: "0123456789abcdef",
@@ -83,12 +83,70 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
 	kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
+	cmd.AddCommand(NewCmdConfigPrint(out))
 	cmd.AddCommand(NewCmdConfigPrintDefault(out))
 	cmd.AddCommand(NewCmdConfigMigrate(out))
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigImages(out))
 	return cmd
+}
+
+// NewCmdConfigPrint returns cobra.Command for "kubeadm config print" command
+func NewCmdConfigPrint(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "print",
+		Short: "Print configuration",
+		Long:  "This command prints configurations for subcommands provided.",
+		RunE:  cmdutil.SubCmdRunE("print"),
+	}
+	cmd.AddCommand(NewCmdConfigPrintInitDefaults(out))
+	cmd.AddCommand(NewCmdConfigPrintJoinDefaults(out))
+	return cmd
+}
+
+// NewCmdConfigPrintInitDefaults returns cobra.Command for "kubeadm config print init-defaults" command
+func NewCmdConfigPrintInitDefaults(out io.Writer) *cobra.Command {
+	return newCmdConfigPrintActionDefaults(out, "init", getDefaultInitConfigBytes)
+}
+
+// NewCmdConfigPrintJoinDefaults returns cobra.Command for "kubeadm config print join-defaults" command
+func NewCmdConfigPrintJoinDefaults(out io.Writer) *cobra.Command {
+	return newCmdConfigPrintActionDefaults(out, "join", getDefaultNodeConfigBytes)
+}
+
+func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesProc func() ([]byte, error)) *cobra.Command {
+	componentConfigs := []string{}
+	cmd := &cobra.Command{
+		Use:   fmt.Sprintf("%s-defaults", action),
+		Short: fmt.Sprintf("Print default %s configuration, that can be used for 'kubeadm %s'", action, action),
+		Long: fmt.Sprintf(dedent.Dedent(`
+			This command prints objects such as the default %s configuration that is used for 'kubeadm %s'.
+
+			Note that sensitive values like the Bootstrap Token fields are replaced with placeholder values like %q in order to pass validation but
+			not perform the real computation for creating a token.
+		`), action, action, placeholderToken),
+		Run: func(cmd *cobra.Command, args []string) {
+			runConfigPrintActionDefaults(out, componentConfigs, configBytesProc)
+		},
+	}
+	cmd.Flags().StringSliceVar(&componentConfigs, "component-configs", componentConfigs,
+		fmt.Sprintf("A comma-separated list for component config API objects to print the default values for. Available values: %v. If this flag is not set, no component configs will be printed.", getSupportedComponentConfigAPIObjects()))
+	return cmd
+}
+
+func runConfigPrintActionDefaults(out io.Writer, componentConfigs []string, configBytesProc func() ([]byte, error)) {
+	initialConfig, err := configBytesProc()
+	kubeadmutil.CheckErr(err)
+
+	allBytes := [][]byte{initialConfig}
+	for _, componentConfig := range componentConfigs {
+		cfgBytes, err := getDefaultComponentConfigAPIObjectBytes(componentConfig)
+		kubeadmutil.CheckErr(err)
+		allBytes = append(allBytes, cfgBytes)
+	}
+
+	fmt.Fprint(out, string(bytes.Join(allBytes, []byte(constants.YAMLDocumentSeparator))))
 }
 
 // NewCmdConfigPrintDefault returns cobra.Command for "kubeadm config print-default" command
@@ -104,9 +162,10 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 
 			For documentation visit: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3
 
-			Note that sensitive values like the Bootstrap Token fields are replaced with silly values like %q in order to pass validation but
+			Note that sensitive values like the Bootstrap Token fields are replaced with placeholder values like %q in order to pass validation but
 			not perform the real computation for creating a token.
-		`), sillyToken),
+		`), placeholderToken),
+		Deprecated: "Please, use `kubeadm config print` instead.",
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(apiObjects) == 0 {
 				apiObjects = getSupportedAPIObjects()
@@ -125,13 +184,21 @@ func NewCmdConfigPrintDefault(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+func getDefaultComponentConfigAPIObjectBytes(apiObject string) ([]byte, error) {
+	registration, ok := componentconfigs.Known[componentconfigs.RegistrationKind(apiObject)]
+	if !ok {
+		return []byte{}, fmt.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigAPIObjects())
+	}
+	return getDefaultComponentConfigBytes(registration)
+}
+
 func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	switch apiObject {
 	case constants.InitConfigurationKind:
-		return getDefaultInitConfigBytes(constants.InitConfigurationKind)
+		return getDefaultInitConfigBytesByKind(constants.InitConfigurationKind)
 
 	case constants.ClusterConfigurationKind:
-		return getDefaultInitConfigBytes(constants.ClusterConfigurationKind)
+		return getDefaultInitConfigBytesByKind(constants.ClusterConfigurationKind)
 
 	case constants.JoinConfigurationKind:
 		return getDefaultNodeConfigBytes()
@@ -146,12 +213,20 @@ func getDefaultAPIObjectBytes(apiObject string) ([]byte, error) {
 	}
 }
 
-// getSupportedAPIObjects returns all currently supported API object names
-func getSupportedAPIObjects() []string {
-	objects := []string{constants.InitConfigurationKind, constants.ClusterConfigurationKind, constants.JoinConfigurationKind}
+// getSupportedComponentConfigAPIObjects returns all currently supported component config API object names
+func getSupportedComponentConfigAPIObjects() []string {
+	objects := []string{}
 	for componentType := range componentconfigs.Known {
 		objects = append(objects, string(componentType))
 	}
+	return objects
+}
+
+// getSupportedAPIObjects returns all currently supported API object names
+func getSupportedAPIObjects() []string {
+	baseObjects := []string{constants.InitConfigurationKind, constants.ClusterConfigurationKind, constants.JoinConfigurationKind}
+	objects := getSupportedComponentConfigAPIObjects()
+	objects = append(objects, baseObjects...)
 	return objects
 }
 
@@ -171,18 +246,21 @@ func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
 		ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
 			KubernetesVersion: fmt.Sprintf("v1.%d.0", constants.MinimumControlPlaneVersion.Minor()+1),
 		},
-		BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{sillyToken},
+		BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{placeholderToken},
 	})
 }
 
-// TODO: This is now invoked for both InitConfiguration and ClusterConfiguration, we should make separate versions of it
-func getDefaultInitConfigBytes(kind string) ([]byte, error) {
+func getDefaultInitConfigBytes() ([]byte, error) {
 	internalcfg, err := getDefaultedInitConfig()
 	if err != nil {
 		return []byte{}, err
 	}
 
-	b, err := configutil.MarshalKubeadmConfigObject(internalcfg)
+	return configutil.MarshalKubeadmConfigObject(internalcfg)
+}
+
+func getDefaultInitConfigBytesByKind(kind string) ([]byte, error) {
+	b, err := getDefaultInitConfigBytes()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -197,7 +275,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.JoinConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.JoinConfiguration{
 		Discovery: kubeadmapiv1beta1.Discovery{
 			BootstrapToken: &kubeadmapiv1beta1.BootstrapTokenDiscovery{
-				Token:                    sillyToken.Token.String(),
+				Token:                    placeholderToken.Token.String(),
 				APIServerEndpoints:       []string{"kube-apiserver:6443"},
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},

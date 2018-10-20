@@ -74,7 +74,9 @@ docs/admin/kubeadm_config_images.md
 docs/admin/kubeadm_config_images_list.md
 docs/admin/kubeadm_config_images_pull.md
 docs/admin/kubeadm_config_migrate.md
-docs/admin/kubeadm_config_print-default.md
+docs/admin/kubeadm_config_print.md
+docs/admin/kubeadm_config_print_init-defaults.md
+docs/admin/kubeadm_config_print_join-defaults.md
 docs/admin/kubeadm_config_upload.md
 docs/admin/kubeadm_config_upload_from-file.md
 docs/admin/kubeadm_config_upload_from-flags.md
@@ -172,6 +174,9 @@ docs/man/man1/kubeadm-config-images-pull.1
 docs/man/man1/kubeadm-config-images.1
 docs/man/man1/kubeadm-config-migrate.1
 docs/man/man1/kubeadm-config-print-default.1
+docs/man/man1/kubeadm-config-print-init-defaults.1
+docs/man/man1/kubeadm-config-print-join-defaults.1
+docs/man/man1/kubeadm-config-print.1
 docs/man/man1/kubeadm-config-upload-from-file.1
 docs/man/man1/kubeadm-config-upload-from-flags.1
 docs/man/man1/kubeadm-config-upload.1
