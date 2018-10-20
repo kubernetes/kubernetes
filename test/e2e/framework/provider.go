@@ -43,8 +43,11 @@ func RegisterProvider(name string, factory Factory) {
 }
 
 func init() {
-	// "local" can always be used.
+	// "local" or "skeleton" can always be used.
 	RegisterProvider("local", func() (ProviderInterface, error) {
+		return NullProvider{}, nil
+	})
+	RegisterProvider("skeleton", func() (ProviderInterface, error) {
 		return NullProvider{}, nil
 	})
 	// The empty string also works, but triggers a warning.
