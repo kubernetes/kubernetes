@@ -286,7 +286,8 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (pc *PCCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
+func (pc *PCCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 // Instances returns an implementation of Instances for Photon Controller.
 func (pc *PCCloud) Instances() (cloudprovider.Instances, bool) {

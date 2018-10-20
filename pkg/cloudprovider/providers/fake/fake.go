@@ -97,7 +97,8 @@ func (f *FakeCloud) ClearCalls() {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (f *FakeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
+func (f *FakeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 func (f *FakeCloud) ListClusters(ctx context.Context) ([]string, error) {
 	return f.ClusterList, f.Err

@@ -121,7 +121,8 @@ func newCSCloud(cfg *CSConfig) (*CSCloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (cs *CSCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {}
+func (cs *CSCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 // LoadBalancer returns an implementation of LoadBalancer for CloudStack.
 func (cs *CSCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
