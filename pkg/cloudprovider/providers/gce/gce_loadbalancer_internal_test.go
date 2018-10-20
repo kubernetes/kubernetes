@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud/mock"
 )
 
-func createInternalLoadBalancer(gce *GCECloud, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
+func createInternalLoadBalancer(gce *Cloud, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodeNames []string, clusterName, clusterID, zoneName string) (*v1.LoadBalancerStatus, error) {
 	nodes, err := createAndInsertNodes(gce, nodeNames, zoneName)
 	if err != nil {
 		return nil, err
@@ -335,19 +335,19 @@ func TestUpdateInternalLoadBalancerBackendServices(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that the new BackendService has the correct attributes
-	url_base := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s", vals.ProjectID)
+	urlBase := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s", vals.ProjectID)
 
 	assert.NotEqual(t, existingBS, bs)
 	assert.Equal(
 		t,
 		bs.SelfLink,
-		fmt.Sprintf("%s/regions/%s/backendServices/%s", url_base, vals.Region, bs.Name),
+		fmt.Sprintf("%s/regions/%s/backendServices/%s", urlBase, vals.Region, bs.Name),
 	)
 	assert.Equal(t, bs.Description, `{"kubernetes.io/service-name":"/"}`)
 	assert.Equal(
 		t,
 		bs.HealthChecks,
-		[]string{fmt.Sprintf("%s/global/healthChecks/k8s-%s-node", url_base, vals.ClusterID)},
+		[]string{fmt.Sprintf("%s/global/healthChecks/k8s-%s-node", urlBase, vals.ClusterID)},
 	)
 }
 
@@ -487,16 +487,16 @@ func TestClearPreviousInternalResources(t *testing.T) {
 	c := gce.c.(*cloud.MockGCE)
 	require.NoError(t, err)
 
-	hc_1, err := gce.ensureInternalHealthCheck("hc_1", nm, false, "healthz", 12345)
+	hc1, err := gce.ensureInternalHealthCheck("hc1", nm, false, "healthz", 12345)
 	require.NoError(t, err)
 
-	hc_2, err := gce.ensureInternalHealthCheck("hc_2", nm, false, "healthz", 12346)
+	hc2, err := gce.ensureInternalHealthCheck("hc2", nm, false, "healthz", 12346)
 	require.NoError(t, err)
 
 	err = gce.ensureInternalBackendService(svc.ObjectMeta.Name, "", svc.Spec.SessionAffinity, cloud.SchemeInternal, v1.ProtocolTCP, []string{}, "")
 	require.NoError(t, err)
 	backendSvc, err := gce.GetRegionBackendService(svc.ObjectMeta.Name, gce.region)
-	backendSvc.HealthChecks = []string{hc_1.SelfLink, hc_2.SelfLink}
+	backendSvc.HealthChecks = []string{hc1.SelfLink, hc2.SelfLink}
 
 	c.MockRegionBackendServices.DeleteHook = mock.DeleteRegionBackendServicesErrHook
 	c.MockHealthChecks.DeleteHook = mock.DeleteHealthChecksInternalErrHook
@@ -505,27 +505,27 @@ func TestClearPreviousInternalResources(t *testing.T) {
 	backendSvc, err = gce.GetRegionBackendService(svc.ObjectMeta.Name, gce.region)
 	assert.NoError(t, err)
 	assert.NotNil(t, backendSvc, "BackendService should not be deleted when api is mocked out.")
-	hc_1, err = gce.GetHealthCheck("hc_1")
+	hc1, err = gce.GetHealthCheck("hc1")
 	assert.NoError(t, err)
-	assert.NotNil(t, hc_1, "HealthCheck should not be deleted when there are more than one healthcheck attached.")
-	hc_2, err = gce.GetHealthCheck("hc_2")
+	assert.NotNil(t, hc1, "HealthCheck should not be deleted when there are more than one healthcheck attached.")
+	hc2, err = gce.GetHealthCheck("hc2")
 	assert.NoError(t, err)
-	assert.NotNil(t, hc_2, "HealthCheck should not be deleted when there are more than one healthcheck attached.")
+	assert.NotNil(t, hc2, "HealthCheck should not be deleted when there are more than one healthcheck attached.")
 
 	c.MockRegionBackendServices.DeleteHook = mock.DeleteRegionBackendServicesInUseErrHook
-	backendSvc.HealthChecks = []string{hc_1.SelfLink}
+	backendSvc.HealthChecks = []string{hc1.SelfLink}
 	gce.clearPreviousInternalResources(svc, loadBalancerName, backendSvc, "expectedBSName", "expectedHCName")
 
-	hc_1, err = gce.GetHealthCheck("hc_1")
+	hc1, err = gce.GetHealthCheck("hc1")
 	assert.NoError(t, err)
-	assert.NotNil(t, hc_1, "HealthCheck should not be deleted when api is mocked out.")
+	assert.NotNil(t, hc1, "HealthCheck should not be deleted when api is mocked out.")
 
 	c.MockHealthChecks.DeleteHook = mock.DeleteHealthChecksInuseErrHook
 	gce.clearPreviousInternalResources(svc, loadBalancerName, backendSvc, "expectedBSName", "expectedHCName")
 
-	hc_1, err = gce.GetHealthCheck("hc_1")
+	hc1, err = gce.GetHealthCheck("hc1")
 	assert.NoError(t, err)
-	assert.NotNil(t, hc_1, "HealthCheck should not be deleted when api is mocked out.")
+	assert.NotNil(t, hc1, "HealthCheck should not be deleted when api is mocked out.")
 
 	c.MockRegionBackendServices.DeleteHook = nil
 	c.MockHealthChecks.DeleteHook = nil
@@ -534,9 +534,9 @@ func TestClearPreviousInternalResources(t *testing.T) {
 	backendSvc, err = gce.GetRegionBackendService(svc.ObjectMeta.Name, gce.region)
 	assert.Error(t, err)
 	assert.Nil(t, backendSvc, "BackendService should be deleted.")
-	hc_1, err = gce.GetHealthCheck("hc_1")
+	hc1, err = gce.GetHealthCheck("hc1")
 	assert.Error(t, err)
-	assert.Nil(t, hc_1, "HealthCheck should be deleted.")
+	assert.Nil(t, hc1, "HealthCheck should be deleted.")
 }
 
 func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {

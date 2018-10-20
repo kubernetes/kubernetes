@@ -59,7 +59,7 @@ type nodeProcessingInfo struct {
 // merely takes the assignment and updates the node spec.
 type cloudCIDRAllocator struct {
 	client clientset.Interface
-	cloud  *gce.GCECloud
+	cloud  *gce.Cloud
 
 	// nodeLister is able to list/get nodes and is populated by the shared informer passed to
 	// NewCloudCIDRAllocator.
@@ -93,7 +93,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	glog.V(0).Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
-	gceCloud, ok := cloud.(*gce.GCECloud)
+	gceCloud, ok := cloud.(*gce.Cloud)
 	if !ok {
 		err := fmt.Errorf("cloudCIDRAllocator does not support %v provider", cloud.ProviderName())
 		return nil, err

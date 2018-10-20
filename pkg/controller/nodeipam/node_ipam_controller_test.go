@@ -48,7 +48,7 @@ func newTestNodeIpamController(clusterCIDR, serviceCIDR *net.IPNet, nodeCIDRMask
 		fakeNodeInformer.Informer().GetStore().Add(node)
 	}
 
-	fakeGCE := gce.FakeGCECloud(gce.DefaultTestClusterValues())
+	fakeGCE := gce.NewFakeGCECloud(gce.DefaultTestClusterValues())
 	return NewNodeIpamController(
 		fakeNodeInformer, fakeGCE, clientSet,
 		clusterCIDR, serviceCIDR, nodeCIDRMaskSize, allocatorType,

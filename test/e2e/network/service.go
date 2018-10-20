@@ -1585,7 +1585,7 @@ var _ = SIGDescribe("Services", func() {
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, framework.LoadBalancerCreateTimeoutDefault)
 
 		hcName := gcecloud.MakeNodesHealthCheckName(clusterID)
-		hc, err := gceCloud.GetHttpHealthCheck(hcName)
+		hc, err := gceCloud.GetHTTPHealthCheck(hcName)
 		if err != nil {
 			framework.Failf("gceCloud.GetHttpHealthCheck(%q) = _, %v; want nil", hcName, err)
 		}
@@ -1593,7 +1593,7 @@ var _ = SIGDescribe("Services", func() {
 
 		By("modify the health check interval")
 		hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1
-		if err = gceCloud.UpdateHttpHealthCheck(hc); err != nil {
+		if err = gceCloud.UpdateHTTPHealthCheck(hc); err != nil {
 			framework.Failf("gcecloud.UpdateHttpHealthCheck(%#v) = %v; want nil", hc, err)
 		}
 
@@ -1608,7 +1608,7 @@ var _ = SIGDescribe("Services", func() {
 		By("health check should be reconciled")
 		pollInterval := framework.Poll * 10
 		if pollErr := wait.PollImmediate(pollInterval, framework.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
-			hc, err := gceCloud.GetHttpHealthCheck(hcName)
+			hc, err := gceCloud.GetHTTPHealthCheck(hcName)
 			if err != nil {
 				framework.Logf("Failed to get HttpHealthCheck(%q): %v", hcName, err)
 				return false, err
