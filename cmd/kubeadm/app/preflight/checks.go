@@ -845,6 +845,25 @@ func (ipc ImagePullCheck) Check() (warnings, errors []error) {
 	return warnings, errors
 }
 
+// NumCPUCheck checks if current number of CPUs is not less than required
+type NumCPUCheck struct {
+	NumCPU int
+}
+
+// Name returns the label for NumCPUCheck
+func (NumCPUCheck) Name() string {
+	return "NumCPU"
+}
+
+// Check number of CPUs required by kubeadm
+func (ncc NumCPUCheck) Check() (warnings, errors []error) {
+	numCPU := runtime.NumCPU()
+	if numCPU < ncc.NumCPU {
+		errors = append(errors, fmt.Errorf("the number of available CPUs %d is less than the required %d", numCPU, ncc.NumCPU))
+	}
+	return warnings, errors
+}
+
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
 func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
@@ -854,6 +873,7 @@ func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigu
 
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	checks := []Checker{
+		NumCPUCheck{NumCPU: kubeadmconstants.MasterNumCPU},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		FirewalldCheck{ports: []int{int(cfg.APIEndpoint.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.APIEndpoint.BindPort)},

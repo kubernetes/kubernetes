@@ -323,6 +323,9 @@ const (
 
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
+
+	// MasterNumCPU is the number of CPUs required on master
+	MasterNumCPU = 2
 )
 
 var (
