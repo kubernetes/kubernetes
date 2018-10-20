@@ -390,7 +390,7 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {
+func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 	az.kubeClient = clientBuilder.ClientOrDie("azure-cloud-provider")
 	az.eventBroadcaster = record.NewBroadcaster()
 	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.kubeClient.CoreV1().Events("")})

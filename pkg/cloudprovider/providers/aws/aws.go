@@ -1159,7 +1159,7 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (c *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder) {
+func (c *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 	c.clientBuilder = clientBuilder
 	c.kubeClient = clientBuilder.ClientOrDie("aws-cloud-provider")
 	c.eventBroadcaster = record.NewBroadcaster()

@@ -468,7 +468,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 	// Initialize the cloud provider with a reference to the clientBuilder only after token controller
 	// has started in case the cloud provider uses the client builder.
 	if ctx.Cloud != nil {
-		ctx.Cloud.Initialize(ctx.ClientBuilder)
+		ctx.Cloud.Initialize(ctx.ClientBuilder, ctx.Stop)
 	}
 
 	for controllerName, initFn := range controllers {
