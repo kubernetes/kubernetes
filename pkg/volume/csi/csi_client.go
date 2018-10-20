@@ -301,7 +301,10 @@ func newGrpcConn(driverName string) (*grpc.ClientConn, error) {
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
 	// TODO once KubeletPluginsWatcher graduates to beta, remove FeatureGate check
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
+		csiDrivers.RLock()
 		driver, ok := csiDrivers.driversMap[driverName]
+		csiDrivers.RUnlock()
+
 		if !ok {
 			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 		}
