@@ -118,7 +118,7 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	return nil
 }
 
-// SetClusterDynamicDefaults checks and sets configuration values for the InitConfiguration object
+// SetClusterDynamicDefaults checks and sets values for the ClusterConfiguration object
 func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAddress string, bindPort int32) error {
 	// Default all the embedded ComponentConfig structs
 	componentconfigs.Known.Default(cfg)
