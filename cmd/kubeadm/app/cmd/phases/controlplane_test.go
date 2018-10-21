@@ -26,7 +26,7 @@ import (
 )
 
 func TestControlPlaneSubCommandsHasFlags(t *testing.T) {
-
+	t.Parallel()
 	subCmds := getControlPlaneSubCommands("", phaseTestK8sVersion)
 
 	commonFlags := []string{
@@ -81,7 +81,7 @@ func TestControlPlaneSubCommandsHasFlags(t *testing.T) {
 }
 
 func TestControlPlaneCreateFilesWithFlags(t *testing.T) {
-
+	t.Parallel()
 	var tests = []struct {
 		command         string
 		additionalFlags []string

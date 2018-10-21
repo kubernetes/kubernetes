@@ -26,7 +26,7 @@ import (
 )
 
 func TestEtcdSubCommandsHasFlags(t *testing.T) {
-
+	t.Parallel()
 	subCmds := getEtcdSubCommands("", phaseTestK8sVersion)
 
 	commonFlags := []string{
@@ -50,7 +50,7 @@ func TestEtcdSubCommandsHasFlags(t *testing.T) {
 }
 
 func TestEtcdCreateFilesWithFlags(t *testing.T) {
-
+	t.Parallel()
 	var tests = []struct {
 		command         string
 		additionalFlags []string

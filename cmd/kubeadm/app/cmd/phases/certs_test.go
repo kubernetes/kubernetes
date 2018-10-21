@@ -35,7 +35,7 @@ import (
 const phaseTestK8sVersion = "v1.11.0"
 
 func TestCertsSubCommandsHasFlags(t *testing.T) {
-
+	t.Parallel()
 	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	commonFlags := []string{
@@ -104,7 +104,6 @@ func TestCertsSubCommandsHasFlags(t *testing.T) {
 }
 
 func TestSubCmdCertsCreateFilesWithFlags(t *testing.T) {
-
 	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	var tests = []struct {
@@ -211,7 +210,7 @@ func TestSubCmdCertsApiServerForwardsFlags(t *testing.T) {
 }
 
 func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
-
+	t.Parallel()
 	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	var tests = []struct {

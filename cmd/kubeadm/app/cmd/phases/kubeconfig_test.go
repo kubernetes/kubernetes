@@ -34,7 +34,7 @@ import (
 )
 
 func TestKubeConfigCSubCommandsHasFlags(t *testing.T) {
-
+	t.Parallel()
 	subCmds := getKubeConfigSubCommands(nil, "", phaseTestK8sVersion)
 
 	commonFlags := []string{
@@ -96,7 +96,7 @@ func TestKubeConfigCSubCommandsHasFlags(t *testing.T) {
 }
 
 func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
-
+	t.Parallel()
 	commonFlags := []string{
 		"--apiserver-advertise-address=1.2.3.4",
 		"--apiserver-bind-port=1234",
@@ -208,7 +208,7 @@ func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
 }
 
 func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
-
+	t.Parallel()
 	var tests = []struct {
 		command       string
 		expectedFiles []string
@@ -316,7 +316,7 @@ func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
 }
 
 func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
-
+	t.Parallel()
 	// Temporary folders for the test case
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)

@@ -24,7 +24,7 @@ import (
 )
 
 func TestSetKubernetesVersion(t *testing.T) {
-
+	t.Parallel()
 	ver := version.Get().String()
 
 	tests := []struct {

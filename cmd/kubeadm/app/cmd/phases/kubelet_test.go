@@ -25,6 +25,7 @@ import (
 )
 
 func TestKubeletSubCommandsHasFlags(t *testing.T) {
+
 	subCmds := []*cobra.Command{
 		NewCmdKubeletWriteEnvFile(),
 		NewCmdKubeletConfigUpload(),

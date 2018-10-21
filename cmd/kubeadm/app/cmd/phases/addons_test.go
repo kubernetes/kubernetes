@@ -23,7 +23,7 @@ import (
 )
 
 func TestAddonsSubCommandsHasFlags(t *testing.T) {
-
+	t.Parallel()
 	subCmds := getAddonsSubCommands()
 
 	commonFlags := []string{
