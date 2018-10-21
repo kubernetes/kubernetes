@@ -1007,7 +1007,7 @@ func RunRootCheckOnly(ignorePreflightErrors sets.String) error {
 	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
 }
 
-// RunPullImagesCheck will pull images kubeadm needs if the are not found on the system
+// RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
 func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.String) error {
 	containerRuntime, err := utilruntime.NewContainerRuntime(utilsexec.New(), cfg.GetCRISocket())
 	if err != nil {

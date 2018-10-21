@@ -43,7 +43,7 @@ type kubeletFlagsOpts struct {
 	defaultHostname          string
 }
 
-// WriteKubeletDynamicEnvFile writes a environment file with dynamic flags to the kubelet.
+// WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
 func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir string) error {
 	hostName, err := nodeutil.GetHostname("")

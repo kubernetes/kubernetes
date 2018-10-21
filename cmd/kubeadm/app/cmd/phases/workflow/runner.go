@@ -84,7 +84,7 @@ type phaseRunner struct {
 	selfPath []string
 
 	// generatedName is the full name of the phase, that corresponds to the absolute
-	// path of the phase in the the workflow managed by the Runner.
+	// path of the phase in the workflow managed by the Runner.
 	generatedName string
 
 	// use is the phase usage string that will be printed in the workflow help.
