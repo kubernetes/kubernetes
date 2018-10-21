@@ -55,6 +55,7 @@ func createTestCert(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKe
 }
 
 func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
+	t.Parallel()
 	setupCert, setupKey := createCACert(t)
 	caCert, caKey := createCACert(t)
 
@@ -130,7 +131,7 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 }
 
 func TestWriteCertificateFilesIfNotExist(t *testing.T) {
-
+	t.Parallel()
 	caCert, caKey := createCACert(t)
 	setupCert, setupKey := createTestCert(t, caCert, caKey)
 	cert, key := createTestCert(t, caCert, caKey)
@@ -209,7 +210,7 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 }
 
 func TestWriteKeyFilesIfNotExist(t *testing.T) {
-
+	t.Parallel()
 	setupKey, _ := NewServiceAccountSigningKey()
 	key, _ := NewServiceAccountSigningKey()
 
@@ -280,6 +281,7 @@ func TestWriteKeyFilesIfNotExist(t *testing.T) {
 }
 
 func TestNewCACertAndKey(t *testing.T) {
+	t.Parallel()
 	certCfg := &certutil.Config{CommonName: "kubernetes"}
 	caCert, _, err := NewCACertAndKey(certCfg)
 	if err != nil {
@@ -290,6 +292,7 @@ func TestNewCACertAndKey(t *testing.T) {
 }
 
 func TestSharedCertificateExists(t *testing.T) {
+	t.Parallel()
 	caCert, caKey := createCACert(t)
 	_, key := createTestCert(t, caCert, caKey)
 	publicKey := &key.PublicKey
@@ -375,6 +378,7 @@ func TestSharedCertificateExists(t *testing.T) {
 }
 
 func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
+	t.Parallel()
 	caCert, caKey := createCACert(t)
 	fpCACert, fpCAKey := createCACert(t)
 	etcdCACert, etcdCAKey := createCACert(t)
@@ -458,6 +462,7 @@ func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
 }
 
 func TestUsingExternalCA(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		setupFuncs []func(cfg *kubeadmapi.InitConfiguration) error
 		expected   bool
@@ -504,7 +509,7 @@ func TestUsingExternalCA(t *testing.T) {
 }
 
 func TestValidateMethods(t *testing.T) {
-
+	t.Parallel()
 	caCert, caKey := createCACert(t)
 	cert, key := createTestCert(t, caCert, caKey)
 
@@ -609,7 +614,7 @@ func writePKIFiles(t *testing.T, dir string, files pkiFiles) {
 }
 
 func TestCreateCertificateFilesMethods(t *testing.T) {
-
+	t.Parallel()
 	var tests = []struct {
 		setupFunc     func(cfg *kubeadmapi.InitConfiguration) error
 		createFunc    func(cfg *kubeadmapi.InitConfiguration) error

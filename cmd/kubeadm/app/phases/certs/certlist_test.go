@@ -30,6 +30,7 @@ import (
 )
 
 func TestCAPointersValid(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		certs Certificates
 		name  string
@@ -59,6 +60,7 @@ func TestCAPointersValid(t *testing.T) {
 }
 
 func TestMakeCertTree(t *testing.T) {
+	t.Parallel()
 	rootCert := &KubeadmCert{
 		Name: "root",
 	}
@@ -109,6 +111,7 @@ func TestMakeCertTree(t *testing.T) {
 }
 
 func TestCreateCertificateChain(t *testing.T) {
+	t.Parallel()
 	dir, err := ioutil.TempDir("", t.Name())
 	if err != nil {
 		t.Fatal(err)
