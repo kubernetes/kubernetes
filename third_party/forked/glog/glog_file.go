@@ -20,7 +20,6 @@ package glog
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"os/user"
@@ -36,15 +35,17 @@ var MaxSize uint64 = 1024 * 1024 * 1800
 // logDirs lists the candidate directories for new log files.
 var logDirs []string
 
-// If non-empty, overrides the choice of directory in which to write logs.
-// See createLogDirs for the full list of possible destinations.
-var logDir = flag.String("log_dir", "", "If non-empty, write log files in this directory")
 
 func createLogDirs() {
-	if *logDir != "" {
-		logDirs = append(logDirs, *logDir)
+	// if log-file is not specified, only then try to use logDir
+	if logging.logFile == "" {
+		// if log-dir is not specified, then use temp directory
+		if logging.logDir == "" {
+			logDirs = append(logDirs, os.TempDir())
+		} else {
+			logDirs = append(logDirs, logging.logDir)
+		}
 	}
-	logDirs = append(logDirs, os.TempDir())
 }
 
 var (
@@ -104,6 +105,14 @@ var onceLogDirs sync.Once
 // errors.
 func create(tag string, t time.Time) (f *os.File, filename string, err error) {
 	onceLogDirs.Do(createLogDirs)
+	if logging.logFile != "" {
+		f, err := os.Create(logging.logFile)
+		if err == nil {
+			return f, logging.logFile, nil
+		} else {
+			return nil, "", fmt.Errorf("log: unable to create log: %v", err)
+		}
+	}
 	if len(logDirs) == 0 {
 		return nil, "", errors.New("log: no log dirs")
 	}
