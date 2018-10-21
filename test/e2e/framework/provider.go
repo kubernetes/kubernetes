@@ -43,11 +43,14 @@ func RegisterProvider(name string, factory Factory) {
 }
 
 func init() {
-	// "local" or "skeleton" can always be used.
+	// register some known null providers
 	RegisterProvider("local", func() (ProviderInterface, error) {
 		return NullProvider{}, nil
 	})
 	RegisterProvider("skeleton", func() (ProviderInterface, error) {
+		return NullProvider{}, nil
+	})
+	RegisterProvider("kubernetes-anywhere", func() (ProviderInterface, error) {
 		return NullProvider{}, nil
 	})
 	// The empty string also works, but triggers a warning.
