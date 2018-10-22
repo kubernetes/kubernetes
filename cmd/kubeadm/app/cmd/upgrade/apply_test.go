@@ -166,28 +166,34 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 	noHAEtcd := &kubeadmapi.InitConfiguration{}
 
 	tests := []struct {
-		name             string
-		cfg              *kubeadmapi.InitConfiguration
-		etcdUpgrade      bool
-		shouldDeleteEtcd bool
+		name        string
+		cfg         *kubeadmapi.InitConfiguration
+		etcdUpgrade bool
+		keepEtcdDir bool
 	}{
 		{
-			name:             "ha etcd but no etcd upgrade",
-			cfg:              haEtcd,
-			etcdUpgrade:      false,
-			shouldDeleteEtcd: true,
+			name:        "ha etcd but no etcd upgrade",
+			cfg:         haEtcd,
+			etcdUpgrade: false,
+			keepEtcdDir: false,
 		},
 		{
-			name:             "non-ha etcd with etcd upgrade",
-			cfg:              noHAEtcd,
-			etcdUpgrade:      true,
-			shouldDeleteEtcd: false,
+			name:        "non-ha etcd with etcd upgrade",
+			cfg:         noHAEtcd,
+			etcdUpgrade: true,
+			keepEtcdDir: false,
 		},
 		{
-			name:             "ha etcd and etcd upgrade",
-			cfg:              haEtcd,
-			etcdUpgrade:      true,
-			shouldDeleteEtcd: true,
+			name:        "ha etcd and etcd upgrade",
+			cfg:         haEtcd,
+			etcdUpgrade: true,
+			keepEtcdDir: false,
+		},
+		{
+			name:        "non-ha etcd and no etcd upgrade",
+			cfg:         noHAEtcd,
+			etcdUpgrade: false,
+			keepEtcdDir: true,
 		},
 	}
 
@@ -211,28 +217,28 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 			}
 
 			if _, err := os.Stat(pathmgr.BackupManifestDir()); os.IsNotExist(err) {
-				t.Errorf("expected manifest dir %s to exist, but it did not (%v)", pathmgr.BackupManifestDir(), err)
+				t.Errorf("expected manifest dir %s to exist, but it did not", pathmgr.BackupManifestDir())
 			}
 
 			if _, err := os.Stat(pathmgr.BackupEtcdDir()); os.IsNotExist(err) {
-				t.Errorf("expected etcd dir %s to exist, but it did not (%v)", pathmgr.BackupEtcdDir(), err)
+				t.Errorf("expected etcd dir %s to exist, but it did not", pathmgr.BackupEtcdDir())
 			}
 
 			if err := pathmgr.CleanupDirs(); err != nil {
 				t.Fatalf("unexpected error cleaning up directories: %v", err)
 			}
 
-			if _, err := os.Stat(pathmgr.BackupManifestDir()); os.IsNotExist(err) {
-				t.Errorf("expected manifest dir %s to exist, but it did not (%v)", pathmgr.BackupManifestDir(), err)
+			if _, err := os.Stat(pathmgr.BackupManifestDir()); !os.IsNotExist(err) {
+				t.Errorf("after cleanup: expected manifest dir %s not to exist, but it did (%v)", pathmgr.BackupManifestDir(), err)
 			}
 
-			if test.shouldDeleteEtcd {
-				if _, err := os.Stat(pathmgr.BackupEtcdDir()); !os.IsNotExist(err) {
-					t.Errorf("expected etcd dir %s not to exist, but it did (%v)", pathmgr.BackupEtcdDir(), err)
+			if test.keepEtcdDir {
+				if _, err := os.Stat(pathmgr.BackupEtcdDir()); os.IsNotExist(err) {
+					t.Errorf("after cleanup: expected etcd dir %s to exist, but it did not", pathmgr.BackupEtcdDir())
 				}
 			} else {
-				if _, err := os.Stat(pathmgr.BackupEtcdDir()); os.IsNotExist(err) {
-					t.Errorf("expected etcd dir %s to exist, but it did not", pathmgr.BackupEtcdDir())
+				if _, err := os.Stat(pathmgr.BackupEtcdDir()); !os.IsNotExist(err) {
+					t.Errorf("after cleanup: expected etcd dir %s not to exist, but it did (%v)", pathmgr.BackupEtcdDir(), err)
 				}
 			}
 		})
