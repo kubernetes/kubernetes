@@ -1032,3 +1032,154 @@ func TestEnsureExternalLoadBalancerErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestExternalLoadBalancerEnsureHttpHealthCheck(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		desc      string
+		modifier  func(*compute.HttpHealthCheck) *compute.HttpHealthCheck
+		wantEqual bool
+	}{
+		{"should ensure HC", func(_ *compute.HttpHealthCheck) *compute.HttpHealthCheck { return nil }, false},
+		{
+			"should reconcile HC interval",
+			func(hc *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+				hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1
+				return hc
+			},
+			false,
+		},
+		{
+			"should allow HC to be configurable to bigger intervals",
+			func(hc *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+				hc.CheckIntervalSec = gceHcCheckIntervalSeconds * 10
+				return hc
+			},
+			true,
+		},
+		{
+			"should allow HC to accept bigger intervals while applying default value to small thresholds",
+			func(hc *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+				hc.CheckIntervalSec = gceHcCheckIntervalSeconds * 10
+				hc.UnhealthyThreshold = gceHcUnhealthyThreshold - 1
+				return hc
+			},
+			false,
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+
+			gce, err := fakeGCECloud(DefaultTestClusterValues())
+			require.NoError(t, err)
+			c := gce.c.(*cloud.MockGCE)
+			c.MockHttpHealthChecks.UpdateHook = func(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck, m *cloud.MockHttpHealthChecks) error {
+				m.Objects[*key] = &cloud.MockHttpHealthChecksObj{Obj: obj}
+				return nil
+			}
+
+			hcName, hcPath, hcPort := "test-hc", "/healthz", int32(12345)
+			existingHC := makeHttpHealthCheck(hcName, hcPath, hcPort)
+			existingHC = tc.modifier(existingHC)
+			if existingHC != nil {
+				if err := gce.CreateHttpHealthCheck(existingHC); err != nil {
+					t.Fatalf("gce.CreateHttpHealthCheck(%#v) = %v; want err = nil", existingHC, err)
+				}
+			}
+			if _, err := gce.ensureHttpHealthCheck(hcName, hcPath, hcPort); err != nil {
+				t.Fatalf("gce.ensureHttpHealthCheck(%q, %q, %v) = _, %d; want err = nil", hcName, hcPath, hcPort, err)
+			}
+			if hc, err := gce.GetHttpHealthCheck(hcName); err != nil {
+				t.Fatalf("gce.GetHttpHealthCheck(%q) = _, %d; want err = nil", hcName, err)
+			} else {
+				if tc.wantEqual {
+					assert.Equal(t, hc, existingHC)
+				} else {
+					assert.NotEqual(t, hc, existingHC)
+				}
+			}
+		})
+	}
+
+}
+
+func TestMergeHttpHealthChecks(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		desc                   string
+		checkIntervalSec       int64
+		timeoutSec             int64
+		healthyThreshold       int64
+		unhealthyThreshold     int64
+		wantCheckIntervalSec   int64
+		wantTimeoutSec         int64
+		wantHealthyThreshold   int64
+		wantUnhealthyThreshold int64
+	}{
+		{"unchanged", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"interval - too small - should reconcile", gceHcCheckIntervalSeconds - 1, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"timeout - too small - should reconcile", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds - 1, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"healthy threshold - too small - should reconcile", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold - 1, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"unhealthy threshold - too small - should reconcile", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold - 1, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"interval - user configured - should keep", gceHcCheckIntervalSeconds + 1, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds + 1, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"timeout - user configured - should keep", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds + 1, gceHcHealthyThreshold, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds + 1, gceHcHealthyThreshold, gceHcUnhealthyThreshold},
+		{"healthy threshold - user configured - should keep", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold + 1, gceHcUnhealthyThreshold, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold + 1, gceHcUnhealthyThreshold},
+		{"unhealthy threshold - user configured - should keep", gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold + 1, gceHcCheckIntervalSeconds, gceHcTimeoutSeconds, gceHcHealthyThreshold, gceHcUnhealthyThreshold + 1},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			wantHC := makeHttpHealthCheck("hc", "/", 12345)
+			hc := &compute.HttpHealthCheck{
+				CheckIntervalSec:   tc.checkIntervalSec,
+				TimeoutSec:         tc.timeoutSec,
+				HealthyThreshold:   tc.healthyThreshold,
+				UnhealthyThreshold: tc.unhealthyThreshold,
+			}
+			mergeHttpHealthChecks(hc, wantHC)
+			if wantHC.CheckIntervalSec != tc.wantCheckIntervalSec {
+				t.Errorf("wantHC.CheckIntervalSec = %d; want %d", wantHC.CheckIntervalSec, tc.checkIntervalSec)
+			}
+			if wantHC.TimeoutSec != tc.wantTimeoutSec {
+				t.Errorf("wantHC.TimeoutSec = %d; want %d", wantHC.TimeoutSec, tc.timeoutSec)
+			}
+			if wantHC.HealthyThreshold != tc.wantHealthyThreshold {
+				t.Errorf("wantHC.HealthyThreshold = %d; want %d", wantHC.HealthyThreshold, tc.healthyThreshold)
+			}
+			if wantHC.UnhealthyThreshold != tc.wantUnhealthyThreshold {
+				t.Errorf("wantHC.UnhealthyThreshold = %d; want %d", wantHC.UnhealthyThreshold, tc.unhealthyThreshold)
+			}
+		})
+	}
+}
+
+func TestNeedToUpdateHttpHealthChecks(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		desc        string
+		modifier    func(*compute.HttpHealthCheck)
+		wantChanged bool
+	}{
+		{"unchanged", nil, false},
+		{"desc does not match", func(hc *compute.HttpHealthCheck) { hc.Description = "bad-desc" }, true},
+		{"port does not match", func(hc *compute.HttpHealthCheck) { hc.Port = 54321 }, true},
+		{"requestPath does not match", func(hc *compute.HttpHealthCheck) { hc.RequestPath = "/anotherone" }, true},
+		{"interval needs update", func(hc *compute.HttpHealthCheck) { hc.CheckIntervalSec = gceHcCheckIntervalSeconds - 1 }, true},
+		{"timeout needs update", func(hc *compute.HttpHealthCheck) { hc.TimeoutSec = gceHcTimeoutSeconds - 1 }, true},
+		{"healthy threshold needs update", func(hc *compute.HttpHealthCheck) { hc.HealthyThreshold = gceHcHealthyThreshold - 1 }, true},
+		{"unhealthy threshold needs update", func(hc *compute.HttpHealthCheck) { hc.UnhealthyThreshold = gceHcUnhealthyThreshold - 1 }, true},
+		{"interval does not need update", func(hc *compute.HttpHealthCheck) { hc.CheckIntervalSec = gceHcCheckIntervalSeconds + 1 }, false},
+		{"timeout does not need update", func(hc *compute.HttpHealthCheck) { hc.TimeoutSec = gceHcTimeoutSeconds + 1 }, false},
+		{"healthy threshold does not need update", func(hc *compute.HttpHealthCheck) { hc.HealthyThreshold = gceHcHealthyThreshold + 1 }, false},
+		{"unhealthy threshold does not need update", func(hc *compute.HttpHealthCheck) { hc.UnhealthyThreshold = gceHcUnhealthyThreshold + 1 }, false},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			hc := makeHttpHealthCheck("hc", "/", 12345)
+			wantHC := makeHttpHealthCheck("hc", "/", 12345)
+			if tc.modifier != nil {
+				tc.modifier(hc)
+			}
+			if gotChanged := needToUpdateHttpHealthChecks(hc, wantHC); gotChanged != tc.wantChanged {
+				t.Errorf("needToUpdateHttpHealthChecks(%#v, %#v) = %t; want changed = %t", hc, wantHC, gotChanged, tc.wantChanged)
+			}
+		})
+	}
+}
