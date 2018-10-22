@@ -94,6 +94,7 @@ go_test(
         "gce_disks_test.go",
         "gce_healthchecks_test.go",
         "gce_loadbalancer_external_test.go",
+        "gce_loadbalancer_internal_test.go",
         "gce_test.go",
         "gce_util_test.go",
         "metrics_test.go",
@@ -112,6 +113,7 @@ go_test(
         "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )

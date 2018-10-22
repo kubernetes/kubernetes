@@ -588,7 +588,7 @@ func (gce *GCECloud) computeHostTags(hosts []*gceInstance) ([]string, error) {
 	nodeInstancePrefix := gce.nodeInstancePrefix
 	for _, host := range hosts {
 		if !strings.HasPrefix(host.Name, gce.nodeInstancePrefix) {
-			glog.Warningf("instance '%s' does not conform to prefix '%s', ignoring filter", host, gce.nodeInstancePrefix)
+			glog.Warningf("instance %q does not conform to prefix %q, ignoring filter", host.Name, gce.nodeInstancePrefix)
 			nodeInstancePrefix = ""
 		}
 
