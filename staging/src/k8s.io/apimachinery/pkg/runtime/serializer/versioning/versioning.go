@@ -18,6 +18,7 @@ package versioning
 
 import (
 	"io"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -90,7 +91,16 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 		into = versioned.Last()
 	}
 
-	obj, gvk, err := c.decoder.Decode(data, defaultGVK, into)
+	// If the into object is unstructured and expresses an opinion about its group/version,
+	// create a new instance of the type so we always exercise the conversion path (skips short-circuiting on `into == obj`)
+	decodeInto := into
+	if into != nil {
+		if _, ok := into.(runtime.Unstructured); ok && !into.GetObjectKind().GroupVersionKind().GroupVersion().Empty() {
+			decodeInto = reflect.New(reflect.TypeOf(into).Elem()).Interface().(runtime.Object)
+		}
+	}
+
+	obj, gvk, err := c.decoder.Decode(data, defaultGVK, decodeInto)
 	if err != nil {
 		return nil, gvk, err
 	}
