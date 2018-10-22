@@ -73,16 +73,16 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		}
 	}
 
-	saInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	saInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: e.serviceAccountDeleted,
-	})
+	}, options.ServiceAccountResync)
 	e.saLister = saInformer.Lister()
 	e.saListerSynced = saInformer.Informer().HasSynced
 
-	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
-	})
+	}, options.NamespaceResync)
 	e.nsLister = nsInformer.Lister()
 	e.nsListerSynced = nsInformer.Informer().HasSynced
 
