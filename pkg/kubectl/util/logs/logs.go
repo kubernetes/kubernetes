@@ -18,6 +18,7 @@ package logs
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
@@ -27,19 +28,20 @@ import (
 
 var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
 
-// GlogWriter serves as a bridge between the standard log package and the glog package.
-type GlogWriter struct{}
+// ErrorLogWriter serves as a bridge between the standard log package and the glog package.
+type ErrorLogWriter struct{}
 
 // Write implements the io.Writer interface.
-func (writer GlogWriter) Write(data []byte) (n int, err error) {
-	glog.InfoDepth(1, string(data))
-	return len(data), nil
+func (writer ErrorLogWriter) Write(data []byte) (n int, err error) {
+	return os.Stderr.Write(data)
 }
 
 // InitLogs initializes logs the way we want for kubernetes.
 func InitLogs() {
-	log.SetOutput(GlogWriter{})
+	errWriter := ErrorLogWriter{}
+	log.SetOutput(errWriter)
 	log.SetFlags(0)
+	glog.SetOutput(errWriter)
 	// The default glog flush interval is 5 seconds.
 	go wait.Until(glog.Flush, *logFlushFreq, wait.NeverStop)
 }
@@ -51,5 +53,5 @@ func FlushLogs() {
 
 // NewLogger creates a new log.Logger which sends logs to glog.Info.
 func NewLogger(prefix string) *log.Logger {
-	return log.New(GlogWriter{}, prefix, 0)
+	return log.New(ErrorLogWriter{}, prefix, 0)
 }
