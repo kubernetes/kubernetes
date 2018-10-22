@@ -50,7 +50,7 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	// utilflag.InitFlags()
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.ShutDownLogs()
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)

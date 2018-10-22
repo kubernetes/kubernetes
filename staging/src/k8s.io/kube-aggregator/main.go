@@ -36,7 +36,7 @@ import (
 
 func main() {
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.ShutDownLogs()
 
 	stopCh := genericapiserver.SetupSignalHandler()
 	options := server.NewDefaultOptions(os.Stdout, os.Stderr)

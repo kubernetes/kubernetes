@@ -38,7 +38,7 @@ func main() {
 
 	command := app.NewKubeletCommand(server.SetupSignalHandler())
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.ShutDownLogs()
 
 	if err := command.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)

@@ -54,7 +54,7 @@ func main() {
 
 	flag.InitFlags()
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.ShutDownLogs()
 
 	if err := m.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)

@@ -282,7 +282,7 @@ func gatherTestSuiteMetrics() error {
 func RunE2ETests(t *testing.T) {
 	runtimeutils.ReallyCrash = true
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.ShutDownLogs()
 
 	gomega.RegisterFailHandler(ginkgowrapper.Fail)
 	// Disable skipped tests unless they are explicitly requested.

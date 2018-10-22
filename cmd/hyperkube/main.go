@@ -58,7 +58,7 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	// utilflag.InitFlags()
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.ShutDownLogs()
 
 	basename := filepath.Base(os.Args[0])
 	if err := commandFor(basename, hyperkubeCommand, allCommandFns).Execute(); err != nil {

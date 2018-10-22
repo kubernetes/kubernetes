@@ -29,7 +29,7 @@ import (
 
 func main() {
 	logs.InitLogs()
-	defer logs.FlushLogs()
+	defer logs.ShutDownLogs()
 
 	stopCh := genericapiserver.SetupSignalHandler()
 	cmd := server.NewServerCommand(os.Stdout, os.Stderr, stopCh)
