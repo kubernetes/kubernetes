@@ -83373,6 +83373,11 @@
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.ContainerPort"
       },
+      "x-kubernetes-list-map-keys": [
+       "containerPort",
+       "protocol"
+      ],
+      "x-kubernetes-list-type": "map",
       "x-kubernetes-patch-merge-key": "containerPort",
       "x-kubernetes-patch-strategy": "merge"
      },

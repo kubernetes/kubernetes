@@ -606,6 +606,9 @@ message Container {
   // +optional
   // +patchMergeKey=containerPort
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=containerPort
+  // +listMapKey=protocol
   repeated ContainerPort ports = 6;
 
   // List of sources to populate environment variables in the container.
