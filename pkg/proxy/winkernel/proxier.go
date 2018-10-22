@@ -180,10 +180,12 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, ser
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
 	info := &serviceInfo{
-		clusterIP:  net.ParseIP(service.Spec.ClusterIP),
-		port:       int(port.Port),
-		protocol:   port.Protocol,
-		nodePort:   int(port.NodePort),
+		clusterIP: net.ParseIP(service.Spec.ClusterIP),
+		port:      int(port.Port),
+		protocol:  port.Protocol,
+		nodePort:  int(port.NodePort),
+		// targetPort is zero if it is specified as a name in port.TargetPort.
+		// Its real value would be got later from endpoints.
 		targetPort: port.TargetPort.IntValue(),
 		// Deep-copy in case the service instance changes
 		loadBalancerStatus:       *service.Status.LoadBalancer.DeepCopy(),
@@ -977,6 +979,14 @@ func (proxier *Proxier) syncProxyRules() {
 			var newHnsEndpoint *hcsshim.HNSEndpoint
 			hnsNetworkName := proxier.network.name
 			var err error
+
+			// targetPort is zero if it is specified as a name in port.TargetPort, so the real port should be got from endpoints.
+			// Note that hcsshim.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
+			// TODO(feiskyer): add support of different endpoint ports after hcsshim.AddLoadBalancer() add that.
+			if svcInfo.targetPort == 0 {
+				svcInfo.targetPort = int(ep.port)
+			}
+
 			if len(ep.hnsID) > 0 {
 				newHnsEndpoint, err = hcsshim.GetHNSEndpointByID(ep.hnsID)
 			}
