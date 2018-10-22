@@ -2,12 +2,9 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "helpers.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/bootstrap/token/util",
-    importpath = "k8s.io/client-go/tools/bootstrap/token/util",
+    srcs = ["helpers.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cluster-bootstrap/token/util",
+    importpath = "k8s.io/cluster-bootstrap/token/util",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",

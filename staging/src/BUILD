@@ -165,6 +165,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/testing:all-srcs",
         "//staging/src/k8s.io/client-go/third_party/forked/golang/template:all-srcs",
         "//staging/src/k8s.io/client-go/tools/auth:all-srcs",
+        "//staging/src/k8s.io/client-go/tools/bootstrap/token/util:all-srcs",
         "//staging/src/k8s.io/client-go/tools/cache:all-srcs",
         "//staging/src/k8s.io/client-go/tools/clientcmd:all-srcs",
         "//staging/src/k8s.io/client-go/tools/leaderelection:all-srcs",
