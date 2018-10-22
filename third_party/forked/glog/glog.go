@@ -677,6 +677,42 @@ func (l *loggingT) printWithFileLine(s severity, file string, line int, alsoToSt
 	l.output(s, buf, file, line, alsoToStderr)
 }
 
+type redirectBuffer struct {
+	w io.Writer
+}
+
+func (rb *redirectBuffer) Sync() error {
+	return nil
+}
+
+func (rb *redirectBuffer) Flush() error {
+	return nil
+}
+
+func (rb *redirectBuffer) Write(bytes []byte) (n int, err error) {
+	return rb.w.Write(bytes)
+}
+
+func SetOutput(w io.Writer) {
+	for s := fatalLog; s >= infoLog; s-- {
+		rb := &redirectBuffer{
+			w: w,
+		}
+		logging.file[s] = rb
+	}
+}
+
+func SetOutputBySeverity(name string, w io.Writer) {
+	sev, ok := severityByName(name)
+	if !ok {
+		panic(fmt.Sprintf("SetOutputBySeverity(%q): unrecognized severity name", name))
+	}
+	rb := &redirectBuffer{
+		w: w,
+	}
+	logging.file[sev] = rb
+}
+
 // output writes the data to the log files and releases the buffer.
 func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoToStderr bool) {
 	l.mu.Lock()
