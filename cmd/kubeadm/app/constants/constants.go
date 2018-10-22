@@ -194,7 +194,7 @@ const (
 
 	// InitConfigurationConfigMapKey specifies in what ConfigMap key the master configuration should be stored
 	// TODO: This was used in v1.11 with vi1alpha2 config and older. Remove in v1.13
-	InitConfigurationConfigMapKey = "MasterConfiguration"
+	InitConfigurationConfigMapKey = "ClusterConfiguration"
 
 	// ClusterConfigurationConfigMapKey specifies in what ConfigMap key the cluster configuration should be stored
 	ClusterConfigurationConfigMapKey = "ClusterConfiguration"
