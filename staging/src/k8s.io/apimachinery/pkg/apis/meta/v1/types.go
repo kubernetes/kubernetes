@@ -1075,8 +1075,9 @@ type FieldNameValuePair struct {
 type FieldValue struct {
 	// Exactly one of the following fields should be set.
 	// FloatValue is a primitive float value.
+	// it is serialized as a string
 	// +optional
-	FloatValue *float64 `json:"floatValue,omitempty" protobuf:"bytes,1,opt,name=floatValue"`
+	FloatValue *string `json:"floatValue,omitempty" protobuf:"bytes,1,opt,name=floatValue"`
 	// IntValue is a primitive int value.
 	// +optional
 	IntValue *int32 `json:"intValue,omitempty" protobuf:"varint,2,opt,name=intValue"`

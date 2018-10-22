@@ -88295,9 +88295,8 @@
       "type": "boolean"
      },
      "floatValue": {
-      "description": "Exactly one of the following fields should be set. FloatValue is a primitive float value.",
-      "type": "number",
-      "format": "double"
+      "description": "Exactly one of the following fields should be set. FloatValue is a primitive float value. it is serialized as a string",
+      "type": "string"
      },
      "intValue": {
       "description": "IntValue is a primitive int value.",

@@ -424,7 +424,7 @@ func (in *FieldValue) DeepCopyInto(out *FieldValue) {
 	*out = *in
 	if in.FloatValue != nil {
 		in, out := &in.FloatValue, &out.FloatValue
-		*out = new(float64)
+		*out = new(string)
 		**out = **in
 	}
 	if in.IntValue != nil {

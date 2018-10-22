@@ -259,8 +259,9 @@ message FieldSetNode {
 message FieldValue {
   // Exactly one of the following fields should be set.
   // FloatValue is a primitive float value.
+  // it is serialized as a string
   // +optional
-  optional double floatValue = 1;
+  optional string floatValue = 1;
 
   // IntValue is a primitive int value.
   // +optional

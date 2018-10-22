@@ -162,7 +162,7 @@ func (FieldSetNode) SwaggerDoc() map[string]string {
 
 var map_FieldValue = map[string]string{
 	"":             "FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.",
-	"floatValue":   "Exactly one of the following fields should be set. FloatValue is a primitive float value.",
+	"floatValue":   "Exactly one of the following fields should be set. FloatValue is a primitive float value. it is serialized as a string",
 	"intValue":     "IntValue is a primitive int value.",
 	"stringValue":  "StringValue is a primitive string value.",
 	"booleanValue": "BooleanValue is a primitive boolean value.",
