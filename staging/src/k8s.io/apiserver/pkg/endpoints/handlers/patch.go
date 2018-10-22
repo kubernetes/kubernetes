@@ -242,11 +242,6 @@ type patcher struct {
 	mechanism         patchMechanism
 }
 
-func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, error) {
-	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-	return p.unsafeConvertor.ConvertToVersion(versionedObj, gvk.GroupVersion())
-}
-
 type patchMechanism interface {
 	applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error)
 }
@@ -321,12 +316,8 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 		return nil, err
 	}
 	// Convert the object back to unversioned (aka internal version).
-	unversionedObjToUpdate, err := p.toUnversioned(versionedObjToUpdate)
-	if err != nil {
-		return nil, err
-	}
-
-	return unversionedObjToUpdate, nil
+	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+	return p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, gvk.GroupVersion())
 }
 
 // strategicPatchObject applies a strategic merge patch of <patchJS> to
