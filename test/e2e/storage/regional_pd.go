@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -90,19 +91,19 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 
 	// This test checks that dynamic provisioning can provision a volume
 	// that can be used to persist data among pods.
-	tests := []storageClassTest{
+	tests := []testsuites.StorageClassTest{
 		{
-			name:           "HDD Regional PD on GCE/GKE",
-			cloudProviders: []string{"gce", "gke"},
-			provisioner:    "kubernetes.io/gce-pd",
-			parameters: map[string]string{
+			Name:           "HDD Regional PD on GCE/GKE",
+			CloudProviders: []string{"gce", "gke"},
+			Provisioner:    "kubernetes.io/gce-pd",
+			Parameters: map[string]string{
 				"type":             "pd-standard",
 				"zones":            strings.Join(cloudZones, ","),
 				"replication-type": "regional-pd",
 			},
-			claimSize:    "1.5Gi",
-			expectedSize: "2Gi",
-			pvCheck: func(volume *v1.PersistentVolume) error {
+			ClaimSize:    "1.5Gi",
+			ExpectedSize: "2Gi",
+			PvCheck: func(volume *v1.PersistentVolume) error {
 				err := checkGCEPD(volume, "pd-standard")
 				if err != nil {
 					return err
@@ -111,16 +112,16 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			},
 		},
 		{
-			name:           "HDD Regional PD with auto zone selection on GCE/GKE",
-			cloudProviders: []string{"gce", "gke"},
-			provisioner:    "kubernetes.io/gce-pd",
-			parameters: map[string]string{
+			Name:           "HDD Regional PD with auto zone selection on GCE/GKE",
+			CloudProviders: []string{"gce", "gke"},
+			Provisioner:    "kubernetes.io/gce-pd",
+			Parameters: map[string]string{
 				"type":             "pd-standard",
 				"replication-type": "regional-pd",
 			},
-			claimSize:    "1.5Gi",
-			expectedSize: "2Gi",
-			pvCheck: func(volume *v1.PersistentVolume) error {
+			ClaimSize:    "1.5Gi",
+			ExpectedSize: "2Gi",
+			PvCheck: func(volume *v1.PersistentVolume) error {
 				err := checkGCEPD(volume, "pd-standard")
 				if err != nil {
 					return err
@@ -138,7 +139,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 		class := newStorageClass(test, ns, "" /* suffix */)
 		claim := newClaim(test, ns, "" /* suffix */)
 		claim.Spec.StorageClassName = &class.Name
-		testDynamicProvisioning(test, c, claim, class)
+		testsuites.TestDynamicProvisioning(test, c, claim, class)
 	}
 }
 
@@ -278,15 +279,15 @@ func testZonalFailover(c clientset.Interface, ns string) {
 }
 
 func testRegionalDelayedBinding(c clientset.Interface, ns string) {
-	test := storageClassTest{
-		name:        "Regional PD storage class with waitForFirstConsumer test on GCE",
-		provisioner: "kubernetes.io/gce-pd",
-		parameters: map[string]string{
+	test := testsuites.StorageClassTest{
+		Name:        "Regional PD storage class with waitForFirstConsumer test on GCE",
+		Provisioner: "kubernetes.io/gce-pd",
+		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		claimSize:    "2Gi",
-		delayBinding: true,
+		ClaimSize:    "2Gi",
+		DelayBinding: true,
 	}
 
 	suffix := "delayed-regional"
@@ -305,15 +306,15 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string) {
 }
 
 func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
-	test := storageClassTest{
-		name:        "Regional PD storage class with allowedTopologies test on GCE",
-		provisioner: "kubernetes.io/gce-pd",
-		parameters: map[string]string{
+	test := testsuites.StorageClassTest{
+		Name:        "Regional PD storage class with allowedTopologies test on GCE",
+		Provisioner: "kubernetes.io/gce-pd",
+		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		claimSize:    "2Gi",
-		expectedSize: "2Gi",
+		ClaimSize:    "2Gi",
+		ExpectedSize: "2Gi",
 	}
 
 	suffix := "topo-regional"
@@ -322,20 +323,20 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 	addAllowedTopologiesToStorageClass(c, class, zones)
 	claim := newClaim(test, ns, suffix)
 	claim.Spec.StorageClassName = &class.Name
-	pv := testDynamicProvisioning(test, c, claim, class)
+	pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zones...), true)
 }
 
 func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns string) {
-	test := storageClassTest{
-		name:        "Regional PD storage class with allowedTopologies and waitForFirstConsumer test on GCE",
-		provisioner: "kubernetes.io/gce-pd",
-		parameters: map[string]string{
+	test := testsuites.StorageClassTest{
+		Name:        "Regional PD storage class with allowedTopologies and waitForFirstConsumer test on GCE",
+		Provisioner: "kubernetes.io/gce-pd",
+		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
 		},
-		claimSize:    "2Gi",
-		delayBinding: true,
+		ClaimSize:    "2Gi",
+		DelayBinding: true,
 	}
 
 	suffix := "topo-delayed-regional"
