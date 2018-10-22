@@ -505,7 +505,7 @@ $(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata/go-bin
 # The result file, in each pkg, of register-gen generation.
 REGISTERGEN_BASENAME := $(GENERATED_FILE_PREFIX)register
 REGISTERGEN_FILENAME := $(REGISTERGEN_BASENAME).go
-REGISTERGEN_OUTPUT_PKG := $(PRJ_SRC_PATH)/vendored
+REGISTERGEN_OUTPUT_PKG := $(PRJ_SRC_PATH)/vendor
 
 # The tool used to generate register.go files.
 REGISTER_GEN := $(BIN_DIR)/register-gen
@@ -513,7 +513,7 @@ REGISTER_GEN := $(BIN_DIR)/register-gen
 # Find all the directories that request register generation.
 # files that need deepcopy also need to generate "register" files
 ifeq ($(DBG_MAKEFILE),1)
-    $(warning ***** finding all +k8s:deepcopy-gen tags)
+    $(warning ***** finding all directories that require register generation)
 endif
 REGISTERGEN_DIRS := $(shell                                                 \
     find ./staging/src/k8s.io/api -name types.go | xargs -n1 dirname | sort \
