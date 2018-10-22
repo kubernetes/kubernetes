@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	//"k8s.io/apimachinery/pkg/util/version"
 )
 
@@ -133,7 +135,7 @@ func TestPrepullImagesInParallel(t *testing.T) {
 
 	for _, rt := range tests {
 
-		actualErr := PrepullImagesInParallel(rt.p, rt.timeout)
+		actualErr := PrepullImagesInParallel(rt.p, rt.timeout, append(constants.MasterComponents, constants.Etcd))
 		if (actualErr != nil) != rt.expectedErr {
 			t.Errorf(
 				"failed TestPrepullImagesInParallel\n\texpected error: %t\n\tgot: %t",
