@@ -17,6 +17,7 @@ limitations under the License.
 package staticpod
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -287,4 +288,18 @@ func GetProbeAddress(cfg *kubeadmapi.InitConfiguration, componentName string) st
 		}
 	}
 	return "127.0.0.1"
+}
+
+// ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise
+func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
+	content1, err := ioutil.ReadFile(path1)
+	if err != nil {
+		return false, err
+	}
+	content2, err := ioutil.ReadFile(path2)
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(content1, content2), nil
 }

@@ -194,7 +194,11 @@ func RunApply(flags *applyFlags) error {
 	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
 	glog.V(1).Infof("[upgrade/apply] creating prepuller")
 	prepuller := upgrade.NewDaemonSetPrepuller(upgradeVars.client, upgradeVars.waiter, &upgradeVars.cfg.ClusterConfiguration)
-	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout); err != nil {
+	componentsToPrepull := constants.MasterComponents
+	if upgradeVars.cfg.Etcd.External != nil {
+		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
+	}
+	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
 		return fmt.Errorf("[upgrade/prepull] Failed prepulled the images for the control plane components error: %v", err)
 	}
 

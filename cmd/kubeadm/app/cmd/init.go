@@ -37,6 +37,7 @@ import (
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -126,6 +127,9 @@ type initData struct {
 	skipTokenPrint        bool
 	dryRun                bool
 	ignorePreflightErrors sets.String
+	certificatesDir       string
+	dryRunDir             string
+	client                clientset.Interface
 }
 
 // NewCmdInit returns "kubeadm init" command.
@@ -160,7 +164,8 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	options.bto.AddTTLFlag(cmd.PersistentFlags())
 
 	// initialize the workflow runner with the list of phases
-	// TODO: add the phases to the runner. e.g. initRunner.AppendPhase(phases.PreflightMaster)
+	initRunner.AppendPhase(phases.NewPreflightMasterPhase())
+	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
@@ -297,31 +302,113 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 		return initData{}, err
 	}
 
+	// if dry running creates a temporary folder for saving kubeadm generated files
+	dryRunDir := ""
+	if options.dryRun {
+		if dryRunDir, err = ioutil.TempDir("", "kubeadm-init-dryrun"); err != nil {
+			return initData{}, fmt.Errorf("couldn't create a temporary directory: %v", err)
+		}
+	}
+
 	return initData{
 		cfg:                   cfg,
+		certificatesDir:       cfg.CertificatesDir,
 		skipTokenPrint:        options.skipTokenPrint,
 		dryRun:                options.dryRun,
+		dryRunDir:             dryRunDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 	}, nil
 }
 
+// Cfg returns initConfiguration.
+func (d initData) Cfg() *kubeadmapi.InitConfiguration {
+	return d.cfg
+}
+
+// DryRun returns the DryRun flag.
+func (d initData) DryRun() bool {
+	return d.dryRun
+}
+
+// SkipTokenPrint returns the SkipTokenPrint flag.
+func (d initData) SkipTokenPrint() bool {
+	return d.skipTokenPrint
+}
+
+// IgnorePreflightErrors returns the IgnorePreflightErrors flag.
+func (d initData) IgnorePreflightErrors() sets.String {
+	return d.ignorePreflightErrors
+}
+
+// CertificateWriteDir returns the path to the certificate folder or the temporary folder path in case of DryRun.
+func (d initData) CertificateWriteDir() string {
+	if d.dryRun {
+		return d.dryRunDir
+	}
+	return d.certificatesDir
+}
+
+// CertificateDir returns the CertificateDir as originally specified by the user.
+func (d initData) CertificateDir() string {
+	return d.certificatesDir
+}
+
+// KubeConfigDir returns the path of the kubernetes configuration folder or the temporary folder path in case of DryRun.
+func (d initData) KubeConfigDir() string {
+	if d.dryRun {
+		return d.dryRunDir
+	}
+	return kubeadmconstants.KubernetesDir
+}
+
+// KubeConfigDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
+func (d initData) ManifestDir() string {
+	if d.dryRun {
+		return d.dryRunDir
+	}
+	return kubeadmconstants.GetStaticPodDirectory()
+}
+
+// KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
+func (d initData) KubeletDir() string {
+	if d.dryRun {
+		return d.dryRunDir
+	}
+	return kubeadmconstants.KubeletRunDirectory
+}
+
+// Client returns a Kubernetes client to be used by kubeadm.
+// This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
+// Important. This function must be called after the admin.conf kubeconfig file is created.
+func (d initData) Client() (clientset.Interface, error) {
+	if d.client == nil {
+		if d.dryRun {
+			// If we're dry-running; we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
+			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, d.cfg.Networking.ServiceSubnet)
+			d.client = apiclient.NewDryRunClient(dryRunGetter, os.Stdout)
+		} else {
+			// If we're acting for real, we should create a connection to the API server and wait for it to come up
+			var err error
+			d.client, err = kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return d.client, nil
+}
+
+// Tokens returns an array of token strings.
+func (d initData) Tokens() []string {
+	tokens := []string{}
+	for _, bt := range d.cfg.BootstrapTokens {
+		tokens = append(tokens, bt.Token.String())
+	}
+	return tokens
+}
+
 // runInit executes master node provisioning
 func runInit(i *initData, out io.Writer) error {
-	fmt.Println("[preflight] running pre-flight checks")
-	if err := preflight.RunInitMasterChecks(utilsexec.New(), i.cfg, i.ignorePreflightErrors); err != nil {
-		return err
-	}
-
-	if !i.dryRun {
-		fmt.Println("[preflight/images] Pulling images required for setting up a Kubernetes cluster")
-		fmt.Println("[preflight/images] This might take a minute or two, depending on the speed of your internet connection")
-		fmt.Println("[preflight/images] You can also perform this action in beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), i.cfg, i.ignorePreflightErrors); err != nil {
-			return err
-		}
-	} else {
-		fmt.Println("[preflight/images] Would pull the required images (like 'kubeadm config images pull')")
-	}
 
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")

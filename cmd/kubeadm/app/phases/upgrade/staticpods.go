@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 const (
@@ -201,6 +202,16 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 	// Store the backup path in the recover list. If something goes wrong now, this component will be rolled back.
 	recoverManifests[component] = backupManifestPath
 
+	// Skip upgrade if current and new manifests are equal
+	equal, err := staticpod.ManifestFilesAreEqual(currentManifestPath, newManifestPath)
+	if err != nil {
+		return err
+	}
+	if equal {
+		fmt.Printf("[upgrade/staticpods] current and new manifests of %s are equal, skipping upgrade\n", component)
+		return nil
+	}
+
 	// Move the old manifest into the old-manifests directory
 	if err := pathMgr.MoveFile(currentManifestPath, backupManifestPath); err != nil {
 		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
@@ -215,7 +226,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	if waitForComponentRestart {
 		fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
-		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v\n", UpgradeManifestTimeout)
+		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v)\n", UpgradeManifestTimeout)
 
 		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
 		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy

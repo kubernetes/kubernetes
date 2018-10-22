@@ -447,11 +447,6 @@ func (j *Join) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadma
 // PrepareForHostingControlPlane makes all preparation activities require for a node hosting a new control plane instance
 func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 
-	// Creates the admin kubeconfig file for the admin and for kubeadm itself.
-	if err := kubeconfigphase.CreateAdminKubeConfigFile(kubeadmconstants.KubernetesDir, initConfiguration); err != nil {
-		return errors.Wrap(err, "error generating the admin kubeconfig file")
-	}
-
 	// Generate missing certificates (if any)
 	if err := certsphase.CreatePKIAssets(initConfiguration); err != nil {
 		return err
