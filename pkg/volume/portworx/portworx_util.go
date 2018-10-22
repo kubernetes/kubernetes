@@ -17,6 +17,8 @@ limitations under the License.
 package portworx
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	osdapi "github.com/libopenstorage/openstorage/api"
 	osdclient "github.com/libopenstorage/openstorage/api/client"
@@ -31,13 +33,13 @@ import (
 )
 
 const (
-	osdMgmtPort       = "9001"
-	osdDriverVersion  = "v1"
-	pxdDriverName     = "pxd"
-	pvcClaimLabel     = "pvc"
-	pvcNamespaceLabel = "namespace"
-	pxServiceName     = "portworx-service"
-	pxDriverName      = "pxd-sched"
+	osdMgmtDefaultPort = 9001
+	osdDriverVersion   = "v1"
+	pxdDriverName      = "pxd"
+	pvcClaimLabel      = "pvc"
+	pvcNamespaceLabel  = "namespace"
+	pxServiceName      = "portworx-service"
+	pxDriverName       = "pxd-sched"
 )
 
 type PortworxVolumeUtil struct {
@@ -201,8 +203,8 @@ func isClientValid(client *osdclient.Client) (bool, error) {
 	return true, nil
 }
 
-func createDriverClient(hostname string) (*osdclient.Client, error) {
-	client, err := volumeclient.NewDriverClient("http://"+hostname+":"+osdMgmtPort,
+func createDriverClient(hostname string, port int32) (*osdclient.Client, error) {
+	client, err := volumeclient.NewDriverClient(fmt.Sprintf("http://%s:%d", hostname, port),
 		pxdDriverName, osdDriverVersion, pxDriverName)
 	if err != nil {
 		return nil, err
@@ -227,8 +229,31 @@ func createDriverClient(hostname string) (*osdclient.Client, error) {
 //            the Portworx node that will own/owns the data.
 func (util *PortworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost, localOnly bool) (volumeapi.VolumeDriver, error) {
 	var err error
+	kubeClient := volumeHost.GetKubeClient()
+	if kubeClient == nil {
+		err = fmt.Errorf("Failed to get kubeclient when creating portworx client")
+		glog.Errorf(err.Error())
+		return nil, err
+	}
+
+	opts := metav1.GetOptions{}
+	svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(pxServiceName, opts)
+	if err != nil {
+		glog.Errorf("Failed to get service. Err: %v", err)
+		return nil, err
+	}
+
+	if svc == nil {
+		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it.", pxServiceName)
+		glog.Errorf(err.Error())
+		return nil, err
+	}
+
+	var pxAPIPort int32 = osdMgmtDefaultPort
+
 	if localOnly {
-		util.portworxClient, err = createDriverClient(volumeHost.GetHostName())
+		pxAPIPort = lookupPXAPIPortFromService(svc)
+		util.portworxClient, err = createDriverClient(volumeHost.GetHostName(), pxAPIPort)
 		if err != nil {
 			return nil, err
 		} else {
@@ -243,28 +268,10 @@ func (util *PortworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost, 
 	}
 
 	// create new client
-	util.portworxClient, err = createDriverClient(volumeHost.GetHostName()) // for backward compatibility
+	util.portworxClient, err = createDriverClient(volumeHost.GetHostName(), pxAPIPort) // for backward compatibility
 	if err != nil || util.portworxClient == nil {
-		// Create client from portworx service
-		kubeClient := volumeHost.GetKubeClient()
-		if kubeClient == nil {
-			glog.Error("Failed to get kubeclient when creating portworx client")
-			return nil, nil
-		}
-
-		opts := metav1.GetOptions{}
-		svc, err := kubeClient.CoreV1().Services(api.NamespaceSystem).Get(pxServiceName, opts)
-		if err != nil {
-			glog.Errorf("Failed to get service. Err: %v", err)
-			return nil, err
-		}
-
-		if svc == nil {
-			glog.Errorf("Service: %v not found. Consult Portworx docs to deploy it.", pxServiceName)
-			return nil, err
-		}
-
-		util.portworxClient, err = createDriverClient(svc.Spec.ClusterIP)
+		// Create client from portworx k8s service
+		util.portworxClient, err = createDriverClient(svc.Spec.ClusterIP, pxAPIPort)
 		if err != nil || util.portworxClient == nil {
 			glog.Errorf("Failed to connect to portworx service. Err: %v", err)
 			return nil, err
@@ -276,4 +283,15 @@ func (util *PortworxVolumeUtil) getPortworxDriver(volumeHost volume.VolumeHost, 
 	}
 
 	return volumeclient.VolumeDriver(util.portworxClient), nil
+}
+
+// lookupPXAPIPortFromService goes over all the ports in the given service and returns the target
+// port for osdMgmtDefaultPort
+func lookupPXAPIPortFromService(svc *v1.Service) int32 {
+	for _, p := range svc.Spec.Ports {
+		if p.Port == osdMgmtDefaultPort {
+			return p.TargetPort.IntVal
+		}
+	}
+	return osdMgmtDefaultPort // default
 }
