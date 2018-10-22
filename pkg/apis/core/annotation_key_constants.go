@@ -84,10 +84,11 @@ const (
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
 
 	// EndpointsLastChangeTriggerTime is the annotation key, set for endpoints objects, that
-	// represents the timestamp (in milliseconds) of the last change, of some pod or service object,
-	// that triggered the endpoints object change. In other words, if a Pod / Service changed at time
-	// T0, that change was observed by endpoints controller at T1, and the Endpoints object was
-	// changed at T2, the EndpointsLastChangeTriggerTime would be set to T0.
+	// represents the timestamp (expressed as a Unix time in milliseconds, i.e. the number of
+	// milliseconds elapsed since January 1, 1970 UTC) of the last change, of some pod or service
+	// object, that triggered the endpoints object change. In other words, if a Pod / Service changed
+	// at time T0, that change was observed by endpoints controller at T1, and the Endpoints object
+	// was changed at T2, the EndpointsLastChangeTriggerTime would be set to T0.
 	//
 	// The "endpoints change trigger" here means any Pod or Service change that resulted in the
 	// Endpoints object change.
