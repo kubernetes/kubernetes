@@ -80,13 +80,13 @@ const (
 	maxTargetPoolCreateInstances = 200
 
 	// HTTP Load Balancer parameters
-	// Configure 2 second period for external health checks.
-	gceHcCheckIntervalSeconds = int64(2)
+	// Configure 8 second period for external health checks.
+	gceHcCheckIntervalSeconds = int64(8)
 	gceHcTimeoutSeconds       = int64(1)
 	// Start sending requests as soon as a pod is found on the node.
 	gceHcHealthyThreshold = int64(1)
-	// Defaults to 5 * 2 = 10 seconds before the LB will steer traffic away
-	gceHcUnhealthyThreshold = int64(5)
+	// Defaults to 3 * 8 = 24 seconds before the LB will steer traffic away.
+	gceHcUnhealthyThreshold = int64(3)
 
 	gceComputeAPIEndpoint     = "https://www.googleapis.com/compute/v1/"
 	gceComputeAPIEndpointBeta = "https://www.googleapis.com/compute/beta/"
