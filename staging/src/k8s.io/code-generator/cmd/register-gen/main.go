@@ -33,7 +33,6 @@ func main() {
 	genericArgs := generatorargs.NewDefaults()
 	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
 	genericArgs.AddFlags(pflag.CommandLine)
-	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	pflag.Parse()

@@ -17,7 +17,6 @@ limitations under the License.
 package logs
 
 import (
-	"flag"
 	"log"
 	"time"
 
@@ -27,11 +26,6 @@ import (
 )
 
 var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
-
-// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
-func init() {
-	flag.Set("logtostderr", "true")
-}
 
 // GlogWriter serves as a bridge between the standard log package and the glog package.
 type GlogWriter struct{}

@@ -41,13 +41,6 @@ const skipped = "\033[0;34mSKIPPED\033[0m"
 var checkFlag = flag.String(
 	"check", "all", "what to check for conformance.  One or more of all,container-runtime,daemons,dns,firewall,kernel")
 
-func init() {
-	// Set this to false to undo util/logs.go settings it to true.  Prevents cadvisor log spam.
-	// Remove this once util/logs.go stops setting the flag to true.
-	flag.Set("logtostderr", "false")
-	flag.Parse()
-}
-
 // TODO: Should we write an e2e test for this?
 func main() {
 	o := strings.Split(*checkFlag, ",")
