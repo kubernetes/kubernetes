@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package resourcelock provides a resource lock on the leader election
 // annotation for use in reading and updating leader election information.
-package resourcelock // import "k8s.io/client-go/leaderelection/resourcelock"
+package resourcelock // import "k8s.io/client-go/tools/leaderelection/resourcelock"

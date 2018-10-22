@@ -17,4 +17,4 @@ limitations under the License.
 // Package deprecated_dynamic provides a client interface to arbitrary Kubernetes
 // APIs that exposes common high level operations and exposes common
 // metadata.
-package deprecated_dynamic // import "k8s.io/client-go/deprecated-dynamic"
+package deprecated_dynamic // import "k8s.io/client-go/deprecated_dynamic"
