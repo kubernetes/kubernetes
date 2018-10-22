@@ -276,6 +276,14 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
 			}
 		},
+		func(j *metav1.VersionedFieldSet, c fuzz.Continue) {
+			// We have to customize the randomization of VersionedFieldSet because
+			// there is not currently a MaxDepth in the vendored version of gofuzz
+			// TODO (jennybuckley): remove this exception once we vendor in
+			// this PR https://github.com/google/gofuzz/pull/21
+			j.APIVersion = ""
+			j.Fields = metav1.FieldSet{}
+		},
 	}
 }
 
