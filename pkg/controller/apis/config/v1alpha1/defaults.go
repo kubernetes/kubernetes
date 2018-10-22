@@ -45,9 +45,6 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 	if obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod == zero {
 		obj.PersistentVolumeBinderController.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}
-	if obj.SAController.ConcurrentSATokenSyncs == 0 {
-		obj.SAController.ConcurrentSATokenSyncs = 5
-	}
 	if obj.TTLAfterFinishedController.ConcurrentTTLSyncs <= 0 {
 		obj.TTLAfterFinishedController.ConcurrentTTLSyncs = 5
 	}
