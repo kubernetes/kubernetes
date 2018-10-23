@@ -28,7 +28,7 @@ type ErrCallingWebhook struct {
 
 func (e *ErrCallingWebhook) Error() string {
 	if e.Reason != nil {
-		return fmt.Sprintf("failed calling admission webhook %q: %v", e.WebhookName, e.Reason)
+		return fmt.Sprintf("failed calling webhook %q: %v", e.WebhookName, e.Reason)
 	}
-	return fmt.Sprintf("failed calling admission webhook %q; no further details available", e.WebhookName)
+	return fmt.Sprintf("failed calling webhook %q; no further details available", e.WebhookName)
 }
