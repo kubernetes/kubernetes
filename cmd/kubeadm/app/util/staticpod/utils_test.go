@@ -482,13 +482,19 @@ func TestVolumeMapToSlice(t *testing.T) {
 		"foo": {
 			Name: "foo",
 		},
+		"bar": {
+			Name: "bar",
+		},
 	}
 	volumeSlice := VolumeMapToSlice(testVolumes)
-	if len(volumeSlice) != 1 {
+	if len(volumeSlice) != 2 {
 		t.Errorf("Expected slice length of 1, got %d", len(volumeSlice))
 	}
-	if volumeSlice[0].Name != "foo" {
-		t.Errorf("Expected volume name \"foo\", got %s", volumeSlice[0].Name)
+	if volumeSlice[0].Name != "bar" {
+		t.Errorf("Expected first volume name \"bar\", got %s", volumeSlice[0].Name)
+	}
+	if volumeSlice[1].Name != "foo" {
+		t.Errorf("Expected second volume name \"foo\", got %s", volumeSlice[1].Name)
 	}
 }
 
@@ -497,13 +503,19 @@ func TestVolumeMountMapToSlice(t *testing.T) {
 		"foo": {
 			Name: "foo",
 		},
+		"bar": {
+			Name: "bar",
+		},
 	}
 	volumeMountSlice := VolumeMountMapToSlice(testVolumeMounts)
-	if len(volumeMountSlice) != 1 {
+	if len(volumeMountSlice) != 2 {
 		t.Errorf("Expected slice length of 1, got %d", len(volumeMountSlice))
 	}
-	if volumeMountSlice[0].Name != "foo" {
-		t.Errorf("Expected volume mount name \"foo\", got %s", volumeMountSlice[0].Name)
+	if volumeMountSlice[0].Name != "bar" {
+		t.Errorf("Expected first volume mount name \"bar\", got %s", volumeMountSlice[0].Name)
+	}
+	if volumeMountSlice[1].Name != "foo" {
+		t.Errorf("Expected second volume name \"foo\", got %s", volumeMountSlice[1].Name)
 	}
 }
 
