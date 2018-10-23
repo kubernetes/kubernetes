@@ -30,7 +30,7 @@ type ClientConnectionConfiguration struct {
 	AcceptContentTypes string
 	// contentType is the content type used when sending data to the server from this client.
 	ContentType string
-	// cps controls the number of queries per second allowed for this connection.
+	// qps controls the number of queries per second allowed for this connection.
 	QPS float32
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
 	Burst int32
