@@ -350,7 +350,7 @@ func SkipIfMultizone(c clientset.Interface) {
 		Skipf("Error listing cluster zones")
 	}
 	if zones.Len() > 1 {
-		Skipf("Requires more than one zone")
+		Skipf("Requires at most one zone")
 	}
 }
 
