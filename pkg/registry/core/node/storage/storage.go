@@ -18,18 +18,17 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/client-go/kubernetes"
+	clientgorest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -75,7 +74,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 }
 
 // NewStorage returns a NodeStorage object that will work against nodes.
-func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
+func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper, restConfig *clientgorest.Config) (*NodeStorage, error) {
+	clientset, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, err
+	}
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Node{} },
 		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
@@ -102,25 +105,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	statusREST := &StatusREST{store: &statusStore}
 	proxyREST := &noderest.ProxyREST{Store: store, ProxyTransport: proxyTransport}
 
-	// Build a NodeGetter that looks up nodes using the REST handler
-	nodeGetter := client.NodeGetterFunc(func(ctx context.Context, nodeName string, options metav1.GetOptions) (*v1.Node, error) {
-		obj, err := nodeREST.Get(ctx, nodeName, &options)
-		if err != nil {
-			return nil, err
-		}
-		node, ok := obj.(*api.Node)
-		if !ok {
-			return nil, fmt.Errorf("unexpected type %T", obj)
-		}
-		// TODO: Remove the conversion. Consider only return the NodeAddresses
-		externalNode := &v1.Node{}
-		err = k8s_api_v1.Convert_core_Node_To_v1_Node(node, externalNode, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert to v1.Node: %v", err)
-		}
-		return externalNode, nil
-	})
-	connectionInfoGetter, err := client.NewNodeConnectionInfoGetter(nodeGetter, kubeletClientConfig)
+	connectionInfoGetter, err := client.NewNodeConnectionInfoGetter(clientset.CoreV1().Nodes(), kubeletClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +125,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified node.
 func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
-	return node.ResourceLocation(r, r.connection, r.proxyTransport, ctx, id)
+	return node.ResourceLocation(r.connection, r.proxyTransport, id)
 }
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.

@@ -194,13 +194,13 @@ func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.
-func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
+func ResourceLocation(connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper, id string) (*url.URL, http.RoundTripper, error) {
 	schemeReq, name, portReq, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
 	}
 
-	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
+	info, err := connection.GetConnectionInfo(types.NodeName(name))
 	if err != nil {
 		return nil, nil, err
 	}

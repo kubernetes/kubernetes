@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -40,7 +41,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "nodes",
 	}
-	storage, err := NewStorage(restOptions, kubeletclient.KubeletClientConfig{}, nil)
+	storage, err := NewStorage(restOptions, kubeletclient.KubeletClientConfig{}, nil, &rest.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}

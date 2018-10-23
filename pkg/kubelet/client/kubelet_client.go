@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -63,7 +63,7 @@ type ConnectionInfo struct {
 
 // ConnectionInfoGetter provides ConnectionInfo for the kubelet running on a named node
 type ConnectionInfoGetter interface {
-	GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*ConnectionInfo, error)
+	GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error)
 }
 
 func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
@@ -102,22 +102,10 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 	return cfg
 }
 
-// NodeGetter defines an interface for looking up a node by name
-type NodeGetter interface {
-	Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
-}
-
-// NodeGetterFunc allows implementing NodeGetter with a function
-type NodeGetterFunc func(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
-
-func (f NodeGetterFunc) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error) {
-	return f(ctx, name, options)
-}
-
 // NodeConnectionInfoGetter obtains connection info from the status of a Node API object
 type NodeConnectionInfoGetter struct {
 	// nodes is used to look up Node objects
-	nodes NodeGetter
+	nodeClient corev1client.NodeInterface
 	// scheme is the scheme to use to connect to all kubelets
 	scheme string
 	// defaultPort is the port to use if no Kubelet endpoint port is recorded in the node status
@@ -128,7 +116,7 @@ type NodeConnectionInfoGetter struct {
 	preferredAddressTypes []v1.NodeAddressType
 }
 
-func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (ConnectionInfoGetter, error) {
+func NewNodeConnectionInfoGetter(nodeClient corev1client.NodeInterface, config KubeletClientConfig) (ConnectionInfoGetter, error) {
 	scheme := "http"
 	if config.EnableHttps {
 		scheme = "https"
@@ -145,7 +133,7 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 	}
 
 	return &NodeConnectionInfoGetter{
-		nodes:       nodes,
+		nodeClient:  nodeClient,
 		scheme:      scheme,
 		defaultPort: int(config.Port),
 		transport:   transport,
@@ -154,8 +142,8 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 	}, nil
 }
 
-func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*ConnectionInfo, error) {
-	node, err := k.nodes.Get(ctx, string(nodeName), metav1.GetOptions{})
+func (k *NodeConnectionInfoGetter) GetConnectionInfo(nodeName types.NodeName) (*ConnectionInfo, error) {
+	node, err := k.nodeClient.Get(string(nodeName), metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
