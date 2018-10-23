@@ -13,6 +13,7 @@ go_library(
         "pv_controller.go",
         "pv_controller_base.go",
         "scheduler_assume_cache.go",
+        "scheduler_bind_cache_metrics.go",
         "scheduler_binder.go",
         "scheduler_binder_cache.go",
         "scheduler_binder_fake.go",
@@ -58,6 +59,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )
 
