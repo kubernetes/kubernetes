@@ -6,18 +6,12 @@ jobs:
     working_directory: /go/src/k8s.io/kubernetes
     steps:
     - checkout
-    - run: pwd
-    - run: ls
-    - run: go env
     - run: go build ./cmd/kubectl
   test:
     docker:
     - image: circleci/golang:1.11.1
     working_directory: /go/src/k8s.io/kubernetes
     steps:
-    - checkout
-    - run: pwd
-    - run: ls
     - run: go test ./pkg/controller
 workflows:
   version: 2
