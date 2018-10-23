@@ -38,7 +38,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		ns = f.Namespace.Name
 
 		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to list nodes in namespace: %s", ns)
 		Expect(len(nodeList.Items)).NotTo(BeZero())
 
 		pickedNode := nodeList.Items[0]
@@ -47,8 +47,9 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		nodeIPs = append(nodeIPs, framework.GetNodeAddresses(&pickedNode, v1.NodeInternalIP)...)
 
 		// make sure ServiceAccount admission controller is enabled, so secret generation on SA creation works
-		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get("default", metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		saName := "default"
+		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(saName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "failed to retrieve service account (%s:%s)", ns, saName)
 		Expect(len(sa.Secrets)).NotTo(BeZero())
 	})
 
@@ -72,7 +73,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 			AutomountServiceAccountToken: &trueValue,
 		}
 		_, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Create(newSA)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create service account (%s:%s)", ns, newSA.Name)
 
 		pod := createNodeAuthTestPod(f)
 
