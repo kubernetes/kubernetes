@@ -323,6 +323,9 @@ func TestDeleteServiceAccountToken(t *testing.T) {
 			testMgr.clock = clock.NewFakeClock(time.Time{}.Add(30 * 24 * time.Hour))
 
 			successGetToken := func(_, _ string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
+				tr.Status = authenticationv1.TokenRequestStatus{
+					ExpirationTimestamp: metav1.Time{Time: testMgr.clock.Now().Add(10 * time.Hour)},
+				}
 				return tr, nil
 			}
 			failGetToken := func(_, _ string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {
