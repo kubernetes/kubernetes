@@ -31,6 +31,7 @@ import (
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -49,7 +50,7 @@ const (
 type csiTestDriver interface {
 	createCSIDriver()
 	cleanupCSIDriver()
-	createStorageClassTest(node v1.Node) storageClassTest
+	createStorageClassTest(node v1.Node) testsuites.StorageClassTest
 }
 
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
@@ -110,7 +111,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				claim := newClaim(t, ns.GetName(), "")
 				class := newStorageClass(t, ns.GetName(), "")
 				claim.Spec.StorageClassName = &class.ObjectMeta.Name
-				testDynamicProvisioning(t, cs, claim, class)
+				testsuites.TestDynamicProvisioning(t, cs, claim, class)
 			})
 		})
 	}
@@ -187,7 +188,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				By("Checking if VolumeAttachment was created for the pod")
 				// Check that VolumeAttachment does not exist
 				handle := getVolumeHandle(cs, claim)
-				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, t.provisioner, node.Name)))
+				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, t.Provisioner, node.Name)))
 				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
 				_, err = cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
 				if err != nil {
@@ -242,7 +243,7 @@ func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) st
 	return pv.Spec.CSI.VolumeHandle
 }
 
-func startPausePod(cs clientset.Interface, t storageClassTest, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
 	class := newStorageClass(t, ns, "")
 	class, err := cs.StorageV1().StorageClasses().Create(class)
 	framework.ExpectNoError(err, "Failed to create class : %v", err)
@@ -283,8 +284,8 @@ func startPausePod(cs clientset.Interface, t storageClassTest, ns string) (*stor
 		},
 	}
 
-	if len(t.nodeName) != 0 {
-		pod.Spec.NodeName = t.nodeName
+	if len(t.NodeName) != 0 {
+		pod.Spec.NodeName = t.NodeName
 	}
 	pod, err = cs.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
@@ -311,14 +312,14 @@ func initCSIHostpath(f *framework.Framework, config framework.VolumeTestConfig) 
 	}
 }
 
-func (h *hostpathCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
-	return storageClassTest{
-		name:         "csi-hostpath",
-		provisioner:  "csi-hostpath",
-		parameters:   map[string]string{},
-		claimSize:    "1Gi",
-		expectedSize: "1Gi",
-		nodeName:     node.Name,
+func (h *hostpathCSIDriver) createStorageClassTest(node v1.Node) testsuites.StorageClassTest {
+	return testsuites.StorageClassTest{
+		Name:         "csi-hostpath",
+		Provisioner:  "csi-hostpath",
+		Parameters:   map[string]string{},
+		ClaimSize:    "1Gi",
+		ExpectedSize: "1Gi",
+		NodeName:     node.Name,
 	}
 }
 
@@ -379,14 +380,14 @@ func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csi
 	}
 }
 
-func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
-	return storageClassTest{
-		name:         "com.google.csi.gcepd",
-		provisioner:  "com.google.csi.gcepd",
-		parameters:   map[string]string{"type": "pd-standard"},
-		claimSize:    "5Gi",
-		expectedSize: "5Gi",
-		nodeName:     node.Name,
+func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) testsuites.StorageClassTest {
+	return testsuites.StorageClassTest{
+		Name:         "com.google.csi.gcepd",
+		Provisioner:  "com.google.csi.gcepd",
+		Parameters:   map[string]string{"type": "pd-standard"},
+		ClaimSize:    "5Gi",
+		ExpectedSize: "5Gi",
+		NodeName:     node.Name,
 	}
 }
 

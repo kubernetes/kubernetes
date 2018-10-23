@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "base.go",
+        "provisioning.go",
         "subpath.go",
         "volume_io.go",
         "volumemode.go",

@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
-// TestSuite represents an interface for a set of tests whchi works with TestDriver
+// TestSuite represents an interface for a set of tests which works with TestDriver
 type TestSuite interface {
 	// getTestSuiteInfo returns the TestSuiteInfo for this TestSuite
 	getTestSuiteInfo() TestSuiteInfo
@@ -44,6 +44,7 @@ type TestSuite interface {
 	execTest(drivers.TestDriver, testpatterns.TestPattern)
 }
 
+// TestSuiteInfo represents a set of parameters for TestSuite
 type TestSuiteInfo struct {
 	name         string                     // name of the TestSuite
 	featureTag   string                     // featureTag for the TestSuite
@@ -132,7 +133,7 @@ type genericVolumeTestResource struct {
 
 var _ TestResource = &genericVolumeTestResource{}
 
-// SetupResource sets up genericVolumeTestResource
+// setupResource sets up genericVolumeTestResource
 func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
 	r.driver = driver
 	dInfo := driver.GetDriverInfo()
@@ -186,7 +187,7 @@ func (r *genericVolumeTestResource) setupResource(driver drivers.TestDriver, pat
 	}
 }
 
-// CleanupResource clean up genericVolumeTestResource
+// cleanupResource cleans up genericVolumeTestResource
 func (r *genericVolumeTestResource) cleanupResource(driver drivers.TestDriver, pattern testpatterns.TestPattern) {
 	dInfo := driver.GetDriverInfo()
 	f := dInfo.Framework
