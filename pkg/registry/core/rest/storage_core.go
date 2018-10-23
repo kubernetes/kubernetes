@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -82,7 +83,7 @@ type LegacyRESTStorageProvider struct {
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
 	ServiceAccountMaxExpiration time.Duration
 
-	APIAudiences []string
+	APIAudiences authenticator.Audiences
 
 	LoopbackClientConfig *restclient.Config
 }
