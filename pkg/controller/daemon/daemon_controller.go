@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -979,6 +980,9 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, hash string) error {
 	return nil
 }
 
+// matchFieldVersion is the minimum version of kubelet that can run pods using MatchField affinity selectors
+var matchFieldVersion = utilversion.MustParseSemantic("v1.11.0")
+
 // syncNodes deletes given pods and creates new daemon set pods on the given nodes
 // returns slice with erros if any
 func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nodesNeedingDaemonPods []string, hash string) error {
@@ -1031,7 +1035,18 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 
 				podTemplate := &template
 
-				if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
+				nodeCanUseMatchFields := false
+				if node, err := dsc.nodeLister.Get(nodesNeedingDaemonPods[ix]); err != nil {
+					glog.Errorf("unknown node %s, disabling ScheduleDaemonSetPods using MatchFields: %v", nodesNeedingDaemonPods[ix], err)
+				} else if kubeletVersion, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion); err != nil {
+					glog.Errorf("unknown kubelet version %s for node %s, disabling ScheduleDaemonSetPods using MatchFields: %v", node.Status.NodeInfo.KubeletVersion, nodesNeedingDaemonPods[ix], err)
+				} else if kubeletVersion.LessThan(matchFieldVersion) {
+					glog.V(4).Infof("kubelet version %s on node %s is less than %s, disabling ScheduleDaemonSetPods using MatchFields", node.Status.NodeInfo.KubeletVersion, nodesNeedingDaemonPods[ix], matchFieldVersion)
+				} else {
+					nodeCanUseMatchFields = true
+				}
+
+				if nodeCanUseMatchFields && utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 					podTemplate = template.DeepCopy()
 					// The pod's NodeAffinity will be updated to make sure the Pod is bound
 					// to the target node by default scheduler. It is safe to do so because there

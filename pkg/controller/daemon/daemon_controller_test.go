@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 )
 
 // IMPORTANT NOTE: Some tests in file need to pass irrespective of ScheduleDaemonSetPods feature is enabled. For rest
@@ -148,7 +149,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
-			Namespace: metav1.NamespaceDefault,
+			Namespace: metav1.NamespaceNone,
 		},
 		Status: v1.NodeStatus{
 			Conditions: []v1.NodeCondition{
@@ -161,10 +162,20 @@ func newNode(name string, label map[string]string) *v1.Node {
 	}
 }
 
-func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]string) {
+func addNodesWithVersion(nodeStore cache.Store, startIndex, numNodes int, label map[string]string, version string) {
 	for i := startIndex; i < startIndex+numNodes; i++ {
-		nodeStore.Add(newNode(fmt.Sprintf("node-%d", i), label))
+		node := newNode(fmt.Sprintf("node-%d", i), label)
+		node.Status.NodeInfo.KubeletVersion = version
+
+		nodeStore.Add(node)
 	}
+}
+
+func addNodes(nodeStore cache.Store, startIndex, numNodes int, label map[string]string) {
+	// ScheduleDaemonSetPods works with kubelet after 1.11 (there's a case test it against 1.10 kubelet);
+	// and other features do not require kubelet's version.
+	// Refer to https://github.com/kubernetes/kubernetes/issues/69346 for more detail.
+	addNodesWithVersion(nodeStore, startIndex, numNodes, label, "v1.11.0")
 }
 
 func newPod(podName string, nodeName string, label map[string]string, ds *apps.DaemonSet) *v1.Pod {
@@ -545,7 +556,117 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 			t.Fatalf("did not foud pods on nodes %+v", nodeMap)
 		}
 	}
+}
 
+// TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPodsWithDifferentKubeletVersion test that ScheduleDaemonSetPods is
+// only worked with kubelet after 1.11; for kubelet before 1.11, DaemonSet controller still uses `spec.NodeName` for
+// DaemonSet pods.
+func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPodsWithDifferentKubeletVersion(t *testing.T) {
+	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
+	// Rollback feature gate.
+	defer func() {
+		setFeatureGate(t, features.ScheduleDaemonSetPods, enabled)
+	}()
+	setFeatureGate(t, features.ScheduleDaemonSetPods, true)
+
+	numNodes := 5
+	for _, strategy := range updateStrategies() {
+		ds := newDaemonSet("foo")
+		ds.Spec.UpdateStrategy = *strategy
+		manager, podControl, _, err := newTestController(ds)
+		if err != nil {
+			t.Fatalf("error creating DaemonSets controller: %v", err)
+		}
+		n110 := numNodes / 2
+		addNodesWithVersion(manager.nodeStore, 0, n110, nil, "v1.10.0")
+		addNodesWithVersion(manager.nodeStore, n110, numNodes-n110, nil, "v1.11.0")
+
+		manager.dsStore.Add(ds)
+		syncAndValidateDaemonSets(t, manager, ds, podControl, numNodes, 0, 0)
+		// Check for ScheduleDaemonSetPods feature
+		if len(podControl.podIDMap) != numNodes {
+			t.Fatalf("failed to create pods for DaemonSet when enabled ScheduleDaemonSetPods.")
+		}
+
+		nodeMap := make(map[string]*v1.Node)
+		for _, node := range manager.nodeStore.List() {
+			n := node.(*v1.Node)
+			nodeMap[n.Name] = n
+		}
+		if len(nodeMap) != numNodes {
+			t.Fatalf("not enough nodes in the store, expected: %v, got: %v",
+				numNodes, len(nodeMap))
+		}
+
+		for _, pod := range podControl.podIDMap {
+			if len(pod.Spec.NodeName) != 0 {
+				node := nodeMap[pod.Spec.NodeName]
+				kubeletVersion, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
+				if err != nil {
+					t.Fatalf("failed to parse kubelet version %s: %v; the hostname of pod %v should be empty, but got %s",
+						node.Status.NodeInfo.KubeletVersion, err, pod.Name, pod.Spec.NodeName)
+				}
+
+				// If kubelet version less than 1.11.0, ScheduleDaemonSetPods is disabled.
+				if !kubeletVersion.LessThan(utilversion.MustParseSemantic("v1.11.0")) {
+					t.Fatalf("the hostname of pod %v should be empty, but got %s",
+						pod.Name, pod.Spec.NodeName)
+				}
+
+				delete(nodeMap, pod.Spec.NodeName)
+			} else {
+				if pod.Spec.Affinity == nil {
+					t.Fatalf("the Affinity of pod %s is nil.", pod.Name)
+				}
+				if pod.Spec.Affinity.NodeAffinity == nil {
+					t.Fatalf("the NodeAffinity of pod %s is nil.", pod.Name)
+				}
+				nodeSelector := pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+				if nodeSelector == nil {
+					t.Fatalf("the node selector of pod %s is nil.", pod.Name)
+				}
+				if len(nodeSelector.NodeSelectorTerms) != 1 {
+					t.Fatalf("incorrect number of node selector terms in pod %s, expected: 1, got: %d.",
+						pod.Name, len(nodeSelector.NodeSelectorTerms))
+				}
+
+				if len(nodeSelector.NodeSelectorTerms[0].MatchFields) != 1 {
+					t.Fatalf("incorrect number of fields in in node selector term for pod %s, expected: 1, got: %d.",
+						pod.Name, len(nodeSelector.NodeSelectorTerms[0].MatchFields))
+				}
+
+				field := nodeSelector.NodeSelectorTerms[0].MatchFields[0]
+				if field.Key == algorithm.NodeFieldSelectorKeyNodeName {
+					if field.Operator != v1.NodeSelectorOpIn {
+						t.Fatalf("the operation of hostname NodeAffinity is not %v", v1.NodeSelectorOpIn)
+					}
+
+					if len(field.Values) != 1 {
+						t.Fatalf("incorrect hostname in node affinity: expected 1, got %v", len(field.Values))
+					}
+
+					if node, found := nodeMap[field.Values[0]]; found {
+						kubeletVersion, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
+						if err != nil {
+							t.Fatalf("failed to parse kubelet version %s: %v", node.Status.NodeInfo.KubeletVersion, err)
+						}
+
+						// If ScheduleDaemonSetPods is enabled, the kubelet version should be greater than 1.11.
+						if kubeletVersion.LessThan(utilversion.MustParseSemantic("v1.11.0")) {
+							t.Fatalf("ScheduleDaemonSetPods is enabled, the kubelet version should be greater than 1.11, got %v",
+								node.Status.NodeInfo.KubeletVersion)
+						}
+					}
+
+					delete(nodeMap, field.Values[0])
+				}
+			}
+		}
+
+		if len(nodeMap) != 0 {
+			t.Fatalf("did not foud pods on nodes %+v", nodeMap)
+		}
+	}
 }
 
 // Simulate a cluster with 100 nodes, but simulate a limit (like a quota limit)
