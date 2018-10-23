@@ -349,19 +349,34 @@ func TestObjectSizeResponses(t *testing.T) {
 
 func TestConstructBody(t *testing.T) {
 
-	const deploymentObjectSize = 372 // Size of deploymentObject initialized in constructBody
-	// Adding a label, annotation, or finalizer will increase the size of the object by an initial fixed amount,
-	// so this is the base size of the object for any size passed to constructBody > 0. After the initial increase
-	// in size, each increase in size by 1 will increase the object size by factor.
-	// So expected size = base size for field + size*factor
-	const baseLabelSize = deploymentObjectSize + 11
-	const baseAnnotationsSize = deploymentObjectSize + 16
-	const baseFinalizersSize = deploymentObjectSize + 15
+	// Initial size of deploymentObject initialized in constructBody once converted to json
+	const deploymentObjectSize = 372
 
+	// For the following labelString, each additional label or annotation will add a string of the form
+	// ,"0000000001":""
+	// For the finalizerString, each additional finalizer will add
+	// ,"sample/sample"
+	// Both strings have length 16
 	const labelString = ""
 	const finalizerString = "sample/sample"
-	// for given labelString and finalizerString, size of the object returned by constructBody is increased by factor*(size passed)
 	const factor = 16
+
+	// Adding a label of size 1 appends the following data:
+	// ,"labels":{"0000000000":""}
+	// which has length 27
+	// This means the additional size for the first label is 27-factor = 27-16 = 11
+	// So for a label, expected size = base size + additional size for first label + factor*size, or 372 + 11 + 16*size
+	const baseLabelSize = deploymentObjectSize + 11
+
+	// Adding an annotation of size 1 will add
+	// ,"annotations":{"0000000000":""}
+	// which has length 32, so the first annotation has additional size of 32-16=16
+	const baseAnnotationsSize = deploymentObjectSize + 16
+
+	// Adding	an annotation of size 1 will add
+	// ,"finalizers":["sample/sample"]
+	// which has length 31, so the first finalizer has additional size of 31-16=15
+	const baseFinalizersSize = deploymentObjectSize + 15
 
 	Deployment1_5MegabyteSize := int(math.Ceil(1.5 * (1 << 20) / float64(factor)))
 	DeploymentTwoMegabyteSize := int(math.Ceil(2 * (1 << 20) / float64(factor)))
