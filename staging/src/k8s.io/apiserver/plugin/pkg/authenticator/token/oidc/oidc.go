@@ -44,8 +44,10 @@ import (
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/client-go/util/cert"
 )
@@ -529,7 +531,7 @@ func (r *claimResolver) resolve(endpoint endpoint, allClaims claims) error {
 	return nil
 }
 
-func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	if !hasCorrectIssuer(a.issuerURL, token) {
 		return nil, false, nil
 	}
@@ -539,7 +541,6 @@ func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error)
 		return nil, false, fmt.Errorf("oidc: authenticator not initialized")
 	}
 
-	ctx := context.Background()
 	idToken, err := verifier.Verify(ctx, token)
 	if err != nil {
 		return nil, false, fmt.Errorf("oidc: verify token: %v", err)
@@ -617,7 +618,7 @@ func (a *Authenticator) AuthenticateToken(token string) (user.Info, bool, error)
 		}
 	}
 
-	return info, true, nil
+	return &authenticator.Response{User: info}, true, nil
 }
 
 // getClaimJWT gets a distributed claim JWT from url, using the supplied access

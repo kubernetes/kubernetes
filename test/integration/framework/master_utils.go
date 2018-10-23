@@ -83,9 +83,11 @@ func (alwaysAllow) Authorize(requestAttributes authorizer.Attributes) (authorize
 }
 
 // alwaysEmpty simulates "no authentication" for old tests
-func alwaysEmpty(req *http.Request) (user.Info, bool, error) {
-	return &user.DefaultInfo{
-		Name: "",
+func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
+	return &authauthenticator.Response{
+		User: &user.DefaultInfo{
+			Name: "",
+		},
 	}, true, nil
 }
 

@@ -186,19 +186,23 @@ func TestRequestHeader(t *testing.T) {
 	}
 
 	for k, testcase := range testcases {
-		auth, err := New(testcase.nameHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders)
-		if err != nil {
-			t.Fatal(err)
-		}
-		req := &http.Request{Header: testcase.requestHeaders}
+		t.Run(k, func(t *testing.T) {
+			auth, err := New(testcase.nameHeaders, testcase.groupHeaders, testcase.extraPrefixHeaders)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := &http.Request{Header: testcase.requestHeaders}
 
-		user, ok, _ := auth.AuthenticateRequest(req)
-		if testcase.expectedOk != ok {
-			t.Errorf("%v: expected %v, got %v", k, testcase.expectedOk, ok)
-		}
-		if e, a := testcase.expectedUser, user; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: expected %#v, got %#v", k, e, a)
-
-		}
+			resp, ok, _ := auth.AuthenticateRequest(req)
+			if testcase.expectedOk != ok {
+				t.Errorf("%v: expected %v, got %v", k, testcase.expectedOk, ok)
+			}
+			if !ok {
+				return
+			}
+			if e, a := testcase.expectedUser, resp.User; !reflect.DeepEqual(e, a) {
+				t.Errorf("%v: expected %#v, got %#v", k, e, a)
+			}
+		})
 	}
 }
