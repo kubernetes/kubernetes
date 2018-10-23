@@ -36,9 +36,11 @@ import (
 )
 
 const (
-	// The reason and message set on a pod when its state cannot be confirmed as kubelet is unresponsive
+	// NodeUnreachablePodReason is the reason on a pod when its state cannot be confirmed as kubelet is unresponsive
 	// on the node it is (was) running.
-	NodeUnreachablePodReason  = "NodeLost"
+	NodeUnreachablePodReason = "NodeLost"
+	// NodeUnreachablePodMessage is the message on a pod when its state cannot be confirmed as kubelet is unresponsive
+	// on the node it is (was) running.
 	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
 )
 
