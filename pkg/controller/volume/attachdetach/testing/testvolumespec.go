@@ -253,6 +253,10 @@ func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *TestPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *TestPlugin) RequiresRemount() bool {
 	return false
 }

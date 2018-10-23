@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.10",
+	"GoVersion": "go1.11",
 	"GodepVersion": "v80",
 	"Packages": [
 		"github.com/onsi/ginkgo/ginkgo",
@@ -2331,6 +2331,14 @@
 		{
 			"ImportPath": "github.com/kr/text",
 			"Rev": "6807e777504f54ad073ecef66747de158294b639"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library",
+			"Rev": "d62704773030f6db982ef016b4fc1bf3b9ac32db"
+		},
+		{
+			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins",
+			"Rev": "d62704773030f6db982ef016b4fc1bf3b9ac32db"
 		},
 		{
 			"ImportPath": "github.com/kubernetes/repo-infra/kazel",

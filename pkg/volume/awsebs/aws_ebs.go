@@ -85,6 +85,10 @@ func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.AWSElasticBlockStore != nil)
 }
 
+func (plugin *awsElasticBlockStorePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *awsElasticBlockStorePlugin) RequiresRemount() bool {
 	return false
 }

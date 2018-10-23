@@ -118,6 +118,10 @@ type VolumePlugin interface {
 	// const.
 	CanSupport(spec *Spec) bool
 
+	// IsMigrated tests whether the plugin is migrated seamlessly to a CSI
+	// Driver
+	IsMigratedToCSI() bool
+
 	// RequiresRemount returns true if this plugin requires mount calls to be
 	// reexecuted. Atomically updating volumes, like Downward API, depend on
 	// this to update the contents of the volume.
@@ -523,6 +527,31 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 
 	glog.V(1).Infof("Loaded volume plugin %q", name)
 	return nil
+}
+
+func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
+	if spec == nil {
+		return false, fmt.Errorf("could not find plugin migratable because volume spec is nil")
+	}
+
+	matchedPluginNames := []string{}
+	matches := []VolumePlugin{}
+	for k, v := range pm.plugins {
+		if v.CanSupport(spec) {
+			matchedPluginNames = append(matchedPluginNames, k)
+			matches = append(matches, v)
+
+		}
+	}
+
+	if len(matches) == 0 {
+		return false, fmt.Errorf("no volume plugin matched")
+	}
+	if len(matches) > 1 {
+		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+	}
+
+	return matches[0].IsMigratedToCSI(), nil
 }
 
 // FindPluginBySpec looks for a plugin that can support a given volume

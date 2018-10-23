@@ -83,6 +83,10 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
 }
 
+func (plugin *hostPathPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *hostPathPlugin) RequiresRemount() bool {
 	return false
 }

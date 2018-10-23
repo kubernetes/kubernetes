@@ -195,7 +195,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				},
 				Spec: storage.VolumeAttachmentSpec{
 					NodeName: "test-node",
-					Attacher: csiPluginName,
+					Attacher: CSIPluginName,
 					Source: storage.VolumeAttachmentSource{
 						PersistentVolumeName: &pvName,
 					},

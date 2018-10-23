@@ -22,13 +22,14 @@ import (
 	"os"
 	"path"
 
+	"time"
+
 	"github.com/golang/glog"
 	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
-	"time"
 )
 
 const (
@@ -109,7 +110,7 @@ func getReadOnlyFromSpec(spec *volume.Spec) (bool, error) {
 
 // log prepends log string with `kubernetes.io/csi`
 func log(msg string, parts ...interface{}) string {
-	return fmt.Sprintf(fmt.Sprintf("%s: %s", csiPluginName, msg), parts...)
+	return fmt.Sprintf(fmt.Sprintf("%s: %s", CSIPluginName, msg), parts...)
 }
 
 // getVolumeDevicePluginDir returns the path where the CSI plugin keeps the
@@ -117,7 +118,7 @@ func log(msg string, parts ...interface{}) string {
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/dev
 func getVolumeDevicePluginDir(specVolID string, host volume.VolumeHost) string {
 	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
-	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "dev")
+	return path.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID, "dev")
 }
 
 // getVolumeDeviceDataDir returns the path where the CSI plugin keeps the
@@ -125,7 +126,7 @@ func getVolumeDevicePluginDir(specVolID string, host volume.VolumeHost) string {
 // path: plugins/kubernetes.io/csi/volumeDevices/{specVolumeID}/data
 func getVolumeDeviceDataDir(specVolID string, host volume.VolumeHost) string {
 	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
-	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "data")
+	return path.Join(host.GetVolumeDevicePluginDir(CSIPluginName), sanitizedSpecVolID, "data")
 }
 
 // hasReadWriteOnce returns true if modes contains v1.ReadWriteOnce
