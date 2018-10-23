@@ -16,12 +16,12 @@ jobs:
     #### expecting it in the form of
     ####   /go/src/github.com/circleci/go-tool
     ####   /go/src/bitbucket.org/circleci/go-tool
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
       - checkout
 
       # specify any bash command here prefixed with `run: `
-      #- run: go get -v -t -d ./...
-      #- run: go test -v ./...
       - run: make
       - run: make test
+      #- run: go get -v -t -d ./...
+      #- run: go test -v ./...
