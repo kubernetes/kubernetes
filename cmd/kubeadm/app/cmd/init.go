@@ -125,10 +125,39 @@ type initData struct {
 	skipTokenPrint        bool
 	dryRun                bool
 	ignorePreflightErrors sets.String
-	certificatesDir       string
 	dryRunDir             string
 	externalCA            bool
 	client                clientset.Interface
+	dirPaths              *dirPaths
+}
+
+// dirPaths stores all the directory paths
+type dirPaths struct {
+	certificatesDir string
+	kubernetesDir   string
+	manifestDir     string
+	kubeletDir      string
+}
+
+// initDirs initializes all the directory paths
+func initDirs(dryRun bool, certsDir string) (*dirPaths, error) {
+	if dryRun {
+		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create a temporary directory: %v", err)
+		}
+		// Use the same temp dir for all
+		return &dirPaths{
+			dryRunDir, dryRunDir, dryRunDir, dryRunDir,
+		}, nil
+	}
+
+	return &dirPaths{
+		certificatesDir: certsDir,
+		kubernetesDir:   kubeadmconstants.KubernetesDir,
+		manifestDir:     kubeadmconstants.GetStaticPodDirectory(),
+		kubeletDir:      kubeadmconstants.KubeletRunDirectory,
+	}, nil
 }
 
 // NewCmdInit returns "kubeadm init" command.
@@ -305,12 +334,9 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 		return initData{}, err
 	}
 
-	// if dry running creates a temporary folder for saving kubeadm generated files
-	dryRunDir := ""
-	if options.dryRun {
-		if dryRunDir, err = ioutil.TempDir("", "kubeadm-init-dryrun"); err != nil {
-			return initData{}, errors.Wrap(err, "couldn't create a temporary directory")
-		}
+	dirPaths, err := initDirs(options.dryRun, cfg.CertificatesDir)
+	if err != nil {
+		return initData{}, err
 	}
 
 	// Checks if an external CA is provided by the user.
@@ -318,10 +344,9 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 
 	return initData{
 		cfg:                   cfg,
-		certificatesDir:       cfg.CertificatesDir,
 		skipTokenPrint:        options.skipTokenPrint,
 		dryRun:                options.dryRun,
-		dryRunDir:             dryRunDir,
+		dirPaths:              dirPaths,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		externalCA:            externalCA,
 	}, nil
@@ -345,48 +370,6 @@ func (d initData) SkipTokenPrint() bool {
 // IgnorePreflightErrors returns the IgnorePreflightErrors flag.
 func (d initData) IgnorePreflightErrors() sets.String {
 	return d.ignorePreflightErrors
-}
-
-// CertificateWriteDir returns the path to the certificate folder or the temporary folder path in case of DryRun.
-func (d initData) CertificateWriteDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return d.certificatesDir
-}
-
-// CertificateDir returns the CertificateDir as originally specified by the user.
-func (d initData) CertificateDir() string {
-	return d.certificatesDir
-}
-
-// KubeConfigDir returns the path of the kubernetes configuration folder or the temporary folder path in case of DryRun.
-func (d initData) KubeConfigDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return kubeadmconstants.KubernetesDir
-}
-
-// KubeConfigDir returns the path where manifest should be stored or the temporary folder path in case of DryRun.
-func (d initData) ManifestDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return kubeadmconstants.GetStaticPodDirectory()
-}
-
-// KubeletDir returns path of the kubelet configuration folder or the temporary folder in case of DryRun.
-func (d initData) KubeletDir() string {
-	if d.dryRun {
-		return d.dryRunDir
-	}
-	return kubeadmconstants.KubeletRunDirectory
-}
-
-// ExternalCA returns true if an external CA is provided by the user.
-func (d initData) ExternalCA() bool {
-	return d.externalCA
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
@@ -421,30 +404,46 @@ func (d initData) Tokens() []string {
 
 // runInit executes master node provisioning
 func runInit(i *initData, out io.Writer) error {
+	i.cfg.CertificatesDir = i.dirPaths.certificatesDir
 
-	// Get directories to write files to; can be faked if we're dry-running
-	glog.V(1).Infof("[init] Getting certificates directory from configuration")
-	certsDirToWriteTo, kubeConfigDir, manifestDir, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
-	if err != nil {
-		return errors.Wrap(err, "error getting directories to use")
+	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
+	// Try to stop the kubelet service so no race conditions occur when configuring it
+	if !i.dryRun {
+		glog.V(1).Infof("Stopping the kubelet")
+		kubeletphase.TryStopKubelet()
 	}
 
-	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
-	i.cfg.CertificatesDir = certsDirToWriteTo
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+	// as we handle that ourselves in the markmaster phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, i.dirPaths.kubeletDir); err != nil {
+		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
+	}
 
-	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
+	// Write the kubelet configuration file to disk.
+	if err := kubeletphase.WriteConfigToDisk(i.cfg.ComponentConfigs.Kubelet, i.dirPaths.kubeletDir); err != nil {
+		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
+	}
+
+	if !i.dryRun {
+		// Try to start the kubelet service in case it's inactive
+		glog.V(1).Infof("Starting the kubelet")
+		kubeletphase.TryStartKubelet()
+	}
+
+	adminKubeConfigPath := filepath.Join(i.dirPaths.kubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
 
 	// Add etcd static pod spec only if external etcd is not configured
 	if i.cfg.Etcd.External == nil {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
-		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
+		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(i.dirPaths.manifestDir, i.cfg); err != nil {
 			return errors.Wrap(err, "error creating local etcd static pod manifest file")
 		}
 	}
 
 	// If we're dry-running, print the generated manifests
-	if err := printFilesIfDryRunning(i.dryRun, manifestDir); err != nil {
-		return errors.Wrap(err, "error printing files on dryrun")
+	if err := printFilesIfDryRunning(i.dryRun, i.dirPaths.manifestDir); err != nil {
+		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
@@ -458,7 +457,7 @@ func runInit(i *initData, out io.Writer) error {
 	glog.V(1).Infof("[init] waiting for the API server to be healthy")
 	waiter := getWaiter(i, client)
 
-	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", kubeadmconstants.GetStaticPodDirectory())
+	fmt.Printf("[init] waiting for the kubelet to boot up the control plane as Static Pods from directory %q \n", i.dirPaths.manifestDir)
 
 	if err := waitForKubeletAndFunc(waiter, waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
@@ -568,8 +567,8 @@ func runInit(i *initData, out io.Writer) error {
 		// Temporary control plane is up, now we create our self hosted control
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] creating self-hosted control plane")
-		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
-			return errors.Wrap(err, "error creating self hosted control plane")
+		if err := selfhostingphase.CreateSelfHostedControlPlane(i.dirPaths.manifestDir, i.dirPaths.kubernetesDir, i.cfg, client, waiter, i.dryRun); err != nil {
+			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
 	}
 
@@ -612,17 +611,6 @@ func createClient(cfg *kubeadmapi.InitConfiguration, dryRun bool) (clientset.Int
 
 	// If we're acting for real, we should create a connection to the API server and wait for it to come up
 	return kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetAdminKubeConfigPath())
-}
-
-// getDirectoriesToUse returns the (in order) certificates, kubeconfig and Static Pod manifest directories, followed by a possible error
-// This behaves differently when dry-running vs the normal flow
-func getDirectoriesToUse(dryRun bool, dryRunDir string, defaultPkiDir string) (string, string, string, string, error) {
-	if dryRun {
-		// Use the same temp dir for all
-		return dryRunDir, dryRunDir, dryRunDir, dryRunDir, nil
-	}
-
-	return defaultPkiDir, kubeadmconstants.KubernetesDir, kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubeletRunDirectory, nil
 }
 
 // printFilesIfDryRunning prints the Static Pod manifests to stdout and informs about the temporary directory to go and lookup
