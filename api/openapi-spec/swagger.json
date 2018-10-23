@@ -77370,12 +77370,9 @@
    },
    "io.k8s.api.admissionregistration.v1beta1.WebhookClientConfig": {
     "description": "WebhookClientConfig contains the information to make a TLS connection with the webhook",
-    "required": [
-     "caBundle"
-    ],
     "properties": {
      "caBundle": {
-      "description": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. Required.",
+      "description": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. If unspecified, system trust roots on the apiserver are used.",
       "type": "string",
       "format": "byte"
      },
@@ -79979,7 +79976,7 @@
     "description": "WebhookClientConfig contains the information to make a connection with the webhook",
     "properties": {
      "caBundle": {
-      "description": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. defaults to the apiservers CA bundle for the endpoint type",
+      "description": "`caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. If unspecified, system trust roots on the apiserver are used.",
       "type": "string",
       "format": "byte"
      },
@@ -93505,7 +93502,7 @@
     ],
     "properties": {
      "caBundle": {
-      "description": "CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.",
+      "description": "CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate. If unspecified, system trust roots on the apiserver are used.",
       "type": "string",
       "format": "byte"
      },
@@ -93664,7 +93661,7 @@
     ],
     "properties": {
      "caBundle": {
-      "description": "CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.",
+      "description": "CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate. If unspecified, system trust roots on the apiserver are used.",
       "type": "string",
       "format": "byte"
      },

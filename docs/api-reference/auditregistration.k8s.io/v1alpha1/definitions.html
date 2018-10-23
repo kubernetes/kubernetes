@@ -525,14 +525,14 @@ Attempting to use a user or basic auth e.g. "user:password@" is not allowed. Fra
 If the webhook is running within the cluster, then you should use <code>service</code>.<br>
 <br>
 Port 443 will be used if it is open, otherwise it is an error.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1alpha1_servicereference">v1alpha1.ServiceReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">caBundle</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><code>caBundle</code> is a PEM encoded CA bundle which will be used to validate the webhook&#8217;s server certificate. defaults to the apiservers CA bundle for the endpoint type</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>caBundle</code> is a PEM encoded CA bundle which will be used to validate the webhook&#8217;s server certificate. If unspecified, system trust roots on the apiserver are used.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
