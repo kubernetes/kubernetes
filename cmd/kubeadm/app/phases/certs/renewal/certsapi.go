@@ -119,6 +119,9 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 	}
 
 	req, err = r.client.CertificateSigningRequests().Get(req.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get certificate signing request")
+	}
 	if len(req.Status.Conditions) < 1 {
 		return nil, nil, errors.New("certificate signing request has no statuses")
 	}
