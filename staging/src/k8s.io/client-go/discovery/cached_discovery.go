@@ -94,6 +94,8 @@ func (d *CachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, er
 	return ServerResources(d)
 }
 
+// ServerGroups returns the supported groups, with information like supported versions and the
+// preferred version.
 func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 	filename := filepath.Join(d.cacheDirectory, "servergroups.json")
 	cachedBytes, err := d.getCachedFile(filename)
@@ -202,26 +204,36 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 	return err
 }
 
+// RESTClient returns a RESTClient that is used to communicate with API server
+// by this client implementation.
 func (d *CachedDiscoveryClient) RESTClient() restclient.Interface {
 	return d.delegate.RESTClient()
 }
 
+// ServerPreferredResources returns the supported resources with the version preferred by the
+// server.
 func (d *CachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return ServerPreferredResources(d)
 }
 
+// ServerPreferredNamespacedResources returns the supported namespaced resources with the
+// version preferred by the server.
 func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return ServerPreferredNamespacedResources(d)
 }
 
+// ServerVersion retrieves and parses the server's version (git version).
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
 }
 
+// OpenAPISchema retrieves and parses the swagger API schema the server supports.
 func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.delegate.OpenAPISchema()
 }
 
+// Fresh is supposed to tell the caller whether or not to retry if the cache
+// fails to find something (false = retry, true = no need to retry).
 func (d *CachedDiscoveryClient) Fresh() bool {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
@@ -229,6 +241,7 @@ func (d *CachedDiscoveryClient) Fresh() bool {
 	return d.fresh
 }
 
+// Invalidate enforces that no cached data is used in the future that is older than the current time.
 func (d *CachedDiscoveryClient) Invalidate() {
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
