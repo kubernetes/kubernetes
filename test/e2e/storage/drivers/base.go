@@ -81,11 +81,13 @@ type DriverInfo struct {
 	Name       string // Name of the driver
 	FeatureTag string // FeatureTag for the driver
 
-	MaxFileSize        int64       // Max file size to be tested for this driver
-	SupportedFsType    sets.String // Map of string for supported fs type
-	IsPersistent       bool        // Flag to represent whether it provides persistency
-	IsFsGroupSupported bool        // Flag to represent whether it supports fsGroup
-	IsBlockSupported   bool        // Flag to represent whether it supports Block Volume
+	MaxFileSize          int64       // Max file size to be tested for this driver
+	SupportedFsType      sets.String // Map of string for supported fs type
+	SupportedMountOption sets.String // Map of string for supported mount option
+	RequiredMountOption  sets.String // Map of string for required mount option (Optional)
+	IsPersistent         bool        // Flag to represent whether it provides persistency
+	IsFsGroupSupported   bool        // Flag to represent whether it supports fsGroup
+	IsBlockSupported     bool        // Flag to represent whether it supports Block Volume
 
 	// Parameters below will be set inside test loop by using SetCommonDriverParameters.
 	// Drivers that implement TestDriver is required to set all the above parameters
@@ -104,8 +106,8 @@ func GetDriverNameWithFeatureTags(driver TestDriver) string {
 	return fmt.Sprintf("[Driver: %s]%s", dInfo.Name, dInfo.FeatureTag)
 }
 
+// CreateVolume creates volume for test unless dynamicPV test
 func CreateVolume(driver TestDriver, volType testpatterns.TestVolType) interface{} {
-	// Create Volume for test unless dynamicPV test
 	switch volType {
 	case testpatterns.InlineVolume:
 		fallthrough
@@ -121,8 +123,8 @@ func CreateVolume(driver TestDriver, volType testpatterns.TestVolType) interface
 	return nil
 }
 
+// DeleteVolume deletes volume for test unless dynamicPV test
 func DeleteVolume(driver TestDriver, volType testpatterns.TestVolType, testResource interface{}) {
-	// Delete Volume for test unless dynamicPV test
 	switch volType {
 	case testpatterns.InlineVolume:
 		fallthrough
