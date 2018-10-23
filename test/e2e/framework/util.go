@@ -85,7 +85,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	"k8s.io/kubernetes/pkg/controller/service"
+	"k8s.io/kubernetes/pkg/controller/loadbalancer"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -2689,7 +2689,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if _, hasMasterRoleLabel := node.ObjectMeta.Labels[service.LabelNodeRoleMaster]; hasMasterRoleLabel {
+			if _, hasMasterRoleLabel := node.ObjectMeta.Labels[loadbalancer.LabelNodeRoleMaster]; hasMasterRoleLabel {
 				// Kops clusters have masters with spec.unscheduable = false and
 				// node-role.kubernetes.io/master NoSchedule taint.
 				// Don't wait for them.

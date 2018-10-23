@@ -48,7 +48,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
-	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
+	lbcontroller "k8s.io/kubernetes/pkg/controller/loadbalancer"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished"
@@ -64,9 +64,9 @@ import (
 )
 
 func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
-	serviceController, err := servicecontroller.New(
+	loadBalancerController, err := lbcontroller.New(
 		ctx.Cloud,
-		ctx.ClientBuilder.ClientOrDie("service-controller"),
+		ctx.ClientBuilder.ClientOrDie("loadbalancer-controller"),
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ComponentConfig.KubeCloudShared.ClusterName,
@@ -76,7 +76,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 		glog.Errorf("Failed to start service controller: %v", err)
 		return nil, false, nil
 	}
-	go serviceController.Run(ctx.Stop, int(ctx.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+	go loadBalancerController.Run(ctx.Stop, int(ctx.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 	return nil, true, nil
 }
 

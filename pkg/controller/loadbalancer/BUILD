@@ -10,9 +10,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-        "service_controller.go",
+        "loadbalancer_controller.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/controller/service",
+    importpath = "k8s.io/kubernetes/pkg/controller/loadbalancer",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller:go_default_library",
@@ -39,7 +39,7 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["service_controller_test.go"],
+    srcs = ["loadbalancer_controller_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",

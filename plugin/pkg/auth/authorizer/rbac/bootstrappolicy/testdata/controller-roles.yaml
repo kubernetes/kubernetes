@@ -1094,7 +1094,7 @@ items:
     creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
-    name: system:controller:service-controller
+    name: system:controller:loadbalancer-controller
   rules:
   - apiGroups:
     - ""

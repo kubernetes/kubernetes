@@ -291,7 +291,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "service-controller"},
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "loadbalancer-controller"},
 		Rules: []rbacv1.PolicyRule{
 			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("services/status").RuleOrDie(),

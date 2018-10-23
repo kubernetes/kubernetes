@@ -40,7 +40,7 @@ import (
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	cloudcontrollers "k8s.io/kubernetes/pkg/controller/cloud"
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
-	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
+	lbcontroller "k8s.io/kubernetes/pkg/controller/loadbalancer"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
@@ -219,18 +219,18 @@ func startControllers(c *cloudcontrollerconfig.CompletedConfig, stop <-chan stru
 	go pvlController.Run(5, stop)
 	time.Sleep(wait.Jitter(c.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	// Start the service controller
-	serviceController, err := servicecontroller.New(
+	// Start the loadbalancer controller
+	loadBalancerController, err := lbcontroller.New(
 		cloud,
-		client("service-controller"),
+		client("loadbalancer-controller"),
 		c.SharedInformers.Core().V1().Services(),
 		c.SharedInformers.Core().V1().Nodes(),
 		c.ComponentConfig.KubeCloudShared.ClusterName,
 	)
 	if err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
+		glog.Errorf("Failed to start loadbalancer controller: %v", err)
 	} else {
-		go serviceController.Run(stop, int(c.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+		go loadBalancerController.Run(stop, int(c.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 		time.Sleep(wait.Jitter(c.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
 

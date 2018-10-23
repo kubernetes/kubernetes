@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package service contains code for syncing cloud load balancers
-// with the service registry.
-package service // import "k8s.io/kubernetes/pkg/controller/service"
+// Package loadbalancer contains code for syncing cloud load balancers
+// with the loadbalancer registry.
+package loadbalancer // import "k8s.io/kubernetes/pkg/controller/loadbalancer"

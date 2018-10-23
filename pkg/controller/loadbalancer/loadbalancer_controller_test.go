@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service
+package loadbalancer
 
 import (
 	"errors"
@@ -52,7 +52,7 @@ func defaultExternalService() *v1.Service {
 
 func alwaysReady() bool { return true }
 
-func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset) {
+func newController() (*LoadBalancerController, *fakecloud.FakeCloud, *fake.Clientset) {
 	cloud := &fakecloud.FakeCloud{}
 	cloud.Region = region
 
@@ -328,7 +328,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 // TODO(a-robinson): Add tests for update/sync/delete.
 
 func TestProcessServiceUpdate(t *testing.T) {
-	var controller *ServiceController
+	var controller *LoadBalancerController
 
 	//A pair of old and new loadbalancer IP address
 	oldLBIP := "192.168.1.1"
@@ -449,7 +449,7 @@ func TestConflictWhenProcessServiceUpdate(t *testing.T) {
 
 func TestSyncService(t *testing.T) {
 
-	var controller *ServiceController
+	var controller *LoadBalancerController
 
 	testCases := []struct {
 		testName   string
@@ -529,19 +529,19 @@ func TestSyncService(t *testing.T) {
 
 func TestProcessServiceDeletion(t *testing.T) {
 
-	var controller *ServiceController
+	var controller *LoadBalancerController
 	var cloud *fakecloud.FakeCloud
 	// Add a global svcKey name
 	svcKey := "external-balancer"
 
 	testCases := []struct {
 		testName   string
-		updateFn   func(*ServiceController) // Update function used to manupulate srv and controller values
-		expectedFn func(svcErr error) error // Function to check if the returned value is expected
+		updateFn   func(*LoadBalancerController) // Update function used to manupulate srv and controller values
+		expectedFn func(svcErr error) error      // Function to check if the returned value is expected
 	}{
 		{
 			testName: "If an non-existent service is deleted",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func(controller *LoadBalancerController) {
 				// Does not do anything
 			},
 			expectedFn: func(svcErr error) error {
@@ -550,7 +550,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		},
 		{
 			testName: "If cloudprovided failed to delete the service",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func(controller *LoadBalancerController) {
 
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = defaultExternalService()
@@ -570,7 +570,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		},
 		{
 			testName: "If delete was successful",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func(controller *LoadBalancerController) {
 
 				testSvc := defaultExternalService()
 				controller.enqueueService(testSvc)
