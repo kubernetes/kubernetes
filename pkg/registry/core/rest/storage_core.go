@@ -80,8 +80,9 @@ type LegacyRESTStorageProvider struct {
 	ServiceNodePortRange utilnet.PortRange
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
-	ServiceAccountAPIAudiences  []string
 	ServiceAccountMaxExpiration time.Duration
+
+	APIAudiences []string
 
 	LoopbackClientConfig *restclient.Config
 }
@@ -142,7 +143,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	var serviceAccountStorage *serviceaccountstore.REST
 	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.ServiceAccountAPIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store)
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store)
 	} else {
 		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil)
 	}
