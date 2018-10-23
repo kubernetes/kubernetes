@@ -6,16 +6,15 @@ jobs:
     working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
     - checkout
-    - run: cd cmd/kubectl
-    - run: go build
+    - run: go build ./cmd/kubectl
   test:
     docker:
     - image: circleci/golang:1.11.1
     working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
     - checkout
-    - run: cd pkg/controller
-    - run: go test
+    - run: cd 
+    - run: go test ./pkg/controller
 workflows:
   version: 2
   workflow:
