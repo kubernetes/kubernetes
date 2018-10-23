@@ -3,6 +3,7 @@ jobs:
   build:
     docker:
     - image: circleci/golang:1.11.1
+    working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
     - checkout
     - run: cd cmd/kubectl
@@ -10,6 +11,7 @@ jobs:
   test:
     docker:
     - image: circleci/golang:1.11.1
+    working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
     - checkout
     - run: cd pkg/controller
