@@ -173,9 +173,8 @@ type WebhookClientConfig struct {
 	// +optional
 	Service *ServiceReference
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate
-	// the webhook's server certificate.
-	// defaults to the apiservers CA bundle for the endpoint type
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte
 }

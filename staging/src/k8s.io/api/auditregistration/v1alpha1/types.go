@@ -169,13 +169,12 @@ type WebhookClientConfig struct {
 	// Port 443 will be used if it is open, otherwise it is an error.
 	//
 	// +optional
-	Service *ServiceReference `json:"service" protobuf:"bytes,2,opt,name=service"`
+	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,2,opt,name=service"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate
-	// the webhook's server certificate.
-	// defaults to the apiservers CA bundle for the endpoint type
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
-	CABundle []byte `json:"caBundle" protobuf:"bytes,3,opt,name=caBundle"`
+	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,3,opt,name=caBundle"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

@@ -152,3 +152,9 @@
   - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/cluster-bootstrap
+
+- baseImportPath: "./vendor/k8s.io/cloud-provider/"
+  allowedImports:
+  - k8s.io/api
+  - k8s.io/apimachinery
+  - k8s.io/client-go

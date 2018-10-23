@@ -93,20 +93,32 @@ stR0Yiw0buV6DL/moUO0HIM9Bjh96HJp+LxiIS6UCdIhMPp5HoQa
 
 func TestNew(t *testing.T) {
 	testCases := map[string]struct {
-		Config  *Config
-		Err     bool
-		TLS     bool
-		TLSCert bool
-		TLSErr  bool
-		Default bool
+		Config       *Config
+		Err          bool
+		TLS          bool
+		TLSCert      bool
+		TLSErr       bool
+		Default      bool
+		Insecure     bool
+		DefaultRoots bool
 	}{
 		"default transport": {
 			Default: true,
 			Config:  &Config{},
 		},
 
+		"insecure": {
+			TLS:          true,
+			Insecure:     true,
+			DefaultRoots: true,
+			Config: &Config{TLS: TLSConfig{
+				Insecure: true,
+			}},
+		},
+
 		"server name": {
-			TLS: true,
+			TLS:          true,
+			DefaultRoots: true,
 			Config: &Config{TLS: TLSConfig{
 				ServerName: "foo",
 			}},
@@ -264,6 +276,18 @@ func TestNew(t *testing.T) {
 			}
 			if !testCase.TLS {
 				return
+			}
+
+			switch {
+			case testCase.DefaultRoots && transport.TLSClientConfig.RootCAs != nil:
+				t.Fatalf("got %#v, expected nil root CAs", transport.TLSClientConfig.RootCAs)
+			case !testCase.DefaultRoots && transport.TLSClientConfig.RootCAs == nil:
+				t.Fatalf("got %#v, expected non-nil root CAs", transport.TLSClientConfig.RootCAs)
+			}
+
+			switch {
+			case testCase.Insecure != transport.TLSClientConfig.InsecureSkipVerify:
+				t.Fatalf("got %#v, expected %#v", transport.TLSClientConfig.InsecureSkipVerify, testCase.Insecure)
 			}
 
 			switch {
