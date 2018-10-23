@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
+	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	"k8s.io/kubernetes/test/utils"
 
@@ -64,6 +65,7 @@ func NewHollowKubelet(
 	// -----------------
 	volumePlugins := emptydir.ProbeVolumePlugins()
 	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
+	volumePlugins = append(volumePlugins, projected.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
 		KubeClient:         client,
 		HeartbeatClient:    client,
