@@ -63,11 +63,11 @@ func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 	if err != nil {
 		return fmt.Errorf("error get interface: %s, err: %v", devName, err)
 	}
-	addr := net.ParseIP(address)
-	if addr == nil {
-		return fmt.Errorf("error parse ip address: %s", address)
+	ipnet, err := netlink.ParseIPNet(address)
+	if err != nil {
+		return fmt.Errorf("error parse IPNet: %s", address)
 	}
-	if err := h.AddrDel(dev, &netlink.Addr{IPNet: netlink.NewIPNet(addr)}); err != nil {
+	if err := h.AddrDel(dev, &netlink.Addr{IPNet: ipnet}); err != nil {
 		if err != unix.ENXIO {
 			return fmt.Errorf("error unbind address: %s from interface: %s, err: %v", address, devName, err)
 		}
@@ -117,7 +117,7 @@ func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
 	}
 	var ips []string
 	for _, addr := range addrs {
-		ips = append(ips, addr.IP.String())
+		ips = append(ips, addr.IPNet.String())
 	}
 	return ips, nil
 }

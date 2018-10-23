@@ -2917,7 +2917,7 @@ func TestCleanLegacyBindAddr(t *testing.T) {
 	// All ipvs service addresses that were bound to ipvs0 in the latest sync loop.
 	activeBindAddrs := map[string]bool{"1.2.3.4": true, "1002:ab8::2:1": true}
 	// All service addresses that were bound to ipvs0 in system
-	currentBindAddrs := []string{"1.2.3.4", "1.2.3.5", "1.2.3.6", "1002:ab8::2:1", "1002:ab8::2:2"}
+	currentBindAddrs := []string{"1.2.3.4/32", "1.2.3.5/32", "1.2.3.6/32", "1002:ab8::2:1/64", "1002:ab8::2:2/64"}
 
 	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 
@@ -2927,15 +2927,15 @@ func TestCleanLegacyBindAddr(t *testing.T) {
 	fp.cleanLegacyBindAddr(activeBindAddrs, currentBindAddrs)
 
 	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
-	// should only remain "1.2.3.4" and "1002:ab8::2:1"
+	// should only remain "1.2.3.4/32" and "1002:ab8::2:1/64"
 	if len(remainingAddrs) != 2 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 2, len(remainingAddrs))
 	}
 
-	// check that address "1.2.3.4" and "1002:ab8::2:1" remain
+	// check that address "1.2.3.4/32" and "1002:ab8::2:1/64" remain
 	remainingAddrsMap := make(map[string]bool)
 	for i := range remainingAddrs {
-		remainingAddrsMap[remainingAddrs[i]] = true
+		remainingAddrsMap[strings.Split(remainingAddrs[i], "/")[0]] = true
 	}
 	if !reflect.DeepEqual(activeBindAddrs, remainingAddrsMap) {
 		t.Errorf("Expected remainingAddrsMap %v, got %v", activeBindAddrs, remainingAddrsMap)
@@ -2978,30 +2978,31 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
 	}
-	if remainingAddrs[0] != "172.16.55.4" {
-		t.Errorf("Expected remaining address should be %s, got %s", "172.16.55.4", remainingAddrs[0])
+	expectedAddr := "172.16.55.4/32"
+	if remainingAddrs[0] != expectedAddr {
+		t.Errorf("Expected remaining address should be %s, got %s", expectedAddr, remainingAddrs[0])
 	}
 
 	// update multi-port service1 to single-port service2
 	fp.OnServiceUpdate(service1, service2)
 	fp.syncProxyRules()
 	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
-	// should still only remain address "172.16.55.4"
+	// should still only remain address "172.16.55.4/32"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
-	} else if remainingAddrs[0] != "172.16.55.4" {
-		t.Errorf("Expected remaining address should be %s, got %s", "172.16.55.4", remainingAddrs[0])
+	} else if remainingAddrs[0] != expectedAddr {
+		t.Errorf("Expected remaining address should be %s, got %s", expectedAddr, remainingAddrs[0])
 	}
 
 	// update single-port service2 to multi-port service3
 	fp.OnServiceUpdate(service2, service3)
 	fp.syncProxyRules()
 	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
-	// should still only remain address "172.16.55.4"
+	// should still only remain address "172.16.55.4/32"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
-	} else if remainingAddrs[0] != "172.16.55.4" {
-		t.Errorf("Expected remaining address should be %s, got %s", "172.16.55.4", remainingAddrs[0])
+	} else if remainingAddrs[0] != expectedAddr {
+		t.Errorf("Expected remaining address should be %s, got %s", expectedAddr, remainingAddrs[0])
 	}
 
 	// delete multi-port service3

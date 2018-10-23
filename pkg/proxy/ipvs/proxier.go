@@ -1619,7 +1619,8 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 
 func (proxier *Proxier) cleanLegacyBindAddr(activeBindAddrs map[string]bool, currentBindAddrs []string) {
 	for _, addr := range currentBindAddrs {
-		if _, ok := activeBindAddrs[addr]; !ok {
+		// Strip IP mask from currentBindAddr (e.g. 1.2.3.4/32) to match activeBindAddrs (e.g. 1.2.3.4)
+		if _, ok := activeBindAddrs[strings.Split(addr, "/")[0]]; !ok {
 			// This address was not processed in the latest sync loop
 			glog.V(4).Infof("Unbind addr %s", addr)
 			err := proxier.netlinkHandle.UnbindAddress(addr, DefaultDummyDevice)
