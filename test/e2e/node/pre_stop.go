@@ -127,7 +127,7 @@ func testPreStop(c clientset.Interface, ns string) {
 
 		var body []byte
 		body, err = c.CoreV1().RESTClient().Get().
-			Context(ctx).
+			WithContext(ctx).
 			Namespace(ns).
 			Resource("pods").
 			SubResource("proxy").

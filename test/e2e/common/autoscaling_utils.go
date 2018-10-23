@@ -258,7 +258,7 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
-			Context(ctx).
+			WithContext(ctx).
 			Name(rc.controllerName).
 			Suffix("ConsumeCPU").
 			Param("millicores", strconv.Itoa(millicores)).
@@ -285,7 +285,7 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
-			Context(ctx).
+			WithContext(ctx).
 			Name(rc.controllerName).
 			Suffix("ConsumeMem").
 			Param("megabytes", strconv.Itoa(megabytes)).
@@ -312,7 +312,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
-			Context(ctx).
+			WithContext(ctx).
 			Name(rc.controllerName).
 			Suffix("BumpMetric").
 			Param("metric", customMetricName).

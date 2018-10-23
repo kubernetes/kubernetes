@@ -1839,7 +1839,7 @@ func TestDoContext(t *testing.T) {
 
 	c := testRESTClient(t, testServer)
 	_, err := c.Verb("GET").
-		Context(ctx).
+		WithContext(ctx).
 		Prefix("foo").
 		DoRaw()
 	if err == nil {

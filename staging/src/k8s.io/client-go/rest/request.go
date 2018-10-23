@@ -411,9 +411,15 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-// Context adds a context to the request. Contexts are only used for
+// Context returns the context currently associated with the request. To change
+// the context, use WithContext.
+func (r *Request) Context() context.Context {
+	return r.ctx
+}
+
+// WithContext adds a context to the request. Contexts are only used for
 // timeouts, deadlines, and cancellations.
-func (r *Request) Context(ctx context.Context) *Request {
+func (r *Request) WithContext(ctx context.Context) *Request {
 	r.ctx = ctx
 	return r
 }

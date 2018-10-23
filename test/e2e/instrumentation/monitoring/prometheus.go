@@ -228,7 +228,7 @@ func fetchPrometheusTargetDiscovery(c clientset.Interface) (TargetDiscovery, err
 	defer cancel()
 
 	response, err := c.CoreV1().RESTClient().Get().
-		Context(ctx).
+		WithContext(ctx).
 		Namespace("kube-system").
 		Resource("services").
 		Name(prometheusService+":9090").
@@ -284,7 +284,7 @@ func queryPrometheus(c clientset.Interface, query string, start, end time.Time, 
 	defer cancel()
 
 	response, err := c.CoreV1().RESTClient().Get().
-		Context(ctx).
+		WithContext(ctx).
 		Namespace("kube-system").
 		Resource("services").
 		Name(prometheusService+":9090").

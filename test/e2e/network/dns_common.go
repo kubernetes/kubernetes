@@ -503,7 +503,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 
 		for _, fileName := range fileNames {
 			contents, err := client.CoreV1().RESTClient().Get().
-				Context(ctx).
+				WithContext(ctx).
 				Namespace(pod.Namespace).
 				Resource("pods").
 				SubResource("proxy").

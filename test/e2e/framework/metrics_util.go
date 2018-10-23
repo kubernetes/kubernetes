@@ -608,7 +608,7 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 		defer cancel()
 
 		body, err := c.CoreV1().RESTClient().Verb(opUpper).
-			Context(ctx).
+			WithContext(ctx).
 			Namespace(metav1.NamespaceSystem).
 			Resource("pods").
 			Name(fmt.Sprintf("kube-scheduler-%v:%v", TestContext.CloudConfig.MasterName, ports.SchedulerPort)).

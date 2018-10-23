@@ -1820,7 +1820,7 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 		defer cancel()
 
 		body, err := r.c.CoreV1().RESTClient().Get().
-			Context(ctx).
+			WithContext(ctx).
 			Namespace(r.ns).
 			Resource("pods").
 			SubResource("proxy").
@@ -2019,7 +2019,7 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 		defer cancel()
 
 		body, err := proxyRequest.Namespace(ns).
-			Context(ctx).
+			WithContext(ctx).
 			Name(name).
 			Do().
 			Raw()

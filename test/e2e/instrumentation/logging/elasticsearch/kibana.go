@@ -92,7 +92,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 		defer cancel()
 
 		_, err = req.Namespace(metav1.NamespaceSystem).
-			Context(ctx).
+			WithContext(ctx).
 			Name("kibana-logging").
 			DoRaw()
 		if err != nil {

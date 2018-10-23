@@ -72,7 +72,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 
 			// Query against the proxy URL for the kubernetes-dashboard service.
 			err := proxyRequest.Namespace(uiNamespace).
-				Context(ctx).
+				WithContext(ctx).
 				Name(utilnet.JoinSchemeNamePort("https", uiServiceName, "")).
 				Timeout(framework.SingleCallTimeout).
 				Do().
