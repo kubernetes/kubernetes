@@ -333,14 +333,14 @@ func CreateKubeAPIServerConfig(
 
 	if s.ServiceAccountSigningKeyFile != "" ||
 		s.Authentication.ServiceAccounts.Issuer != "" ||
-		len(s.Authentication.ServiceAccounts.APIAudiences) > 0 {
+		len(s.Authentication.APIAudiences) > 0 {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
 			lastErr = fmt.Errorf("the TokenRequest feature is not enabled but --service-account-signing-key-file, --service-account-issuer and/or --service-account-api-audiences flags were passed")
 			return
 		}
 		if s.ServiceAccountSigningKeyFile == "" ||
 			s.Authentication.ServiceAccounts.Issuer == "" ||
-			len(s.Authentication.ServiceAccounts.APIAudiences) == 0 ||
+			len(s.Authentication.APIAudiences) == 0 ||
 			len(s.Authentication.ServiceAccounts.KeyFiles) == 0 {
 			lastErr = fmt.Errorf("service-account-signing-key-file, service-account-issuer, service-account-api-audiences and service-account-key-file should be specified together")
 			return
@@ -365,7 +365,7 @@ func CreateKubeAPIServerConfig(
 			lastErr = fmt.Errorf("failed to build token generator: %v", err)
 			return
 		}
-		apiAudiences = s.Authentication.ServiceAccounts.APIAudiences
+		apiAudiences = s.Authentication.APIAudiences
 		maxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
 
@@ -401,7 +401,7 @@ func CreateKubeAPIServerConfig(
 			MasterCount:            s.MasterCount,
 
 			ServiceAccountIssuer:        issuer,
-			ServiceAccountAPIAudiences:  apiAudiences,
+			APIAudiences:                apiAudiences,
 			ServiceAccountMaxExpiration: maxExpiration,
 
 			InternalInformers:  sharedInformers,
