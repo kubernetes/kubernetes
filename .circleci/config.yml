@@ -3,7 +3,7 @@ jobs:
   build:
     docker:
     - image: circleci/golang:1.11.1
-    working_directory: /go/src/github.com/islinwb/kubernetes
+    working_directory: /go/src/k8s.io/kubernetes
     steps:
     - checkout
     - run: pwd
@@ -13,7 +13,7 @@ jobs:
   test:
     docker:
     - image: circleci/golang:1.11.1
-    working_directory: /go/src/github.com/islinwb/kubernetes
+    working_directory: /go/src/k8s.io/kubernetes
     steps:
     - checkout
     - run: pwd
