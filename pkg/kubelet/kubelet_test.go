@@ -2279,7 +2279,6 @@ func (p podsByUID) Len() int           { return len(p) }
 func (p podsByUID) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podsByUID) Less(i, j int) bool { return p[i].UID < p[j].UID }
 
-//go:generate $KUBE_ROOT/hack/generate-mocks.sh ./kubelet.go pluginWatcher ./fake/fake_plugin_watcher.go
 func TestCSIPluginHandlerRegistration(t *testing.T) {
 	testKubelet := newTestKubeletWithoutFakeVolumePlugin(t, false)
 	defer testKubelet.Cleanup()
