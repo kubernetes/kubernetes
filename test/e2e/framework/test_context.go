@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
+	"github.com/pkg/errors"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -366,7 +367,20 @@ func AfterReadingAllFlags(t *TestContextType) {
 	// Make sure that all test runs have a valid TestContext.CloudConfig.Provider.
 	var err error
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
+	if err == nil {
+		return
+	}
+	if !os.IsNotExist(errors.Cause(err)) {
+		Failf("Failed to setup provider config: %v", err)
+	}
+	// We allow unknown provider parameters for historic reasons. At least log a
+	// warning to catch typos.
+	// TODO (https://github.com/kubernetes/kubernetes/issues/70200):
+	// - remove the fallback for unknown providers
+	// - proper error message instead of Failf (which panics)
+	glog.Warningf("Unknown provider %q, proceeding as for --provider=skeleton.", TestContext.Provider)
+	TestContext.CloudConfig.Provider, err = SetupProviderConfig("skeleton")
 	if err != nil {
-		Failf("Failed to setup provide r config: %v", err)
+		Failf("Failed to setup fallback skeleton provider config: %v", err)
 	}
 }
