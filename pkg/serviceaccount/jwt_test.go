@@ -17,6 +17,7 @@ limitations under the License.
 package serviceaccount_test
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -278,12 +279,12 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 		authenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
 
 		// An invalid, non-JWT token should always fail
-		if _, ok, err := authenticator.AuthenticateToken("invalid token"); err != nil || ok {
+		if _, ok, err := authenticator.AuthenticateToken(context.Background(), "invalid token"); err != nil || ok {
 			t.Errorf("%s: Expected err=nil, ok=false for non-JWT token", k)
 			continue
 		}
 
-		user, ok, err := authenticator.AuthenticateToken(tc.Token)
+		resp, ok, err := authenticator.AuthenticateToken(context.Background(), tc.Token)
 		if (err != nil) != tc.ExpectedErr {
 			t.Errorf("%s: Expected error=%v, got %v", k, tc.ExpectedErr, err)
 			continue
@@ -298,16 +299,16 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			continue
 		}
 
-		if user.GetName() != tc.ExpectedUserName {
-			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, user.GetName())
+		if resp.User.GetName() != tc.ExpectedUserName {
+			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, resp.User.GetName())
 			continue
 		}
-		if user.GetUID() != tc.ExpectedUserUID {
-			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, user.GetUID())
+		if resp.User.GetUID() != tc.ExpectedUserUID {
+			t.Errorf("%s: Expected userUID=%v, got %v", k, tc.ExpectedUserUID, resp.User.GetUID())
 			continue
 		}
-		if !reflect.DeepEqual(user.GetGroups(), tc.ExpectedGroups) {
-			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, user.GetGroups())
+		if !reflect.DeepEqual(resp.User.GetGroups(), tc.ExpectedGroups) {
+			t.Errorf("%s: Expected groups=%v, got %v", k, tc.ExpectedGroups, resp.User.GetGroups())
 			continue
 		}
 	}

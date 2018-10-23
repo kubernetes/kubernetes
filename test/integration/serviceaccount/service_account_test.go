@@ -21,6 +21,7 @@ package serviceaccount
 // to work for any client of the HTTP interface.
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
@@ -365,9 +366,9 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
-	rootTokenAuth := authenticator.TokenFunc(func(token string) (user.Info, bool, error) {
+	rootTokenAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		if token == rootToken {
-			return &user.DefaultInfo{Name: rootUserName}, true, nil
+			return &authenticator.Response{User: &user.DefaultInfo{Name: rootUserName}}, true, nil
 		}
 		return nil, false, nil
 	})

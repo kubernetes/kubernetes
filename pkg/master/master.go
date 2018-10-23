@@ -169,8 +169,9 @@ type ExtraConfig struct {
 	EndpointReconcilerType reconcilers.Type
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
-	ServiceAccountAPIAudiences  []string
 	ServiceAccountMaxExpiration time.Duration
+
+	APIAudiences []string
 
 	VersionedInformers informers.SharedInformerFactory
 	InternalInformers  internalinformers.SharedInformerFactory
@@ -334,8 +335,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
 			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
 			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
-			ServiceAccountAPIAudiences:  c.ExtraConfig.ServiceAccountAPIAudiences,
 			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
+			APIAudiences:                c.ExtraConfig.APIAudiences,
 		}
 		m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider)
 	}

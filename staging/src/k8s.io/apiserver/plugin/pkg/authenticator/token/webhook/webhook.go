@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"time"
 
 	"github.com/golang/glog"
@@ -69,7 +70,7 @@ func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, ttl, 
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
-func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
+func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	r := &authentication.TokenReview{
 		Spec: authentication.TokenReviewSpec{Token: token},
 	}
@@ -104,11 +105,13 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 		}
 	}
 
-	return &user.DefaultInfo{
-		Name:   r.Status.User.Username,
-		UID:    r.Status.User.UID,
-		Groups: r.Status.User.Groups,
-		Extra:  extra,
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name:   r.Status.User.Username,
+			UID:    r.Status.User.UID,
+			Groups: r.Status.User.Groups,
+			Extra:  extra,
+		},
 	}, true, nil
 }
 

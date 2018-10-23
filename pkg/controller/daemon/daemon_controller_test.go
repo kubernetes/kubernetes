@@ -524,7 +524,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 			}
 
 			if len(nodeSelector.NodeSelectorTerms[0].MatchFields) != 1 {
-				t.Fatalf("incorrect number of fields in in node selector term for pod %s, expected: 1, got: %d.",
+				t.Fatalf("incorrect number of fields in node selector term for pod %s, expected: 1, got: %d.",
 					pod.Name, len(nodeSelector.NodeSelectorTerms[0].MatchFields))
 			}
 
