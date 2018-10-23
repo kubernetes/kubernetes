@@ -46,6 +46,7 @@ import (
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	coordlisters "k8s.io/client-go/listers/coordination/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
@@ -266,6 +267,13 @@ func NewNodeLifecycleController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
+	eventBroadcaster.StartLogging(glog.Infof)
+
+	glog.Infof("Sending events to api server.")
+	eventBroadcaster.StartRecordingToSink(
+		&v1core.EventSinkImpl{
+			Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events(""),
+		})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("node_lifecycle_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
