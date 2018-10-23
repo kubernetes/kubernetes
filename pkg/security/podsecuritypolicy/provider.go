@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/features"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -174,9 +175,9 @@ func (s *simpleProvider) DefaultContainerSecurityContext(pod *api.Pod, container
 		sc.SetAllowPrivilegeEscalation(s.psp.Spec.DefaultAllowPrivilegeEscalation)
 	}
 
-	// if the PSP sets psp.AllowPrivilegeEscalation to false set that as the default
-	if !s.psp.Spec.AllowPrivilegeEscalation && sc.AllowPrivilegeEscalation() == nil {
-		sc.SetAllowPrivilegeEscalation(&s.psp.Spec.AllowPrivilegeEscalation)
+	// if the PSP sets psp.AllowPrivilegeEscalation to false, set that as the default
+	if !*s.psp.Spec.AllowPrivilegeEscalation && sc.AllowPrivilegeEscalation() == nil {
+		sc.SetAllowPrivilegeEscalation(s.psp.Spec.AllowPrivilegeEscalation)
 	}
 
 	pod.Annotations = annotations
@@ -313,14 +314,15 @@ func (s *simpleProvider) ValidateContainer(pod *api.Pod, container *api.Containe
 	procMount := sc.ProcMount()
 	allowedProcMounts := s.psp.Spec.AllowedProcMountTypes
 	if len(allowedProcMounts) == 0 {
-		allowedProcMounts = []api.ProcMountType{api.DefaultProcMount}
+		allowedProcMounts = []corev1.ProcMountType{corev1.DefaultProcMount}
 	}
 	foundProcMountType := false
 	for _, pm := range allowedProcMounts {
-		if pm == procMount {
+		if string(pm) == string(procMount) {
 			foundProcMountType = true
 		}
 	}
+
 	if !foundProcMountType {
 		allErrs = append(allErrs, field.Invalid(scPath.Child("procMount"), procMount, "ProcMountType is not allowed"))
 	}
@@ -339,12 +341,8 @@ func (s *simpleProvider) ValidateContainer(pod *api.Pod, container *api.Containe
 	}
 
 	allowEscalation := sc.AllowPrivilegeEscalation()
-	if !s.psp.Spec.AllowPrivilegeEscalation && allowEscalation == nil {
+	if !*s.psp.Spec.AllowPrivilegeEscalation && (allowEscalation == nil || *allowEscalation) {
 		allErrs = append(allErrs, field.Invalid(scPath.Child("allowPrivilegeEscalation"), allowEscalation, "Allowing privilege escalation for containers is not allowed"))
-	}
-
-	if !s.psp.Spec.AllowPrivilegeEscalation && allowEscalation != nil && *allowEscalation {
-		allErrs = append(allErrs, field.Invalid(scPath.Child("allowPrivilegeEscalation"), *allowEscalation, "Allowing privilege escalation for containers is not allowed"))
 	}
 
 	return allErrs

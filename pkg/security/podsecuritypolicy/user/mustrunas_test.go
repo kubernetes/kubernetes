@@ -17,8 +17,8 @@ limitations under the License.
 package user
 
 import (
+	policy "k8s.io/api/policy/v1beta1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	"strings"
 	"testing"
 )
