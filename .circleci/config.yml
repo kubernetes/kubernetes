@@ -6,9 +6,9 @@ jobs:
     working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
     - checkout
-    - pwd
-    - ls
-    - go env
+    - run: pwd
+    - run: ls
+    - run: go env
     - run: go build ./cmd/kubectl
   test:
     docker:
@@ -16,7 +16,8 @@ jobs:
     working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
     - checkout
-    - run: cd 
+    - run: pwd
+    - run: ls
     - run: go test ./pkg/controller
 workflows:
   version: 2
