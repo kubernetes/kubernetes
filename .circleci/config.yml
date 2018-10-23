@@ -6,6 +6,9 @@ jobs:
     working_directory: /go/src/github.com/islinwb/kubernetes
     steps:
     - checkout
+    - pwd
+    - ls
+    - go env
     - run: go build ./cmd/kubectl
   test:
     docker:
