@@ -589,7 +589,6 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 
-	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error converting pod selector to selector: %v", err))
@@ -619,6 +618,8 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 
 	var manageReplicasErr error
+
+	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, rs)
 	}
