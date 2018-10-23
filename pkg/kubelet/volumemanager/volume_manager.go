@@ -50,21 +50,21 @@ import (
 const (
 	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
 	// between successive executions
-	reconcilerLoopSleepPeriod time.Duration = 100 * time.Millisecond
+	reconcilerLoopSleepPeriod = 100 * time.Millisecond
 
 	// reconcilerSyncStatesSleepPeriod is the amount of time the reconciler reconstruct process
 	// waits between successive executions
-	reconcilerSyncStatesSleepPeriod time.Duration = 3 * time.Minute
+	reconcilerSyncStatesSleepPeriod = 3 * time.Minute
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 100 * time.Millisecond
+	desiredStateOfWorldPopulatorLoopSleepPeriod = 100 * time.Millisecond
 
 	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
 	// time the DesiredStateOfWorldPopulator loop waits between successive pod
 	// cleanup calls (to prevent calling containerruntime.GetPodStatus too
 	// frequently).
-	desiredStateOfWorldPopulatorGetPodStatusRetryDuration time.Duration = 2 * time.Second
+	desiredStateOfWorldPopulatorGetPodStatusRetryDuration = 2 * time.Second
 
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
@@ -75,11 +75,11 @@ const (
 	// request to the pod).
 	// Value is slightly offset from 2 minutes to make timeouts due to this
 	// constant recognizable.
-	podAttachAndMountTimeout time.Duration = 2*time.Minute + 3*time.Second
+	podAttachAndMountTimeout = 2*time.Minute + 3*time.Second
 
 	// podAttachAndMountRetryInterval is the amount of time the GetVolumesForPod
 	// call waits before retrying
-	podAttachAndMountRetryInterval time.Duration = 300 * time.Millisecond
+	podAttachAndMountRetryInterval = 300 * time.Millisecond
 
 	// waitForAttachTimeout is the maximum amount of time a
 	// operationexecutor.Mount call will wait for a volume to be attached.
@@ -87,7 +87,7 @@ const (
 	// minutes to complete for some volume plugins in some cases. While this
 	// operation is waiting it only blocks other operations on the same device,
 	// other devices are not affected.
-	waitForAttachTimeout time.Duration = 10 * time.Minute
+	waitForAttachTimeout = 10 * time.Minute
 )
 
 // VolumeManager runs a set of asynchronous loops that figure out which volumes
