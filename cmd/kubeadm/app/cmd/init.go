@@ -215,6 +215,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
 	flagSet.StringVar(
+		&cfg.ClusterConfiguration.ClusterName, "cluster-name", cfg.ClusterConfiguration.ClusterName,
+		`Specify the cluster name.`,
+	)
+	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, "node-name", cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)

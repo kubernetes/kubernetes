@@ -25,12 +25,13 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcertutil "k8s.io/client-go/util/cert"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
-	`kubeadm join {{.MasterHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}`,
+	`kubeadm join {{.MasterHostPort}}{{if .ClusterName}} --cluster-name {{.ClusterName}}{{end}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}`,
 ))
 
 // GetJoinCommand returns the kubeadm join command for a given token and
@@ -70,8 +71,16 @@ func GetJoinCommand(kubeConfigFile string, token string, skipTokenPrint bool) (s
 		publicKeyPins = append(publicKeyPins, pubkeypin.Hash(caCert))
 	}
 
+	clusterName := ""
+	if config.Contexts[config.CurrentContext] != nil {
+		if config.Contexts[config.CurrentContext].Cluster != kubeadmapiv1beta1.DefaultClusterName {
+			clusterName = config.Contexts[config.CurrentContext].Cluster
+		}
+	}
+
 	ctx := map[string]interface{}{
 		"Token":          token,
+		"ClusterName":    clusterName,
 		"CAPubKeyPins":   publicKeyPins,
 		"MasterHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
 	}
