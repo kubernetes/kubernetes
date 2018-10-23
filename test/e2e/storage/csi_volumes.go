@@ -55,6 +55,7 @@ type csiTestDriver interface {
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
 	"hostPath": initCSIHostpath,
 	"gcePD":    initCSIgcePD,
+	"mock":     initCSIMock,
 }
 
 var _ = utils.SIGDescribe("CSI Volumes", func() {
@@ -115,13 +116,12 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		})
 	}
 
-	// Use [Serial], because there can be only one CSIDriver for csi-hostpath driver.
-	Context("CSI attach test using HostPath driver [Serial][Feature:CSISkipAttach]", func() {
+	Context("CSI attach test using Mock driver [Feature:CSISkipAttach]", func() {
 		var (
 			driver csiTestDriver
 		)
 		BeforeEach(func() {
-			driver = initCSIHostpath(f, config)
+			driver = initCSIMock(f, config)
 			driver.createCSIDriver()
 		})
 
@@ -158,7 +158,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 			test := t
 			It(test.name, func() {
 				if test.driverExists {
-					driver := createCSIDriver(csics, test.driverAttachable)
+					driver := createCSIDriver(csics, config.Namespace, test.driverAttachable)
 					if driver != nil {
 						defer csics.CsiV1alpha1().CSIDrivers().Delete(driver.Name, nil)
 					}
@@ -207,11 +207,11 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	})
 })
 
-func createCSIDriver(csics csiclient.Interface, attachable bool) *csiv1alpha1.CSIDriver {
+func createCSIDriver(csics csiclient.Interface, driverName string, attachable bool) *csiv1alpha1.CSIDriver {
 	By("Creating CSIDriver instance")
 	driver := &csiv1alpha1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "csi-hostpath",
+			Name: driverName,
 		},
 		Spec: csiv1alpha1.CSIDriverSpec{
 			AttachRequired: &attachable,
@@ -344,6 +344,65 @@ func (h *hostpathCSIDriver) cleanupCSIDriver() {
 	role := csiControllerRole(cs, config, true)
 	csiControllerRoleBinding(cs, config, true, role, h.serviceAccount)
 	csiServiceAccount(cs, config, "hostpath", true)
+}
+
+type mockCSIDriver struct {
+	combinedClusterRoleNames []string
+	serviceAccount           *v1.ServiceAccount
+
+	f          *framework.Framework
+	config     framework.VolumeTestConfig
+	driverName string
+	skipAttach bool
+}
+
+func initCSIMock(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
+	return &mockCSIDriver{
+		combinedClusterRoleNames: []string{
+			csiExternalAttacherClusterRoleName,
+			csiExternalProvisionerClusterRoleName,
+			csiDriverRegistrarClusterRoleName,
+		},
+		f:          f,
+		config:     config,
+		driverName: config.Namespace,
+	}
+}
+
+func (m *mockCSIDriver) createStorageClassTest(node v1.Node) storageClassTest {
+	return storageClassTest{
+		name:               m.driverName,
+		provisioner:        m.driverName,
+		parameters:         map[string]string{},
+		claimSize:          "1Gi",
+		expectedSize:       "1Gi",
+		nodeName:           node.Name,
+		skipWriteReadCheck: true,
+	}
+}
+
+func (m *mockCSIDriver) createCSIDriver() {
+	By("deploying csi mock driver")
+	f := m.f
+	cs := f.ClientSet
+	config := m.config
+	m.serviceAccount = csiServiceAccount(cs, config, "mock", false)
+	csiClusterRoleBindings(cs, config, false, m.serviceAccount, m.combinedClusterRoleNames)
+	role := csiControllerRole(cs, config, false)
+	csiControllerRoleBinding(cs, config, false, role, m.serviceAccount)
+	csiMockPod(cs, config, false, f, m.serviceAccount, true /* skipAttach */, m.driverName)
+}
+
+func (m *mockCSIDriver) cleanupCSIDriver() {
+	By("uninstalling csi hostpath driver")
+	f := m.f
+	cs := f.ClientSet
+	config := m.config
+	csiMockPod(cs, config, true, f, m.serviceAccount, true /* skipAttach */, m.driverName)
+	csiClusterRoleBindings(cs, config, true, m.serviceAccount, m.combinedClusterRoleNames)
+	role := csiControllerRole(cs, config, true)
+	csiControllerRoleBinding(cs, config, true, role, m.serviceAccount)
+	csiServiceAccount(cs, config, "mock", true)
 }
 
 type gcePDCSIDriver struct {

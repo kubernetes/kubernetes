@@ -51,7 +51,9 @@ var (
 	csiImageVersion  = flag.String("storage.csi.image.version", "", "overrides the default tag used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
 	csiImageRegistry = flag.String("storage.csi.image.registry", "quay.io/k8scsi", "overrides the default repository used for hostpathplugin/csi-attacher/csi-provisioner/driver-registrar images")
 	csiImageVersions = map[string]string{
-		"hostpathplugin":   "v0.4.0",
+		"hostpathplugin": "v0.4.0",
+		// TODO: set to 0.5.0 when it's released
+		"mock-driver":      "canary",
 		"csi-attacher":     "v0.4.0",
 		"csi-provisioner":  "v0.4.0",
 		"driver-registrar": "v0.4.0",
@@ -430,6 +432,199 @@ func csiHostPathPod(
 					VolumeSource: v1.VolumeSource{
 						HostPath: &v1.HostPathVolumeSource{
 							Path: "/var/lib/kubelet/plugins/csi-hostpath",
+							Type: &hostPathType,
+						},
+					},
+				},
+				{
+					Name: "registration-dir",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/var/lib/kubelet/plugins",
+							Type: &hostPathType,
+						},
+					},
+				},
+				{
+					Name: "mountpoint-dir",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: "/var/lib/kubelet/pods",
+							Type: &hostPathType,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := framework.DeletePodWithWait(f, client, pod)
+	framework.ExpectNoError(err, "Failed to delete pod %s/%s: %v",
+		pod.GetNamespace(), pod.GetName(), err)
+
+	if teardown {
+		return nil
+	}
+
+	// Creating the pod can fail initially while the service
+	// account's secret isn't provisioned yet ('No API token found
+	// for service account "csi-service-account", retry after the
+	// token is automatically created and added to the service
+	// account', see https://github.com/kubernetes/kubernetes/issues/68776).
+	// We could use a DaemonSet, but then the name of the csi-pod changes
+	// during each test run. It's simpler to just try for a while here.
+	podClient := f.PodClient()
+	ret := podClient.CreateEventually(pod)
+	if err != nil {
+		framework.ExpectNoError(err, "Failed to create %q pod: %v", pod.GetName(), err)
+	}
+
+	// Wait for pod to come up
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, ret))
+	return ret
+}
+
+func csiMockPod(
+	client clientset.Interface,
+	config framework.VolumeTestConfig,
+	teardown bool,
+	f *framework.Framework,
+	sa *v1.ServiceAccount,
+	skipAttach bool,
+	driverName string,
+) *v1.Pod {
+	mockDriverArgs := []string{
+		fmt.Sprintf("--name=%s", driverName),
+	}
+	if skipAttach {
+		mockDriverArgs = append(mockDriverArgs, "--disable-attach")
+	}
+	socketDir := fmt.Sprintf("/var/lib/kubelet/plugins/csi-mock-%s", driverName)
+
+	priv := true
+	mountPropagation := v1.MountPropagationBidirectional
+	hostPathType := v1.HostPathDirectoryOrCreate
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.Prefix + "-pod",
+			Namespace: config.Namespace,
+			Labels: map[string]string{
+				"app": "mock-driver",
+			},
+		},
+		Spec: v1.PodSpec{
+			ServiceAccountName: sa.GetName(),
+			NodeName:           config.ServerNodeName,
+			RestartPolicy:      v1.RestartPolicyNever,
+			Containers: []v1.Container{
+				{
+					Name:            "external-provisioner",
+					Image:           csiContainerImage("csi-provisioner"),
+					ImagePullPolicy: v1.PullAlways,
+					Args: []string{
+						"--v=5",
+						fmt.Sprintf("--provisioner=%s", driverName),
+						"--csi-address=/csi/csi.sock",
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "socket-dir",
+							MountPath: "/csi",
+						},
+					},
+				},
+				{
+					Name:            "driver-registrar",
+					Image:           csiContainerImage("driver-registrar"),
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Args: []string{
+						"--v=5",
+						"--csi-address=/csi/csi.sock",
+						fmt.Sprintf("--kubelet-registration-path=%s/csi.sock", socketDir),
+					},
+					Env: []v1.EnvVar{
+						{
+							Name: "KUBE_NODE_NAME",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "spec.nodeName",
+								},
+							},
+						},
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "socket-dir",
+							MountPath: "/csi",
+						},
+						{
+							Name:      "registration-dir",
+							MountPath: "/registration",
+						},
+					},
+				},
+				{
+					Name:            "external-attacher",
+					Image:           csiContainerImage("csi-attacher"),
+					ImagePullPolicy: v1.PullAlways,
+					Args: []string{
+						"--v=5",
+						"--csi-address=$(ADDRESS)",
+					},
+					Env: []v1.EnvVar{
+						{
+							Name:  "ADDRESS",
+							Value: "/csi/csi.sock",
+						},
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "socket-dir",
+							MountPath: "/csi",
+						},
+					},
+				},
+				{
+					Name:            "mock-driver",
+					Image:           csiContainerImage("mock-driver"),
+					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{
+						Privileged: &priv,
+					},
+					Args: mockDriverArgs,
+					Env: []v1.EnvVar{
+						{
+							Name:  "CSI_ENDPOINT",
+							Value: "/csi/csi.sock",
+						},
+						{
+							Name: "KUBE_NODE_NAME",
+							ValueFrom: &v1.EnvVarSource{
+								FieldRef: &v1.ObjectFieldSelector{
+									FieldPath: "spec.nodeName",
+								},
+							},
+						},
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "socket-dir",
+							MountPath: "/csi",
+						},
+						{
+							Name:             "mountpoint-dir",
+							MountPath:        "/var/lib/kubelet/pods",
+							MountPropagation: &mountPropagation,
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "socket-dir",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{
+							Path: socketDir,
 							Type: &hostPathType,
 						},
 					},
