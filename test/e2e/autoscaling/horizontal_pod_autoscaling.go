@@ -96,8 +96,8 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 
 // HPAScaleTest struct is used by the scale(...) function.
 type HPAScaleTest struct {
-	initPods                    int32
-	totalInitialCPUUsage        int32
+	initPods                    int
+	totalInitialCPUUsage        int
 	perPodCPURequest            int64
 	targetCPUUtilizationPercent int32
 	minPods                     int32
@@ -116,7 +116,7 @@ type HPAScaleTest struct {
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
 func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *common.ResourceConsumer, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
-	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset, f.ScalesGetter)
+	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset, f.ScalesGetter)
 	defer rc.CleanUp()
 	hpa := common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer common.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
@@ -137,14 +137,14 @@ func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc 
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    1,
-		totalInitialCPUUsage:        250,
-		perPodCPURequest:            500,
+		totalInitialCPUUsage:        500,
+		perPodCPURequest:            1000,
 		targetCPUUtilizationPercent: 20,
 		minPods:                     1,
 		maxPods:                     5,
 		firstScale:                  3,
 		firstScaleStasis:            stasis,
-		cpuBurst:                    700,
+		cpuBurst:                    1400,
 		secondScale:                 5,
 	}
 	scaleTest.run(name, kind, rc, f)
@@ -157,8 +157,8 @@ func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, r
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
-		totalInitialCPUUsage:        375,
-		perPodCPURequest:            500,
+		totalInitialCPUUsage:        650,
+		perPodCPURequest:            1000,
 		targetCPUUtilizationPercent: 30,
 		minPods:                     1,
 		maxPods:                     5,
