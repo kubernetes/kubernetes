@@ -1,51 +1,22 @@
-#
-# Check https://circleci.com/docs/2.0/language-go/ for more details
 version: 2
 jobs:
   build:
     docker:
-      # specify the version
-      - image: circleci/golang:1.11.1
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
-
-    #### TEMPLATE_NOTE: go expects specific checkout path representing url
-    #### expecting it in the form of
-    ####   /go/src/github.com/circleci/go-tool
-    ####   /go/src/bitbucket.org/circleci/go-tool
-    working_directory: /go/src/github.com/islinwb/kubernetes
+    - image: circleci/golang:1.11.1
     steps:
-      - checkout
-
-      # specify any bash command here prefixed with `run: `
-      - run: cd cmd/kubectl
-      - run: go build
-      #- run: go get -v -t -d ./...
-      #- run: go test -v ./...
-  
+    - checkout
+    - run: cd cmd/kubectl
+    - run: go build
   test:
     docker:
-      # specify the version
-      - image: circleci/golang:1.11.1
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
-
-    #### TEMPLATE_NOTE: go expects specific checkout path representing url
-    #### expecting it in the form of
-    ####   /go/src/github.com/circleci/go-tool
-    ####   /go/src/bitbucket.org/circleci/go-tool
-    working_directory: /go/src/github.com/islinwb/kubernetes
+    - image: circleci/golang:1.11.1
     steps:
-      - checkout
-
-      # specify any bash command here prefixed with `run: `
-      - run: cd pkg/controller
-      - run: go test
-      #- run: go get -v -t -d ./...
-      #- run: go test -v ./...
+    - checkout
+    - run: cd pkg/controller
+    - run: go test
+workflows:
+  version: 2
+  workflow:
+    jobs:
+    - build
+    - test
