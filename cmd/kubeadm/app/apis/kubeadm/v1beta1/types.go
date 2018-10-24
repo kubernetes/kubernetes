@@ -47,6 +47,9 @@ type InitConfiguration struct {
 
 	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
 	APIEndpoint APIEndpoint `json:"apiEndpoint,omitempty"`
+
+	// Timeouts defines maximum time intervals kubeadm should wait for completion of critical steps of the init workflow.
+	Timeouts map[TimeoutName]metav1.Duration `json:"timeouts,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -274,6 +277,9 @@ type JoinConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
+	// Timeouts defines maximum time intervals kubeadm should wait for completion of critical steps of the join workflow.
+	Timeouts map[TimeoutName]metav1.Duration `json:"timeouts,omitempty"`
 }
 
 // Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
@@ -290,9 +296,6 @@ type Discovery struct {
 	// If .BootstrapToken is set, this field is defaulted to .BootstrapToken.Token, but can be overridden.
 	// If .File is set, this field **must be set** in case the KubeConfigFile does not contain any other authentication information
 	TLSBootstrapToken string `json:"tlsBootstrapToken"`
-
-	// Timeout modifies the discovery timeout
-	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
 
 // BootstrapTokenDiscovery is used to set the options for bootstrap token based discovery
@@ -354,3 +357,18 @@ type AuditPolicyConfiguration struct {
 	LogMaxAge *int32 `json:"logMaxAge,omitempty"`
 	//TODO(chuckha) add other options for audit policy.
 }
+
+// TimeoutName is a string that identifies timeouts managed by kubeadm.
+type TimeoutName string
+
+const (
+	// WaitForControlPlaneTimeout indicates the timeout duration for the control-plane
+	// to start in the kubeadm init workflow and in the kubeadm join --controlplane workflow
+	// defaults to 4 minutes
+	WaitForControlPlaneTimeout TimeoutName = "controlplaneTimeout"
+
+	// DiscoveryTimeout indicates the timeout duration for the discovery phase in the kubeadm
+	// join controlplane workflow
+	// defaults to 5 minutes
+	DiscoveryTimeout TimeoutName = "discoveryTimeout"
+)

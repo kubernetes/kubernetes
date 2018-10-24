@@ -727,7 +727,7 @@ func getWaiter(ctx *initData, client clientset.Interface) apiclient.Waiter {
 	// We know that the images should be cached locally already as we have pulled them using
 	// crictl in the preflight checks. Hence we can have a pretty short timeout for the kubelet
 	// to start creating Static Pods.
-	timeout := 4 * time.Minute
+	timeout := ctx.cfg.GetTimeoutOrDefault(kubeadmapi.WaitForControlPlaneTimeout).Duration
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
 }
 

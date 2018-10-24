@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha3
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
@@ -26,7 +27,11 @@ func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinCon
 		return err
 	}
 
-	out.Discovery.Timeout = in.DiscoveryTimeout
+	if in.DiscoveryTimeout.Duration != kubeadm.GetDefaultTimeout(kubeadm.DiscoveryTimeout).Duration {
+		out.Timeouts = map[kubeadm.TimeoutName]v1.Duration{
+			kubeadm.DiscoveryTimeout: {Duration: in.DiscoveryTimeout.Duration},
+		}
+	}
 
 	if len(in.TLSBootstrapToken) != 0 {
 		out.Discovery.TLSBootstrapToken = in.TLSBootstrapToken
@@ -59,7 +64,9 @@ func Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kubeadm
 		return err
 	}
 
-	out.DiscoveryTimeout = in.Discovery.Timeout
+	//NB. in v1alpha3 only JoinConfiguration.DiscoveryTimeout is managed while all the other timeouts will be lost, but this is not a problem
+	//    because conversion to v1alpha3 are used only for roundtrip tests
+	out.DiscoveryTimeout = &v1.Duration{Duration: in.GetTimeoutOrDefault(kubeadm.DiscoveryTimeout).Duration}
 	out.TLSBootstrapToken = in.Discovery.TLSBootstrapToken
 
 	if in.Discovery.BootstrapToken != nil {
@@ -71,6 +78,17 @@ func Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kubeadm
 	} else if in.Discovery.File != nil {
 		out.DiscoveryFile = in.Discovery.File.KubeConfigPath
 	}
+
+	return nil
+}
+
+func Convert_kubeadm_InitConfiguration_To_v1alpha3_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_InitConfiguration_To_v1alpha3_InitConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	//NB. in v1alpha3 no timeout are managed for InitConfiguration, but this is not a problem
+	//    because conversion to v1alpha3 are used only for roundtrip tests
 
 	return nil
 }

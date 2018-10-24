@@ -18,7 +18,6 @@ package fuzzer
 
 import (
 	fuzz "github.com/google/gofuzz"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -79,6 +78,10 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			Usages: []string{"foo"},
 		},
 	}
+
+	// Since initConfiguration.Timeouts were introduced in v1beta1, it is necessary to set this to empty to get roundtrip to/from v1alpha3 working
+	// TODO: Delete when v1alpha3 will be removed.
+	obj.Timeouts = map[kubeadm.TimeoutName]metav1.Duration{}
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -136,6 +139,10 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 	obj.Discovery = kubeadm.Discovery{
 		BootstrapToken:    &kubeadm.BootstrapTokenDiscovery{Token: "baz"},
 		TLSBootstrapToken: "qux",
-		Timeout:           &metav1.Duration{Duration: 1234},
+	}
+	// This is necessary only to avoid roundtrip errors due to the different management of defaults between v1alpha3 JoinConfiguration.DiscoveryTimeout and v1beta1 JoinConfiguration.Timeouts.
+	// TODO: Delete when v1alpha3 will be removed.
+	obj.Timeouts = map[kubeadm.TimeoutName]metav1.Duration{
+		kubeadm.DiscoveryTimeout: {Duration: 1234},
 	}
 }

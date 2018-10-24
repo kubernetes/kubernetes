@@ -58,7 +58,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 
 	// The function below runs for every endpoint, and all endpoints races with each other.
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
-	baseKubeConfig, err := runForEndpointsAndReturnFirst(cfg.Discovery.BootstrapToken.APIServerEndpoints, cfg.Discovery.Timeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
+	baseKubeConfig, err := runForEndpointsAndReturnFirst(cfg.Discovery.BootstrapToken.APIServerEndpoints, cfg.GetTimeoutOrDefault(kubeadmapi.DiscoveryTimeout).Duration, func(endpoint string) (*clientcmdapi.Config, error) {
 
 		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, cfg.ClusterName)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster

@@ -17,6 +17,8 @@ limitations under the License.
 package kubeadm
 
 import (
+	"time"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -48,6 +50,9 @@ type InitConfiguration struct {
 
 	// APIEndpoint represents the endpoint of the instance of the API server to be deployed on this node.
 	APIEndpoint APIEndpoint
+
+	// Timeouts defines maximum time intervals kubeadm should wait for completion of critical steps of the init workflow.
+	Timeouts map[TimeoutName]metav1.Duration
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -296,6 +301,9 @@ type JoinConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool
+
+	// Timeouts defines maximum time intervals kubeadm should wait for completion of critical steps of the join workflow.
+	Timeouts map[TimeoutName]metav1.Duration
 }
 
 // Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
@@ -312,9 +320,6 @@ type Discovery struct {
 	// If .BootstrapToken is set, this field is defaulted to .BootstrapToken.Token, but can be overridden.
 	// If .File is set, this field **must be set** in case the KubeConfigFile does not contain any other authentication information
 	TLSBootstrapToken string
-
-	// Timeout modifies the discovery timeout
-	Timeout *metav1.Duration
 }
 
 // BootstrapTokenDiscovery is used to set the options for bootstrap token based discovery
@@ -387,6 +392,51 @@ type AuditPolicyConfiguration struct {
 	// LogMaxAge is the number of days logs will be stored for. 0 indicates forever.
 	LogMaxAge *int32
 	//TODO(chuckha) add other options for audit policy.
+}
+
+// TimeoutName is a string that identifies timeouts managed by kubeadm.
+type TimeoutName string
+
+const (
+	// WaitForControlPlaneTimeout indicates the timeout duration for the control-plane
+	// to start in the kubeadm init workflow and in the kubeadm join --controlplane workflow
+	// defaults to 4 minutes
+	WaitForControlPlaneTimeout TimeoutName = "controlplaneTimeout"
+
+	// DiscoveryTimeout indicates the timeout duration for the discovery phase in the kubeadm
+	// join controlplane workflow
+	// defaults to 5 minutes
+	DiscoveryTimeout TimeoutName = "discoveryTimeout"
+)
+
+// GetTimeoutOrDefault returns the timeout duration set in the InitConfiguration or, in case
+// a custom timeout is not set, the default timeout duration
+func (cfg *InitConfiguration) GetTimeoutOrDefault(timeout TimeoutName) metav1.Duration {
+	if val, ok := cfg.Timeouts[timeout]; ok {
+		return val
+	}
+	return GetDefaultTimeout(timeout)
+}
+
+// GetTimeoutOrDefault returns the timeout duration set in the JoinConfiguration or, in case
+// a custom timeout is not set, the default timeout duration
+func (cfg *JoinConfiguration) GetTimeoutOrDefault(timeout TimeoutName) metav1.Duration {
+	if val, ok := cfg.Timeouts[timeout]; ok {
+		return val
+	}
+	return GetDefaultTimeout(timeout)
+}
+
+// GetDefaultTimeout returns default timeout duration
+func GetDefaultTimeout(timeout TimeoutName) metav1.Duration {
+	switch timeout {
+	case WaitForControlPlaneTimeout:
+		return metav1.Duration{Duration: 4 * time.Minute}
+	case DiscoveryTimeout:
+		return metav1.Duration{Duration: 5 * time.Minute}
+	}
+	// this case should never be hit, but it is implemented as a fallback
+	return metav1.Duration{Duration: 5 * time.Minute}
 }
 
 // CommonConfiguration defines the list of common configuration elements and the getter

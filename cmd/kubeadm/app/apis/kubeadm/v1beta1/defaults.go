@@ -18,7 +18,6 @@ package v1beta1
 
 import (
 	"net/url"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,8 +50,6 @@ const (
 	DefaultProxyBindAddressv4 = "0.0.0.0"
 	// DefaultProxyBindAddressv6 is the default bind address when the advertise address is v6
 	DefaultProxyBindAddressv6 = "::"
-	// DefaultDiscoveryTimeout specifies the default discovery timeout for kubeadm (used unless one is specified in the JoinConfiguration)
-	DefaultDiscoveryTimeout = 5 * time.Minute
 )
 
 var (
@@ -140,12 +137,6 @@ func SetDefaults_NodeRegistrationOptions(obj *NodeRegistrationOptions) {
 func SetDefaults_Discovery(obj *Discovery) {
 	if len(obj.TLSBootstrapToken) == 0 && obj.BootstrapToken != nil {
 		obj.TLSBootstrapToken = obj.BootstrapToken.Token
-	}
-
-	if obj.Timeout == nil {
-		obj.Timeout = &metav1.Duration{
-			Duration: DefaultDiscoveryTimeout,
-		}
 	}
 
 	if obj.File != nil {
