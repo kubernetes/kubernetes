@@ -31,758 +31,758 @@ import (
 	common "k8s.io/kube-openapi/pkg/common"
 )
 
-func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
+func GetOpenAPIDefinitions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"k8s.io/api/admissionregistration/v1alpha1.Initializer":                                                       schema_k8sio_api_admissionregistration_v1alpha1_Initializer(ref),
-		"k8s.io/api/admissionregistration/v1alpha1.InitializerConfiguration":                                          schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfiguration(ref),
-		"k8s.io/api/admissionregistration/v1alpha1.InitializerConfigurationList":                                      schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfigurationList(ref),
-		"k8s.io/api/admissionregistration/v1alpha1.Rule":                                                              schema_k8sio_api_admissionregistration_v1alpha1_Rule(ref),
-		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfiguration":                                       schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration(ref),
-		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfigurationList":                                   schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfigurationList(ref),
-		"k8s.io/api/admissionregistration/v1beta1.Rule":                                                               schema_k8sio_api_admissionregistration_v1beta1_Rule(ref),
-		"k8s.io/api/admissionregistration/v1beta1.RuleWithOperations":                                                 schema_k8sio_api_admissionregistration_v1beta1_RuleWithOperations(ref),
-		"k8s.io/api/admissionregistration/v1beta1.ServiceReference":                                                   schema_k8sio_api_admissionregistration_v1beta1_ServiceReference(ref),
-		"k8s.io/api/admissionregistration/v1beta1.ValidatingWebhookConfiguration":                                     schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfiguration(ref),
-		"k8s.io/api/admissionregistration/v1beta1.ValidatingWebhookConfigurationList":                                 schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurationList(ref),
-		"k8s.io/api/admissionregistration/v1beta1.Webhook":                                                            schema_k8sio_api_admissionregistration_v1beta1_Webhook(ref),
-		"k8s.io/api/admissionregistration/v1beta1.WebhookClientConfig":                                                schema_k8sio_api_admissionregistration_v1beta1_WebhookClientConfig(ref),
-		"k8s.io/api/apps/v1.ControllerRevision":                                                                       schema_k8sio_api_apps_v1_ControllerRevision(ref),
-		"k8s.io/api/apps/v1.ControllerRevisionList":                                                                   schema_k8sio_api_apps_v1_ControllerRevisionList(ref),
-		"k8s.io/api/apps/v1.DaemonSet":                                                                                schema_k8sio_api_apps_v1_DaemonSet(ref),
-		"k8s.io/api/apps/v1.DaemonSetCondition":                                                                       schema_k8sio_api_apps_v1_DaemonSetCondition(ref),
-		"k8s.io/api/apps/v1.DaemonSetList":                                                                            schema_k8sio_api_apps_v1_DaemonSetList(ref),
-		"k8s.io/api/apps/v1.DaemonSetSpec":                                                                            schema_k8sio_api_apps_v1_DaemonSetSpec(ref),
-		"k8s.io/api/apps/v1.DaemonSetStatus":                                                                          schema_k8sio_api_apps_v1_DaemonSetStatus(ref),
-		"k8s.io/api/apps/v1.DaemonSetUpdateStrategy":                                                                  schema_k8sio_api_apps_v1_DaemonSetUpdateStrategy(ref),
-		"k8s.io/api/apps/v1.Deployment":                                                                               schema_k8sio_api_apps_v1_Deployment(ref),
-		"k8s.io/api/apps/v1.DeploymentCondition":                                                                      schema_k8sio_api_apps_v1_DeploymentCondition(ref),
-		"k8s.io/api/apps/v1.DeploymentList":                                                                           schema_k8sio_api_apps_v1_DeploymentList(ref),
-		"k8s.io/api/apps/v1.DeploymentSpec":                                                                           schema_k8sio_api_apps_v1_DeploymentSpec(ref),
-		"k8s.io/api/apps/v1.DeploymentStatus":                                                                         schema_k8sio_api_apps_v1_DeploymentStatus(ref),
-		"k8s.io/api/apps/v1.DeploymentStrategy":                                                                       schema_k8sio_api_apps_v1_DeploymentStrategy(ref),
-		"k8s.io/api/apps/v1.ReplicaSet":                                                                               schema_k8sio_api_apps_v1_ReplicaSet(ref),
-		"k8s.io/api/apps/v1.ReplicaSetCondition":                                                                      schema_k8sio_api_apps_v1_ReplicaSetCondition(ref),
-		"k8s.io/api/apps/v1.ReplicaSetList":                                                                           schema_k8sio_api_apps_v1_ReplicaSetList(ref),
-		"k8s.io/api/apps/v1.ReplicaSetSpec":                                                                           schema_k8sio_api_apps_v1_ReplicaSetSpec(ref),
-		"k8s.io/api/apps/v1.ReplicaSetStatus":                                                                         schema_k8sio_api_apps_v1_ReplicaSetStatus(ref),
-		"k8s.io/api/apps/v1.RollingUpdateDaemonSet":                                                                   schema_k8sio_api_apps_v1_RollingUpdateDaemonSet(ref),
-		"k8s.io/api/apps/v1.RollingUpdateDeployment":                                                                  schema_k8sio_api_apps_v1_RollingUpdateDeployment(ref),
-		"k8s.io/api/apps/v1.RollingUpdateStatefulSetStrategy":                                                         schema_k8sio_api_apps_v1_RollingUpdateStatefulSetStrategy(ref),
-		"k8s.io/api/apps/v1.StatefulSet":                                                                              schema_k8sio_api_apps_v1_StatefulSet(ref),
-		"k8s.io/api/apps/v1.StatefulSetCondition":                                                                     schema_k8sio_api_apps_v1_StatefulSetCondition(ref),
-		"k8s.io/api/apps/v1.StatefulSetList":                                                                          schema_k8sio_api_apps_v1_StatefulSetList(ref),
-		"k8s.io/api/apps/v1.StatefulSetSpec":                                                                          schema_k8sio_api_apps_v1_StatefulSetSpec(ref),
-		"k8s.io/api/apps/v1.StatefulSetStatus":                                                                        schema_k8sio_api_apps_v1_StatefulSetStatus(ref),
-		"k8s.io/api/apps/v1.StatefulSetUpdateStrategy":                                                                schema_k8sio_api_apps_v1_StatefulSetUpdateStrategy(ref),
-		"k8s.io/api/apps/v1beta1.ControllerRevision":                                                                  schema_k8sio_api_apps_v1beta1_ControllerRevision(ref),
-		"k8s.io/api/apps/v1beta1.ControllerRevisionList":                                                              schema_k8sio_api_apps_v1beta1_ControllerRevisionList(ref),
-		"k8s.io/api/apps/v1beta1.Deployment":                                                                          schema_k8sio_api_apps_v1beta1_Deployment(ref),
-		"k8s.io/api/apps/v1beta1.DeploymentCondition":                                                                 schema_k8sio_api_apps_v1beta1_DeploymentCondition(ref),
-		"k8s.io/api/apps/v1beta1.DeploymentList":                                                                      schema_k8sio_api_apps_v1beta1_DeploymentList(ref),
-		"k8s.io/api/apps/v1beta1.DeploymentRollback":                                                                  schema_k8sio_api_apps_v1beta1_DeploymentRollback(ref),
-		"k8s.io/api/apps/v1beta1.DeploymentSpec":                                                                      schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref),
-		"k8s.io/api/apps/v1beta1.DeploymentStatus":                                                                    schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref),
-		"k8s.io/api/apps/v1beta1.DeploymentStrategy":                                                                  schema_k8sio_api_apps_v1beta1_DeploymentStrategy(ref),
-		"k8s.io/api/apps/v1beta1.RollbackConfig":                                                                      schema_k8sio_api_apps_v1beta1_RollbackConfig(ref),
-		"k8s.io/api/apps/v1beta1.RollingUpdateDeployment":                                                             schema_k8sio_api_apps_v1beta1_RollingUpdateDeployment(ref),
-		"k8s.io/api/apps/v1beta1.RollingUpdateStatefulSetStrategy":                                                    schema_k8sio_api_apps_v1beta1_RollingUpdateStatefulSetStrategy(ref),
-		"k8s.io/api/apps/v1beta1.Scale":                                                                               schema_k8sio_api_apps_v1beta1_Scale(ref),
-		"k8s.io/api/apps/v1beta1.ScaleSpec":                                                                           schema_k8sio_api_apps_v1beta1_ScaleSpec(ref),
-		"k8s.io/api/apps/v1beta1.ScaleStatus":                                                                         schema_k8sio_api_apps_v1beta1_ScaleStatus(ref),
-		"k8s.io/api/apps/v1beta1.StatefulSet":                                                                         schema_k8sio_api_apps_v1beta1_StatefulSet(ref),
-		"k8s.io/api/apps/v1beta1.StatefulSetCondition":                                                                schema_k8sio_api_apps_v1beta1_StatefulSetCondition(ref),
-		"k8s.io/api/apps/v1beta1.StatefulSetList":                                                                     schema_k8sio_api_apps_v1beta1_StatefulSetList(ref),
-		"k8s.io/api/apps/v1beta1.StatefulSetSpec":                                                                     schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref),
-		"k8s.io/api/apps/v1beta1.StatefulSetStatus":                                                                   schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref),
-		"k8s.io/api/apps/v1beta1.StatefulSetUpdateStrategy":                                                           schema_k8sio_api_apps_v1beta1_StatefulSetUpdateStrategy(ref),
-		"k8s.io/api/apps/v1beta2.ControllerRevision":                                                                  schema_k8sio_api_apps_v1beta2_ControllerRevision(ref),
-		"k8s.io/api/apps/v1beta2.ControllerRevisionList":                                                              schema_k8sio_api_apps_v1beta2_ControllerRevisionList(ref),
-		"k8s.io/api/apps/v1beta2.DaemonSet":                                                                           schema_k8sio_api_apps_v1beta2_DaemonSet(ref),
-		"k8s.io/api/apps/v1beta2.DaemonSetCondition":                                                                  schema_k8sio_api_apps_v1beta2_DaemonSetCondition(ref),
-		"k8s.io/api/apps/v1beta2.DaemonSetList":                                                                       schema_k8sio_api_apps_v1beta2_DaemonSetList(ref),
-		"k8s.io/api/apps/v1beta2.DaemonSetSpec":                                                                       schema_k8sio_api_apps_v1beta2_DaemonSetSpec(ref),
-		"k8s.io/api/apps/v1beta2.DaemonSetStatus":                                                                     schema_k8sio_api_apps_v1beta2_DaemonSetStatus(ref),
-		"k8s.io/api/apps/v1beta2.DaemonSetUpdateStrategy":                                                             schema_k8sio_api_apps_v1beta2_DaemonSetUpdateStrategy(ref),
-		"k8s.io/api/apps/v1beta2.Deployment":                                                                          schema_k8sio_api_apps_v1beta2_Deployment(ref),
-		"k8s.io/api/apps/v1beta2.DeploymentCondition":                                                                 schema_k8sio_api_apps_v1beta2_DeploymentCondition(ref),
-		"k8s.io/api/apps/v1beta2.DeploymentList":                                                                      schema_k8sio_api_apps_v1beta2_DeploymentList(ref),
-		"k8s.io/api/apps/v1beta2.DeploymentSpec":                                                                      schema_k8sio_api_apps_v1beta2_DeploymentSpec(ref),
-		"k8s.io/api/apps/v1beta2.DeploymentStatus":                                                                    schema_k8sio_api_apps_v1beta2_DeploymentStatus(ref),
-		"k8s.io/api/apps/v1beta2.DeploymentStrategy":                                                                  schema_k8sio_api_apps_v1beta2_DeploymentStrategy(ref),
-		"k8s.io/api/apps/v1beta2.ReplicaSet":                                                                          schema_k8sio_api_apps_v1beta2_ReplicaSet(ref),
-		"k8s.io/api/apps/v1beta2.ReplicaSetCondition":                                                                 schema_k8sio_api_apps_v1beta2_ReplicaSetCondition(ref),
-		"k8s.io/api/apps/v1beta2.ReplicaSetList":                                                                      schema_k8sio_api_apps_v1beta2_ReplicaSetList(ref),
-		"k8s.io/api/apps/v1beta2.ReplicaSetSpec":                                                                      schema_k8sio_api_apps_v1beta2_ReplicaSetSpec(ref),
-		"k8s.io/api/apps/v1beta2.ReplicaSetStatus":                                                                    schema_k8sio_api_apps_v1beta2_ReplicaSetStatus(ref),
-		"k8s.io/api/apps/v1beta2.RollingUpdateDaemonSet":                                                              schema_k8sio_api_apps_v1beta2_RollingUpdateDaemonSet(ref),
-		"k8s.io/api/apps/v1beta2.RollingUpdateDeployment":                                                             schema_k8sio_api_apps_v1beta2_RollingUpdateDeployment(ref),
-		"k8s.io/api/apps/v1beta2.RollingUpdateStatefulSetStrategy":                                                    schema_k8sio_api_apps_v1beta2_RollingUpdateStatefulSetStrategy(ref),
-		"k8s.io/api/apps/v1beta2.Scale":                                                                               schema_k8sio_api_apps_v1beta2_Scale(ref),
-		"k8s.io/api/apps/v1beta2.ScaleSpec":                                                                           schema_k8sio_api_apps_v1beta2_ScaleSpec(ref),
-		"k8s.io/api/apps/v1beta2.ScaleStatus":                                                                         schema_k8sio_api_apps_v1beta2_ScaleStatus(ref),
-		"k8s.io/api/apps/v1beta2.StatefulSet":                                                                         schema_k8sio_api_apps_v1beta2_StatefulSet(ref),
-		"k8s.io/api/apps/v1beta2.StatefulSetCondition":                                                                schema_k8sio_api_apps_v1beta2_StatefulSetCondition(ref),
-		"k8s.io/api/apps/v1beta2.StatefulSetList":                                                                     schema_k8sio_api_apps_v1beta2_StatefulSetList(ref),
-		"k8s.io/api/apps/v1beta2.StatefulSetSpec":                                                                     schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref),
-		"k8s.io/api/apps/v1beta2.StatefulSetStatus":                                                                   schema_k8sio_api_apps_v1beta2_StatefulSetStatus(ref),
-		"k8s.io/api/apps/v1beta2.StatefulSetUpdateStrategy":                                                           schema_k8sio_api_apps_v1beta2_StatefulSetUpdateStrategy(ref),
-		"k8s.io/api/auditregistration/v1alpha1.AuditSink":                                                             schema_k8sio_api_auditregistration_v1alpha1_AuditSink(ref),
-		"k8s.io/api/auditregistration/v1alpha1.AuditSinkList":                                                         schema_k8sio_api_auditregistration_v1alpha1_AuditSinkList(ref),
-		"k8s.io/api/auditregistration/v1alpha1.AuditSinkSpec":                                                         schema_k8sio_api_auditregistration_v1alpha1_AuditSinkSpec(ref),
-		"k8s.io/api/auditregistration/v1alpha1.Policy":                                                                schema_k8sio_api_auditregistration_v1alpha1_Policy(ref),
-		"k8s.io/api/auditregistration/v1alpha1.ServiceReference":                                                      schema_k8sio_api_auditregistration_v1alpha1_ServiceReference(ref),
-		"k8s.io/api/auditregistration/v1alpha1.Webhook":                                                               schema_k8sio_api_auditregistration_v1alpha1_Webhook(ref),
-		"k8s.io/api/auditregistration/v1alpha1.WebhookClientConfig":                                                   schema_k8sio_api_auditregistration_v1alpha1_WebhookClientConfig(ref),
-		"k8s.io/api/auditregistration/v1alpha1.WebhookThrottleConfig":                                                 schema_k8sio_api_auditregistration_v1alpha1_WebhookThrottleConfig(ref),
-		"k8s.io/api/authentication/v1.BoundObjectReference":                                                           schema_k8sio_api_authentication_v1_BoundObjectReference(ref),
-		"k8s.io/api/authentication/v1.TokenRequest":                                                                   schema_k8sio_api_authentication_v1_TokenRequest(ref),
-		"k8s.io/api/authentication/v1.TokenRequestSpec":                                                               schema_k8sio_api_authentication_v1_TokenRequestSpec(ref),
-		"k8s.io/api/authentication/v1.TokenRequestStatus":                                                             schema_k8sio_api_authentication_v1_TokenRequestStatus(ref),
-		"k8s.io/api/authentication/v1.TokenReview":                                                                    schema_k8sio_api_authentication_v1_TokenReview(ref),
-		"k8s.io/api/authentication/v1.TokenReviewSpec":                                                                schema_k8sio_api_authentication_v1_TokenReviewSpec(ref),
-		"k8s.io/api/authentication/v1.TokenReviewStatus":                                                              schema_k8sio_api_authentication_v1_TokenReviewStatus(ref),
-		"k8s.io/api/authentication/v1.UserInfo":                                                                       schema_k8sio_api_authentication_v1_UserInfo(ref),
-		"k8s.io/api/authentication/v1beta1.TokenReview":                                                               schema_k8sio_api_authentication_v1beta1_TokenReview(ref),
-		"k8s.io/api/authentication/v1beta1.TokenReviewSpec":                                                           schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref),
-		"k8s.io/api/authentication/v1beta1.TokenReviewStatus":                                                         schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref),
-		"k8s.io/api/authentication/v1beta1.UserInfo":                                                                  schema_k8sio_api_authentication_v1beta1_UserInfo(ref),
-		"k8s.io/api/authorization/v1.LocalSubjectAccessReview":                                                        schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref),
-		"k8s.io/api/authorization/v1.NonResourceAttributes":                                                           schema_k8sio_api_authorization_v1_NonResourceAttributes(ref),
-		"k8s.io/api/authorization/v1.NonResourceRule":                                                                 schema_k8sio_api_authorization_v1_NonResourceRule(ref),
-		"k8s.io/api/authorization/v1.ResourceAttributes":                                                              schema_k8sio_api_authorization_v1_ResourceAttributes(ref),
-		"k8s.io/api/authorization/v1.ResourceRule":                                                                    schema_k8sio_api_authorization_v1_ResourceRule(ref),
-		"k8s.io/api/authorization/v1.SelfSubjectAccessReview":                                                         schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref),
-		"k8s.io/api/authorization/v1.SelfSubjectAccessReviewSpec":                                                     schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref),
-		"k8s.io/api/authorization/v1.SelfSubjectRulesReview":                                                          schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref),
-		"k8s.io/api/authorization/v1.SelfSubjectRulesReviewSpec":                                                      schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref),
-		"k8s.io/api/authorization/v1.SubjectAccessReview":                                                             schema_k8sio_api_authorization_v1_SubjectAccessReview(ref),
-		"k8s.io/api/authorization/v1.SubjectAccessReviewSpec":                                                         schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref),
-		"k8s.io/api/authorization/v1.SubjectAccessReviewStatus":                                                       schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref),
-		"k8s.io/api/authorization/v1.SubjectRulesReviewStatus":                                                        schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref),
-		"k8s.io/api/authorization/v1beta1.LocalSubjectAccessReview":                                                   schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref),
-		"k8s.io/api/authorization/v1beta1.NonResourceAttributes":                                                      schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref),
-		"k8s.io/api/authorization/v1beta1.NonResourceRule":                                                            schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref),
-		"k8s.io/api/authorization/v1beta1.ResourceAttributes":                                                         schema_k8sio_api_authorization_v1beta1_ResourceAttributes(ref),
-		"k8s.io/api/authorization/v1beta1.ResourceRule":                                                               schema_k8sio_api_authorization_v1beta1_ResourceRule(ref),
-		"k8s.io/api/authorization/v1beta1.SelfSubjectAccessReview":                                                    schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref),
-		"k8s.io/api/authorization/v1beta1.SelfSubjectAccessReviewSpec":                                                schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReviewSpec(ref),
-		"k8s.io/api/authorization/v1beta1.SelfSubjectRulesReview":                                                     schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReview(ref),
-		"k8s.io/api/authorization/v1beta1.SelfSubjectRulesReviewSpec":                                                 schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReviewSpec(ref),
-		"k8s.io/api/authorization/v1beta1.SubjectAccessReview":                                                        schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref),
-		"k8s.io/api/authorization/v1beta1.SubjectAccessReviewSpec":                                                    schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref),
-		"k8s.io/api/authorization/v1beta1.SubjectAccessReviewStatus":                                                  schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref),
-		"k8s.io/api/authorization/v1beta1.SubjectRulesReviewStatus":                                                   schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref),
-		"k8s.io/api/autoscaling/v1.CrossVersionObjectReference":                                                       schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref),
-		"k8s.io/api/autoscaling/v1.ExternalMetricSource":                                                              schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.ExternalMetricStatus":                                                              schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscaler":                                                           schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerCondition":                                                  schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerList":                                                       schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerSpec":                                                       schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref),
-		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerStatus":                                                     schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref),
-		"k8s.io/api/autoscaling/v1.MetricSpec":                                                                        schema_k8sio_api_autoscaling_v1_MetricSpec(ref),
-		"k8s.io/api/autoscaling/v1.MetricStatus":                                                                      schema_k8sio_api_autoscaling_v1_MetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.ObjectMetricSource":                                                                schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.ObjectMetricStatus":                                                                schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.PodsMetricSource":                                                                  schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.PodsMetricStatus":                                                                  schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.ResourceMetricSource":                                                              schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref),
-		"k8s.io/api/autoscaling/v1.ResourceMetricStatus":                                                              schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref),
-		"k8s.io/api/autoscaling/v1.Scale":                                                                             schema_k8sio_api_autoscaling_v1_Scale(ref),
-		"k8s.io/api/autoscaling/v1.ScaleSpec":                                                                         schema_k8sio_api_autoscaling_v1_ScaleSpec(ref),
-		"k8s.io/api/autoscaling/v1.ScaleStatus":                                                                       schema_k8sio_api_autoscaling_v1_ScaleStatus(ref),
-		"k8s.io/api/autoscaling/v2beta1.CrossVersionObjectReference":                                                  schema_k8sio_api_autoscaling_v2beta1_CrossVersionObjectReference(ref),
-		"k8s.io/api/autoscaling/v2beta1.ExternalMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta1_ExternalMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta1.ExternalMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta1_ExternalMetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscaler":                                                      schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscaler(ref),
-		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerCondition":                                             schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerCondition(ref),
-		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerList":                                                  schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerList(ref),
-		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerSpec":                                                  schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerSpec(ref),
-		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerStatus":                                                schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerStatus(ref),
-		"k8s.io/api/autoscaling/v2beta1.MetricSpec":                                                                   schema_k8sio_api_autoscaling_v2beta1_MetricSpec(ref),
-		"k8s.io/api/autoscaling/v2beta1.MetricStatus":                                                                 schema_k8sio_api_autoscaling_v2beta1_MetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta1.ObjectMetricSource":                                                           schema_k8sio_api_autoscaling_v2beta1_ObjectMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta1.ObjectMetricStatus":                                                           schema_k8sio_api_autoscaling_v2beta1_ObjectMetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta1.PodsMetricSource":                                                             schema_k8sio_api_autoscaling_v2beta1_PodsMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta1.PodsMetricStatus":                                                             schema_k8sio_api_autoscaling_v2beta1_PodsMetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta1.ResourceMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta1_ResourceMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta1.ResourceMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta1_ResourceMetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta2.CrossVersionObjectReference":                                                  schema_k8sio_api_autoscaling_v2beta2_CrossVersionObjectReference(ref),
-		"k8s.io/api/autoscaling/v2beta2.ExternalMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta2_ExternalMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta2.ExternalMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta2_ExternalMetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscaler":                                                      schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscaler(ref),
-		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerCondition":                                             schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerCondition(ref),
-		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerList":                                                  schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerList(ref),
-		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerSpec":                                                  schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerSpec(ref),
-		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerStatus":                                                schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerStatus(ref),
-		"k8s.io/api/autoscaling/v2beta2.MetricIdentifier":                                                             schema_k8sio_api_autoscaling_v2beta2_MetricIdentifier(ref),
-		"k8s.io/api/autoscaling/v2beta2.MetricSpec":                                                                   schema_k8sio_api_autoscaling_v2beta2_MetricSpec(ref),
-		"k8s.io/api/autoscaling/v2beta2.MetricStatus":                                                                 schema_k8sio_api_autoscaling_v2beta2_MetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta2.MetricTarget":                                                                 schema_k8sio_api_autoscaling_v2beta2_MetricTarget(ref),
-		"k8s.io/api/autoscaling/v2beta2.MetricValueStatus":                                                            schema_k8sio_api_autoscaling_v2beta2_MetricValueStatus(ref),
-		"k8s.io/api/autoscaling/v2beta2.ObjectMetricSource":                                                           schema_k8sio_api_autoscaling_v2beta2_ObjectMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta2.ObjectMetricStatus":                                                           schema_k8sio_api_autoscaling_v2beta2_ObjectMetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta2.PodsMetricSource":                                                             schema_k8sio_api_autoscaling_v2beta2_PodsMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta2.PodsMetricStatus":                                                             schema_k8sio_api_autoscaling_v2beta2_PodsMetricStatus(ref),
-		"k8s.io/api/autoscaling/v2beta2.ResourceMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta2_ResourceMetricSource(ref),
-		"k8s.io/api/autoscaling/v2beta2.ResourceMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta2_ResourceMetricStatus(ref),
-		"k8s.io/api/batch/v1.Job":                                                                                     schema_k8sio_api_batch_v1_Job(ref),
-		"k8s.io/api/batch/v1.JobCondition":                                                                            schema_k8sio_api_batch_v1_JobCondition(ref),
-		"k8s.io/api/batch/v1.JobList":                                                                                 schema_k8sio_api_batch_v1_JobList(ref),
-		"k8s.io/api/batch/v1.JobSpec":                                                                                 schema_k8sio_api_batch_v1_JobSpec(ref),
-		"k8s.io/api/batch/v1.JobStatus":                                                                               schema_k8sio_api_batch_v1_JobStatus(ref),
-		"k8s.io/api/batch/v1beta1.CronJob":                                                                            schema_k8sio_api_batch_v1beta1_CronJob(ref),
-		"k8s.io/api/batch/v1beta1.CronJobList":                                                                        schema_k8sio_api_batch_v1beta1_CronJobList(ref),
-		"k8s.io/api/batch/v1beta1.CronJobSpec":                                                                        schema_k8sio_api_batch_v1beta1_CronJobSpec(ref),
-		"k8s.io/api/batch/v1beta1.CronJobStatus":                                                                      schema_k8sio_api_batch_v1beta1_CronJobStatus(ref),
-		"k8s.io/api/batch/v1beta1.JobTemplate":                                                                        schema_k8sio_api_batch_v1beta1_JobTemplate(ref),
-		"k8s.io/api/batch/v1beta1.JobTemplateSpec":                                                                    schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref),
-		"k8s.io/api/batch/v2alpha1.CronJob":                                                                           schema_k8sio_api_batch_v2alpha1_CronJob(ref),
-		"k8s.io/api/batch/v2alpha1.CronJobList":                                                                       schema_k8sio_api_batch_v2alpha1_CronJobList(ref),
-		"k8s.io/api/batch/v2alpha1.CronJobSpec":                                                                       schema_k8sio_api_batch_v2alpha1_CronJobSpec(ref),
-		"k8s.io/api/batch/v2alpha1.CronJobStatus":                                                                     schema_k8sio_api_batch_v2alpha1_CronJobStatus(ref),
-		"k8s.io/api/batch/v2alpha1.JobTemplate":                                                                       schema_k8sio_api_batch_v2alpha1_JobTemplate(ref),
-		"k8s.io/api/batch/v2alpha1.JobTemplateSpec":                                                                   schema_k8sio_api_batch_v2alpha1_JobTemplateSpec(ref),
-		"k8s.io/api/certificates/v1beta1.CertificateSigningRequest":                                                   schema_k8sio_api_certificates_v1beta1_CertificateSigningRequest(ref),
-		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestCondition":                                          schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestCondition(ref),
-		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestList":                                               schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestList(ref),
-		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestSpec":                                               schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref),
-		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestStatus":                                             schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestStatus(ref),
-		"k8s.io/api/coordination/v1beta1.Lease":                                                                       schema_k8sio_api_coordination_v1beta1_Lease(ref),
-		"k8s.io/api/coordination/v1beta1.LeaseList":                                                                   schema_k8sio_api_coordination_v1beta1_LeaseList(ref),
-		"k8s.io/api/coordination/v1beta1.LeaseSpec":                                                                   schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref),
-		"k8s.io/api/core/v1.AWSElasticBlockStoreVolumeSource":                                                         schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref),
-		"k8s.io/api/core/v1.Affinity":                                                                                 schema_k8sio_api_core_v1_Affinity(ref),
-		"k8s.io/api/core/v1.AttachedVolume":                                                                           schema_k8sio_api_core_v1_AttachedVolume(ref),
-		"k8s.io/api/core/v1.AvoidPods":                                                                                schema_k8sio_api_core_v1_AvoidPods(ref),
-		"k8s.io/api/core/v1.AzureDiskVolumeSource":                                                                    schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref),
-		"k8s.io/api/core/v1.AzureFilePersistentVolumeSource":                                                          schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.AzureFileVolumeSource":                                                                    schema_k8sio_api_core_v1_AzureFileVolumeSource(ref),
-		"k8s.io/api/core/v1.Binding":                                                                                  schema_k8sio_api_core_v1_Binding(ref),
-		"k8s.io/api/core/v1.CSIPersistentVolumeSource":                                                                schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.Capabilities":                                                                             schema_k8sio_api_core_v1_Capabilities(ref),
-		"k8s.io/api/core/v1.CephFSPersistentVolumeSource":                                                             schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.CephFSVolumeSource":                                                                       schema_k8sio_api_core_v1_CephFSVolumeSource(ref),
-		"k8s.io/api/core/v1.CinderPersistentVolumeSource":                                                             schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.CinderVolumeSource":                                                                       schema_k8sio_api_core_v1_CinderVolumeSource(ref),
-		"k8s.io/api/core/v1.ClientIPConfig":                                                                           schema_k8sio_api_core_v1_ClientIPConfig(ref),
-		"k8s.io/api/core/v1.ComponentCondition":                                                                       schema_k8sio_api_core_v1_ComponentCondition(ref),
-		"k8s.io/api/core/v1.ComponentStatus":                                                                          schema_k8sio_api_core_v1_ComponentStatus(ref),
-		"k8s.io/api/core/v1.ComponentStatusList":                                                                      schema_k8sio_api_core_v1_ComponentStatusList(ref),
-		"k8s.io/api/core/v1.ConfigMap":                                                                                schema_k8sio_api_core_v1_ConfigMap(ref),
-		"k8s.io/api/core/v1.ConfigMapEnvSource":                                                                       schema_k8sio_api_core_v1_ConfigMapEnvSource(ref),
-		"k8s.io/api/core/v1.ConfigMapKeySelector":                                                                     schema_k8sio_api_core_v1_ConfigMapKeySelector(ref),
-		"k8s.io/api/core/v1.ConfigMapList":                                                                            schema_k8sio_api_core_v1_ConfigMapList(ref),
-		"k8s.io/api/core/v1.ConfigMapNodeConfigSource":                                                                schema_k8sio_api_core_v1_ConfigMapNodeConfigSource(ref),
-		"k8s.io/api/core/v1.ConfigMapProjection":                                                                      schema_k8sio_api_core_v1_ConfigMapProjection(ref),
-		"k8s.io/api/core/v1.ConfigMapVolumeSource":                                                                    schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref),
-		"k8s.io/api/core/v1.Container":                                                                                schema_k8sio_api_core_v1_Container(ref),
-		"k8s.io/api/core/v1.ContainerImage":                                                                           schema_k8sio_api_core_v1_ContainerImage(ref),
-		"k8s.io/api/core/v1.ContainerPort":                                                                            schema_k8sio_api_core_v1_ContainerPort(ref),
-		"k8s.io/api/core/v1.ContainerState":                                                                           schema_k8sio_api_core_v1_ContainerState(ref),
-		"k8s.io/api/core/v1.ContainerStateRunning":                                                                    schema_k8sio_api_core_v1_ContainerStateRunning(ref),
-		"k8s.io/api/core/v1.ContainerStateTerminated":                                                                 schema_k8sio_api_core_v1_ContainerStateTerminated(ref),
-		"k8s.io/api/core/v1.ContainerStateWaiting":                                                                    schema_k8sio_api_core_v1_ContainerStateWaiting(ref),
-		"k8s.io/api/core/v1.ContainerStatus":                                                                          schema_k8sio_api_core_v1_ContainerStatus(ref),
-		"k8s.io/api/core/v1.DaemonEndpoint":                                                                           schema_k8sio_api_core_v1_DaemonEndpoint(ref),
-		"k8s.io/api/core/v1.DownwardAPIProjection":                                                                    schema_k8sio_api_core_v1_DownwardAPIProjection(ref),
-		"k8s.io/api/core/v1.DownwardAPIVolumeFile":                                                                    schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref),
-		"k8s.io/api/core/v1.DownwardAPIVolumeSource":                                                                  schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref),
-		"k8s.io/api/core/v1.EmptyDirVolumeSource":                                                                     schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref),
-		"k8s.io/api/core/v1.EndpointAddress":                                                                          schema_k8sio_api_core_v1_EndpointAddress(ref),
-		"k8s.io/api/core/v1.EndpointPort":                                                                             schema_k8sio_api_core_v1_EndpointPort(ref),
-		"k8s.io/api/core/v1.EndpointSubset":                                                                           schema_k8sio_api_core_v1_EndpointSubset(ref),
-		"k8s.io/api/core/v1.Endpoints":                                                                                schema_k8sio_api_core_v1_Endpoints(ref),
-		"k8s.io/api/core/v1.EndpointsList":                                                                            schema_k8sio_api_core_v1_EndpointsList(ref),
-		"k8s.io/api/core/v1.EnvFromSource":                                                                            schema_k8sio_api_core_v1_EnvFromSource(ref),
-		"k8s.io/api/core/v1.EnvVar":                                                                                   schema_k8sio_api_core_v1_EnvVar(ref),
-		"k8s.io/api/core/v1.EnvVarSource":                                                                             schema_k8sio_api_core_v1_EnvVarSource(ref),
-		"k8s.io/api/core/v1.Event":                                                                                    schema_k8sio_api_core_v1_Event(ref),
-		"k8s.io/api/core/v1.EventList":                                                                                schema_k8sio_api_core_v1_EventList(ref),
-		"k8s.io/api/core/v1.EventSeries":                                                                              schema_k8sio_api_core_v1_EventSeries(ref),
-		"k8s.io/api/core/v1.EventSource":                                                                              schema_k8sio_api_core_v1_EventSource(ref),
-		"k8s.io/api/core/v1.ExecAction":                                                                               schema_k8sio_api_core_v1_ExecAction(ref),
-		"k8s.io/api/core/v1.FCVolumeSource":                                                                           schema_k8sio_api_core_v1_FCVolumeSource(ref),
-		"k8s.io/api/core/v1.FlexPersistentVolumeSource":                                                               schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.FlexVolumeSource":                                                                         schema_k8sio_api_core_v1_FlexVolumeSource(ref),
-		"k8s.io/api/core/v1.FlockerVolumeSource":                                                                      schema_k8sio_api_core_v1_FlockerVolumeSource(ref),
-		"k8s.io/api/core/v1.GCEPersistentDiskVolumeSource":                                                            schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref),
-		"k8s.io/api/core/v1.GitRepoVolumeSource":                                                                      schema_k8sio_api_core_v1_GitRepoVolumeSource(ref),
-		"k8s.io/api/core/v1.GlusterfsVolumeSource":                                                                    schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref),
-		"k8s.io/api/core/v1.HTTPGetAction":                                                                            schema_k8sio_api_core_v1_HTTPGetAction(ref),
-		"k8s.io/api/core/v1.HTTPHeader":                                                                               schema_k8sio_api_core_v1_HTTPHeader(ref),
-		"k8s.io/api/core/v1.Handler":                                                                                  schema_k8sio_api_core_v1_Handler(ref),
-		"k8s.io/api/core/v1.HostAlias":                                                                                schema_k8sio_api_core_v1_HostAlias(ref),
-		"k8s.io/api/core/v1.HostPathVolumeSource":                                                                     schema_k8sio_api_core_v1_HostPathVolumeSource(ref),
-		"k8s.io/api/core/v1.ISCSIPersistentVolumeSource":                                                              schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.ISCSIVolumeSource":                                                                        schema_k8sio_api_core_v1_ISCSIVolumeSource(ref),
-		"k8s.io/api/core/v1.KeyToPath":                                                                                schema_k8sio_api_core_v1_KeyToPath(ref),
-		"k8s.io/api/core/v1.Lifecycle":                                                                                schema_k8sio_api_core_v1_Lifecycle(ref),
-		"k8s.io/api/core/v1.LimitRange":                                                                               schema_k8sio_api_core_v1_LimitRange(ref),
-		"k8s.io/api/core/v1.LimitRangeItem":                                                                           schema_k8sio_api_core_v1_LimitRangeItem(ref),
-		"k8s.io/api/core/v1.LimitRangeList":                                                                           schema_k8sio_api_core_v1_LimitRangeList(ref),
-		"k8s.io/api/core/v1.LimitRangeSpec":                                                                           schema_k8sio_api_core_v1_LimitRangeSpec(ref),
-		"k8s.io/api/core/v1.List":                                                                                     schema_k8sio_api_core_v1_List(ref),
-		"k8s.io/api/core/v1.LoadBalancerIngress":                                                                      schema_k8sio_api_core_v1_LoadBalancerIngress(ref),
-		"k8s.io/api/core/v1.LoadBalancerStatus":                                                                       schema_k8sio_api_core_v1_LoadBalancerStatus(ref),
-		"k8s.io/api/core/v1.LocalObjectReference":                                                                     schema_k8sio_api_core_v1_LocalObjectReference(ref),
-		"k8s.io/api/core/v1.LocalVolumeSource":                                                                        schema_k8sio_api_core_v1_LocalVolumeSource(ref),
-		"k8s.io/api/core/v1.NFSVolumeSource":                                                                          schema_k8sio_api_core_v1_NFSVolumeSource(ref),
-		"k8s.io/api/core/v1.Namespace":                                                                                schema_k8sio_api_core_v1_Namespace(ref),
-		"k8s.io/api/core/v1.NamespaceList":                                                                            schema_k8sio_api_core_v1_NamespaceList(ref),
-		"k8s.io/api/core/v1.NamespaceSpec":                                                                            schema_k8sio_api_core_v1_NamespaceSpec(ref),
-		"k8s.io/api/core/v1.NamespaceStatus":                                                                          schema_k8sio_api_core_v1_NamespaceStatus(ref),
-		"k8s.io/api/core/v1.Node":                                                                                     schema_k8sio_api_core_v1_Node(ref),
-		"k8s.io/api/core/v1.NodeAddress":                                                                              schema_k8sio_api_core_v1_NodeAddress(ref),
-		"k8s.io/api/core/v1.NodeAffinity":                                                                             schema_k8sio_api_core_v1_NodeAffinity(ref),
-		"k8s.io/api/core/v1.NodeCondition":                                                                            schema_k8sio_api_core_v1_NodeCondition(ref),
-		"k8s.io/api/core/v1.NodeConfigSource":                                                                         schema_k8sio_api_core_v1_NodeConfigSource(ref),
-		"k8s.io/api/core/v1.NodeConfigStatus":                                                                         schema_k8sio_api_core_v1_NodeConfigStatus(ref),
-		"k8s.io/api/core/v1.NodeDaemonEndpoints":                                                                      schema_k8sio_api_core_v1_NodeDaemonEndpoints(ref),
-		"k8s.io/api/core/v1.NodeList":                                                                                 schema_k8sio_api_core_v1_NodeList(ref),
-		"k8s.io/api/core/v1.NodeProxyOptions":                                                                         schema_k8sio_api_core_v1_NodeProxyOptions(ref),
-		"k8s.io/api/core/v1.NodeResources":                                                                            schema_k8sio_api_core_v1_NodeResources(ref),
-		"k8s.io/api/core/v1.NodeSelector":                                                                             schema_k8sio_api_core_v1_NodeSelector(ref),
-		"k8s.io/api/core/v1.NodeSelectorRequirement":                                                                  schema_k8sio_api_core_v1_NodeSelectorRequirement(ref),
-		"k8s.io/api/core/v1.NodeSelectorTerm":                                                                         schema_k8sio_api_core_v1_NodeSelectorTerm(ref),
-		"k8s.io/api/core/v1.NodeSpec":                                                                                 schema_k8sio_api_core_v1_NodeSpec(ref),
-		"k8s.io/api/core/v1.NodeStatus":                                                                               schema_k8sio_api_core_v1_NodeStatus(ref),
-		"k8s.io/api/core/v1.NodeSystemInfo":                                                                           schema_k8sio_api_core_v1_NodeSystemInfo(ref),
-		"k8s.io/api/core/v1.ObjectFieldSelector":                                                                      schema_k8sio_api_core_v1_ObjectFieldSelector(ref),
-		"k8s.io/api/core/v1.ObjectReference":                                                                          schema_k8sio_api_core_v1_ObjectReference(ref),
-		"k8s.io/api/core/v1.PersistentVolume":                                                                         schema_k8sio_api_core_v1_PersistentVolume(ref),
-		"k8s.io/api/core/v1.PersistentVolumeClaim":                                                                    schema_k8sio_api_core_v1_PersistentVolumeClaim(ref),
-		"k8s.io/api/core/v1.PersistentVolumeClaimCondition":                                                           schema_k8sio_api_core_v1_PersistentVolumeClaimCondition(ref),
-		"k8s.io/api/core/v1.PersistentVolumeClaimList":                                                                schema_k8sio_api_core_v1_PersistentVolumeClaimList(ref),
-		"k8s.io/api/core/v1.PersistentVolumeClaimSpec":                                                                schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref),
-		"k8s.io/api/core/v1.PersistentVolumeClaimStatus":                                                              schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref),
-		"k8s.io/api/core/v1.PersistentVolumeClaimVolumeSource":                                                        schema_k8sio_api_core_v1_PersistentVolumeClaimVolumeSource(ref),
-		"k8s.io/api/core/v1.PersistentVolumeList":                                                                     schema_k8sio_api_core_v1_PersistentVolumeList(ref),
-		"k8s.io/api/core/v1.PersistentVolumeSource":                                                                   schema_k8sio_api_core_v1_PersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.PersistentVolumeSpec":                                                                     schema_k8sio_api_core_v1_PersistentVolumeSpec(ref),
-		"k8s.io/api/core/v1.PersistentVolumeStatus":                                                                   schema_k8sio_api_core_v1_PersistentVolumeStatus(ref),
-		"k8s.io/api/core/v1.PhotonPersistentDiskVolumeSource":                                                         schema_k8sio_api_core_v1_PhotonPersistentDiskVolumeSource(ref),
-		"k8s.io/api/core/v1.Pod":                                                                                      schema_k8sio_api_core_v1_Pod(ref),
-		"k8s.io/api/core/v1.PodAffinity":                                                                              schema_k8sio_api_core_v1_PodAffinity(ref),
-		"k8s.io/api/core/v1.PodAffinityTerm":                                                                          schema_k8sio_api_core_v1_PodAffinityTerm(ref),
-		"k8s.io/api/core/v1.PodAntiAffinity":                                                                          schema_k8sio_api_core_v1_PodAntiAffinity(ref),
-		"k8s.io/api/core/v1.PodAttachOptions":                                                                         schema_k8sio_api_core_v1_PodAttachOptions(ref),
-		"k8s.io/api/core/v1.PodCondition":                                                                             schema_k8sio_api_core_v1_PodCondition(ref),
-		"k8s.io/api/core/v1.PodDNSConfig":                                                                             schema_k8sio_api_core_v1_PodDNSConfig(ref),
-		"k8s.io/api/core/v1.PodDNSConfigOption":                                                                       schema_k8sio_api_core_v1_PodDNSConfigOption(ref),
-		"k8s.io/api/core/v1.PodExecOptions":                                                                           schema_k8sio_api_core_v1_PodExecOptions(ref),
-		"k8s.io/api/core/v1.PodList":                                                                                  schema_k8sio_api_core_v1_PodList(ref),
-		"k8s.io/api/core/v1.PodLogOptions":                                                                            schema_k8sio_api_core_v1_PodLogOptions(ref),
-		"k8s.io/api/core/v1.PodPortForwardOptions":                                                                    schema_k8sio_api_core_v1_PodPortForwardOptions(ref),
-		"k8s.io/api/core/v1.PodProxyOptions":                                                                          schema_k8sio_api_core_v1_PodProxyOptions(ref),
-		"k8s.io/api/core/v1.PodReadinessGate":                                                                         schema_k8sio_api_core_v1_PodReadinessGate(ref),
-		"k8s.io/api/core/v1.PodSecurityContext":                                                                       schema_k8sio_api_core_v1_PodSecurityContext(ref),
-		"k8s.io/api/core/v1.PodSignature":                                                                             schema_k8sio_api_core_v1_PodSignature(ref),
-		"k8s.io/api/core/v1.PodSpec":                                                                                  schema_k8sio_api_core_v1_PodSpec(ref),
-		"k8s.io/api/core/v1.PodStatus":                                                                                schema_k8sio_api_core_v1_PodStatus(ref),
-		"k8s.io/api/core/v1.PodStatusResult":                                                                          schema_k8sio_api_core_v1_PodStatusResult(ref),
-		"k8s.io/api/core/v1.PodTemplate":                                                                              schema_k8sio_api_core_v1_PodTemplate(ref),
-		"k8s.io/api/core/v1.PodTemplateList":                                                                          schema_k8sio_api_core_v1_PodTemplateList(ref),
-		"k8s.io/api/core/v1.PodTemplateSpec":                                                                          schema_k8sio_api_core_v1_PodTemplateSpec(ref),
-		"k8s.io/api/core/v1.PortworxVolumeSource":                                                                     schema_k8sio_api_core_v1_PortworxVolumeSource(ref),
-		"k8s.io/api/core/v1.PreferAvoidPodsEntry":                                                                     schema_k8sio_api_core_v1_PreferAvoidPodsEntry(ref),
-		"k8s.io/api/core/v1.PreferredSchedulingTerm":                                                                  schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref),
-		"k8s.io/api/core/v1.Probe":                                                                                    schema_k8sio_api_core_v1_Probe(ref),
-		"k8s.io/api/core/v1.ProjectedVolumeSource":                                                                    schema_k8sio_api_core_v1_ProjectedVolumeSource(ref),
-		"k8s.io/api/core/v1.QuobyteVolumeSource":                                                                      schema_k8sio_api_core_v1_QuobyteVolumeSource(ref),
-		"k8s.io/api/core/v1.RBDPersistentVolumeSource":                                                                schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.RBDVolumeSource":                                                                          schema_k8sio_api_core_v1_RBDVolumeSource(ref),
-		"k8s.io/api/core/v1.RangeAllocation":                                                                          schema_k8sio_api_core_v1_RangeAllocation(ref),
-		"k8s.io/api/core/v1.ReplicationController":                                                                    schema_k8sio_api_core_v1_ReplicationController(ref),
-		"k8s.io/api/core/v1.ReplicationControllerCondition":                                                           schema_k8sio_api_core_v1_ReplicationControllerCondition(ref),
-		"k8s.io/api/core/v1.ReplicationControllerList":                                                                schema_k8sio_api_core_v1_ReplicationControllerList(ref),
-		"k8s.io/api/core/v1.ReplicationControllerSpec":                                                                schema_k8sio_api_core_v1_ReplicationControllerSpec(ref),
-		"k8s.io/api/core/v1.ReplicationControllerStatus":                                                              schema_k8sio_api_core_v1_ReplicationControllerStatus(ref),
-		"k8s.io/api/core/v1.ResourceFieldSelector":                                                                    schema_k8sio_api_core_v1_ResourceFieldSelector(ref),
-		"k8s.io/api/core/v1.ResourceQuota":                                                                            schema_k8sio_api_core_v1_ResourceQuota(ref),
-		"k8s.io/api/core/v1.ResourceQuotaList":                                                                        schema_k8sio_api_core_v1_ResourceQuotaList(ref),
-		"k8s.io/api/core/v1.ResourceQuotaSpec":                                                                        schema_k8sio_api_core_v1_ResourceQuotaSpec(ref),
-		"k8s.io/api/core/v1.ResourceQuotaStatus":                                                                      schema_k8sio_api_core_v1_ResourceQuotaStatus(ref),
-		"k8s.io/api/core/v1.ResourceRequirements":                                                                     schema_k8sio_api_core_v1_ResourceRequirements(ref),
-		"k8s.io/api/core/v1.SELinuxOptions":                                                                           schema_k8sio_api_core_v1_SELinuxOptions(ref),
-		"k8s.io/api/core/v1.ScaleIOPersistentVolumeSource":                                                            schema_k8sio_api_core_v1_ScaleIOPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.ScaleIOVolumeSource":                                                                      schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref),
-		"k8s.io/api/core/v1.ScopeSelector":                                                                            schema_k8sio_api_core_v1_ScopeSelector(ref),
-		"k8s.io/api/core/v1.ScopedResourceSelectorRequirement":                                                        schema_k8sio_api_core_v1_ScopedResourceSelectorRequirement(ref),
-		"k8s.io/api/core/v1.Secret":                                                                                   schema_k8sio_api_core_v1_Secret(ref),
-		"k8s.io/api/core/v1.SecretEnvSource":                                                                          schema_k8sio_api_core_v1_SecretEnvSource(ref),
-		"k8s.io/api/core/v1.SecretKeySelector":                                                                        schema_k8sio_api_core_v1_SecretKeySelector(ref),
-		"k8s.io/api/core/v1.SecretList":                                                                               schema_k8sio_api_core_v1_SecretList(ref),
-		"k8s.io/api/core/v1.SecretProjection":                                                                         schema_k8sio_api_core_v1_SecretProjection(ref),
-		"k8s.io/api/core/v1.SecretReference":                                                                          schema_k8sio_api_core_v1_SecretReference(ref),
-		"k8s.io/api/core/v1.SecretVolumeSource":                                                                       schema_k8sio_api_core_v1_SecretVolumeSource(ref),
-		"k8s.io/api/core/v1.SecurityContext":                                                                          schema_k8sio_api_core_v1_SecurityContext(ref),
-		"k8s.io/api/core/v1.SerializedReference":                                                                      schema_k8sio_api_core_v1_SerializedReference(ref),
-		"k8s.io/api/core/v1.Service":                                                                                  schema_k8sio_api_core_v1_Service(ref),
-		"k8s.io/api/core/v1.ServiceAccount":                                                                           schema_k8sio_api_core_v1_ServiceAccount(ref),
-		"k8s.io/api/core/v1.ServiceAccountList":                                                                       schema_k8sio_api_core_v1_ServiceAccountList(ref),
-		"k8s.io/api/core/v1.ServiceAccountTokenProjection":                                                            schema_k8sio_api_core_v1_ServiceAccountTokenProjection(ref),
-		"k8s.io/api/core/v1.ServiceList":                                                                              schema_k8sio_api_core_v1_ServiceList(ref),
-		"k8s.io/api/core/v1.ServicePort":                                                                              schema_k8sio_api_core_v1_ServicePort(ref),
-		"k8s.io/api/core/v1.ServiceProxyOptions":                                                                      schema_k8sio_api_core_v1_ServiceProxyOptions(ref),
-		"k8s.io/api/core/v1.ServiceSpec":                                                                              schema_k8sio_api_core_v1_ServiceSpec(ref),
-		"k8s.io/api/core/v1.ServiceStatus":                                                                            schema_k8sio_api_core_v1_ServiceStatus(ref),
-		"k8s.io/api/core/v1.SessionAffinityConfig":                                                                    schema_k8sio_api_core_v1_SessionAffinityConfig(ref),
-		"k8s.io/api/core/v1.StorageOSPersistentVolumeSource":                                                          schema_k8sio_api_core_v1_StorageOSPersistentVolumeSource(ref),
-		"k8s.io/api/core/v1.StorageOSVolumeSource":                                                                    schema_k8sio_api_core_v1_StorageOSVolumeSource(ref),
-		"k8s.io/api/core/v1.Sysctl":                                                                                   schema_k8sio_api_core_v1_Sysctl(ref),
-		"k8s.io/api/core/v1.TCPSocketAction":                                                                          schema_k8sio_api_core_v1_TCPSocketAction(ref),
-		"k8s.io/api/core/v1.Taint":                                                                                    schema_k8sio_api_core_v1_Taint(ref),
-		"k8s.io/api/core/v1.Toleration":                                                                               schema_k8sio_api_core_v1_Toleration(ref),
-		"k8s.io/api/core/v1.TopologySelectorLabelRequirement":                                                         schema_k8sio_api_core_v1_TopologySelectorLabelRequirement(ref),
-		"k8s.io/api/core/v1.TopologySelectorTerm":                                                                     schema_k8sio_api_core_v1_TopologySelectorTerm(ref),
-		"k8s.io/api/core/v1.TypedLocalObjectReference":                                                                schema_k8sio_api_core_v1_TypedLocalObjectReference(ref),
-		"k8s.io/api/core/v1.Volume":                                                                                   schema_k8sio_api_core_v1_Volume(ref),
-		"k8s.io/api/core/v1.VolumeDevice":                                                                             schema_k8sio_api_core_v1_VolumeDevice(ref),
-		"k8s.io/api/core/v1.VolumeMount":                                                                              schema_k8sio_api_core_v1_VolumeMount(ref),
-		"k8s.io/api/core/v1.VolumeNodeAffinity":                                                                       schema_k8sio_api_core_v1_VolumeNodeAffinity(ref),
-		"k8s.io/api/core/v1.VolumeProjection":                                                                         schema_k8sio_api_core_v1_VolumeProjection(ref),
-		"k8s.io/api/core/v1.VolumeSource":                                                                             schema_k8sio_api_core_v1_VolumeSource(ref),
-		"k8s.io/api/core/v1.VsphereVirtualDiskVolumeSource":                                                           schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref),
-		"k8s.io/api/core/v1.WeightedPodAffinityTerm":                                                                  schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref),
-		"k8s.io/api/events/v1beta1.Event":                                                                             schema_k8sio_api_events_v1beta1_Event(ref),
-		"k8s.io/api/events/v1beta1.EventList":                                                                         schema_k8sio_api_events_v1beta1_EventList(ref),
-		"k8s.io/api/events/v1beta1.EventSeries":                                                                       schema_k8sio_api_events_v1beta1_EventSeries(ref),
-		"k8s.io/api/extensions/v1beta1.AllowedFlexVolume":                                                             schema_k8sio_api_extensions_v1beta1_AllowedFlexVolume(ref),
-		"k8s.io/api/extensions/v1beta1.AllowedHostPath":                                                               schema_k8sio_api_extensions_v1beta1_AllowedHostPath(ref),
-		"k8s.io/api/extensions/v1beta1.CustomMetricCurrentStatus":                                                     schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatus(ref),
-		"k8s.io/api/extensions/v1beta1.CustomMetricCurrentStatusList":                                                 schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatusList(ref),
-		"k8s.io/api/extensions/v1beta1.CustomMetricTarget":                                                            schema_k8sio_api_extensions_v1beta1_CustomMetricTarget(ref),
-		"k8s.io/api/extensions/v1beta1.CustomMetricTargetList":                                                        schema_k8sio_api_extensions_v1beta1_CustomMetricTargetList(ref),
-		"k8s.io/api/extensions/v1beta1.DaemonSet":                                                                     schema_k8sio_api_extensions_v1beta1_DaemonSet(ref),
-		"k8s.io/api/extensions/v1beta1.DaemonSetCondition":                                                            schema_k8sio_api_extensions_v1beta1_DaemonSetCondition(ref),
-		"k8s.io/api/extensions/v1beta1.DaemonSetList":                                                                 schema_k8sio_api_extensions_v1beta1_DaemonSetList(ref),
-		"k8s.io/api/extensions/v1beta1.DaemonSetSpec":                                                                 schema_k8sio_api_extensions_v1beta1_DaemonSetSpec(ref),
-		"k8s.io/api/extensions/v1beta1.DaemonSetStatus":                                                               schema_k8sio_api_extensions_v1beta1_DaemonSetStatus(ref),
-		"k8s.io/api/extensions/v1beta1.DaemonSetUpdateStrategy":                                                       schema_k8sio_api_extensions_v1beta1_DaemonSetUpdateStrategy(ref),
-		"k8s.io/api/extensions/v1beta1.Deployment":                                                                    schema_k8sio_api_extensions_v1beta1_Deployment(ref),
-		"k8s.io/api/extensions/v1beta1.DeploymentCondition":                                                           schema_k8sio_api_extensions_v1beta1_DeploymentCondition(ref),
-		"k8s.io/api/extensions/v1beta1.DeploymentList":                                                                schema_k8sio_api_extensions_v1beta1_DeploymentList(ref),
-		"k8s.io/api/extensions/v1beta1.DeploymentRollback":                                                            schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref),
-		"k8s.io/api/extensions/v1beta1.DeploymentSpec":                                                                schema_k8sio_api_extensions_v1beta1_DeploymentSpec(ref),
-		"k8s.io/api/extensions/v1beta1.DeploymentStatus":                                                              schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref),
-		"k8s.io/api/extensions/v1beta1.DeploymentStrategy":                                                            schema_k8sio_api_extensions_v1beta1_DeploymentStrategy(ref),
-		"k8s.io/api/extensions/v1beta1.FSGroupStrategyOptions":                                                        schema_k8sio_api_extensions_v1beta1_FSGroupStrategyOptions(ref),
-		"k8s.io/api/extensions/v1beta1.HTTPIngressPath":                                                               schema_k8sio_api_extensions_v1beta1_HTTPIngressPath(ref),
-		"k8s.io/api/extensions/v1beta1.HTTPIngressRuleValue":                                                          schema_k8sio_api_extensions_v1beta1_HTTPIngressRuleValue(ref),
-		"k8s.io/api/extensions/v1beta1.HostPortRange":                                                                 schema_k8sio_api_extensions_v1beta1_HostPortRange(ref),
-		"k8s.io/api/extensions/v1beta1.IDRange":                                                                       schema_k8sio_api_extensions_v1beta1_IDRange(ref),
-		"k8s.io/api/extensions/v1beta1.IPBlock":                                                                       schema_k8sio_api_extensions_v1beta1_IPBlock(ref),
-		"k8s.io/api/extensions/v1beta1.Ingress":                                                                       schema_k8sio_api_extensions_v1beta1_Ingress(ref),
-		"k8s.io/api/extensions/v1beta1.IngressBackend":                                                                schema_k8sio_api_extensions_v1beta1_IngressBackend(ref),
-		"k8s.io/api/extensions/v1beta1.IngressList":                                                                   schema_k8sio_api_extensions_v1beta1_IngressList(ref),
-		"k8s.io/api/extensions/v1beta1.IngressRule":                                                                   schema_k8sio_api_extensions_v1beta1_IngressRule(ref),
-		"k8s.io/api/extensions/v1beta1.IngressRuleValue":                                                              schema_k8sio_api_extensions_v1beta1_IngressRuleValue(ref),
-		"k8s.io/api/extensions/v1beta1.IngressSpec":                                                                   schema_k8sio_api_extensions_v1beta1_IngressSpec(ref),
-		"k8s.io/api/extensions/v1beta1.IngressStatus":                                                                 schema_k8sio_api_extensions_v1beta1_IngressStatus(ref),
-		"k8s.io/api/extensions/v1beta1.IngressTLS":                                                                    schema_k8sio_api_extensions_v1beta1_IngressTLS(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicy":                                                                 schema_k8sio_api_extensions_v1beta1_NetworkPolicy(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicyEgressRule":                                                       schema_k8sio_api_extensions_v1beta1_NetworkPolicyEgressRule(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicyIngressRule":                                                      schema_k8sio_api_extensions_v1beta1_NetworkPolicyIngressRule(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicyList":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicyList(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicyPeer":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicyPeer(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicyPort":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicyPort(ref),
-		"k8s.io/api/extensions/v1beta1.NetworkPolicySpec":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref),
-		"k8s.io/api/extensions/v1beta1.PodSecurityPolicy":                                                             schema_k8sio_api_extensions_v1beta1_PodSecurityPolicy(ref),
-		"k8s.io/api/extensions/v1beta1.PodSecurityPolicyList":                                                         schema_k8sio_api_extensions_v1beta1_PodSecurityPolicyList(ref),
-		"k8s.io/api/extensions/v1beta1.PodSecurityPolicySpec":                                                         schema_k8sio_api_extensions_v1beta1_PodSecurityPolicySpec(ref),
-		"k8s.io/api/extensions/v1beta1.ReplicaSet":                                                                    schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref),
-		"k8s.io/api/extensions/v1beta1.ReplicaSetCondition":                                                           schema_k8sio_api_extensions_v1beta1_ReplicaSetCondition(ref),
-		"k8s.io/api/extensions/v1beta1.ReplicaSetList":                                                                schema_k8sio_api_extensions_v1beta1_ReplicaSetList(ref),
-		"k8s.io/api/extensions/v1beta1.ReplicaSetSpec":                                                                schema_k8sio_api_extensions_v1beta1_ReplicaSetSpec(ref),
-		"k8s.io/api/extensions/v1beta1.ReplicaSetStatus":                                                              schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref),
-		"k8s.io/api/extensions/v1beta1.ReplicationControllerDummy":                                                    schema_k8sio_api_extensions_v1beta1_ReplicationControllerDummy(ref),
-		"k8s.io/api/extensions/v1beta1.RollbackConfig":                                                                schema_k8sio_api_extensions_v1beta1_RollbackConfig(ref),
-		"k8s.io/api/extensions/v1beta1.RollingUpdateDaemonSet":                                                        schema_k8sio_api_extensions_v1beta1_RollingUpdateDaemonSet(ref),
-		"k8s.io/api/extensions/v1beta1.RollingUpdateDeployment":                                                       schema_k8sio_api_extensions_v1beta1_RollingUpdateDeployment(ref),
-		"k8s.io/api/extensions/v1beta1.RunAsGroupStrategyOptions":                                                     schema_k8sio_api_extensions_v1beta1_RunAsGroupStrategyOptions(ref),
-		"k8s.io/api/extensions/v1beta1.RunAsUserStrategyOptions":                                                      schema_k8sio_api_extensions_v1beta1_RunAsUserStrategyOptions(ref),
-		"k8s.io/api/extensions/v1beta1.SELinuxStrategyOptions":                                                        schema_k8sio_api_extensions_v1beta1_SELinuxStrategyOptions(ref),
-		"k8s.io/api/extensions/v1beta1.Scale":                                                                         schema_k8sio_api_extensions_v1beta1_Scale(ref),
-		"k8s.io/api/extensions/v1beta1.ScaleSpec":                                                                     schema_k8sio_api_extensions_v1beta1_ScaleSpec(ref),
-		"k8s.io/api/extensions/v1beta1.ScaleStatus":                                                                   schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref),
-		"k8s.io/api/extensions/v1beta1.SupplementalGroupsStrategyOptions":                                             schema_k8sio_api_extensions_v1beta1_SupplementalGroupsStrategyOptions(ref),
-		"k8s.io/api/imagepolicy/v1alpha1.ImageReview":                                                                 schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref),
-		"k8s.io/api/imagepolicy/v1alpha1.ImageReviewContainerSpec":                                                    schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref),
-		"k8s.io/api/imagepolicy/v1alpha1.ImageReviewSpec":                                                             schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref),
-		"k8s.io/api/imagepolicy/v1alpha1.ImageReviewStatus":                                                           schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref),
-		"k8s.io/api/networking/v1.IPBlock":                                                                            schema_k8sio_api_networking_v1_IPBlock(ref),
-		"k8s.io/api/networking/v1.NetworkPolicy":                                                                      schema_k8sio_api_networking_v1_NetworkPolicy(ref),
-		"k8s.io/api/networking/v1.NetworkPolicyEgressRule":                                                            schema_k8sio_api_networking_v1_NetworkPolicyEgressRule(ref),
-		"k8s.io/api/networking/v1.NetworkPolicyIngressRule":                                                           schema_k8sio_api_networking_v1_NetworkPolicyIngressRule(ref),
-		"k8s.io/api/networking/v1.NetworkPolicyList":                                                                  schema_k8sio_api_networking_v1_NetworkPolicyList(ref),
-		"k8s.io/api/networking/v1.NetworkPolicyPeer":                                                                  schema_k8sio_api_networking_v1_NetworkPolicyPeer(ref),
-		"k8s.io/api/networking/v1.NetworkPolicyPort":                                                                  schema_k8sio_api_networking_v1_NetworkPolicyPort(ref),
-		"k8s.io/api/networking/v1.NetworkPolicySpec":                                                                  schema_k8sio_api_networking_v1_NetworkPolicySpec(ref),
-		"k8s.io/api/policy/v1beta1.AllowedFlexVolume":                                                                 schema_k8sio_api_policy_v1beta1_AllowedFlexVolume(ref),
-		"k8s.io/api/policy/v1beta1.AllowedHostPath":                                                                   schema_k8sio_api_policy_v1beta1_AllowedHostPath(ref),
-		"k8s.io/api/policy/v1beta1.Eviction":                                                                          schema_k8sio_api_policy_v1beta1_Eviction(ref),
-		"k8s.io/api/policy/v1beta1.FSGroupStrategyOptions":                                                            schema_k8sio_api_policy_v1beta1_FSGroupStrategyOptions(ref),
-		"k8s.io/api/policy/v1beta1.HostPortRange":                                                                     schema_k8sio_api_policy_v1beta1_HostPortRange(ref),
-		"k8s.io/api/policy/v1beta1.IDRange":                                                                           schema_k8sio_api_policy_v1beta1_IDRange(ref),
-		"k8s.io/api/policy/v1beta1.PodDisruptionBudget":                                                               schema_k8sio_api_policy_v1beta1_PodDisruptionBudget(ref),
-		"k8s.io/api/policy/v1beta1.PodDisruptionBudgetList":                                                           schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetList(ref),
-		"k8s.io/api/policy/v1beta1.PodDisruptionBudgetSpec":                                                           schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetSpec(ref),
-		"k8s.io/api/policy/v1beta1.PodDisruptionBudgetStatus":                                                         schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetStatus(ref),
-		"k8s.io/api/policy/v1beta1.PodSecurityPolicy":                                                                 schema_k8sio_api_policy_v1beta1_PodSecurityPolicy(ref),
-		"k8s.io/api/policy/v1beta1.PodSecurityPolicyList":                                                             schema_k8sio_api_policy_v1beta1_PodSecurityPolicyList(ref),
-		"k8s.io/api/policy/v1beta1.PodSecurityPolicySpec":                                                             schema_k8sio_api_policy_v1beta1_PodSecurityPolicySpec(ref),
-		"k8s.io/api/policy/v1beta1.RunAsGroupStrategyOptions":                                                         schema_k8sio_api_policy_v1beta1_RunAsGroupStrategyOptions(ref),
-		"k8s.io/api/policy/v1beta1.RunAsUserStrategyOptions":                                                          schema_k8sio_api_policy_v1beta1_RunAsUserStrategyOptions(ref),
-		"k8s.io/api/policy/v1beta1.SELinuxStrategyOptions":                                                            schema_k8sio_api_policy_v1beta1_SELinuxStrategyOptions(ref),
-		"k8s.io/api/policy/v1beta1.SupplementalGroupsStrategyOptions":                                                 schema_k8sio_api_policy_v1beta1_SupplementalGroupsStrategyOptions(ref),
-		"k8s.io/api/rbac/v1.AggregationRule":                                                                          schema_k8sio_api_rbac_v1_AggregationRule(ref),
-		"k8s.io/api/rbac/v1.ClusterRole":                                                                              schema_k8sio_api_rbac_v1_ClusterRole(ref),
-		"k8s.io/api/rbac/v1.ClusterRoleBinding":                                                                       schema_k8sio_api_rbac_v1_ClusterRoleBinding(ref),
-		"k8s.io/api/rbac/v1.ClusterRoleBindingList":                                                                   schema_k8sio_api_rbac_v1_ClusterRoleBindingList(ref),
-		"k8s.io/api/rbac/v1.ClusterRoleList":                                                                          schema_k8sio_api_rbac_v1_ClusterRoleList(ref),
-		"k8s.io/api/rbac/v1.PolicyRule":                                                                               schema_k8sio_api_rbac_v1_PolicyRule(ref),
-		"k8s.io/api/rbac/v1.Role":                                                                                     schema_k8sio_api_rbac_v1_Role(ref),
-		"k8s.io/api/rbac/v1.RoleBinding":                                                                              schema_k8sio_api_rbac_v1_RoleBinding(ref),
-		"k8s.io/api/rbac/v1.RoleBindingList":                                                                          schema_k8sio_api_rbac_v1_RoleBindingList(ref),
-		"k8s.io/api/rbac/v1.RoleList":                                                                                 schema_k8sio_api_rbac_v1_RoleList(ref),
-		"k8s.io/api/rbac/v1.RoleRef":                                                                                  schema_k8sio_api_rbac_v1_RoleRef(ref),
-		"k8s.io/api/rbac/v1.Subject":                                                                                  schema_k8sio_api_rbac_v1_Subject(ref),
-		"k8s.io/api/rbac/v1alpha1.AggregationRule":                                                                    schema_k8sio_api_rbac_v1alpha1_AggregationRule(ref),
-		"k8s.io/api/rbac/v1alpha1.ClusterRole":                                                                        schema_k8sio_api_rbac_v1alpha1_ClusterRole(ref),
-		"k8s.io/api/rbac/v1alpha1.ClusterRoleBinding":                                                                 schema_k8sio_api_rbac_v1alpha1_ClusterRoleBinding(ref),
-		"k8s.io/api/rbac/v1alpha1.ClusterRoleBindingList":                                                             schema_k8sio_api_rbac_v1alpha1_ClusterRoleBindingList(ref),
-		"k8s.io/api/rbac/v1alpha1.ClusterRoleList":                                                                    schema_k8sio_api_rbac_v1alpha1_ClusterRoleList(ref),
-		"k8s.io/api/rbac/v1alpha1.PolicyRule":                                                                         schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref),
-		"k8s.io/api/rbac/v1alpha1.Role":                                                                               schema_k8sio_api_rbac_v1alpha1_Role(ref),
-		"k8s.io/api/rbac/v1alpha1.RoleBinding":                                                                        schema_k8sio_api_rbac_v1alpha1_RoleBinding(ref),
-		"k8s.io/api/rbac/v1alpha1.RoleBindingList":                                                                    schema_k8sio_api_rbac_v1alpha1_RoleBindingList(ref),
-		"k8s.io/api/rbac/v1alpha1.RoleList":                                                                           schema_k8sio_api_rbac_v1alpha1_RoleList(ref),
-		"k8s.io/api/rbac/v1alpha1.RoleRef":                                                                            schema_k8sio_api_rbac_v1alpha1_RoleRef(ref),
-		"k8s.io/api/rbac/v1alpha1.Subject":                                                                            schema_k8sio_api_rbac_v1alpha1_Subject(ref),
-		"k8s.io/api/rbac/v1beta1.AggregationRule":                                                                     schema_k8sio_api_rbac_v1beta1_AggregationRule(ref),
-		"k8s.io/api/rbac/v1beta1.ClusterRole":                                                                         schema_k8sio_api_rbac_v1beta1_ClusterRole(ref),
-		"k8s.io/api/rbac/v1beta1.ClusterRoleBinding":                                                                  schema_k8sio_api_rbac_v1beta1_ClusterRoleBinding(ref),
-		"k8s.io/api/rbac/v1beta1.ClusterRoleBindingList":                                                              schema_k8sio_api_rbac_v1beta1_ClusterRoleBindingList(ref),
-		"k8s.io/api/rbac/v1beta1.ClusterRoleList":                                                                     schema_k8sio_api_rbac_v1beta1_ClusterRoleList(ref),
-		"k8s.io/api/rbac/v1beta1.PolicyRule":                                                                          schema_k8sio_api_rbac_v1beta1_PolicyRule(ref),
-		"k8s.io/api/rbac/v1beta1.Role":                                                                                schema_k8sio_api_rbac_v1beta1_Role(ref),
-		"k8s.io/api/rbac/v1beta1.RoleBinding":                                                                         schema_k8sio_api_rbac_v1beta1_RoleBinding(ref),
-		"k8s.io/api/rbac/v1beta1.RoleBindingList":                                                                     schema_k8sio_api_rbac_v1beta1_RoleBindingList(ref),
-		"k8s.io/api/rbac/v1beta1.RoleList":                                                                            schema_k8sio_api_rbac_v1beta1_RoleList(ref),
-		"k8s.io/api/rbac/v1beta1.RoleRef":                                                                             schema_k8sio_api_rbac_v1beta1_RoleRef(ref),
-		"k8s.io/api/rbac/v1beta1.Subject":                                                                             schema_k8sio_api_rbac_v1beta1_Subject(ref),
-		"k8s.io/api/scheduling/v1alpha1.PriorityClass":                                                                schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref),
-		"k8s.io/api/scheduling/v1alpha1.PriorityClassList":                                                            schema_k8sio_api_scheduling_v1alpha1_PriorityClassList(ref),
-		"k8s.io/api/scheduling/v1beta1.PriorityClass":                                                                 schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref),
-		"k8s.io/api/scheduling/v1beta1.PriorityClassList":                                                             schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref),
-		"k8s.io/api/settings/v1alpha1.PodPreset":                                                                      schema_k8sio_api_settings_v1alpha1_PodPreset(ref),
-		"k8s.io/api/settings/v1alpha1.PodPresetList":                                                                  schema_k8sio_api_settings_v1alpha1_PodPresetList(ref),
-		"k8s.io/api/settings/v1alpha1.PodPresetSpec":                                                                  schema_k8sio_api_settings_v1alpha1_PodPresetSpec(ref),
-		"k8s.io/api/storage/v1.StorageClass":                                                                          schema_k8sio_api_storage_v1_StorageClass(ref),
-		"k8s.io/api/storage/v1.StorageClassList":                                                                      schema_k8sio_api_storage_v1_StorageClassList(ref),
-		"k8s.io/api/storage/v1alpha1.VolumeAttachment":                                                                schema_k8sio_api_storage_v1alpha1_VolumeAttachment(ref),
-		"k8s.io/api/storage/v1alpha1.VolumeAttachmentList":                                                            schema_k8sio_api_storage_v1alpha1_VolumeAttachmentList(ref),
-		"k8s.io/api/storage/v1alpha1.VolumeAttachmentSource":                                                          schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSource(ref),
-		"k8s.io/api/storage/v1alpha1.VolumeAttachmentSpec":                                                            schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSpec(ref),
-		"k8s.io/api/storage/v1alpha1.VolumeAttachmentStatus":                                                          schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref),
-		"k8s.io/api/storage/v1alpha1.VolumeError":                                                                     schema_k8sio_api_storage_v1alpha1_VolumeError(ref),
-		"k8s.io/api/storage/v1beta1.StorageClass":                                                                     schema_k8sio_api_storage_v1beta1_StorageClass(ref),
-		"k8s.io/api/storage/v1beta1.StorageClassList":                                                                 schema_k8sio_api_storage_v1beta1_StorageClassList(ref),
-		"k8s.io/api/storage/v1beta1.VolumeAttachment":                                                                 schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref),
-		"k8s.io/api/storage/v1beta1.VolumeAttachmentList":                                                             schema_k8sio_api_storage_v1beta1_VolumeAttachmentList(ref),
-		"k8s.io/api/storage/v1beta1.VolumeAttachmentSource":                                                           schema_k8sio_api_storage_v1beta1_VolumeAttachmentSource(ref),
-		"k8s.io/api/storage/v1beta1.VolumeAttachmentSpec":                                                             schema_k8sio_api_storage_v1beta1_VolumeAttachmentSpec(ref),
-		"k8s.io/api/storage/v1beta1.VolumeAttachmentStatus":                                                           schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref),
-		"k8s.io/api/storage/v1beta1.VolumeError":                                                                      schema_k8sio_api_storage_v1beta1_VolumeError(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceColumnDefinition":                schema_pkg_apis_apiextensions_v1beta1_CustomResourceColumnDefinition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinition":                      schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionCondition":             schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionList":                  schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionNames":                 schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionSpec":                  schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionStatus":                schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionVersion":               schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceScale":                schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceScale(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceStatus":               schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources":                    schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation":                      schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation":                         schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON":                                          schema_pkg_apis_apiextensions_v1beta1_JSON(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps":                               schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray":                        schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool":                         schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref),
-		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray":                  schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref),
-		"k8s.io/apimachinery/pkg/api/resource.Quantity":                                                               schema_apimachinery_pkg_api_resource_Quantity(ref),
-		"k8s.io/apimachinery/pkg/api/resource.int64Amount":                                                            schema_apimachinery_pkg_api_resource_int64Amount(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":                                                               schema_pkg_apis_meta_v1_APIGroup(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":                                                           schema_pkg_apis_meta_v1_APIGroupList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource":                                                            schema_pkg_apis_meta_v1_APIResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList":                                                        schema_pkg_apis_meta_v1_APIResourceList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":                                                            schema_pkg_apis_meta_v1_APIVersions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.CreateOptions":                                                          schema_pkg_apis_meta_v1_CreateOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.DeleteOptions":                                                          schema_pkg_apis_meta_v1_DeleteOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Duration":                                                               schema_pkg_apis_meta_v1_Duration(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ExportOptions":                                                          schema_pkg_apis_meta_v1_ExportOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GetOptions":                                                             schema_pkg_apis_meta_v1_GetOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupKind":                                                              schema_pkg_apis_meta_v1_GroupKind(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupResource":                                                          schema_pkg_apis_meta_v1_GroupResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersion":                                                           schema_pkg_apis_meta_v1_GroupVersion(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery":                                               schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionKind":                                                       schema_pkg_apis_meta_v1_GroupVersionKind(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionResource":                                                   schema_pkg_apis_meta_v1_GroupVersionResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Initializer":                                                            schema_pkg_apis_meta_v1_Initializer(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Initializers":                                                           schema_pkg_apis_meta_v1_Initializers(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent":                                                          schema_pkg_apis_meta_v1_InternalEvent(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector":                                                          schema_pkg_apis_meta_v1_LabelSelector(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement":                                               schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.List":                                                                   schema_pkg_apis_meta_v1_List(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta":                                                               schema_pkg_apis_meta_v1_ListMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ListOptions":                                                            schema_pkg_apis_meta_v1_ListOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime":                                                              schema_pkg_apis_meta_v1_MicroTime(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta":                                                             schema_pkg_apis_meta_v1_ObjectMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference":                                                         schema_pkg_apis_meta_v1_OwnerReference(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Patch":                                                                  schema_pkg_apis_meta_v1_Patch(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions":                                                          schema_pkg_apis_meta_v1_Preconditions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.RootPaths":                                                              schema_pkg_apis_meta_v1_RootPaths(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR":                                              schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":                                                                 schema_pkg_apis_meta_v1_Status(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause":                                                            schema_pkg_apis_meta_v1_StatusCause(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails":                                                          schema_pkg_apis_meta_v1_StatusDetails(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Time":                                                                   schema_pkg_apis_meta_v1_Time(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Timestamp":                                                              schema_pkg_apis_meta_v1_Timestamp(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta":                                                               schema_pkg_apis_meta_v1_TypeMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.UpdateOptions":                                                          schema_pkg_apis_meta_v1_UpdateOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.WatchEvent":                                                             schema_pkg_apis_meta_v1_WatchEvent(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.PartialObjectMetadata":                                             schema_pkg_apis_meta_v1beta1_PartialObjectMetadata(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.PartialObjectMetadataList":                                         schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.Table":                                                             schema_pkg_apis_meta_v1beta1_Table(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableColumnDefinition":                                             schema_pkg_apis_meta_v1beta1_TableColumnDefinition(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableOptions":                                                      schema_pkg_apis_meta_v1beta1_TableOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableRow":                                                          schema_pkg_apis_meta_v1beta1_TableRow(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableRowCondition":                                                 schema_pkg_apis_meta_v1beta1_TableRowCondition(ref),
-		"k8s.io/apimachinery/pkg/runtime.RawExtension":                                                                schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
-		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                                                    schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
-		"k8s.io/apimachinery/pkg/runtime.Unknown":                                                                     schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
-		"k8s.io/apimachinery/pkg/util/intstr.IntOrString":                                                             schema_apimachinery_pkg_util_intstr_IntOrString(ref),
-		"k8s.io/apimachinery/pkg/version.Info":                                                                        schema_k8sio_apimachinery_pkg_version_Info(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1.Event":                                                                    schema_pkg_apis_audit_v1_Event(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1.EventList":                                                                schema_pkg_apis_audit_v1_EventList(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1.GroupResources":                                                           schema_pkg_apis_audit_v1_GroupResources(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1.ObjectReference":                                                          schema_pkg_apis_audit_v1_ObjectReference(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1.Policy":                                                                   schema_pkg_apis_audit_v1_Policy(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1.PolicyList":                                                               schema_pkg_apis_audit_v1_PolicyList(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1.PolicyRule":                                                               schema_pkg_apis_audit_v1_PolicyRule(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.Event":                                                              schema_pkg_apis_audit_v1alpha1_Event(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.EventList":                                                          schema_pkg_apis_audit_v1alpha1_EventList(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.GroupResources":                                                     schema_pkg_apis_audit_v1alpha1_GroupResources(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.ObjectReference":                                                    schema_pkg_apis_audit_v1alpha1_ObjectReference(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.Policy":                                                             schema_pkg_apis_audit_v1alpha1_Policy(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.PolicyList":                                                         schema_pkg_apis_audit_v1alpha1_PolicyList(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.PolicyRule":                                                         schema_pkg_apis_audit_v1alpha1_PolicyRule(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1beta1.Event":                                                               schema_pkg_apis_audit_v1beta1_Event(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1beta1.EventList":                                                           schema_pkg_apis_audit_v1beta1_EventList(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1beta1.GroupResources":                                                      schema_pkg_apis_audit_v1beta1_GroupResources(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1beta1.ObjectReference":                                                     schema_pkg_apis_audit_v1beta1_ObjectReference(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1beta1.Policy":                                                              schema_pkg_apis_audit_v1beta1_Policy(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1beta1.PolicyList":                                                          schema_pkg_apis_audit_v1beta1_PolicyList(ref),
-		"k8s.io/apiserver/pkg/apis/audit/v1beta1.PolicyRule":                                                          schema_pkg_apis_audit_v1beta1_PolicyRule(ref),
-		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.ExecCredential":                                      schema_pkg_apis_clientauthentication_v1alpha1_ExecCredential(ref),
-		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.ExecCredentialSpec":                                  schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialSpec(ref),
-		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.ExecCredentialStatus":                                schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialStatus(ref),
-		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.Response":                                            schema_pkg_apis_clientauthentication_v1alpha1_Response(ref),
-		"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1.ExecCredential":                                       schema_pkg_apis_clientauthentication_v1beta1_ExecCredential(ref),
-		"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1.ExecCredentialSpec":                                   schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialSpec(ref),
-		"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1.ExecCredentialStatus":                                 schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialStatus(ref),
-		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriver":                                                              schema_pkg_apis_csi_v1alpha1_CSIDriver(ref),
-		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriverInfo":                                                          schema_pkg_apis_csi_v1alpha1_CSIDriverInfo(ref),
-		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriverList":                                                          schema_pkg_apis_csi_v1alpha1_CSIDriverList(ref),
-		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriverSpec":                                                          schema_pkg_apis_csi_v1alpha1_CSIDriverSpec(ref),
-		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSINodeInfo":                                                            schema_pkg_apis_csi_v1alpha1_CSINodeInfo(ref),
-		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSINodeInfoList":                                                        schema_pkg_apis_csi_v1alpha1_CSINodeInfoList(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIService":                                               schema_pkg_apis_apiregistration_v1_APIService(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceCondition":                                      schema_pkg_apis_apiregistration_v1_APIServiceCondition(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceList":                                           schema_pkg_apis_apiregistration_v1_APIServiceList(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceSpec":                                           schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceStatus":                                         schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.ServiceReference":                                         schema_pkg_apis_apiregistration_v1_ServiceReference(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIService":                                          schema_pkg_apis_apiregistration_v1beta1_APIService(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceCondition":                                 schema_pkg_apis_apiregistration_v1beta1_APIServiceCondition(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceList":                                      schema_pkg_apis_apiregistration_v1beta1_APIServiceList(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceSpec":                                      schema_pkg_apis_apiregistration_v1beta1_APIServiceSpec(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceStatus":                                    schema_pkg_apis_apiregistration_v1beta1_APIServiceStatus(ref),
-		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.ServiceReference":                                    schema_pkg_apis_apiregistration_v1beta1_ServiceReference(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.AttachDetachControllerConfiguration":                          schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.CSRSigningControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_CSRSigningControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.CloudProviderConfiguration":                                   schema_k8sio_kube_controller_manager_config_v1alpha1_CloudProviderConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.DaemonSetControllerConfiguration":                             schema_k8sio_kube_controller_manager_config_v1alpha1_DaemonSetControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.DeploymentControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_DeploymentControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.DeprecatedControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_DeprecatedControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.EndpointControllerConfiguration":                              schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.GarbageCollectorControllerConfiguration":                      schema_k8sio_kube_controller_manager_config_v1alpha1_GarbageCollectorControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.GenericControllerManagerConfiguration":                        schema_k8sio_kube_controller_manager_config_v1alpha1_GenericControllerManagerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.GroupResource":                                                schema_k8sio_kube_controller_manager_config_v1alpha1_GroupResource(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.HPAControllerConfiguration":                                   schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.JobControllerConfiguration":                                   schema_k8sio_kube_controller_manager_config_v1alpha1_JobControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.KubeCloudSharedConfiguration":                                 schema_k8sio_kube_controller_manager_config_v1alpha1_KubeCloudSharedConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.KubeControllerManagerConfiguration":                           schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration":                             schema_k8sio_kube_controller_manager_config_v1alpha1_NamespaceControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.NodeIPAMControllerConfiguration":                              schema_k8sio_kube_controller_manager_config_v1alpha1_NodeIPAMControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.NodeLifecycleControllerConfiguration":                         schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeBinderControllerConfiguration":                schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinderControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeRecyclerConfiguration":                        schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeRecyclerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.PodGCControllerConfiguration":                                 schema_k8sio_kube_controller_manager_config_v1alpha1_PodGCControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.ReplicaSetControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicaSetControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.ReplicationControllerConfiguration":                           schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicationControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.ResourceQuotaControllerConfiguration":                         schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceQuotaControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.SAControllerConfiguration":                                    schema_k8sio_kube_controller_manager_config_v1alpha1_SAControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.ServiceControllerConfiguration":                               schema_k8sio_kube_controller_manager_config_v1alpha1_ServiceControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.TTLAfterFinishedControllerConfiguration":                      schema_k8sio_kube_controller_manager_config_v1alpha1_TTLAfterFinishedControllerConfiguration(ref),
-		"k8s.io/kube-controller-manager/config/v1alpha1.VolumeConfiguration":                                          schema_k8sio_kube_controller_manager_config_v1alpha1_VolumeConfiguration(ref),
-		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyConfiguration":                                                    schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref),
-		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyConntrackConfiguration":                                           schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConntrackConfiguration(ref),
-		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPTablesConfiguration":                                            schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref),
-		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration":                                                schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref),
-		"k8s.io/kube-scheduler/config/v1alpha1.KubeSchedulerConfiguration":                                            schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerConfiguration(ref),
-		"k8s.io/kube-scheduler/config/v1alpha1.KubeSchedulerLeaderElectionConfiguration":                              schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerLeaderElectionConfiguration(ref),
-		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerAlgorithmSource":                                              schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerAlgorithmSource(ref),
-		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicyConfigMapSource":                                        schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyConfigMapSource(ref),
-		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicyFileSource":                                             schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyFileSource(ref),
-		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicySource":                                                 schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicySource(ref),
-		"k8s.io/kubelet/config/v1beta1.KubeletAnonymousAuthentication":                                                schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref),
-		"k8s.io/kubelet/config/v1beta1.KubeletAuthentication":                                                         schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref),
-		"k8s.io/kubelet/config/v1beta1.KubeletAuthorization":                                                          schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref),
-		"k8s.io/kubelet/config/v1beta1.KubeletConfiguration":                                                          schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref),
-		"k8s.io/kubelet/config/v1beta1.KubeletWebhookAuthentication":                                                  schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthentication(ref),
-		"k8s.io/kubelet/config/v1beta1.KubeletWebhookAuthorization":                                                   schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthorization(ref),
-		"k8s.io/kubelet/config/v1beta1.KubeletX509Authentication":                                                     schema_k8sio_kubelet_config_v1beta1_KubeletX509Authentication(ref),
-		"k8s.io/kubelet/config/v1beta1.SerializedNodeConfigSource":                                                    schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref),
-		"k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1.CloudControllerManagerConfiguration": schema_app_apis_config_v1alpha1_CloudControllerManagerConfiguration(ref),
-		"k8s.io/kubernetes/pkg/apis/abac/v1beta1.Policy":                                                              schema_pkg_apis_abac_v1beta1_Policy(ref),
-		"k8s.io/kubernetes/pkg/apis/abac/v1beta1.PolicySpec":                                                          schema_pkg_apis_abac_v1beta1_PolicySpec(ref),
-		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1.MetricListOptions":                                            schema_pkg_apis_custom_metrics_v1beta1_MetricListOptions(ref),
-		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1.MetricValue":                                                  schema_pkg_apis_custom_metrics_v1beta1_MetricValue(ref),
-		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1.MetricValueList":                                              schema_pkg_apis_custom_metrics_v1beta1_MetricValueList(ref),
-		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricIdentifier":                                             schema_pkg_apis_custom_metrics_v1beta2_MetricIdentifier(ref),
-		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricListOptions":                                            schema_pkg_apis_custom_metrics_v1beta2_MetricListOptions(ref),
-		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricValue":                                                  schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref),
-		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricValueList":                                              schema_pkg_apis_custom_metrics_v1beta2_MetricValueList(ref),
-		"k8s.io/metrics/pkg/apis/external_metrics/v1beta1.ExternalMetricValue":                                        schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValue(ref),
-		"k8s.io/metrics/pkg/apis/external_metrics/v1beta1.ExternalMetricValueList":                                    schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.ContainerMetrics":                                                   schema_pkg_apis_metrics_v1alpha1_ContainerMetrics(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.NodeMetrics":                                                        schema_pkg_apis_metrics_v1alpha1_NodeMetrics(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.NodeMetricsList":                                                    schema_pkg_apis_metrics_v1alpha1_NodeMetricsList(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.PodMetrics":                                                         schema_pkg_apis_metrics_v1alpha1_PodMetrics(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.PodMetricsList":                                                     schema_pkg_apis_metrics_v1alpha1_PodMetricsList(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1beta1.ContainerMetrics":                                                    schema_pkg_apis_metrics_v1beta1_ContainerMetrics(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1beta1.NodeMetrics":                                                         schema_pkg_apis_metrics_v1beta1_NodeMetrics(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1beta1.NodeMetricsList":                                                     schema_pkg_apis_metrics_v1beta1_NodeMetricsList(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1beta1.PodMetrics":                                                          schema_pkg_apis_metrics_v1beta1_PodMetrics(ref),
-		"k8s.io/metrics/pkg/apis/metrics/v1beta1.PodMetricsList":                                                      schema_pkg_apis_metrics_v1beta1_PodMetricsList(ref),
+		"k8s.io/api/admissionregistration/v1alpha1.Initializer":                                                       schema_k8sio_api_admissionregistration_v1alpha1_Initializer(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1alpha1.InitializerConfiguration":                                          schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfiguration(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1alpha1.InitializerConfigurationList":                                      schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfigurationList(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1alpha1.Rule":                                                              schema_k8sio_api_admissionregistration_v1alpha1_Rule(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfiguration":                                       schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.MutatingWebhookConfigurationList":                                   schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfigurationList(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.Rule":                                                               schema_k8sio_api_admissionregistration_v1beta1_Rule(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.RuleWithOperations":                                                 schema_k8sio_api_admissionregistration_v1beta1_RuleWithOperations(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.ServiceReference":                                                   schema_k8sio_api_admissionregistration_v1beta1_ServiceReference(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.ValidatingWebhookConfiguration":                                     schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfiguration(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.ValidatingWebhookConfigurationList":                                 schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurationList(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.Webhook":                                                            schema_k8sio_api_admissionregistration_v1beta1_Webhook(ref, featureIsEnabled),
+		"k8s.io/api/admissionregistration/v1beta1.WebhookClientConfig":                                                schema_k8sio_api_admissionregistration_v1beta1_WebhookClientConfig(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.ControllerRevision":                                                                       schema_k8sio_api_apps_v1_ControllerRevision(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.ControllerRevisionList":                                                                   schema_k8sio_api_apps_v1_ControllerRevisionList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DaemonSet":                                                                                schema_k8sio_api_apps_v1_DaemonSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DaemonSetCondition":                                                                       schema_k8sio_api_apps_v1_DaemonSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DaemonSetList":                                                                            schema_k8sio_api_apps_v1_DaemonSetList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DaemonSetSpec":                                                                            schema_k8sio_api_apps_v1_DaemonSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DaemonSetStatus":                                                                          schema_k8sio_api_apps_v1_DaemonSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DaemonSetUpdateStrategy":                                                                  schema_k8sio_api_apps_v1_DaemonSetUpdateStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.Deployment":                                                                               schema_k8sio_api_apps_v1_Deployment(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DeploymentCondition":                                                                      schema_k8sio_api_apps_v1_DeploymentCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DeploymentList":                                                                           schema_k8sio_api_apps_v1_DeploymentList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DeploymentSpec":                                                                           schema_k8sio_api_apps_v1_DeploymentSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DeploymentStatus":                                                                         schema_k8sio_api_apps_v1_DeploymentStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.DeploymentStrategy":                                                                       schema_k8sio_api_apps_v1_DeploymentStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.ReplicaSet":                                                                               schema_k8sio_api_apps_v1_ReplicaSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.ReplicaSetCondition":                                                                      schema_k8sio_api_apps_v1_ReplicaSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.ReplicaSetList":                                                                           schema_k8sio_api_apps_v1_ReplicaSetList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.ReplicaSetSpec":                                                                           schema_k8sio_api_apps_v1_ReplicaSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.ReplicaSetStatus":                                                                         schema_k8sio_api_apps_v1_ReplicaSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.RollingUpdateDaemonSet":                                                                   schema_k8sio_api_apps_v1_RollingUpdateDaemonSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.RollingUpdateDeployment":                                                                  schema_k8sio_api_apps_v1_RollingUpdateDeployment(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.RollingUpdateStatefulSetStrategy":                                                         schema_k8sio_api_apps_v1_RollingUpdateStatefulSetStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.StatefulSet":                                                                              schema_k8sio_api_apps_v1_StatefulSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.StatefulSetCondition":                                                                     schema_k8sio_api_apps_v1_StatefulSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.StatefulSetList":                                                                          schema_k8sio_api_apps_v1_StatefulSetList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.StatefulSetSpec":                                                                          schema_k8sio_api_apps_v1_StatefulSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.StatefulSetStatus":                                                                        schema_k8sio_api_apps_v1_StatefulSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1.StatefulSetUpdateStrategy":                                                                schema_k8sio_api_apps_v1_StatefulSetUpdateStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.ControllerRevision":                                                                  schema_k8sio_api_apps_v1beta1_ControllerRevision(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.ControllerRevisionList":                                                              schema_k8sio_api_apps_v1beta1_ControllerRevisionList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.Deployment":                                                                          schema_k8sio_api_apps_v1beta1_Deployment(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.DeploymentCondition":                                                                 schema_k8sio_api_apps_v1beta1_DeploymentCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.DeploymentList":                                                                      schema_k8sio_api_apps_v1beta1_DeploymentList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.DeploymentRollback":                                                                  schema_k8sio_api_apps_v1beta1_DeploymentRollback(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.DeploymentSpec":                                                                      schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.DeploymentStatus":                                                                    schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.DeploymentStrategy":                                                                  schema_k8sio_api_apps_v1beta1_DeploymentStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.RollbackConfig":                                                                      schema_k8sio_api_apps_v1beta1_RollbackConfig(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.RollingUpdateDeployment":                                                             schema_k8sio_api_apps_v1beta1_RollingUpdateDeployment(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.RollingUpdateStatefulSetStrategy":                                                    schema_k8sio_api_apps_v1beta1_RollingUpdateStatefulSetStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.Scale":                                                                               schema_k8sio_api_apps_v1beta1_Scale(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.ScaleSpec":                                                                           schema_k8sio_api_apps_v1beta1_ScaleSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.ScaleStatus":                                                                         schema_k8sio_api_apps_v1beta1_ScaleStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.StatefulSet":                                                                         schema_k8sio_api_apps_v1beta1_StatefulSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.StatefulSetCondition":                                                                schema_k8sio_api_apps_v1beta1_StatefulSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.StatefulSetList":                                                                     schema_k8sio_api_apps_v1beta1_StatefulSetList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.StatefulSetSpec":                                                                     schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.StatefulSetStatus":                                                                   schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta1.StatefulSetUpdateStrategy":                                                           schema_k8sio_api_apps_v1beta1_StatefulSetUpdateStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ControllerRevision":                                                                  schema_k8sio_api_apps_v1beta2_ControllerRevision(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ControllerRevisionList":                                                              schema_k8sio_api_apps_v1beta2_ControllerRevisionList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DaemonSet":                                                                           schema_k8sio_api_apps_v1beta2_DaemonSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DaemonSetCondition":                                                                  schema_k8sio_api_apps_v1beta2_DaemonSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DaemonSetList":                                                                       schema_k8sio_api_apps_v1beta2_DaemonSetList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DaemonSetSpec":                                                                       schema_k8sio_api_apps_v1beta2_DaemonSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DaemonSetStatus":                                                                     schema_k8sio_api_apps_v1beta2_DaemonSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DaemonSetUpdateStrategy":                                                             schema_k8sio_api_apps_v1beta2_DaemonSetUpdateStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.Deployment":                                                                          schema_k8sio_api_apps_v1beta2_Deployment(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DeploymentCondition":                                                                 schema_k8sio_api_apps_v1beta2_DeploymentCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DeploymentList":                                                                      schema_k8sio_api_apps_v1beta2_DeploymentList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DeploymentSpec":                                                                      schema_k8sio_api_apps_v1beta2_DeploymentSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DeploymentStatus":                                                                    schema_k8sio_api_apps_v1beta2_DeploymentStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.DeploymentStrategy":                                                                  schema_k8sio_api_apps_v1beta2_DeploymentStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ReplicaSet":                                                                          schema_k8sio_api_apps_v1beta2_ReplicaSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ReplicaSetCondition":                                                                 schema_k8sio_api_apps_v1beta2_ReplicaSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ReplicaSetList":                                                                      schema_k8sio_api_apps_v1beta2_ReplicaSetList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ReplicaSetSpec":                                                                      schema_k8sio_api_apps_v1beta2_ReplicaSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ReplicaSetStatus":                                                                    schema_k8sio_api_apps_v1beta2_ReplicaSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.RollingUpdateDaemonSet":                                                              schema_k8sio_api_apps_v1beta2_RollingUpdateDaemonSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.RollingUpdateDeployment":                                                             schema_k8sio_api_apps_v1beta2_RollingUpdateDeployment(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.RollingUpdateStatefulSetStrategy":                                                    schema_k8sio_api_apps_v1beta2_RollingUpdateStatefulSetStrategy(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.Scale":                                                                               schema_k8sio_api_apps_v1beta2_Scale(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ScaleSpec":                                                                           schema_k8sio_api_apps_v1beta2_ScaleSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.ScaleStatus":                                                                         schema_k8sio_api_apps_v1beta2_ScaleStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.StatefulSet":                                                                         schema_k8sio_api_apps_v1beta2_StatefulSet(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.StatefulSetCondition":                                                                schema_k8sio_api_apps_v1beta2_StatefulSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.StatefulSetList":                                                                     schema_k8sio_api_apps_v1beta2_StatefulSetList(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.StatefulSetSpec":                                                                     schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.StatefulSetStatus":                                                                   schema_k8sio_api_apps_v1beta2_StatefulSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/apps/v1beta2.StatefulSetUpdateStrategy":                                                           schema_k8sio_api_apps_v1beta2_StatefulSetUpdateStrategy(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.AuditSink":                                                             schema_k8sio_api_auditregistration_v1alpha1_AuditSink(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.AuditSinkList":                                                         schema_k8sio_api_auditregistration_v1alpha1_AuditSinkList(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.AuditSinkSpec":                                                         schema_k8sio_api_auditregistration_v1alpha1_AuditSinkSpec(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.Policy":                                                                schema_k8sio_api_auditregistration_v1alpha1_Policy(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.ServiceReference":                                                      schema_k8sio_api_auditregistration_v1alpha1_ServiceReference(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.Webhook":                                                               schema_k8sio_api_auditregistration_v1alpha1_Webhook(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.WebhookClientConfig":                                                   schema_k8sio_api_auditregistration_v1alpha1_WebhookClientConfig(ref, featureIsEnabled),
+		"k8s.io/api/auditregistration/v1alpha1.WebhookThrottleConfig":                                                 schema_k8sio_api_auditregistration_v1alpha1_WebhookThrottleConfig(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.BoundObjectReference":                                                           schema_k8sio_api_authentication_v1_BoundObjectReference(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.TokenRequest":                                                                   schema_k8sio_api_authentication_v1_TokenRequest(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.TokenRequestSpec":                                                               schema_k8sio_api_authentication_v1_TokenRequestSpec(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.TokenRequestStatus":                                                             schema_k8sio_api_authentication_v1_TokenRequestStatus(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.TokenReview":                                                                    schema_k8sio_api_authentication_v1_TokenReview(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.TokenReviewSpec":                                                                schema_k8sio_api_authentication_v1_TokenReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.TokenReviewStatus":                                                              schema_k8sio_api_authentication_v1_TokenReviewStatus(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1.UserInfo":                                                                       schema_k8sio_api_authentication_v1_UserInfo(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1beta1.TokenReview":                                                               schema_k8sio_api_authentication_v1beta1_TokenReview(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1beta1.TokenReviewSpec":                                                           schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1beta1.TokenReviewStatus":                                                         schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref, featureIsEnabled),
+		"k8s.io/api/authentication/v1beta1.UserInfo":                                                                  schema_k8sio_api_authentication_v1beta1_UserInfo(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.LocalSubjectAccessReview":                                                        schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.NonResourceAttributes":                                                           schema_k8sio_api_authorization_v1_NonResourceAttributes(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.NonResourceRule":                                                                 schema_k8sio_api_authorization_v1_NonResourceRule(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.ResourceAttributes":                                                              schema_k8sio_api_authorization_v1_ResourceAttributes(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.ResourceRule":                                                                    schema_k8sio_api_authorization_v1_ResourceRule(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SelfSubjectAccessReview":                                                         schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SelfSubjectAccessReviewSpec":                                                     schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SelfSubjectRulesReview":                                                          schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SelfSubjectRulesReviewSpec":                                                      schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SubjectAccessReview":                                                             schema_k8sio_api_authorization_v1_SubjectAccessReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SubjectAccessReviewSpec":                                                         schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SubjectAccessReviewStatus":                                                       schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1.SubjectRulesReviewStatus":                                                        schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.LocalSubjectAccessReview":                                                   schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.NonResourceAttributes":                                                      schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.NonResourceRule":                                                            schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.ResourceAttributes":                                                         schema_k8sio_api_authorization_v1beta1_ResourceAttributes(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.ResourceRule":                                                               schema_k8sio_api_authorization_v1beta1_ResourceRule(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SelfSubjectAccessReview":                                                    schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SelfSubjectAccessReviewSpec":                                                schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SelfSubjectRulesReview":                                                     schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SelfSubjectRulesReviewSpec":                                                 schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SubjectAccessReview":                                                        schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SubjectAccessReviewSpec":                                                    schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SubjectAccessReviewStatus":                                                  schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref, featureIsEnabled),
+		"k8s.io/api/authorization/v1beta1.SubjectRulesReviewStatus":                                                   schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.CrossVersionObjectReference":                                                       schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ExternalMetricSource":                                                              schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ExternalMetricStatus":                                                              schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscaler":                                                           schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerCondition":                                                  schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerList":                                                       schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerSpec":                                                       schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.HorizontalPodAutoscalerStatus":                                                     schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.MetricSpec":                                                                        schema_k8sio_api_autoscaling_v1_MetricSpec(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.MetricStatus":                                                                      schema_k8sio_api_autoscaling_v1_MetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ObjectMetricSource":                                                                schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ObjectMetricStatus":                                                                schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.PodsMetricSource":                                                                  schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.PodsMetricStatus":                                                                  schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ResourceMetricSource":                                                              schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ResourceMetricStatus":                                                              schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.Scale":                                                                             schema_k8sio_api_autoscaling_v1_Scale(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ScaleSpec":                                                                         schema_k8sio_api_autoscaling_v1_ScaleSpec(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v1.ScaleStatus":                                                                       schema_k8sio_api_autoscaling_v1_ScaleStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.CrossVersionObjectReference":                                                  schema_k8sio_api_autoscaling_v2beta1_CrossVersionObjectReference(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.ExternalMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta1_ExternalMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.ExternalMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta1_ExternalMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscaler":                                                      schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscaler(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerCondition":                                             schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerCondition(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerList":                                                  schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerList(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerSpec":                                                  schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerSpec(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.HorizontalPodAutoscalerStatus":                                                schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.MetricSpec":                                                                   schema_k8sio_api_autoscaling_v2beta1_MetricSpec(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.MetricStatus":                                                                 schema_k8sio_api_autoscaling_v2beta1_MetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.ObjectMetricSource":                                                           schema_k8sio_api_autoscaling_v2beta1_ObjectMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.ObjectMetricStatus":                                                           schema_k8sio_api_autoscaling_v2beta1_ObjectMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.PodsMetricSource":                                                             schema_k8sio_api_autoscaling_v2beta1_PodsMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.PodsMetricStatus":                                                             schema_k8sio_api_autoscaling_v2beta1_PodsMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.ResourceMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta1_ResourceMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta1.ResourceMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta1_ResourceMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.CrossVersionObjectReference":                                                  schema_k8sio_api_autoscaling_v2beta2_CrossVersionObjectReference(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.ExternalMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta2_ExternalMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.ExternalMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta2_ExternalMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscaler":                                                      schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscaler(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerCondition":                                             schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerCondition(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerList":                                                  schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerList(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerSpec":                                                  schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerSpec(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.HorizontalPodAutoscalerStatus":                                                schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.MetricIdentifier":                                                             schema_k8sio_api_autoscaling_v2beta2_MetricIdentifier(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.MetricSpec":                                                                   schema_k8sio_api_autoscaling_v2beta2_MetricSpec(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.MetricStatus":                                                                 schema_k8sio_api_autoscaling_v2beta2_MetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.MetricTarget":                                                                 schema_k8sio_api_autoscaling_v2beta2_MetricTarget(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.MetricValueStatus":                                                            schema_k8sio_api_autoscaling_v2beta2_MetricValueStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.ObjectMetricSource":                                                           schema_k8sio_api_autoscaling_v2beta2_ObjectMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.ObjectMetricStatus":                                                           schema_k8sio_api_autoscaling_v2beta2_ObjectMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.PodsMetricSource":                                                             schema_k8sio_api_autoscaling_v2beta2_PodsMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.PodsMetricStatus":                                                             schema_k8sio_api_autoscaling_v2beta2_PodsMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.ResourceMetricSource":                                                         schema_k8sio_api_autoscaling_v2beta2_ResourceMetricSource(ref, featureIsEnabled),
+		"k8s.io/api/autoscaling/v2beta2.ResourceMetricStatus":                                                         schema_k8sio_api_autoscaling_v2beta2_ResourceMetricStatus(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1.Job":                                                                                     schema_k8sio_api_batch_v1_Job(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1.JobCondition":                                                                            schema_k8sio_api_batch_v1_JobCondition(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1.JobList":                                                                                 schema_k8sio_api_batch_v1_JobList(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1.JobSpec":                                                                                 schema_k8sio_api_batch_v1_JobSpec(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1.JobStatus":                                                                               schema_k8sio_api_batch_v1_JobStatus(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1beta1.CronJob":                                                                            schema_k8sio_api_batch_v1beta1_CronJob(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1beta1.CronJobList":                                                                        schema_k8sio_api_batch_v1beta1_CronJobList(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1beta1.CronJobSpec":                                                                        schema_k8sio_api_batch_v1beta1_CronJobSpec(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1beta1.CronJobStatus":                                                                      schema_k8sio_api_batch_v1beta1_CronJobStatus(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1beta1.JobTemplate":                                                                        schema_k8sio_api_batch_v1beta1_JobTemplate(ref, featureIsEnabled),
+		"k8s.io/api/batch/v1beta1.JobTemplateSpec":                                                                    schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref, featureIsEnabled),
+		"k8s.io/api/batch/v2alpha1.CronJob":                                                                           schema_k8sio_api_batch_v2alpha1_CronJob(ref, featureIsEnabled),
+		"k8s.io/api/batch/v2alpha1.CronJobList":                                                                       schema_k8sio_api_batch_v2alpha1_CronJobList(ref, featureIsEnabled),
+		"k8s.io/api/batch/v2alpha1.CronJobSpec":                                                                       schema_k8sio_api_batch_v2alpha1_CronJobSpec(ref, featureIsEnabled),
+		"k8s.io/api/batch/v2alpha1.CronJobStatus":                                                                     schema_k8sio_api_batch_v2alpha1_CronJobStatus(ref, featureIsEnabled),
+		"k8s.io/api/batch/v2alpha1.JobTemplate":                                                                       schema_k8sio_api_batch_v2alpha1_JobTemplate(ref, featureIsEnabled),
+		"k8s.io/api/batch/v2alpha1.JobTemplateSpec":                                                                   schema_k8sio_api_batch_v2alpha1_JobTemplateSpec(ref, featureIsEnabled),
+		"k8s.io/api/certificates/v1beta1.CertificateSigningRequest":                                                   schema_k8sio_api_certificates_v1beta1_CertificateSigningRequest(ref, featureIsEnabled),
+		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestCondition":                                          schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestCondition(ref, featureIsEnabled),
+		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestList":                                               schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestList(ref, featureIsEnabled),
+		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestSpec":                                               schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref, featureIsEnabled),
+		"k8s.io/api/certificates/v1beta1.CertificateSigningRequestStatus":                                             schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestStatus(ref, featureIsEnabled),
+		"k8s.io/api/coordination/v1beta1.Lease":                                                                       schema_k8sio_api_coordination_v1beta1_Lease(ref, featureIsEnabled),
+		"k8s.io/api/coordination/v1beta1.LeaseList":                                                                   schema_k8sio_api_coordination_v1beta1_LeaseList(ref, featureIsEnabled),
+		"k8s.io/api/coordination/v1beta1.LeaseSpec":                                                                   schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.AWSElasticBlockStoreVolumeSource":                                                         schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Affinity":                                                                                 schema_k8sio_api_core_v1_Affinity(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.AttachedVolume":                                                                           schema_k8sio_api_core_v1_AttachedVolume(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.AvoidPods":                                                                                schema_k8sio_api_core_v1_AvoidPods(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.AzureDiskVolumeSource":                                                                    schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.AzureFilePersistentVolumeSource":                                                          schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.AzureFileVolumeSource":                                                                    schema_k8sio_api_core_v1_AzureFileVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Binding":                                                                                  schema_k8sio_api_core_v1_Binding(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.CSIPersistentVolumeSource":                                                                schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Capabilities":                                                                             schema_k8sio_api_core_v1_Capabilities(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.CephFSPersistentVolumeSource":                                                             schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.CephFSVolumeSource":                                                                       schema_k8sio_api_core_v1_CephFSVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.CinderPersistentVolumeSource":                                                             schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.CinderVolumeSource":                                                                       schema_k8sio_api_core_v1_CinderVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ClientIPConfig":                                                                           schema_k8sio_api_core_v1_ClientIPConfig(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ComponentCondition":                                                                       schema_k8sio_api_core_v1_ComponentCondition(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ComponentStatus":                                                                          schema_k8sio_api_core_v1_ComponentStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ComponentStatusList":                                                                      schema_k8sio_api_core_v1_ComponentStatusList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ConfigMap":                                                                                schema_k8sio_api_core_v1_ConfigMap(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ConfigMapEnvSource":                                                                       schema_k8sio_api_core_v1_ConfigMapEnvSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ConfigMapKeySelector":                                                                     schema_k8sio_api_core_v1_ConfigMapKeySelector(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ConfigMapList":                                                                            schema_k8sio_api_core_v1_ConfigMapList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ConfigMapNodeConfigSource":                                                                schema_k8sio_api_core_v1_ConfigMapNodeConfigSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ConfigMapProjection":                                                                      schema_k8sio_api_core_v1_ConfigMapProjection(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ConfigMapVolumeSource":                                                                    schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Container":                                                                                schema_k8sio_api_core_v1_Container(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ContainerImage":                                                                           schema_k8sio_api_core_v1_ContainerImage(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ContainerPort":                                                                            schema_k8sio_api_core_v1_ContainerPort(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ContainerState":                                                                           schema_k8sio_api_core_v1_ContainerState(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ContainerStateRunning":                                                                    schema_k8sio_api_core_v1_ContainerStateRunning(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ContainerStateTerminated":                                                                 schema_k8sio_api_core_v1_ContainerStateTerminated(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ContainerStateWaiting":                                                                    schema_k8sio_api_core_v1_ContainerStateWaiting(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ContainerStatus":                                                                          schema_k8sio_api_core_v1_ContainerStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.DaemonEndpoint":                                                                           schema_k8sio_api_core_v1_DaemonEndpoint(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.DownwardAPIProjection":                                                                    schema_k8sio_api_core_v1_DownwardAPIProjection(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.DownwardAPIVolumeFile":                                                                    schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.DownwardAPIVolumeSource":                                                                  schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EmptyDirVolumeSource":                                                                     schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EndpointAddress":                                                                          schema_k8sio_api_core_v1_EndpointAddress(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EndpointPort":                                                                             schema_k8sio_api_core_v1_EndpointPort(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EndpointSubset":                                                                           schema_k8sio_api_core_v1_EndpointSubset(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Endpoints":                                                                                schema_k8sio_api_core_v1_Endpoints(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EndpointsList":                                                                            schema_k8sio_api_core_v1_EndpointsList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EnvFromSource":                                                                            schema_k8sio_api_core_v1_EnvFromSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EnvVar":                                                                                   schema_k8sio_api_core_v1_EnvVar(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EnvVarSource":                                                                             schema_k8sio_api_core_v1_EnvVarSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Event":                                                                                    schema_k8sio_api_core_v1_Event(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EventList":                                                                                schema_k8sio_api_core_v1_EventList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EventSeries":                                                                              schema_k8sio_api_core_v1_EventSeries(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.EventSource":                                                                              schema_k8sio_api_core_v1_EventSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ExecAction":                                                                               schema_k8sio_api_core_v1_ExecAction(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.FCVolumeSource":                                                                           schema_k8sio_api_core_v1_FCVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.FlexPersistentVolumeSource":                                                               schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.FlexVolumeSource":                                                                         schema_k8sio_api_core_v1_FlexVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.FlockerVolumeSource":                                                                      schema_k8sio_api_core_v1_FlockerVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.GCEPersistentDiskVolumeSource":                                                            schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.GitRepoVolumeSource":                                                                      schema_k8sio_api_core_v1_GitRepoVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.GlusterfsVolumeSource":                                                                    schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.HTTPGetAction":                                                                            schema_k8sio_api_core_v1_HTTPGetAction(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.HTTPHeader":                                                                               schema_k8sio_api_core_v1_HTTPHeader(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Handler":                                                                                  schema_k8sio_api_core_v1_Handler(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.HostAlias":                                                                                schema_k8sio_api_core_v1_HostAlias(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.HostPathVolumeSource":                                                                     schema_k8sio_api_core_v1_HostPathVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ISCSIPersistentVolumeSource":                                                              schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ISCSIVolumeSource":                                                                        schema_k8sio_api_core_v1_ISCSIVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.KeyToPath":                                                                                schema_k8sio_api_core_v1_KeyToPath(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Lifecycle":                                                                                schema_k8sio_api_core_v1_Lifecycle(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LimitRange":                                                                               schema_k8sio_api_core_v1_LimitRange(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LimitRangeItem":                                                                           schema_k8sio_api_core_v1_LimitRangeItem(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LimitRangeList":                                                                           schema_k8sio_api_core_v1_LimitRangeList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LimitRangeSpec":                                                                           schema_k8sio_api_core_v1_LimitRangeSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.List":                                                                                     schema_k8sio_api_core_v1_List(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LoadBalancerIngress":                                                                      schema_k8sio_api_core_v1_LoadBalancerIngress(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LoadBalancerStatus":                                                                       schema_k8sio_api_core_v1_LoadBalancerStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LocalObjectReference":                                                                     schema_k8sio_api_core_v1_LocalObjectReference(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.LocalVolumeSource":                                                                        schema_k8sio_api_core_v1_LocalVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NFSVolumeSource":                                                                          schema_k8sio_api_core_v1_NFSVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Namespace":                                                                                schema_k8sio_api_core_v1_Namespace(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NamespaceList":                                                                            schema_k8sio_api_core_v1_NamespaceList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NamespaceSpec":                                                                            schema_k8sio_api_core_v1_NamespaceSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NamespaceStatus":                                                                          schema_k8sio_api_core_v1_NamespaceStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Node":                                                                                     schema_k8sio_api_core_v1_Node(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeAddress":                                                                              schema_k8sio_api_core_v1_NodeAddress(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeAffinity":                                                                             schema_k8sio_api_core_v1_NodeAffinity(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeCondition":                                                                            schema_k8sio_api_core_v1_NodeCondition(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeConfigSource":                                                                         schema_k8sio_api_core_v1_NodeConfigSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeConfigStatus":                                                                         schema_k8sio_api_core_v1_NodeConfigStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeDaemonEndpoints":                                                                      schema_k8sio_api_core_v1_NodeDaemonEndpoints(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeList":                                                                                 schema_k8sio_api_core_v1_NodeList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeProxyOptions":                                                                         schema_k8sio_api_core_v1_NodeProxyOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeResources":                                                                            schema_k8sio_api_core_v1_NodeResources(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeSelector":                                                                             schema_k8sio_api_core_v1_NodeSelector(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeSelectorRequirement":                                                                  schema_k8sio_api_core_v1_NodeSelectorRequirement(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeSelectorTerm":                                                                         schema_k8sio_api_core_v1_NodeSelectorTerm(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeSpec":                                                                                 schema_k8sio_api_core_v1_NodeSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeStatus":                                                                               schema_k8sio_api_core_v1_NodeStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.NodeSystemInfo":                                                                           schema_k8sio_api_core_v1_NodeSystemInfo(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ObjectFieldSelector":                                                                      schema_k8sio_api_core_v1_ObjectFieldSelector(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ObjectReference":                                                                          schema_k8sio_api_core_v1_ObjectReference(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolume":                                                                         schema_k8sio_api_core_v1_PersistentVolume(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeClaim":                                                                    schema_k8sio_api_core_v1_PersistentVolumeClaim(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeClaimCondition":                                                           schema_k8sio_api_core_v1_PersistentVolumeClaimCondition(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeClaimList":                                                                schema_k8sio_api_core_v1_PersistentVolumeClaimList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeClaimSpec":                                                                schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeClaimStatus":                                                              schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeClaimVolumeSource":                                                        schema_k8sio_api_core_v1_PersistentVolumeClaimVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeList":                                                                     schema_k8sio_api_core_v1_PersistentVolumeList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeSource":                                                                   schema_k8sio_api_core_v1_PersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeSpec":                                                                     schema_k8sio_api_core_v1_PersistentVolumeSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PersistentVolumeStatus":                                                                   schema_k8sio_api_core_v1_PersistentVolumeStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PhotonPersistentDiskVolumeSource":                                                         schema_k8sio_api_core_v1_PhotonPersistentDiskVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Pod":                                                                                      schema_k8sio_api_core_v1_Pod(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodAffinity":                                                                              schema_k8sio_api_core_v1_PodAffinity(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodAffinityTerm":                                                                          schema_k8sio_api_core_v1_PodAffinityTerm(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodAntiAffinity":                                                                          schema_k8sio_api_core_v1_PodAntiAffinity(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodAttachOptions":                                                                         schema_k8sio_api_core_v1_PodAttachOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodCondition":                                                                             schema_k8sio_api_core_v1_PodCondition(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodDNSConfig":                                                                             schema_k8sio_api_core_v1_PodDNSConfig(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodDNSConfigOption":                                                                       schema_k8sio_api_core_v1_PodDNSConfigOption(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodExecOptions":                                                                           schema_k8sio_api_core_v1_PodExecOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodList":                                                                                  schema_k8sio_api_core_v1_PodList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodLogOptions":                                                                            schema_k8sio_api_core_v1_PodLogOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodPortForwardOptions":                                                                    schema_k8sio_api_core_v1_PodPortForwardOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodProxyOptions":                                                                          schema_k8sio_api_core_v1_PodProxyOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodReadinessGate":                                                                         schema_k8sio_api_core_v1_PodReadinessGate(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodSecurityContext":                                                                       schema_k8sio_api_core_v1_PodSecurityContext(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodSignature":                                                                             schema_k8sio_api_core_v1_PodSignature(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodSpec":                                                                                  schema_k8sio_api_core_v1_PodSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodStatus":                                                                                schema_k8sio_api_core_v1_PodStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodStatusResult":                                                                          schema_k8sio_api_core_v1_PodStatusResult(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodTemplate":                                                                              schema_k8sio_api_core_v1_PodTemplate(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodTemplateList":                                                                          schema_k8sio_api_core_v1_PodTemplateList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PodTemplateSpec":                                                                          schema_k8sio_api_core_v1_PodTemplateSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PortworxVolumeSource":                                                                     schema_k8sio_api_core_v1_PortworxVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PreferAvoidPodsEntry":                                                                     schema_k8sio_api_core_v1_PreferAvoidPodsEntry(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.PreferredSchedulingTerm":                                                                  schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Probe":                                                                                    schema_k8sio_api_core_v1_Probe(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ProjectedVolumeSource":                                                                    schema_k8sio_api_core_v1_ProjectedVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.QuobyteVolumeSource":                                                                      schema_k8sio_api_core_v1_QuobyteVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.RBDPersistentVolumeSource":                                                                schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.RBDVolumeSource":                                                                          schema_k8sio_api_core_v1_RBDVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.RangeAllocation":                                                                          schema_k8sio_api_core_v1_RangeAllocation(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ReplicationController":                                                                    schema_k8sio_api_core_v1_ReplicationController(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ReplicationControllerCondition":                                                           schema_k8sio_api_core_v1_ReplicationControllerCondition(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ReplicationControllerList":                                                                schema_k8sio_api_core_v1_ReplicationControllerList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ReplicationControllerSpec":                                                                schema_k8sio_api_core_v1_ReplicationControllerSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ReplicationControllerStatus":                                                              schema_k8sio_api_core_v1_ReplicationControllerStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ResourceFieldSelector":                                                                    schema_k8sio_api_core_v1_ResourceFieldSelector(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ResourceQuota":                                                                            schema_k8sio_api_core_v1_ResourceQuota(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ResourceQuotaList":                                                                        schema_k8sio_api_core_v1_ResourceQuotaList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ResourceQuotaSpec":                                                                        schema_k8sio_api_core_v1_ResourceQuotaSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ResourceQuotaStatus":                                                                      schema_k8sio_api_core_v1_ResourceQuotaStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ResourceRequirements":                                                                     schema_k8sio_api_core_v1_ResourceRequirements(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SELinuxOptions":                                                                           schema_k8sio_api_core_v1_SELinuxOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ScaleIOPersistentVolumeSource":                                                            schema_k8sio_api_core_v1_ScaleIOPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ScaleIOVolumeSource":                                                                      schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ScopeSelector":                                                                            schema_k8sio_api_core_v1_ScopeSelector(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ScopedResourceSelectorRequirement":                                                        schema_k8sio_api_core_v1_ScopedResourceSelectorRequirement(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Secret":                                                                                   schema_k8sio_api_core_v1_Secret(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SecretEnvSource":                                                                          schema_k8sio_api_core_v1_SecretEnvSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SecretKeySelector":                                                                        schema_k8sio_api_core_v1_SecretKeySelector(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SecretList":                                                                               schema_k8sio_api_core_v1_SecretList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SecretProjection":                                                                         schema_k8sio_api_core_v1_SecretProjection(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SecretReference":                                                                          schema_k8sio_api_core_v1_SecretReference(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SecretVolumeSource":                                                                       schema_k8sio_api_core_v1_SecretVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SecurityContext":                                                                          schema_k8sio_api_core_v1_SecurityContext(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SerializedReference":                                                                      schema_k8sio_api_core_v1_SerializedReference(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Service":                                                                                  schema_k8sio_api_core_v1_Service(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServiceAccount":                                                                           schema_k8sio_api_core_v1_ServiceAccount(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServiceAccountList":                                                                       schema_k8sio_api_core_v1_ServiceAccountList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServiceAccountTokenProjection":                                                            schema_k8sio_api_core_v1_ServiceAccountTokenProjection(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServiceList":                                                                              schema_k8sio_api_core_v1_ServiceList(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServicePort":                                                                              schema_k8sio_api_core_v1_ServicePort(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServiceProxyOptions":                                                                      schema_k8sio_api_core_v1_ServiceProxyOptions(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServiceSpec":                                                                              schema_k8sio_api_core_v1_ServiceSpec(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.ServiceStatus":                                                                            schema_k8sio_api_core_v1_ServiceStatus(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.SessionAffinityConfig":                                                                    schema_k8sio_api_core_v1_SessionAffinityConfig(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.StorageOSPersistentVolumeSource":                                                          schema_k8sio_api_core_v1_StorageOSPersistentVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.StorageOSVolumeSource":                                                                    schema_k8sio_api_core_v1_StorageOSVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Sysctl":                                                                                   schema_k8sio_api_core_v1_Sysctl(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.TCPSocketAction":                                                                          schema_k8sio_api_core_v1_TCPSocketAction(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Taint":                                                                                    schema_k8sio_api_core_v1_Taint(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Toleration":                                                                               schema_k8sio_api_core_v1_Toleration(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.TopologySelectorLabelRequirement":                                                         schema_k8sio_api_core_v1_TopologySelectorLabelRequirement(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.TopologySelectorTerm":                                                                     schema_k8sio_api_core_v1_TopologySelectorTerm(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.TypedLocalObjectReference":                                                                schema_k8sio_api_core_v1_TypedLocalObjectReference(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.Volume":                                                                                   schema_k8sio_api_core_v1_Volume(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.VolumeDevice":                                                                             schema_k8sio_api_core_v1_VolumeDevice(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.VolumeMount":                                                                              schema_k8sio_api_core_v1_VolumeMount(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.VolumeNodeAffinity":                                                                       schema_k8sio_api_core_v1_VolumeNodeAffinity(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.VolumeProjection":                                                                         schema_k8sio_api_core_v1_VolumeProjection(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.VolumeSource":                                                                             schema_k8sio_api_core_v1_VolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.VsphereVirtualDiskVolumeSource":                                                           schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref, featureIsEnabled),
+		"k8s.io/api/core/v1.WeightedPodAffinityTerm":                                                                  schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref, featureIsEnabled),
+		"k8s.io/api/events/v1beta1.Event":                                                                             schema_k8sio_api_events_v1beta1_Event(ref, featureIsEnabled),
+		"k8s.io/api/events/v1beta1.EventList":                                                                         schema_k8sio_api_events_v1beta1_EventList(ref, featureIsEnabled),
+		"k8s.io/api/events/v1beta1.EventSeries":                                                                       schema_k8sio_api_events_v1beta1_EventSeries(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.AllowedFlexVolume":                                                             schema_k8sio_api_extensions_v1beta1_AllowedFlexVolume(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.AllowedHostPath":                                                               schema_k8sio_api_extensions_v1beta1_AllowedHostPath(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.CustomMetricCurrentStatus":                                                     schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatus(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.CustomMetricCurrentStatusList":                                                 schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatusList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.CustomMetricTarget":                                                            schema_k8sio_api_extensions_v1beta1_CustomMetricTarget(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.CustomMetricTargetList":                                                        schema_k8sio_api_extensions_v1beta1_CustomMetricTargetList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DaemonSet":                                                                     schema_k8sio_api_extensions_v1beta1_DaemonSet(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DaemonSetCondition":                                                            schema_k8sio_api_extensions_v1beta1_DaemonSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DaemonSetList":                                                                 schema_k8sio_api_extensions_v1beta1_DaemonSetList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DaemonSetSpec":                                                                 schema_k8sio_api_extensions_v1beta1_DaemonSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DaemonSetStatus":                                                               schema_k8sio_api_extensions_v1beta1_DaemonSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DaemonSetUpdateStrategy":                                                       schema_k8sio_api_extensions_v1beta1_DaemonSetUpdateStrategy(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.Deployment":                                                                    schema_k8sio_api_extensions_v1beta1_Deployment(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DeploymentCondition":                                                           schema_k8sio_api_extensions_v1beta1_DeploymentCondition(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DeploymentList":                                                                schema_k8sio_api_extensions_v1beta1_DeploymentList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DeploymentRollback":                                                            schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DeploymentSpec":                                                                schema_k8sio_api_extensions_v1beta1_DeploymentSpec(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DeploymentStatus":                                                              schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.DeploymentStrategy":                                                            schema_k8sio_api_extensions_v1beta1_DeploymentStrategy(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.FSGroupStrategyOptions":                                                        schema_k8sio_api_extensions_v1beta1_FSGroupStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.HTTPIngressPath":                                                               schema_k8sio_api_extensions_v1beta1_HTTPIngressPath(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.HTTPIngressRuleValue":                                                          schema_k8sio_api_extensions_v1beta1_HTTPIngressRuleValue(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.HostPortRange":                                                                 schema_k8sio_api_extensions_v1beta1_HostPortRange(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IDRange":                                                                       schema_k8sio_api_extensions_v1beta1_IDRange(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IPBlock":                                                                       schema_k8sio_api_extensions_v1beta1_IPBlock(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.Ingress":                                                                       schema_k8sio_api_extensions_v1beta1_Ingress(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IngressBackend":                                                                schema_k8sio_api_extensions_v1beta1_IngressBackend(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IngressList":                                                                   schema_k8sio_api_extensions_v1beta1_IngressList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IngressRule":                                                                   schema_k8sio_api_extensions_v1beta1_IngressRule(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IngressRuleValue":                                                              schema_k8sio_api_extensions_v1beta1_IngressRuleValue(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IngressSpec":                                                                   schema_k8sio_api_extensions_v1beta1_IngressSpec(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IngressStatus":                                                                 schema_k8sio_api_extensions_v1beta1_IngressStatus(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.IngressTLS":                                                                    schema_k8sio_api_extensions_v1beta1_IngressTLS(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.NetworkPolicy":                                                                 schema_k8sio_api_extensions_v1beta1_NetworkPolicy(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.NetworkPolicyEgressRule":                                                       schema_k8sio_api_extensions_v1beta1_NetworkPolicyEgressRule(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.NetworkPolicyIngressRule":                                                      schema_k8sio_api_extensions_v1beta1_NetworkPolicyIngressRule(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.NetworkPolicyList":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicyList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.NetworkPolicyPeer":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicyPeer(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.NetworkPolicyPort":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicyPort(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.NetworkPolicySpec":                                                             schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.PodSecurityPolicy":                                                             schema_k8sio_api_extensions_v1beta1_PodSecurityPolicy(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.PodSecurityPolicyList":                                                         schema_k8sio_api_extensions_v1beta1_PodSecurityPolicyList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.PodSecurityPolicySpec":                                                         schema_k8sio_api_extensions_v1beta1_PodSecurityPolicySpec(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ReplicaSet":                                                                    schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ReplicaSetCondition":                                                           schema_k8sio_api_extensions_v1beta1_ReplicaSetCondition(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ReplicaSetList":                                                                schema_k8sio_api_extensions_v1beta1_ReplicaSetList(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ReplicaSetSpec":                                                                schema_k8sio_api_extensions_v1beta1_ReplicaSetSpec(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ReplicaSetStatus":                                                              schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ReplicationControllerDummy":                                                    schema_k8sio_api_extensions_v1beta1_ReplicationControllerDummy(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.RollbackConfig":                                                                schema_k8sio_api_extensions_v1beta1_RollbackConfig(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.RollingUpdateDaemonSet":                                                        schema_k8sio_api_extensions_v1beta1_RollingUpdateDaemonSet(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.RollingUpdateDeployment":                                                       schema_k8sio_api_extensions_v1beta1_RollingUpdateDeployment(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.RunAsGroupStrategyOptions":                                                     schema_k8sio_api_extensions_v1beta1_RunAsGroupStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.RunAsUserStrategyOptions":                                                      schema_k8sio_api_extensions_v1beta1_RunAsUserStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.SELinuxStrategyOptions":                                                        schema_k8sio_api_extensions_v1beta1_SELinuxStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.Scale":                                                                         schema_k8sio_api_extensions_v1beta1_Scale(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ScaleSpec":                                                                     schema_k8sio_api_extensions_v1beta1_ScaleSpec(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.ScaleStatus":                                                                   schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref, featureIsEnabled),
+		"k8s.io/api/extensions/v1beta1.SupplementalGroupsStrategyOptions":                                             schema_k8sio_api_extensions_v1beta1_SupplementalGroupsStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/imagepolicy/v1alpha1.ImageReview":                                                                 schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref, featureIsEnabled),
+		"k8s.io/api/imagepolicy/v1alpha1.ImageReviewContainerSpec":                                                    schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref, featureIsEnabled),
+		"k8s.io/api/imagepolicy/v1alpha1.ImageReviewSpec":                                                             schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref, featureIsEnabled),
+		"k8s.io/api/imagepolicy/v1alpha1.ImageReviewStatus":                                                           schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.IPBlock":                                                                            schema_k8sio_api_networking_v1_IPBlock(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.NetworkPolicy":                                                                      schema_k8sio_api_networking_v1_NetworkPolicy(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.NetworkPolicyEgressRule":                                                            schema_k8sio_api_networking_v1_NetworkPolicyEgressRule(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.NetworkPolicyIngressRule":                                                           schema_k8sio_api_networking_v1_NetworkPolicyIngressRule(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.NetworkPolicyList":                                                                  schema_k8sio_api_networking_v1_NetworkPolicyList(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.NetworkPolicyPeer":                                                                  schema_k8sio_api_networking_v1_NetworkPolicyPeer(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.NetworkPolicyPort":                                                                  schema_k8sio_api_networking_v1_NetworkPolicyPort(ref, featureIsEnabled),
+		"k8s.io/api/networking/v1.NetworkPolicySpec":                                                                  schema_k8sio_api_networking_v1_NetworkPolicySpec(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.AllowedFlexVolume":                                                                 schema_k8sio_api_policy_v1beta1_AllowedFlexVolume(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.AllowedHostPath":                                                                   schema_k8sio_api_policy_v1beta1_AllowedHostPath(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.Eviction":                                                                          schema_k8sio_api_policy_v1beta1_Eviction(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.FSGroupStrategyOptions":                                                            schema_k8sio_api_policy_v1beta1_FSGroupStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.HostPortRange":                                                                     schema_k8sio_api_policy_v1beta1_HostPortRange(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.IDRange":                                                                           schema_k8sio_api_policy_v1beta1_IDRange(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.PodDisruptionBudget":                                                               schema_k8sio_api_policy_v1beta1_PodDisruptionBudget(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.PodDisruptionBudgetList":                                                           schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetList(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.PodDisruptionBudgetSpec":                                                           schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetSpec(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.PodDisruptionBudgetStatus":                                                         schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetStatus(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.PodSecurityPolicy":                                                                 schema_k8sio_api_policy_v1beta1_PodSecurityPolicy(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.PodSecurityPolicyList":                                                             schema_k8sio_api_policy_v1beta1_PodSecurityPolicyList(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.PodSecurityPolicySpec":                                                             schema_k8sio_api_policy_v1beta1_PodSecurityPolicySpec(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.RunAsGroupStrategyOptions":                                                         schema_k8sio_api_policy_v1beta1_RunAsGroupStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.RunAsUserStrategyOptions":                                                          schema_k8sio_api_policy_v1beta1_RunAsUserStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.SELinuxStrategyOptions":                                                            schema_k8sio_api_policy_v1beta1_SELinuxStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/policy/v1beta1.SupplementalGroupsStrategyOptions":                                                 schema_k8sio_api_policy_v1beta1_SupplementalGroupsStrategyOptions(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.AggregationRule":                                                                          schema_k8sio_api_rbac_v1_AggregationRule(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.ClusterRole":                                                                              schema_k8sio_api_rbac_v1_ClusterRole(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.ClusterRoleBinding":                                                                       schema_k8sio_api_rbac_v1_ClusterRoleBinding(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.ClusterRoleBindingList":                                                                   schema_k8sio_api_rbac_v1_ClusterRoleBindingList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.ClusterRoleList":                                                                          schema_k8sio_api_rbac_v1_ClusterRoleList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.PolicyRule":                                                                               schema_k8sio_api_rbac_v1_PolicyRule(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.Role":                                                                                     schema_k8sio_api_rbac_v1_Role(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.RoleBinding":                                                                              schema_k8sio_api_rbac_v1_RoleBinding(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.RoleBindingList":                                                                          schema_k8sio_api_rbac_v1_RoleBindingList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.RoleList":                                                                                 schema_k8sio_api_rbac_v1_RoleList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.RoleRef":                                                                                  schema_k8sio_api_rbac_v1_RoleRef(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1.Subject":                                                                                  schema_k8sio_api_rbac_v1_Subject(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.AggregationRule":                                                                    schema_k8sio_api_rbac_v1alpha1_AggregationRule(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.ClusterRole":                                                                        schema_k8sio_api_rbac_v1alpha1_ClusterRole(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.ClusterRoleBinding":                                                                 schema_k8sio_api_rbac_v1alpha1_ClusterRoleBinding(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.ClusterRoleBindingList":                                                             schema_k8sio_api_rbac_v1alpha1_ClusterRoleBindingList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.ClusterRoleList":                                                                    schema_k8sio_api_rbac_v1alpha1_ClusterRoleList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.PolicyRule":                                                                         schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.Role":                                                                               schema_k8sio_api_rbac_v1alpha1_Role(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.RoleBinding":                                                                        schema_k8sio_api_rbac_v1alpha1_RoleBinding(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.RoleBindingList":                                                                    schema_k8sio_api_rbac_v1alpha1_RoleBindingList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.RoleList":                                                                           schema_k8sio_api_rbac_v1alpha1_RoleList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.RoleRef":                                                                            schema_k8sio_api_rbac_v1alpha1_RoleRef(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1alpha1.Subject":                                                                            schema_k8sio_api_rbac_v1alpha1_Subject(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.AggregationRule":                                                                     schema_k8sio_api_rbac_v1beta1_AggregationRule(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.ClusterRole":                                                                         schema_k8sio_api_rbac_v1beta1_ClusterRole(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.ClusterRoleBinding":                                                                  schema_k8sio_api_rbac_v1beta1_ClusterRoleBinding(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.ClusterRoleBindingList":                                                              schema_k8sio_api_rbac_v1beta1_ClusterRoleBindingList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.ClusterRoleList":                                                                     schema_k8sio_api_rbac_v1beta1_ClusterRoleList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.PolicyRule":                                                                          schema_k8sio_api_rbac_v1beta1_PolicyRule(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.Role":                                                                                schema_k8sio_api_rbac_v1beta1_Role(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.RoleBinding":                                                                         schema_k8sio_api_rbac_v1beta1_RoleBinding(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.RoleBindingList":                                                                     schema_k8sio_api_rbac_v1beta1_RoleBindingList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.RoleList":                                                                            schema_k8sio_api_rbac_v1beta1_RoleList(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.RoleRef":                                                                             schema_k8sio_api_rbac_v1beta1_RoleRef(ref, featureIsEnabled),
+		"k8s.io/api/rbac/v1beta1.Subject":                                                                             schema_k8sio_api_rbac_v1beta1_Subject(ref, featureIsEnabled),
+		"k8s.io/api/scheduling/v1alpha1.PriorityClass":                                                                schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref, featureIsEnabled),
+		"k8s.io/api/scheduling/v1alpha1.PriorityClassList":                                                            schema_k8sio_api_scheduling_v1alpha1_PriorityClassList(ref, featureIsEnabled),
+		"k8s.io/api/scheduling/v1beta1.PriorityClass":                                                                 schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref, featureIsEnabled),
+		"k8s.io/api/scheduling/v1beta1.PriorityClassList":                                                             schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref, featureIsEnabled),
+		"k8s.io/api/settings/v1alpha1.PodPreset":                                                                      schema_k8sio_api_settings_v1alpha1_PodPreset(ref, featureIsEnabled),
+		"k8s.io/api/settings/v1alpha1.PodPresetList":                                                                  schema_k8sio_api_settings_v1alpha1_PodPresetList(ref, featureIsEnabled),
+		"k8s.io/api/settings/v1alpha1.PodPresetSpec":                                                                  schema_k8sio_api_settings_v1alpha1_PodPresetSpec(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1.StorageClass":                                                                          schema_k8sio_api_storage_v1_StorageClass(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1.StorageClassList":                                                                      schema_k8sio_api_storage_v1_StorageClassList(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1alpha1.VolumeAttachment":                                                                schema_k8sio_api_storage_v1alpha1_VolumeAttachment(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1alpha1.VolumeAttachmentList":                                                            schema_k8sio_api_storage_v1alpha1_VolumeAttachmentList(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1alpha1.VolumeAttachmentSource":                                                          schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSource(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1alpha1.VolumeAttachmentSpec":                                                            schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSpec(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1alpha1.VolumeAttachmentStatus":                                                          schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1alpha1.VolumeError":                                                                     schema_k8sio_api_storage_v1alpha1_VolumeError(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.StorageClass":                                                                     schema_k8sio_api_storage_v1beta1_StorageClass(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.StorageClassList":                                                                 schema_k8sio_api_storage_v1beta1_StorageClassList(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.VolumeAttachment":                                                                 schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.VolumeAttachmentList":                                                             schema_k8sio_api_storage_v1beta1_VolumeAttachmentList(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.VolumeAttachmentSource":                                                           schema_k8sio_api_storage_v1beta1_VolumeAttachmentSource(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.VolumeAttachmentSpec":                                                             schema_k8sio_api_storage_v1beta1_VolumeAttachmentSpec(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.VolumeAttachmentStatus":                                                           schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref, featureIsEnabled),
+		"k8s.io/api/storage/v1beta1.VolumeError":                                                                      schema_k8sio_api_storage_v1beta1_VolumeError(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceColumnDefinition":                schema_pkg_apis_apiextensions_v1beta1_CustomResourceColumnDefinition(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinition":                      schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionCondition":             schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionList":                  schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionNames":                 schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionSpec":                  schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionStatus":                schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceDefinitionVersion":               schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceScale":                schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceScale(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresourceStatus":               schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceSubresources":                    schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.CustomResourceValidation":                      schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.ExternalDocumentation":                         schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSON":                                          schema_pkg_apis_apiextensions_v1beta1_JSON(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaProps":                               schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrArray":                        schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrBool":                         schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref, featureIsEnabled),
+		"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1.JSONSchemaPropsOrStringArray":                  schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/api/resource.Quantity":                                                               schema_apimachinery_pkg_api_resource_Quantity(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/api/resource.int64Amount":                                                            schema_apimachinery_pkg_api_resource_int64Amount(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":                                                               schema_pkg_apis_meta_v1_APIGroup(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":                                                           schema_pkg_apis_meta_v1_APIGroupList(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource":                                                            schema_pkg_apis_meta_v1_APIResource(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList":                                                        schema_pkg_apis_meta_v1_APIResourceList(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":                                                            schema_pkg_apis_meta_v1_APIVersions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.CreateOptions":                                                          schema_pkg_apis_meta_v1_CreateOptions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.DeleteOptions":                                                          schema_pkg_apis_meta_v1_DeleteOptions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Duration":                                                               schema_pkg_apis_meta_v1_Duration(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.ExportOptions":                                                          schema_pkg_apis_meta_v1_ExportOptions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.GetOptions":                                                             schema_pkg_apis_meta_v1_GetOptions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupKind":                                                              schema_pkg_apis_meta_v1_GroupKind(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupResource":                                                          schema_pkg_apis_meta_v1_GroupResource(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersion":                                                           schema_pkg_apis_meta_v1_GroupVersion(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery":                                               schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionKind":                                                       schema_pkg_apis_meta_v1_GroupVersionKind(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionResource":                                                   schema_pkg_apis_meta_v1_GroupVersionResource(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Initializer":                                                            schema_pkg_apis_meta_v1_Initializer(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Initializers":                                                           schema_pkg_apis_meta_v1_Initializers(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent":                                                          schema_pkg_apis_meta_v1_InternalEvent(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector":                                                          schema_pkg_apis_meta_v1_LabelSelector(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement":                                               schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.List":                                                                   schema_pkg_apis_meta_v1_List(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta":                                                               schema_pkg_apis_meta_v1_ListMeta(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.ListOptions":                                                            schema_pkg_apis_meta_v1_ListOptions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime":                                                              schema_pkg_apis_meta_v1_MicroTime(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta":                                                             schema_pkg_apis_meta_v1_ObjectMeta(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference":                                                         schema_pkg_apis_meta_v1_OwnerReference(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Patch":                                                                  schema_pkg_apis_meta_v1_Patch(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions":                                                          schema_pkg_apis_meta_v1_Preconditions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.RootPaths":                                                              schema_pkg_apis_meta_v1_RootPaths(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR":                                              schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":                                                                 schema_pkg_apis_meta_v1_Status(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause":                                                            schema_pkg_apis_meta_v1_StatusCause(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails":                                                          schema_pkg_apis_meta_v1_StatusDetails(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Time":                                                                   schema_pkg_apis_meta_v1_Time(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.Timestamp":                                                              schema_pkg_apis_meta_v1_Timestamp(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta":                                                               schema_pkg_apis_meta_v1_TypeMeta(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.UpdateOptions":                                                          schema_pkg_apis_meta_v1_UpdateOptions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1.WatchEvent":                                                             schema_pkg_apis_meta_v1_WatchEvent(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.PartialObjectMetadata":                                             schema_pkg_apis_meta_v1beta1_PartialObjectMetadata(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.PartialObjectMetadataList":                                         schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.Table":                                                             schema_pkg_apis_meta_v1beta1_Table(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableColumnDefinition":                                             schema_pkg_apis_meta_v1beta1_TableColumnDefinition(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableOptions":                                                      schema_pkg_apis_meta_v1beta1_TableOptions(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableRow":                                                          schema_pkg_apis_meta_v1beta1_TableRow(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/apis/meta/v1beta1.TableRowCondition":                                                 schema_pkg_apis_meta_v1beta1_TableRowCondition(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/runtime.RawExtension":                                                                schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                                                    schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/runtime.Unknown":                                                                     schema_k8sio_apimachinery_pkg_runtime_Unknown(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/util/intstr.IntOrString":                                                             schema_apimachinery_pkg_util_intstr_IntOrString(ref, featureIsEnabled),
+		"k8s.io/apimachinery/pkg/version.Info":                                                                        schema_k8sio_apimachinery_pkg_version_Info(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1.Event":                                                                    schema_pkg_apis_audit_v1_Event(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1.EventList":                                                                schema_pkg_apis_audit_v1_EventList(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1.GroupResources":                                                           schema_pkg_apis_audit_v1_GroupResources(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1.ObjectReference":                                                          schema_pkg_apis_audit_v1_ObjectReference(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1.Policy":                                                                   schema_pkg_apis_audit_v1_Policy(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1.PolicyList":                                                               schema_pkg_apis_audit_v1_PolicyList(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1.PolicyRule":                                                               schema_pkg_apis_audit_v1_PolicyRule(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.Event":                                                              schema_pkg_apis_audit_v1alpha1_Event(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.EventList":                                                          schema_pkg_apis_audit_v1alpha1_EventList(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.GroupResources":                                                     schema_pkg_apis_audit_v1alpha1_GroupResources(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.ObjectReference":                                                    schema_pkg_apis_audit_v1alpha1_ObjectReference(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.Policy":                                                             schema_pkg_apis_audit_v1alpha1_Policy(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.PolicyList":                                                         schema_pkg_apis_audit_v1alpha1_PolicyList(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1alpha1.PolicyRule":                                                         schema_pkg_apis_audit_v1alpha1_PolicyRule(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1beta1.Event":                                                               schema_pkg_apis_audit_v1beta1_Event(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1beta1.EventList":                                                           schema_pkg_apis_audit_v1beta1_EventList(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1beta1.GroupResources":                                                      schema_pkg_apis_audit_v1beta1_GroupResources(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1beta1.ObjectReference":                                                     schema_pkg_apis_audit_v1beta1_ObjectReference(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1beta1.Policy":                                                              schema_pkg_apis_audit_v1beta1_Policy(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1beta1.PolicyList":                                                          schema_pkg_apis_audit_v1beta1_PolicyList(ref, featureIsEnabled),
+		"k8s.io/apiserver/pkg/apis/audit/v1beta1.PolicyRule":                                                          schema_pkg_apis_audit_v1beta1_PolicyRule(ref, featureIsEnabled),
+		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.ExecCredential":                                      schema_pkg_apis_clientauthentication_v1alpha1_ExecCredential(ref, featureIsEnabled),
+		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.ExecCredentialSpec":                                  schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialSpec(ref, featureIsEnabled),
+		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.ExecCredentialStatus":                                schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialStatus(ref, featureIsEnabled),
+		"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1.Response":                                            schema_pkg_apis_clientauthentication_v1alpha1_Response(ref, featureIsEnabled),
+		"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1.ExecCredential":                                       schema_pkg_apis_clientauthentication_v1beta1_ExecCredential(ref, featureIsEnabled),
+		"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1.ExecCredentialSpec":                                   schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialSpec(ref, featureIsEnabled),
+		"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1.ExecCredentialStatus":                                 schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialStatus(ref, featureIsEnabled),
+		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriver":                                                              schema_pkg_apis_csi_v1alpha1_CSIDriver(ref, featureIsEnabled),
+		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriverInfo":                                                          schema_pkg_apis_csi_v1alpha1_CSIDriverInfo(ref, featureIsEnabled),
+		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriverList":                                                          schema_pkg_apis_csi_v1alpha1_CSIDriverList(ref, featureIsEnabled),
+		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSIDriverSpec":                                                          schema_pkg_apis_csi_v1alpha1_CSIDriverSpec(ref, featureIsEnabled),
+		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSINodeInfo":                                                            schema_pkg_apis_csi_v1alpha1_CSINodeInfo(ref, featureIsEnabled),
+		"k8s.io/csi-api/pkg/apis/csi/v1alpha1.CSINodeInfoList":                                                        schema_pkg_apis_csi_v1alpha1_CSINodeInfoList(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIService":                                               schema_pkg_apis_apiregistration_v1_APIService(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceCondition":                                      schema_pkg_apis_apiregistration_v1_APIServiceCondition(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceList":                                           schema_pkg_apis_apiregistration_v1_APIServiceList(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceSpec":                                           schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.APIServiceStatus":                                         schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1.ServiceReference":                                         schema_pkg_apis_apiregistration_v1_ServiceReference(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIService":                                          schema_pkg_apis_apiregistration_v1beta1_APIService(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceCondition":                                 schema_pkg_apis_apiregistration_v1beta1_APIServiceCondition(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceList":                                      schema_pkg_apis_apiregistration_v1beta1_APIServiceList(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceSpec":                                      schema_pkg_apis_apiregistration_v1beta1_APIServiceSpec(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.APIServiceStatus":                                    schema_pkg_apis_apiregistration_v1beta1_APIServiceStatus(ref, featureIsEnabled),
+		"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1.ServiceReference":                                    schema_pkg_apis_apiregistration_v1beta1_ServiceReference(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.AttachDetachControllerConfiguration":                          schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.CSRSigningControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_CSRSigningControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.CloudProviderConfiguration":                                   schema_k8sio_kube_controller_manager_config_v1alpha1_CloudProviderConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.DaemonSetControllerConfiguration":                             schema_k8sio_kube_controller_manager_config_v1alpha1_DaemonSetControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.DeploymentControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_DeploymentControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.DeprecatedControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_DeprecatedControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.EndpointControllerConfiguration":                              schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.GarbageCollectorControllerConfiguration":                      schema_k8sio_kube_controller_manager_config_v1alpha1_GarbageCollectorControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.GenericControllerManagerConfiguration":                        schema_k8sio_kube_controller_manager_config_v1alpha1_GenericControllerManagerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.GroupResource":                                                schema_k8sio_kube_controller_manager_config_v1alpha1_GroupResource(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.HPAControllerConfiguration":                                   schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.JobControllerConfiguration":                                   schema_k8sio_kube_controller_manager_config_v1alpha1_JobControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.KubeCloudSharedConfiguration":                                 schema_k8sio_kube_controller_manager_config_v1alpha1_KubeCloudSharedConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.KubeControllerManagerConfiguration":                           schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.NamespaceControllerConfiguration":                             schema_k8sio_kube_controller_manager_config_v1alpha1_NamespaceControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.NodeIPAMControllerConfiguration":                              schema_k8sio_kube_controller_manager_config_v1alpha1_NodeIPAMControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.NodeLifecycleControllerConfiguration":                         schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeBinderControllerConfiguration":                schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinderControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.PersistentVolumeRecyclerConfiguration":                        schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeRecyclerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.PodGCControllerConfiguration":                                 schema_k8sio_kube_controller_manager_config_v1alpha1_PodGCControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.ReplicaSetControllerConfiguration":                            schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicaSetControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.ReplicationControllerConfiguration":                           schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicationControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.ResourceQuotaControllerConfiguration":                         schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceQuotaControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.SAControllerConfiguration":                                    schema_k8sio_kube_controller_manager_config_v1alpha1_SAControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.ServiceControllerConfiguration":                               schema_k8sio_kube_controller_manager_config_v1alpha1_ServiceControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.TTLAfterFinishedControllerConfiguration":                      schema_k8sio_kube_controller_manager_config_v1alpha1_TTLAfterFinishedControllerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-controller-manager/config/v1alpha1.VolumeConfiguration":                                          schema_k8sio_kube_controller_manager_config_v1alpha1_VolumeConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyConfiguration":                                                    schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyConntrackConfiguration":                                           schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConntrackConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPTablesConfiguration":                                            schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyIPVSConfiguration":                                                schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-scheduler/config/v1alpha1.KubeSchedulerConfiguration":                                            schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-scheduler/config/v1alpha1.KubeSchedulerLeaderElectionConfiguration":                              schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerLeaderElectionConfiguration(ref, featureIsEnabled),
+		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerAlgorithmSource":                                              schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerAlgorithmSource(ref, featureIsEnabled),
+		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicyConfigMapSource":                                        schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyConfigMapSource(ref, featureIsEnabled),
+		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicyFileSource":                                             schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyFileSource(ref, featureIsEnabled),
+		"k8s.io/kube-scheduler/config/v1alpha1.SchedulerPolicySource":                                                 schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicySource(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.KubeletAnonymousAuthentication":                                                schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.KubeletAuthentication":                                                         schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.KubeletAuthorization":                                                          schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.KubeletConfiguration":                                                          schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.KubeletWebhookAuthentication":                                                  schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthentication(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.KubeletWebhookAuthorization":                                                   schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthorization(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.KubeletX509Authentication":                                                     schema_k8sio_kubelet_config_v1beta1_KubeletX509Authentication(ref, featureIsEnabled),
+		"k8s.io/kubelet/config/v1beta1.SerializedNodeConfigSource":                                                    schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref, featureIsEnabled),
+		"k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1.CloudControllerManagerConfiguration": schema_app_apis_config_v1alpha1_CloudControllerManagerConfiguration(ref, featureIsEnabled),
+		"k8s.io/kubernetes/pkg/apis/abac/v1beta1.Policy":                                                              schema_pkg_apis_abac_v1beta1_Policy(ref, featureIsEnabled),
+		"k8s.io/kubernetes/pkg/apis/abac/v1beta1.PolicySpec":                                                          schema_pkg_apis_abac_v1beta1_PolicySpec(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1.MetricListOptions":                                            schema_pkg_apis_custom_metrics_v1beta1_MetricListOptions(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1.MetricValue":                                                  schema_pkg_apis_custom_metrics_v1beta1_MetricValue(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1.MetricValueList":                                              schema_pkg_apis_custom_metrics_v1beta1_MetricValueList(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricIdentifier":                                             schema_pkg_apis_custom_metrics_v1beta2_MetricIdentifier(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricListOptions":                                            schema_pkg_apis_custom_metrics_v1beta2_MetricListOptions(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricValue":                                                  schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2.MetricValueList":                                              schema_pkg_apis_custom_metrics_v1beta2_MetricValueList(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/external_metrics/v1beta1.ExternalMetricValue":                                        schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValue(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/external_metrics/v1beta1.ExternalMetricValueList":                                    schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.ContainerMetrics":                                                   schema_pkg_apis_metrics_v1alpha1_ContainerMetrics(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.NodeMetrics":                                                        schema_pkg_apis_metrics_v1alpha1_NodeMetrics(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.NodeMetricsList":                                                    schema_pkg_apis_metrics_v1alpha1_NodeMetricsList(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.PodMetrics":                                                         schema_pkg_apis_metrics_v1alpha1_PodMetrics(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1alpha1.PodMetricsList":                                                     schema_pkg_apis_metrics_v1alpha1_PodMetricsList(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1beta1.ContainerMetrics":                                                    schema_pkg_apis_metrics_v1beta1_ContainerMetrics(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1beta1.NodeMetrics":                                                         schema_pkg_apis_metrics_v1beta1_NodeMetrics(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1beta1.NodeMetricsList":                                                     schema_pkg_apis_metrics_v1beta1_NodeMetricsList(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1beta1.PodMetrics":                                                          schema_pkg_apis_metrics_v1beta1_PodMetrics(ref, featureIsEnabled),
+		"k8s.io/metrics/pkg/apis/metrics/v1beta1.PodMetricsList":                                                      schema_pkg_apis_metrics_v1beta1_PodMetricsList(ref, featureIsEnabled),
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1alpha1_Initializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1alpha1_Initializer(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -814,7 +814,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Initializer(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -862,7 +862,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfiguration(re
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfigurationList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfigurationList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -905,7 +905,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_InitializerConfigurationLis
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1alpha1_Rule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1alpha1_Rule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -956,7 +956,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_Rule(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1004,7 +1004,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfigurationList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfigurationList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1047,7 +1047,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_Rule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_Rule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1098,7 +1098,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_Rule(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_RuleWithOperations(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_RuleWithOperations(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1162,7 +1162,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_RuleWithOperations(ref commo
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_ServiceReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_ServiceReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1193,7 +1193,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ServiceReference(ref common.
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1241,7 +1241,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurati
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurationList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurationList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1284,7 +1284,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurati
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_Webhook(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_Webhook(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1338,7 +1338,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_Webhook(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_admissionregistration_v1beta1_WebhookClientConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_admissionregistration_v1beta1_WebhookClientConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1368,7 +1368,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_WebhookClientConfig(ref comm
 	}
 }
 
-func schema_k8sio_api_apps_v1_ControllerRevision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_ControllerRevision(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1410,7 +1410,7 @@ func schema_k8sio_api_apps_v1_ControllerRevision(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_apps_v1_ControllerRevisionList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_ControllerRevisionList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1453,7 +1453,7 @@ func schema_k8sio_api_apps_v1_ControllerRevisionList(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_apps_v1_DaemonSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DaemonSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1493,7 +1493,7 @@ func schema_k8sio_api_apps_v1_DaemonSet(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_apps_v1_DaemonSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DaemonSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1536,7 +1536,7 @@ func schema_k8sio_api_apps_v1_DaemonSetCondition(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_apps_v1_DaemonSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DaemonSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1579,7 +1579,7 @@ func schema_k8sio_api_apps_v1_DaemonSetList(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_apps_v1_DaemonSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DaemonSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1620,7 +1620,7 @@ func schema_k8sio_api_apps_v1_DaemonSetSpec(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_apps_v1_DaemonSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DaemonSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1706,7 +1706,7 @@ func schema_k8sio_api_apps_v1_DaemonSetStatus(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_apps_v1_DaemonSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DaemonSetUpdateStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1730,7 +1730,7 @@ func schema_k8sio_api_apps_v1_DaemonSetUpdateStrategy(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1_Deployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_Deployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1770,7 +1770,7 @@ func schema_k8sio_api_apps_v1_Deployment(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_apps_v1_DeploymentCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DeploymentCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1818,7 +1818,7 @@ func schema_k8sio_api_apps_v1_DeploymentCondition(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1_DeploymentList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DeploymentList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1861,7 +1861,7 @@ func schema_k8sio_api_apps_v1_DeploymentList(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1920,7 +1920,7 @@ func schema_k8sio_api_apps_v1_DeploymentSpec(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_apps_v1_DeploymentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DeploymentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1993,7 +1993,7 @@ func schema_k8sio_api_apps_v1_DeploymentStatus(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_apps_v1_DeploymentStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_DeploymentStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2017,7 +2017,7 @@ func schema_k8sio_api_apps_v1_DeploymentStrategy(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_apps_v1_ReplicaSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_ReplicaSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2057,7 +2057,7 @@ func schema_k8sio_api_apps_v1_ReplicaSet(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_apps_v1_ReplicaSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_ReplicaSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2100,7 +2100,7 @@ func schema_k8sio_api_apps_v1_ReplicaSetCondition(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1_ReplicaSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_ReplicaSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2143,7 +2143,7 @@ func schema_k8sio_api_apps_v1_ReplicaSetList(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_apps_v1_ReplicaSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_ReplicaSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2179,7 +2179,7 @@ func schema_k8sio_api_apps_v1_ReplicaSetSpec(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_apps_v1_ReplicaSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_ReplicaSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2241,7 +2241,7 @@ func schema_k8sio_api_apps_v1_ReplicaSetStatus(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_apps_v1_RollingUpdateDaemonSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_RollingUpdateDaemonSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2259,7 +2259,7 @@ func schema_k8sio_api_apps_v1_RollingUpdateDaemonSet(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_apps_v1_RollingUpdateDeployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_RollingUpdateDeployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2282,7 +2282,7 @@ func schema_k8sio_api_apps_v1_RollingUpdateDeployment(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1_RollingUpdateStatefulSetStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_RollingUpdateStatefulSetStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2300,7 +2300,7 @@ func schema_k8sio_api_apps_v1_RollingUpdateStatefulSetStrategy(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_apps_v1_StatefulSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_StatefulSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2339,7 +2339,7 @@ func schema_k8sio_api_apps_v1_StatefulSet(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_apps_v1_StatefulSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_StatefulSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2382,7 +2382,7 @@ func schema_k8sio_api_apps_v1_StatefulSetCondition(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_apps_v1_StatefulSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_StatefulSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2423,7 +2423,7 @@ func schema_k8sio_api_apps_v1_StatefulSetList(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2488,7 +2488,7 @@ func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_apps_v1_StatefulSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_StatefulSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2568,7 +2568,7 @@ func schema_k8sio_api_apps_v1_StatefulSetStatus(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_apps_v1_StatefulSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1_StatefulSetUpdateStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2592,7 +2592,7 @@ func schema_k8sio_api_apps_v1_StatefulSetUpdateStrategy(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_ControllerRevision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_ControllerRevision(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2634,7 +2634,7 @@ func schema_k8sio_api_apps_v1beta1_ControllerRevision(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_ControllerRevisionList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_ControllerRevisionList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2677,7 +2677,7 @@ func schema_k8sio_api_apps_v1beta1_ControllerRevisionList(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_Deployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_Deployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2717,7 +2717,7 @@ func schema_k8sio_api_apps_v1beta1_Deployment(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_DeploymentCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_DeploymentCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2765,7 +2765,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentCondition(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_DeploymentList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_DeploymentList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2808,7 +2808,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentList(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_DeploymentRollback(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_DeploymentRollback(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2858,7 +2858,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentRollback(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2922,7 +2922,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentSpec(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -2995,7 +2995,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_DeploymentStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_DeploymentStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3019,7 +3019,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStrategy(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_RollbackConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_RollbackConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3037,7 +3037,7 @@ func schema_k8sio_api_apps_v1beta1_RollbackConfig(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_RollingUpdateDeployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_RollingUpdateDeployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3060,7 +3060,7 @@ func schema_k8sio_api_apps_v1beta1_RollingUpdateDeployment(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_RollingUpdateStatefulSetStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_RollingUpdateStatefulSetStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3078,7 +3078,7 @@ func schema_k8sio_api_apps_v1beta1_RollingUpdateStatefulSetStrategy(ref common.R
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_Scale(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_Scale(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3118,7 +3118,7 @@ func schema_k8sio_api_apps_v1beta1_Scale(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_ScaleSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_ScaleSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3136,7 +3136,7 @@ func schema_k8sio_api_apps_v1beta1_ScaleSpec(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_ScaleStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_ScaleStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3174,7 +3174,7 @@ func schema_k8sio_api_apps_v1beta1_ScaleStatus(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_StatefulSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_StatefulSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3213,7 +3213,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSet(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_StatefulSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_StatefulSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3256,7 +3256,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetCondition(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_StatefulSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_StatefulSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3297,7 +3297,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetList(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3362,7 +3362,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3442,7 +3442,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_apps_v1beta1_StatefulSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta1_StatefulSetUpdateStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3466,7 +3466,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetUpdateStrategy(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ControllerRevision(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ControllerRevision(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3508,7 +3508,7 @@ func schema_k8sio_api_apps_v1beta2_ControllerRevision(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ControllerRevisionList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ControllerRevisionList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3551,7 +3551,7 @@ func schema_k8sio_api_apps_v1beta2_ControllerRevisionList(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DaemonSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DaemonSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3591,7 +3591,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSet(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DaemonSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DaemonSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3634,7 +3634,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetCondition(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DaemonSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DaemonSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3677,7 +3677,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetList(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DaemonSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DaemonSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3718,7 +3718,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetSpec(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DaemonSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DaemonSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3804,7 +3804,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetStatus(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DaemonSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DaemonSetUpdateStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3828,7 +3828,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetUpdateStrategy(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_Deployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_Deployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3868,7 +3868,7 @@ func schema_k8sio_api_apps_v1beta2_Deployment(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DeploymentCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DeploymentCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3916,7 +3916,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentCondition(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DeploymentList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DeploymentList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -3959,7 +3959,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentList(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DeploymentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DeploymentSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4018,7 +4018,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentSpec(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DeploymentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DeploymentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4091,7 +4091,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentStatus(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_DeploymentStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_DeploymentStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4115,7 +4115,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentStrategy(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ReplicaSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ReplicaSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4155,7 +4155,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSet(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ReplicaSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ReplicaSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4198,7 +4198,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetCondition(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ReplicaSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ReplicaSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4241,7 +4241,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetList(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ReplicaSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ReplicaSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4277,7 +4277,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetSpec(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ReplicaSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ReplicaSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4339,7 +4339,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetStatus(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_RollingUpdateDaemonSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_RollingUpdateDaemonSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4357,7 +4357,7 @@ func schema_k8sio_api_apps_v1beta2_RollingUpdateDaemonSet(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_RollingUpdateDeployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_RollingUpdateDeployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4380,7 +4380,7 @@ func schema_k8sio_api_apps_v1beta2_RollingUpdateDeployment(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_RollingUpdateStatefulSetStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_RollingUpdateStatefulSetStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4398,7 +4398,7 @@ func schema_k8sio_api_apps_v1beta2_RollingUpdateStatefulSetStrategy(ref common.R
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_Scale(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_Scale(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4438,7 +4438,7 @@ func schema_k8sio_api_apps_v1beta2_Scale(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ScaleSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ScaleSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4456,7 +4456,7 @@ func schema_k8sio_api_apps_v1beta2_ScaleSpec(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_ScaleStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_ScaleStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4494,7 +4494,7 @@ func schema_k8sio_api_apps_v1beta2_ScaleStatus(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_StatefulSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_StatefulSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4533,7 +4533,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSet(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_StatefulSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_StatefulSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4576,7 +4576,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetCondition(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_StatefulSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_StatefulSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4617,7 +4617,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetList(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4682,7 +4682,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_StatefulSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_StatefulSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4762,7 +4762,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetStatus(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_apps_v1beta2_StatefulSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_apps_v1beta2_StatefulSetUpdateStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4786,7 +4786,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetUpdateStrategy(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_AuditSink(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_AuditSink(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4820,7 +4820,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_AuditSink(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_AuditSinkList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_AuditSinkList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4862,7 +4862,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_AuditSinkList(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_AuditSinkSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_AuditSinkSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4886,7 +4886,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_AuditSinkSpec(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_Policy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_Policy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4918,7 +4918,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_Policy(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_ServiceReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_ServiceReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4949,7 +4949,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_ServiceReference(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_Webhook(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_Webhook(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -4973,7 +4973,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_Webhook(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_WebhookClientConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_WebhookClientConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5003,7 +5003,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_WebhookClientConfig(ref common.
 	}
 }
 
-func schema_k8sio_api_auditregistration_v1alpha1_WebhookThrottleConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_auditregistration_v1alpha1_WebhookThrottleConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5027,7 +5027,7 @@ func schema_k8sio_api_auditregistration_v1alpha1_WebhookThrottleConfig(ref commo
 	}
 }
 
-func schema_k8sio_api_authentication_v1_BoundObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_BoundObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5063,7 +5063,7 @@ func schema_k8sio_api_authentication_v1_BoundObjectReference(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_authentication_v1_TokenRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_TokenRequest(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5101,7 +5101,7 @@ func schema_k8sio_api_authentication_v1_TokenRequest(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5139,7 +5139,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5164,7 +5164,7 @@ func schema_k8sio_api_authentication_v1_TokenRequestStatus(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_authentication_v1_TokenReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_TokenReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5204,7 +5204,7 @@ func schema_k8sio_api_authentication_v1_TokenReview(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5222,7 +5222,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5252,7 +5252,7 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5309,7 +5309,7 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_authentication_v1beta1_TokenReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1beta1_TokenReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5349,7 +5349,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReview(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5367,7 +5367,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5397,7 +5397,7 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5454,7 +5454,7 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5494,7 +5494,7 @@ func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_authorization_v1_NonResourceAttributes(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_NonResourceAttributes(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5518,7 +5518,7 @@ func schema_k8sio_api_authorization_v1_NonResourceAttributes(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5557,7 +5557,7 @@ func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_authorization_v1_ResourceAttributes(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_ResourceAttributes(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5611,7 +5611,7 @@ func schema_k8sio_api_authorization_v1_ResourceAttributes(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5676,7 +5676,7 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5716,7 +5716,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5739,7 +5739,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReviewSpec(ref common.Re
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5779,7 +5779,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5796,7 +5796,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectRulesReviewSpec(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5836,7 +5836,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5904,7 +5904,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5941,7 +5941,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewStatus(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -5991,7 +5991,7 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6031,7 +6031,7 @@ func schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref common.
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6055,7 +6055,7 @@ func schema_k8sio_api_authorization_v1beta1_NonResourceAttributes(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6094,7 +6094,7 @@ func schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_ResourceAttributes(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_ResourceAttributes(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6148,7 +6148,7 @@ func schema_k8sio_api_authorization_v1beta1_ResourceAttributes(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6213,7 +6213,7 @@ func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6253,7 +6253,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref common.R
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6276,7 +6276,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReviewSpec(ref comm
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6316,7 +6316,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReview(ref common.Re
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6333,7 +6333,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReviewSpec(ref commo
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6373,7 +6373,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6441,7 +6441,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref common.R
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6478,7 +6478,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewStatus(ref common
 	}
 }
 
-func schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6528,7 +6528,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref common.
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6559,7 +6559,7 @@ func schema_k8sio_api_autoscaling_v1_CrossVersionObjectReference(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6594,7 +6594,7 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricSource(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6629,7 +6629,7 @@ func schema_k8sio_api_autoscaling_v1_ExternalMetricStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6669,7 +6669,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6712,7 +6712,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerCondition(ref common
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6755,7 +6755,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6792,7 +6792,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6835,7 +6835,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerStatus(ref common.Re
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6875,7 +6875,7 @@ func schema_k8sio_api_autoscaling_v1_MetricSpec(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6915,7 +6915,7 @@ func schema_k8sio_api_autoscaling_v1_MetricStatus(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6955,7 +6955,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -6995,7 +6995,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7025,7 +7025,7 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricSource(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7055,7 +7055,7 @@ func schema_k8sio_api_autoscaling_v1_PodsMetricStatus(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7086,7 +7086,7 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricSource(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7117,7 +7117,7 @@ func schema_k8sio_api_autoscaling_v1_ResourceMetricStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7157,7 +7157,7 @@ func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ScaleSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ScaleSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7175,7 +7175,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleSpec(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7200,7 +7200,7 @@ func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_CrossVersionObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_CrossVersionObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7231,7 +7231,7 @@ func schema_k8sio_api_autoscaling_v2beta1_CrossVersionObjectReference(ref common
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_ExternalMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_ExternalMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7266,7 +7266,7 @@ func schema_k8sio_api_autoscaling_v2beta1_ExternalMetricSource(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_ExternalMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_ExternalMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7301,7 +7301,7 @@ func schema_k8sio_api_autoscaling_v2beta1_ExternalMetricStatus(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscaler(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscaler(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7341,7 +7341,7 @@ func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscaler(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7384,7 +7384,7 @@ func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerCondition(ref c
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7427,7 +7427,7 @@ func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerList(ref common
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7470,7 +7470,7 @@ func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerSpec(ref common
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7531,7 +7531,7 @@ func schema_k8sio_api_autoscaling_v2beta1_HorizontalPodAutoscalerStatus(ref comm
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_MetricSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_MetricSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7571,7 +7571,7 @@ func schema_k8sio_api_autoscaling_v2beta1_MetricSpec(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_MetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_MetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7611,7 +7611,7 @@ func schema_k8sio_api_autoscaling_v2beta1_MetricStatus(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_ObjectMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_ObjectMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7651,7 +7651,7 @@ func schema_k8sio_api_autoscaling_v2beta1_ObjectMetricSource(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_ObjectMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_ObjectMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7691,7 +7691,7 @@ func schema_k8sio_api_autoscaling_v2beta1_ObjectMetricStatus(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_PodsMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_PodsMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7721,7 +7721,7 @@ func schema_k8sio_api_autoscaling_v2beta1_PodsMetricSource(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_PodsMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_PodsMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7751,7 +7751,7 @@ func schema_k8sio_api_autoscaling_v2beta1_PodsMetricStatus(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_ResourceMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_ResourceMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7782,7 +7782,7 @@ func schema_k8sio_api_autoscaling_v2beta1_ResourceMetricSource(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta1_ResourceMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta1_ResourceMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7813,7 +7813,7 @@ func schema_k8sio_api_autoscaling_v2beta1_ResourceMetricStatus(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_CrossVersionObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_CrossVersionObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7844,7 +7844,7 @@ func schema_k8sio_api_autoscaling_v2beta2_CrossVersionObjectReference(ref common
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_ExternalMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_ExternalMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7868,7 +7868,7 @@ func schema_k8sio_api_autoscaling_v2beta2_ExternalMetricSource(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_ExternalMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_ExternalMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7892,7 +7892,7 @@ func schema_k8sio_api_autoscaling_v2beta2_ExternalMetricStatus(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscaler(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscaler(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7932,7 +7932,7 @@ func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscaler(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -7975,7 +7975,7 @@ func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerCondition(ref c
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8018,7 +8018,7 @@ func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerList(ref common
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8061,7 +8061,7 @@ func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerSpec(ref common
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8122,7 +8122,7 @@ func schema_k8sio_api_autoscaling_v2beta2_HorizontalPodAutoscalerStatus(ref comm
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_MetricIdentifier(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_MetricIdentifier(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8147,7 +8147,7 @@ func schema_k8sio_api_autoscaling_v2beta2_MetricIdentifier(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_MetricSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_MetricSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8187,7 +8187,7 @@ func schema_k8sio_api_autoscaling_v2beta2_MetricSpec(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_MetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_MetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8227,7 +8227,7 @@ func schema_k8sio_api_autoscaling_v2beta2_MetricStatus(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_MetricTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_MetricTarget(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8263,7 +8263,7 @@ func schema_k8sio_api_autoscaling_v2beta2_MetricTarget(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_MetricValueStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_MetricValueStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8292,7 +8292,7 @@ func schema_k8sio_api_autoscaling_v2beta2_MetricValueStatus(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_ObjectMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_ObjectMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8320,7 +8320,7 @@ func schema_k8sio_api_autoscaling_v2beta2_ObjectMetricSource(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_ObjectMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_ObjectMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8348,7 +8348,7 @@ func schema_k8sio_api_autoscaling_v2beta2_ObjectMetricStatus(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_PodsMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_PodsMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8372,7 +8372,7 @@ func schema_k8sio_api_autoscaling_v2beta2_PodsMetricSource(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_PodsMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_PodsMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8396,7 +8396,7 @@ func schema_k8sio_api_autoscaling_v2beta2_PodsMetricStatus(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_ResourceMetricSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_ResourceMetricSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8421,7 +8421,7 @@ func schema_k8sio_api_autoscaling_v2beta2_ResourceMetricSource(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_autoscaling_v2beta2_ResourceMetricStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_autoscaling_v2beta2_ResourceMetricStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8446,7 +8446,7 @@ func schema_k8sio_api_autoscaling_v2beta2_ResourceMetricStatus(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_batch_v1_Job(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1_Job(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8486,7 +8486,7 @@ func schema_k8sio_api_batch_v1_Job(ref common.ReferenceCallback) common.OpenAPID
 	}
 }
 
-func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8534,7 +8534,7 @@ func schema_k8sio_api_batch_v1_JobCondition(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_batch_v1_JobList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1_JobList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8577,7 +8577,7 @@ func schema_k8sio_api_batch_v1_JobList(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8637,7 +8637,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8696,7 +8696,7 @@ func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_batch_v1beta1_CronJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1beta1_CronJob(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8736,7 +8736,7 @@ func schema_k8sio_api_batch_v1beta1_CronJob(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_batch_v1beta1_CronJobList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1beta1_CronJobList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8779,7 +8779,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobList(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8834,7 +8834,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobSpec(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_batch_v1beta1_CronJobStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1beta1_CronJobStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8864,7 +8864,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobStatus(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_batch_v1beta1_JobTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1beta1_JobTemplate(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8899,7 +8899,7 @@ func schema_k8sio_api_batch_v1beta1_JobTemplate(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8922,7 +8922,7 @@ func schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_batch_v2alpha1_CronJob(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v2alpha1_CronJob(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -8962,7 +8962,7 @@ func schema_k8sio_api_batch_v2alpha1_CronJob(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_batch_v2alpha1_CronJobList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v2alpha1_CronJobList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9005,7 +9005,7 @@ func schema_k8sio_api_batch_v2alpha1_CronJobList(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_batch_v2alpha1_CronJobSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v2alpha1_CronJobSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9060,7 +9060,7 @@ func schema_k8sio_api_batch_v2alpha1_CronJobSpec(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_batch_v2alpha1_CronJobStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v2alpha1_CronJobStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9090,7 +9090,7 @@ func schema_k8sio_api_batch_v2alpha1_CronJobStatus(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_batch_v2alpha1_JobTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v2alpha1_JobTemplate(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9125,7 +9125,7 @@ func schema_k8sio_api_batch_v2alpha1_JobTemplate(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_batch_v2alpha1_JobTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_batch_v2alpha1_JobTemplateSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9148,7 +9148,7 @@ func schema_k8sio_api_batch_v2alpha1_JobTemplateSpec(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequest(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9187,7 +9187,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequest(ref common.
 	}
 }
 
-func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9223,7 +9223,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestCondition(re
 	}
 }
 
-func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9263,7 +9263,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestList(ref com
 	}
 }
 
-func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9340,7 +9340,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref com
 	}
 }
 
-func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9370,7 +9370,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestStatus(ref c
 	}
 }
 
-func schema_k8sio_api_coordination_v1beta1_Lease(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1beta1_Lease(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9405,7 +9405,7 @@ func schema_k8sio_api_coordination_v1beta1_Lease(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_coordination_v1beta1_LeaseList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1beta1_LeaseList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9448,7 +9448,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseList(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9489,7 +9489,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseSpec(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9526,7 +9526,7 @@ func schema_k8sio_api_core_v1_AWSElasticBlockStoreVolumeSource(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_core_v1_Affinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Affinity(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9554,7 +9554,7 @@ func schema_k8sio_api_core_v1_Affinity(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_k8sio_api_core_v1_AttachedVolume(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_AttachedVolume(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9579,7 +9579,7 @@ func schema_k8sio_api_core_v1_AttachedVolume(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_AvoidPods(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_AvoidPods(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9604,7 +9604,7 @@ func schema_k8sio_api_core_v1_AvoidPods(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9653,7 +9653,7 @@ func schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9690,7 +9690,7 @@ func schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_core_v1_AzureFileVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_AzureFileVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9721,7 +9721,7 @@ func schema_k8sio_api_core_v1_AzureFileVolumeSource(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_Binding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Binding(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9757,7 +9757,7 @@ func schema_k8sio_api_core_v1_Binding(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9823,7 +9823,7 @@ func schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_Capabilities(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Capabilities(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9861,7 +9861,7 @@ func schema_k8sio_api_core_v1_Capabilities(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9917,7 +9917,7 @@ func schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -9973,7 +9973,7 @@ func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10010,7 +10010,7 @@ func schema_k8sio_api_core_v1_CinderPersistentVolumeSource(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_core_v1_CinderVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_CinderVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10047,7 +10047,7 @@ func schema_k8sio_api_core_v1_CinderVolumeSource(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_ClientIPConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ClientIPConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10065,7 +10065,7 @@ func schema_k8sio_api_core_v1_ClientIPConfig(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_ComponentCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ComponentCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10102,7 +10102,7 @@ func schema_k8sio_api_core_v1_ComponentCondition(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_ComponentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ComponentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10150,7 +10150,7 @@ func schema_k8sio_api_core_v1_ComponentStatus(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_ComponentStatusList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ComponentStatusList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10193,7 +10193,7 @@ func schema_k8sio_api_core_v1_ComponentStatusList(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_ConfigMap(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ConfigMap(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10249,7 +10249,7 @@ func schema_k8sio_api_core_v1_ConfigMap(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_ConfigMapEnvSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ConfigMapEnvSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10273,7 +10273,7 @@ func schema_k8sio_api_core_v1_ConfigMapEnvSource(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_ConfigMapKeySelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ConfigMapKeySelector(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10304,7 +10304,7 @@ func schema_k8sio_api_core_v1_ConfigMapKeySelector(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_ConfigMapList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ConfigMapList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10347,7 +10347,7 @@ func schema_k8sio_api_core_v1_ConfigMapList(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_ConfigMapNodeConfigSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ConfigMapNodeConfigSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10390,7 +10390,7 @@ func schema_k8sio_api_core_v1_ConfigMapNodeConfigSource(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_ConfigMapProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ConfigMapProjection(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10427,7 +10427,7 @@ func schema_k8sio_api_core_v1_ConfigMapProjection(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10470,7 +10470,7 @@ func schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10673,7 +10673,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_ContainerImage(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ContainerImage(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10705,7 +10705,7 @@ func schema_k8sio_api_core_v1_ContainerImage(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10748,7 +10748,7 @@ func schema_k8sio_api_core_v1_ContainerPort(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_ContainerState(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ContainerState(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10776,7 +10776,7 @@ func schema_k8sio_api_core_v1_ContainerState(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_ContainerStateRunning(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ContainerStateRunning(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10794,7 +10794,7 @@ func schema_k8sio_api_core_v1_ContainerStateRunning(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_ContainerStateTerminated(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ContainerStateTerminated(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10848,7 +10848,7 @@ func schema_k8sio_api_core_v1_ContainerStateTerminated(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_core_v1_ContainerStateWaiting(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ContainerStateWaiting(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10872,7 +10872,7 @@ func schema_k8sio_api_core_v1_ContainerStateWaiting(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10932,7 +10932,7 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_DaemonEndpoint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_DaemonEndpoint(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10951,7 +10951,7 @@ func schema_k8sio_api_core_v1_DaemonEndpoint(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_DownwardAPIProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_DownwardAPIProjection(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -10976,7 +10976,7 @@ func schema_k8sio_api_core_v1_DownwardAPIProjection(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11012,7 +11012,7 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeFile(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11043,7 +11043,7 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11067,7 +11067,7 @@ func schema_k8sio_api_core_v1_EmptyDirVolumeSource(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_EndpointAddress(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EndpointAddress(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11104,7 +11104,7 @@ func schema_k8sio_api_core_v1_EndpointAddress(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_EndpointPort(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EndpointPort(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11135,7 +11135,7 @@ func schema_k8sio_api_core_v1_EndpointPort(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_EndpointSubset(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EndpointSubset(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11184,7 +11184,7 @@ func schema_k8sio_api_core_v1_EndpointSubset(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_Endpoints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Endpoints(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11226,7 +11226,7 @@ func schema_k8sio_api_core_v1_Endpoints(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_EndpointsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EndpointsList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11269,7 +11269,7 @@ func schema_k8sio_api_core_v1_EndpointsList(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_EnvFromSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EnvFromSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11298,7 +11298,7 @@ func schema_k8sio_api_core_v1_EnvFromSource(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_EnvVar(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EnvVar(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11329,7 +11329,7 @@ func schema_k8sio_api_core_v1_EnvVar(ref common.ReferenceCallback) common.OpenAP
 	}
 }
 
-func schema_k8sio_api_core_v1_EnvVarSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EnvVarSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11362,7 +11362,7 @@ func schema_k8sio_api_core_v1_EnvVarSource(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_Event(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Event(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11470,7 +11470,7 @@ func schema_k8sio_api_core_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 	}
 }
 
-func schema_k8sio_api_core_v1_EventList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EventList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11513,7 +11513,7 @@ func schema_k8sio_api_core_v1_EventList(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_EventSeries(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EventSeries(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11543,7 +11543,7 @@ func schema_k8sio_api_core_v1_EventSeries(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_EventSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_EventSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11567,7 +11567,7 @@ func schema_k8sio_api_core_v1_EventSource(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11592,7 +11592,7 @@ func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11648,7 +11648,7 @@ func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11698,7 +11698,7 @@ func schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_core_v1_FlexVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_FlexVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11748,7 +11748,7 @@ func schema_k8sio_api_core_v1_FlexVolumeSource(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_FlockerVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_FlockerVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11772,7 +11772,7 @@ func schema_k8sio_api_core_v1_FlockerVolumeSource(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11809,7 +11809,7 @@ func schema_k8sio_api_core_v1_GCEPersistentDiskVolumeSource(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_core_v1_GitRepoVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_GitRepoVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11840,7 +11840,7 @@ func schema_k8sio_api_core_v1_GitRepoVolumeSource(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11871,7 +11871,7 @@ func schema_k8sio_api_core_v1_GlusterfsVolumeSource(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11920,7 +11920,7 @@ func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_HTTPHeader(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_HTTPHeader(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11945,7 +11945,7 @@ func schema_k8sio_api_core_v1_HTTPHeader(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_core_v1_Handler(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Handler(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -11973,7 +11973,7 @@ func schema_k8sio_api_core_v1_Handler(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_k8sio_api_core_v1_HostAlias(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_HostAlias(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12004,7 +12004,7 @@ func schema_k8sio_api_core_v1_HostAlias(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_HostPathVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_HostPathVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12029,7 +12029,7 @@ func schema_k8sio_api_core_v1_HostPathVolumeSource(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12115,7 +12115,7 @@ func schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12201,7 +12201,7 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_core_v1_KeyToPath(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_KeyToPath(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12232,7 +12232,7 @@ func schema_k8sio_api_core_v1_KeyToPath(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_Lifecycle(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Lifecycle(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12255,7 +12255,7 @@ func schema_k8sio_api_core_v1_Lifecycle(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_LimitRange(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LimitRange(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12290,7 +12290,7 @@ func schema_k8sio_api_core_v1_LimitRange(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_core_v1_LimitRangeItem(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LimitRangeItem(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12369,7 +12369,7 @@ func schema_k8sio_api_core_v1_LimitRangeItem(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_LimitRangeList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LimitRangeList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12412,7 +12412,7 @@ func schema_k8sio_api_core_v1_LimitRangeList(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_LimitRangeSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LimitRangeSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12438,7 +12438,7 @@ func schema_k8sio_api_core_v1_LimitRangeSpec(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_List(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_List(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12481,7 +12481,7 @@ func schema_k8sio_api_core_v1_List(ref common.ReferenceCallback) common.OpenAPID
 	}
 }
 
-func schema_k8sio_api_core_v1_LoadBalancerIngress(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LoadBalancerIngress(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12505,7 +12505,7 @@ func schema_k8sio_api_core_v1_LoadBalancerIngress(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_LoadBalancerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LoadBalancerStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12530,7 +12530,7 @@ func schema_k8sio_api_core_v1_LoadBalancerStatus(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_LocalObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LocalObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12548,7 +12548,7 @@ func schema_k8sio_api_core_v1_LocalObjectReference(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_LocalVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_LocalVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12573,7 +12573,7 @@ func schema_k8sio_api_core_v1_LocalVolumeSource(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_core_v1_NFSVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NFSVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12604,7 +12604,7 @@ func schema_k8sio_api_core_v1_NFSVolumeSource(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_Namespace(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Namespace(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12644,7 +12644,7 @@ func schema_k8sio_api_core_v1_Namespace(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_NamespaceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NamespaceList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12687,7 +12687,7 @@ func schema_k8sio_api_core_v1_NamespaceList(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_NamespaceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NamespaceSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12712,7 +12712,7 @@ func schema_k8sio_api_core_v1_NamespaceSpec(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_NamespaceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NamespaceStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12730,7 +12730,7 @@ func schema_k8sio_api_core_v1_NamespaceStatus(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_Node(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Node(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12770,7 +12770,7 @@ func schema_k8sio_api_core_v1_Node(ref common.ReferenceCallback) common.OpenAPID
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeAddress(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeAddress(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12795,7 +12795,7 @@ func schema_k8sio_api_core_v1_NodeAddress(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12825,7 +12825,7 @@ func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12873,7 +12873,7 @@ func schema_k8sio_api_core_v1_NodeCondition(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeConfigSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeConfigSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12891,7 +12891,7 @@ func schema_k8sio_api_core_v1_NodeConfigSource(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeConfigStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeConfigStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12925,7 +12925,7 @@ func schema_k8sio_api_core_v1_NodeConfigStatus(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeDaemonEndpoints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeDaemonEndpoints(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12943,7 +12943,7 @@ func schema_k8sio_api_core_v1_NodeDaemonEndpoints(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -12986,7 +12986,7 @@ func schema_k8sio_api_core_v1_NodeList(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeProxyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeProxyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13016,7 +13016,7 @@ func schema_k8sio_api_core_v1_NodeProxyOptions(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeResources(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13042,7 +13042,7 @@ func schema_k8sio_api_core_v1_NodeResources(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeSelector(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13068,7 +13068,7 @@ func schema_k8sio_api_core_v1_NodeSelector(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeSelectorRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeSelectorRequirement(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13106,7 +13106,7 @@ func schema_k8sio_api_core_v1_NodeSelectorRequirement(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeSelectorTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeSelectorTerm(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13143,7 +13143,7 @@ func schema_k8sio_api_core_v1_NodeSelectorTerm(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13197,7 +13197,7 @@ func schema_k8sio_api_core_v1_NodeSpec(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13328,7 +13328,7 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_core_v1_NodeSystemInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_NodeSystemInfo(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13401,7 +13401,7 @@ func schema_k8sio_api_core_v1_NodeSystemInfo(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_ObjectFieldSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ObjectFieldSelector(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13426,7 +13426,7 @@ func schema_k8sio_api_core_v1_ObjectFieldSelector(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_ObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13480,7 +13480,7 @@ func schema_k8sio_api_core_v1_ObjectReference(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolume(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolume(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13520,7 +13520,7 @@ func schema_k8sio_api_core_v1_PersistentVolume(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeClaim(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13560,7 +13560,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaim(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeClaimCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeClaimCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13606,7 +13606,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimCondition(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeClaimList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeClaimList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13649,7 +13649,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimList(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13708,7 +13708,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13770,7 +13770,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeClaimVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeClaimVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13795,7 +13795,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimVolumeSource(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13838,7 +13838,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeList(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13961,7 +13961,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeSource(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14150,7 +14150,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_PersistentVolumeStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PersistentVolumeStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14180,7 +14180,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeStatus(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_core_v1_PhotonPersistentDiskVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PhotonPersistentDiskVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14205,7 +14205,7 @@ func schema_k8sio_api_core_v1_PhotonPersistentDiskVolumeSource(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14245,7 +14245,7 @@ func schema_k8sio_api_core_v1_Pod(ref common.ReferenceCallback) common.OpenAPIDe
 	}
 }
 
-func schema_k8sio_api_core_v1_PodAffinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodAffinity(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14282,7 +14282,7 @@ func schema_k8sio_api_core_v1_PodAffinity(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14320,7 +14320,7 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_PodAntiAffinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodAntiAffinity(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14357,7 +14357,7 @@ func schema_k8sio_api_core_v1_PodAntiAffinity(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_PodAttachOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodAttachOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14411,7 +14411,7 @@ func schema_k8sio_api_core_v1_PodAttachOptions(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_PodCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14459,7 +14459,7 @@ func schema_k8sio_api_core_v1_PodCondition(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14510,7 +14510,7 @@ func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_PodDNSConfigOption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodDNSConfigOption(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14533,7 +14533,7 @@ func schema_k8sio_api_core_v1_PodDNSConfigOption(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_PodExecOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodExecOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14601,7 +14601,7 @@ func schema_k8sio_api_core_v1_PodExecOptions(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_PodList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14644,7 +14644,7 @@ func schema_k8sio_api_core_v1_PodList(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_k8sio_api_core_v1_PodLogOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodLogOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14716,7 +14716,7 @@ func schema_k8sio_api_core_v1_PodLogOptions(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_PodPortForwardOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodPortForwardOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14753,7 +14753,7 @@ func schema_k8sio_api_core_v1_PodPortForwardOptions(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_PodProxyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodProxyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14783,7 +14783,7 @@ func schema_k8sio_api_core_v1_PodProxyOptions(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_PodReadinessGate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodReadinessGate(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14802,7 +14802,7 @@ func schema_k8sio_api_core_v1_PodReadinessGate(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14869,7 +14869,7 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_PodSignature(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodSignature(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -14887,7 +14887,7 @@ func schema_k8sio_api_core_v1_PodSignature(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15157,7 +15157,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15259,7 +15259,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_core_v1_PodStatusResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodStatusResult(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15294,7 +15294,7 @@ func schema_k8sio_api_core_v1_PodStatusResult(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_PodTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodTemplate(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15329,7 +15329,7 @@ func schema_k8sio_api_core_v1_PodTemplate(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_PodTemplateList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodTemplateList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15372,7 +15372,7 @@ func schema_k8sio_api_core_v1_PodTemplateList(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_PodTemplateSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PodTemplateSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15395,7 +15395,7 @@ func schema_k8sio_api_core_v1_PodTemplateSpec(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_PortworxVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PortworxVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15426,7 +15426,7 @@ func schema_k8sio_api_core_v1_PortworxVolumeSource(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_PreferAvoidPodsEntry(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PreferAvoidPodsEntry(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15462,7 +15462,7 @@ func schema_k8sio_api_core_v1_PreferAvoidPodsEntry(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15487,7 +15487,7 @@ func schema_k8sio_api_core_v1_PreferredSchedulingTerm(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15545,7 +15545,7 @@ func schema_k8sio_api_core_v1_Probe(ref common.ReferenceCallback) common.OpenAPI
 	}
 }
 
-func schema_k8sio_api_core_v1_ProjectedVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ProjectedVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15577,7 +15577,7 @@ func schema_k8sio_api_core_v1_ProjectedVolumeSource(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15620,7 +15620,7 @@ func schema_k8sio_api_core_v1_QuobyteVolumeSource(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15688,7 +15688,7 @@ func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_RBDVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_RBDVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15756,7 +15756,7 @@ func schema_k8sio_api_core_v1_RBDVolumeSource(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_RangeAllocation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_RangeAllocation(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15799,7 +15799,7 @@ func schema_k8sio_api_core_v1_RangeAllocation(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_ReplicationController(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ReplicationController(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15839,7 +15839,7 @@ func schema_k8sio_api_core_v1_ReplicationController(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_ReplicationControllerCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ReplicationControllerCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15882,7 +15882,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerCondition(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_core_v1_ReplicationControllerList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ReplicationControllerList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15925,7 +15925,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerList(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_ReplicationControllerSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ReplicationControllerSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -15968,7 +15968,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerSpec(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_ReplicationControllerStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ReplicationControllerStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16030,7 +16030,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_core_v1_ResourceFieldSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ResourceFieldSelector(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16061,7 +16061,7 @@ func schema_k8sio_api_core_v1_ResourceFieldSelector(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_ResourceQuota(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ResourceQuota(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16101,7 +16101,7 @@ func schema_k8sio_api_core_v1_ResourceQuota(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_ResourceQuotaList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ResourceQuotaList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16144,7 +16144,7 @@ func schema_k8sio_api_core_v1_ResourceQuotaList(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_core_v1_ResourceQuotaSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ResourceQuotaSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16187,7 +16187,7 @@ func schema_k8sio_api_core_v1_ResourceQuotaSpec(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_core_v1_ResourceQuotaStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ResourceQuotaStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16224,7 +16224,7 @@ func schema_k8sio_api_core_v1_ResourceQuotaStatus(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16261,7 +16261,7 @@ func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_SELinuxOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SELinuxOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16297,7 +16297,7 @@ func schema_k8sio_api_core_v1_SELinuxOptions(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_ScaleIOPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ScaleIOPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16370,7 +16370,7 @@ func schema_k8sio_api_core_v1_ScaleIOPersistentVolumeSource(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16443,7 +16443,7 @@ func schema_k8sio_api_core_v1_ScaleIOVolumeSource(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_ScopeSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ScopeSelector(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16468,7 +16468,7 @@ func schema_k8sio_api_core_v1_ScopeSelector(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_ScopedResourceSelectorRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ScopedResourceSelectorRequirement(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16506,7 +16506,7 @@ func schema_k8sio_api_core_v1_ScopedResourceSelectorRequirement(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_core_v1_Secret(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Secret(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16568,7 +16568,7 @@ func schema_k8sio_api_core_v1_Secret(ref common.ReferenceCallback) common.OpenAP
 	}
 }
 
-func schema_k8sio_api_core_v1_SecretEnvSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SecretEnvSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16592,7 +16592,7 @@ func schema_k8sio_api_core_v1_SecretEnvSource(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_SecretKeySelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SecretKeySelector(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16623,7 +16623,7 @@ func schema_k8sio_api_core_v1_SecretKeySelector(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_core_v1_SecretList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SecretList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16666,7 +16666,7 @@ func schema_k8sio_api_core_v1_SecretList(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_core_v1_SecretProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SecretProjection(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16703,7 +16703,7 @@ func schema_k8sio_api_core_v1_SecretProjection(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_SecretReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SecretReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16727,7 +16727,7 @@ func schema_k8sio_api_core_v1_SecretReference(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16770,7 +16770,7 @@ func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16835,7 +16835,7 @@ func schema_k8sio_api_core_v1_SecurityContext(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_SerializedReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SerializedReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16865,7 +16865,7 @@ func schema_k8sio_api_core_v1_SerializedReference(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_Service(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Service(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16905,7 +16905,7 @@ func schema_k8sio_api_core_v1_Service(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_k8sio_api_core_v1_ServiceAccount(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServiceAccount(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -16971,7 +16971,7 @@ func schema_k8sio_api_core_v1_ServiceAccount(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_core_v1_ServiceAccountList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServiceAccountList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17014,7 +17014,7 @@ func schema_k8sio_api_core_v1_ServiceAccountList(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_ServiceAccountTokenProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServiceAccountTokenProjection(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17045,7 +17045,7 @@ func schema_k8sio_api_core_v1_ServiceAccountTokenProjection(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_core_v1_ServiceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServiceList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17088,7 +17088,7 @@ func schema_k8sio_api_core_v1_ServiceList(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_ServicePort(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServicePort(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17131,7 +17131,7 @@ func schema_k8sio_api_core_v1_ServicePort(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_ServiceProxyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServiceProxyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17161,7 +17161,7 @@ func schema_k8sio_api_core_v1_ServiceProxyOptions(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17284,7 +17284,7 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_ServiceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_ServiceStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17302,7 +17302,7 @@ func schema_k8sio_api_core_v1_ServiceStatus(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_core_v1_SessionAffinityConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_SessionAffinityConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17320,7 +17320,7 @@ func schema_k8sio_api_core_v1_SessionAffinityConfig(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_StorageOSPersistentVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_StorageOSPersistentVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17362,7 +17362,7 @@ func schema_k8sio_api_core_v1_StorageOSPersistentVolumeSource(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_core_v1_StorageOSVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_StorageOSVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17404,7 +17404,7 @@ func schema_k8sio_api_core_v1_StorageOSVolumeSource(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_core_v1_Sysctl(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Sysctl(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17429,7 +17429,7 @@ func schema_k8sio_api_core_v1_Sysctl(ref common.ReferenceCallback) common.OpenAP
 	}
 }
 
-func schema_k8sio_api_core_v1_TCPSocketAction(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_TCPSocketAction(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17454,7 +17454,7 @@ func schema_k8sio_api_core_v1_TCPSocketAction(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_core_v1_Taint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Taint(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17491,7 +17491,7 @@ func schema_k8sio_api_core_v1_Taint(ref common.ReferenceCallback) common.OpenAPI
 	}
 }
 
-func schema_k8sio_api_core_v1_Toleration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Toleration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17533,7 +17533,7 @@ func schema_k8sio_api_core_v1_Toleration(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_core_v1_TopologySelectorLabelRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_TopologySelectorLabelRequirement(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17565,7 +17565,7 @@ func schema_k8sio_api_core_v1_TopologySelectorLabelRequirement(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_core_v1_TopologySelectorTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_TopologySelectorTerm(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17590,7 +17590,7 @@ func schema_k8sio_api_core_v1_TopologySelectorTerm(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_core_v1_TypedLocalObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_TypedLocalObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17621,7 +17621,7 @@ func schema_k8sio_api_core_v1_TypedLocalObjectReference(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_core_v1_Volume(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_Volume(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17776,7 +17776,7 @@ func schema_k8sio_api_core_v1_Volume(ref common.ReferenceCallback) common.OpenAP
 	}
 }
 
-func schema_k8sio_api_core_v1_VolumeDevice(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_VolumeDevice(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17801,7 +17801,7 @@ func schema_k8sio_api_core_v1_VolumeDevice(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17844,7 +17844,7 @@ func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_core_v1_VolumeNodeAffinity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_VolumeNodeAffinity(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17862,7 +17862,7 @@ func schema_k8sio_api_core_v1_VolumeNodeAffinity(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_core_v1_VolumeProjection(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_VolumeProjection(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -17895,7 +17895,7 @@ func schema_k8sio_api_core_v1_VolumeProjection(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_core_v1_VolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_VolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18043,7 +18043,7 @@ func schema_k8sio_api_core_v1_VolumeSource(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18080,7 +18080,7 @@ func schema_k8sio_api_core_v1_VsphereVirtualDiskVolumeSource(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18105,7 +18105,7 @@ func schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_events_v1beta1_Event(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_events_v1beta1_Event(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18212,7 +18212,7 @@ func schema_k8sio_api_events_v1beta1_Event(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_events_v1beta1_EventList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_events_v1beta1_EventList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18255,7 +18255,7 @@ func schema_k8sio_api_events_v1beta1_EventList(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_events_v1beta1_EventSeries(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_events_v1beta1_EventSeries(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18286,7 +18286,7 @@ func schema_k8sio_api_events_v1beta1_EventSeries(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_AllowedFlexVolume(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_AllowedFlexVolume(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18305,7 +18305,7 @@ func schema_k8sio_api_extensions_v1beta1_AllowedFlexVolume(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_AllowedHostPath(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_AllowedHostPath(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18329,7 +18329,7 @@ func schema_k8sio_api_extensions_v1beta1_AllowedHostPath(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18353,7 +18353,7 @@ func schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatus(ref common.Re
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatusList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatusList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18377,7 +18377,7 @@ func schema_k8sio_api_extensions_v1beta1_CustomMetricCurrentStatusList(ref commo
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_CustomMetricTarget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_CustomMetricTarget(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18402,7 +18402,7 @@ func schema_k8sio_api_extensions_v1beta1_CustomMetricTarget(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_CustomMetricTargetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_CustomMetricTargetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18426,7 +18426,7 @@ func schema_k8sio_api_extensions_v1beta1_CustomMetricTargetList(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DaemonSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DaemonSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18466,7 +18466,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSet(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DaemonSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DaemonSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18509,7 +18509,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetCondition(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DaemonSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DaemonSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18552,7 +18552,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetList(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DaemonSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DaemonSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18599,7 +18599,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetSpec(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DaemonSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DaemonSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18685,7 +18685,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetStatus(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DaemonSetUpdateStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DaemonSetUpdateStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18708,7 +18708,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetUpdateStrategy(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_Deployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_Deployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18748,7 +18748,7 @@ func schema_k8sio_api_extensions_v1beta1_Deployment(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DeploymentCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DeploymentCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18796,7 +18796,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentCondition(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DeploymentList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DeploymentList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18839,7 +18839,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentList(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18889,7 +18889,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DeploymentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DeploymentSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -18958,7 +18958,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentSpec(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19031,7 +19031,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_DeploymentStrategy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_DeploymentStrategy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19055,7 +19055,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentStrategy(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_FSGroupStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_FSGroupStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19086,7 +19086,7 @@ func schema_k8sio_api_extensions_v1beta1_FSGroupStrategyOptions(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_HTTPIngressPath(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_HTTPIngressPath(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19111,7 +19111,7 @@ func schema_k8sio_api_extensions_v1beta1_HTTPIngressPath(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_HTTPIngressRuleValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_HTTPIngressRuleValue(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19137,7 +19137,7 @@ func schema_k8sio_api_extensions_v1beta1_HTTPIngressRuleValue(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_HostPortRange(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_HostPortRange(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19162,7 +19162,7 @@ func schema_k8sio_api_extensions_v1beta1_HostPortRange(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IDRange(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IDRange(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19187,7 +19187,7 @@ func schema_k8sio_api_extensions_v1beta1_IDRange(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IPBlock(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IPBlock(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19219,7 +19219,7 @@ func schema_k8sio_api_extensions_v1beta1_IPBlock(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_Ingress(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_Ingress(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19259,7 +19259,7 @@ func schema_k8sio_api_extensions_v1beta1_Ingress(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IngressBackend(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IngressBackend(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19284,7 +19284,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressBackend(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IngressList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IngressList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19327,7 +19327,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressList(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IngressRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IngressRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19350,7 +19350,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressRule(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IngressRuleValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IngressRuleValue(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19367,7 +19367,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressRuleValue(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IngressSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IngressSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19409,7 +19409,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressSpec(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IngressStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IngressStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19427,7 +19427,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressStatus(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_IngressTLS(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_IngressTLS(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19458,7 +19458,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressTLS(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_NetworkPolicy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19493,7 +19493,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicy(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicyEgressRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_NetworkPolicyEgressRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19530,7 +19530,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyEgressRule(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicyIngressRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_NetworkPolicyIngressRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19567,7 +19567,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyIngressRule(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_NetworkPolicyList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19610,7 +19610,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyList(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicyPeer(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_NetworkPolicyPeer(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19638,7 +19638,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyPeer(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicyPort(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_NetworkPolicyPort(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19662,7 +19662,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyPort(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19718,7 +19718,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19753,7 +19753,7 @@ func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicy(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicyList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -19796,7 +19796,7 @@ func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicyList(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicySpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20004,7 +20004,7 @@ func schema_k8sio_api_extensions_v1beta1_PodSecurityPolicySpec(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20044,7 +20044,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ReplicaSetCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ReplicaSetCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20087,7 +20087,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetCondition(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ReplicaSetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ReplicaSetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20130,7 +20130,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetList(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ReplicaSetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ReplicaSetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20165,7 +20165,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetSpec(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20227,7 +20227,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ReplicationControllerDummy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ReplicationControllerDummy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20251,7 +20251,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicationControllerDummy(ref common.R
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_RollbackConfig(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_RollbackConfig(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20269,7 +20269,7 @@ func schema_k8sio_api_extensions_v1beta1_RollbackConfig(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_RollingUpdateDaemonSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_RollingUpdateDaemonSet(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20287,7 +20287,7 @@ func schema_k8sio_api_extensions_v1beta1_RollingUpdateDaemonSet(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_RollingUpdateDeployment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_RollingUpdateDeployment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20310,7 +20310,7 @@ func schema_k8sio_api_extensions_v1beta1_RollingUpdateDeployment(ref common.Refe
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_RunAsGroupStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_RunAsGroupStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20342,7 +20342,7 @@ func schema_k8sio_api_extensions_v1beta1_RunAsGroupStrategyOptions(ref common.Re
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_RunAsUserStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_RunAsUserStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20374,7 +20374,7 @@ func schema_k8sio_api_extensions_v1beta1_RunAsUserStrategyOptions(ref common.Ref
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_SELinuxStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_SELinuxStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20399,7 +20399,7 @@ func schema_k8sio_api_extensions_v1beta1_SELinuxStrategyOptions(ref common.Refer
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_Scale(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_Scale(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20439,7 +20439,7 @@ func schema_k8sio_api_extensions_v1beta1_Scale(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ScaleSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ScaleSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20457,7 +20457,7 @@ func schema_k8sio_api_extensions_v1beta1_ScaleSpec(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20495,7 +20495,7 @@ func schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_extensions_v1beta1_SupplementalGroupsStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_extensions_v1beta1_SupplementalGroupsStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20526,7 +20526,7 @@ func schema_k8sio_api_extensions_v1beta1_SupplementalGroupsStrategyOptions(ref c
 	}
 }
 
-func schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20566,7 +20566,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20584,7 +20584,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref common.R
 	}
 }
 
-func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20628,7 +20628,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20666,7 +20666,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_networking_v1_IPBlock(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_IPBlock(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20698,7 +20698,7 @@ func schema_k8sio_api_networking_v1_IPBlock(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_networking_v1_NetworkPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_NetworkPolicy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20733,7 +20733,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicy(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_networking_v1_NetworkPolicyEgressRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_NetworkPolicyEgressRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20770,7 +20770,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyEgressRule(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_networking_v1_NetworkPolicyIngressRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_NetworkPolicyIngressRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20807,7 +20807,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyIngressRule(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_networking_v1_NetworkPolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_NetworkPolicyList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20850,7 +20850,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyList(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_networking_v1_NetworkPolicyPeer(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_NetworkPolicyPeer(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20878,7 +20878,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyPeer(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_networking_v1_NetworkPolicyPort(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_NetworkPolicyPort(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20902,7 +20902,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyPort(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20958,7 +20958,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_AllowedFlexVolume(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_AllowedFlexVolume(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -20977,7 +20977,7 @@ func schema_k8sio_api_policy_v1beta1_AllowedFlexVolume(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_AllowedHostPath(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_AllowedHostPath(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21001,7 +21001,7 @@ func schema_k8sio_api_policy_v1beta1_AllowedHostPath(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_Eviction(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_Eviction(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21036,7 +21036,7 @@ func schema_k8sio_api_policy_v1beta1_Eviction(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_FSGroupStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_FSGroupStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21067,7 +21067,7 @@ func schema_k8sio_api_policy_v1beta1_FSGroupStrategyOptions(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_HostPortRange(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_HostPortRange(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21092,7 +21092,7 @@ func schema_k8sio_api_policy_v1beta1_HostPortRange(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_IDRange(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_IDRange(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21117,7 +21117,7 @@ func schema_k8sio_api_policy_v1beta1_IDRange(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_PodDisruptionBudget(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_PodDisruptionBudget(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21156,7 +21156,7 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudget(ref common.ReferenceCal
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21197,7 +21197,7 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetList(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21225,7 +21225,7 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetSpec(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21281,7 +21281,7 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetStatus(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_PodSecurityPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_PodSecurityPolicy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21316,7 +21316,7 @@ func schema_k8sio_api_policy_v1beta1_PodSecurityPolicy(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_PodSecurityPolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_PodSecurityPolicyList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21359,7 +21359,7 @@ func schema_k8sio_api_policy_v1beta1_PodSecurityPolicyList(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_PodSecurityPolicySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_PodSecurityPolicySpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21567,7 +21567,7 @@ func schema_k8sio_api_policy_v1beta1_PodSecurityPolicySpec(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_RunAsGroupStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_RunAsGroupStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21599,7 +21599,7 @@ func schema_k8sio_api_policy_v1beta1_RunAsGroupStrategyOptions(ref common.Refere
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_RunAsUserStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_RunAsUserStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21631,7 +21631,7 @@ func schema_k8sio_api_policy_v1beta1_RunAsUserStrategyOptions(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_SELinuxStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_SELinuxStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21656,7 +21656,7 @@ func schema_k8sio_api_policy_v1beta1_SELinuxStrategyOptions(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_policy_v1beta1_SupplementalGroupsStrategyOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_policy_v1beta1_SupplementalGroupsStrategyOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21687,7 +21687,7 @@ func schema_k8sio_api_policy_v1beta1_SupplementalGroupsStrategyOptions(ref commo
 	}
 }
 
-func schema_k8sio_api_rbac_v1_AggregationRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_AggregationRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21712,7 +21712,7 @@ func schema_k8sio_api_rbac_v1_AggregationRule(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_rbac_v1_ClusterRole(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_ClusterRole(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21760,7 +21760,7 @@ func schema_k8sio_api_rbac_v1_ClusterRole(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_rbac_v1_ClusterRoleBinding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_ClusterRoleBinding(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21808,7 +21808,7 @@ func schema_k8sio_api_rbac_v1_ClusterRoleBinding(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_k8sio_api_rbac_v1_ClusterRoleBindingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_ClusterRoleBindingList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21851,7 +21851,7 @@ func schema_k8sio_api_rbac_v1_ClusterRoleBindingList(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_api_rbac_v1_ClusterRoleList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_ClusterRoleList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21894,7 +21894,7 @@ func schema_k8sio_api_rbac_v1_ClusterRoleList(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -21972,7 +21972,7 @@ func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_rbac_v1_Role(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_Role(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22015,7 +22015,7 @@ func schema_k8sio_api_rbac_v1_Role(ref common.ReferenceCallback) common.OpenAPID
 	}
 }
 
-func schema_k8sio_api_rbac_v1_RoleBinding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_RoleBinding(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22063,7 +22063,7 @@ func schema_k8sio_api_rbac_v1_RoleBinding(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_k8sio_api_rbac_v1_RoleBindingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_RoleBindingList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22106,7 +22106,7 @@ func schema_k8sio_api_rbac_v1_RoleBindingList(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_rbac_v1_RoleList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_RoleList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22149,7 +22149,7 @@ func schema_k8sio_api_rbac_v1_RoleList(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_k8sio_api_rbac_v1_RoleRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_RoleRef(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22180,7 +22180,7 @@ func schema_k8sio_api_rbac_v1_RoleRef(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_k8sio_api_rbac_v1_Subject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1_Subject(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22217,7 +22217,7 @@ func schema_k8sio_api_rbac_v1_Subject(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_AggregationRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_AggregationRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22242,7 +22242,7 @@ func schema_k8sio_api_rbac_v1alpha1_AggregationRule(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_ClusterRole(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_ClusterRole(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22290,7 +22290,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRole(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBinding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBinding(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22338,7 +22338,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBinding(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBindingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBindingList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22381,7 +22381,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBindingList(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_ClusterRoleList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_ClusterRoleList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22424,7 +22424,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRoleList(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22502,7 +22502,7 @@ func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_Role(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_Role(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22545,7 +22545,7 @@ func schema_k8sio_api_rbac_v1alpha1_Role(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_RoleBinding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_RoleBinding(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22593,7 +22593,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleBinding(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_RoleBindingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_RoleBindingList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22636,7 +22636,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleBindingList(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_RoleList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_RoleList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22679,7 +22679,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleList(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_RoleRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_RoleRef(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22710,7 +22710,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleRef(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_rbac_v1alpha1_Subject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1alpha1_Subject(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22747,7 +22747,7 @@ func schema_k8sio_api_rbac_v1alpha1_Subject(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_AggregationRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_AggregationRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22772,7 +22772,7 @@ func schema_k8sio_api_rbac_v1beta1_AggregationRule(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_ClusterRole(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_ClusterRole(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22820,7 +22820,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRole(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_ClusterRoleBinding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_ClusterRoleBinding(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22868,7 +22868,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRoleBinding(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_ClusterRoleBindingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_ClusterRoleBindingList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22911,7 +22911,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRoleBindingList(ref common.ReferenceCa
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_ClusterRoleList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_ClusterRoleList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -22954,7 +22954,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRoleList(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23032,7 +23032,7 @@ func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_Role(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_Role(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23075,7 +23075,7 @@ func schema_k8sio_api_rbac_v1beta1_Role(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_RoleBinding(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_RoleBinding(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23123,7 +23123,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleBinding(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_RoleBindingList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_RoleBindingList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23166,7 +23166,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleBindingList(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_RoleList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_RoleList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23209,7 +23209,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleList(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_RoleRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_RoleRef(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23240,7 +23240,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleRef(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_rbac_v1beta1_Subject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_rbac_v1beta1_Subject(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23277,7 +23277,7 @@ func schema_k8sio_api_rbac_v1beta1_Subject(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23326,7 +23326,7 @@ func schema_k8sio_api_scheduling_v1alpha1_PriorityClass(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_scheduling_v1alpha1_PriorityClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_scheduling_v1alpha1_PriorityClassList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23369,7 +23369,7 @@ func schema_k8sio_api_scheduling_v1alpha1_PriorityClassList(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23418,7 +23418,7 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23461,7 +23461,7 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_settings_v1alpha1_PodPreset(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_settings_v1alpha1_PodPreset(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23494,7 +23494,7 @@ func schema_k8sio_api_settings_v1alpha1_PodPreset(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_settings_v1alpha1_PodPresetList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_settings_v1alpha1_PodPresetList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23537,7 +23537,7 @@ func schema_k8sio_api_settings_v1alpha1_PodPresetList(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_settings_v1alpha1_PodPresetSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_settings_v1alpha1_PodPresetSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23603,7 +23603,7 @@ func schema_k8sio_api_settings_v1alpha1_PodPresetSpec(ref common.ReferenceCallba
 	}
 }
 
-func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23696,7 +23696,7 @@ func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_k8sio_api_storage_v1_StorageClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1_StorageClassList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23739,7 +23739,7 @@ func schema_k8sio_api_storage_v1_StorageClassList(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_k8sio_api_storage_v1alpha1_VolumeAttachment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1alpha1_VolumeAttachment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23780,7 +23780,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachment(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23823,7 +23823,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentList(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23841,7 +23841,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSource(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23872,7 +23872,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentSpec(ref common.Reference
 	}
 }
 
-func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23915,7 +23915,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref common.Referen
 	}
 }
 
-func schema_k8sio_api_storage_v1alpha1_VolumeError(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1alpha1_VolumeError(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -23939,7 +23939,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeError(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_StorageClass(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_StorageClass(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24032,7 +24032,7 @@ func schema_k8sio_api_storage_v1beta1_StorageClass(ref common.ReferenceCallback)
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_StorageClassList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_StorageClassList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24075,7 +24075,7 @@ func schema_k8sio_api_storage_v1beta1_StorageClassList(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24116,7 +24116,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref common.ReferenceCallb
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_VolumeAttachmentList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_VolumeAttachmentList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24159,7 +24159,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentList(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_VolumeAttachmentSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_VolumeAttachmentSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24177,7 +24177,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentSource(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_VolumeAttachmentSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_VolumeAttachmentSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24208,7 +24208,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentSpec(ref common.ReferenceC
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24251,7 +24251,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref common.Referenc
 	}
 }
 
-func schema_k8sio_api_storage_v1beta1_VolumeError(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_api_storage_v1beta1_VolumeError(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24275,7 +24275,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeError(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceColumnDefinition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceColumnDefinition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24324,7 +24324,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceColumnDefinition(ref co
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24364,7 +24364,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref common.R
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24407,7 +24407,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionCondition(ref
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24449,7 +24449,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref comm
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24512,7 +24512,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref com
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24583,7 +24583,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24627,7 +24627,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24657,7 +24657,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceScale(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceScale(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24688,7 +24688,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceScale(ref co
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24700,7 +24700,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresourceStatus(ref c
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24723,7 +24723,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceSubresources(ref common
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24741,7 +24741,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceValidation(ref common.R
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24763,7 +24763,7 @@ func schema_pkg_apis_apiextensions_v1beta1_ExternalDocumentation(ref common.Refe
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_JSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_JSON(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -24775,7 +24775,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSON(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25016,7 +25016,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25028,7 +25028,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrArray(ref common.Ref
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25040,7 +25040,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrBool(ref common.Refe
 	}
 }
 
-func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25052,7 +25052,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaPropsOrStringArray(ref comm
 	}
 }
 
-func schema_apimachinery_pkg_api_resource_Quantity(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_apimachinery_pkg_api_resource_Quantity(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25064,7 +25064,7 @@ func schema_apimachinery_pkg_api_resource_Quantity(ref common.ReferenceCallback)
 	}
 }
 
-func schema_apimachinery_pkg_api_resource_int64Amount(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_apimachinery_pkg_api_resource_int64Amount(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25087,7 +25087,7 @@ func schema_apimachinery_pkg_api_resource_int64Amount(ref common.ReferenceCallba
 	}
 }
 
-func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25148,7 +25148,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25186,7 +25186,7 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25274,7 +25274,7 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25318,7 +25318,7 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25369,7 +25369,7 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25412,7 +25412,7 @@ func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25473,7 +25473,7 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_Duration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Duration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25491,7 +25491,7 @@ func schema_pkg_apis_meta_v1_Duration(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_pkg_apis_meta_v1_ExportOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_ExportOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25528,7 +25528,7 @@ func schema_pkg_apis_meta_v1_ExportOptions(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_GetOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_GetOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25564,7 +25564,7 @@ func schema_pkg_apis_meta_v1_GetOptions(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_pkg_apis_meta_v1_GroupKind(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_GroupKind(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25587,7 +25587,7 @@ func schema_pkg_apis_meta_v1_GroupKind(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_pkg_apis_meta_v1_GroupResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_GroupResource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25610,7 +25610,7 @@ func schema_pkg_apis_meta_v1_GroupResource(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_GroupVersion(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_GroupVersion(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25633,7 +25633,7 @@ func schema_pkg_apis_meta_v1_GroupVersion(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25658,7 +25658,7 @@ func schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref common.ReferenceCallba
 	}
 }
 
-func schema_pkg_apis_meta_v1_GroupVersionKind(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_GroupVersionKind(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25686,7 +25686,7 @@ func schema_pkg_apis_meta_v1_GroupVersionKind(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_pkg_apis_meta_v1_GroupVersionResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_GroupVersionResource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25714,7 +25714,7 @@ func schema_pkg_apis_meta_v1_GroupVersionResource(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_pkg_apis_meta_v1_Initializer(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Initializer(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25733,7 +25733,7 @@ func schema_pkg_apis_meta_v1_Initializer(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_meta_v1_Initializers(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Initializers(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25770,7 +25770,7 @@ func schema_pkg_apis_meta_v1_Initializers(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_pkg_apis_meta_v1_InternalEvent(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_InternalEvent(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25794,7 +25794,7 @@ func schema_pkg_apis_meta_v1_InternalEvent(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25832,7 +25832,7 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25876,7 +25876,7 @@ func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallba
 	}
 }
 
-func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25919,7 +25919,7 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 	}
 }
 
-func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -25949,7 +25949,7 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26021,7 +26021,7 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_meta_v1_MicroTime(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_MicroTime(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26033,7 +26033,7 @@ func schema_pkg_apis_meta_v1_MicroTime(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26177,7 +26177,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_pkg_apis_meta_v1_OwnerReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_OwnerReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26226,7 +26226,7 @@ func schema_pkg_apis_meta_v1_OwnerReference(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_pkg_apis_meta_v1_Patch(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Patch(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26238,7 +26238,7 @@ func schema_pkg_apis_meta_v1_Patch(ref common.ReferenceCallback) common.OpenAPID
 	}
 }
 
-func schema_pkg_apis_meta_v1_Preconditions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Preconditions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26256,7 +26256,7 @@ func schema_pkg_apis_meta_v1_Preconditions(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_RootPaths(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_RootPaths(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26282,7 +26282,7 @@ func schema_pkg_apis_meta_v1_RootPaths(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26307,7 +26307,7 @@ func schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref common.ReferenceCallb
 	}
 }
 
-func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26366,7 +26366,7 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 	}
 }
 
-func schema_pkg_apis_meta_v1_StatusCause(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_StatusCause(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26396,7 +26396,7 @@ func schema_pkg_apis_meta_v1_StatusCause(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26451,7 +26451,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_Time(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Time(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26463,7 +26463,7 @@ func schema_pkg_apis_meta_v1_Time(ref common.ReferenceCallback) common.OpenAPIDe
 	}
 }
 
-func schema_pkg_apis_meta_v1_Timestamp(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_Timestamp(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26488,7 +26488,7 @@ func schema_pkg_apis_meta_v1_Timestamp(ref common.ReferenceCallback) common.Open
 	}
 }
 
-func schema_pkg_apis_meta_v1_TypeMeta(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_TypeMeta(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26512,7 +26512,7 @@ func schema_pkg_apis_meta_v1_TypeMeta(ref common.ReferenceCallback) common.OpenA
 	}
 }
 
-func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26549,7 +26549,7 @@ func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26573,7 +26573,7 @@ func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_pkg_apis_meta_v1beta1_PartialObjectMetadata(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1beta1_PartialObjectMetadata(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26603,7 +26603,7 @@ func schema_pkg_apis_meta_v1beta1_PartialObjectMetadata(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26641,7 +26641,7 @@ func schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref common.Reference
 	}
 }
 
-func schema_pkg_apis_meta_v1beta1_Table(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1beta1_Table(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26696,7 +26696,7 @@ func schema_pkg_apis_meta_v1beta1_Table(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_pkg_apis_meta_v1beta1_TableColumnDefinition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1beta1_TableColumnDefinition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26739,7 +26739,7 @@ func schema_pkg_apis_meta_v1beta1_TableColumnDefinition(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_meta_v1beta1_TableOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1beta1_TableOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26769,7 +26769,7 @@ func schema_pkg_apis_meta_v1beta1_TableOptions(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_pkg_apis_meta_v1beta1_TableRow(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1beta1_TableRow(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26813,7 +26813,7 @@ func schema_pkg_apis_meta_v1beta1_TableRow(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_meta_v1beta1_TableRowCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_meta_v1beta1_TableRowCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26850,7 +26850,7 @@ func schema_pkg_apis_meta_v1beta1_TableRowCondition(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26869,7 +26869,7 @@ func schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref common.ReferenceCall
 	}
 }
 
-func schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26891,7 +26891,7 @@ func schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref common.ReferenceCallback
 	}
 }
 
-func schema_k8sio_apimachinery_pkg_runtime_Unknown(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_apimachinery_pkg_runtime_Unknown(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26932,7 +26932,7 @@ func schema_k8sio_apimachinery_pkg_runtime_Unknown(ref common.ReferenceCallback)
 	}
 }
 
-func schema_apimachinery_pkg_util_intstr_IntOrString(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_apimachinery_pkg_util_intstr_IntOrString(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -26944,7 +26944,7 @@ func schema_apimachinery_pkg_util_intstr_IntOrString(ref common.ReferenceCallbac
 	}
 }
 
-func schema_k8sio_apimachinery_pkg_version_Info(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_apimachinery_pkg_version_Info(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27002,7 +27002,7 @@ func schema_k8sio_apimachinery_pkg_version_Info(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27130,7 +27130,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 	}
 }
 
-func schema_pkg_apis_audit_v1_EventList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1_EventList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27171,7 +27171,7 @@ func schema_pkg_apis_audit_v1_EventList(ref common.ReferenceCallback) common.Ope
 	}
 }
 
-func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27215,7 +27215,7 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_pkg_apis_audit_v1_ObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1_ObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27269,7 +27269,7 @@ func schema_pkg_apis_audit_v1_ObjectReference(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27325,7 +27325,7 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 	}
 }
 
-func schema_pkg_apis_audit_v1_PolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1_PolicyList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27366,7 +27366,7 @@ func schema_pkg_apis_audit_v1_PolicyList(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27476,7 +27476,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_audit_v1alpha1_Event(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1alpha1_Event(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27614,7 +27614,7 @@ func schema_pkg_apis_audit_v1alpha1_Event(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_pkg_apis_audit_v1alpha1_EventList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1alpha1_EventList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27655,7 +27655,7 @@ func schema_pkg_apis_audit_v1alpha1_EventList(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_pkg_apis_audit_v1alpha1_GroupResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1alpha1_GroupResources(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27699,7 +27699,7 @@ func schema_pkg_apis_audit_v1alpha1_GroupResources(ref common.ReferenceCallback)
 	}
 }
 
-func schema_pkg_apis_audit_v1alpha1_ObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1alpha1_ObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27746,7 +27746,7 @@ func schema_pkg_apis_audit_v1alpha1_ObjectReference(ref common.ReferenceCallback
 	}
 }
 
-func schema_pkg_apis_audit_v1alpha1_Policy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1alpha1_Policy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27802,7 +27802,7 @@ func schema_pkg_apis_audit_v1alpha1_Policy(ref common.ReferenceCallback) common.
 	}
 }
 
-func schema_pkg_apis_audit_v1alpha1_PolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1alpha1_PolicyList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27843,7 +27843,7 @@ func schema_pkg_apis_audit_v1alpha1_PolicyList(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_pkg_apis_audit_v1alpha1_PolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1alpha1_PolicyRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -27953,7 +27953,7 @@ func schema_pkg_apis_audit_v1alpha1_PolicyRule(ref common.ReferenceCallback) com
 	}
 }
 
-func schema_pkg_apis_audit_v1beta1_Event(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1beta1_Event(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28091,7 +28091,7 @@ func schema_pkg_apis_audit_v1beta1_Event(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_audit_v1beta1_EventList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1beta1_EventList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28132,7 +28132,7 @@ func schema_pkg_apis_audit_v1beta1_EventList(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_pkg_apis_audit_v1beta1_GroupResources(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1beta1_GroupResources(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28176,7 +28176,7 @@ func schema_pkg_apis_audit_v1beta1_GroupResources(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_pkg_apis_audit_v1beta1_ObjectReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1beta1_ObjectReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28230,7 +28230,7 @@ func schema_pkg_apis_audit_v1beta1_ObjectReference(ref common.ReferenceCallback)
 	}
 }
 
-func schema_pkg_apis_audit_v1beta1_Policy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1beta1_Policy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28286,7 +28286,7 @@ func schema_pkg_apis_audit_v1beta1_Policy(ref common.ReferenceCallback) common.O
 	}
 }
 
-func schema_pkg_apis_audit_v1beta1_PolicyList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1beta1_PolicyList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28327,7 +28327,7 @@ func schema_pkg_apis_audit_v1beta1_PolicyList(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_pkg_apis_audit_v1beta1_PolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_audit_v1beta1_PolicyRule(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28437,7 +28437,7 @@ func schema_pkg_apis_audit_v1beta1_PolicyRule(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredential(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredential(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28472,7 +28472,7 @@ func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredential(ref common.Ref
 	}
 }
 
-func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28496,7 +28496,7 @@ func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialSpec(ref common
 	}
 }
 
-func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28532,7 +28532,7 @@ func schema_pkg_apis_clientauthentication_v1alpha1_ExecCredentialStatus(ref comm
 	}
 }
 
-func schema_pkg_apis_clientauthentication_v1alpha1_Response(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_clientauthentication_v1alpha1_Response(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28570,7 +28570,7 @@ func schema_pkg_apis_clientauthentication_v1alpha1_Response(ref common.Reference
 	}
 }
 
-func schema_pkg_apis_clientauthentication_v1beta1_ExecCredential(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_clientauthentication_v1beta1_ExecCredential(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28605,7 +28605,7 @@ func schema_pkg_apis_clientauthentication_v1beta1_ExecCredential(ref common.Refe
 	}
 }
 
-func schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28617,7 +28617,7 @@ func schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialSpec(ref common.
 	}
 }
 
-func schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28653,7 +28653,7 @@ func schema_pkg_apis_clientauthentication_v1beta1_ExecCredentialStatus(ref commo
 	}
 }
 
-func schema_pkg_apis_csi_v1alpha1_CSIDriver(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_csi_v1alpha1_CSIDriver(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28689,7 +28689,7 @@ func schema_pkg_apis_csi_v1alpha1_CSIDriver(ref common.ReferenceCallback) common
 	}
 }
 
-func schema_pkg_apis_csi_v1alpha1_CSIDriverInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_csi_v1alpha1_CSIDriverInfo(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28727,7 +28727,7 @@ func schema_pkg_apis_csi_v1alpha1_CSIDriverInfo(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_pkg_apis_csi_v1alpha1_CSIDriverList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_csi_v1alpha1_CSIDriverList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28770,7 +28770,7 @@ func schema_pkg_apis_csi_v1alpha1_CSIDriverList(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_pkg_apis_csi_v1alpha1_CSIDriverSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_csi_v1alpha1_CSIDriverSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28794,7 +28794,7 @@ func schema_pkg_apis_csi_v1alpha1_CSIDriverSpec(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_pkg_apis_csi_v1alpha1_CSINodeInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_csi_v1alpha1_CSINodeInfo(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28843,7 +28843,7 @@ func schema_pkg_apis_csi_v1alpha1_CSINodeInfo(ref common.ReferenceCallback) comm
 	}
 }
 
-func schema_pkg_apis_csi_v1alpha1_CSINodeInfoList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_csi_v1alpha1_CSINodeInfoList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28886,7 +28886,7 @@ func schema_pkg_apis_csi_v1alpha1_CSINodeInfoList(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1_APIService(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1_APIService(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28925,7 +28925,7 @@ func schema_pkg_apis_apiregistration_v1_APIService(ref common.ReferenceCallback)
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1_APIServiceCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1_APIServiceCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -28967,7 +28967,7 @@ func schema_pkg_apis_apiregistration_v1_APIServiceCondition(ref common.Reference
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1_APIServiceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1_APIServiceList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29008,7 +29008,7 @@ func schema_pkg_apis_apiregistration_v1_APIServiceList(ref common.ReferenceCallb
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29063,7 +29063,7 @@ func schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref common.ReferenceCallb
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29094,7 +29094,7 @@ func schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref common.ReferenceCal
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1_ServiceReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1_ServiceReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29118,7 +29118,7 @@ func schema_pkg_apis_apiregistration_v1_ServiceReference(ref common.ReferenceCal
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1beta1_APIService(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1beta1_APIService(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29157,7 +29157,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIService(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1beta1_APIServiceCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1beta1_APIServiceCondition(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29199,7 +29199,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceCondition(ref common.Refe
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1beta1_APIServiceList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1beta1_APIServiceList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29240,7 +29240,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceList(ref common.Reference
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1beta1_APIServiceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1beta1_APIServiceSpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29295,7 +29295,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceSpec(ref common.Reference
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1beta1_APIServiceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1beta1_APIServiceStatus(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29326,7 +29326,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceStatus(ref common.Referen
 	}
 }
 
-func schema_pkg_apis_apiregistration_v1beta1_ServiceReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_apiregistration_v1beta1_ServiceReference(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29350,7 +29350,7 @@ func schema_pkg_apis_apiregistration_v1beta1_ServiceReference(ref common.Referen
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29375,7 +29375,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_AttachDetachController
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_CSRSigningControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_CSRSigningControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29406,7 +29406,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_CSRSigningControllerCo
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_CloudProviderConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_CloudProviderConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29431,7 +29431,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_CloudProviderConfigura
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_DaemonSetControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_DaemonSetControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29450,7 +29450,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_DaemonSetControllerCon
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_DeploymentControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_DeploymentControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29475,7 +29475,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_DeploymentControllerCo
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_DeprecatedControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_DeprecatedControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29506,7 +29506,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_DeprecatedControllerCo
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29525,7 +29525,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_EndpointControllerConf
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_GarbageCollectorControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_GarbageCollectorControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29563,7 +29563,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_GarbageCollectorContro
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_GenericControllerManagerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_GenericControllerManagerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29627,7 +29627,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_GenericControllerManag
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_GroupResource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_GroupResource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29652,7 +29652,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_GroupResource(ref comm
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29708,7 +29708,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_HPAControllerConfigura
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_JobControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_JobControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29727,7 +29727,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_JobControllerConfigura
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeCloudSharedConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeCloudSharedConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29809,7 +29809,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeCloudSharedConfigu
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29945,7 +29945,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_NamespaceControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_NamespaceControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29970,7 +29970,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NamespaceControllerCon
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeIPAMControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeIPAMControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -29995,7 +29995,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeIPAMControllerConf
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30054,7 +30054,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinderControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinderControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30078,7 +30078,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinder
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeRecyclerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeRecyclerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30133,7 +30133,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeRecycl
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_PodGCControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_PodGCControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30152,7 +30152,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_PodGCControllerConfigu
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicaSetControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicaSetControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30171,7 +30171,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicaSetControllerCo
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicationControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicationControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30190,7 +30190,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_ReplicationControllerC
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceQuotaControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceQuotaControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30215,7 +30215,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_ResourceQuotaControlle
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_SAControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_SAControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30246,7 +30246,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_SAControllerConfigurat
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_ServiceControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_ServiceControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30265,7 +30265,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_ServiceControllerConfi
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_TTLAfterFinishedControllerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_TTLAfterFinishedControllerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30284,7 +30284,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_TTLAfterFinishedContro
 	}
 }
 
-func schema_k8sio_kube_controller_manager_config_v1alpha1_VolumeConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_controller_manager_config_v1alpha1_VolumeConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30321,7 +30321,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_VolumeConfiguration(re
 	}
 }
 
-func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30463,7 +30463,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 	}
 }
 
-func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConntrackConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConntrackConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30505,7 +30505,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConntrackConfiguration(ref
 	}
 }
 
-func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30541,7 +30541,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPTablesConfiguration(ref 
 	}
 }
 
-func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30584,7 +30584,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref comm
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30685,7 +30685,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerConfiguration(ref 
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerLeaderElectionConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerLeaderElectionConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30738,7 +30738,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha1_KubeSchedulerLeaderElectionConf
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerAlgorithmSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerAlgorithmSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30762,7 +30762,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerAlgorithmSource(ref co
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyConfigMapSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyConfigMapSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30787,7 +30787,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyConfigMapSource(
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyFileSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyFileSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30806,7 +30806,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicyFileSource(ref c
 	}
 }
 
-func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicySource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicySource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30829,7 +30829,7 @@ func schema_k8sio_kube_scheduler_config_v1alpha1_SchedulerPolicySource(ref commo
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30846,7 +30846,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletAnonymousAuthentication(ref comm
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30873,7 +30873,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletAuthentication(ref common.Refere
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -30896,7 +30896,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletAuthorization(ref common.Referen
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31467,7 +31467,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthentication(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthentication(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31490,7 +31490,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthentication(ref common
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthorization(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthorization(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31512,7 +31512,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletWebhookAuthorization(ref common.
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_KubeletX509Authentication(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_KubeletX509Authentication(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31529,7 +31529,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletX509Authentication(ref common.Re
 	}
 }
 
-func schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31559,7 +31559,7 @@ func schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref common.R
 	}
 }
 
-func schema_app_apis_config_v1alpha1_CloudControllerManagerConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_app_apis_config_v1alpha1_CloudControllerManagerConfiguration(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31604,7 +31604,7 @@ func schema_app_apis_config_v1alpha1_CloudControllerManagerConfiguration(ref com
 	}
 }
 
-func schema_pkg_apis_abac_v1beta1_Policy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_abac_v1beta1_Policy(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31635,7 +31635,7 @@ func schema_pkg_apis_abac_v1beta1_Policy(ref common.ReferenceCallback) common.Op
 	}
 }
 
-func schema_pkg_apis_abac_v1beta1_PolicySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_abac_v1beta1_PolicySpec(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31689,7 +31689,7 @@ func schema_pkg_apis_abac_v1beta1_PolicySpec(ref common.ReferenceCallback) commo
 	}
 }
 
-func schema_pkg_apis_custom_metrics_v1beta1_MetricListOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_custom_metrics_v1beta1_MetricListOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31725,7 +31725,7 @@ func schema_pkg_apis_custom_metrics_v1beta1_MetricListOptions(ref common.Referen
 	}
 }
 
-func schema_pkg_apis_custom_metrics_v1beta1_MetricValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_custom_metrics_v1beta1_MetricValue(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31783,7 +31783,7 @@ func schema_pkg_apis_custom_metrics_v1beta1_MetricValue(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_custom_metrics_v1beta1_MetricValueList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_custom_metrics_v1beta1_MetricValueList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31825,7 +31825,7 @@ func schema_pkg_apis_custom_metrics_v1beta1_MetricValueList(ref common.Reference
 	}
 }
 
-func schema_pkg_apis_custom_metrics_v1beta2_MetricIdentifier(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_custom_metrics_v1beta2_MetricIdentifier(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31850,7 +31850,7 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricIdentifier(ref common.Referenc
 	}
 }
 
-func schema_pkg_apis_custom_metrics_v1beta2_MetricListOptions(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_custom_metrics_v1beta2_MetricListOptions(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31886,7 +31886,7 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricListOptions(ref common.Referen
 	}
 }
 
-func schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31937,7 +31937,7 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_custom_metrics_v1beta2_MetricValueList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_custom_metrics_v1beta2_MetricValueList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -31979,7 +31979,7 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricValueList(ref common.Reference
 	}
 }
 
-func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValue(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValue(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32040,7 +32040,7 @@ func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValue(ref common.Ref
 	}
 }
 
-func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32082,7 +32082,7 @@ func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref common
 	}
 }
 
-func schema_pkg_apis_metrics_v1alpha1_ContainerMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1alpha1_ContainerMetrics(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32114,7 +32114,7 @@ func schema_pkg_apis_metrics_v1alpha1_ContainerMetrics(ref common.ReferenceCallb
 	}
 }
 
-func schema_pkg_apis_metrics_v1alpha1_NodeMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1alpha1_NodeMetrics(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32165,7 +32165,7 @@ func schema_pkg_apis_metrics_v1alpha1_NodeMetrics(ref common.ReferenceCallback) 
 	}
 }
 
-func schema_pkg_apis_metrics_v1alpha1_NodeMetricsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1alpha1_NodeMetricsList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32208,7 +32208,7 @@ func schema_pkg_apis_metrics_v1alpha1_NodeMetricsList(ref common.ReferenceCallba
 	}
 }
 
-func schema_pkg_apis_metrics_v1alpha1_PodMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1alpha1_PodMetrics(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32259,7 +32259,7 @@ func schema_pkg_apis_metrics_v1alpha1_PodMetrics(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_pkg_apis_metrics_v1alpha1_PodMetricsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1alpha1_PodMetricsList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32302,7 +32302,7 @@ func schema_pkg_apis_metrics_v1alpha1_PodMetricsList(ref common.ReferenceCallbac
 	}
 }
 
-func schema_pkg_apis_metrics_v1beta1_ContainerMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1beta1_ContainerMetrics(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32334,7 +32334,7 @@ func schema_pkg_apis_metrics_v1beta1_ContainerMetrics(ref common.ReferenceCallba
 	}
 }
 
-func schema_pkg_apis_metrics_v1beta1_NodeMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1beta1_NodeMetrics(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32385,7 +32385,7 @@ func schema_pkg_apis_metrics_v1beta1_NodeMetrics(ref common.ReferenceCallback) c
 	}
 }
 
-func schema_pkg_apis_metrics_v1beta1_NodeMetricsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1beta1_NodeMetricsList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32428,7 +32428,7 @@ func schema_pkg_apis_metrics_v1beta1_NodeMetricsList(ref common.ReferenceCallbac
 	}
 }
 
-func schema_pkg_apis_metrics_v1beta1_PodMetrics(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1beta1_PodMetrics(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -32479,7 +32479,7 @@ func schema_pkg_apis_metrics_v1beta1_PodMetrics(ref common.ReferenceCallback) co
 	}
 }
 
-func schema_pkg_apis_metrics_v1beta1_PodMetricsList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_metrics_v1beta1_PodMetricsList(ref common.ReferenceCallback, featureIsEnabled common.FeatureGate) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
