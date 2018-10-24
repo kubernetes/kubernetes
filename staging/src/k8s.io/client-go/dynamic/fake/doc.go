@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package fake implements a fake of the dynamic client.
+// Package fake implements a mock dynamic client which can be used for testing.
 package fake // import "k8s.io/client-go/dynamic/fake"

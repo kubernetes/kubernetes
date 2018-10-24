@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package fake implements a fake of the discovery client.
+// Package fake implements a mock discovery client which can be used for
+// testing.
 package fake // import "k8s.io/client-go/discovery/fake"
