@@ -185,19 +185,6 @@ func testProvisioning(input *provisioningTestInput) {
 		TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
 	})
 
-	It("should provision storage with non-default reclaim policy Retain", func() {
-		retain := v1.PersistentVolumeReclaimRetain
-		input.sc.ReclaimPolicy = &retain
-		pv := TestDynamicProvisioning(input.testCase, input.cs, input.pvc, input.sc)
-
-		By(fmt.Sprintf("waiting for the provisioned PV %q to enter phase %s", pv.Name, v1.VolumeReleased))
-		framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeReleased, input.cs, pv.Name, 1*time.Second, 30*time.Second))
-
-		By(fmt.Sprintf("deleting the PV %q", pv.Name))
-		framework.ExpectNoError(framework.DeletePersistentVolume(input.cs, pv.Name), "Failed to delete PV ", pv.Name)
-		framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(input.cs, pv.Name, 1*time.Second, 30*time.Second))
-	})
-
 	It("should create and delete block persistent volumes [Feature:BlockVolume]", func() {
 		if !input.dInfo.IsBlockSupported {
 			framework.Skipf("Driver %q does not support BlockVolume - skipping", input.dInfo.Name)
