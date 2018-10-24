@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
@@ -555,6 +556,8 @@ func (g openAPITypeWriter) generateDescription(CommentLines []string) {
 	}
 }
 
+var allowedPrereleaseNames = sets.NewString("alpha", "beta", "stable")
+
 func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type) error {
 	name := getReferableName(m)
 	if name == "" {
@@ -563,9 +566,45 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	if err := g.validatePatchTags(m, parent); err != nil {
 		return err
 	}
+
+	prereleases := map[string]map[string]string{}
+	for _, prerelease := range types.ExtractCommentTags("+", m.CommentLines)["k8s:openapi-gen:prerelease"] {
+		itemMap := map[string]string{}
+		itemValues := strings.Split(prerelease, ",")
+		prereleaseName := strings.TrimSpace(itemValues[0])
+		if !allowedPrereleaseNames.Has(prereleaseName) {
+			return fmt.Errorf("unrecognized prerelease %q in %s. supported names are %q", prereleaseName, name, allowedPrereleaseNames.List())
+		}
+		for _, itemValue := range itemValues[1:] {
+			itemValueParts := strings.Split(itemValue, "=")
+			if len(itemValueParts) == 2 {
+				itemMap[strings.TrimSpace(itemValueParts[0])] = strings.TrimSpace(itemValueParts[1])
+			} else {
+				return fmt.Errorf("unrecognized prerelease item in %s: %v", name, itemValue)
+			}
+		}
+		if itemMap["version"] == "" {
+			return fmt.Errorf("prerelease item %s in %s is missing version info", prereleaseName, name)
+		}
+		if itemMap["feature"] == "" {
+			return fmt.Errorf("prerelease item %s in %s is missing feature info", prereleaseName, name)
+		}
+		prereleases[prereleaseName] = itemMap
+	}
+
+	_, isAlpha := prereleases["alpha"]
+	_, isBeta := prereleases["beta"]
+	_, isStable := prereleases["stable"]
+
 	args := argsFromType(nil)
 	args["name"] = name
-	g.Do(".Add(\"$.name$\", $.SpecSchemaType|raw${\n", args)
+	if isAlpha && !isBeta && !isStable {
+		// alpha fields should only be included in the schema if their feature is enabled
+		args["feature"] = prereleases["alpha"]["feature"]
+		g.Do(".AddIf(\"$.name$\", func() bool { return featureIsEnabled(\"$.feature$\") }, $.SpecSchemaType|raw${\n", args)
+	} else {
+		g.Do(".Add(\"$.name$\", $.SpecSchemaType|raw${\n", args)
+	}
 	if err := g.generateMemberExtensions(m, parent); err != nil {
 		return err
 	}
