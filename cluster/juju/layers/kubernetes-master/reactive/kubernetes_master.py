@@ -144,12 +144,13 @@ def check_for_upgrade_needed():
         # minor change, just for consistency
         remove_state('kubernetes-master.cloud-request-sent')
         set_state('kubernetes-master.cloud.request-sent')
-    if is_state('ceph-storage.configured'):
-        # this is a local kubernetes-master flag, but named in a
-        # way that it seems like an interface flag. Further, it could
-        # easily interfere with an interface flag.
-        remove_state('ceph-storage.configured')
-        set_state('kubernetes-master.ceph.configured')
+
+    # ceph-storage.configured flag no longer exists
+    remove_state('ceph-storage.configured')
+
+    # reconfigure ceph. we need this in case we're reverting from ceph-csi back
+    # to old ceph on Kubernetes 1.10 or 1.11
+    remove_state('kubernetes-master.ceph.configured')
 
     migrate_from_pre_snaps()
     maybe_install_kube_proxy()
@@ -809,7 +810,7 @@ def configure_cdk_addons():
     default_storage = ''
     ceph = {}
     if (is_state('kubernetes-master.ceph.configured') and
-            get_version('kube-apiserver') >= (1, 10)):
+            get_version('kube-apiserver') >= (1, 12)):
         cephEnabled = "true"
         ceph_ep = endpoint_from_flag('ceph-storage.available')
         b64_ceph_key = base64.b64encode(ceph_ep.key().encode('utf-8'))
@@ -934,10 +935,10 @@ def ceph_storage():
 
     ceph_admin = endpoint_from_flag('ceph-storage.available')
 
-    # deprecated in 1.10 in favor of using CSI instead of dumping the config
+    # deprecated in 1.12 in favor of using CSI instead of dumping the config
     # to ceph. Also be sure to note that we don't set kubernetes-master.ceph.configured
     # until ceph is up and has provided us a key.
-    if get_version('kube-apiserver') >= (1, 10):
+    if get_version('kube-apiserver') >= (1, 12):
         # this is actually false, but by setting this flag we won't keep
         # running this function for no reason. Also note that we watch this
         # flag to run cdk-addons.apply.
