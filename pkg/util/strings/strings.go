@@ -22,7 +22,7 @@ import (
 	"unicode"
 )
 
-// SplitQualifiedName Splits a fully qualified name and returns its namespace and name.
+// SplitQualifiedName splits a fully qualified name and returns its namespace and name.
 // Assumes that the input 'str' has been validated.
 func SplitQualifiedName(str string) (string, string) {
 	parts := strings.Split(str, "/")

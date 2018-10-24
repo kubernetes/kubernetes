@@ -375,7 +375,6 @@ pkg/ssh
 pkg/util/bandwidth
 pkg/util/config
 pkg/util/configz
-pkg/util/dbus
 pkg/util/ebtables
 pkg/util/env
 pkg/util/file
@@ -387,7 +386,6 @@ pkg/util/iptables/testing
 pkg/util/labels
 pkg/util/mount
 pkg/util/netsh/testing
-pkg/util/node
 pkg/util/normalizer
 pkg/util/oom
 pkg/util/parsers
@@ -401,7 +399,6 @@ pkg/util/sysctl/testing
 pkg/util/system
 pkg/util/taints
 pkg/util/tolerations
-pkg/util/workqueue/prometheus
 pkg/version/verflag
 pkg/volume
 pkg/volume/azure_dd
