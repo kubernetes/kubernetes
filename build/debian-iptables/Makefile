@@ -55,6 +55,6 @@ all-push: all-push-images push-manifest
 push-manifest:
 	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(IMAGE)\-&:$(TAG)~g")
 	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}-$${arch}:${TAG}; done
-	docker manifest push ${IMAGE}:${TAG}
+	docker manifest push --purge ${IMAGE}:${TAG}
 
 all: all-push
