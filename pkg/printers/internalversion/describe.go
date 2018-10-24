@@ -774,6 +774,8 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 			printFlexVolumeSource(volume.VolumeSource.FlexVolume, w)
 		case volume.VolumeSource.Flocker != nil:
 			printFlockerVolumeSource(volume.VolumeSource.Flocker, w)
+		case volume.VolumeSource.Projected != nil:
+			printProjectedVolumeSource(volume.VolumeSource.Projected, w)
 		default:
 			w.Write(LEVEL_1, "<unknown>\n")
 		}
@@ -835,6 +837,26 @@ func printConfigMapVolumeSource(configMap *api.ConfigMapVolumeSource, w PrefixWr
 		"    Name:\t%v\n"+
 		"    Optional:\t%v\n",
 		configMap.Name, optional)
+}
+
+func printProjectedVolumeSource(projected *api.ProjectedVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tProjected (a volume that contains injected data from multiple sources)\n")
+	for _, source := range projected.Sources {
+		if source.Secret != nil {
+			w.Write(LEVEL_2, "SecretName:\t%v\n"+
+				"    SecretOptionalName:\t%v\n",
+				source.Secret.Name, source.Secret.Optional)
+		} else if source.DownwardAPI != nil {
+			w.Write(LEVEL_2, "DownwardAPI:\ttrue\n")
+		} else if source.ConfigMap != nil {
+			w.Write(LEVEL_2, "ConfigMapName:\t%v\n"+
+				"    ConfigMapOptional:\t%v\n",
+				source.ConfigMap.Name, source.ConfigMap.Optional)
+		} else if source.ServiceAccountToken != nil {
+			w.Write(LEVEL_2, "TokenExpirationSeconds:\t%v\n",
+				source.ServiceAccountToken.ExpirationSeconds)
+		}
+	}
 }
 
 func printNFSVolumeSource(nfs *api.NFSVolumeSource, w PrefixWriter) {
