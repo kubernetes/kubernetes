@@ -524,7 +524,7 @@ func buildGenericConfig(
 	}
 	serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 
-	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, sharedInformers)
+	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, versionedInformers)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authentication config: %v", err)
 		return
@@ -625,13 +625,13 @@ func BuildAdmissionPluginInitializers(
 }
 
 // BuildAuthenticator constructs the authenticator
-func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, sharedInformers informers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
+func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) (authenticator.Request, *spec.SecurityDefinitions, error) {
 	authenticatorConfig := s.Authentication.ToAuthenticationConfig()
 	if s.Authentication.ServiceAccounts.Lookup {
 		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(extclient)
 	}
 	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
-		sharedInformers.Core().InternalVersion().Secrets().Lister().Secrets(v1.NamespaceSystem),
+		versionedInformer.Core().V1().Secrets().Lister().Secrets(v1.NamespaceSystem),
 	)
 
 	return authenticatorConfig.New()
