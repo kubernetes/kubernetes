@@ -228,6 +228,7 @@ func (g *openAPIGen) Imports(c *generator.Context) []string {
 func argsFromType(t *types.Type) generator.Args {
 	return generator.Args{
 		"type":              t,
+		"FeatureGate":       types.Ref(openAPICommonPackagePath, "FeatureGate"),
 		"NewProperties":     types.Ref(openAPICommonPackagePath, "NewProperties"),
 		"ReferenceCallback": types.Ref(openAPICommonPackagePath, "ReferenceCallback"),
 		"OpenAPIDefinition": types.Ref(openAPICommonPackagePath, "OpenAPIDefinition"),
@@ -237,7 +238,7 @@ func argsFromType(t *types.Type) generator.Args {
 
 func (g *openAPIGen) Init(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	sw.Do("func GetOpenAPIDefinitions(ref $.ReferenceCallback|raw$) map[string]$.OpenAPIDefinition|raw$ {\n", argsFromType(nil))
+	sw.Do("func GetOpenAPIDefinitions(ref $.ReferenceCallback|raw$, featureIsEnabled $.FeatureGate|raw$) map[string]$.OpenAPIDefinition|raw$ {\n", argsFromType(nil))
 	sw.Do("return map[string]$.OpenAPIDefinition|raw${\n", argsFromType(nil))
 
 	for _, t := range g.types {
@@ -379,7 +380,7 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 		if hasOpenAPIDefinitionMethod(t) {
 			g.Do("$.type|raw${}.OpenAPIDefinition(),\n", args)
 		} else {
-			g.Do(nameTmpl+"(ref),\n", args)
+			g.Do(nameTmpl+"(ref, featureIsEnabled),\n", args)
 		}
 	}
 	return g.Error()
@@ -395,7 +396,7 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		}
 
 		args := argsFromType(t)
-		g.Do("func "+nameTmpl+"(ref $.ReferenceCallback|raw$) $.OpenAPIDefinition|raw$ {\n", args)
+		g.Do("func "+nameTmpl+"(ref $.ReferenceCallback|raw$, featureIsEnabled $.FeatureGate|raw$) $.OpenAPIDefinition|raw$ {\n", args)
 		if hasOpenAPIDefinitionMethods(t) {
 			g.Do("return $.OpenAPIDefinition|raw${\n"+
 				"Schema: spec.Schema{\n"+

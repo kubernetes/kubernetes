@@ -110,7 +110,7 @@ func newOpenAPI(config *common.Config) openAPI {
 	o.definitions = o.config.GetDefinitions(func(name string) spec.Ref {
 		defName, _ := o.config.GetDefinitionName(name)
 		return spec.MustCreateRef("#/definitions/" + common.EscapeJsonPointer(defName))
-	})
+	}, o.config.FeatureIsEnabled)
 	if o.config.CommonResponses == nil {
 		o.config.CommonResponses = map[int]spec.Response{}
 	}

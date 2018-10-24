@@ -45,10 +45,12 @@ func (p Properties) AddIf(key string, condition func() bool, value spec.Schema) 
 	return p
 }
 
+type FeatureGate func(feature string) (enabled bool)
+
 type ReferenceCallback func(path string) spec.Ref
 
 // GetOpenAPIDefinitions is collection of all definitions.
-type GetOpenAPIDefinitions func(ReferenceCallback) map[string]OpenAPIDefinition
+type GetOpenAPIDefinitions func(ReferenceCallback, FeatureGate) map[string]OpenAPIDefinition
 
 // OpenAPIDefinitionGetter gets openAPI definitions for a given type. If a type implements this interface,
 // the definition returned by it will be used, otherwise the auto-generated definitions will be used. See
@@ -84,6 +86,8 @@ type Config struct {
 	// OpenAPIDefinitions should provide definition for all models used by routes. Failure to provide this map
 	// or any of the models will result in spec generation failure.
 	GetDefinitions GetOpenAPIDefinitions
+
+	FeatureIsEnabled FeatureGate
 
 	// GetOperationIDAndTags returns operation id and tags for a restful route. It is an optional function to customize operation IDs.
 	GetOperationIDAndTags func(r *restful.Route) (string, []string, error)
