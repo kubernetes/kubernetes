@@ -16,5 +16,7 @@ You can also post your question on the [Kubernetes Slack](http://slack.k8s.io/) 
 If the matter is security related, please disclose it privately via https://kubernetes.io/security/.
 -->
 
+<!-- DO NOT EDIT BELOW THIS LINE -->
+
 /triage support
 
