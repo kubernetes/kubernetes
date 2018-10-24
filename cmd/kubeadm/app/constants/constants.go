@@ -25,6 +25,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
@@ -422,7 +424,7 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 
 	tempDir, err := ioutil.TempDir(tempDir, dirName)
 	if err != nil {
-		return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+		return "", errors.Wrap(err, "couldn't create a temporary directory")
 	}
 	return tempDir, nil
 }

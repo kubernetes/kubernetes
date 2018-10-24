@@ -29,6 +29,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"github.com/pkg/errors"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -306,7 +307,7 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 	dryRunDir := ""
 	if options.dryRun {
 		if dryRunDir, err = ioutil.TempDir("", "kubeadm-init-dryrun"); err != nil {
-			return initData{}, fmt.Errorf("couldn't create a temporary directory: %v", err)
+			return initData{}, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
 
@@ -527,7 +528,7 @@ func runInit(i *initData, out io.Writer) error {
 
 		kubeletFailTempl.Execute(out, ctx)
 
-		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
+		return errors.New("couldn't initialize a Kubernetes cluster")
 	}
 
 	// Upload currently used configuration to the cluster
@@ -680,7 +681,7 @@ func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, str
 	if dryRun {
 		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
 		if err != nil {
-			return "", "", "", "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+			return "", "", "", "", errors.Wrap(err, "couldn't create a temporary directory")
 		}
 		// Use the same temp dir for all
 		return dryRunDir, dryRunDir, dryRunDir, dryRunDir, nil

@@ -24,6 +24,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -194,7 +195,7 @@ func getKubeletDir(dryRun bool) (string, error) {
 	if dryRun {
 		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
 		if err != nil {
-			return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+			return "", errors.Wrap(err, "couldn't create a temporary directory")
 		}
 		return dryRunDir, nil
 	}
