@@ -167,6 +167,17 @@ func InsertPredicateKeyToAlgorithmProviderMap(key string) {
 	return
 }
 
+// InsertPriorityKeyToAlgorithmProviderMap inserts a priority function to all algorithmProviders which are in algorithmProviderMap.
+func InsertPriorityKeyToAlgorithmProviderMap(key string) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	for _, provider := range algorithmProviderMap {
+		provider.PriorityFunctionKeys.Insert(key)
+	}
+	return
+}
+
 // RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
 // kubelet, DaemonSet; it is always included in configuration. Returns the name with which the predicate was
 // registered.
