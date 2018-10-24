@@ -217,7 +217,6 @@ func RunApply(flags *applyFlags) error {
 
 	fmt.Println("")
 	fmt.Printf("[upgrade/successful] SUCCESS! Your cluster was upgraded to %q. Enjoy!\n", flags.newK8sVersionStr)
-	fmt.Println("")
 	fmt.Println("[upgrade/kubelet] Now that your control plane is upgraded, please proceed with upgrading your kubelets if you haven't already done so.")
 
 	return nil
