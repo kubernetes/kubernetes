@@ -367,8 +367,9 @@ func (sched *Scheduler) assumeVolumes(assumed *v1.Pod, host string) (allBound bo
 			invalidPredicates := sets.NewString(predicates.CheckVolumeBindingPred)
 			sched.config.Ecache.InvalidatePredicates(invalidPredicates)
 		}
+		return allBound, err
 	}
-	return
+	return true, nil
 }
 
 // bindVolumes will make the API update with the assumed bindings and wait until
