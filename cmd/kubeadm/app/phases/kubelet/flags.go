@@ -119,7 +119,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 // writeKubeletFlagBytesToDisk writes a byte slice down to disk at the specific location of the kubelet flag overrides file
 func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 	kubeletEnvFilePath := filepath.Join(kubeletDir, constants.KubeletEnvFileName)
-	fmt.Printf("[kubelet] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
+	fmt.Printf("[kubelet-start] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {

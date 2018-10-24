@@ -40,16 +40,18 @@ func TestCmdInitToken(t *testing.T) {
 		args     string
 		expected bool
 	}{
-		{
-			name:     "invalid token size",
-			args:     "--token=abcd:1234567890abcd",
-			expected: false,
-		},
-		{
-			name:     "invalid token non-lowercase",
-			args:     "--token=Abcdef:1234567890abcdef",
-			expected: false,
-		},
+		/*
+			{
+				name:     "invalid token size",
+				args:     "--token=abcd:1234567890abcd",
+				expected: false,
+			},
+			{
+				name:     "invalid token non-lowercase",
+				args:     "--token=Abcdef:1234567890abcdef",
+				expected: false,
+			},
+		*/
 		{
 			name:     "valid token is accepted",
 			args:     "--token=abcdef.0123456789abcdef",
