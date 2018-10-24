@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["options.go"],
+    srcs = [
+        "customflags.go",
+        "options.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/options",
     deps = [
         "//cmd/cloud-controller-manager/app/apis/config:go_default_library",
@@ -17,6 +20,7 @@ go_library(
         "//cmd/cloud-controller-manager/app/config:go_default_library",
         "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -32,6 +36,7 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -51,7 +56,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["options_test.go"],
+    srcs = [
+        "customflags_test.go",
+        "options_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//cmd/controller-manager/app/options:go_default_library",
@@ -60,6 +68,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/flag:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/globalflag:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
