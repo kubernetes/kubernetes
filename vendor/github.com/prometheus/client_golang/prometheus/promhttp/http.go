@@ -39,6 +39,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/prometheus/common/expfmt"
 
@@ -67,21 +68,51 @@ func giveBuf(buf *bytes.Buffer) {
 	bufPool.Put(buf)
 }
 
-// Handler returns an HTTP handler for the prometheus.DefaultGatherer. The
-// Handler uses the default HandlerOpts, i.e. report the first error as an HTTP
-// error, no error logging, and compression if requested by the client.
+// Handler returns an http.Handler for the prometheus.DefaultGatherer, using
+// default HandlerOpts, i.e. it reports the first error as an HTTP error, it has
+// no error logging, and it applies compression if requested by the client.
 //
-// If you want to create a Handler for the DefaultGatherer with different
-// HandlerOpts, create it with HandlerFor with prometheus.DefaultGatherer and
-// your desired HandlerOpts.
+// The returned http.Handler is already instrumented using the
+// InstrumentMetricHandler function and the prometheus.DefaultRegisterer. If you
+// create multiple http.Handlers by separate calls of the Handler function, the
+// metrics used for instrumentation will be shared between them, providing
+// global scrape counts.
+//
+// This function is meant to cover the bulk of basic use cases. If you are doing
+// anything that requires more customization (including using a non-default
+// Gatherer, different instrumentation, and non-default HandlerOpts), use the
+// HandlerFor function. See there for details.
 func Handler() http.Handler {
-	return HandlerFor(prometheus.DefaultGatherer, HandlerOpts{})
+	return InstrumentMetricHandler(
+		prometheus.DefaultRegisterer, HandlerFor(prometheus.DefaultGatherer, HandlerOpts{}),
+	)
 }
 
-// HandlerFor returns an http.Handler for the provided Gatherer. The behavior
-// of the Handler is defined by the provided HandlerOpts.
+// HandlerFor returns an uninstrumented http.Handler for the provided
+// Gatherer. The behavior of the Handler is defined by the provided
+// HandlerOpts. Thus, HandlerFor is useful to create http.Handlers for custom
+// Gatherers, with non-default HandlerOpts, and/or with custom (or no)
+// instrumentation. Use the InstrumentMetricHandler function to apply the same
+// kind of instrumentation as it is used by the Handler function.
 func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	var inFlightSem chan struct{}
+	if opts.MaxRequestsInFlight > 0 {
+		inFlightSem = make(chan struct{}, opts.MaxRequestsInFlight)
+	}
+
+	h := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if inFlightSem != nil {
+			select {
+			case inFlightSem <- struct{}{}: // All good, carry on.
+				defer func() { <-inFlightSem }()
+			default:
+				http.Error(w, fmt.Sprintf(
+					"Limit of concurrent requests reached (%d), try again later.", opts.MaxRequestsInFlight,
+				), http.StatusServiceUnavailable)
+				return
+			}
+		}
+
 		mfs, err := reg.Gather()
 		if err != nil {
 			if opts.ErrorLog != nil {
@@ -128,7 +159,7 @@ func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
 			closer.Close()
 		}
 		if lastErr != nil && buf.Len() == 0 {
-			http.Error(w, "No metrics encoded, last error:\n\n"+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "No metrics encoded, last error:\n\n"+lastErr.Error(), http.StatusInternalServerError)
 			return
 		}
 		header := w.Header()
@@ -137,9 +168,70 @@ func HandlerFor(reg prometheus.Gatherer, opts HandlerOpts) http.Handler {
 		if encoding != "" {
 			header.Set(contentEncodingHeader, encoding)
 		}
-		w.Write(buf.Bytes())
+		if _, err := w.Write(buf.Bytes()); err != nil && opts.ErrorLog != nil {
+			opts.ErrorLog.Println("error while sending encoded metrics:", err)
+		}
 		// TODO(beorn7): Consider streaming serving of metrics.
 	})
+
+	if opts.Timeout <= 0 {
+		return h
+	}
+	return http.TimeoutHandler(h, opts.Timeout, fmt.Sprintf(
+		"Exceeded configured timeout of %v.\n",
+		opts.Timeout,
+	))
+}
+
+// InstrumentMetricHandler is usually used with an http.Handler returned by the
+// HandlerFor function. It instruments the provided http.Handler with two
+// metrics: A counter vector "promhttp_metric_handler_requests_total" to count
+// scrapes partitioned by HTTP status code, and a gauge
+// "promhttp_metric_handler_requests_in_flight" to track the number of
+// simultaneous scrapes. This function idempotently registers collectors for
+// both metrics with the provided Registerer. It panics if the registration
+// fails. The provided metrics are useful to see how many scrapes hit the
+// monitored target (which could be from different Prometheus servers or other
+// scrapers), and how often they overlap (which would result in more than one
+// scrape in flight at the same time). Note that the scrapes-in-flight gauge
+// will contain the scrape by which it is exposed, while the scrape counter will
+// only get incremented after the scrape is complete (as only then the status
+// code is known). For tracking scrape durations, use the
+// "scrape_duration_seconds" gauge created by the Prometheus server upon each
+// scrape.
+func InstrumentMetricHandler(reg prometheus.Registerer, handler http.Handler) http.Handler {
+	cnt := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "promhttp_metric_handler_requests_total",
+			Help: "Total number of scrapes by HTTP status code.",
+		},
+		[]string{"code"},
+	)
+	// Initialize the most likely HTTP status codes.
+	cnt.WithLabelValues("200")
+	cnt.WithLabelValues("500")
+	cnt.WithLabelValues("503")
+	if err := reg.Register(cnt); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			cnt = are.ExistingCollector.(*prometheus.CounterVec)
+		} else {
+			panic(err)
+		}
+	}
+
+	gge := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "promhttp_metric_handler_requests_in_flight",
+		Help: "Current number of scrapes being served.",
+	})
+	if err := reg.Register(gge); err != nil {
+		if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			gge = are.ExistingCollector.(prometheus.Gauge)
+		} else {
+			panic(err)
+		}
+	}
+
+	return InstrumentHandlerCounter(cnt, InstrumentHandlerInFlight(gge, handler))
 }
 
 // HandlerErrorHandling defines how a Handler serving metrics will handle
@@ -183,6 +275,21 @@ type HandlerOpts struct {
 	// If DisableCompression is true, the handler will never compress the
 	// response, even if requested by the client.
 	DisableCompression bool
+	// The number of concurrent HTTP requests is limited to
+	// MaxRequestsInFlight. Additional requests are responded to with 503
+	// Service Unavailable and a suitable message in the body. If
+	// MaxRequestsInFlight is 0 or negative, no limit is applied.
+	MaxRequestsInFlight int
+	// If handling a request takes longer than Timeout, it is responded to
+	// with 503 ServiceUnavailable and a suitable Message. No timeout is
+	// applied if Timeout is 0 or negative. Note that with the current
+	// implementation, reaching the timeout simply ends the HTTP requests as
+	// described above (and even that only if sending of the body hasn't
+	// started yet), while the bulk work of gathering all the metrics keeps
+	// running in the background (with the eventual result to be thrown
+	// away). Until the implementation is improved, it is recommended to
+	// implement a separate timeout in potentially slow Collectors.
+	Timeout time.Duration
 }
 
 // decorateWriter wraps a writer to handle gzip compression if requested.  It
@@ -195,7 +302,7 @@ func decorateWriter(request *http.Request, writer io.Writer, compressionDisabled
 	header := request.Header.Get(acceptEncodingHeader)
 	parts := strings.Split(header, ",")
 	for _, part := range parts {
-		part := strings.TrimSpace(part)
+		part = strings.TrimSpace(part)
 		if part == "gzip" || strings.HasPrefix(part, "gzip;") {
 			return gzip.NewWriter(writer), "gzip"
 		}

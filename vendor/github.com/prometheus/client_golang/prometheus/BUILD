@@ -13,6 +13,7 @@ go_library(
         "go_collector.go",
         "histogram.go",
         "http.go",
+        "labels.go",
         "metric.go",
         "observer.go",
         "process_collector.go",
@@ -22,6 +23,7 @@ go_library(
         "untyped.go",
         "value.go",
         "vec.go",
+        "wrap.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/client_golang/prometheus",
     importpath = "github.com/prometheus/client_golang/prometheus",
@@ -29,6 +31,7 @@ go_library(
     deps = [
         "//vendor/github.com/beorn7/perks/quantile:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus/internal:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
@@ -47,6 +50,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/prometheus/client_golang/prometheus/internal:all-srcs",
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:all-srcs",
     ],
     tags = ["automanaged"],
