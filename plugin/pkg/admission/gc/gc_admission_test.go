@@ -30,8 +30,11 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	_ "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+
+	// Manually initialize legacy scheme to make test rest mapper work with built-in resources.
+	// See issue #70192 for more details
+	_ "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 type fakeAuthorizer struct{}
