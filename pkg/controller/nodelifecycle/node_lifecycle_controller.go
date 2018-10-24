@@ -275,7 +275,7 @@ func NewNodeLifecycleController(
 			Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events(""),
 		})
 
-	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("node_lifecycle_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
