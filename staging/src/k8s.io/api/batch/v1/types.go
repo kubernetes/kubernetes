@@ -125,6 +125,7 @@ type JobSpec struct {
 	// This field is alpha-level and is only honored by servers that enable the
 	// TTLAfterFinished feature.
 	// +optional
+	// +k8s:openapi-gen:prerelease=alpha,version=v1.12,feature=TTLAfterFinished
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 }
 

@@ -328,6 +328,7 @@ type PersistentVolumeSpec struct {
 	// or to remain in raw block state. Value of Filesystem is implied when not included in spec.
 	// This is an alpha feature and may change in the future.
 	// +optional
+	// +k8s:openapi-gen:prerelease=alpha,version=v1.9,feature=BlockVolume
 	VolumeMode *PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,8,opt,name=volumeMode,casttype=PersistentVolumeMode"`
 	// NodeAffinity defines constraints that limit what nodes this volume can be accessed from.
 	// This field influences the scheduling of pods that use this volume.
@@ -467,6 +468,7 @@ type PersistentVolumeClaimSpec struct {
 	// In the future, we plan to support more data source types and the behavior
 	// of the provisioner may change.
 	// +optional
+	// +k8s:openapi-gen:prerelease=alpha,version=v1.12,feature=VolumeSnapshotDataSource
 	DataSource *TypedLocalObjectReference `json:"dataSource" protobuf:"bytes,7,opt,name=dataSource"`
 }
 
@@ -2091,6 +2093,7 @@ type Container struct {
 	// +patchMergeKey=devicePath
 	// +patchStrategy=merge
 	// +optional
+	// +k8s:openapi-gen:prerelease=alpha,version=v1.9,feature=BlockVolume
 	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
 	// Periodic probe of container liveness.
 	// Container will be restarted if the probe fails.
@@ -2890,6 +2893,7 @@ type PodSpec struct {
 	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md
 	// This is an alpha feature and may change in the future.
 	// +optional
+	// +k8s:openapi-gen:prerelease=alpha,version=v1.12,feature=RuntimeClass
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
 	// environment variables, matching the syntax of Docker links.
