@@ -18,8 +18,6 @@ go_library(
     srcs = ["initializer.go"],
     importpath = "k8s.io/kubernetes/pkg/kubeapiserver/admission",
     deps = [
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/quota/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",

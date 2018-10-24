@@ -565,7 +565,6 @@ func buildGenericConfig(
 	pluginInitializers, admissionPostStartHook, err = BuildAdmissionPluginInitializers(
 		s,
 		client,
-		sharedInformers,
 		serviceResolver,
 		webhookAuthResolverWrapper,
 	)
@@ -591,7 +590,6 @@ func buildGenericConfig(
 func BuildAdmissionPluginInitializers(
 	s *options.ServerRunOptions,
 	client internalclientset.Interface,
-	sharedInformers informers.SharedInformerFactory,
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	webhookAuthWrapper webhook.AuthenticationInfoResolverWrapper,
 ) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
@@ -618,7 +616,7 @@ func BuildAdmissionPluginInitializers(
 
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
 
-	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, discoveryRESTMapper, quotaConfiguration)
+	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(cloudConfig, discoveryRESTMapper, quotaConfiguration)
 	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthWrapper, serviceResolver)
 
 	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, admissionPostStartHook, nil

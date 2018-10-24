@@ -31,6 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+
+	// Manually initialize legacy scheme to make test rest mapper work with built-in resources.
+	// See issue #70192 for more details
+	_ "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 type fakeAuthorizer struct{}
@@ -88,7 +92,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	}
 
 	genericPluginInitializer := initializer.New(nil, nil, fakeAuthorizer{}, nil)
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme), nil)
 	initializersChain := admission.PluginInitializers{}
 	initializersChain = append(initializersChain, genericPluginInitializer)
 	initializersChain = append(initializersChain, pluginInitializer)
