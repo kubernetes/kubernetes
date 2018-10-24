@@ -155,7 +155,7 @@ func getConfigBytes(kubeletConfig *kubeletconfig.KubeletConfiguration) ([]byte, 
 // writeConfigBytesToDisk writes a byte slice down to disk at the specific location of the kubelet config file
 func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 	configFile := filepath.Join(kubeletDir, kubeadmconstants.KubeletConfigurationFileName)
-	fmt.Printf("[kubelet] Writing kubelet configuration to file %q\n", configFile)
+	fmt.Printf("[kubelet-start] Writing kubelet configuration to file %q\n", configFile)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {

@@ -19,12 +19,14 @@ package phases
 import (
 	"fmt"
 
+	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
@@ -38,18 +40,9 @@ import (
 )
 
 var (
-	kubeletWriteEnvFileLongDesc = normalizer.LongDesc(`
-		Writes an environment file with flags that should be passed to the kubelet executing on the master or node.
-		This --config flag can either consume a InitConfiguration object or a JoinConfiguration one, as this
-		function is used for both "kubeadm init" and "kubeadm join".
-		` + cmdutil.AlphaDisclaimer)
-
-	kubeletWriteEnvFileExample = normalizer.Examples(`
+	kubeletStartPhaseExample = normalizer.Examples(`
 		# Writes a dynamic environment file with kubelet flags from a InitConfiguration file.
-		kubeadm alpha phase kubelet write-env-file --config masterconfig.yaml
-
-		# Writes a dynamic environment file with kubelet flags from a JoinConfiguration file.
-		kubeadm alpha phase kubelet write-env-file --config nodeconfig.yaml
+		kubeadm init phase kubelet-start --config masterconfig.yaml
 		`)
 
 	kubeletConfigUploadLongDesc = normalizer.LongDesc(`
@@ -84,15 +77,6 @@ var (
 		kubeadm alpha phase kubelet config download --kubelet-version v1.12.0
 		`)
 
-	kubeletConfigWriteToDiskLongDesc = normalizer.LongDesc(`
-		Writes kubelet configuration to disk, based on the kubeadm configuration passed via "--config".
-		` + cmdutil.AlphaDisclaimer)
-
-	kubeletConfigWriteToDiskExample = normalizer.Examples(`
-		# Extracts the kubelet configuration from a kubeadm configuration file
-		kubeadm alpha phase kubelet config write-to-disk --config kubeadm.yaml
-		`)
-
 	kubeletConfigEnableDynamicLongDesc = normalizer.LongDesc(`
 		Enables or updates dynamic kubelet configuration for a Node, against the kubelet-config-1.X ConfigMap in the cluster,
 		where X is the minor version of the desired kubelet version.
@@ -111,6 +95,61 @@ var (
 		`)
 )
 
+// kubeletStartData defines the behavior that a runtime data struct passed to the kubelet start phase
+// should have. Please note that we are using an interface in order to make this phase reusable in different workflows
+// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
+type kubeletStartData interface {
+	Cfg() *kubeadmapi.InitConfiguration
+	DryRun() bool
+	KubeletDir() string
+}
+
+// NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
+func NewKubeletStartPhase() workflow.Phase {
+	return workflow.Phase{
+		Name:    "kubelet-start",
+		Short:   "Writes kubelet settings and (re)starts the kubelet",
+		Long:    "Writes a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)starts kubelet.",
+		Example: kubeletStartPhaseExample,
+		Run:     runKubeletStart,
+	}
+}
+
+// runKubeletStart executes kubelet start logic.
+func runKubeletStart(c workflow.RunData) error {
+	data, ok := c.(kubeletStartData)
+	if !ok {
+		return errors.New("kubelet-start phase invoked with an invalid data struct")
+	}
+
+	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
+	// Try to stop the kubelet service so no race conditions occur when configuring it
+	if !data.DryRun() {
+		glog.V(1).Infof("Stopping the kubelet")
+		kubeletphase.TryStopKubelet()
+	}
+
+	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
+	// as we handle that ourselves in the markmaster phase
+	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
+	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().NodeRegistration, data.Cfg().FeatureGates, false, data.KubeletDir()); err != nil {
+		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
+	}
+
+	// Write the kubelet configuration file to disk.
+	if err := kubeletphase.WriteConfigToDisk(data.Cfg().ComponentConfigs.Kubelet, data.KubeletDir()); err != nil {
+		return errors.Wrap(err, "error writing kubelet configuration to disk")
+	}
+
+	// Try to start the kubelet service in case it's inactive
+	if !data.DryRun() {
+		glog.V(1).Infof("Starting the kubelet")
+		kubeletphase.TryStartKubelet()
+	}
+
+	return nil
+}
+
 // NewCmdKubelet returns command for `kubeadm phase kubelet`
 func NewCmdKubelet() *cobra.Command {
 	cmd := &cobra.Command{
@@ -120,61 +159,7 @@ func NewCmdKubelet() *cobra.Command {
 	}
 
 	cmd.AddCommand(NewCmdKubeletConfig())
-	cmd.AddCommand(NewCmdKubeletWriteEnvFile())
 	return cmd
-}
-
-// NewCmdKubeletWriteEnvFile calls cobra.Command for writing the dynamic kubelet env file based on a InitConfiguration or JoinConfiguration object
-func NewCmdKubeletWriteEnvFile() *cobra.Command {
-	var cfgPath string
-
-	cmd := &cobra.Command{
-		Use:     "write-env-file",
-		Short:   "Writes an environment file with runtime flags for the kubelet.",
-		Long:    kubeletWriteEnvFileLongDesc,
-		Example: kubeletWriteEnvFileExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
-			}
-
-			err := RunKubeletWriteEnvFile(cfgPath)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	options.AddConfigFlag(cmd.Flags(), &cfgPath)
-	return cmd
-}
-
-// RunKubeletWriteEnvFile is the function that is run when "kubeadm phase kubelet write-env-file" is executed
-func RunKubeletWriteEnvFile(cfgPath string) error {
-	internalcfg, err := configutil.AnyConfigFileAndDefaultsToInternal(cfgPath)
-	if err != nil {
-		return err
-	}
-
-	var nodeRegistrationObj *kubeadmapi.NodeRegistrationOptions
-	var featureGates map[string]bool
-	var registerWithTaints bool
-
-	switch cfg := internalcfg.(type) {
-	case *kubeadmapi.InitConfiguration:
-		nodeRegistrationObj = &cfg.NodeRegistration
-		featureGates = cfg.FeatureGates
-		registerWithTaints = false
-	case *kubeadmapi.JoinConfiguration:
-		nodeRegistrationObj = &cfg.NodeRegistration
-		featureGates = cfg.FeatureGates
-		registerWithTaints = true
-	default:
-		return fmt.Errorf("couldn't read config file, no matching kind found")
-	}
-
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(nodeRegistrationObj, featureGates, registerWithTaints, constants.KubeletRunDirectory); err != nil {
-		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
-	}
-	return nil
 }
 
 // NewCmdKubeletConfig returns command for `kubeadm phase kubelet config`
@@ -188,7 +173,6 @@ func NewCmdKubeletConfig() *cobra.Command {
 	cmd.AddCommand(NewCmdKubeletConfigUpload())
 	cmd.AddCommand(NewCmdKubeletAnnotateCRI())
 	cmd.AddCommand(NewCmdKubeletConfigDownload())
-	cmd.AddCommand(NewCmdKubeletConfigWriteToDisk())
 	cmd.AddCommand(NewCmdKubeletConfigEnableDynamic())
 	return cmd
 }
@@ -302,37 +286,6 @@ func getKubeletVersion(kubeletVersionStr string) (*version.Version, error) {
 		return version.ParseSemantic(kubeletVersionStr)
 	}
 	return preflight.GetKubeletVersion(utilsexec.New())
-}
-
-// NewCmdKubeletConfigWriteToDisk calls cobra.Command for writing init kubelet configuration
-func NewCmdKubeletConfigWriteToDisk() *cobra.Command {
-	cfg := &kubeadmapiv1beta1.InitConfiguration{}
-	var cfgPath string
-	cmd := &cobra.Command{
-		Use:     "write-to-disk",
-		Short:   "Writes kubelet configuration to disk, either based on the --config argument.",
-		Long:    kubeletConfigWriteToDiskLongDesc,
-		Example: kubeletConfigWriteToDiskExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config argument is required"))
-			}
-
-			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-			// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-			SetKubernetesVersion(cfg)
-
-			// This call returns the ready-to-use configuration based on the configuration file
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-
-			err = kubeletphase.WriteConfigToDisk(internalcfg.ComponentConfigs.Kubelet, constants.KubeletRunDirectory)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	options.AddConfigFlag(cmd.Flags(), &cfgPath)
-	return cmd
 }
 
 // NewCmdKubeletConfigEnableDynamic calls cobra.Command for enabling dynamic kubelet configuration on node
