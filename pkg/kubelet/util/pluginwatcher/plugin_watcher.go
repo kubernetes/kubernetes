@@ -216,7 +216,12 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	}
 
 	if !fi.IsDir() {
-		return w.handlePluginRegistration(event.Name)
+		if fi.Mode()&os.ModeSocket != 0 {
+			return w.handlePluginRegistration(event.Name)
+		} else {
+			glog.V(5).Infof("Ignoring file: %s with mode %v", fi.Name(), fi.Mode())
+			return nil
+		}
 	}
 
 	return w.traversePluginDir(event.Name)
