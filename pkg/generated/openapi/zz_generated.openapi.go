@@ -8622,7 +8622,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback, featureIsEn
 						Description: "Describes the pod that will be created when executing a job. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/",
 						Ref:         ref("k8s.io/api/core/v1.PodTemplateSpec"),
 					},
-				}).Add("ttlSecondsAfterFinished", spec.Schema{
+				}).AddIf("ttlSecondsAfterFinished", func() bool { return featureIsEnabled("TTLAfterFinished") }, spec.Schema{
 					SchemaProps: spec.SchemaProps{
 						Description: "ttlSecondsAfterFinished limits the lifetime of a Job that has finished execution (either Complete or Failed). If this field is set, ttlSecondsAfterFinished after the Job finishes, it is eligible to be automatically deleted. When the Job is being deleted, its lifecycle guarantees (e.g. finalizers) will be honored. If this field is unset, the Job won't be automatically deleted. If this field is set to zero, the Job becomes eligible to be deleted immediately after it finishes. This field is alpha-level and is only honored by servers that enable the TTLAfterFinished feature.",
 						Type:        []string{"integer"},
@@ -10590,7 +10590,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback, featureIsE
 							},
 						},
 					},
-				}).Add("volumeDevices", spec.Schema{
+				}).AddIf("volumeDevices", func() bool { return featureIsEnabled("BlockVolume") }, spec.Schema{
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: spec.Extensions{
 							"x-kubernetes-patch-merge-key": "devicePath",
@@ -13695,7 +13695,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 						Type:        []string{"string"},
 						Format:      "",
 					},
-				}).Add("dataSource", spec.Schema{
+				}).AddIf("dataSource", func() bool { return featureIsEnabled("VolumeSnapshotDataSource") }, spec.Schema{
 					SchemaProps: spec.SchemaProps{
 						Description: "This field requires the VolumeSnapshotDataSource alpha feature gate to be enabled and currently VolumeSnapshot is the only supported data source. If the provisioner can support VolumeSnapshot data source, it will create a new volume and data will be restored to the volume at the same time. If the provisioner does not support VolumeSnapshot data source, volume will not be created and the failure will be reported as an event. In the future, we plan to support more data source types and the behavior of the provisioner may change.",
 						Ref:         ref("k8s.io/api/core/v1.TypedLocalObjectReference"),
@@ -14131,7 +14131,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback,
 							},
 						},
 					},
-				}).Add("volumeMode", spec.Schema{
+				}).AddIf("volumeMode", func() bool { return featureIsEnabled("BlockVolume") }, spec.Schema{
 					SchemaProps: spec.SchemaProps{
 						Description: "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec. This is an alpha feature and may change in the future.",
 						Type:        []string{"string"},
@@ -15136,7 +15136,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback, featureIsEna
 							},
 						},
 					},
-				}).Add("runtimeClassName", spec.Schema{
+				}).AddIf("runtimeClassName", func() bool { return featureIsEnabled("RuntimeClass") }, spec.Schema{
 					SchemaProps: spec.SchemaProps{
 						Description: "RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run. If unset or empty, the \"legacy\" RuntimeClass will be used, which is an implicit class with an empty definition that uses the default runtime handler. More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md This is an alpha feature and may change in the future.",
 						Type:        []string{"string"},
