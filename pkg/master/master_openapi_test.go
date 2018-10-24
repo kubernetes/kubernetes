@@ -29,6 +29,7 @@ import (
 
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
 	genericapiserver "k8s.io/apiserver/pkg/server"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	openapigen "k8s.io/kubernetes/pkg/generated/openapi"
 
@@ -45,7 +46,11 @@ func TestValidOpenAPISpec(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.GenericConfig.EnableIndex = true
-	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapigen.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	config.GenericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(
+		openapigen.GetOpenAPIDefinitions,
+		func(feature string) bool { return utilfeature.DefaultFeatureGate.Enabled(utilfeature.Feature(feature)) },
+		openapinamer.NewDefinitionNamer(legacyscheme.Scheme),
+	)
 	config.GenericConfig.OpenAPIConfig.Info = &spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",

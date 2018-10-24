@@ -276,7 +276,7 @@ func NewRecommendedConfig(codecs serializer.CodecFactory) *RecommendedConfig {
 	}
 }
 
-func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, defNamer *apiopenapi.DefinitionNamer) *openapicommon.Config {
+func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, featureIsEnabled openapicommon.FeatureGate, defNamer *apiopenapi.DefinitionNamer) *openapicommon.Config {
 	return &openapicommon.Config{
 		ProtocolList:   []string{"https"},
 		IgnorePrefixes: []string{"/swaggerapi"},
@@ -293,6 +293,7 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, de
 		GetOperationIDAndTags: apiopenapi.GetOperationIDAndTags,
 		GetDefinitionName:     defNamer.GetDefinitionName,
 		GetDefinitions:        getDefinitions,
+		FeatureIsEnabled:      featureIsEnabled,
 	}
 }
 
