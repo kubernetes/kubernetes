@@ -583,9 +583,7 @@ func TestRoundTripper(t *testing.T) {
 	get(t, http.StatusOK)
 
 	wantToken = "token2"
-	// Token is still cached, hits unauthorized but causes token to rotate.
-	get(t, http.StatusUnauthorized)
-	// Follow up request uses the rotated token.
+	// Cached token hits unauthorized, token is refreshed and retry succeeds
 	get(t, http.StatusOK)
 
 	setOutput(`{
@@ -597,8 +595,8 @@ func TestRoundTripper(t *testing.T) {
 		}
 	}`)
 	wantToken = "token3"
-	// Token is still cached, hit's unauthorized but causes rotation to token with an expiry.
-	get(t, http.StatusUnauthorized)
+	// Cached token hits unauthorized, token is refreshed and retry succeeds. The
+	// new token has an expiry.
 	get(t, http.StatusOK)
 
 	// Move time forward 2 hours, "token3" is now expired.

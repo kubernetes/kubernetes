@@ -205,33 +205,68 @@ type roundTripper struct {
 
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// If a user has already set credentials, use that. This makes commands like
-	// "kubectl get --token (token) pods" work.
-	if req.Header.Get("Authorization") != "" {
-		return r.base.RoundTrip(req)
+	// "kubectl get --token (token) pods" work. Otherwise try and set the token
+	// from the cache.
+	var creds *credentials
+	if req.Header.Get("Authorization") == "" {
+		creds = r.a.maybeSetTokenFromCache(req)
 	}
 
-	creds, err := r.a.getCreds()
-	if err != nil {
-		return nil, fmt.Errorf("getting credentials: %v", err)
-	}
-	if creds.token != "" {
-		req.Header.Set("Authorization", "Bearer "+creds.token)
+	// If the user didn't set credentials, and the cache didn't provide
+	// them, then prompt the user for them.
+	promptedUserForCreds := false
+	if req.Header.Get("Authorization") == "" {
+		promptedUserForCreds = true
+		if _, err := r.a.getCreds(); err != nil {
+			return nil, err
+		}
+
+		creds = r.a.maybeSetTokenFromCache(req)
 	}
 
 	res, err := r.base.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
-	if res.StatusCode == http.StatusUnauthorized {
-		resp := &clientauthentication.Response{
-			Header: res.Header,
-			Code:   int32(res.StatusCode),
-		}
-		if err := r.a.maybeRefreshCreds(creds, resp); err != nil {
-			glog.Errorf("refreshing credentials: %v", err)
-		}
+
+	if res.StatusCode != http.StatusUnauthorized || promptedUserForCreds {
+		return res, nil
 	}
-	return res, nil
+
+	resp := &clientauthentication.Response{
+		Header: res.Header,
+		Code:   int32(res.StatusCode),
+	}
+
+	// If we haven't already prompted the user for creds, and the req was
+	// unauthorized, then prompt the user for creds and retry
+	if err := r.a.maybeRefreshCreds(creds, resp); err != nil {
+		glog.Errorf("Failed refreshing credentials: %v", err)
+		return nil, err
+	}
+
+	r.a.maybeSetTokenFromCache(req)
+
+	return r.base.RoundTrip(req)
+}
+
+// Set request's bearer token to any cached credentials.
+//
+// Returns a copy of the credentials used for the request so that if the
+// request fails the credentials can be checked against the future value of the
+// cache to determine if the user has already been prompted for new credentials
+// since the request was made
+func (a *Authenticator) maybeSetTokenFromCache(req *http.Request) *credentials {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.cachedCreds == nil {
+		return nil
+	}
+
+	req.Header.Set("Authorization", "Bearer "+a.cachedCreds.token)
+
+	return &(*a.cachedCreds)
 }
 
 func (a *Authenticator) credsExpired() bool {
@@ -259,18 +294,17 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 	if err := a.refreshCredsLocked(nil); err != nil {
 		return nil, err
 	}
+
 	return a.cachedCreds, nil
 }
 
 // maybeRefreshCreds executes the plugin to force a rotation of the
-// credentials, unless they were rotated already.
+// cached credentials, unless they were rotated already.
 func (a *Authenticator) maybeRefreshCreds(creds *credentials, r *clientauthentication.Response) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	// Since we're not making a new pointer to a.cachedCreds in getCreds, no
-	// need to do deep comparison.
-	if creds != a.cachedCreds {
+	if !reflect.DeepEqual(creds, a.cachedCreds) {
 		// Credentials already rotated.
 		return nil
 	}
