@@ -165,6 +165,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	// initialize the workflow runner with the list of phases
 	initRunner.AppendPhase(phases.NewPreflightMasterPhase())
+	initRunner.AppendPhase(phases.NewKubeletStartPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -413,34 +414,9 @@ func runInit(i *initData, out io.Writer) error {
 	// Get directories to write files to; can be faked if we're dry-running
 	glog.V(1).Infof("[init] Getting certificates directory from configuration")
 	realCertsDir := i.cfg.CertificatesDir
-	certsDirToWriteTo, kubeConfigDir, manifestDir, kubeletDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
+	certsDirToWriteTo, kubeConfigDir, manifestDir, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
 	if err != nil {
 		return fmt.Errorf("error getting directories to use: %v", err)
-	}
-
-	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
-	// Try to stop the kubelet service so no race conditions occur when configuring it
-	if !i.dryRun {
-		glog.V(1).Infof("Stopping the kubelet")
-		kubeletphase.TryStopKubelet()
-	}
-
-	// Write env file with flags for the kubelet to use. We do not need to write the --register-with-taints for the master,
-	// as we handle that ourselves in the markmaster phase
-	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
-	if err := kubeletphase.WriteKubeletDynamicEnvFile(&i.cfg.NodeRegistration, i.cfg.FeatureGates, false, kubeletDir); err != nil {
-		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err)
-	}
-
-	// Write the kubelet configuration file to disk.
-	if err := kubeletphase.WriteConfigToDisk(i.cfg.ComponentConfigs.Kubelet, kubeletDir); err != nil {
-		return fmt.Errorf("error writing kubelet configuration to disk: %v", err)
-	}
-
-	if !i.dryRun {
-		// Try to start the kubelet service in case it's inactive
-		glog.V(1).Infof("Starting the kubelet")
-		kubeletphase.TryStartKubelet()
 	}
 
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
@@ -676,12 +652,8 @@ func createClient(cfg *kubeadmapi.InitConfiguration, dryRun bool) (clientset.Int
 
 // getDirectoriesToUse returns the (in order) certificates, kubeconfig and Static Pod manifest directories, followed by a possible error
 // This behaves differently when dry-running vs the normal flow
-func getDirectoriesToUse(dryRun bool, defaultPkiDir string) (string, string, string, string, error) {
+func getDirectoriesToUse(dryRun bool, dryRunDir string, defaultPkiDir string) (string, string, string, string, error) {
 	if dryRun {
-		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
-		if err != nil {
-			return "", "", "", "", fmt.Errorf("couldn't create a temporary directory: %v", err)
-		}
 		// Use the same temp dir for all
 		return dryRunDir, dryRunDir, dryRunDir, dryRunDir, nil
 	}
