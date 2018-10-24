@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	goflag "flag"
 	"fmt"
 	"math/rand"
 	"net"
@@ -140,6 +141,7 @@ func (o *CloudControllerManagerOptions) Flags() apiserverflag.NamedFlagSets {
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&o.Kubeconfig, "kubeconfig", o.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	fs.DurationVar(&o.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", o.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
+	fs.AddGoFlagSet(goflag.CommandLine)
 
 	utilfeature.DefaultFeatureGate.AddFlag(fss.FlagSet("generic"))
 

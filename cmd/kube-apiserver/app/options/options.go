@@ -18,6 +18,7 @@ limitations under the License.
 package options
 
 import (
+	goflag "flag"
 	"net"
 	"strings"
 	"time"
@@ -234,6 +235,8 @@ func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key. (Requires the 'TokenRequest' feature gate.)")
+
+	fs.AddGoFlagSet(goflag.CommandLine)
 
 	return fss
 }

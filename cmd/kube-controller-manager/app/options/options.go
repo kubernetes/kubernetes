@@ -19,6 +19,7 @@ limitations under the License.
 package options
 
 import (
+	goflag "flag"
 	"fmt"
 	"net"
 
@@ -263,6 +264,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	var dummy string
 	fs.MarkDeprecated("insecure-experimental-approve-all-kubelet-csrs-for-group", "This flag does nothing.")
 	fs.StringVar(&dummy, "insecure-experimental-approve-all-kubelet-csrs-for-group", "", "This flag does nothing.")
+	fs.AddGoFlagSet(goflag.CommandLine)
 	utilfeature.DefaultFeatureGate.AddFlag(fss.FlagSet("generic"))
 
 	return fss
