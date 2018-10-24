@@ -68,6 +68,7 @@ go_test(
     srcs = [
         "exec_mount_test.go",
         "mount_linux_test.go",
+        "mount_test.go",
         "mount_windows_test.go",
         "nsenter_mount_test.go",
         "safe_format_and_mount_test.go",

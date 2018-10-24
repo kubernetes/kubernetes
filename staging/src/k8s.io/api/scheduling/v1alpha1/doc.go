@@ -18,4 +18,5 @@ limitations under the License.
 // +k8s:openapi-gen=true
 
 // +groupName=scheduling.k8s.io
+
 package v1alpha1 // import "k8s.io/api/scheduling/v1alpha1"

@@ -49,8 +49,9 @@ func TestCmdVersion(t *testing.T) {
 		{"", NormalExpectedRegex, true},
 	}
 
+	kubeadmPath := getKubeadmPath()
 	for _, rt := range versionTest {
-		stdout, _, actual := RunCmd(*kubeadmPath, "version", rt.args)
+		stdout, _, actual := RunCmd(kubeadmPath, "version", rt.args)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed CmdVersion running 'kubeadm version %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
@@ -88,8 +89,9 @@ func TestCmdVersionOutputJsonOrYaml(t *testing.T) {
 		{"--output=yaml", "yaml", true},
 	}
 
+	kubeadmPath := getKubeadmPath()
 	for _, rt := range versionTest {
-		stdout, _, actual := RunCmd(*kubeadmPath, "version", rt.args)
+		stdout, _, actual := RunCmd(kubeadmPath, "version", rt.args)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed CmdVersion running 'kubeadm version %s' with an error: %v\n\texpected: %t\n\t  actual: %t",

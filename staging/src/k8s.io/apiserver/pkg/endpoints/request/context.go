@@ -21,6 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -36,6 +37,9 @@ const (
 
 	// auditKey is the context key for the audit event.
 	auditKey
+
+	// audiencesKey is the context key for request audiences.
+	audiencesKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -90,4 +94,15 @@ func WithAuditEvent(parent context.Context, ev *audit.Event) context.Context {
 func AuditEventFrom(ctx context.Context) *audit.Event {
 	ev, _ := ctx.Value(auditKey).(*audit.Event)
 	return ev
+}
+
+// WithAudiences returns a context that stores a request's expected audiences.
+func WithAudiences(ctx context.Context, auds authenticator.Audiences) context.Context {
+	return context.WithValue(ctx, audiencesKey, auds)
+}
+
+// AudiencesFrom returns a request's expected audiences stored in the request context.
+func AudiencesFrom(ctx context.Context) (authenticator.Audiences, bool) {
+	auds, ok := ctx.Value(audiencesKey).(authenticator.Audiences)
+	return auds, ok
 }

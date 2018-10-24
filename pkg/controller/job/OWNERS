@@ -6,3 +6,5 @@ reviewers:
 - erictune
 - janetkuo
 - soltysh
+labels:
+- sig/apps

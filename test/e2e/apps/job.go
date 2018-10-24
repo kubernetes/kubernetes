@@ -44,7 +44,7 @@ var _ = SIGDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -63,7 +63,7 @@ var _ = SIGDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -84,7 +84,7 @@ var _ = SIGDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, *job.Spec.Completions)
+		err = framework.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, *job.Spec.Completions)
 		Expect(err).NotTo(HaveOccurred())
 	})
 

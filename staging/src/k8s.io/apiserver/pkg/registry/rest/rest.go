@@ -320,7 +320,7 @@ type ResourceStreamer interface {
 	// the caller may return a flag indicating whether the result should be flushed as writes occur
 	// and a content type string that indicates the type of the stream.
 	// If a null stream is returned, a StatusNoContent response wil be generated.
-	InputStream(apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
+	InputStream(ctx context.Context, apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
 }
 
 // StorageMetadata is an optional interface that callers can implement to provide additional
@@ -334,19 +334,3 @@ type StorageMetadata interface {
 	// it is not nil. Only the type of the return object matters, the value will be ignored.
 	ProducesObject(verb string) interface{}
 }
-
-// +k8s:deepcopy-gen=true
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// ConnectRequest is an object passed to admission control for Connect operations
-type ConnectRequest struct {
-	// Name is the name of the object on which the connect request was made
-	Name string
-
-	// Options is the options object passed to the connect request. See the NewConnectOptions method on Connecter
-	Options runtime.Object
-
-	// ResourcePath is the path for the resource in the REST server (ie. "pods/proxy")
-	ResourcePath string
-}
-
-func (obj *ConnectRequest) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }

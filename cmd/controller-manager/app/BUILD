@@ -4,16 +4,15 @@ go_library(
     name = "go_default_library",
     srcs = [
         "helper.go",
-        "insecure_serving.go",
         "serve.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/controller-manager/app",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/config:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",

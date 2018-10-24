@@ -26,11 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/pointer"
 )
 
@@ -99,22 +99,21 @@ func TestCompileManifests(t *testing.T) {
 		{
 			manifest: KubeProxyConfigMap19,
 			data: struct {
-				MasterEndpoint, ProxyConfig string
+				MasterEndpoint, ProxyConfig, ProxyConfigMap, ProxyConfigMapKey string
 			}{
-				MasterEndpoint: "foo",
-				ProxyConfig:    "  bindAddress: 0.0.0.0\n  clusterCIDR: 192.168.1.1\n  enableProfiling: false",
+				MasterEndpoint:    "foo",
+				ProxyConfig:       "  bindAddress: 0.0.0.0\n  clusterCIDR: 192.168.1.1\n  enableProfiling: false",
+				ProxyConfigMap:    "bar",
+				ProxyConfigMapKey: "baz",
 			},
 			expected: true,
 		},
 		{
 			manifest: KubeProxyDaemonSet19,
-			data: struct{ ImageRepository, Arch, Version, ImageOverride, MasterTaintKey, CloudTaintKey string }{
-				ImageRepository: "foo",
-				Arch:            "foo",
-				Version:         "foo",
-				ImageOverride:   "foo",
-				MasterTaintKey:  "foo",
-				CloudTaintKey:   "foo",
+			data: struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
+				Image:             "foo",
+				ProxyConfigMap:    "bar",
+				ProxyConfigMapKey: "baz",
 			},
 			expected: true,
 		},
@@ -174,16 +173,18 @@ func TestEnsureProxyAddon(t *testing.T) {
 		// Create a fake client and set up default test configuration
 		client := clientsetfake.NewSimpleClientset()
 		// TODO: Consider using a YAML file instead for this that makes it possible to specify YAML documents for the ComponentConfigs
-		masterConfig := &kubeadmapiv1alpha3.InitConfiguration{
-			API: kubeadmapiv1alpha3.API{
+		masterConfig := &kubeadmapiv1beta1.InitConfiguration{
+			APIEndpoint: kubeadmapiv1beta1.APIEndpoint{
 				AdvertiseAddress: "1.2.3.4",
 				BindPort:         1234,
 			},
-			Networking: kubeadmapiv1alpha3.Networking{
-				PodSubnet: "5.6.7.8/24",
+			ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+				Networking: kubeadmapiv1beta1.Networking{
+					PodSubnet: "5.6.7.8/24",
+				},
+				ImageRepository:   "someRepo",
+				KubernetesVersion: "v1.11.0",
 			},
-			ImageRepository:   "someRepo",
-			KubernetesVersion: "v1.10.0",
 		}
 
 		// Simulate an error if necessary
@@ -193,9 +194,9 @@ func TestEnsureProxyAddon(t *testing.T) {
 				return true, nil, apierrors.NewUnauthorized("")
 			})
 		case InvalidMasterEndpoint:
-			masterConfig.API.AdvertiseAddress = "1.2.3"
+			masterConfig.APIEndpoint.AdvertiseAddress = "1.2.3"
 		case IPv6SetBindAddress:
-			masterConfig.API.AdvertiseAddress = "1:2::3:4"
+			masterConfig.APIEndpoint.AdvertiseAddress = "1:2::3:4"
 			masterConfig.Networking.PodSubnet = "2001:101::/96"
 		}
 
@@ -209,9 +210,9 @@ func TestEnsureProxyAddon(t *testing.T) {
 			HealthzBindAddress: "0.0.0.0:10256",
 			MetricsBindAddress: "127.0.0.1:10249",
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:        pointer.Int32Ptr(2),
-				MaxPerCore: pointer.Int32Ptr(1),
-				Min:        pointer.Int32Ptr(1),
+				Max:                   pointer.Int32Ptr(2),
+				MaxPerCore:            pointer.Int32Ptr(1),
+				Min:                   pointer.Int32Ptr(1),
 				TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 			},

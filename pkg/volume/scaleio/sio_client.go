@@ -236,7 +236,7 @@ func (c *sioClient) AttachVolume(id sioVolumeID, multipleMappings bool) error {
 	}
 
 	params := &siotypes.MapVolumeSdcParam{
-		SdcID: iid,
+		SdcID:                 iid,
 		AllowMultipleMappings: strconv.FormatBool(multipleMappings),
 		AllSdcs:               "",
 	}

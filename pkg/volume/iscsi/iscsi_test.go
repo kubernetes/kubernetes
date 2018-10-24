@@ -488,8 +488,8 @@ func TestGetISCSICHAP(t *testing.T) {
 			expectedError:         nil,
 		},
 		{
-			name: "no volume",
-			spec: &volume.Spec{},
+			name:                  "no volume",
+			spec:                  &volume.Spec{},
 			expectedDiscoveryCHAP: false,
 			expectedSessionCHAP:   false,
 			expectedError:         fmt.Errorf("Spec does not reference an ISCSI volume type"),

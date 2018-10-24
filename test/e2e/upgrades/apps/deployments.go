@@ -51,7 +51,7 @@ func (DeploymentUpgradeTest) Name() string { return "[sig-apps] deployment-upgra
 // Setup creates a deployment and makes sure it has a new and an old replicaset running.
 func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	c := f.ClientSet
-	nginxImage := imageutils.GetE2EImage(imageutils.NginxSlim)
+	nginxImage := imageutils.GetE2EImage(imageutils.Nginx)
 
 	ns := f.Namespace.Name
 	deploymentClient := c.AppsV1().Deployments(ns)

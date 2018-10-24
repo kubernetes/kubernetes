@@ -17,6 +17,8 @@ limitations under the License.
 package credentialprovider
 
 import (
+	"reflect"
+	"sort"
 	"sync"
 
 	"github.com/golang/glog"
@@ -49,11 +51,17 @@ func NewDockerKeyring() DockerKeyring {
 		Providers: make([]DockerConfigProvider, 0),
 	}
 
-	// TODO(mattmoor): iterating over the map is non-deterministic.  We should
-	// introduce the notion of priorities for conflict resolution.
-	for name, provider := range providers {
+	keys := reflect.ValueOf(providers).MapKeys()
+	stringKeys := make([]string, len(keys))
+	for ix := range keys {
+		stringKeys[ix] = keys[ix].String()
+	}
+	sort.Strings(stringKeys)
+
+	for _, key := range stringKeys {
+		provider := providers[key]
 		if provider.Enabled() {
-			glog.V(4).Infof("Registering credential provider: %v", name)
+			glog.V(4).Infof("Registering credential provider: %v", key)
 			keyring.Providers = append(keyring.Providers, provider)
 		}
 	}

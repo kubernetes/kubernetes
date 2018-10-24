@@ -105,7 +105,7 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	return x509request.NewVerifier(opts, headerAuthenticator, sets.NewString(proxyClientNames...)), nil
 }
 
-func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	name := headerValue(req.Header, a.nameHeaders)
 	if len(name) == 0 {
 		return nil, false, nil
@@ -126,10 +126,12 @@ func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request)
 		}
 	}
 
-	return &user.DefaultInfo{
-		Name:   name,
-		Groups: groups,
-		Extra:  extra,
+	return &authenticator.Response{
+		User: &user.DefaultInfo{
+			Name:   name,
+			Groups: groups,
+			Extra:  extra,
+		},
 	}, true, nil
 }
 

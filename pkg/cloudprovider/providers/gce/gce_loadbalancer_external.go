@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -27,7 +28,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
@@ -44,7 +44,7 @@ import (
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
-func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (gce *GCECloud) ensureExternalLoadBalancer(clusterName string, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
 	}
@@ -56,7 +56,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		return nil, err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, apiService)
 	requestedIP := apiService.Spec.LoadBalancerIP
 	ports := apiService.Spec.Ports
 	portStr := []string{}
@@ -281,13 +281,13 @@ func (gce *GCECloud) updateExternalLoadBalancer(clusterName string, service *v1.
 		return err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, service)
 	return gce.updateTargetPool(loadBalancerName, hosts)
 }
 
 // ensureExternalLoadBalancerDeleted is the external implementation of LoadBalancer.EnsureLoadBalancerDeleted
 func (gce *GCECloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, service)
 	serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
 

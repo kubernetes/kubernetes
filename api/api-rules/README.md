@@ -12,8 +12,8 @@ e.g.
 
  * ***API rule violation: names_match,k8s.io/api/core/v1,Event,ReportingController***
 
-Make rule returns error when new generated violation report differs from this
-checked-in violation report. If new API rule violation is detected, please fix
+Make rule returns an error when the newly generated violation report differs from this
+checked-in violation report. If a new API rule violation is detected, please fix
 the API Go source file to pass the API rule check. **The entries in the checked-in
 violation report should only be removed when existing API rule violation is
 being fixed, but not added.**

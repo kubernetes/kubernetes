@@ -256,7 +256,6 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	glog.V(2).Infof("TestPersistentVolumeBindRace claims created")
 
 	// putting a bind manually on a pv should only match the claim it is bound to
-	rand.Seed(time.Now().Unix())
 	claim := claims[rand.Intn(maxClaims-1)]
 	claimRef, err := ref.GetReference(legacyscheme.Scheme, claim)
 	if err != nil {

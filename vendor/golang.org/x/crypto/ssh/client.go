@@ -19,6 +19,8 @@ import (
 type Client struct {
 	Conn
 
+	handleForwardsOnce sync.Once // guards calling (*Client).handleForwards
+
 	forwards        forwardList // forwarded tcpip connections from the remote side
 	mu              sync.Mutex
 	channelHandlers map[string]chan NewChannel
@@ -60,8 +62,6 @@ func NewClient(c Conn, chans <-chan NewChannel, reqs <-chan *Request) *Client {
 		conn.Wait()
 		conn.forwards.closeAll()
 	}()
-	go conn.forwards.handleChannels(conn.HandleChannelOpen("forwarded-tcpip"))
-	go conn.forwards.handleChannels(conn.HandleChannelOpen("forwarded-streamlocal@openssh.com"))
 	return conn
 }
 

@@ -82,7 +82,7 @@ func newReplicationController(replicas int) *v1.ReplicationController {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Image: "foo/bar",
+							Image:                  "foo/bar",
 							TerminationMessagePath: v1.TerminationMessagePathDefault,
 							ImagePullPolicy:        v1.PullIfNotPresent,
 							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
@@ -144,7 +144,7 @@ func newReplicaSet(name string, replicas int) *apps.ReplicaSet {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Image: "foo/bar",
+							Image:                  "foo/bar",
 							TerminationMessagePath: v1.TerminationMessagePathDefault,
 							ImagePullPolicy:        v1.PullIfNotPresent,
 							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
@@ -312,6 +312,19 @@ func TestCreatePods(t *testing.T) {
 	assert.NoError(t, err, "unexpected error: %v", err)
 	assert.True(t, apiequality.Semantic.DeepDerivative(&expectedPod, actualPod),
 		"Body: %s", fakeHandler.RequestBody)
+}
+
+func TestDeletePodsAllowsMissing(t *testing.T) {
+	fakeClient := fake.NewSimpleClientset()
+	podControl := RealPodControl{
+		KubeClient: fakeClient,
+		Recorder:   &record.FakeRecorder{},
+	}
+
+	controllerSpec := newReplicationController(1)
+
+	err := podControl.DeletePod("namespace-name", "podName", controllerSpec)
+	assert.NoError(t, err, "unexpected error: %v", err)
 }
 
 func TestActivePodFiltering(t *testing.T) {

@@ -100,6 +100,39 @@ func TestGetCgroupStats(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
+func TestGetCgroupCPUAndMemoryStats(t *testing.T) {
+	const (
+		cgroupName        = "test-cgroup-name"
+		containerInfoSeed = 1000
+		updateStats       = false
+	)
+	var (
+		mockCadvisor     = new(cadvisortest.Mock)
+		mockPodManager   = new(kubepodtest.MockManager)
+		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+
+		assert  = assert.New(t)
+		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
+
+		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
+		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{cgroupName: containerInfo}
+	)
+
+	mockCadvisor.On("ContainerInfoV2", cgroupName, options).Return(containerInfoMap, nil)
+
+	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
+	cs, err := provider.GetCgroupCPUAndMemoryStats(cgroupName, updateStats)
+	assert.NoError(err)
+
+	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
+	checkMemoryStats(t, "", containerInfoSeed, containerInfo, cs.Memory)
+
+	assert.Equal(cgroupName, cs.Name)
+	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
+
+	mockCadvisor.AssertExpectations(t)
+}
+
 func TestRootFsStats(t *testing.T) {
 	const (
 		rootFsInfoSeed    = 1000
@@ -634,8 +667,9 @@ type fakeResourceAnalyzer struct {
 	podVolumeStats serverstats.PodVolumeStats
 }
 
-func (o *fakeResourceAnalyzer) Start()                              {}
-func (o *fakeResourceAnalyzer) Get(bool) (*statsapi.Summary, error) { return nil, nil }
+func (o *fakeResourceAnalyzer) Start()                                           {}
+func (o *fakeResourceAnalyzer) Get(bool) (*statsapi.Summary, error)              { return nil, nil }
+func (o *fakeResourceAnalyzer) GetCPUAndMemoryStats() (*statsapi.Summary, error) { return nil, nil }
 func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.PodVolumeStats, bool) {
 	return o.podVolumeStats, true
 }
@@ -647,6 +681,11 @@ type fakeContainerStatsProvider struct {
 func (p fakeContainerStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
+func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (p fakeContainerStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }

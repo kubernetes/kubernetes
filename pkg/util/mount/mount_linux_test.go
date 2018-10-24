@@ -110,6 +110,10 @@ func TestGetMountRefs(t *testing.T) {
 				"/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2",
 			},
 		},
+		{
+			"/var/fake/directory/that/doesnt/exist",
+			[]string{},
+		},
 	}
 
 	for i, test := range tests {
@@ -413,7 +417,7 @@ func TestPathWithinBase(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if pathWithinBase(test.fullPath, test.basePath) != test.expected {
+		if PathWithinBase(test.fullPath, test.basePath) != test.expected {
 			t.Errorf("test %q failed: expected %v", test.name, test.expected)
 		}
 

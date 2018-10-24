@@ -200,7 +200,7 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
 	}
 
-	info, err := connection.GetConnectionInfo(types.NodeName(name))
+	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
 	if err != nil {
 		return nil, nil, err
 	}

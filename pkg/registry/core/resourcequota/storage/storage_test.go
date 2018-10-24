@@ -162,7 +162,7 @@ func TestUpdateStatus(t *testing.T) {
 
 	key, _ := storage.KeyFunc(ctx, "foo")
 	resourcequotaStart := validNewResourceQuota()
-	err := storage.Storage.Create(ctx, key, resourcequotaStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, resourcequotaStart, nil, 0, false)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

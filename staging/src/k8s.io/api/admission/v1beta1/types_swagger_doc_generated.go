@@ -39,6 +39,7 @@ var map_AdmissionRequest = map[string]string{
 	"userInfo":    "UserInfo is information about the requesting user",
 	"object":      "Object is the object from the incoming request prior to default values being applied",
 	"oldObject":   "OldObject is the existing object. Only populated for UPDATE requests.",
+	"dryRun":      "DryRun indicates that modifications will definitely not be persisted for this request. Defaults to false.",
 }
 
 func (AdmissionRequest) SwaggerDoc() map[string]string {
@@ -46,12 +47,13 @@ func (AdmissionRequest) SwaggerDoc() map[string]string {
 }
 
 var map_AdmissionResponse = map[string]string{
-	"":          "AdmissionResponse describes an admission response.",
-	"uid":       "UID is an identifier for the individual request/response. This should be copied over from the corresponding AdmissionRequest.",
-	"allowed":   "Allowed indicates whether or not the admission request was permitted.",
-	"status":    "Result contains extra details into why an admission request was denied. This field IS NOT consulted in any way if \"Allowed\" is \"true\".",
-	"patch":     "The patch body. Currently we only support \"JSONPatch\" which implements RFC 6902.",
-	"patchType": "The type of Patch. Currently we only allow \"JSONPatch\".",
+	"":                 "AdmissionResponse describes an admission response.",
+	"uid":              "UID is an identifier for the individual request/response. This should be copied over from the corresponding AdmissionRequest.",
+	"allowed":          "Allowed indicates whether or not the admission request was permitted.",
+	"status":           "Result contains extra details into why an admission request was denied. This field IS NOT consulted in any way if \"Allowed\" is \"true\".",
+	"patch":            "The patch body. Currently we only support \"JSONPatch\" which implements RFC 6902.",
+	"patchType":        "The type of Patch. Currently we only allow \"JSONPatch\".",
+	"auditAnnotations": "AuditAnnotations is an unstructured key value map set by remote admission controller (e.g. error=image-blacklisted). MutatingAdmissionWebhook and ValidatingAdmissionWebhook admission controller will prefix the keys with admission webhook name (e.g. imagepolicy.example.com/error=image-blacklisted). AuditAnnotations will be provided by the admission webhook to add additional context to the audit log for this request.",
 }
 
 func (AdmissionResponse) SwaggerDoc() map[string]string {

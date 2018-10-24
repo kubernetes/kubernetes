@@ -147,14 +147,17 @@ func GroupVersionKindsHasKind(gvks []schema.GroupVersionKind, kind string) bool 
 	return false
 }
 
+// GroupVersionKindsHasClusterConfiguration returns whether the following gvk slice contains a ClusterConfiguration object
+func GroupVersionKindsHasClusterConfiguration(gvks ...schema.GroupVersionKind) bool {
+	return GroupVersionKindsHasKind(gvks, constants.ClusterConfigurationKind)
+}
+
 // GroupVersionKindsHasInitConfiguration returns whether the following gvk slice contains a InitConfiguration object
 func GroupVersionKindsHasInitConfiguration(gvks ...schema.GroupVersionKind) bool {
-	// Finding a MasterConfiguration kind is also okay, as it will decode and convert into an InitConfiguration struct eventually
-	// TODO: When we remove support for the v1alpha2 API, remove support for MasterConfiguration
-	return GroupVersionKindsHasKind(gvks, constants.InitConfigurationKind) || GroupVersionKindsHasKind(gvks, constants.MasterConfigurationKind)
+	return GroupVersionKindsHasKind(gvks, constants.InitConfigurationKind)
 }
 
 // GroupVersionKindsHasJoinConfiguration returns whether the following gvk slice contains a JoinConfiguration object
 func GroupVersionKindsHasJoinConfiguration(gvks ...schema.GroupVersionKind) bool {
-	return GroupVersionKindsHasKind(gvks, constants.JoinConfigurationKind) || GroupVersionKindsHasKind(gvks, constants.NodeConfigurationKind)
+	return GroupVersionKindsHasKind(gvks, constants.JoinConfigurationKind)
 }

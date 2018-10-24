@@ -54,7 +54,7 @@ func scrapeMetrics(s *httptest.Server) ([]*prometheuspb.MetricFamily, error) {
 		return nil, fmt.Errorf("Unable to contact metrics endpoint of master: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Non-200 response trying to scrape metrics from master: %v", resp)
 	}
 

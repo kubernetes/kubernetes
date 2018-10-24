@@ -42,7 +42,7 @@ func TestGetVolumeName(t *testing.T) {
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, fakeVolumeNameOutput(spec.Name()), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
+			specJSON(plugin, spec, nil)),
 	)
 
 	name, err := plugin.GetVolumeName(spec)

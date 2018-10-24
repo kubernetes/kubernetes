@@ -1,3 +1,6 @@
+# Disable inheritance as this is an api owners file
+options:
+  no_parent_owners: true
 approvers:
 - erictune
 - lavalamp
@@ -48,3 +51,5 @@ reviewers:
 - yifan-gu
 - yujuhong
 - zmerlynn
+labels:
+- sig/architecture

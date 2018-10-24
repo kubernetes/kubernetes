@@ -236,6 +236,47 @@ func TestAPIs(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "unavailable service",
+			apiservices: []*apiregistration.APIService{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+					Spec: apiregistration.APIServiceSpec{
+						Service: &apiregistration.ServiceReference{
+							Namespace: "ns",
+							Name:      "api",
+						},
+						Group:                "foo",
+						Version:              "v1",
+						GroupPriorityMinimum: 11,
+					},
+					Status: apiregistration.APIServiceStatus{
+						Conditions: []apiregistration.APIServiceCondition{
+							{Type: apiregistration.Available, Status: apiregistration.ConditionFalse},
+						},
+					},
+				},
+			},
+			expected: &metav1.APIGroupList{
+				TypeMeta: metav1.TypeMeta{Kind: "APIGroupList", APIVersion: "v1"},
+				Groups: []metav1.APIGroup{
+					discoveryGroup,
+					{
+						Name: "foo",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{
+								GroupVersion: "foo/v1",
+								Version:      "v1",
+							},
+						},
+						PreferredVersion: metav1.GroupVersionForDiscovery{
+							GroupVersion: "foo/v1",
+							Version:      "v1",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {

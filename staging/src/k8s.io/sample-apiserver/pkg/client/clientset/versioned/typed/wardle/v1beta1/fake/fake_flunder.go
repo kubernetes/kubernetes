@@ -131,7 +131,7 @@ func (c *FakeFlunders) DeleteCollection(options *v1.DeleteOptions, listOptions v
 // Patch applies the patch and returns the patched flunder.
 func (c *FakeFlunders) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Flunder, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, name, data, subresources...), &v1beta1.Flunder{})
+		Invokes(testing.NewPatchSubresourceAction(flundersResource, c.ns, name, pt, data, subresources...), &v1beta1.Flunder{})
 
 	if obj == nil {
 		return nil, err

@@ -15,9 +15,8 @@
 package grpcproxy
 
 import (
+	"context"
 	"io"
-
-	"golang.org/x/net/context"
 
 	"github.com/coreos/etcd/clientv3"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
@@ -42,6 +41,8 @@ func (mp *maintenanceProxy) Snapshot(sr *pb.SnapshotRequest, stream pb.Maintenan
 	conn := mp.client.ActiveConnection()
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
+
+	ctx = withClientAuthToken(ctx, stream.Context())
 
 	sc, err := pb.NewMaintenanceClient(conn).Snapshot(ctx, sr)
 	if err != nil {
@@ -68,6 +69,11 @@ func (mp *maintenanceProxy) Hash(ctx context.Context, r *pb.HashRequest) (*pb.Ha
 	return pb.NewMaintenanceClient(conn).Hash(ctx, r)
 }
 
+func (mp *maintenanceProxy) HashKV(ctx context.Context, r *pb.HashKVRequest) (*pb.HashKVResponse, error) {
+	conn := mp.client.ActiveConnection()
+	return pb.NewMaintenanceClient(conn).HashKV(ctx, r)
+}
+
 func (mp *maintenanceProxy) Alarm(ctx context.Context, r *pb.AlarmRequest) (*pb.AlarmResponse, error) {
 	conn := mp.client.ActiveConnection()
 	return pb.NewMaintenanceClient(conn).Alarm(ctx, r)
@@ -76,4 +82,9 @@ func (mp *maintenanceProxy) Alarm(ctx context.Context, r *pb.AlarmRequest) (*pb.
 func (mp *maintenanceProxy) Status(ctx context.Context, r *pb.StatusRequest) (*pb.StatusResponse, error) {
 	conn := mp.client.ActiveConnection()
 	return pb.NewMaintenanceClient(conn).Status(ctx, r)
+}
+
+func (mp *maintenanceProxy) MoveLeader(ctx context.Context, r *pb.MoveLeaderRequest) (*pb.MoveLeaderResponse, error) {
+	conn := mp.client.ActiveConnection()
+	return pb.NewMaintenanceClient(conn).MoveLeader(ctx, r)
 }

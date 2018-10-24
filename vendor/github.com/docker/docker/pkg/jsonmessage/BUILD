@@ -8,7 +8,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Nvveen/Gotty:go_default_library",
-        "//vendor/github.com/docker/docker/pkg/jsonlog:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",
         "//vendor/github.com/docker/go-units:go_default_library",
     ],

@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -29,10 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -41,16 +42,24 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// ValidateInitConfiguration validates master configuration and collects all encountered errors
+// ValidateInitConfiguration validates an InitConfiguration object and collects all encountered errors
 func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
+	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
+	allErrs = append(allErrs, ValidateClusterConfiguration(&c.ClusterConfiguration)...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
+	return allErrs
+}
+
+// ValidateClusterConfiguration validates an ClusterConfiguration object and collects all encountered errors
+func ValidateClusterConfiguration(c *kubeadm.ClusterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNetworking(&c.Networking, field.NewPath("networking"))...)
 	allErrs = append(allErrs, ValidateCertSANs(c.APIServerCertSANs, field.NewPath("apiServerCertSANs"))...)
 	allErrs = append(allErrs, ValidateAbsolutePath(c.CertificatesDir, field.NewPath("certificatesDir"))...)
-	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
-	allErrs = append(allErrs, ValidateBootstrapTokens(c.BootstrapTokens, field.NewPath("bootstrapTokens"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("featureGates"))...)
-	allErrs = append(allErrs, ValidateAPIEndpoint(&c.API, field.NewPath("api"))...)
+	allErrs = append(allErrs, ValidateHostPort(c.ControlPlaneEndpoint, field.NewPath("controlPlaneEndpoint"))...)
 	allErrs = append(allErrs, ValidateEtcd(&c.Etcd, field.NewPath("etcd"))...)
 	allErrs = append(allErrs, componentconfigs.Known.Validate(c)...)
 	return allErrs
@@ -59,8 +68,9 @@ func ValidateInitConfiguration(c *kubeadm.InitConfiguration) field.ErrorList {
 // ValidateJoinConfiguration validates node configuration and collects all encountered errors
 func ValidateJoinConfiguration(c *kubeadm.JoinConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, ValidateDiscovery(c)...)
+	allErrs = append(allErrs, ValidateDiscovery(&c.Discovery, field.NewPath("discovery"))...)
 	allErrs = append(allErrs, ValidateNodeRegistrationOptions(&c.NodeRegistration, field.NewPath("nodeRegistration"))...)
+	allErrs = append(allErrs, ValidateAPIEndpoint(&c.APIEndpoint, field.NewPath("apiEndpoint"))...)
 
 	if !filepath.IsAbs(c.CACertPath) || !strings.HasSuffix(c.CACertPath, ".crt") {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("caCertPath"), c.CACertPath, "the ca certificate path must be an absolute path"))
@@ -82,52 +92,66 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 }
 
 // ValidateDiscovery validates discovery related configuration and collects all encountered errors
-func ValidateDiscovery(c *kubeadm.JoinConfiguration) field.ErrorList {
+func ValidateDiscovery(d *kubeadm.Discovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(c.DiscoveryToken) != 0 {
-		allErrs = append(allErrs, ValidateToken(c.DiscoveryToken, field.NewPath("discoveryToken"))...)
+
+	if d.BootstrapToken == nil && d.File == nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "bootstrapToken or file must be set"))
 	}
-	if len(c.DiscoveryFile) != 0 {
-		allErrs = append(allErrs, ValidateDiscoveryFile(c.DiscoveryFile, field.NewPath("discoveryFile"))...)
+
+	if d.BootstrapToken != nil && d.File != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "bootstrapToken and file cannot both be set"))
 	}
-	allErrs = append(allErrs, ValidateArgSelection(c, field.NewPath("discovery"))...)
-	allErrs = append(allErrs, ValidateToken(c.TLSBootstrapToken, field.NewPath("tlsBootstrapToken"))...)
-	allErrs = append(allErrs, ValidateJoinDiscoveryTokenAPIServer(c.DiscoveryTokenAPIServers, field.NewPath("discoveryTokenAPIServers"))...)
+
+	if d.BootstrapToken != nil {
+		allErrs = append(allErrs, ValidateDiscoveryBootstrapToken(d.BootstrapToken, fldPath.Child("bootstrapToken"))...)
+		allErrs = append(allErrs, ValidateToken(d.TLSBootstrapToken, fldPath.Child("tlsBootstrapToken"))...)
+	}
+
+	if d.File != nil {
+		allErrs = append(allErrs, ValidateDiscoveryFile(d.File, fldPath.Child("file"))...)
+		if len(d.TLSBootstrapToken) != 0 {
+			allErrs = append(allErrs, ValidateToken(d.TLSBootstrapToken, fldPath.Child("tlsBootstrapToken"))...)
+		}
+	}
 
 	return allErrs
 }
 
-// ValidateArgSelection validates discovery related configuration and collects all encountered errors
-func ValidateArgSelection(cfg *kubeadm.JoinConfiguration, fldPath *field.Path) field.ErrorList {
+// ValidateDiscoveryBootstrapToken validates bootstrap token discovery configuration
+func ValidateDiscoveryBootstrapToken(b *kubeadm.BootstrapTokenDiscovery, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(cfg.DiscoveryToken) != 0 && len(cfg.DiscoveryFile) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "discoveryToken and discoveryFile cannot both be set"))
-	}
-	if len(cfg.DiscoveryToken) == 0 && len(cfg.DiscoveryFile) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "discoveryToken or discoveryFile must be set"))
-	}
-	if len(cfg.DiscoveryTokenAPIServers) < 1 && len(cfg.DiscoveryToken) != 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "discoveryTokenAPIServers not set"))
-	}
 
-	if len(cfg.DiscoveryFile) != 0 && len(cfg.DiscoveryTokenCACertHashes) != 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "discoveryTokenCACertHashes cannot be used with discoveryFile"))
-	}
-
-	if len(cfg.DiscoveryFile) == 0 && len(cfg.DiscoveryToken) != 0 &&
-		len(cfg.DiscoveryTokenCACertHashes) == 0 && !cfg.DiscoveryTokenUnsafeSkipCAVerification {
-		allErrs = append(allErrs, field.Invalid(fldPath, "", "using token-based discovery without discoveryTokenCACertHashes can be unsafe. set --discovery-token-unsafe-skip-ca-verification to continue"))
+	if len(b.APIServerEndpoints) < 1 {
+		allErrs = append(allErrs, field.Required(fldPath, "APIServerEndpoints not set"))
 	}
 
 	// TODO remove once we support multiple api servers
-	if len(cfg.DiscoveryTokenAPIServers) > 1 {
+	if len(b.APIServerEndpoints) > 1 {
 		fmt.Println("[validation] WARNING: kubeadm doesn't fully support multiple API Servers yet")
 	}
+
+	if len(b.CACertHashes) == 0 && !b.UnsafeSkipCAVerification {
+		allErrs = append(allErrs, field.Invalid(fldPath, "", "using token-based discovery without caCertHashes can be unsafe. Set unsafeSkipCAVerification to continue"))
+	}
+
+	allErrs = append(allErrs, ValidateToken(b.Token, fldPath.Child("token"))...)
+	allErrs = append(allErrs, ValidateDiscoveryTokenAPIServer(b.APIServerEndpoints, fldPath.Child("apiServerEndpoints"))...)
+
 	return allErrs
 }
 
-// ValidateJoinDiscoveryTokenAPIServer validates discovery token for API server
-func ValidateJoinDiscoveryTokenAPIServer(apiServers []string, fldPath *field.Path) field.ErrorList {
+// ValidateDiscoveryFile validates file discovery configuration
+func ValidateDiscoveryFile(f *kubeadm.FileDiscovery, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, ValidateDiscoveryKubeConfigPath(f.KubeConfigPath, fldPath.Child("kubeConfigPath"))...)
+
+	return allErrs
+}
+
+// ValidateDiscoveryTokenAPIServer validates discovery token for API server
+func ValidateDiscoveryTokenAPIServer(apiServers []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, m := range apiServers {
 		_, _, err := net.SplitHostPort(m)
@@ -138,8 +162,8 @@ func ValidateJoinDiscoveryTokenAPIServer(apiServers []string, fldPath *field.Pat
 	return allErrs
 }
 
-// ValidateDiscoveryFile validates location of a discovery file
-func ValidateDiscoveryFile(discoveryFile string, fldPath *field.Path) field.ErrorList {
+// ValidateDiscoveryKubeConfigPath validates location of a discovery file
+func ValidateDiscoveryKubeConfigPath(discoveryFile string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	u, err := url.Parse(discoveryFile)
 	if err != nil {
@@ -304,6 +328,24 @@ func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePort validates port numbers
+func ValidatePort(port int32, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if _, err := kubeadmutil.ParsePort(strconv.Itoa(int(port))); err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, port, "port number is not valid"))
+	}
+	return allErrs
+}
+
+// ValidateHostPort validates host[:port] endpoints
+func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if _, _, err := kubeadmutil.ParseHostPort(endpoint); endpoint != "" && err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, "endpoint is not valid"))
+	}
+	return allErrs
+}
+
 // ValidateIPNetFromString validates network portion of ip address
 func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -348,7 +390,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 
 	mixedInvalidFlags := []string{}
 	flag.Visit(func(f *pflag.Flag) {
-		if f.Name == "config" || f.Name == "ignore-preflight-errors" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" || f.Name == "v" {
+		if f.Name == "config" || f.Name == "ignore-preflight-errors" || strings.HasPrefix(f.Name, "skip-") || f.Name == "dry-run" || f.Name == "kubeconfig" || f.Name == "v" || f.Name == "rootfs" || f.Name == "print-join-command" {
 			// "--skip-*" flags or other whitelisted flags can be set with --config
 			return
 		}
@@ -378,28 +420,20 @@ func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) fie
 }
 
 // ValidateAPIEndpoint validates API server's endpoint
-func ValidateAPIEndpoint(c *kubeadm.API, fldPath *field.Path) field.ErrorList {
+func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	endpoint, err := kubeadmutil.GetMasterEndpoint(c)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath, endpoint, err.Error()))
-	}
+	allErrs = append(allErrs, ValidateIPFromString(c.AdvertiseAddress, fldPath.Child("advertiseAddress"))...)
+	allErrs = append(allErrs, ValidatePort(c.BindPort, fldPath.Child("bindPort"))...)
 	return allErrs
 }
 
 // ValidateIgnorePreflightErrors validates duplicates in ignore-preflight-errors flag.
-func ValidateIgnorePreflightErrors(ignorePreflightErrors []string, skipPreflightChecks bool) (sets.String, error) {
+func ValidateIgnorePreflightErrors(ignorePreflightErrors []string) (sets.String, error) {
 	ignoreErrors := sets.NewString()
 	allErrs := field.ErrorList{}
 
 	for _, item := range ignorePreflightErrors {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
-	}
-
-	// TODO: remove once deprecated flag --skip-preflight-checks is removed.
-	if skipPreflightChecks {
-		ignoreErrors.Insert("all")
 	}
 
 	if ignoreErrors.Has("all") && ignoreErrors.Len() > 1 {
@@ -422,7 +456,7 @@ func ValidateSocketPath(socket string, fldPath *field.Path) field.ErrorList {
 		if !filepath.IsAbs(u.Path) {
 			return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("path is not absolute: %s", socket)))
 		}
-	} else if u.Scheme != kubeadmapiv1alpha3.DefaultUrlScheme {
+	} else if u.Scheme != kubeadmapiv1beta1.DefaultUrlScheme {
 		return append(allErrs, field.Invalid(fldPath, socket, fmt.Sprintf("url scheme %s is not supported", u.Scheme)))
 	}
 

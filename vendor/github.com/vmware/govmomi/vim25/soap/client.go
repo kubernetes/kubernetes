@@ -77,6 +77,17 @@ type Client struct {
 
 var schemeMatch = regexp.MustCompile(`^\w+://`)
 
+type errInvalidCACertificate struct {
+	File string
+}
+
+func (e errInvalidCACertificate) Error() string {
+	return fmt.Sprintf(
+		"invalid certificate '%s', cannot be used as a trusted CA certificate",
+		e.File,
+	)
+}
+
 // ParseURL is wrapper around url.Parse, where Scheme defaults to "https" and Path defaults to "/sdk"
 func ParseURL(s string) (*url.URL, error) {
 	var err error
@@ -200,7 +211,11 @@ func (c *Client) SetRootCAs(file string) error {
 			return err
 		}
 
-		pool.AppendCertsFromPEM(pem)
+		if ok := pool.AppendCertsFromPEM(pem); !ok {
+			return errInvalidCACertificate{
+				File: name,
+			}
+		}
 	}
 
 	c.t.TLSClientConfig.RootCAs = pool
@@ -434,12 +449,51 @@ func (c *Client) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	if nil == ctx || nil == ctx.Done() { // ctx.Done() is for ctx
-		return c.Client.Do(req)
+type kindContext struct{}
+
+func (c *Client) Do(ctx context.Context, req *http.Request, f func(*http.Response) error) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// Create debugging context for this round trip
+	d := c.d.newRoundTrip()
+	if d.enabled() {
+		defer d.done()
 	}
 
-	return c.Client.Do(req.WithContext(ctx))
+	if c.UserAgent != "" {
+		req.Header.Set(`User-Agent`, c.UserAgent)
+	}
+
+	if d.enabled() {
+		d.debugRequest(req)
+	}
+
+	tstart := time.Now()
+	res, err := c.Client.Do(req.WithContext(ctx))
+	tstop := time.Now()
+
+	if d.enabled() {
+		var name string
+		if kind, ok := ctx.Value(kindContext{}).(HasFault); ok {
+			name = fmt.Sprintf("%T", kind)
+		} else {
+			name = fmt.Sprintf("%s %s", req.Method, req.URL)
+		}
+		d.logf("%6dms (%s)", tstop.Sub(tstart)/time.Millisecond, name)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	defer res.Body.Close()
+
+	if d.enabled() {
+		d.debugResponse(res)
+	}
+
+	return f(res)
 }
 
 // Signer can be implemented by soap.Header.Security to sign requests.
@@ -478,12 +532,6 @@ func (c *Client) RoundTrip(ctx context.Context, reqBody, resBody HasFault) error
 		reqEnv.Header = &h // XML marshal header only if a field is set
 	}
 
-	// Create debugging context for this round trip
-	d := c.d.newRoundTrip()
-	if d.enabled() {
-		defer d.done()
-	}
-
 	if signer, ok := h.Security.(Signer); ok {
 		b, err = signer.Sign(reqEnv)
 		if err != nil {
@@ -502,8 +550,6 @@ func (c *Client) RoundTrip(ctx context.Context, reqBody, resBody HasFault) error
 		panic(err)
 	}
 
-	req = req.WithContext(ctx)
-
 	req.Header.Set(`Content-Type`, `text/xml; charset="utf-8"`)
 
 	action := h.Action
@@ -512,54 +558,29 @@ func (c *Client) RoundTrip(ctx context.Context, reqBody, resBody HasFault) error
 	}
 	req.Header.Set(`SOAPAction`, action)
 
-	if c.UserAgent != "" {
-		req.Header.Set(`User-Agent`, c.UserAgent)
-	}
+	return c.Do(context.WithValue(ctx, kindContext{}, resBody), req, func(res *http.Response) error {
+		switch res.StatusCode {
+		case http.StatusOK:
+			// OK
+		case http.StatusInternalServerError:
+			// Error, but typically includes a body explaining the error
+		default:
+			return errors.New(res.Status)
+		}
 
-	if d.enabled() {
-		d.debugRequest(req)
-	}
+		dec := xml.NewDecoder(res.Body)
+		dec.TypeFunc = types.TypeFunc()
+		err = dec.Decode(&resEnv)
+		if err != nil {
+			return err
+		}
 
-	tstart := time.Now()
-	res, err := c.do(ctx, req)
-	tstop := time.Now()
+		if f := resBody.Fault(); f != nil {
+			return WrapSoapFault(f)
+		}
 
-	if d.enabled() {
-		d.logf("%6dms (%T)", tstop.Sub(tstart)/time.Millisecond, resBody)
-	}
-
-	if err != nil {
 		return err
-	}
-
-	if d.enabled() {
-		d.debugResponse(res)
-	}
-
-	// Close response regardless of what happens next
-	defer res.Body.Close()
-
-	switch res.StatusCode {
-	case http.StatusOK:
-		// OK
-	case http.StatusInternalServerError:
-		// Error, but typically includes a body explaining the error
-	default:
-		return errors.New(res.Status)
-	}
-
-	dec := xml.NewDecoder(res.Body)
-	dec.TypeFunc = types.TypeFunc()
-	err = dec.Decode(&resEnv)
-	if err != nil {
-		return err
-	}
-
-	if f := resBody.Fault(); f != nil {
-		return WrapSoapFault(f)
-	}
-
-	return err
+	})
 }
 
 func (c *Client) CloseIdleConnections() {

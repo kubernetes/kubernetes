@@ -109,7 +109,9 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
 	s := options.NewServerRunOptions()
-	s.AddFlags(fs)
+	for _, f := range s.Flags().FlagSets {
+		fs.AddFlagSet(f)
+	}
 
 	s.InsecureServing.BindPort = 0
 

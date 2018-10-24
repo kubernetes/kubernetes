@@ -32,7 +32,7 @@ func CreateBasic(serverURL, clusterName, userName string, caCert []byte) *client
 	return &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			clusterName: {
-				Server: serverURL,
+				Server:                   serverURL,
 				CertificateAuthorityData: caCert,
 			},
 		},

@@ -46,7 +46,7 @@ func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 	upgrader := spdy.NewResponseUpgrader()
 	conn := upgrader.UpgradeResponse(w, req, httpStreamReceived(streamChan))
 	if conn == nil {
-		return errors.New("Unable to upgrade websocket connection")
+		return errors.New("Unable to upgrade httpstream connection")
 	}
 	defer conn.Close()
 
@@ -58,9 +58,9 @@ func handleHttpStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 		streamChan:            streamChan,
 		streamPairs:           make(map[string]*httpStreamPair),
 		streamCreationTimeout: streamCreationTimeout,
-		pod:       podName,
-		uid:       uid,
-		forwarder: portForwarder,
+		pod:                   podName,
+		uid:                   uid,
+		forwarder:             portForwarder,
 	}
 	h.run()
 

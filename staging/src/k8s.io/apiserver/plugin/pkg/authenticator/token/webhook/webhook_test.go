@@ -17,6 +17,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -257,7 +258,7 @@ func TestTLSConfig(t *testing.T) {
 
 			// Allow all and see if we get an error.
 			service.Allow()
-			_, authenticated, err := wh.AuthenticateToken("t0k3n")
+			_, authenticated, err := wh.AuthenticateToken(context.Background(), "t0k3n")
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error making authorization request: %v", err)
@@ -270,7 +271,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			_, authenticated, err = wh.AuthenticateToken("t0k3n")
+			_, authenticated, err = wh.AuthenticateToken(context.Background(), "t0k3n")
 			if err != nil {
 				t.Errorf("%s: unexpectedly failed AuthenticateToken", tt.test)
 			}
@@ -374,7 +375,7 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 	token := "my-s3cr3t-t0ken"
 	for i, tt := range tests {
 		serv.response = tt.serverResponse
-		user, authenticated, err := wh.AuthenticateToken(token)
+		resp, authenticated, err := wh.AuthenticateToken(context.Background(), token)
 		if err != nil {
 			t.Errorf("case %d: authentication failed: %v", i, err)
 			continue
@@ -391,9 +392,9 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 			t.Errorf("case %d: Plugin returned incorrect authentication response. Got %t, expected %t.",
 				i, authenticated, tt.expectedAuthenticated)
 		}
-		if user != nil && tt.expectedUser != nil && !reflect.DeepEqual(user, tt.expectedUser) {
+		if resp != nil && tt.expectedUser != nil && !reflect.DeepEqual(resp.User, tt.expectedUser) {
 			t.Errorf("case %d: Plugin returned incorrect user. Got %#v, expected %#v",
-				i, user, tt.expectedUser)
+				i, resp.User, tt.expectedUser)
 		}
 	}
 }
@@ -540,12 +541,12 @@ func TestWebhookCacheAndRetry(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		func() {
+		t.Run(testcase.description, func(t *testing.T) {
 			serv.allow = testcase.allow
 			serv.statusCode = testcase.code
 			serv.called = 0
 
-			_, ok, err := wh.AuthenticateToken(testcase.token)
+			_, ok, err := wh.AuthenticateToken(context.Background(), testcase.token)
 			hasError := err != nil
 			if hasError != testcase.expectError {
 				t.Log(testcase.description)
@@ -559,6 +560,6 @@ func TestWebhookCacheAndRetry(t *testing.T) {
 				t.Log(testcase.description)
 				t.Errorf("Expected ok=%v, got %v", testcase.expectOk, ok)
 			}
-		}()
+		})
 	}
 }

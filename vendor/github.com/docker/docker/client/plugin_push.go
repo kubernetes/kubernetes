@@ -1,9 +1,8 @@
 package client
 
 import (
+	"context"
 	"io"
-
-	"golang.org/x/net/context"
 )
 
 // PluginPush pushes a plugin to a registry

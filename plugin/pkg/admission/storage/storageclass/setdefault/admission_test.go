@@ -21,12 +21,12 @@ import (
 
 	"github.com/golang/glog"
 
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/informers"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -34,7 +34,7 @@ func TestAdmission(t *testing.T) {
 	empty := ""
 	foo := "foo"
 
-	defaultClass1 := &storage.StorageClass{
+	defaultClass1 := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -46,7 +46,7 @@ func TestAdmission(t *testing.T) {
 		},
 		Provisioner: "default1",
 	}
-	defaultClass2 := &storage.StorageClass{
+	defaultClass2 := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -59,7 +59,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "default2",
 	}
 	// Class that has explicit default = false
-	classWithFalseDefault := &storage.StorageClass{
+	classWithFalseDefault := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -72,7 +72,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "nondefault1",
 	}
 	// Class with missing default annotation (=non-default)
-	classWithNoDefault := &storage.StorageClass{
+	classWithNoDefault := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -82,7 +82,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "nondefault1",
 	}
 	// Class with empty default annotation (=non-default)
-	classWithEmptyDefault := &storage.StorageClass{
+	classWithEmptyDefault := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -131,56 +131,56 @@ func TestAdmission(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		classes           []*storage.StorageClass
+		classes           []*storagev1.StorageClass
 		claim             *api.PersistentVolumeClaim
 		expectError       bool
 		expectedClassName string
 	}{
 		{
 			"no default, no modification of PVCs",
-			[]*storage.StorageClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storagev1.StorageClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithNoClass,
 			false,
 			"",
 		},
 		{
 			"one default, modify PVC with class=nil",
-			[]*storage.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storagev1.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithNoClass,
 			false,
 			"default1",
 		},
 		{
 			"one default, no modification of PVC with class=''",
-			[]*storage.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storagev1.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithEmptyClass,
 			false,
 			"",
 		},
 		{
 			"one default, no modification of PVC with class='foo'",
-			[]*storage.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storagev1.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithClass,
 			false,
 			"foo",
 		},
 		{
 			"two defaults, error with PVC with class=nil",
-			[]*storage.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storagev1.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithNoClass,
 			true,
 			"",
 		},
 		{
 			"two defaults, no modification of PVC with class=''",
-			[]*storage.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storagev1.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithEmptyClass,
 			false,
 			"",
 		},
 		{
 			"two defaults, no modification of PVC with class='foo'",
-			[]*storage.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storagev1.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithClass,
 			false,
 			"foo",
@@ -195,9 +195,9 @@ func TestAdmission(t *testing.T) {
 
 		ctrl := newPlugin()
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-		ctrl.SetInternalKubeInformerFactory(informerFactory)
+		ctrl.SetExternalKubeInformerFactory(informerFactory)
 		for _, c := range test.classes {
-			informerFactory.Storage().InternalVersion().StorageClasses().Informer().GetStore().Add(c)
+			informerFactory.Storage().V1().StorageClasses().Informer().GetStore().Add(c)
 		}
 		attrs := admission.NewAttributesRecord(
 			claim, // new object
@@ -208,7 +208,8 @@ func TestAdmission(t *testing.T) {
 			api.Resource("persistentvolumeclaims").WithVersion("version"),
 			"", // subresource
 			admission.Create,
-			nil, // userInfo
+			false, // dryRun
+			nil,   // userInfo
 		)
 		err := ctrl.Admit(attrs)
 		glog.Infof("Got %v", err)

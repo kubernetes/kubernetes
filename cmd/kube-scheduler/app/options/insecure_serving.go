@@ -23,16 +23,16 @@ import (
 
 	"github.com/spf13/pflag"
 
-	controlleroptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
+	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
-// CombinedInsecureServingOptions sets up up to two insecure listeners for healthz and metrics. The flags
-// override the ComponentConfig and InsecureServingOptions values for both.
+// CombinedInsecureServingOptions sets up to two insecure listeners for healthz and metrics. The flags
+// override the ComponentConfig and DeprecatedInsecureServingOptions values for both.
 type CombinedInsecureServingOptions struct {
-	Healthz *controlleroptions.InsecureServingOptions
-	Metrics *controlleroptions.InsecureServingOptions
+	Healthz *apiserveroptions.DeprecatedInsecureServingOptions
+	Metrics *apiserveroptions.DeprecatedInsecureServingOptions
 
 	BindPort    int    // overrides the structs above on ApplyTo, ignored on ApplyToFromLoadedConfig
 	BindAddress string // overrides the structs above on ApplyTo, ignored on ApplyToFromLoadedConfig
@@ -52,11 +52,11 @@ func (o *CombinedInsecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	// fs.MarkDeprecated("port", "see --secure-port instead.")
 }
 
-func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, componentConfig *componentconfig.KubeSchedulerConfiguration) error {
-	if err := updateAddressFromInsecureServingOptions(&componentConfig.HealthzBindAddress, o.Healthz); err != nil {
+func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
+	if err := updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.HealthzBindAddress, o.Healthz); err != nil {
 		return err
 	}
-	if err := updateAddressFromInsecureServingOptions(&componentConfig.MetricsBindAddress, o.Metrics); err != nil {
+	if err := updateAddressFromDeprecatedInsecureServingOptions(&componentConfig.MetricsBindAddress, o.Metrics); err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func (o *CombinedInsecureServingOptions) applyTo(c *schedulerappconfig.Config, c
 }
 
 // ApplyTo applies the insecure serving options to the given scheduler app configuration, and updates the componentConfig.
-func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, componentConfig *componentconfig.KubeSchedulerConfiguration) error {
+func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if o == nil {
 		componentConfig.HealthzBindAddress = ""
 		componentConfig.MetricsBindAddress = ""
@@ -93,22 +93,22 @@ func (o *CombinedInsecureServingOptions) ApplyTo(c *schedulerappconfig.Config, c
 }
 
 // ApplyToFromLoadedConfig updates the insecure serving options from the component config and then appies it to the given scheduler app configuration.
-func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerappconfig.Config, componentConfig *componentconfig.KubeSchedulerConfiguration) error {
+func (o *CombinedInsecureServingOptions) ApplyToFromLoadedConfig(c *schedulerappconfig.Config, componentConfig *kubeschedulerconfig.KubeSchedulerConfiguration) error {
 	if o == nil {
 		return nil
 	}
 
-	if err := updateInsecureServingOptionsFromAddress(o.Healthz, componentConfig.HealthzBindAddress); err != nil {
+	if err := updateDeprecatedInsecureServingOptionsFromAddress(o.Healthz, componentConfig.HealthzBindAddress); err != nil {
 		return fmt.Errorf("invalid healthz address: %v", err)
 	}
-	if err := updateInsecureServingOptionsFromAddress(o.Metrics, componentConfig.MetricsBindAddress); err != nil {
+	if err := updateDeprecatedInsecureServingOptionsFromAddress(o.Metrics, componentConfig.MetricsBindAddress); err != nil {
 		return fmt.Errorf("invalid metrics address: %v", err)
 	}
 
 	return o.applyTo(c, componentConfig)
 }
 
-func updateAddressFromInsecureServingOptions(addr *string, is *controlleroptions.InsecureServingOptions) error {
+func updateAddressFromDeprecatedInsecureServingOptions(addr *string, is *apiserveroptions.DeprecatedInsecureServingOptions) error {
 	if is == nil {
 		*addr = ""
 	} else {
@@ -124,7 +124,7 @@ func updateAddressFromInsecureServingOptions(addr *string, is *controlleroptions
 	return nil
 }
 
-func updateInsecureServingOptionsFromAddress(is *controlleroptions.InsecureServingOptions, addr string) error {
+func updateDeprecatedInsecureServingOptionsFromAddress(is *apiserveroptions.DeprecatedInsecureServingOptions, addr string) error {
 	if is == nil {
 		return nil
 	}

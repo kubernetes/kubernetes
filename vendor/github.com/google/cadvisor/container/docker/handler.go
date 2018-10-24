@@ -83,7 +83,7 @@ type dockerContainerHandler struct {
 	// The IP address of the container
 	ipAddress string
 
-	ignoreMetrics container.MetricSet
+	includedMetrics container.MetricSet
 
 	// the devicemapper poolname
 	poolName string
@@ -128,7 +128,7 @@ func newDockerContainerHandler(
 	inHostNamespace bool,
 	metadataEnvs []string,
 	dockerVersion []int,
-	ignoreMetrics container.MetricSet,
+	includedMetrics container.MetricSet,
 	thinPoolName string,
 	thinPoolWatcher *devicemapper.ThinPoolWatcher,
 	zfsWatcher *zfs.ZfsWatcher,
@@ -203,7 +203,7 @@ func newDockerContainerHandler(
 		rootfsStorageDir:   rootfsStorageDir,
 		envs:               make(map[string]string),
 		labels:             ctnr.Config.Labels,
-		ignoreMetrics:      ignoreMetrics,
+		includedMetrics:    includedMetrics,
 		zfsParent:          zfsParent,
 	}
 	// Timestamp returned by Docker is in time.RFC3339Nano format.
@@ -212,7 +212,7 @@ func newDockerContainerHandler(
 		// This should not happen, report the error just in case
 		return nil, fmt.Errorf("failed to parse the create timestamp %q for container %q: %v", ctnr.Created, id, err)
 	}
-	handler.libcontainerHandler = containerlibcontainer.NewHandler(cgroupManager, rootFs, ctnr.State.Pid, ignoreMetrics)
+	handler.libcontainerHandler = containerlibcontainer.NewHandler(cgroupManager, rootFs, ctnr.State.Pid, includedMetrics)
 
 	// Add the name and bare ID as aliases of the container.
 	handler.reference = info.ContainerReference{
@@ -244,7 +244,7 @@ func newDockerContainerHandler(
 
 	handler.ipAddress = ipAddress
 
-	if !ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if includedMetrics.Has(container.DiskUsageMetrics) {
 		handler.fsHandler = &dockerFsHandler{
 			fsHandler:       common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, otherStorageDir, fsInfo),
 			thinPoolWatcher: thinPoolWatcher,
@@ -345,14 +345,14 @@ func (self *dockerContainerHandler) ContainerReference() (info.ContainerReferenc
 }
 
 func (self *dockerContainerHandler) needNet() bool {
-	if !self.ignoreMetrics.Has(container.NetworkUsageMetrics) {
+	if self.includedMetrics.Has(container.NetworkUsageMetrics) {
 		return !self.networkMode.IsContainer()
 	}
 	return false
 }
 
 func (self *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
-	hasFilesystem := !self.ignoreMetrics.Has(container.DiskUsageMetrics)
+	hasFilesystem := self.includedMetrics.Has(container.DiskUsageMetrics)
 	spec, err := common.GetSpec(self.cgroupPaths, self.machineInfoFactory, self.needNet(), hasFilesystem)
 
 	spec.Labels = self.labels
@@ -369,11 +369,11 @@ func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error
 		return err
 	}
 
-	if !self.ignoreMetrics.Has(container.DiskIOMetrics) {
+	if self.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
 
-	if self.ignoreMetrics.Has(container.DiskUsageMetrics) {
+	if !self.includedMetrics.Has(container.DiskUsageMetrics) {
 		return nil
 	}
 	var device string

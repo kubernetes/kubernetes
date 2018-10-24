@@ -19,7 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 )
 
 // DebuggingOptions holds the Debugging options.
@@ -41,7 +41,7 @@ func (o *DebuggingOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up Debugging config with options.
-func (o *DebuggingOptions) ApplyTo(cfg *componentconfig.DebuggingConfiguration) error {
+func (o *DebuggingOptions) ApplyTo(cfg *apiserverconfig.DebuggingConfiguration) error {
 	if o == nil {
 		return nil
 	}

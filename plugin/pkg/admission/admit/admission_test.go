@@ -25,7 +25,7 @@ import (
 
 func TestAdmissionNonNilAttribute(t *testing.T) {
 	handler := NewAlwaysAdmit()
-	err := handler.(*alwaysAdmit).Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, nil))
+	err := handler.(*alwaysAdmit).Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, false, nil))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}

@@ -383,8 +383,7 @@ func (nm *NodeManager) vcConnect(ctx context.Context, vsphereInstance *VSphereIn
 		return err
 	}
 
-	glog.V(4).Infof("Invalid credentials. Cannot connect to server %q. "+
-		"Fetching credentials from secrets.", vsphereInstance.conn.Hostname)
+	glog.V(4).Infof("Invalid credentials. Cannot connect to server %q. Fetching credentials from secrets.", vsphereInstance.conn.Hostname)
 
 	// Get latest credentials from SecretCredentialManager
 	credentials, err := credentialManager.GetCredential(vsphereInstance.conn.Hostname)

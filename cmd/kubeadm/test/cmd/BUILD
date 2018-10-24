@@ -23,9 +23,8 @@ go_test(
         "version_test.go",
     ],
     args = ["--kubeadm-path=$(location //cmd/kubeadm:kubeadm)"],
-    data = ["//cmd/kubeadm"],
+    data = ["//cmd/kubeadm"] + glob(["testdata/**"]),
     embed = [":go_default_library"],
-    rundir = ".",
     tags = [
         "integration",
         "skip",

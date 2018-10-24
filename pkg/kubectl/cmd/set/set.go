@@ -18,10 +18,10 @@ package set
 
 import (
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/genericclioptions"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -33,11 +33,11 @@ var (
 
 func NewCmdSet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "set SUBCOMMAND",
+		Use:                   "set SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Set specific features on objects"),
-		Long:  set_long,
-		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
+		Short:                 i18n.T("Set specific features on objects"),
+		Long:                  set_long,
+		Run:                   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
 	// add subcommands

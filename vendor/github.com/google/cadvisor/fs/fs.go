@@ -107,7 +107,7 @@ type CrioContext struct {
 }
 
 func NewFsInfo(context Context) (FsInfo, error) {
-	mounts, err := mount.GetMounts()
+	mounts, err := mount.GetMounts(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +422,7 @@ func (self *RealFsInfo) GetFsInfoForPath(mountSet map[string]struct{}) ([]Fs, er
 				}
 			}
 			if err != nil {
-				glog.Errorf("Stat fs failed. Error: %v", err)
+				glog.V(4).Infof("Stat fs failed. Error: %v", err)
 			} else {
 				deviceSet[device] = struct{}{}
 				fs.DeviceInfo = DeviceInfo{

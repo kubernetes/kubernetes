@@ -19,6 +19,7 @@ package kubeadm
 import (
 	"flag"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -28,15 +29,26 @@ const (
 	TokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
 )
 
-var kubeadmPath = flag.String("kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
+var kubeadmPathFlag = flag.String("kubeadm-path", filepath.Join(os.Getenv("KUBE_ROOT"), "cluster/kubeadm.sh"), "Location of kubeadm")
+
+func getKubeadmPath() string {
+	kubeadmPath := *kubeadmPathFlag // TEST_SRCDIR is provided by Bazel.
+	if srcDir := os.Getenv("TEST_SRCDIR"); srcDir != "" {
+		kubeadmPath = path.Join(srcDir, os.Getenv("TEST_WORKSPACE"), kubeadmPath)
+	}
+
+	return kubeadmPath
+}
+
 var kubeadmCmdSkip = flag.Bool("kubeadm-cmd-skip", false, "Skip kubeadm cmd tests")
 
 func TestCmdTokenGenerate(t *testing.T) {
+	kubeadmPath := getKubeadmPath()
 	if *kubeadmCmdSkip {
 		t.Log("kubeadm cmd tests being skipped")
 		t.Skip()
 	}
-	stdout, _, err := RunCmd(*kubeadmPath, "token", "generate")
+	stdout, _, err := RunCmd(kubeadmPath, "token", "generate")
 	if err != nil {
 		t.Fatalf("'kubeadm token generate' exited uncleanly: %v", err)
 	}
@@ -65,7 +77,8 @@ func TestCmdTokenGenerateTypoError(t *testing.T) {
 		t.Skip()
 	}
 
-	_, _, err := RunCmd(*kubeadmPath, "token", "genorate") // subtle typo
+	kubeadmPath := getKubeadmPath()
+	_, _, err := RunCmd(kubeadmPath, "token", "genorate") // subtle typo
 	if err == nil {
 		t.Error("'kubeadm token genorate' (a deliberate typo) exited without an error when we expected non-zero exit status")
 	}
@@ -84,8 +97,9 @@ func TestCmdTokenDelete(t *testing.T) {
 		{"foobar", false}, // invalid token
 	}
 
+	kubeadmPath := getKubeadmPath()
 	for _, rt := range tests {
-		_, _, actual := RunCmd(*kubeadmPath, "token", "delete", rt.args)
+		_, _, actual := RunCmd(kubeadmPath, "token", "delete", rt.args)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed CmdTokenDelete running 'kubeadm token %s' with an error: %v\n\texpected: %t\n\t  actual: %t",

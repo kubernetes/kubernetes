@@ -26,10 +26,11 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -53,7 +54,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		}
 		for _, lb := range serviceLBNames {
 			framework.Logf("cleaning gce resource for %s", lb)
-			framework.CleanupServiceGCEResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
+			framework.TestContext.CloudConfig.Provider.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
 		serviceLBNames = []string{}
@@ -80,7 +81,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(svcTier).To(Equal(cloud.NetworkTierStandard))
 		// Record the LB name for test cleanup.
-		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
+		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 
 		// Wait and verify the LB.
 		ingressIP := waitAndVerifyLBWithTier(jig, ns, svcName, "", createTimeout, lagTimeout)
@@ -102,7 +103,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		// Test 3: create a standard-tierd LB with a user-requested IP.
 		By("reserving a static IP for the load balancer")
 		requestedAddrName := fmt.Sprintf("e2e-ext-lb-net-tier-%s", framework.RunId)
-		gceCloud, err := framework.GetGCECloud()
+		gceCloud, err := gce.GetGCECloud()
 		Expect(err).NotTo(HaveOccurred())
 		requestedIP, err := reserveAlphaRegionalAddress(gceCloud, requestedAddrName, cloud.NetworkTierStandard)
 		Expect(err).NotTo(HaveOccurred(), "failed to reserve a STANDARD tiered address")
@@ -187,7 +188,7 @@ func getLBNetworkTierByIP(ip string) (cloud.NetworkTier, error) {
 }
 
 func getGCEForwardingRuleByIP(ip string) (*computealpha.ForwardingRule, error) {
-	cloud, err := framework.GetGCECloud()
+	cloud, err := gce.GetGCECloud()
 	if err != nil {
 		return nil, err
 	}

@@ -75,6 +75,23 @@ run_kubectl_apply_tests() {
   # cleanup
   kubectl delete pods selector-test-pod
 
+  ## kubectl apply --server-dry-run
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  # apply dry-run
+  kubectl apply --server-dry-run -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # No pod exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply non dry-run creates the pod
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # apply changes
+  kubectl apply --server-dry-run -f hack/testdata/pod-apply.yaml "${kube_flags[@]}"
+  # Post-Condition: label still has initial value
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+
+  # clean-up
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
 
   ## kubectl apply --prune
   # Pre-Condition: no POD exists
@@ -156,6 +173,25 @@ run_kubectl_apply_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # cleanup
   kubectl delete svc prune-svc 2>&1 "${kube_flags[@]}"
+
+
+  ## kubectl apply -f some.yml --force
+  # Pre-condition: no service exists
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply service a
+  kubectl apply -f hack/testdata/service-revision1.yaml "${kube_flags[@]}"
+  # check right service exists
+  kube::test::get_object_assert 'services a' "{{${id_field}}}" 'a'
+  # change immutable field and apply service a
+  output_message=$(! kubectl apply -f hack/testdata/service-revision2.yaml 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'field is immutable'
+  # apply --force to recreate resources for immutable fields
+  kubectl apply -f hack/testdata/service-revision2.yaml --force "${kube_flags[@]}"
+  # check immutable field exists
+  kube::test::get_object_assert 'services a' "{{.spec.clusterIP}}" '10.0.0.12'
+  # cleanup
+  kubectl delete -f hack/testdata/service-revision2.yaml "${kube_flags[@]}"
+
 
   set +o nounset
   set +o errexit

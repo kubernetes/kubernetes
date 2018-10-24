@@ -49,7 +49,7 @@ const (
 var (
 	defaultCluster = v1.NamedCluster{
 		Cluster: v1.Cluster{
-			Server: "https://webhook.example.com",
+			Server:                   "https://webhook.example.com",
 			CertificateAuthorityData: caCert,
 		},
 	}
@@ -61,7 +61,7 @@ var (
 	}
 	namedCluster = v1.NamedCluster{
 		Cluster: v1.Cluster{
-			Server: "https://webhook.example.com",
+			Server:                   "https://webhook.example.com",
 			CertificateAuthorityData: caCert,
 		},
 		Name: "test-cluster",
@@ -159,7 +159,7 @@ func TestKubeConfigFile(t *testing.T) {
 			test: "cluster with invalid CA certificate ",
 			cluster: &v1.NamedCluster{
 				Cluster: v1.Cluster{
-					Server: namedCluster.Cluster.Server,
+					Server:                   namedCluster.Cluster.Server,
 					CertificateAuthorityData: caKey,
 				},
 			},
@@ -371,7 +371,7 @@ func TestTLSConfig(t *testing.T) {
 				Clusters: []v1.NamedCluster{
 					{
 						Cluster: v1.Cluster{
-							Server: server.URL,
+							Server:                   server.URL,
 							CertificateAuthorityData: tt.clientCA,
 						},
 					},
@@ -436,7 +436,7 @@ func TestRequestTimeout(t *testing.T) {
 		Clusters: []v1.NamedCluster{
 			{
 				Cluster: v1.Cluster{
-					Server: server.URL,
+					Server:                   server.URL,
 					CertificateAuthorityData: caCert,
 				},
 			},
@@ -522,7 +522,7 @@ func TestWithExponentialBackoff(t *testing.T) {
 		Clusters: []v1.NamedCluster{
 			{
 				Cluster: v1.Cluster{
-					Server: server.URL,
+					Server:                   server.URL,
 					CertificateAuthorityData: caCert,
 				},
 			},

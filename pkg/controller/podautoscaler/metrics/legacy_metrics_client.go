@@ -26,7 +26,7 @@ import (
 	heapster "k8s.io/heapster/metrics/api/v1/types"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
-	autoscaling "k8s.io/api/autoscaling/v2beta1"
+	autoscaling "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,10 +35,11 @@ import (
 )
 
 const (
-	DefaultHeapsterNamespace = "kube-system"
-	DefaultHeapsterScheme    = "http"
-	DefaultHeapsterService   = "heapster"
-	DefaultHeapsterPort      = "" // use the first exposed port on the service
+	DefaultHeapsterNamespace    = "kube-system"
+	DefaultHeapsterScheme       = "http"
+	DefaultHeapsterService      = "heapster"
+	DefaultHeapsterPort         = "" // use the first exposed port on the service
+	heapsterDefaultMetricWindow = time.Minute
 )
 
 var heapsterQueryStart = -5 * time.Minute
@@ -100,7 +101,11 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		}
 
 		if !missing {
-			res[m.Name] = int64(podSum)
+			res[m.Name] = PodMetric{
+				Timestamp: m.Timestamp.Time,
+				Window:    m.Window.Duration,
+				Value:     int64(podSum),
+			}
 		}
 	}
 
@@ -109,7 +114,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 	return res, timestamp, nil
 }
 
-func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
+func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector, metricSelector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	podList, err := h.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("failed to get pod list while fetching metrics: %v", err)
@@ -159,7 +164,12 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 	for i, podMetrics := range metrics.Items {
 		val, podTimestamp, hadMetrics := collapseTimeSamples(podMetrics, time.Minute)
 		if hadMetrics {
-			res[podNames[i]] = val
+			res[podNames[i]] = PodMetric{
+				Timestamp: podTimestamp,
+				Window:    heapsterDefaultMetricWindow,
+				Value:     int64(val),
+			}
+
 			if timestamp == nil || podTimestamp.Before(*timestamp) {
 				timestamp = &podTimestamp
 			}
@@ -173,7 +183,7 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 	return res, *timestamp, nil
 }
 
-func (h *HeapsterMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference) (int64, time.Time, error) {
+func (h *HeapsterMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (int64, time.Time, error) {
 	return 0, time.Time{}, fmt.Errorf("object metrics are not yet supported")
 }
 

@@ -110,11 +110,27 @@ func TestModifyContainerConfig(t *testing.T) {
 
 func TestModifyHostConfig(t *testing.T) {
 	setNetworkHC := &dockercontainer.HostConfig{}
+
+	// When we have Privileged pods, we do not need to use the
+	// Masked / Readonly paths.
 	setPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
 	setPrivSC.Privileged = true
+	setPrivSC.MaskedPaths = []string{"/hello/world/masked"}
+	setPrivSC.ReadonlyPaths = []string{"/hello/world/readonly"}
 	setPrivHC := &dockercontainer.HostConfig{
 		Privileged: true,
 	}
+
+	unsetPrivSC := &runtimeapi.LinuxContainerSecurityContext{}
+	unsetPrivSC.Privileged = false
+	unsetPrivSC.MaskedPaths = []string{"/hello/world/masked"}
+	unsetPrivSC.ReadonlyPaths = []string{"/hello/world/readonly"}
+	unsetPrivHC := &dockercontainer.HostConfig{
+		Privileged:    false,
+		MaskedPaths:   []string{"/hello/world/masked"},
+		ReadonlyPaths: []string{"/hello/world/readonly"},
+	}
+
 	setCapsHC := &dockercontainer.HostConfig{
 		CapAdd:  []string{"addCapA", "addCapB"},
 		CapDrop: []string{"dropCapA", "dropCapB"},
@@ -147,6 +163,11 @@ func TestModifyHostConfig(t *testing.T) {
 			name:     "container.SecurityContext.Privileged",
 			sc:       setPrivSC,
 			expected: setPrivHC,
+		},
+		{
+			name:     "container.SecurityContext.NoPrivileges",
+			sc:       unsetPrivSC,
+			expected: unsetPrivHC,
 		},
 		{
 			name: "container.SecurityContext.Capabilities",

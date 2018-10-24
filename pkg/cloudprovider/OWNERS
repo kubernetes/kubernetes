@@ -43,3 +43,5 @@ reviewers:
 - wlan0
 - cheftako
 - andrewsykim
+labels:
+- sig/cloud-provider

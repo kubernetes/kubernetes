@@ -99,6 +99,7 @@ func (ec *EstablishingController) processNextWorkItem() bool {
 
 	err := ec.syncFn(key.(string))
 	if err == nil {
+		ec.queue.Forget(key)
 		return true
 	}
 

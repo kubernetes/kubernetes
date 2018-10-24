@@ -24,8 +24,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,6 +52,10 @@ const (
 	daemonsetNameLabel   = daemonsetLabelPrefix + "name"
 	daemonsetColorLabel  = daemonsetLabelPrefix + "color"
 )
+
+// The annotation key scheduler.alpha.kubernetes.io/node-selector is for assigning
+// node selectors labels to namespaces
+var NamespaceNodeSelectors = []string{"scheduler.alpha.kubernetes.io/node-selector"}
 
 // This test must be run in serial because it assumes the Daemon Set pods will
 // always get scheduled.  If we run other tests in parallel, this may not
@@ -100,7 +103,13 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		ns = f.Namespace.Name
 
 		c = f.ClientSet
-		err := clearDaemonSetNodeLabels(c)
+
+		updatedNS, err := updateNamespaceAnnotations(c, ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		ns = updatedNS.Name
+
+		err = clearDaemonSetNodeLabels(c)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -495,6 +504,26 @@ func clearDaemonSetNodeLabels(c clientset.Interface) error {
 	return nil
 }
 
+// updateNamespaceAnnotations sets node selectors related annotations on tests namespaces to empty
+func updateNamespaceAnnotations(c clientset.Interface, nsName string) (*v1.Namespace, error) {
+	nsClient := c.CoreV1().Namespaces()
+
+	ns, err := nsClient.Get(nsName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if ns.Annotations == nil {
+		ns.Annotations = make(map[string]string)
+	}
+
+	for _, n := range NamespaceNodeSelectors {
+		ns.Annotations[n] = ""
+	}
+
+	return nsClient.Update(ns)
+}
+
 func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[string]string) (*v1.Node, error) {
 	nodeClient := c.CoreV1().Nodes()
 	var newNode *v1.Node
@@ -520,7 +549,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 			newLabels, _ = separateDaemonSetNodeLabels(newNode.Labels)
 			return true, err
 		}
-		if se, ok := err.(*apierrs.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
+		if se, ok := err.(*apierrors.StatusError); ok && se.ErrStatus.Reason == metav1.StatusReasonConflict {
 			framework.Logf("failed to update node due to resource version conflict")
 			return false, nil
 		}
@@ -734,7 +763,7 @@ func curHistory(historyList *apps.ControllerRevisionList, ds *apps.DaemonSet) *a
 func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func() (bool, error) {
 	return func() (bool, error) {
 		if _, err := c.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{}); err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, fmt.Errorf("failed to get failed daemon pod %q: %v", pod.Name, err)

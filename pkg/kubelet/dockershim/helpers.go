@@ -172,6 +172,8 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (dockernat.PortSet, map[
 			protocol = "/udp"
 		case runtimeapi.Protocol_TCP:
 			protocol = "/tcp"
+		case runtimeapi.Protocol_SCTP:
+			protocol = "/sctp"
 		default:
 			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
 			protocol = "/tcp"
@@ -342,7 +344,7 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := credentialprovider.LazyProvide(currentCreds)
+		authConfig := dockertypes.AuthConfig(credentialprovider.LazyProvide(currentCreds))
 		err := client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
 		// If there was no error, return success
 		if err == nil {

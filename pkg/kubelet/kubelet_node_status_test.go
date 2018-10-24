@@ -43,8 +43,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/features"
@@ -54,7 +54,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -570,7 +570,7 @@ func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.kubeClient = nil // ensure only the heartbeat client is used
-	kubelet.heartbeatClient, err = v1core.NewForConfig(config)
+	kubelet.heartbeatClient, err = clientset.NewForConfig(config)
 	kubelet.onRepeatedHeartbeatFailure = func() {
 		atomic.AddInt64(&failureCallbacks, 1)
 	}
@@ -1549,7 +1549,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 		// Check the unschedulable taint.
 		got := gotNode.(*v1.Node)
 		unschedulableTaint := &v1.Taint{
-			Key:    algorithm.TaintNodeUnschedulable,
+			Key:    schedulerapi.TaintNodeUnschedulable,
 			Effect: v1.TaintEffectNoSchedule,
 		}
 

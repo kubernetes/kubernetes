@@ -17,16 +17,18 @@ limitations under the License.
 package cache
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
-	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // cacheRecord holds the three return values of the authenticator.Token AuthenticateToken method
 type cacheRecord struct {
-	user user.Info
+	resp *authenticator.Response
 	ok   bool
 	err  error
 }
@@ -59,24 +61,31 @@ func newWithClock(authenticator authenticator.Token, successTTL, failureTTL time
 		authenticator: authenticator,
 		successTTL:    successTTL,
 		failureTTL:    failureTTL,
-		cache:         newStripedCache(32, fnvKeyFunc, func() cache { return newSimpleCache(128, clock) }),
+		cache:         newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock) }),
 	}
 }
 
 // AuthenticateToken implements authenticator.Token
-func (a *cachedTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, error) {
-	if record, ok := a.cache.get(token); ok {
-		return record.user, record.ok, record.err
+func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	auds, _ := request.AudiencesFrom(ctx)
+
+	key := keyFunc(auds, token)
+	if record, ok := a.cache.get(key); ok {
+		return record.resp, record.ok, record.err
 	}
 
-	user, ok, err := a.authenticator.AuthenticateToken(token)
+	resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
 
 	switch {
 	case ok && a.successTTL > 0:
-		a.cache.set(token, &cacheRecord{user: user, ok: ok, err: err}, a.successTTL)
+		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
 	case !ok && a.failureTTL > 0:
-		a.cache.set(token, &cacheRecord{user: user, ok: ok, err: err}, a.failureTTL)
+		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
 	}
 
-	return user, ok, err
+	return resp, ok, err
+}
+
+func keyFunc(auds []string, token string) string {
+	return fmt.Sprintf("%#v|%v", auds, token)
 }

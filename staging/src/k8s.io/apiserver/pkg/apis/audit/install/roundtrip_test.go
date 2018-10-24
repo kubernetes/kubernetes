@@ -19,7 +19,7 @@ package install
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apiserver/pkg/apis/audit/fuzzer"
 )
 

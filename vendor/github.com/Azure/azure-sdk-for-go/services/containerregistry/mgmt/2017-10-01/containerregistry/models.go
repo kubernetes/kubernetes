@@ -441,8 +441,10 @@ type ImportImageParameters struct {
 
 // ImportSource ...
 type ImportSource struct {
-	// ResourceID - The resource identifier of the target Azure Container Registry.
+	// ResourceID - The resource identifier of the source Azure Container Registry.
 	ResourceID *string `json:"resourceId,omitempty"`
+	// RegistryURI - The address of the source registry.
+	RegistryURI *string `json:"registryUri,omitempty"`
 	// SourceImage - Repository name of the source image.
 	// Specify an image by repository ('hello-world'). This will use the 'latest' tag.
 	// Specify an image by tag ('hello-world:latest').

@@ -22,10 +22,11 @@ package app
 
 import (
 	"fmt"
-
 	"net/http"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
@@ -42,6 +43,7 @@ func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error)
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
+		flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating DaemonSets controller: %v", err)

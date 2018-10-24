@@ -322,7 +322,7 @@ func (hs *HealthzServer) Run() {
 			glog.Errorf("Healthz closed with error: %v", err)
 			return
 		}
-		glog.Errorf("Unexpected healthz closed.")
+		glog.Error("Unexpected healthz closed.")
 	}, nodeHealthzRetryInterval, wait.NeverStop)
 }
 

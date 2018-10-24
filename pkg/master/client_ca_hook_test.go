@@ -186,6 +186,30 @@ func TestWriteClientCAs(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "skip on no change",
+			hook: ClientCARegistrationHook{
+				RequestHeaderUsernameHeaders:     []string{},
+				RequestHeaderGroupHeaders:        []string{},
+				RequestHeaderExtraHeaderPrefixes: []string{},
+				RequestHeaderCA:                  []byte("bar"),
+				RequestHeaderAllowedNames:        []string{},
+			},
+			preexistingObjs: []runtime.Object{
+				&api.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "extension-apiserver-authentication"},
+					Data: map[string]string{
+						"requestheader-username-headers":     `[]`,
+						"requestheader-group-headers":        `[]`,
+						"requestheader-extra-headers-prefix": `[]`,
+						"requestheader-client-ca-file":       "bar",
+						"requestheader-allowed-names":        `[]`,
+					},
+				},
+			},
+			expectedConfigMaps: map[string]*api.ConfigMap{},
+			expectUpdate:       false,
+		},
 	}
 
 	for _, test := range tests {

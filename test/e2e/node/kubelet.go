@@ -133,7 +133,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			Containers: []v1.Container{
 				{
 					Name:    "pod-nfs-vol",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"/bin/sh"},
 					Args:    cmdLine,
 					VolumeMounts: []v1.VolumeMount{

@@ -72,3 +72,39 @@ run_kubectl_create_error_tests() {
   set +o nounset
   set +o errexit
 }
+
+# Runs kubectl create job tests
+run_create_job_tests() {
+    set -o nounset
+    set -o errexit
+
+    create_and_use_new_namespace
+
+    # Test kubectl create job
+    kubectl create job test-job --image=k8s.gcr.io/nginx:test-cmd
+    # Post-Condition: job nginx is created
+    kube::test::get_object_assert 'job test-job' "{{$image_field0}}" 'k8s.gcr.io/nginx:test-cmd'
+    # Clean up
+    kubectl delete job test-job "${kube_flags[@]}"
+
+    # Test kubectl create job with command
+    kubectl create job test-job-pi "--image=$IMAGE_PERL" -- perl -Mbignum=bpi -wle 'print bpi(20)'
+    kube::test::get_object_assert 'job test-job-pi' "{{$image_field0}}" $IMAGE_PERL
+    # Clean up
+    kubectl delete job test-job-pi
+
+    # Test kubectl create job from cronjob
+    # Pre-Condition: create a cronjob
+    kubectl run test-pi --schedule="* */5 * * *" --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(10)'
+    kubectl create job my-pi --from=cronjob/test-pi
+    # Post-condition: container args contain expected command
+    output_message=$(kubectl get job my-pi -o go-template='{{(index .spec.template.spec.containers 0).args}}' "${kube_flags[@]}")
+    kube::test::if_has_string "${output_message}" "perl -Mbignum=bpi -wle print bpi(10)"
+
+    # Clean up
+    kubectl delete job my-pi
+    kubectl delete cronjob test-pi
+
+    set +o nounset
+    set +o errexit
+}

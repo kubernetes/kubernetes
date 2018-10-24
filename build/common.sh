@@ -19,6 +19,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Unset CDPATH, having it set messes up with script import paths
+unset CDPATH
+
 USER_ID=$(id -u)
 GROUP_ID=$(id -g)
 
@@ -85,9 +88,9 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  debian_iptables_version=v10
+  debian_iptables_version=v10.2
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
-  ### in build/BUILD.
+  ### in build/BUILD. And kube::golang::server_image_targets
   case $1 in
     "amd64")
         local targets=(
@@ -95,7 +98,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
-          kube-aggregator,busybox
           kube-proxy,k8s.gcr.io/debian-iptables-amd64:${debian_iptables_version}
         );;
     "arm")
@@ -104,7 +106,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,arm32v7/busybox
           kube-controller-manager,arm32v7/busybox
           kube-scheduler,arm32v7/busybox
-          kube-aggregator,arm32v7/busybox
           kube-proxy,k8s.gcr.io/debian-iptables-arm:${debian_iptables_version}
         );;
     "arm64")
@@ -113,7 +114,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,arm64v8/busybox
           kube-controller-manager,arm64v8/busybox
           kube-scheduler,arm64v8/busybox
-          kube-aggregator,arm64v8/busybox
           kube-proxy,k8s.gcr.io/debian-iptables-arm64:${debian_iptables_version}
         );;
     "ppc64le")
@@ -122,7 +122,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
-          kube-aggregator,ppc64le/busybox
           kube-proxy,k8s.gcr.io/debian-iptables-ppc64le:${debian_iptables_version}
         );;
     "s390x")
@@ -131,7 +130,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-apiserver,s390x/busybox
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
-          kube-aggregator,s390x/busybox
           kube-proxy,k8s.gcr.io/debian-iptables-s390x:${debian_iptables_version}
         );;
   esac
@@ -598,9 +596,11 @@ function kube::build::run_build_command_ex() {
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
     --env "KUBE_VERBOSE=${KUBE_VERBOSE}"
+    --env "KUBE_BUILD_WITH_COVERAGE=${KUBE_BUILD_WITH_COVERAGE:-}"
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
+    --env "SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-}"
   )
 
   if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then

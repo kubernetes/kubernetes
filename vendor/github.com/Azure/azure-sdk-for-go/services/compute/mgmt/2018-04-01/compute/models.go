@@ -798,84 +798,6 @@ func PossibleVirtualMachineSizeTypesValues() []VirtualMachineSizeTypes {
 // AccessURI a disk access SAS uri.
 type AccessURI struct {
 	autorest.Response `json:"-"`
-	// AccessURIOutput - Operation output data (raw JSON)
-	*AccessURIOutput `json:"properties,omitempty"`
-}
-
-// MarshalJSON is the custom marshaler for AccessURI.
-func (au AccessURI) MarshalJSON() ([]byte, error) {
-	objectMap := make(map[string]interface{})
-	if au.AccessURIOutput != nil {
-		objectMap["properties"] = au.AccessURIOutput
-	}
-	return json.Marshal(objectMap)
-}
-
-// UnmarshalJSON is the custom unmarshaler for AccessURI struct.
-func (au *AccessURI) UnmarshalJSON(body []byte) error {
-	var m map[string]*json.RawMessage
-	err := json.Unmarshal(body, &m)
-	if err != nil {
-		return err
-	}
-	for k, v := range m {
-		switch k {
-		case "properties":
-			if v != nil {
-				var accessURIOutput AccessURIOutput
-				err = json.Unmarshal(*v, &accessURIOutput)
-				if err != nil {
-					return err
-				}
-				au.AccessURIOutput = &accessURIOutput
-			}
-		}
-	}
-
-	return nil
-}
-
-// AccessURIOutput azure properties, including output.
-type AccessURIOutput struct {
-	// AccessURIRaw - Operation output data (raw JSON)
-	*AccessURIRaw `json:"output,omitempty"`
-}
-
-// MarshalJSON is the custom marshaler for AccessURIOutput.
-func (auo AccessURIOutput) MarshalJSON() ([]byte, error) {
-	objectMap := make(map[string]interface{})
-	if auo.AccessURIRaw != nil {
-		objectMap["output"] = auo.AccessURIRaw
-	}
-	return json.Marshal(objectMap)
-}
-
-// UnmarshalJSON is the custom unmarshaler for AccessURIOutput struct.
-func (auo *AccessURIOutput) UnmarshalJSON(body []byte) error {
-	var m map[string]*json.RawMessage
-	err := json.Unmarshal(body, &m)
-	if err != nil {
-		return err
-	}
-	for k, v := range m {
-		switch k {
-		case "output":
-			if v != nil {
-				var accessURIRaw AccessURIRaw
-				err = json.Unmarshal(*v, &accessURIRaw)
-				if err != nil {
-					return err
-				}
-				auo.AccessURIRaw = &accessURIRaw
-			}
-		}
-	}
-
-	return nil
-}
-
-// AccessURIRaw a disk access SAS uri.
-type AccessURIRaw struct {
 	// AccessSAS - A SAS uri for accessing a disk.
 	AccessSAS *string `json:"accessSAS,omitempty"`
 }
@@ -1290,7 +1212,7 @@ type DataDisk struct {
 	WriteAcceleratorEnabled *bool `json:"writeAcceleratorEnabled,omitempty"`
 	// CreateOption - Specifies how the virtual machine should be created.<br><br> Possible values are:<br><br> **Attach** \u2013 This value is used when you are using a specialized disk to create the virtual machine.<br><br> **FromImage** \u2013 This value is used when you are using an image to create the virtual machine. If you are using a platform image, you also use the imageReference element described above. If you are using a marketplace image, you  also use the plan element previously described. Possible values include: 'DiskCreateOptionTypesFromImage', 'DiskCreateOptionTypesEmpty', 'DiskCreateOptionTypesAttach'
 	CreateOption DiskCreateOptionTypes `json:"createOption,omitempty"`
-	// DiskSizeGB - Specifies the size of an empty data disk in gigabytes. This element can be used to overwrite the name of the disk in a virtual machine image. <br><br> This value cannot be larger than 1023 GB
+	// DiskSizeGB - Specifies the size of an empty data disk in gigabytes. This element can be used to overwrite the size of the disk in a virtual machine image. <br><br> This value cannot be larger than 1023 GB
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
 	// ManagedDisk - The managed disk parameters.
 	ManagedDisk *ManagedDiskParameters `json:"managedDisk,omitempty"`
@@ -2718,7 +2640,7 @@ type OSDisk struct {
 	WriteAcceleratorEnabled *bool `json:"writeAcceleratorEnabled,omitempty"`
 	// CreateOption - Specifies how the virtual machine should be created.<br><br> Possible values are:<br><br> **Attach** \u2013 This value is used when you are using a specialized disk to create the virtual machine.<br><br> **FromImage** \u2013 This value is used when you are using an image to create the virtual machine. If you are using a platform image, you also use the imageReference element described above. If you are using a marketplace image, you  also use the plan element previously described. Possible values include: 'DiskCreateOptionTypesFromImage', 'DiskCreateOptionTypesEmpty', 'DiskCreateOptionTypesAttach'
 	CreateOption DiskCreateOptionTypes `json:"createOption,omitempty"`
-	// DiskSizeGB - Specifies the size of an empty data disk in gigabytes. This element can be used to overwrite the name of the disk in a virtual machine image. <br><br> This value cannot be larger than 1023 GB
+	// DiskSizeGB - Specifies the size of an empty data disk in gigabytes. This element can be used to overwrite the size of the disk in a virtual machine image. <br><br> This value cannot be larger than 1023 GB
 	DiskSizeGB *int32 `json:"diskSizeGB,omitempty"`
 	// ManagedDisk - The managed disk parameters.
 	ManagedDisk *ManagedDiskParameters `json:"managedDisk,omitempty"`

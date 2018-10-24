@@ -28,6 +28,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"time"
+)
+
+const (
+	testInformerSyncPeriod  = 100 * time.Millisecond
+	testInformerSyncTimeout = 30 * time.Second
 )
 
 func getCredentialsFromSecret(k8s kubernetes.Interface, secretRef *api.SecretReference) (map[string]string, error) {
@@ -120,4 +126,17 @@ func getVolumeDevicePluginDir(specVolID string, host volume.VolumeHost) string {
 func getVolumeDeviceDataDir(specVolID string, host volume.VolumeHost) string {
 	sanitizedSpecVolID := kstrings.EscapeQualifiedNameForDisk(specVolID)
 	return path.Join(host.GetVolumeDevicePluginDir(csiPluginName), sanitizedSpecVolID, "data")
+}
+
+// hasReadWriteOnce returns true if modes contains v1.ReadWriteOnce
+func hasReadWriteOnce(modes []api.PersistentVolumeAccessMode) bool {
+	if modes == nil {
+		return false
+	}
+	for _, mode := range modes {
+		if mode == api.ReadWriteOnce {
+			return true
+		}
+	}
+	return false
 }

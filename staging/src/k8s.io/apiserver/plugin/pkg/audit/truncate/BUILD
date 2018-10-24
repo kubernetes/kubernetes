@@ -25,7 +25,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/fake:go_default_library",
         "//staging/src/k8s.io/apiserver/plugin/pkg/audit/webhook:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",

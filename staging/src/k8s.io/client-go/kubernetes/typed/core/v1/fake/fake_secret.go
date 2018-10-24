@@ -119,7 +119,7 @@ func (c *FakeSecrets) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 // Patch applies the patch and returns the patched secret.
 func (c *FakeSecrets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.Secret, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, data, subresources...), &corev1.Secret{})
+		Invokes(testing.NewPatchSubresourceAction(secretsResource, c.ns, name, pt, data, subresources...), &corev1.Secret{})
 
 	if obj == nil {
 		return nil, err

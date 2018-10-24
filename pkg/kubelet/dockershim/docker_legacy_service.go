@@ -17,6 +17,7 @@ limitations under the License.
 package dockershim
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -39,7 +40,7 @@ import (
 // more functions.
 type DockerLegacyService interface {
 	// GetContainerLogs gets logs for a specific container.
-	GetContainerLogs(*v1.Pod, kubecontainer.ContainerID, *v1.PodLogOptions, io.Writer, io.Writer) error
+	GetContainerLogs(context.Context, *v1.Pod, kubecontainer.ContainerID, *v1.PodLogOptions, io.Writer, io.Writer) error
 
 	// IsCRISupportedLogDriver checks whether the logging driver used by docker is
 	// supported by native CRI integration.
@@ -50,7 +51,7 @@ type DockerLegacyService interface {
 }
 
 // GetContainerLogs get container logs directly from docker daemon.
-func (d *dockerService) GetContainerLogs(pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
 	container, err := d.client.InspectContainer(containerID.ID)
 	if err != nil {
 		return err
@@ -97,7 +98,7 @@ func (d *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace s
 			Namespace: namespace,
 		},
 	}
-	err := d.GetContainerLogs(pod, containerId, &v1.PodLogOptions{TailLines: &value}, buf, buf)
+	err := d.GetContainerLogs(context.Background(), pod, containerId, &v1.PodLogOptions{TailLines: &value}, buf, buf)
 	if err != nil {
 		return "", err
 	}

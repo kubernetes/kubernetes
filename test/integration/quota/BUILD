@@ -14,13 +14,11 @@ go_test(
     ],
     tags = ["integration"],
     deps = [
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/replication:go_default_library",
         "//pkg/controller/resourcequota:go_default_library",
-        "//pkg/quota/generic:go_default_library",
-        "//pkg/quota/install:go_default_library",
+        "//pkg/quota/v1/generic:go_default_library",
+        "//pkg/quota/v1/install:go_default_library",
         "//plugin/pkg/admission/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -35,6 +33,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//test/integration/framework:go_default_library",
     ],
 )

@@ -19,8 +19,10 @@ package polymorphichelpers
 import (
 	"testing"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestCanBeAutoscaled(t *testing.T) {
@@ -29,11 +31,27 @@ func TestCanBeAutoscaled(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			kind:      api.Kind("ReplicationController"),
+			kind:      corev1.SchemeGroupVersion.WithKind("ReplicationController").GroupKind(),
 			expectErr: false,
 		},
 		{
-			kind:      api.Kind("Node"),
+			kind:      appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
+			expectErr: false,
+		},
+		{
+			kind:      extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(),
+			expectErr: false,
+		},
+		{
+			kind:      corev1.SchemeGroupVersion.WithKind("Node").GroupKind(),
+			expectErr: true,
+		},
+		{
+			kind:      corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
+			expectErr: true,
+		},
+		{
+			kind:      corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
 			expectErr: true,
 		},
 	}

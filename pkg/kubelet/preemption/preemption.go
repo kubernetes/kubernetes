@@ -22,11 +22,9 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -63,8 +61,8 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
-func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
-	if !kubetypes.IsCriticalPod(pod) || !utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) {
+func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []algorithm.PredicateFailureReason) (bool, []algorithm.PredicateFailureReason, error) {
+	if !kubetypes.IsCriticalPod(admitPod) {
 		return false, failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
@@ -85,16 +83,16 @@ func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(pod *v1.Pod, failur
 		// Return only reasons that are not resource related, since critical pods cannot fail admission for resource reasons.
 		return false, nonResourceReasons, nil
 	}
-	err := c.evictPodsToFreeRequests(admissionRequirementList(resourceReasons))
+	err := c.evictPodsToFreeRequests(admitPod, admissionRequirementList(resourceReasons))
 	// if no error is returned, preemption succeeded and the pod is safe to admit.
 	return err == nil, nil, err
 }
 
-// freeRequests takes a list of insufficient resources, and attempts to free them by evicting pods
+// evictPodsToFreeRequests takes a list of insufficient resources, and attempts to free them by evicting pods
 // based on requests.  For example, if the only insufficient resource is 200Mb of memory, this function could
 // evict a pod with request=250Mb.
-func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResources admissionRequirementList) error {
-	podsToPreempt, err := getPodsToPreempt(c.getPodsFunc(), insufficientResources)
+func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, insufficientResources admissionRequirementList) error {
+	podsToPreempt, err := getPodsToPreempt(admitPod, c.getPodsFunc(), insufficientResources)
 	if err != nil {
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
@@ -118,8 +116,8 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(insufficientResour
 }
 
 // getPodsToPreempt returns a list of pods that could be preempted to free requests >= requirements
-func getPodsToPreempt(pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
-	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pods)
+func getPodsToPreempt(pod *v1.Pod, pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
+	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pod, pods)
 
 	// make sure that pods exist to reclaim the requirements
 	unableToMeetRequirements := requirements.subtract(append(append(bestEffortPods, burstablePods...), guaranteedPods...)...)
@@ -144,7 +142,7 @@ func getPodsToPreempt(pods []*v1.Pod, requirements admissionRequirementList) ([]
 	return append(append(bestEffortToEvict, burstableToEvict...), guarateedToEvict...), nil
 }
 
-// finds the pods that have pod requests >= admission requirements.
+// getPodsToPreemptByDistance finds the pods that have pod requests >= admission requirements.
 // Chooses pods that minimize "distance" to the requirements.
 // If more than one pod exists that fulfills the remaining requirements,
 // it chooses the pod that has the "smaller resource request"
@@ -185,8 +183,8 @@ type admissionRequirement struct {
 
 type admissionRequirementList []*admissionRequirement
 
-// distance of the pods requests from the admissionRequirements.
-// distance is measured by the fraction of the requirement satisfied by the pod,
+// distance returns distance of the pods requests from the admissionRequirements.
+// The distance is measured by the fraction of the requirement satisfied by the pod,
 // so that each requirement is weighted equally, regardless of absolute magnitude.
 func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 	dist := float64(0)
@@ -200,7 +198,7 @@ func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 	return dist
 }
 
-// returns a new admissionRequirementList containing remaining requirements if the provided pod
+// subtract returns a new admissionRequirementList containing remaining requirements if the provided pod
 // were to be preempted
 func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirementList {
 	newList := []*admissionRequirement{}
@@ -227,10 +225,11 @@ func (a admissionRequirementList) toString() string {
 	return s + "]"
 }
 
-// returns lists containing non-critical besteffort, burstable, and guaranteed pods
-func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
+// sortPodsByQOS returns lists containing besteffort, burstable, and guaranteed pods that
+// can be preempted by preemptor pod.
+func sortPodsByQOS(preemptor *v1.Pod, pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
 	for _, pod := range pods {
-		if !kubetypes.IsCriticalPod(pod) {
+		if kubetypes.Preemptable(preemptor, pod) {
 			switch v1qos.GetPodQOS(pod) {
 			case v1.PodQOSBestEffort:
 				bestEffort = append(bestEffort, pod)
@@ -242,10 +241,11 @@ func sortPodsByQOS(pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod)
 			}
 		}
 	}
+
 	return
 }
 
-// returns true if pod1 has a smaller request than pod2
+// smallerResourceRequest returns true if pod1 has a smaller request than pod2
 func smallerResourceRequest(pod1 *v1.Pod, pod2 *v1.Pod) bool {
 	priorityList := []v1.ResourceName{
 		v1.ResourceMemory,

@@ -7,3 +7,5 @@ reviewers:
 - sttts
 - munnerz
 - nikhita
+labels:
+- sig/api-machinery

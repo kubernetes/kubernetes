@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"time"
 
@@ -32,6 +33,11 @@ import (
 )
 
 type csiClient interface {
+	NodeGetInfo(ctx context.Context) (
+		nodeID string,
+		maxVolumePerNode int64,
+		accessibleTopology *csipb.Topology,
+		err error)
 	NodePublishVolume(
 		ctx context.Context,
 		volumeid string,
@@ -64,15 +70,61 @@ type csiClient interface {
 
 // csiClient encapsulates all csi-plugin methods
 type csiDriverClient struct {
-	driverName string
-	nodeClient csipb.NodeClient
+	driverName        string
+	nodeClientCreator nodeClientCreator
 }
 
 var _ csiClient = &csiDriverClient{}
 
+type nodeClientCreator func(driverName string) (
+	nodeClient csipb.NodeClient,
+	closer io.Closer,
+	err error,
+)
+
+// newNodeClient creates a new NodeClient with the internally used gRPC
+// connection set up. It also returns a closer which must to be called to close
+// the gRPC connection when the NodeClient is not used anymore.
+// This is the default implementation for the nodeClientCreator, used in
+// newCsiDriverClient.
+func newNodeClient(driverName string) (nodeClient csipb.NodeClient, closer io.Closer, err error) {
+	var conn *grpc.ClientConn
+	conn, err = newGrpcConn(driverName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodeClient = csipb.NewNodeClient(conn)
+	return nodeClient, conn, nil
+}
+
 func newCsiDriverClient(driverName string) *csiDriverClient {
-	c := &csiDriverClient{driverName: driverName}
+	c := &csiDriverClient{
+		driverName:        driverName,
+		nodeClientCreator: newNodeClient,
+	}
 	return c
+}
+
+func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
+	nodeID string,
+	maxVolumePerNode int64,
+	accessibleTopology *csipb.Topology,
+	err error) {
+	glog.V(4).Info(log("calling NodeGetInfo rpc"))
+
+	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	defer closer.Close()
+
+	res, err := nodeClient.NodeGetInfo(ctx, &csipb.NodeGetInfoRequest{})
+	if err != nil {
+		return "", 0, nil, err
+	}
+
+	return res.GetNodeId(), res.GetMaxVolumesPerNode(), res.GetAccessibleTopology(), nil
 }
 
 func (c *csiDriverClient) NodePublishVolume(
@@ -95,12 +147,11 @@ func (c *csiDriverClient) NodePublishVolume(
 		return errors.New("missing target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	nodeClient := csipb.NewNodeClient(conn)
+	defer closer.Close()
 
 	req := &csipb.NodePublishVolumeRequest{
 		VolumeId:           volID,
@@ -144,12 +195,11 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string,
 		return errors.New("missing target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	nodeClient := csipb.NewNodeClient(conn)
+	defer closer.Close()
 
 	req := &csipb.NodeUnpublishVolumeRequest{
 		VolumeId:   volID,
@@ -177,12 +227,11 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 		return errors.New("missing staging target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	nodeClient := csipb.NewNodeClient(conn)
+	defer closer.Close()
 
 	req := &csipb.NodeStageVolumeRequest{
 		VolumeId:          volID,
@@ -222,12 +271,11 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 		return errors.New("missing staging target path")
 	}
 
-	conn, err := newGrpcConn(c.driverName)
+	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
-	nodeClient := csipb.NewNodeClient(conn)
+	defer closer.Close()
 
 	req := &csipb.NodeUnstageVolumeRequest{
 		VolumeId:          volID,
@@ -240,12 +288,11 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 func (c *csiDriverClient) NodeGetCapabilities(ctx context.Context) ([]*csipb.NodeServiceCapability, error) {
 	glog.V(4).Info(log("calling NodeGetCapabilities rpc"))
 
-	conn, err := newGrpcConn(c.driverName)
+	nodeClient, closer, err := c.nodeClientCreator(c.driverName)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
-	nodeClient := csipb.NewNodeClient(conn)
+	defer closer.Close()
 
 	req := &csipb.NodeGetCapabilitiesRequest{}
 	resp, err := nodeClient.NodeGetCapabilities(ctx, req)
@@ -274,7 +321,10 @@ func newGrpcConn(driverName string) (*grpc.ClientConn, error) {
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
 	// TODO once KubeletPluginsWatcher graduates to beta, remove FeatureGate check
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
+		csiDrivers.RLock()
 		driver, ok := csiDrivers.driversMap[driverName]
+		csiDrivers.RUnlock()
+
 		if !ok {
 			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 		}

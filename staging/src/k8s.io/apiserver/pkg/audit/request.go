@@ -45,10 +45,10 @@ const (
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		RequestReceivedTimestamp: metav1.NewMicroTime(time.Now()),
-		Verb:       attribs.GetVerb(),
-		RequestURI: req.URL.RequestURI(),
-		UserAgent:  maybeTruncateUserAgent(req),
-		Level:      level,
+		Verb:                     attribs.GetVerb(),
+		RequestURI:               req.URL.RequestURI(),
+		UserAgent:                maybeTruncateUserAgent(req),
+		Level:                    level,
 	}
 
 	// prefer the id from the headers. If not available, create a new one.

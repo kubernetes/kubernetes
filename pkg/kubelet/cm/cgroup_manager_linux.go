@@ -204,18 +204,16 @@ func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
 func (m *cgroupManagerImpl) Name(name CgroupName) string {
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		return name.ToSystemd()
-	} else {
-		return name.ToCgroupfs()
 	}
+	return name.ToCgroupfs()
 }
 
 // CgroupName converts the literal cgroupfs name on the host to an internal identifier.
 func (m *cgroupManagerImpl) CgroupName(name string) CgroupName {
 	if m.adapter.cgroupManagerType == libcontainerSystemd {
 		return ParseSystemdToCgroupName(name)
-	} else {
-		return ParseCgroupfsToCgroupName(name)
 	}
+	return ParseCgroupfsToCgroupName(name)
 }
 
 // buildCgroupPaths builds a path to each cgroup subsystem for the specified name.
@@ -257,6 +255,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// once resolved, we can remove this code.
 	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd")
 
+	var missingPaths []string
 	// If even one cgroup path doesn't exist, then the cgroup doesn't exist.
 	for controller, path := range cgroupPaths {
 		// ignore mounts we don't care about
@@ -264,8 +263,13 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 			continue
 		}
 		if !libcontainercgroups.PathExists(path) {
-			return false
+			missingPaths = append(missingPaths, path)
 		}
+	}
+
+	if len(missingPaths) > 0 {
+		glog.V(4).Infof("The Cgroup %v has some missing paths: %v", name, missingPaths)
+		return false
 	}
 
 	return true

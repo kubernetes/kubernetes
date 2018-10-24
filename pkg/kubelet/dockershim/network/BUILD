@@ -9,7 +9,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim/network",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/network/hostport:go_default_library",
         "//pkg/kubelet/dockershim/network/metrics:go_default_library",

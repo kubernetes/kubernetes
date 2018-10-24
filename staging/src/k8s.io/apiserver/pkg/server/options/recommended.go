@@ -54,7 +54,7 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 
 	return &RecommendedOptions{
 		Etcd:                       NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
-		SecureServing:              WithLoopback(sso),
+		SecureServing:              sso.WithLoopback(),
 		Authentication:             NewDelegatingAuthenticationOptions(),
 		Authorization:              NewDelegatingAuthorizationOptions(),
 		Audit:                      NewAuditOptions(),

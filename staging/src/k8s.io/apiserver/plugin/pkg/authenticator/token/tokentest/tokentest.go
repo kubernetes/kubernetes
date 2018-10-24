@@ -16,7 +16,12 @@ limitations under the License.
 
 package tokentest
 
-import "k8s.io/apiserver/pkg/authentication/user"
+import (
+	"context"
+
+	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/user"
+)
 
 type TokenAuthenticator struct {
 	Tokens map[string]*user.DefaultInfo
@@ -27,10 +32,11 @@ func New() *TokenAuthenticator {
 		Tokens: make(map[string]*user.DefaultInfo),
 	}
 }
-func (a *TokenAuthenticator) AuthenticateToken(value string) (user.Info, bool, error) {
+
+func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
 	user, ok := a.Tokens[value]
 	if !ok {
 		return nil, false, nil
 	}
-	return user, true, nil
+	return &authenticator.Response{User: user}, true, nil
 }

@@ -157,15 +157,18 @@ func (m *EventManager) PostEvent(ctx *Context, req *types.PostEvent) soap.HasFau
 	event.CreatedTime = time.Now()
 	event.UserName = ctx.Session.UserName
 
-	m.page = m.page.Next()
+	m.page = m.page.Prev()
 	m.page.Value = req.EventToPost
 	m.formatMessage(req.EventToPost)
 
 	for _, c := range m.collectors {
-		if c.eventMatches(req.EventToPost) {
-			c.page = c.page.Next()
-			c.page.Value = event
-		}
+		ctx.WithLock(c, func() {
+			if c.eventMatches(req.EventToPost) {
+				c.page = c.page.Prev()
+				c.page.Value = req.EventToPost
+				Map.Update(c, []types.PropertyChange{{Name: "latestPage", Val: c.GetLatestPage()}})
+			}
+		})
 	}
 
 	return &methods.PostEventBody{

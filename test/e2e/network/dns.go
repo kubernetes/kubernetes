@@ -37,8 +37,9 @@ var _ = SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
 	/*
-	   Testname: dns-for-clusters
-	   Description: Make sure that DNS can resolve the names of clusters.
+		Release : v1.9
+		Testname: DNS, cluster
+		Description: When a Pod is created, the pod MUST be able to resolve cluster dns entries such as kubernetes.default via DNS and /etc/hosts.
 	*/
 	framework.ConformanceIt("should provide DNS for the cluster ", func() {
 		// All the names we need to be able to resolve.
@@ -67,8 +68,9 @@ var _ = SIGDescribe("DNS", func() {
 	})
 
 	/*
-	   Testname: dns-for-services
-	   Description: Make sure that DNS can resolve the names of services.
+		Release : v1.9
+		Testname: DNS, services
+		Description: When a headless service is created, the service MUST be able to resolve all the required service endpoints. When the service is created, any pod in the same namespace must be able to resolve the service by all of the expected DNS names.
 	*/
 	framework.ConformanceIt("should provide DNS for services ", func() {
 		// Create a test headless service.
@@ -78,16 +80,17 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
-		regularService := framework.CreateServiceSpec("test-service-2", "", false, testServiceSelector)
+		regularServiceName := "test-service-2"
+		regularService := framework.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create regular service: %s", regularServiceName)
 		defer func() {
 			By("deleting the test service")
 			defer GinkgoRecover()
@@ -128,7 +131,7 @@ var _ = SIGDescribe("DNS", func() {
 		podHostname := "dns-querier-2"
 		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create headless service: %s", serviceName)
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
@@ -159,7 +162,7 @@ var _ = SIGDescribe("DNS", func() {
 		serviceName := "dns-test-service-3"
 		externalNameService := framework.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to create ExternalName service: %s", serviceName)
 		defer func() {
 			By("deleting the test externalName service")
 			defer GinkgoRecover()
@@ -183,7 +186,7 @@ var _ = SIGDescribe("DNS", func() {
 		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to change externalName of service: %s", serviceName)
 		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
 		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
@@ -200,10 +203,10 @@ var _ = SIGDescribe("DNS", func() {
 		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: "TCP"},
+				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 			}
 		})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to change service type to ClusterIP for service: %s", serviceName)
 		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "A", "wheezy")
 		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "A", "jessie")
 		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
@@ -214,7 +217,7 @@ var _ = SIGDescribe("DNS", func() {
 		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 
 		svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Get(externalNameService.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(), "failed to get service: %s", externalNameService.Name)
 
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
@@ -230,7 +233,7 @@ var _ = SIGDescribe("DNS", func() {
 			testDNSNameFull: testInjectedIP,
 		})
 		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testServerPod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s", testServerPod.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testServerPod.Name)
 		framework.Logf("Created pod %v", testServerPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testServerPod.Name)
@@ -261,7 +264,7 @@ var _ = SIGDescribe("DNS", func() {
 			},
 		}
 		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod %s", testUtilsPod.Name)
+		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testUtilsPod.Name)
 		framework.Logf("Created pod %v", testUtilsPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testUtilsPod.Name)

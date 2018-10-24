@@ -60,7 +60,6 @@ func main() {
 // Outputs linesTotal lines of logs to stdout uniformly for duration
 func generateLogs(linesTotal int, duration time.Duration) {
 	delay := duration / time.Duration(linesTotal)
-	rand.Seed(time.Now().UnixNano())
 
 	ticker := time.NewTicker(delay)
 	defer ticker.Stop()

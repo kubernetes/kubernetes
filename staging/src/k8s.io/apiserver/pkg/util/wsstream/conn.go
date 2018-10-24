@@ -137,7 +137,7 @@ type ChannelProtocolConfig struct {
 // channels.
 func NewDefaultChannelProtocols(channels []ChannelType) map[string]ChannelProtocolConfig {
 	return map[string]ChannelProtocolConfig{
-		"": {Binary: true, Channels: channels},
+		"":                             {Binary: true, Channels: channels},
 		ChannelWebSocketProtocol:       {Binary: true, Channels: channels},
 		Base64ChannelWebSocketProtocol: {Binary: false, Channels: channels},
 	}

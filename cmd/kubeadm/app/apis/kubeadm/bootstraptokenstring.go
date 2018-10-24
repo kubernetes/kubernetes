@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"strings"
 
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 )
 
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used

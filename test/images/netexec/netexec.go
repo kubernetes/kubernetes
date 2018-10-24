@@ -357,6 +357,7 @@ func startUDPServer(udpPort int) {
 	serverAddress, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", udpPort))
 	assertNoError(err)
 	serverConn, err := net.ListenUDP("udp", serverAddress)
+	assertNoError(err)
 	defer serverConn.Close()
 	buf := make([]byte, 1024)
 

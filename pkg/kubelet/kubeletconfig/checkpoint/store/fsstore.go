@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"

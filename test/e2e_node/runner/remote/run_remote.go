@@ -188,7 +188,7 @@ func main() {
 		glog.Fatalf("--test-suite must be one of default or conformance")
 	}
 
-	rand.Seed(time.Now().UTC().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
 		remote.CreateTestArchive(suite, *systemSpecName)

@@ -116,7 +116,7 @@ func (s *SecureServingOptions) Validate() []error {
 	errors := []error{}
 
 	if s.Required && s.BindPort < 1 || s.BindPort > 65535 {
-		errors = append(errors, fmt.Errorf("--secure-port %v must be between 1 and 65535, inclusive. It cannot turned off with 0", s.BindPort))
+		errors = append(errors, fmt.Errorf("--secure-port %v must be between 1 and 65535, inclusive. It cannot be turned off with 0", s.BindPort))
 	} else if s.BindPort < 0 || s.BindPort > 65535 {
 		errors = append(errors, fmt.Errorf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port", s.BindPort))
 	}
@@ -136,7 +136,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 
 	desc := "The port on which to serve HTTPS with authentication and authorization."
 	if s.Required {
-		desc += "It cannot switched off with 0."
+		desc += "It cannot be switched off with 0."
 	} else {
 		desc += "If 0, don't serve HTTPS at all."
 	}

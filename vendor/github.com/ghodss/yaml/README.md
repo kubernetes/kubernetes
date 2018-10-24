@@ -4,13 +4,13 @@
 
 ## Introduction
 
-A wrapper around [go-yaml](https://github.com/go-yaml/yaml) designed to enable a better way of handling YAML when marshaling to and from structs. 
+A wrapper around [go-yaml](https://github.com/go-yaml/yaml) designed to enable a better way of handling YAML when marshaling to and from structs.
 
 In short, this library first converts YAML to JSON using go-yaml and then uses `json.Marshal` and `json.Unmarshal` to convert to or from the struct. This means that it effectively reuses the JSON struct tags as well as the custom JSON methods `MarshalJSON` and `UnmarshalJSON` unlike go-yaml. For a detailed overview of the rationale behind this method, [see this blog post](http://ghodss.com/2014/the-right-way-to-handle-yaml-in-golang/).
 
 ## Compatibility
 
-This package uses [go-yaml v2](https://github.com/go-yaml/yaml) and therefore supports [everything go-yaml supports](https://github.com/go-yaml/yaml#compatibility).
+This package uses [go-yaml](https://github.com/go-yaml/yaml) and therefore supports [everything go-yaml supports](https://github.com/go-yaml/yaml#compatibility).
 
 ## Caveats
 
@@ -44,6 +44,8 @@ import "github.com/ghodss/yaml"
 Usage is very similar to the JSON library:
 
 ```go
+package main
+
 import (
 	"fmt"
 
@@ -51,8 +53,8 @@ import (
 )
 
 type Person struct {
-	Name string `json:"name"`  // Affects YAML field names too.
-	Age int `json:"name"`
+	Name string `json:"name"` // Affects YAML field names too.
+	Age  int    `json:"age"`
 }
 
 func main() {
@@ -65,13 +67,13 @@ func main() {
 	}
 	fmt.Println(string(y))
 	/* Output:
-	name: John
 	age: 30
+	name: John
 	*/
 
 	// Unmarshal the YAML back into a Person struct.
 	var p2 Person
-	err := yaml.Unmarshal(y, &p2)
+	err = yaml.Unmarshal(y, &p2)
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
 		return
@@ -86,11 +88,14 @@ func main() {
 `yaml.YAMLToJSON` and `yaml.JSONToYAML` methods are also available:
 
 ```go
+package main
+
 import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
 )
+
 func main() {
 	j := []byte(`{"name": "John", "age": 30}`)
 	y, err := yaml.JSONToYAML(j)

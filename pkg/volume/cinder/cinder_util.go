@@ -162,7 +162,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 }
 
 // CreateVolume uses the cloud provider entrypoint for creating a volume
-func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
+func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, volumeLabels map[string]string, fstype string, err error) {
 	cloud, err := c.plugin.getCloudProvider()
 	if err != nil {
 		return "", 0, nil, "", err
@@ -207,7 +207,11 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
 		if len(zones) > 0 {
-			availability = volutil.ChooseZoneForVolume(zones, c.options.PVC.Name)
+			availability, err = volutil.SelectZoneForVolume(false, false, "", nil, zones, node, allowedTopologies, c.options.PVC.Name)
+			if err != nil {
+				glog.V(2).Infof("error selecting zone for volume: %v", err)
+				return "", 0, nil, "", err
+			}
 		}
 	}
 
@@ -221,8 +225,12 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID string,
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
-		volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
-		volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
+		if volumeAZ != "" {
+			volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+		}
+		if volumeRegion != "" {
+			volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
+		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil
 }

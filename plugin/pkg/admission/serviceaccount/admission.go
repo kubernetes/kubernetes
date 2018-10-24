@@ -23,19 +23,20 @@ import (
 	"strconv"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -74,16 +75,16 @@ type serviceAccount struct {
 	// MountServiceAccountToken creates Volume and VolumeMounts for the first referenced ServiceAccountToken for the pod's service account
 	MountServiceAccountToken bool
 
-	client internalclientset.Interface
+	client kubernetes.Interface
 
-	serviceAccountLister corelisters.ServiceAccountLister
-	secretLister         corelisters.SecretLister
+	serviceAccountLister corev1listers.ServiceAccountLister
+	secretLister         corev1listers.SecretLister
 }
 
 var _ admission.MutationInterface = &serviceAccount{}
 var _ admission.ValidationInterface = &serviceAccount{}
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&serviceAccount{})
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&serviceAccount{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&serviceAccount{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&serviceAccount{})
 
 // NewServiceAccount returns an admission.Interface implementation which limits admission of Pod CREATE requests based on the pod's ServiceAccount:
 // 1. If the pod does not specify a ServiceAccount, it sets the pod's ServiceAccount to "default"
@@ -103,15 +104,15 @@ func NewServiceAccount() *serviceAccount {
 	}
 }
 
-func (a *serviceAccount) SetInternalKubeClientSet(cl internalclientset.Interface) {
+func (a *serviceAccount) SetExternalKubeClientSet(cl kubernetes.Interface) {
 	a.client = cl
 }
 
-func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	serviceAccountInformer := f.Core().InternalVersion().ServiceAccounts()
+func (a *serviceAccount) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	serviceAccountInformer := f.Core().V1().ServiceAccounts()
 	a.serviceAccountLister = serviceAccountInformer.Lister()
 
-	secretInformer := f.Core().InternalVersion().Secrets()
+	secretInformer := f.Core().V1().Secrets()
 	a.secretLister = secretInformer.Lister()
 
 	a.SetReadyFunc(func() bool {
@@ -174,7 +175,9 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	}
 	if len(pod.Spec.ImagePullSecrets) == 0 {
 		pod.Spec.ImagePullSecrets = make([]api.LocalObjectReference, len(serviceAccount.ImagePullSecrets))
-		copy(pod.Spec.ImagePullSecrets, serviceAccount.ImagePullSecrets)
+		for i := 0; i < len(serviceAccount.ImagePullSecrets); i++ {
+			pod.Spec.ImagePullSecrets[i].Name = serviceAccount.ImagePullSecrets[i].Name
+		}
 	}
 
 	return s.Validate(a)
@@ -251,7 +254,7 @@ func shouldIgnore(a admission.Attributes) bool {
 	return false
 }
 
-func shouldAutomount(sa *api.ServiceAccount, pod *api.Pod) bool {
+func shouldAutomount(sa *corev1.ServiceAccount, pod *api.Pod) bool {
 	// Pod's preference wins
 	if pod.Spec.AutomountServiceAccountToken != nil {
 		return *pod.Spec.AutomountServiceAccountToken
@@ -266,7 +269,7 @@ func shouldAutomount(sa *api.ServiceAccount, pod *api.Pod) bool {
 
 // enforceMountableSecrets indicates whether mountable secrets should be enforced for a particular service account
 // A global setting of true will override any flag set on the individual service account
-func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAccount) bool {
+func (s *serviceAccount) enforceMountableSecrets(serviceAccount *corev1.ServiceAccount) bool {
 	if s.LimitSecretReferences {
 		return true
 	}
@@ -280,7 +283,7 @@ func (s *serviceAccount) enforceMountableSecrets(serviceAccount *api.ServiceAcco
 }
 
 // getServiceAccount returns the ServiceAccount for the given namespace and name if it exists
-func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.ServiceAccount, error) {
+func (s *serviceAccount) getServiceAccount(namespace string, name string) (*corev1.ServiceAccount, error) {
 	serviceAccount, err := s.serviceAccountLister.ServiceAccounts(namespace).Get(name)
 	if err == nil {
 		return serviceAccount, nil
@@ -313,7 +316,7 @@ func (s *serviceAccount) getServiceAccount(namespace string, name string) (*api.
 }
 
 // getReferencedServiceAccountToken returns the name of the first referenced secret which is a ServiceAccountToken for the service account
-func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.ServiceAccount) (string, error) {
+func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *corev1.ServiceAccount) (string, error) {
 	if len(serviceAccount.Secrets) == 0 {
 		return "", nil
 	}
@@ -338,27 +341,27 @@ func (s *serviceAccount) getReferencedServiceAccountToken(serviceAccount *api.Se
 }
 
 // getServiceAccountTokens returns all ServiceAccountToken secrets for the given ServiceAccount
-func (s *serviceAccount) getServiceAccountTokens(serviceAccount *api.ServiceAccount) ([]*api.Secret, error) {
+func (s *serviceAccount) getServiceAccountTokens(serviceAccount *corev1.ServiceAccount) ([]*corev1.Secret, error) {
 	secrets, err := s.secretLister.Secrets(serviceAccount.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	tokens := []*api.Secret{}
+	tokens := []*corev1.Secret{}
 
 	for _, secret := range secrets {
-		if secret.Type != api.SecretTypeServiceAccountToken {
+		if secret.Type != corev1.SecretTypeServiceAccountToken {
 			continue
 		}
 
-		if serviceaccount.InternalIsServiceAccountToken(secret, serviceAccount) {
+		if serviceaccount.IsServiceAccountToken(secret, serviceAccount) {
 			tokens = append(tokens, secret)
 		}
 	}
 	return tokens, nil
 }
 
-func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccount, pod *api.Pod) error {
+func (s *serviceAccount) limitSecretReferences(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
 	// Ensure all secrets the pod references are allowed by the service account
 	mountableSecrets := sets.NewString()
 	for _, s := range serviceAccount.Secrets {
@@ -408,7 +411,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 	return nil
 }
 
-func (s *serviceAccount) mountServiceAccountToken(serviceAccount *api.ServiceAccount, pod *api.Pod) error {
+func (s *serviceAccount) mountServiceAccountToken(serviceAccount *corev1.ServiceAccount, pod *api.Pod) error {
 	// Find the name of a referenced ServiceAccountToken secret we can mount
 	serviceAccountToken, err := s.getReferencedServiceAccountToken(serviceAccount)
 	if err != nil {

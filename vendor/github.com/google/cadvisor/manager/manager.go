@@ -33,6 +33,7 @@ import (
 	"github.com/google/cadvisor/container/containerd"
 	"github.com/google/cadvisor/container/crio"
 	"github.com/google/cadvisor/container/docker"
+	"github.com/google/cadvisor/container/mesos"
 	"github.com/google/cadvisor/container/raw"
 	"github.com/google/cadvisor/container/rkt"
 	"github.com/google/cadvisor/container/systemd"
@@ -141,7 +142,7 @@ type Manager interface {
 }
 
 // New takes a memory storage and returns a new manager.
-func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, ignoreMetricsSet container.MetricSet, collectorHttpClient *http.Client) (Manager, error) {
+func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, includedMetricsSet container.MetricSet, collectorHttpClient *http.Client, rawContainerCgroupPathPrefixWhiteList []string) (Manager, error) {
 	if memoryCache == nil {
 		return nil, fmt.Errorf("manager requires memory storage")
 	}
@@ -203,20 +204,21 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, maxHousekeepingIn
 	eventsChannel := make(chan watcher.ContainerEvent, 16)
 
 	newManager := &manager{
-		containers:               make(map[namespacedContainerName]*containerData),
-		quitChannels:             make([]chan error, 0, 2),
-		memoryCache:              memoryCache,
-		fsInfo:                   fsInfo,
-		cadvisorContainer:        selfContainer,
-		inHostNamespace:          inHostNamespace,
-		startupTime:              time.Now(),
-		maxHousekeepingInterval:  maxHousekeepingInterval,
-		allowDynamicHousekeeping: allowDynamicHousekeeping,
-		ignoreMetrics:            ignoreMetricsSet,
-		containerWatchers:        []watcher.ContainerWatcher{},
-		eventsChannel:            eventsChannel,
-		collectorHttpClient:      collectorHttpClient,
-		nvidiaManager:            &accelerators.NvidiaManager{},
+		containers:                            make(map[namespacedContainerName]*containerData),
+		quitChannels:                          make([]chan error, 0, 2),
+		memoryCache:                           memoryCache,
+		fsInfo:                                fsInfo,
+		cadvisorContainer:                     selfContainer,
+		inHostNamespace:                       inHostNamespace,
+		startupTime:                           time.Now(),
+		maxHousekeepingInterval:               maxHousekeepingInterval,
+		allowDynamicHousekeeping:              allowDynamicHousekeeping,
+		includedMetrics:                       includedMetricsSet,
+		containerWatchers:                     []watcher.ContainerWatcher{},
+		eventsChannel:                         eventsChannel,
+		collectorHttpClient:                   collectorHttpClient,
+		nvidiaManager:                         &accelerators.NvidiaManager{},
+		rawContainerCgroupPathPrefixWhiteList: rawContainerCgroupPathPrefixWhiteList,
 	}
 
 	machineInfo, err := machine.Info(sysfs, fsInfo, inHostNamespace)
@@ -283,21 +285,23 @@ type manager struct {
 	startupTime              time.Time
 	maxHousekeepingInterval  time.Duration
 	allowDynamicHousekeeping bool
-	ignoreMetrics            container.MetricSet
+	includedMetrics          container.MetricSet
 	containerWatchers        []watcher.ContainerWatcher
 	eventsChannel            chan watcher.ContainerEvent
 	collectorHttpClient      *http.Client
 	nvidiaManager            accelerators.AcceleratorManager
+	// List of raw container cgroup path prefix whitelist.
+	rawContainerCgroupPathPrefixWhiteList []string
 }
 
 // Start the container manager.
 func (self *manager) Start() error {
-	err := docker.Register(self, self.fsInfo, self.ignoreMetrics)
+	err := docker.Register(self, self.fsInfo, self.includedMetrics)
 	if err != nil {
 		glog.V(5).Infof("Registration of the Docker container factory failed: %v.", err)
 	}
 
-	err = rkt.Register(self, self.fsInfo, self.ignoreMetrics)
+	err = rkt.Register(self, self.fsInfo, self.includedMetrics)
 	if err != nil {
 		glog.V(5).Infof("Registration of the rkt container factory failed: %v", err)
 	} else {
@@ -308,22 +312,27 @@ func (self *manager) Start() error {
 		self.containerWatchers = append(self.containerWatchers, watcher)
 	}
 
-	err = containerd.Register(self, self.fsInfo, self.ignoreMetrics)
+	err = containerd.Register(self, self.fsInfo, self.includedMetrics)
 	if err != nil {
 		glog.V(5).Infof("Registration of the containerd container factory failed: %v", err)
 	}
 
-	err = crio.Register(self, self.fsInfo, self.ignoreMetrics)
+	err = crio.Register(self, self.fsInfo, self.includedMetrics)
 	if err != nil {
 		glog.V(5).Infof("Registration of the crio container factory failed: %v", err)
 	}
 
-	err = systemd.Register(self, self.fsInfo, self.ignoreMetrics)
+	err = mesos.Register(self, self.fsInfo, self.includedMetrics)
+	if err != nil {
+		glog.V(5).Infof("Registration of the mesos container factory failed: %v", err)
+	}
+
+	err = systemd.Register(self, self.fsInfo, self.includedMetrics)
 	if err != nil {
 		glog.V(5).Infof("Registration of the systemd container factory failed: %v", err)
 	}
 
-	err = raw.Register(self, self.fsInfo, self.ignoreMetrics)
+	err = raw.Register(self, self.fsInfo, self.includedMetrics, self.rawContainerCgroupPathPrefixWhiteList)
 	if err != nil {
 		glog.Errorf("Registration of the raw container factory failed: %v", err)
 	}
@@ -619,6 +628,11 @@ func (self *manager) AllDockerContainers(query *info.ContainerInfoRequest) (map[
 	for name, cont := range containers {
 		inf, err := self.containerDataToContainerInfo(cont, query)
 		if err != nil {
+			// Ignore the error because of race condition and return best-effort result.
+			if err == memory.ErrDataNotFound {
+				glog.Warningf("Error getting data for container %s because of race condition", name)
+				continue
+			}
 			return nil, err
 		}
 		output[name] = *inf
@@ -1072,21 +1086,24 @@ func (m *manager) destroyContainerLocked(containerName string) error {
 
 // Detect all containers that have been added or deleted from the specified container.
 func (m *manager) getContainersDiff(containerName string) (added []info.ContainerReference, removed []info.ContainerReference, err error) {
-	m.containersLock.RLock()
-	defer m.containersLock.RUnlock()
-
 	// Get all subcontainers recursively.
+	m.containersLock.RLock()
 	cont, ok := m.containers[namespacedContainerName{
 		Name: containerName,
 	}]
+	m.containersLock.RUnlock()
 	if !ok {
 		return nil, nil, fmt.Errorf("failed to find container %q while checking for new containers", containerName)
 	}
 	allContainers, err := cont.handler.ListContainers(container.ListRecursive)
+
 	if err != nil {
 		return nil, nil, err
 	}
 	allContainers = append(allContainers, info.ContainerReference{Name: containerName})
+
+	m.containersLock.RLock()
+	defer m.containersLock.RUnlock()
 
 	// Determine which were added and which were removed.
 	allContainersSet := make(map[string]*containerData)

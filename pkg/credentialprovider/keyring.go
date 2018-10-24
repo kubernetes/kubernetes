@@ -25,7 +25,6 @@ import (
 
 	"github.com/golang/glog"
 
-	dockertypes "github.com/docker/docker/api/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -52,17 +51,39 @@ type lazyDockerKeyring struct {
 	Providers []DockerConfigProvider
 }
 
+// AuthConfig contains authorization information for connecting to a Registry
+// This type mirrors "github.com/docker/docker/api/types.AuthConfig"
+type AuthConfig struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Auth     string `json:"auth,omitempty"`
+
+	// Email is an optional value associated with the username.
+	// This field is deprecated and will be removed in a later
+	// version of docker.
+	Email string `json:"email,omitempty"`
+
+	ServerAddress string `json:"serveraddress,omitempty"`
+
+	// IdentityToken is used to authenticate the user and get
+	// an access token for the registry.
+	IdentityToken string `json:"identitytoken,omitempty"`
+
+	// RegistryToken is a bearer token to be sent to a registry
+	RegistryToken string `json:"registrytoken,omitempty"`
+}
+
 // LazyAuthConfiguration wraps dockertypes.AuthConfig, potentially deferring its
 // binding. If Provider is non-nil, it will be used to obtain new credentials
 // by calling LazyProvide() on it.
 type LazyAuthConfiguration struct {
-	dockertypes.AuthConfig
+	AuthConfig
 	Provider DockerConfigProvider
 }
 
 func DockerConfigEntryToLazyAuthConfiguration(ident DockerConfigEntry) LazyAuthConfiguration {
 	return LazyAuthConfiguration{
-		AuthConfig: dockertypes.AuthConfig{
+		AuthConfig: AuthConfig{
 			Username: ident.Username,
 			Password: ident.Password,
 			Email:    ident.Email,

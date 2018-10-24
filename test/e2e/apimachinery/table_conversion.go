@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/tabwriter"
 
@@ -31,8 +32,8 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/pkg/printers"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -79,7 +80,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		client := c.CoreV1().PodTemplates(ns)
 
 		By("creating a large number of resources")
-		workqueue.Parallelize(5, 20, func(i int) {
+		workqueue.ParallelizeUntil(context.TODO(), 5, 20, func(i int) {
 			for tries := 3; tries >= 0; tries-- {
 				_, err := client.Create(&v1.PodTemplate{
 					ObjectMeta: metav1.ObjectMeta{
@@ -107,10 +108,6 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
 		Expect(err).NotTo(HaveOccurred())
-		// TODO: kops PR job is still using etcd2, which prevents this feature from working. Remove this check when kops is upgraded to etcd3
-		if len(pagedTable.Rows) > 2 {
-			framework.Skipf("ERROR: This cluster does not support chunking, which means it is running etcd2 and not supported.")
-		}
 		Expect(len(pagedTable.Rows)).To(Equal(2))
 		Expect(pagedTable.ResourceVersion).ToNot(Equal(""))
 		Expect(pagedTable.SelfLink).ToNot(Equal(""))

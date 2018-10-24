@@ -332,7 +332,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.1
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3.0/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -628,7 +628,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.5
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -731,7 +731,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.4
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -820,7 +820,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.3
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -873,7 +873,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.2
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -917,7 +917,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.1
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 

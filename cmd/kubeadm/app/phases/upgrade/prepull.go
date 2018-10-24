@@ -44,12 +44,12 @@ type Prepuller interface {
 // DaemonSetPrepuller makes sure the control plane images are available on all masters
 type DaemonSetPrepuller struct {
 	client clientset.Interface
-	cfg    *kubeadmapi.InitConfiguration
+	cfg    *kubeadmapi.ClusterConfiguration
 	waiter apiclient.Waiter
 }
 
 // NewDaemonSetPrepuller creates a new instance of the DaemonSetPrepuller struct
-func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.InitConfiguration) *DaemonSetPrepuller {
+func NewDaemonSetPrepuller(client clientset.Interface, waiter apiclient.Waiter, cfg *kubeadmapi.ClusterConfiguration) *DaemonSetPrepuller {
 	return &DaemonSetPrepuller{
 		client: client,
 		cfg:    cfg,
@@ -91,8 +91,7 @@ func (d *DaemonSetPrepuller) DeleteFunc(component string) error {
 }
 
 // PrepullImagesInParallel creates DaemonSets synchronously but waits in parallel for the images to pull
-func PrepullImagesInParallel(kubePrepuller Prepuller, timeout time.Duration) error {
-	componentsToPrepull := append(constants.MasterComponents, constants.Etcd)
+func PrepullImagesInParallel(kubePrepuller Prepuller, timeout time.Duration, componentsToPrepull []string) error {
 	fmt.Printf("[upgrade/prepull] Will prepull images for components %v\n", componentsToPrepull)
 
 	timeoutChan := time.After(timeout)
@@ -159,6 +158,11 @@ func buildPrePullDaemonSet(component, image string) *apps.DaemonSet {
 			Namespace: metav1.NamespaceSystem,
 		},
 		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"k8s-app": addPrepullPrefix(component),
+				},
+			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{

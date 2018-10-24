@@ -36,7 +36,6 @@ func Run() error {
 	// We do not want these flags to show up in --help
 	// These MarkHidden calls must be after the lines above
 	pflag.CommandLine.MarkHidden("version")
-	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
 	pflag.CommandLine.MarkHidden("alsologtostderr")
 	pflag.CommandLine.MarkHidden("log-backtrace-at")

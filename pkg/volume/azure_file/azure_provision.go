@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
 	"github.com/golang/glog"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -38,7 +40,7 @@ var _ volume.ProvisionableVolumePlugin = &azureFilePlugin{}
 // azure cloud provider should implement it
 type azureCloudProvider interface {
 	// create a file share
-	CreateFileShare(shareName, accountName, accountType, location string, requestGiB int) (string, string, error)
+	CreateFileShare(shareName, accountName, accountType, accountKind, resourceGroup, location string, requestGiB int) (string, string, error)
 	// delete a file share
 	DeleteFileShare(accountName, accountKey, shareName string) error
 	// resize a file share
@@ -139,7 +141,7 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("%s does not support block volume provisioning", a.plugin.GetPluginName())
 	}
 
-	var sku, location, account string
+	var sku, resourceGroup, location, account string
 
 	// File share name has a length limit of 63, and it cannot contain two consecutive '-'s.
 	name := util.GenerateVolumeName(a.options.ClusterName, a.options.PVName, 63)
@@ -160,6 +162,8 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 			account = v
 		case "secretnamespace":
 			secretNamespace = v
+		case "resourcegroup":
+			resourceGroup = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, a.plugin.GetPluginName())
 		}
@@ -169,7 +173,12 @@ func (a *azureFileProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure file")
 	}
 
-	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, location, requestGiB)
+	// when use azure file premium, account kind should be specified as FileStorage
+	accountKind := string(storage.StorageV2)
+	if strings.HasPrefix(strings.ToLower(sku), "premium") {
+		accountKind = string(storage.FileStorage)
+	}
+	account, key, err := a.azureProvider.CreateFileShare(name, account, sku, accountKind, resourceGroup, location, requestGiB)
 	if err != nil {
 		return nil, err
 	}

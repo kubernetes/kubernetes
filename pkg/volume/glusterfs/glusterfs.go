@@ -288,23 +288,52 @@ func (c *glusterfsUnmounter) TearDownAt(dir string) error {
 
 func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	var errs error
-
 	options := []string{}
+	hasLogFile := false
+	hasLogLevel := false
+	log := ""
+
 	if b.readOnly {
 		options = append(options, "ro")
+
 	}
 
-	p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
-	if err := os.MkdirAll(p, 0750); err != nil {
-		return fmt.Errorf("failed to create directory %v: %v", p, err)
+	// Check for log-file,log-level options existence in user supplied mount options, if provided, use those.
+	for _, userOpt := range b.mountOptions {
+
+		switch {
+		case dstrings.HasPrefix(userOpt, "log-file"):
+			glog.V(4).Infof("log-file mount option has provided")
+			hasLogFile = true
+
+		case dstrings.HasPrefix(userOpt, "log-level"):
+			glog.V(4).Infof("log-level mount option has provided")
+			hasLogLevel = true
+		}
+
 	}
 
-	// adding log-level ERROR to remove noise
-	// and more specific log path so each pod has
-	// its own log based on PV + Pod
-	log := path.Join(p, b.pod.Name+"-glusterfs.log")
-	options = append(options, "log-level=ERROR")
-	options = append(options, "log-file="+log)
+	// If logfile has not been provided, create driver specific log file.
+	if !hasLogFile {
+		log = ""
+		p := path.Join(b.glusterfs.plugin.host.GetPluginDir(glusterfsPluginName), b.glusterfs.volName)
+		if err := os.MkdirAll(p, 0750); err != nil {
+			return fmt.Errorf("failed to create directory %v: %v", p, err)
+		}
+
+		// adding log-level ERROR to remove noise
+		// and more specific log path so each pod has
+		// its own log based on PV + Pod
+		log = path.Join(p, b.pod.Name+"-glusterfs.log")
+
+		// Use derived log file in gluster fuse mount
+		options = append(options, "log-file="+log)
+
+	}
+
+	if !hasLogLevel {
+		options = append(options, "log-level=ERROR")
+	}
 
 	var addrlist []string
 	if b.hosts == nil {
@@ -689,8 +718,6 @@ func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTop
 		return nil, err
 	}
 	p.provisionerConfig = *cfg
-
-	glog.V(4).Infof("creating volume with configuration %+v", p.provisionerConfig)
 
 	gidTable, err := p.plugin.getGidTable(scName, cfg.gidMin, cfg.gidMax)
 	if err != nil {
@@ -1152,7 +1179,7 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 		return oldSize, err
 	}
 
-	glog.V(4).Infof("expanding volume: %q with configuration: %+v", volumeID, cfg)
+	glog.V(4).Infof("expanding volume: %q", volumeID)
 
 	//Create REST server connection
 	cli := gcli.NewClient(cfg.url, cfg.user, cfg.secretValue)

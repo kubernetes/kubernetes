@@ -22,15 +22,17 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 const (
@@ -185,27 +187,8 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 		}
 	}
 
-	// ensure etcd certs are generated for etcd and kube-apiserver
-	if component == constants.Etcd || component == constants.KubeAPIServer {
-		if err := certsphase.CreateEtcdCACertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s CA certificate and key: %v", constants.Etcd, err)
-		}
-	}
-	if component == constants.Etcd {
-		if err := certsphase.CreateEtcdServerCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s certificate and key: %v", constants.Etcd, err)
-		}
-		if err := certsphase.CreateEtcdPeerCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s peer certificate and key: %v", constants.Etcd, err)
-		}
-		if err := certsphase.CreateEtcdHealthcheckClientCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s healthcheck certificate and key: %v", constants.Etcd, err)
-		}
-	}
-	if component == constants.KubeAPIServer {
-		if err := certsphase.CreateAPIServerEtcdClientCertAndKeyFiles(cfg); err != nil {
-			return fmt.Errorf("failed to upgrade the %s %s-client certificate and key: %v", constants.KubeAPIServer, constants.Etcd, err)
-		}
+	if err := renewCerts(cfg, component); err != nil {
+		return fmt.Errorf("failed to renew certificates for component %q: %v", component, err)
 	}
 
 	// The old manifest is here; in the /etc/kubernetes/manifests/
@@ -218,6 +201,16 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	// Store the backup path in the recover list. If something goes wrong now, this component will be rolled back.
 	recoverManifests[component] = backupManifestPath
+
+	// Skip upgrade if current and new manifests are equal
+	equal, err := staticpod.ManifestFilesAreEqual(currentManifestPath, newManifestPath)
+	if err != nil {
+		return err
+	}
+	if equal {
+		fmt.Printf("[upgrade/staticpods] current and new manifests of %s are equal, skipping upgrade\n", component)
+		return nil
+	}
 
 	// Move the old manifest into the old-manifests directory
 	if err := pathMgr.MoveFile(currentManifestPath, backupManifestPath); err != nil {
@@ -233,7 +226,7 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	if waitForComponentRestart {
 		fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
-		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v\n", UpgradeManifestTimeout)
+		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v)\n", UpgradeManifestTimeout)
 
 		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
 		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
@@ -359,7 +352,7 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 	// Initialize the new etcd client if it wasn't pre-initialized
 	if newEtcdClient == nil {
 		client, err := etcdutil.NewFromStaticPod(
-			[]string{"localhost:2379"},
+			[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
 			constants.GetStaticPodDirectory(),
 			cfg.CertificatesDir,
 		)
@@ -435,7 +428,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 		} else {
 			// etcd Static Pod
 			client, err := etcdutil.NewFromStaticPod(
-				[]string{"localhost:2379"},
+				[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
 				constants.GetStaticPodDirectory(),
 				cfg.CertificatesDir,
 			)
@@ -507,7 +500,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)
 }
 
-// rollbackEtcdData rolls back the the content of etcd folder if something went wrong.
+// rollbackEtcdData rolls back the content of etcd folder if something went wrong.
 // When the folder contents are successfully rolled back, nil is returned, otherwise an error is returned.
 func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathManager) error {
 	backupEtcdDir := pathMgr.BackupEtcdDir()
@@ -518,5 +511,37 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 		return fmt.Errorf("couldn't recover etcd database with error: %v, the location of etcd backup: %s ", err, backupEtcdDir)
 	}
 
+	return nil
+}
+
+func renewCerts(cfg *kubeadmapi.InitConfiguration, component string) error {
+	if cfg.Etcd.Local != nil {
+		// ensure etcd certs are loaded for etcd and kube-apiserver
+		if component == constants.Etcd || component == constants.KubeAPIServer {
+			caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertEtcdCA.BaseName)
+			if err != nil {
+				return fmt.Errorf("failed to upgrade the %s CA certificate and key: %v", constants.Etcd, err)
+			}
+			renewer := renewal.NewFileRenewal(caCert, caKey)
+
+			if component == constants.Etcd {
+				for _, cert := range []*certsphase.KubeadmCert{
+					&certsphase.KubeadmCertEtcdServer,
+					&certsphase.KubeadmCertEtcdPeer,
+					&certsphase.KubeadmCertEtcdHealthcheck,
+				} {
+					if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
+						return fmt.Errorf("failed to renew %s certificate and key: %v", cert.Name, err)
+					}
+				}
+			}
+			if component == constants.KubeAPIServer {
+				cert := certsphase.KubeadmCertEtcdAPIClient
+				if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
+					return fmt.Errorf("failed to renew %s certificate and key: %v", cert.Name, err)
+				}
+			}
+		}
+	}
 	return nil
 }

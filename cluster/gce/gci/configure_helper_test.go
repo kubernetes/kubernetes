@@ -143,7 +143,7 @@ func (c *ManifestTestCase) mustLoadPodFromManifest() {
 	}
 
 	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), json, &c.pod); err != nil {
-		c.t.Fatalf("Failed to decode manifest: %v", err)
+		c.t.Fatalf("Failed to decode manifest:\n%s\nerror: %v", json, err)
 	}
 }
 

@@ -34,6 +34,10 @@ func NewEscapeProxy(r io.Reader, escapeKeys []byte) io.Reader {
 func (r *escapeProxy) Read(buf []byte) (int, error) {
 	nr, err := r.r.Read(buf)
 
+	if len(r.escapeKeys) == 0 {
+		return nr, err
+	}
+
 	preserve := func() {
 		// this preserves the original key presses in the passed in buffer
 		nr += r.escapeKeyPos

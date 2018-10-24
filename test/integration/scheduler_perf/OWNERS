@@ -1,16 +1,4 @@
 approvers:
-- bsalamat
-- davidopp
-- gmarek
-- jayunit100
-- timothysc
-- wojtek-t
+- sig-scheduling-maintainers
 reviewers:
-- bsalamat
-- davidopp
-- jayunit100
-- k82cn
-- ravisantoshgudimetla
-- sjug
-- timothysc
-- wojtek-t
+- sig-scheduling

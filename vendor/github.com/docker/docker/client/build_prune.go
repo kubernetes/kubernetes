@@ -1,11 +1,11 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // BuildCachePrune requests the daemon to delete unused cache data

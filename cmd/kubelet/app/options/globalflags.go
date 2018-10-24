@@ -78,21 +78,12 @@ func registerDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, 
 	local.Lookup(normalize(globalName)).Deprecated = deprecated
 }
 
-// pflagRegisterDeprecated registers the flag with pflagRegister, and then marks it deprecated
-func pflagRegisterDeprecated(global, local *pflag.FlagSet, globalName, deprecated string) {
-	pflagRegister(global, local, globalName)
-	local.Lookup(normalize(globalName)).Deprecated = deprecated
-}
-
 // addCredentialProviderFlags adds flags from k8s.io/kubernetes/pkg/credentialprovider
 func addCredentialProviderFlags(fs *pflag.FlagSet) {
 	// lookup flags in global flag set and re-register the values with our flagset
 	global := pflag.CommandLine
 	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 
-	// Note this is deprecated in the library that provides it, so we just allow that deprecation
-	// notice to pass through our registration here.
-	pflagRegister(global, local, "google-json-key")
 	// TODO(#58034): This is not a static file, so it's not quite as straightforward as --google-json-key.
 	// We need to figure out how ACR users can dynamically provide pull credentials before we can deprecate this.
 	pflagRegister(global, local, "azure-container-registry-config")

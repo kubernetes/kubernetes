@@ -35,7 +35,7 @@ func instantiateCustomResource(t *testing.T, instanceToCreate *unstructured.Unst
 }
 
 func instantiateVersionedCustomResource(t *testing.T, instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition, version string) (*unstructured.Unstructured, error) {
-	createdInstance, err := client.Create(instanceToCreate)
+	createdInstance, err := client.Create(instanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		t.Logf("%#v", createdInstance)
 		return nil, err

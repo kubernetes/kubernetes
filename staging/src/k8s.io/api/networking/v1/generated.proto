@@ -22,8 +22,6 @@ syntax = 'proto2';
 package k8s.io.api.networking.v1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/api/extensions/v1beta1/generated.proto";
-import "k8s.io/api/policy/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -140,7 +138,7 @@ message NetworkPolicyPeer {
 
 // NetworkPolicyPort describes a port to allow traffic on
 message NetworkPolicyPort {
-  // The protocol (TCP or UDP) which traffic must match. If not specified, this
+  // The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this
   // field defaults to TCP.
   // +optional
   optional string protocol = 1;

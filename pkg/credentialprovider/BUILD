@@ -18,7 +18,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/credentialprovider",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
 )
@@ -31,7 +30,6 @@ go_test(
         "provider_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//vendor/github.com/docker/docker/api/types:go_default_library"],
 )
 
 filegroup(
