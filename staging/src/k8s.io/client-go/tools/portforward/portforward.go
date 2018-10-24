@@ -187,13 +187,17 @@ func (pf *PortForwarder) ForwardPorts() error {
 	}
 	defer pf.streamConn.Close()
 
+	err = pf.startListeners()
+	if err != nil {
+		return err
+	}
+
 	return pf.forward()
 }
 
-// forward dials the remote host specific in req, upgrades the request, starts
-// listeners for each port specified in ports, and forwards local connections
-// to the remote host via streams.
-func (pf *PortForwarder) forward() error {
+// startListeners binds the local listener ports in preparation to start forwarding
+// local connections to the remote host.
+func (pf *PortForwarder) startListeners() error {
 	var err error
 
 	listenSuccess := false
@@ -213,6 +217,13 @@ func (pf *PortForwarder) forward() error {
 		return fmt.Errorf("Unable to listen on any of the requested ports: %v", pf.ports)
 	}
 
+	return nil
+}
+
+// forward dials the remote host specific in req, upgrades the request, starts
+// listeners for each port specified in ports, and forwards local connections
+// to the remote host via streams.
+func (pf *PortForwarder) forward() error {
 	if pf.Ready != nil {
 		close(pf.Ready)
 	}

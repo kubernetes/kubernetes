@@ -179,6 +179,88 @@ func TestParsePortsAndNew(t *testing.T) {
 	}
 }
 
+type StartListenersTestCase struct {
+	Ports            []ForwardedPort
+	ShouldRaiseError bool
+	ExpectedPorts    []ForwardedPort
+}
+
+func TestBindListeners(t *testing.T) {
+	var pf PortForwarder
+	var err error
+
+	testCases := []StartListenersTestCase{
+		{
+			Ports: []ForwardedPort{
+				ForwardedPort{
+					Local:  0,
+					Remote: 80,
+				},
+				ForwardedPort{
+					Local:  0,
+					Remote: 443,
+				},
+			},
+			ShouldRaiseError: false,
+			ExpectedPorts: []ForwardedPort{
+				ForwardedPort{
+					Local:  0,
+					Remote: 80,
+				},
+				ForwardedPort{
+					Local:  0,
+					Remote: 443,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		pf.ports = testCase.Ports
+		pf.addresses, err = parseAddresses([]string{"localhost"})
+		if err != nil {
+			t.Errorf("Test failure: failed to parse address: %v", err.Error())
+		}
+
+		err = pf.startListeners()
+
+		if err == nil && testCase.ShouldRaiseError {
+			t.Errorf("Expected error but got nil")
+		}
+
+		if err != nil && !testCase.ShouldRaiseError {
+			t.Errorf("Unexpected error starting listeners: %s", err.Error())
+		}
+
+		if len(pf.ports) != len(testCase.ExpectedPorts) {
+			t.Errorf(
+				"Expected %d ports (found %d)",
+				len(testCase.ExpectedPorts),
+				len(pf.ports),
+			)
+		}
+
+		for i, expectedPort := range testCase.ExpectedPorts {
+			// counter-intuitively, if expectedPort has
+			// the Local port set to zero, we expect it to be
+			// non-zero as it should have been bound to an
+			// available port (though we can't know ahead of time
+			// what port that will be).
+			if expectedPort.Local == 0 && pf.ports[i].Local == 0 {
+				t.Errorf("startListeners failed to update listener port assignment")
+			}
+
+			if expectedPort.Local != 0 && pf.ports[i].Local != expectedPort.Local {
+				t.Errorf("assigned local port did not match expected local port")
+			}
+
+			if pf.ports[i].Remote != expectedPort.Remote {
+				t.Errorf("assigned remote port did not match expected remote port")
+			}
+		}
+	}
+}
+
 type GetListenerTestCase struct {
 	Hostname                string
 	Protocol                string
