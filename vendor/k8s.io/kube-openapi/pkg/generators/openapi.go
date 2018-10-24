@@ -228,6 +228,7 @@ func (g *openAPIGen) Imports(c *generator.Context) []string {
 func argsFromType(t *types.Type) generator.Args {
 	return generator.Args{
 		"type":              t,
+		"NewProperties":     types.Ref(openAPICommonPackagePath, "NewProperties"),
 		"ReferenceCallback": types.Ref(openAPICommonPackagePath, "ReferenceCallback"),
 		"OpenAPIDefinition": types.Ref(openAPICommonPackagePath, "OpenAPIDefinition"),
 		"SpecSchemaType":    types.Ref(specPackagePath, "Schema"),
@@ -409,12 +410,12 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 		}
 		g.Do("return $.OpenAPIDefinition|raw${\nSchema: spec.Schema{\nSchemaProps: spec.SchemaProps{\n", args)
 		g.generateDescription(t.CommentLines)
-		g.Do("Properties: map[string]$.SpecSchemaType|raw${\n", args)
+		g.Do("Properties: $.NewProperties|raw$()", args)
 		required, err := g.generateMembers(t, []string{})
 		if err != nil {
 			return err
 		}
-		g.Do("},\n", nil)
+		g.Do(",\n", nil)
 		if len(required) > 0 {
 			g.Do("Required: []string{\"$.$\"},\n", strings.Join(required, "\",\""))
 		}
@@ -561,7 +562,9 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	if err := g.validatePatchTags(m, parent); err != nil {
 		return err
 	}
-	g.Do("\"$.$\": {\n", name)
+	args := argsFromType(nil)
+	args["name"] = name
+	g.Do(".Add(\"$.name$\", $.SpecSchemaType|raw${\n", args)
 	if err := g.generateMemberExtensions(m, parent); err != nil {
 		return err
 	}
@@ -570,7 +573,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	jsonTags := getJsonTags(m)
 	if len(jsonTags) > 1 && jsonTags[1] == "string" {
 		g.generateSimpleProperty("string", "")
-		g.Do("},\n},\n", nil)
+		g.Do("},\n})", nil)
 		return nil
 	}
 	t := resolveAliasAndPtrType(m.Type)
@@ -578,7 +581,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	typeString, format := openapi.GetOpenAPITypeFormat(t.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
-		g.Do("},\n},\n", nil)
+		g.Do("},\n})", nil)
 		return nil
 	}
 	switch t.Kind {
@@ -597,7 +600,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 	default:
 		return fmt.Errorf("cannot generate spec for type %v", t)
 	}
-	g.Do("},\n},\n", nil)
+	g.Do("},\n})", nil)
 	return g.Error()
 }
 

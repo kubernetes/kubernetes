@@ -30,6 +30,21 @@ type OpenAPIDefinition struct {
 	Dependencies []string
 }
 
+type Properties map[string]spec.Schema
+
+func NewProperties() Properties { return Properties{} }
+
+func (p Properties) Add(key string, value spec.Schema) Properties {
+	p[key] = value
+	return p
+}
+func (p Properties) AddIf(key string, condition func() bool, value spec.Schema) Properties {
+	if condition() {
+		p[key] = value
+	}
+	return p
+}
+
 type ReferenceCallback func(path string) spec.Ref
 
 // GetOpenAPIDefinitions is collection of all definitions.
