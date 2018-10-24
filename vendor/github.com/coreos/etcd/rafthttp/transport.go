@@ -127,7 +127,8 @@ type Transport struct {
 	remotes map[types.ID]*remote // remotes map that helps newly joined member to catch up
 	peers   map[types.ID]Peer    // peers map
 
-	prober probing.Prober
+	pipelineProber probing.Prober
+	streamProber   probing.Prober
 }
 
 func (t *Transport) Start() error {
@@ -142,7 +143,8 @@ func (t *Transport) Start() error {
 	}
 	t.remotes = make(map[types.ID]*remote)
 	t.peers = make(map[types.ID]Peer)
-	t.prober = probing.NewProber(t.pipelineRt)
+	t.pipelineProber = probing.NewProber(t.pipelineRt)
+	t.streamProber = probing.NewProber(t.streamRt)
 
 	// If client didn't provide dial retry frequency, use the default
 	// (100ms backoff between attempts to create a new stream),
@@ -210,7 +212,8 @@ func (t *Transport) Stop() {
 	for _, p := range t.peers {
 		p.stop()
 	}
-	t.prober.RemoveAll()
+	t.pipelineProber.RemoveAll()
+	t.streamProber.RemoveAll()
 	if tr, ok := t.streamRt.(*http.Transport); ok {
 		tr.CloseIdleConnections()
 	}
@@ -289,8 +292,8 @@ func (t *Transport) AddPeer(id types.ID, us []string) {
 	}
 	fs := t.LeaderStats.Follower(id.String())
 	t.peers[id] = startPeer(t, urls, id, fs)
-	addPeerToProber(t.prober, id.String(), us)
-
+	addPeerToProber(t.pipelineProber, id.String(), us, RoundTripperNameSnapshot, rtts)
+	addPeerToProber(t.streamProber, id.String(), us, RoundTripperNameRaftMessage, rtts)
 	plog.Infof("added peer %s", id)
 }
 
@@ -317,7 +320,8 @@ func (t *Transport) removePeer(id types.ID) {
 	}
 	delete(t.peers, id)
 	delete(t.LeaderStats.Followers, id.String())
-	t.prober.Remove(id.String())
+	t.pipelineProber.Remove(id.String())
+	t.streamProber.Remove(id.String())
 	plog.Infof("removed peer %s", id)
 }
 
@@ -334,8 +338,10 @@ func (t *Transport) UpdatePeer(id types.ID, us []string) {
 	}
 	t.peers[id].update(urls)
 
-	t.prober.Remove(id.String())
-	addPeerToProber(t.prober, id.String(), us)
+	t.pipelineProber.Remove(id.String())
+	addPeerToProber(t.pipelineProber, id.String(), us, RoundTripperNameSnapshot, rtts)
+	t.streamProber.Remove(id.String())
+	addPeerToProber(t.streamProber, id.String(), us, RoundTripperNameRaftMessage, rtts)
 	plog.Infof("updated peer %s", id)
 }
 
