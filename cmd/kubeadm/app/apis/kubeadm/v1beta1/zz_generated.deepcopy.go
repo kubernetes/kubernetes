@@ -266,11 +266,6 @@ func (in *Discovery) DeepCopyInto(out *Discovery) {
 		*out = new(FileDiscovery)
 		**out = **in
 	}
-	if in.Timeout != nil {
-		in, out := &in.Timeout, &out.Timeout
-		*out = new(v1.Duration)
-		**out = **in
-	}
 	return
 }
 
@@ -377,6 +372,13 @@ func (in *InitConfiguration) DeepCopyInto(out *InitConfiguration) {
 	}
 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 	out.APIEndpoint = in.APIEndpoint
+	if in.Timeouts != nil {
+		in, out := &in.Timeouts, &out.Timeouts
+		*out = make(map[TimeoutName]v1.Duration, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	return
 }
 
@@ -408,6 +410,13 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
 	if in.FeatureGates != nil {
 		in, out := &in.FeatureGates, &out.FeatureGates
 		*out = make(map[string]bool, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
+	if in.Timeouts != nil {
+		in, out := &in.Timeouts, &out.Timeouts
+		*out = make(map[TimeoutName]v1.Duration, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}

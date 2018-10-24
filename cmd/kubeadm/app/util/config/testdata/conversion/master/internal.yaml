@@ -185,4 +185,5 @@ NodeRegistration:
     key: node-role.kubernetes.io/master
 SchedulerExtraArgs: null
 SchedulerExtraVolumes: null
+Timeouts: null
 UnifiedControlPlaneImage: ""

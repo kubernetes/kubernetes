@@ -424,7 +424,6 @@ func autoConvert_v1beta1_Discovery_To_kubeadm_Discovery(in *Discovery, out *kube
 	out.BootstrapToken = (*kubeadm.BootstrapTokenDiscovery)(unsafe.Pointer(in.BootstrapToken))
 	out.File = (*kubeadm.FileDiscovery)(unsafe.Pointer(in.File))
 	out.TLSBootstrapToken = in.TLSBootstrapToken
-	out.Timeout = (*v1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
@@ -437,7 +436,6 @@ func autoConvert_kubeadm_Discovery_To_v1beta1_Discovery(in *kubeadm.Discovery, o
 	out.BootstrapToken = (*BootstrapTokenDiscovery)(unsafe.Pointer(in.BootstrapToken))
 	out.File = (*FileDiscovery)(unsafe.Pointer(in.File))
 	out.TLSBootstrapToken = in.TLSBootstrapToken
-	out.Timeout = (*v1.Duration)(unsafe.Pointer(in.Timeout))
 	return nil
 }
 
@@ -553,6 +551,7 @@ func autoConvert_v1beta1_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 	if err := Convert_v1beta1_APIEndpoint_To_kubeadm_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err
 	}
+	out.Timeouts = *(*map[kubeadm.TimeoutName]v1.Duration)(unsafe.Pointer(&in.Timeouts))
 	return nil
 }
 
@@ -572,6 +571,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kube
 	if err := Convert_kubeadm_APIEndpoint_To_v1beta1_APIEndpoint(&in.APIEndpoint, &out.APIEndpoint, s); err != nil {
 		return err
 	}
+	out.Timeouts = *(*map[TimeoutName]v1.Duration)(unsafe.Pointer(&in.Timeouts))
 	return nil
 }
 
@@ -594,6 +594,7 @@ func autoConvert_v1beta1_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Join
 		return err
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+	out.Timeouts = *(*map[kubeadm.TimeoutName]v1.Duration)(unsafe.Pointer(&in.Timeouts))
 	return nil
 }
 
@@ -616,6 +617,7 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1beta1_JoinConfiguration(in *kube
 		return err
 	}
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
+	out.Timeouts = *(*map[TimeoutName]v1.Duration)(unsafe.Pointer(&in.Timeouts))
 	return nil
 }
 
