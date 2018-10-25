@@ -19,7 +19,6 @@ package logs
 import (
 	"io"
 	"log"
-	"log/syslog"
 	"os"
 	"time"
 
@@ -30,18 +29,17 @@ import (
 
 var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
 
-// SysLogWriter serves as a bridge between the standard log package and the glog package.
-type SysLogWriter struct{ w io.Writer }
+// logWriter serves as a bridge between the standard log package and the glog package.
+type logWriter struct{ w io.Writer }
 
 // Write implements the io.Writer interface.
-func (writer SysLogWriter) Write(data []byte) (n int, err error) {
+func (writer logWriter) Write(data []byte) (n int, err error) {
 	return writer.w.Write(data)
 }
 
 // InitLogs initializes logs the way we want for kubernetes.
 func InitLogs() {
-	w, _ := syslog.New(syslog.LOG_NOTICE, os.Args[0])
-	errWriter := SysLogWriter{w: w}
+	errWriter := logWriter{w: os.Stderr}
 	log.SetOutput(errWriter)
 	log.SetFlags(0)
 	glog.SetOutput(errWriter)
@@ -56,5 +54,5 @@ func FlushLogs() {
 
 // NewLogger creates a new log.Logger which sends logs to glog.Info.
 func NewLogger(prefix string) *log.Logger {
-	return log.New(SysLogWriter{}, prefix, 0)
+	return log.New(logWriter{}, prefix, 0)
 }

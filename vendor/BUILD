@@ -194,6 +194,8 @@ filegroup(
         "//vendor/github.com/fsnotify/fsnotify:all-srcs",
         "//vendor/github.com/ghodss/yaml:all-srcs",
         "//vendor/github.com/go-ini/ini:all-srcs",
+        "//vendor/github.com/go-logr/glogr:all-srcs",
+        "//vendor/github.com/go-logr/logr:all-srcs",
         "//vendor/github.com/go-openapi/analysis:all-srcs",
         "//vendor/github.com/go-openapi/errors:all-srcs",
         "//vendor/github.com/go-openapi/jsonpointer:all-srcs",

@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
 	extensionsapiserver "k8s.io/apiextensions-apiserver/pkg/apiserver"
@@ -53,6 +52,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientgoinformers "k8s.io/client-go/informers"
@@ -149,7 +149,7 @@ cluster's shared state through which all other components interact.`,
 // Run runs the specified APIServer.  This should never exit.
 func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	glog.Infof("Version: %+v", version.Get())
+	logs.NewLogr().Info("Version: ", "version", version.Get())
 
 	server, err := CreateServerChain(completeOptions, stopCh)
 	if err != nil {
@@ -601,7 +601,8 @@ func BuildAdmissionPluginInitializers(
 		var err error
 		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
 		if err != nil {
-			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
+			logs.NewLogr().Error(err, "Error reading from cloud configuration file", "config-file", s.CloudProvider.CloudConfigFile)
+			os.Exit(1)
 		}
 	}
 
@@ -678,7 +679,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 				return options, fmt.Errorf("error finding host name: %v", err)
 			}
 		}
-		glog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
+		logs.NewLogr().Info("external host was not specified, using", "external-host", s.GenericServerRunOptions.ExternalHost)
 	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
@@ -694,13 +695,13 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			if kubeauthenticator.IsValidServiceAccountKeyFile(s.SecureServing.ServerCert.CertKey.KeyFile) {
 				s.Authentication.ServiceAccounts.KeyFiles = []string{s.SecureServing.ServerCert.CertKey.KeyFile}
 			} else {
-				glog.Warning("No TLS key provided, service account token authentication disabled")
+				logs.NewLogr().Error(nil, "No TLS key provided, service account token authentication disabled")
 			}
 		}
 	}
 
 	if s.Etcd.EnableWatchCache {
-		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
+		logs.NewLogr().V(2).Info("Initializing cache sizes based on limit", "TargetRAMMB", s.GenericServerRunOptions.TargetRAMMB)
 		sizes := cachesize.NewHeuristicWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
 		if userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err == nil {
 			for resource, size := range userSpecified {

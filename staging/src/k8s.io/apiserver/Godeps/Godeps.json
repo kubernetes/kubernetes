@@ -391,6 +391,14 @@
 			"Rev": "c7ce16629ff4cd059ed96ed06419dd3856fd3577"
 		},
 		{
+			"ImportPath": "github.com/go-logr/glogr",
+			"Rev": "03aa3c3200582c33f271f63ba3ae7d23abb9e699"
+		},
+		{
+			"ImportPath": "github.com/go-logr/logr",
+			"Rev": "9fb12b3b21c5415d16ac18dc5cd42c1cfdd40c4e"
+		},
+		{
 			"ImportPath": "github.com/go-openapi/jsonpointer",
 			"Rev": "46af16f9f7b149af66e5d1bd010e3574dc06de98"
 		},
