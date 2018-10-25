@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +83,20 @@ func (u *UnexpectedObjectError) Error() string {
 func FromObject(obj runtime.Object) error {
 	switch t := obj.(type) {
 	case *metav1.Status:
-		return &StatusError{*t}
+		return &StatusError{ErrStatus: *t}
+	case runtime.Unstructured:
+		var status metav1.Status
+		obj := t.UnstructuredContent()
+		if !reflect.DeepEqual(obj["kind"], "Status") {
+			break
+		}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(t.UnstructuredContent(), &status); err != nil {
+			return err
+		}
+		if status.APIVersion != "v1" && status.APIVersion != "meta.k8s.io/v1" {
+			break
+		}
+		return &StatusError{ErrStatus: status}
 	}
 	return &UnexpectedObjectError{obj}
 }
