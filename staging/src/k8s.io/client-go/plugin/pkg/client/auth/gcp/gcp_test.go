@@ -196,6 +196,26 @@ func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
 	}
 }
 
+func Test_tokenSource_credentailsFile(t *testing.T) {
+	fakeTokenFile, err := ioutil.TempFile("", "credentailsfile")
+	if err != nil {
+		t.Fatalf("failed to create fake token file: +%v", err)
+	}
+	fakeTokenFile.Close()
+	defer os.Remove(fakeTokenFile.Name())
+	if err := ioutil.WriteFile(fakeTokenFile.Name(), []byte(`{"type":"service_account"}`), 0600); err != nil {
+		t.Fatalf("failed to write to fake token file: %+v", err)
+	}
+
+	ts, err := tokenSource(false, map[string]string{"credentials-file": fakeTokenFile.Name()})
+	if err != nil {
+		t.Fatalf("failed to get a token source: %+v", err)
+	}
+	if ts == nil {
+		t.Fatal("returned nil token source")
+	}
+}
+
 func Test_parseScopes(t *testing.T) {
 	cases := []struct {
 		in  map[string]string
@@ -319,6 +339,16 @@ func TestCmdTokenSource(t *testing.T) {
 			nil,
 			nil,
 			fmt.Errorf("error parsing expiry-key %q", "{.expiry}"),
+		},
+		{
+			"missing credentails-file",
+			map[string]string{
+				"cmd-path":         "/default/no/args",
+				"credentials-file": "path/to/service/account.json",
+			},
+			nil,
+			fmt.Errorf("credentials-file can only be used when kubectl is using a gcp service account key"),
+			nil,
 		},
 		{
 			"invalid expiry timestamp",

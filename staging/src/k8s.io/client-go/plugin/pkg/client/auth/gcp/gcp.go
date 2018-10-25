@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -103,7 +104,16 @@ var (
 //
 //       # golang reference time in the format that the expiration timestamp uses.
 //       # If omitted, defaults to time.RFC3339Nano
-//       "time-fmt": "2006-01-02 15:04:05.999999999"
+//       "time-fmt": "2006-01-02 15:04:05.999999999",
+//
+//       # Google application credentials options
+//       # These options are used when "cmd-path" is not present to authenticate
+//       # using a Google Application Credentials-based token source.
+//
+//       # The path to the Google Application Credentials JSON file. If missing,
+//       # The Application Default Credentials (ADC) are used. See:
+//       #   https://cloud.google.com/docs/authentication/production
+//       "credentials-file": "/path/to/creds.json"
 //     }
 //   }
 // }
@@ -140,6 +150,9 @@ func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, e
 		if gcpConfig["scopes"] != "" {
 			return nil, fmt.Errorf("scopes can only be used when kubectl is using a gcp service account key")
 		}
+		if gcpConfig["credentials-file"] != "" {
+			return nil, fmt.Errorf("credentials-file can only be used when kubectl is using a gcp service account key")
+		}
 		var args []string
 		if cmdArgs, ok := gcpConfig["cmd-args"]; ok {
 			args = strings.Fields(cmdArgs)
@@ -153,6 +166,19 @@ func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, e
 
 	// Google Application Credentials-based token source
 	scopes := parseScopes(gcpConfig)
+	// If "credentials-file" is set, load from file. Otherwise, use default
+	// token source.
+	if credentialsFile, ok := gcpConfig["credentials-file"]; ok {
+		data, err := ioutil.ReadFile(credentialsFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read credentials-file: %v", err)
+		}
+		creds, err := google.CredentialsFromJSON(context.Background(), data, scopes...)
+		if err != nil {
+			return nil, fmt.Errorf("cannot construct google credentials from JSON: %v", err)
+		}
+		return creds.TokenSource, nil
+	}
 	ts, err := google.DefaultTokenSource(context.Background(), scopes...)
 	if err != nil {
 		return nil, fmt.Errorf("cannot construct google default token source: %v", err)
