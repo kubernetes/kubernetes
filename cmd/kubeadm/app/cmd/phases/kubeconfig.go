@@ -21,6 +21,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -144,7 +145,7 @@ func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion st
 			examples: userKubeconfigExample,
 			cmdFunc: func(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 				if clientName == "" {
-					return fmt.Errorf("missing required argument --client-name")
+					return errors.New("missing required argument --client-name")
 				}
 
 				// if the kubeconfig file for an additional user has to use a token, use it
