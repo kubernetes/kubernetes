@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "attachdetachcontroller.go",
         "csrsigningcontroller.go",
+        "customflags.go",
         "daemonsetcontroller.go",
         "deploymentcontroller.go",
         "deprecatedcontroller.go",
@@ -35,6 +36,7 @@ go_library(
         "//cmd/controller-manager/app/options:go_default_library",
         "//cmd/kube-controller-manager/app/config:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/controller/apis/config:go_default_library",
         "//pkg/controller/apis/config/v1alpha1:go_default_library",
         "//pkg/controller/garbagecollector:go_default_library",
