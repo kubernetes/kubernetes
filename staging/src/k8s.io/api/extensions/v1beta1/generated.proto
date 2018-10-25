@@ -45,7 +45,7 @@ message AllowedHostPath {
   // pathPrefix is the path prefix that the host volume must match.
   // It does not support `*`.
   // Trailing slashes are trimmed when validating the path prefix with a host path.
-  // 
+  //
   // Examples:
   // `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
   // `/foo` would not allow `/food` or `/etc/foo`
@@ -690,7 +690,7 @@ message NetworkPolicyList {
 message NetworkPolicyPeer {
   // This is a label selector which selects Pods. This field follows standard label
   // selector semantics; if present but empty, it selects all pods.
-  // 
+  //
   // If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
@@ -699,7 +699,7 @@ message NetworkPolicyPeer {
 
   // Selects Namespaces using cluster-scoped labels. This field follows standard label
   // selector semantics; if present but empty, it selects all namespaces.
-  // 
+  //
   // If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
   // the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
   // Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
@@ -894,7 +894,7 @@ message PodSecurityPolicySpec {
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
   // Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
@@ -904,7 +904,7 @@ message PodSecurityPolicySpec {
   // forbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
   // Each entry is either a plain sysctl name or ends in "*" in which case it is considered
   // as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
-  // 
+  //
   // Examples:
   // e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
   // e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
