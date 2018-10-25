@@ -219,6 +219,8 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		containerPath := mount.MountPath
 		if runtime.GOOS == "windows" {
 			// Append C: only if it looks like a local path. Do not process UNC path/SMB shares/named pipes
+			// NOTE: strings.HasPrefix(hostPath, "\\") checks for prefix "\" as in "\foo\bar" and not "\\foo\bar"
+			// IsWindowsUNCPath checks for prefix "\\" as in "\\foo\bar" and not "\foo\bar"
 			if (strings.HasPrefix(hostPath, "/") || strings.HasPrefix(hostPath, "\\")) && !strings.Contains(hostPath, ":") && !volumeutil.IsWindowsUNCPath(runtime.GOOS, hostPath) {
 				hostPath = "c:" + hostPath
 			}
