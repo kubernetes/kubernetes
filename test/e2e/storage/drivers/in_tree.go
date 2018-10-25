@@ -88,7 +88,7 @@ func InitNFSDriver() TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedMountOption: sets.NewString("proto=tcp", "nosuid"),
+			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			IsPersistent:         true,
 			IsFsGroupSupported:   false,
