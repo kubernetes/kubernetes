@@ -1382,6 +1382,13 @@ When an object is created, the system will populate this list with the current s
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">managedFields</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ManagedFields is a map of workflow-id to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn&#8217;t need to set or understand this field. A workflow can be the user&#8217;s name, a controller&#8217;s name, or the name of a specific apply path like "ci-cd". The set of fields is always in the version that the workflow used when modifying the object.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
