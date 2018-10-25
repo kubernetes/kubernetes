@@ -51,6 +51,10 @@ func NewNoxuSubresourcesCRD(scope apiextensionsv1beta1.ResourceScope) *apiextens
 				ShortNames: []string{"foo", "bar", "abc", "def"},
 				ListKind:   "NoxuItemList",
 			},
+			Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+				{Name: "v1beta1", Served: true, Storage: false},
+				{Name: "v1", Served: true, Storage: true},
+			},
 			Scope: scope,
 			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
 				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},

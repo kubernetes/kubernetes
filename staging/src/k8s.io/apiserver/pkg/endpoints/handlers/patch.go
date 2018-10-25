@@ -118,9 +118,10 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 		gv := scope.Kind.GroupVersion()
+
 		codec := runtime.NewCodec(
 			scope.Serializer.EncoderForVersion(s.Serializer, gv),
-			scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
+			scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion),
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
@@ -162,6 +163,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			unsafeConvertor: scope.UnsafeConvertor,
 			kind:            scope.Kind,
 			resource:        scope.Resource,
+
+			hubGroupVersion: scope.HubGroupVersion,
 
 			createValidation: rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
 			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
@@ -218,6 +221,8 @@ type patcher struct {
 	resource        schema.GroupVersionResource
 	kind            schema.GroupVersionKind
 
+	hubGroupVersion schema.GroupVersion
+
 	// Validation functions
 	createValidation rest.ValidateObjectFunc
 	updateValidation rest.ValidateObjectUpdateFunc
@@ -240,11 +245,6 @@ type patcher struct {
 	namespace         string
 	updatedObjectInfo rest.UpdatedObjectInfo
 	mechanism         patchMechanism
-}
-
-func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, error) {
-	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-	return p.unsafeConvertor.ConvertToVersion(versionedObj, gvk.GroupVersion())
 }
 
 type patchMechanism interface {
@@ -320,13 +320,8 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	if err := strategicPatchObject(p.defaulter, currentVersionedObject, p.patchJS, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
 		return nil, err
 	}
-	// Convert the object back to unversioned (aka internal version).
-	unversionedObjToUpdate, err := p.toUnversioned(versionedObjToUpdate)
-	if err != nil {
-		return nil, err
-	}
-
-	return unversionedObjToUpdate, nil
+	// Convert the object back to the hub version
+	return p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, p.hubGroupVersion)
 }
 
 // strategicPatchObject applies a strategic merge patch of <patchJS> to

@@ -506,6 +506,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Subresource: subresource,
 		Kind:        fqKindToRegister,
 
+		HubGroupVersion: schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal},
+
 		MetaGroupVersion: metav1.SchemeGroupVersion,
 	}
 	if a.group.MetaGroupVersion != nil {
