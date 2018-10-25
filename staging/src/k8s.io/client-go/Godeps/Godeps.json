@@ -224,23 +224,23 @@
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/google",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/internal",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/jws",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/jwt",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
