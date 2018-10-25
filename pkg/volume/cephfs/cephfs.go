@@ -252,7 +252,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 			return nil
 		} else {
 			// if cephfs fuse mount failed, fallback to kernel mount.
-			glog.V(4).Infof("CephFS fuse mount failed: %v, fallback to kernel mount.", err)
+			glog.V(2).Infof("CephFS fuse mount failed: %v, fallback to kernel mount.", err)
 		}
 	}
 	glog.V(4).Info("CephFS kernel mount.")
