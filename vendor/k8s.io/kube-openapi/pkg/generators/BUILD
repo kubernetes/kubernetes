@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "api_linter.go",
+        "config.go",
         "extension.go",
         "openapi.go",
     ],
