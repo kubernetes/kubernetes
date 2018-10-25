@@ -65,7 +65,7 @@ data:
         errors
         health
         kubernetes $DNS_DOMAIN in-addr.arpa ip6.arpa {
-            pods insecure
+            pods verified
             upstream
             fallthrough in-addr.arpa ip6.arpa
         }
