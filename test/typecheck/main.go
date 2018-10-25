@@ -37,7 +37,7 @@ import (
 
 	"golang.org/x/crypto/ssh/terminal"
 
-	"k8s.io/kubernetes/test/typecheck/srcimporter"
+	srcimporter "k8s.io/kubernetes/third_party/go-srcimporter"
 )
 
 var (
