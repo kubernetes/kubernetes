@@ -30,10 +30,9 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"path/filepath"
 	"sync"
-
-	"k8s.io/kubernetes/third_party/forked/golang/go/types"
 )
 
 // An Importer provides the context for importing packages from source code.

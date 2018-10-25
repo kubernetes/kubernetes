@@ -5,7 +5,6 @@ go_library(
     srcs = ["srcimporter.go"],
     importpath = "k8s.io/kubernetes/test/typecheck/srcimporter",
     visibility = ["//visibility:public"],
-    deps = ["//third_party/forked/golang/go/types:go_default_library"],
 )
 
 filegroup(
