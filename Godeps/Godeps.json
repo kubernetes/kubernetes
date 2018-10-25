@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.10",
+	"GoVersion": "go1.11",
 	"GodepVersion": "v80",
 	"Packages": [
 		"github.com/onsi/ginkgo/ginkgo",
@@ -1561,6 +1561,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
+			"Comment": "v1.0.0-4-gc7ce166",
 			"Rev": "c7ce16629ff4cd059ed96ed06419dd3856fd3577"
 		},
 		{
@@ -3390,23 +3391,23 @@
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/google",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/internal",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/jws",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/oauth2/jwt",
-			"Rev": "a6bd8cefa1811bd24b86f8902872e4e8225f74c4"
+			"Rev": "9dcd33a902f40452422c2367fefcb95b54f9f8f8"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
@@ -3816,6 +3817,7 @@
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
+			"Comment": "v2.2.1",
 			"Rev": "5420a8b6744d3b0345ab293f6fcba19c978f1183"
 		},
 		{

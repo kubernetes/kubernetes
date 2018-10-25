@@ -5,9 +5,11 @@
 package google
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/user"
@@ -18,7 +20,6 @@ import (
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/internal"
 )
 
 type sdkCredentials struct {
@@ -76,7 +77,7 @@ func NewSDKConfig(account string) (*SDKConfig, error) {
 			return nil, fmt.Errorf("oauth2/google: failed to load SDK properties: %v", err)
 		}
 		defer f.Close()
-		ini, err := internal.ParseINI(f)
+		ini, err := parseINI(f)
 		if err != nil {
 			return nil, fmt.Errorf("oauth2/google: failed to parse SDK properties %q: %v", propertiesPath, err)
 		}
@@ -144,6 +145,34 @@ func (c *SDKConfig) TokenSource(ctx context.Context) oauth2.TokenSource {
 // Scopes are the OAuth 2.0 scopes the current account is authorized for.
 func (c *SDKConfig) Scopes() []string {
 	return c.conf.Scopes
+}
+
+func parseINI(ini io.Reader) (map[string]map[string]string, error) {
+	result := map[string]map[string]string{
+		"": {}, // root section
+	}
+	scanner := bufio.NewScanner(ini)
+	currentSection := ""
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, ";") {
+			// comment.
+			continue
+		}
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			currentSection = strings.TrimSpace(line[1 : len(line)-1])
+			result[currentSection] = map[string]string{}
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 && parts[0] != "" {
+			result[currentSection][strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error scanning ini: %v", err)
+	}
+	return result, nil
 }
 
 // sdkConfigPath tries to guess where the gcloud config is located.

@@ -5,6 +5,7 @@
 package oauth2
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -20,7 +21,7 @@ import (
 // expirations due to client-server time mismatches.
 const expiryDelta = 10 * time.Second
 
-// Token represents the crendentials used to authorize
+// Token represents the credentials used to authorize
 // the requests to access protected resources on the OAuth 2.0
 // provider's backend.
 //
@@ -123,7 +124,7 @@ func (t *Token) expired() bool {
 	if t.Expiry.IsZero() {
 		return false
 	}
-	return t.Expiry.Add(-expiryDelta).Before(time.Now())
+	return t.Expiry.Round(0).Add(-expiryDelta).Before(time.Now())
 }
 
 // Valid reports whether t is non-nil, has an AccessToken, and is not expired.
@@ -152,7 +153,23 @@ func tokenFromInternal(t *internal.Token) *Token {
 func retrieveToken(ctx context.Context, c *Config, v url.Values) (*Token, error) {
 	tk, err := internal.RetrieveToken(ctx, c.ClientID, c.ClientSecret, c.Endpoint.TokenURL, v)
 	if err != nil {
+		if rErr, ok := err.(*internal.RetrieveError); ok {
+			return nil, (*RetrieveError)(rErr)
+		}
 		return nil, err
 	}
 	return tokenFromInternal(tk), nil
+}
+
+// RetrieveError is the error returned when the token endpoint returns a
+// non-2XX HTTP status code.
+type RetrieveError struct {
+	Response *http.Response
+	// Body is the body that was consumed by reading Response.Body.
+	// It may be truncated.
+	Body []byte
+}
+
+func (r *RetrieveError) Error() string {
+	return fmt.Sprintf("oauth2: cannot fetch token: %v\nResponse: %s", r.Response.Status, r.Body)
 }
