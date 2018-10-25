@@ -24,4 +24,4 @@ about: Report a bug encountered while operating Kubernetes
 - Others:
 
 <!-- DO NOT EDIT BELOW THIS LINE -->
-/king bug
+/kind bug
