@@ -20,10 +20,7 @@ spec:
           args:
             - "--v=5"
             - "--provisioner=com.google.csi.gcepd"
-            - "--csi-address=$(ADDRESS)"
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
+            - "--csi-address=/csi/csi.sock"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -32,10 +29,7 @@ spec:
           image: quay.io/k8scsi/csi-attacher:v0.2.0
           args:
             - "--v=5"
-            - "--csi-address=$(ADDRESS)"
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
+            - "--csi-address=/csi/csi.sock"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -44,11 +38,9 @@ spec:
           image: gcr.io/google-containers/volume-csi/gcp-compute-persistent-disk-csi-driver:v0.1.0.alpha
           args:
             - "--v=5"
-            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--endpoint=unix:///csi/csi.sock"
             - "--nodeid=$(KUBE_NODE_NAME)"
           env:
-            - name: CSI_ENDPOINT
-              value: unix:///csi/csi.sock
             - name: KUBE_NODE_NAME
               valueFrom:
                 fieldRef:
