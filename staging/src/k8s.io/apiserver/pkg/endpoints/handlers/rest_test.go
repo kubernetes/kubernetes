@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/evanphx/json-patch"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -149,8 +148,8 @@ func TestJSONPatch(t *testing.T) {
 		},
 	} {
 		p := &patcher{
-			patchType: types.JSONPatchType,
-			patchJS:   []byte(test.patch),
+			patchType:  types.JSONPatchType,
+			patchBytes: []byte(test.patch),
 		}
 		jp := jsonPatcher{p}
 		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)

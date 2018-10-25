@@ -138,6 +138,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.Resource,
 			scope.Subresource,
 			admission.Create,
+			dryrun.IsDryRun(options.DryRun),
 			userInfo)
 		staticUpdateAttributes := admission.NewAttributesRecord(
 			nil,
@@ -175,6 +176,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			kind:            scope.Kind,
 			resource:        scope.Resource,
 			subresource:     scope.Subresource,
+			dryRun:          dryrun.IsDryRun(options.DryRun),
 
 			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes), scope.Authorizer, createAuthorizerAttributes),
 			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes),
@@ -236,6 +238,7 @@ type patcher struct {
 	resource        schema.GroupVersionResource
 	kind            schema.GroupVersionKind
 	subresource     string
+	dryRun          bool
 
 	// Validation functions
 	createValidation rest.ValidateObjectFunc
@@ -423,7 +426,7 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 
 func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation) admission.Attributes {
 	userInfo, _ := request.UserFrom(ctx)
-	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, userInfo)
+	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, p.dryRun, userInfo)
 }
 
 // applyAdmission is called every time GuaranteedUpdate asks for the updated object,

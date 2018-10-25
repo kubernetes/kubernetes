@@ -366,7 +366,7 @@ func (o *ApplyOptions) Run() error {
 
 		if o.ServerSideApply {
 			// Send the full object to be applied on the server side.
-			data, err := runtime.Encode(cmdutil.InternalVersionJSONEncoder(), info.Object)
+			data, err := runtime.Encode(unstructured.UnstructuredJSONScheme, info.Object)
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
@@ -379,14 +379,8 @@ func (o *ApplyOptions) Run() error {
 				info.Name,
 				types.ApplyPatchType,
 				data,
-				options,
+				&options,
 			)
-			if err != nil {
-				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
-			}
-
-			info.Refresh(obj, true)
-			metadata, err := meta.Accessor(info.Object)
 			if err == nil {
 				info.Refresh(obj, true)
 				metadata, err := meta.Accessor(info.Object)

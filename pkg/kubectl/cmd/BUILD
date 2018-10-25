@@ -183,8 +183,8 @@ go_test(
         "top_test.go",
     ],
     data = [
-        "testdata",
         "//api/openapi-spec:swagger-spec",
+        "//pkg/kubectl/cmd/plugin:testdata",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/fixtures",
     ],
