@@ -279,6 +279,7 @@ func TestDynamicProvisioning(t StorageClassTest, client clientset.Interface, cla
 			// Get entry, get mount options at 6th word, replace brackets with commas
 			command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
 		}
+		command += " || (mount | grep 'on /mnt/test'; false)"
 		runInPodWithVolume(client, claim.Namespace, claim.Name, t.NodeName, command)
 
 		By("checking the created volume is readable and retains data")
@@ -348,6 +349,12 @@ func runInPodWithVolume(c clientset.Interface, ns, claimName, nodeName, command 
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	defer func() {
+		body, err := c.CoreV1().Pods(ns).GetLogs(pod.Name, &v1.PodLogOptions{}).Do().Raw()
+		if err != nil {
+			framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
+		} else {
+			framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
+		}
 		framework.DeletePodOrFail(c, ns, pod.Name)
 	}()
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
