@@ -13,8 +13,6 @@ go_library(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/capabilities:go_default_library",
-        "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/generated/openapi:go_default_library",

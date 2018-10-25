@@ -43,7 +43,6 @@ type AdmissionConfig struct {
 	CloudConfigFile      string
 	LoopbackClientConfig *rest.Config
 	ExternalInformers    externalinformers.SharedInformerFactory
-	InternalInformers    internalinformers.SharedInformerFactory
 }
 
 func (c *AdmissionConfig) buildAuthnInfoResolver(proxyTransport *http.Transport) webhook.AuthenticationInfoResolverWrapper {
