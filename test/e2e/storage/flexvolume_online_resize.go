@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"path"
@@ -60,9 +59,6 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 	f := framework.NewDefaultFramework("mounted-flexvolume-expand")
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce", "local")
-		if enabled, ok := framework.TestContext.FeatureGates["ExpandInUsePersistentVolumes"]; !ok || !enabled {
-			framework.Skipf("Only supported when %v feature is enabled", features.ExpandInUsePersistentVolumes)
-		}
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
