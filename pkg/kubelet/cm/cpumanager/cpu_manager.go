@@ -112,12 +112,8 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		}
 		glog.Infof("[cpumanager] detected CPU topology: %v", topo)
 		reservedCPUs, ok := nodeAllocatableReservation[v1.ResourceCPU]
-		if !ok {
-			// The static policy cannot initialize without this information.
-			return nil, fmt.Errorf("[cpumanager] unable to determine reserved CPU resources for static policy")
-		}
-		if reservedCPUs.IsZero() {
-			// The static policy requires this to be nonzero. Zero CPU reservation
+		if !ok || reservedCPUs.IsZero() {
+			// The static policy requires reserved CPUs to be nonzero. Zero CPU reservation
 			// would allow the shared pool to be completely exhausted. At that point
 			// either we would violate our guarantee of exclusivity or need to evict
 			// any pod that has at least one container that requires zero CPUs.

@@ -248,15 +248,9 @@ func TestCPUManagerGenerate(t *testing.T) {
 			expectedError:              fmt.Errorf("could not detect number of cpus"),
 		},
 		{
-			description:                "static policy - broken reservation",
+			description:                "static policy - broken reservation / no CPU resources",
 			cpuPolicyName:              "static",
 			nodeAllocatableReservation: v1.ResourceList{},
-			expectedError:              fmt.Errorf("unable to determine reserved CPU resources for static policy"),
-		},
-		{
-			description:                "static policy - no CPU resources",
-			cpuPolicyName:              "static",
-			nodeAllocatableReservation: v1.ResourceList{v1.ResourceCPU: *resource.NewQuantity(0, resource.DecimalSI)},
 			expectedError:              fmt.Errorf("the static policy requires systemreserved.cpu + kubereserved.cpu to be greater than zero"),
 		},
 	}
