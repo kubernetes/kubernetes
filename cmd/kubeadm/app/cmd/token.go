@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
@@ -230,7 +231,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 	if printJoinCommand {
 		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), false)
 		if err != nil {
-			return fmt.Errorf("failed to get join command: %v", err)
+			return errors.Wrap(err, "failed to get join command")
 		}
 		fmt.Fprintln(out, joinCommand)
 	} else {
@@ -271,7 +272,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 	glog.V(1).Infoln("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("failed to list bootstrap tokens [%v]", err)
+		return errors.Wrap(err, "failed to list bootstrap tokens")
 	}
 
 	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
@@ -310,7 +311,7 @@ func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken st
 	tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 	glog.V(1).Infoln("[token] deleting token")
 	if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
-		return fmt.Errorf("failed to delete bootstrap token [%v]", err)
+		return errors.Wrap(err, "failed to delete bootstrap token")
 	}
 	fmt.Fprintf(out, "bootstrap token with id %q deleted\n", tokenID)
 	return nil

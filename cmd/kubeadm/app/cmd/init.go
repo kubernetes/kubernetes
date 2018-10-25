@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -307,7 +308,7 @@ func newInitData(cmd *cobra.Command, options *initOptions) (initData, error) {
 	dryRunDir := ""
 	if options.dryRun {
 		if dryRunDir, err = ioutil.TempDir("", "kubeadm-init-dryrun"); err != nil {
-			return initData{}, fmt.Errorf("couldn't create a temporary directory: %v", err)
+			return initData{}, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
 
@@ -416,7 +417,7 @@ func runInit(i *initData, out io.Writer) error {
 	realCertsDir := i.cfg.CertificatesDir
 	certsDirToWriteTo, kubeConfigDir, manifestDir, _, err := getDirectoriesToUse(i.dryRun, i.dryRunDir, i.cfg.CertificatesDir)
 	if err != nil {
-		return fmt.Errorf("error getting directories to use: %v", err)
+		return errors.Wrap(err, "error getting directories to use")
 	}
 
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
@@ -465,13 +466,13 @@ func runInit(i *initData, out io.Writer) error {
 	glog.V(1).Infof("[init] bootstraping the control plane")
 	glog.V(1).Infof("[init] creating static pod manifest")
 	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
-		return fmt.Errorf("error creating init static pod manifest files: %v", err)
+		return errors.Wrap(err, "error creating init static pod manifest files")
 	}
 	// Add etcd static pod spec only if external etcd is not configured
 	if i.cfg.Etcd.External == nil {
 		glog.V(1).Infof("[init] no external etcd found. Creating manifest for local etcd static pod")
 		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
-			return fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
+			return errors.Wrap(err, "error creating local etcd static pod manifest file")
 		}
 	}
 
@@ -480,14 +481,14 @@ func runInit(i *initData, out io.Writer) error {
 
 	// If we're dry-running, print the generated manifests
 	if err := printFilesIfDryRunning(i.dryRun, manifestDir); err != nil {
-		return fmt.Errorf("error printing files on dryrun: %v", err)
+		return errors.Wrap(err, "error printing files on dryrun")
 	}
 
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	glog.V(1).Infof("creating Kubernetes client")
 	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return errors.Wrap(err, "error creating client")
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
@@ -503,7 +504,7 @@ func runInit(i *initData, out io.Writer) error {
 
 		kubeletFailTempl.Execute(out, ctx)
 
-		return fmt.Errorf("couldn't initialize a Kubernetes cluster")
+		return errors.New("couldn't initialize a Kubernetes cluster")
 	}
 
 	// Upload currently used configuration to the cluster
@@ -511,23 +512,23 @@ func runInit(i *initData, out io.Writer) error {
 	// depend on centralized information from this source in the future
 	glog.V(1).Infof("[init] uploading currently used configuration to the cluster")
 	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
-		return fmt.Errorf("error uploading configuration: %v", err)
+		return errors.Wrap(err, "error uploading configuration")
 	}
 
 	glog.V(1).Infof("[init] creating kubelet configuration configmap")
 	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
-		return fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err)
+		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
 	// PHASE 4: Mark the master with the right label/taint
 	glog.V(1).Infof("[init] marking the master with right label")
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
-		return fmt.Errorf("error marking master: %v", err)
+		return errors.Wrap(err, "error marking master")
 	}
 
 	glog.V(1).Infof("[init] preserving the crisocket information for the master")
 	if err := patchnodephase.AnnotateCRISocket(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.CRISocket); err != nil {
-		return fmt.Errorf("error uploading crisocket: %v", err)
+		return errors.Wrap(err, "error uploading crisocket")
 	}
 
 	// This feature is disabled by default
@@ -539,7 +540,7 @@ func runInit(i *initData, out io.Writer) error {
 
 		// Enable dynamic kubelet configuration for the node.
 		if err := kubeletphase.EnableDynamicConfigForNode(client, i.cfg.NodeRegistration.Name, kubeletVersion); err != nil {
-			return fmt.Errorf("error enabling dynamic kubelet configuration: %v", err)
+			return errors.Wrap(err, "error enabling dynamic kubelet configuration")
 		}
 	}
 
@@ -559,17 +560,17 @@ func runInit(i *initData, out io.Writer) error {
 	// Create the default node bootstrap token
 	glog.V(1).Infof("[init] creating RBAC rules to generate default bootstrap token")
 	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, i.cfg.BootstrapTokens); err != nil {
-		return fmt.Errorf("error updating or creating token: %v", err)
+		return errors.Wrap(err, "error updating or creating token")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
 	glog.V(1).Infof("[init] creating RBAC rules to allow bootstrap tokens to post CSR")
 	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
-		return fmt.Errorf("error allowing bootstrap tokens to post CSRs: %v", err)
+		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
 	glog.V(1).Infof("[init] creating RBAC rules to automatic approval of CSRs automatically")
 	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
-		return fmt.Errorf("error auto-approving node bootstrap tokens: %v", err)
+		return errors.Wrap(err, "error auto-approving node bootstrap tokens: %v")
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
@@ -581,21 +582,21 @@ func runInit(i *initData, out io.Writer) error {
 	// Create the cluster-info ConfigMap with the associated RBAC rules
 	glog.V(1).Infof("[init] creating bootstrap configmap")
 	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
-		return fmt.Errorf("error creating bootstrap configmap: %v", err)
+		return errors.Wrap(err, "error creating bootstrap configmap")
 	}
 	glog.V(1).Infof("[init] creating ClusterInfo RBAC rules")
 	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
-		return fmt.Errorf("error creating clusterinfo RBAC rules: %v", err)
+		return errors.Wrap(err, "error creating clusterinfo RBAC rules")
 	}
 
 	glog.V(1).Infof("[init] ensuring DNS addon")
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
-		return fmt.Errorf("error ensuring dns addon: %v", err)
+		return errors.Wrap(err, "error ensuring dns addon")
 	}
 
 	glog.V(1).Infof("[init] ensuring proxy addon")
 	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
-		return fmt.Errorf("error ensuring proxy addon: %v", err)
+		return errors.Wrap(err, "error ensuring proxy addon")
 	}
 
 	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
@@ -605,7 +606,7 @@ func runInit(i *initData, out io.Writer) error {
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] creating self-hosted control plane")
 		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter, i.dryRun); err != nil {
-			return fmt.Errorf("error creating self hosted control plane: %v", err)
+			return errors.Wrap(err, "error creating self hosted control plane")
 		}
 	}
 
@@ -618,7 +619,7 @@ func runInit(i *initData, out io.Writer) error {
 	// Prints the join command, multiple times in case the user has multiple tokens
 	for _, token := range tokens {
 		if err := printJoinCommand(out, adminKubeConfigPath, token, i.skipTokenPrint); err != nil {
-			return fmt.Errorf("failed to print join command: %v", err)
+			return errors.Wrap(err, "failed to print join command")
 		}
 	}
 	return nil
