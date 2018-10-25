@@ -196,8 +196,8 @@ func Test_tokenSource_applicationDefaultCredentials(t *testing.T) {
 	}
 }
 
-func Test_tokenSource_credentailsFile(t *testing.T) {
-	fakeTokenFile, err := ioutil.TempFile("", "credentailsfile")
+func Test_tokenSource_credentialsFile(t *testing.T) {
+	fakeTokenFile, err := ioutil.TempFile("", "credentialsfile")
 	if err != nil {
 		t.Fatalf("failed to create fake token file: +%v", err)
 	}
