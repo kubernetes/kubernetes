@@ -140,6 +140,7 @@ const (
 	// owner: @jsafrane
 	// GA: v1.12
 	//
+	// Note: This feature gate is unconditionally enabled in v1.13 and will be removed in v1.14.
 	// Enable mount propagation of volumes.
 	MountPropagation utilfeature.Feature = "MountPropagation"
 
