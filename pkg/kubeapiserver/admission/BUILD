@@ -10,7 +10,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/quota/v1:go_default_library",
         "//pkg/quota/v1/install:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
