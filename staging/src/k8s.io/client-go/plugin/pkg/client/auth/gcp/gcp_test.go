@@ -341,7 +341,7 @@ func TestCmdTokenSource(t *testing.T) {
 			fmt.Errorf("error parsing expiry-key %q", "{.expiry}"),
 		},
 		{
-			"missing credentails-file",
+			"missing credentials-file",
 			map[string]string{
 				"cmd-path":         "/default/no/args",
 				"credentials-file": "path/to/service/account.json",
