@@ -1561,6 +1561,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
+			"Comment": "v1.0.0-4-gc7ce166",
 			"Rev": "c7ce16629ff4cd059ed96ed06419dd3856fd3577"
 		},
 		{
@@ -2334,11 +2335,11 @@
 		},
 		{
 			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library",
-			"Rev": "d62704773030f6db982ef016b4fc1bf3b9ac32db"
+			"Rev": "5e48892b442e2bd3db1d28aabf43ba85c1dc69ca"
 		},
 		{
 			"ImportPath": "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins",
-			"Rev": "d62704773030f6db982ef016b4fc1bf3b9ac32db"
+			"Rev": "5e48892b442e2bd3db1d28aabf43ba85c1dc69ca"
 		},
 		{
 			"ImportPath": "github.com/kubernetes/repo-infra/kazel",
@@ -3824,6 +3825,7 @@
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
+			"Comment": "v2.2.1",
 			"Rev": "5420a8b6744d3b0345ab293f6fcba19c978f1183"
 		},
 		{

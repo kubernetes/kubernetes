@@ -14,9 +14,7 @@ limitations under the License.
 
 package plugins
 
-import (
-	"k8s.io/api/core/v1"
-)
+import "k8s.io/api/core/v1"
 
 type InTreePlugin interface {
 	// TranslateToCSI takes a persistent volume and will translate

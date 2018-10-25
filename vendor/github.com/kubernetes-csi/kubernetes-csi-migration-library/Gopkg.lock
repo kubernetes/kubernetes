@@ -77,7 +77,6 @@
   version = "kubernetes-1.12.1"
 
 [[projects]]
-  branch = "release-1.12"
   digest = "1:01926916f6f34e7cc6230e36e66f9690013adcfd32755aebf03ceb91f9c16864"
   name = "k8s.io/apimachinery"
   packages = [
@@ -105,6 +104,7 @@
   ]
   pruneopts = "UT"
   revision = "6dd46049f39503a1fc8d65de4bd566829e95faff"
+  version = "kubernetes-1.12.0"
 
 [solve-meta]
   analyzer-name = "dep"
