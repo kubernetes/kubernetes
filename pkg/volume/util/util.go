@@ -959,6 +959,24 @@ func IsWindowsUNCPath(goos, path string) bool {
 	return false
 }
 
+// IsWindowsLocalPath checks if path is a local path
+// prefixed with "/" or "\" like "/foo/bar" or "\foo\bar"
+func IsWindowsLocalPath(goos, path string) bool {
+	if goos != "windows" {
+		return false
+	}
+	if IsWindowsUNCPath(goos, path) {
+		return false
+	}
+	if strings.Contains(path, ":") {
+		return false
+	}
+	if !(strings.HasPrefix(path, `/`) || strings.HasPrefix(path, `\`)) {
+		return false
+	}
+	return true
+}
+
 // MakeAbsolutePath convert path to absolute path according to GOOS
 func MakeAbsolutePath(goos, path string) string {
 	if goos != "windows" {

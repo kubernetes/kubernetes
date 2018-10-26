@@ -128,7 +128,6 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 
 // makeMounts determines the mount points for the given container.
 func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap, mounter mountutil.Interface, expandEnvs []kubecontainer.EnvVar) ([]kubecontainer.Mount, func(), error) {
-
 	// Kubernetes only mounts on /etc/hosts if:
 	// - container is not an infrastructure (pause) container
 	// - container is not already mounting on /etc/hosts
@@ -216,15 +215,11 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 
 		// Docker Volume Mounts fail on Windows if it is not of the form C:/
-		containerPath := mount.MountPath
-		if runtime.GOOS == "windows" {
-			// Append C: only if it looks like a local path. Do not process UNC path/SMB shares/named pipes
-			// NOTE: strings.HasPrefix(hostPath, "\\") checks for prefix "\" as in "\foo\bar" and not "\\foo\bar"
-			// IsWindowsUNCPath checks for prefix "\\" as in "\\foo\bar" and not "\foo\bar"
-			if (strings.HasPrefix(hostPath, "/") || strings.HasPrefix(hostPath, "\\")) && !strings.Contains(hostPath, ":") && !volumeutil.IsWindowsUNCPath(runtime.GOOS, hostPath) {
-				hostPath = "c:" + hostPath
-			}
+		if volumeutil.IsWindowsLocalPath(runtime.GOOS, hostPath) {
+			hostPath = "c:" + hostPath
 		}
+
+		containerPath := mount.MountPath
 		// IsAbs returns false for UNC path/SMB shares/named pipes in Windows. So check for those specifically and skip MakeAbsolutePath
 		if !volumeutil.IsWindowsUNCPath(runtime.GOOS, containerPath) && !filepath.IsAbs(containerPath) {
 			containerPath = volumeutil.MakeAbsolutePath(runtime.GOOS, containerPath)

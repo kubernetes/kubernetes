@@ -2424,6 +2424,97 @@ func TestIsWindowsUNCPath(t *testing.T) {
 	}
 }
 
+func TestIsWindowsLocalPath(t *testing.T) {
+	tests := []struct {
+		goos               string
+		path               string
+		isWindowsLocalPath bool
+	}{
+		{
+			goos:               "linux",
+			path:               `/usr/bin`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "linux",
+			path:               `\\.\pipe\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `C:\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `:\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `X:\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\server\share\foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\?\server\share`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\?\c:\`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\\.\pipe\valid_pipe`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `:foo`,
+			isWindowsLocalPath: false,
+		},
+		{
+			goos:               "windows",
+			path:               `\foo`,
+			isWindowsLocalPath: true,
+		},
+		{
+			goos:               "windows",
+			path:               `\foo\bar`,
+			isWindowsLocalPath: true,
+		},
+		{
+			goos:               "windows",
+			path:               `/foo`,
+			isWindowsLocalPath: true,
+		},
+		{
+			goos:               "windows",
+			path:               `/foo/bar`,
+			isWindowsLocalPath: true,
+		},
+	}
+
+	for _, test := range tests {
+		result := IsWindowsLocalPath(test.goos, test.path)
+		if result != test.isWindowsLocalPath {
+			t.Errorf("isWindowsLocalPath(%v) returned (%v), expected (%v)", test.path, result, test.isWindowsLocalPath)
+		}
+	}
+}
+
 func TestMakeAbsolutePath(t *testing.T) {
 	tests := []struct {
 		goos         string
