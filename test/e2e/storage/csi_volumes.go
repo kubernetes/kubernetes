@@ -384,8 +384,9 @@ func initCSIgcePD(f *framework.Framework, config framework.VolumeTestConfig) csi
 
 func (g *gcePDCSIDriver) createStorageClassTest() testsuites.StorageClassTest {
 	return testsuites.StorageClassTest{
-		Name:         "com.google.csi.gcepd",
-		Provisioner:  "com.google.csi.gcepd-" + g.f.UniqueName,
+		Name: "com.google.csi.gcepd",
+		// *Not* renaming the driver, see below.
+		Provisioner:  "com.google.csi.gcepd",
 		Parameters:   map[string]string{"type": "pd-standard"},
 		ClaimSize:    "5Gi",
 		ExpectedSize: "5Gi",
