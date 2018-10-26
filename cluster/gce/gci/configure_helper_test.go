@@ -32,8 +32,9 @@ import (
 )
 
 const (
-	envScriptFileName         = "kube-env"
-	configureHelperScriptName = "configure-helper.sh"
+	envScriptFileName                = "kube-env"
+	configureHelperScriptName        = "configure-helper.sh"
+	configureKubeAPIServerScriptName = "configure-kube-apiserver.sh"
 )
 
 type ManifestTestCase struct {
@@ -125,7 +126,7 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
 
 func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
 	c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s --source-only ; %s", c.envScriptPath, configureHelperScriptName, c.manifestFuncName)
+	args := fmt.Sprintf("source %s ; source %s --source-only ; source %s ; %s", c.envScriptPath, configureHelperScriptName, configureKubeAPIServerScriptName, c.manifestFuncName)
 	cmd := exec.Command("bash", "-c", args)
 
 	bs, err := cmd.CombinedOutput()
