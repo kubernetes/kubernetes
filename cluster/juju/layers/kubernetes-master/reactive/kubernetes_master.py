@@ -863,7 +863,7 @@ def configure_cdk_addons():
     if ks:
         leader_set({'keystone-cdk-addons-configured': True})
     else:
-        leader_set({'keystone-cdk-addons-configured': False})
+        leader_set({'keystone-cdk-addons-configured': None})
 
 
 @retry(times=3, delay_secs=20)
