@@ -605,7 +605,7 @@ filename | sha256 hash
 * Fixed a race condition in k8s.io/client-go/tools/cache.SharedInformer that could violate the sequential delivery guarantee and cause panics on shutdown. ([#59828](https://github.com/kubernetes/kubernetes/pull/59828), [@krousey](https://github.com/krousey))
 * [fluentd-gcp addon] Update fluentd and event-exporter images to have the latest base image. ([#61719](https://github.com/kubernetes/kubernetes/pull/61719), [@crassirostris](https://github.com/crassirostris))
 * Support new NODE_OS_DISTRIBUTION 'custom' on GCE ([#61235](https://github.com/kubernetes/kubernetes/pull/61235), [@yguo0905](https://github.com/yguo0905))
-* Fixes a bug where character devices are not recongized by the kubelet ([#60440](https://github.com/kubernetes/kubernetes/pull/60440), [@andrewsykim](https://github.com/andrewsykim))
+* Fixes a bug where character devices are not recognized by the kubelet ([#60440](https://github.com/kubernetes/kubernetes/pull/60440), [@andrewsykim](https://github.com/andrewsykim))
 * Fixes storage e2e test failures in GKE regional clusters. ([#61303](https://github.com/kubernetes/kubernetes/pull/61303), [@verult](https://github.com/verult))
 * fix the error prone account creation method of blob disk ([#59739](https://github.com/kubernetes/kubernetes/pull/59739), [@andyzhangx](https://github.com/andyzhangx))
 * The webhook admission controller in a custom apiserver now works off-the-shelf. ([#60995](https://github.com/kubernetes/kubernetes/pull/60995), [@caesarxuchao](https://github.com/caesarxuchao))
