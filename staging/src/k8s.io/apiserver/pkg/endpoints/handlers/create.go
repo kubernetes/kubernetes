@@ -40,6 +40,14 @@ import (
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
+const (
+	maxBodyLength = (1 << 20) / 8
+)
+
+var (
+	tooBIGObject = fmt.Sprintf("object is bigger than maximum allowed size: %d KiB", maxBodyLength*8/1024)
+)
+
 func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
@@ -82,6 +90,10 @@ func createHandler(r rest.NamedCreater, scope RequestScope, admit admission.Inte
 		body, err := readBody(req)
 		if err != nil {
 			scope.err(err, w, req)
+			return
+		}
+		if len(body) > maxBodyLength {
+			scope.err(errors.NewBadRequest(tooBIGObject), w, req)
 			return
 		}
 

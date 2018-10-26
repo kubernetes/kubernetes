@@ -93,6 +93,10 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.err(err, w, req)
 			return
 		}
+		if len(patchJS) > maxBodyLength {
+			scope.err(errors.NewBadRequest(tooBIGObject), w, req)
+			return
+		}
 
 		options := &metav1.UpdateOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {

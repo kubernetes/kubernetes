@@ -69,6 +69,10 @@ func UpdateResource(r rest.Updater, scope RequestScope, admit admission.Interfac
 			scope.err(err, w, req)
 			return
 		}
+		if len(body) > maxBodyLength {
+			scope.err(errors.NewBadRequest(tooBIGObject), w, req)
+			return
+		}
 
 		options := &metav1.UpdateOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {

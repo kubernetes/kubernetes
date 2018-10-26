@@ -71,6 +71,10 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				scope.err(err, w, req)
 				return
 			}
+			if len(body) > maxBodyLength {
+				scope.err(errors.NewBadRequest(tooBIGObject), w, req)
+				return
+			}
 			if len(body) > 0 {
 				s, err := negotiation.NegotiateInputSerializer(req, false, metainternalversion.Codecs)
 				if err != nil {
