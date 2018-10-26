@@ -861,9 +861,9 @@ def configure_cdk_addons():
 
     set_state('cdk-addons.configured')
     if ks:
-        set_state('keystone.cdk-addons.configured')
+        leader_set({'keystone-cdk-addons-configured': True})
     else:
-        remove_state('keystone.cdk-addons.configured')
+        leader_set({'keystone-cdk-addons-configured': False})
 
 
 @retry(times=3, delay_secs=20)
@@ -1863,7 +1863,7 @@ def setup_keystone_user():
     ks.request_credentials('k8s')
 
 
-@when('keystone.cdk-addons.configured', 'keystone.credentials.configured')
+@when('keystone.credentials.configured', 'leadership.set.keystone-cdk-addons-configured')
 @when_not('keystone.apiserver.configured')
 def keystone_kick_apiserver():
     # if we have run configure, but we haven't configured the api server
@@ -1874,7 +1874,7 @@ def keystone_kick_apiserver():
 
 @when('keystone-credentials.available.auth', 'certificates.ca.available',
       'certificates.client.cert.available', 'authentication.setup',
-      'keystone.cdk-addons.configured', 'etcd.available')
+      'etcd.available', 'leadership.set.keystone-cdk-addons-configured')
 def keystone_config():
     # first, we have to have the service set up before we can render this stuff
     ks = endpoint_from_flag('keystone-credentials.available.auth')
