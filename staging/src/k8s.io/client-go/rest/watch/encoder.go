@@ -50,7 +50,8 @@ func (e *Encoder) Encode(event *watch.Event) error {
 	}
 	// FIXME: get rid of json.RawMessage.
 	return e.encoder.Encode(&metav1.WatchEvent{
-		Type:   string(event.Type),
-		Object: runtime.RawExtension{Raw: json.RawMessage(data)},
+		Type:      string(event.Type),
+		Object:    runtime.RawExtension{Raw: json.RawMessage(data)},
+		TrackInfo: string(event.TrackInfo),
 	})
 }

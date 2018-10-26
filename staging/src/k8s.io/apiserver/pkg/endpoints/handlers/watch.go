@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
+	"k8s.io/klog"
 
 	"golang.org/x/net/websocket"
 )
@@ -229,6 +231,15 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// client disconnect.
 				return
 			}
+			// outEvent.Object is raw
+			meta, err := meta.Accessor(obj)
+			if err != nil {
+				klog.Warningf("unexpected et error: %v, %s", err, reflect.TypeOf(obj))
+			} else {
+				klog.Warningf("et,%s,%s,%s,%s,%s,%s,%s\n",
+					outEvent.Type, meta.GetNamespace(), meta.GetName(), reflect.TypeOf(outEvent.Object), meta.GetResourceVersion(), outEvent.TrackInfo, meta.GetUID())
+			}
+
 			if err := e.Encode(outEvent); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v (%#v)", outEvent, err, e))
 				// client disconnect.

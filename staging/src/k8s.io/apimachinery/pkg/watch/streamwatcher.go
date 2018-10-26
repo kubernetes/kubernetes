@@ -31,7 +31,7 @@ type Decoder interface {
 	// Decode should return the type of event, the decoded object, or an error.
 	// An error will cause StreamWatcher to call Close(). Decode should block until
 	// it has data or an error occurs.
-	Decode() (action EventType, object runtime.Object, err error)
+	Decode() (action EventType, object runtime.Object, trackinfo string, err error)
 
 	// Close should close the underlying io.Reader, signalling to the source of
 	// the stream that it is no longer being watched. Close() must cause any
@@ -90,7 +90,7 @@ func (sw *StreamWatcher) receive() {
 	defer sw.Stop()
 	defer utilruntime.HandleCrash()
 	for {
-		action, obj, err := sw.source.Decode()
+		action, obj, trackinfo, err := sw.source.Decode()
 		if err != nil {
 			// Ignore expected error.
 			if sw.stopping() {
@@ -112,8 +112,9 @@ func (sw *StreamWatcher) receive() {
 			return
 		}
 		sw.result <- Event{
-			Type:   action,
-			Object: obj,
+			Type:      action,
+			Object:    obj,
+			TrackInfo: trackinfo + "streamwatcher/receive;",
 		}
 	}
 }

@@ -59,6 +59,7 @@ func (d *decoratedWatcher) run(ctx context.Context) {
 			case watch.Error:
 				send = recv
 			}
+			send.TrackInfo = send.TrackInfo + "decorated_watcher/run;"
 			select {
 			case d.resultCh <- send:
 				if send.Type == watch.Error {

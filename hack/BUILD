@@ -20,6 +20,7 @@ filegroup(
         ":package-srcs",
         "//hack/boilerplate:all-srcs",
         "//hack/e2e-internal:all-srcs",
+        "//hack/eventLoad:all-srcs",
         "//hack/lib:all-srcs",
         "//hack/make-rules:all-srcs",
     ],

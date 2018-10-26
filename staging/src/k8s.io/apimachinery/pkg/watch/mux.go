@@ -153,6 +153,7 @@ func (m *Broadcaster) WatchWithPrefix(queuedEvents []Event) Interface {
 		}
 		m.watchers[id] = w
 		for _, e := range queuedEvents {
+			e.TrackInfo = e.TrackInfo + "mux/watchWithPrefix;"
 			w.result <- e
 		}
 	})
@@ -186,7 +187,7 @@ func (m *Broadcaster) closeAll() {
 
 // Action distributes the given event among all watchers.
 func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
-	m.incoming <- Event{action, obj}
+	m.incoming <- Event{action, obj, "broadcaster;"}
 }
 
 // Shutdown disconnects all watchers (but any queued events will still be distributed).
@@ -219,6 +220,7 @@ func (m *Broadcaster) loop() {
 func (m *Broadcaster) distribute(event Event) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
+	event.TrackInfo = event.TrackInfo + "mux/distribute;"
 	if m.fullChannelBehavior == DropIfChannelFull {
 		for _, w := range m.watchers {
 			select {

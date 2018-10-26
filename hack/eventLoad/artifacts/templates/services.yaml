@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: site-ns-site-id-tomcat
+  namespace: "site-ns"
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    site: site-id
+  sessionAffinity: None
+  type: ClusterIP

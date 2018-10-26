@@ -166,7 +166,7 @@ func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 // and then use the resource version to watch.
 // It returns error if ListAndWatch didn't even try to initialize watch.
 func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
-	klog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
+	klog.V(2).Infof("Listing and watching %v from %s", r.expectedType, r.name)
 	var resourceVersion string
 
 	// Explicitly set "0" as resource version - it's fine for the List()
@@ -189,6 +189,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
 	}
+	klog.Warningf("et,list,nons,noname,%s,%s,notrackinfo,notrackinfo\n",
+		reflect.TypeOf(list), resourceVersion)
 	r.metrics.numberOfItemsInList.Observe(float64(len(items)))
 	if err := r.syncWith(items, resourceVersion); err != nil {
 		return fmt.Errorf("%s: Unable to sync list result: %v", r.name, err)
@@ -255,8 +257,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// watch where we ended.
 			// If that's the case wait and resend watch request.
 			if urlError, ok := err.(*url.Error); ok {
+				klog.Warningf("et,urlError\n")
 				if opError, ok := urlError.Err.(*net.OpError); ok {
+					klog.Warningf("et,net.OpError\n")
 					if errno, ok := opError.Err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
+						klog.Warningf("et,syscall.Error\n")
 						time.Sleep(time.Second)
 						continue
 					}
@@ -317,10 +322,14 @@ loop:
 			}
 			meta, err := meta.Accessor(event.Object)
 			if err != nil {
+				klog.Errorf("unexpected et error: %v, %s", err, reflect.TypeOf(event.Object))
 				utilruntime.HandleError(fmt.Errorf("%s: unable to understand watch event %#v", r.name, event))
 				continue
 			}
 			newResourceVersion := meta.GetResourceVersion()
+			// eventTracker Event lost: print out resourceVersion, EventType and event object name
+			klog.Warningf("et,%s,%s,%s,%s,%s,%s(%s),%s\n",
+				event.Type, meta.GetNamespace(), meta.GetName(), reflect.TypeOf(event.Object), newResourceVersion, event.TrackInfo, r.name, meta.GetUID())
 			switch event.Type {
 			case watch.Added:
 				err := r.store.Add(event.Object)

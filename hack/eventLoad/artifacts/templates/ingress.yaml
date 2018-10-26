@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: tomcat
+  name: "cust-site-id"
+  namespace: "site-ns"
+spec:
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - backend:
+          serviceName: tomcat
+          servicePort: 80
+        path: /
+  tls:
+  - hosts:
+    - localhost
