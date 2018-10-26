@@ -216,6 +216,17 @@ func Test_tokenSource_credentialsFile(t *testing.T) {
 	}
 }
 
+func Test_tokenSource_credentialsFileEnsureAbsolutePath(t *testing.T) {
+	expected := fmt.Errorf("only absolute path to credentials-file accepted ./foo/bar.json is relative")
+	ts, err := tokenSource(false, map[string]string{"credentials-file": "./foo/bar.json"})
+	if !errEquiv(err, expected) {
+		t.Errorf("tokenSource() error: got %v, want %v", err, expected)
+	}
+	if ts != nil {
+		t.Fatal("expected nil token source")
+	}
+}
+
 func Test_parseScopes(t *testing.T) {
 	cases := []struct {
 		in  map[string]string

@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -169,6 +170,9 @@ func tokenSource(isCmd bool, gcpConfig map[string]string) (oauth2.TokenSource, e
 	// If "credentials-file" is set, load from file. Otherwise, use default
 	// token source.
 	if credentialsFile, ok := gcpConfig["credentials-file"]; ok {
+		if isAbs := filepath.IsAbs(credentialsFile); !isAbs {
+			return nil, fmt.Errorf("only absolute path to credentials-file accepted %s is relative", credentialsFile)
+		}
 		data, err := ioutil.ReadFile(credentialsFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read credentials-file: %v", err)
