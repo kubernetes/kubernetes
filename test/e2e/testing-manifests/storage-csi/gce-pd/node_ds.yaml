@@ -15,7 +15,7 @@ spec:
       containers:
         - name: csi-driver-registrar
           imagePullPolicy: Always
-          image: quay.io/k8scsi/driver-registrar:v0.3.0
+          image: quay.io/k8scsi/driver-registrar:v0.4.1
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"
