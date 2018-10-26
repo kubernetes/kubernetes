@@ -738,6 +738,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Returns(http.StatusAccepted, "Accepted", versionedStatus)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
+				route.ParameterNamed("body").Required(false)
 				if err := addObjectParams(ws, route, versionedDeleteOptions); err != nil {
 					return nil, err
 				}
