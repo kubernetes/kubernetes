@@ -39,7 +39,11 @@ var (
 	groupVersions = []schema.GroupVersion{authorization.SchemeGroupVersion}
 )
 
-const retryBackoff = 500 * time.Millisecond
+const (
+	retryBackoff = 500 * time.Millisecond
+	// The maximum key length for unauthorized request keys to qualify for caching.
+	maxUnauthorizedCachedKeySize = 10000
+)
 
 // Ensure Webhook implements the authorizer.Authorizer interface.
 var _ authorizer.Authorizer = (*WebhookAuthorizer)(nil)
@@ -196,7 +200,9 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision auth
 		if r.Status.Allowed {
 			w.responseCache.Add(string(key), r.Status, w.authorizedTTL)
 		} else {
-			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+			if len(key) <= maxUnauthorizedCachedKeySize {
+				w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
+			}
 		}
 	}
 	switch {
