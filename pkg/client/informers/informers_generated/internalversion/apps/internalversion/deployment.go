@@ -25,65 +25,65 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
-	internalversion "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
+	internalversion "k8s.io/kubernetes/pkg/client/listers/apps/internalversion"
 )
 
-// ReplicaSetInformer provides access to a shared informer and lister for
-// ReplicaSets.
-type ReplicaSetInformer interface {
+// DeploymentInformer provides access to a shared informer and lister for
+// Deployments.
+type DeploymentInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ReplicaSetLister
+	Lister() internalversion.DeploymentLister
 }
 
-type replicaSetInformer struct {
+type deploymentInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewReplicaSetInformer constructs a new informer for ReplicaSet type.
+// NewDeploymentInformer constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewReplicaSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredReplicaSetInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewDeploymentInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredDeploymentInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredReplicaSetInformer constructs a new informer for ReplicaSet type.
+// NewFilteredDeploymentInformer constructs a new informer for Deployment type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredReplicaSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredDeploymentInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().ReplicaSets(namespace).List(options)
+				return client.Apps().Deployments(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Extensions().ReplicaSets(namespace).Watch(options)
+				return client.Apps().Deployments(namespace).Watch(options)
 			},
 		},
-		&extensions.ReplicaSet{},
+		&apps.Deployment{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *replicaSetInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredReplicaSetInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *deploymentInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredDeploymentInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *replicaSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.ReplicaSet{}, f.defaultInformer)
+func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apps.Deployment{}, f.defaultInformer)
 }
 
-func (f *replicaSetInformer) Lister() internalversion.ReplicaSetLister {
-	return internalversion.NewReplicaSetLister(f.Informer().GetIndexer())
+func (f *deploymentInformer) Lister() internalversion.DeploymentLister {
+	return internalversion.NewDeploymentLister(f.Informer().GetIndexer())
 }

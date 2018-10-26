@@ -77,6 +77,12 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=apps, Version=internalVersion
 	case apps.SchemeGroupVersion.WithResource("controllerrevisions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().ControllerRevisions().Informer()}, nil
+	case apps.SchemeGroupVersion.WithResource("daemonsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().DaemonSets().Informer()}, nil
+	case apps.SchemeGroupVersion.WithResource("deployments"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().Deployments().Informer()}, nil
+	case apps.SchemeGroupVersion.WithResource("replicasets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().ReplicaSets().Informer()}, nil
 	case apps.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().StatefulSets().Informer()}, nil
 
@@ -137,14 +143,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().InternalVersion().ServiceAccounts().Informer()}, nil
 
 		// Group=extensions, Version=internalVersion
-	case extensions.SchemeGroupVersion.WithResource("daemonsets"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().DaemonSets().Informer()}, nil
-	case extensions.SchemeGroupVersion.WithResource("deployments"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().Deployments().Informer()}, nil
 	case extensions.SchemeGroupVersion.WithResource("ingresses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().Ingresses().Informer()}, nil
-	case extensions.SchemeGroupVersion.WithResource("replicasets"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().InternalVersion().ReplicaSets().Informer()}, nil
 
 		// Group=networking.k8s.io, Version=internalVersion
 	case networking.SchemeGroupVersion.WithResource("networkpolicies"):

@@ -24,8 +24,6 @@ API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RBDPool
 API rule violation: names_match,k8s.io/api/core/v1,RBDVolumeSource,RadosUser
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
-API rule violation: names_match,k8s.io/api/extensions/v1beta1,CustomMetricCurrentStatus,CurrentValue
-API rule violation: names_match,k8s.io/api/extensions/v1beta1,CustomMetricTarget,TargetValue
 API rule violation: names_match,k8s.io/api/policy/v1beta1,PodDisruptionBudgetStatus,PodDisruptionsAllowed
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceColumnDefinition,JSONPath
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSON,Raw

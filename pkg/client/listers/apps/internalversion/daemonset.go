@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	apps "k8s.io/kubernetes/pkg/apis/apps"
 )
 
 // DaemonSetLister helps list DaemonSets.
 type DaemonSetLister interface {
 	// List lists all DaemonSets in the indexer.
-	List(selector labels.Selector) (ret []*extensions.DaemonSet, err error)
+	List(selector labels.Selector) (ret []*apps.DaemonSet, err error)
 	// DaemonSets returns an object that can list and get DaemonSets.
 	DaemonSets(namespace string) DaemonSetNamespaceLister
 	DaemonSetListerExpansion
@@ -45,9 +45,9 @@ func NewDaemonSetLister(indexer cache.Indexer) DaemonSetLister {
 }
 
 // List lists all DaemonSets in the indexer.
-func (s *daemonSetLister) List(selector labels.Selector) (ret []*extensions.DaemonSet, err error) {
+func (s *daemonSetLister) List(selector labels.Selector) (ret []*apps.DaemonSet, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*extensions.DaemonSet))
+		ret = append(ret, m.(*apps.DaemonSet))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *daemonSetLister) DaemonSets(namespace string) DaemonSetNamespaceLister 
 // DaemonSetNamespaceLister helps list and get DaemonSets.
 type DaemonSetNamespaceLister interface {
 	// List lists all DaemonSets in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*extensions.DaemonSet, err error)
+	List(selector labels.Selector) (ret []*apps.DaemonSet, err error)
 	// Get retrieves the DaemonSet from the indexer for a given namespace and name.
-	Get(name string) (*extensions.DaemonSet, error)
+	Get(name string) (*apps.DaemonSet, error)
 	DaemonSetNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type daemonSetNamespaceLister struct {
 }
 
 // List lists all DaemonSets in the indexer for a given namespace.
-func (s daemonSetNamespaceLister) List(selector labels.Selector) (ret []*extensions.DaemonSet, err error) {
+func (s daemonSetNamespaceLister) List(selector labels.Selector) (ret []*apps.DaemonSet, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*extensions.DaemonSet))
+		ret = append(ret, m.(*apps.DaemonSet))
 	})
 	return ret, err
 }
 
 // Get retrieves the DaemonSet from the indexer for a given namespace and name.
-func (s daemonSetNamespaceLister) Get(name string) (*extensions.DaemonSet, error) {
+func (s daemonSetNamespaceLister) Get(name string) (*apps.DaemonSet, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(extensions.Resource("daemonset"), name)
+		return nil, errors.NewNotFound(apps.Resource("daemonset"), name)
 	}
-	return obj.(*extensions.DaemonSet), nil
+	return obj.(*apps.DaemonSet), nil
 }

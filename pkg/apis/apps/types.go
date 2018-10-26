@@ -19,12 +19,11 @@ package apps
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -261,4 +260,542 @@ type ControllerRevisionList struct {
 
 	// Items is the list of ControllerRevision objects.
 	Items []ControllerRevision
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type Deployment struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Specification of the desired behavior of the Deployment.
+	// +optional
+	Spec DeploymentSpec
+
+	// Most recently observed status of the Deployment.
+	// +optional
+	Status DeploymentStatus
+}
+
+type DeploymentSpec struct {
+	// Number of desired pods. This is a pointer to distinguish between explicit
+	// zero and not specified. Defaults to 1.
+	// +optional
+	Replicas int32
+
+	// Label selector for pods. Existing ReplicaSets whose pods are
+	// selected by this will be the ones affected by this deployment.
+	// +optional
+	Selector *metav1.LabelSelector
+
+	// Template describes the pods that will be created.
+	Template api.PodTemplateSpec
+
+	// The deployment strategy to use to replace existing pods with new ones.
+	// +optional
+	Strategy DeploymentStrategy
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// +optional
+	MinReadySeconds int32
+
+	// The number of old ReplicaSets to retain to allow rollback.
+	// This is a pointer to distinguish between explicit zero and not specified.
+	// This is set to the max value of int32 (i.e. 2147483647) by default, which means
+	// "retaining all old ReplicaSets".
+	// +optional
+	RevisionHistoryLimit *int32
+
+	// Indicates that the deployment is paused and will not be processed by the
+	// deployment controller.
+	// +optional
+	Paused bool
+
+	// DEPRECATED.
+	// The config this deployment is rolling back to. Will be cleared after rollback is done.
+	// +optional
+	RollbackTo *RollbackConfig
+
+	// The maximum time in seconds for a deployment to make progress before it
+	// is considered to be failed. The deployment controller will continue to
+	// process failed deployments and a condition with a ProgressDeadlineExceeded
+	// reason will be surfaced in the deployment status. Note that progress will
+	// not be estimated during the time a deployment is paused. This is set to
+	// the max value of int32 (i.e. 2147483647) by default, which means "no deadline".
+	// +optional
+	ProgressDeadlineSeconds *int32
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// DEPRECATED.
+// DeploymentRollback stores the information required to rollback a deployment.
+type DeploymentRollback struct {
+	metav1.TypeMeta
+	// Required: This must match the Name of a deployment.
+	Name string
+	// The annotations to be updated to a deployment
+	// +optional
+	UpdatedAnnotations map[string]string
+	// The config of this deployment rollback.
+	RollbackTo RollbackConfig
+}
+
+// DEPRECATED.
+type RollbackConfig struct {
+	// The revision to rollback to. If set to 0, rollback to the last revision.
+	// +optional
+	Revision int64
+}
+
+const (
+	// DefaultDeploymentUniqueLabelKey is the default key of the selector that is added
+	// to existing RCs (and label key that is added to its pods) to prevent the existing RCs
+	// to select new pods (and old pods being select by new RC).
+	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
+)
+
+type DeploymentStrategy struct {
+	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
+	// +optional
+	Type DeploymentStrategyType
+
+	// Rolling update config params. Present only if DeploymentStrategyType =
+	// RollingUpdate.
+	//---
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be.
+	// +optional
+	RollingUpdate *RollingUpdateDeployment
+}
+
+type DeploymentStrategyType string
+
+const (
+	// Kill all existing pods before creating new ones.
+	RecreateDeploymentStrategyType DeploymentStrategyType = "Recreate"
+
+	// Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
+	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
+)
+
+// Spec to control the desired behavior of rolling update.
+type RollingUpdateDeployment struct {
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
+	// Absolute number is calculated from percentage by rounding down.
+	// This can not be 0 if MaxSurge is 0.
+	// By default, a fixed value of 1 is used.
+	// Example: when this is set to 30%, the old RC can be scaled down by 30%
+	// immediately when the rolling update starts. Once new pods are ready, old RC
+	// can be scaled down further, followed by scaling up the new RC, ensuring
+	// that at least 70% of original number of pods are available at all times
+	// during the update.
+	// +optional
+	MaxUnavailable intstr.IntOrString
+
+	// The maximum number of pods that can be scheduled above the original number of
+	// pods.
+	// Value can be an absolute number (ex: 5) or a percentage of total pods at
+	// the start of the update (ex: 10%). This can not be 0 if MaxUnavailable is 0.
+	// Absolute number is calculated from percentage by rounding up.
+	// By default, a value of 1 is used.
+	// Example: when this is set to 30%, the new RC can be scaled up by 30%
+	// immediately when the rolling update starts. Once old pods have been killed,
+	// new RC can be scaled up further, ensuring that total number of pods running
+	// at any time during the update is atmost 130% of original pods.
+	// +optional
+	MaxSurge intstr.IntOrString
+}
+
+type DeploymentStatus struct {
+	// The generation observed by the deployment controller.
+	// +optional
+	ObservedGeneration int64
+
+	// Total number of non-terminated pods targeted by this deployment (their labels match the selector).
+	// +optional
+	Replicas int32
+
+	// Total number of non-terminated pods targeted by this deployment that have the desired template spec.
+	// +optional
+	UpdatedReplicas int32
+
+	// Total number of ready pods targeted by this deployment.
+	// +optional
+	ReadyReplicas int32
+
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.
+	// +optional
+	AvailableReplicas int32
+
+	// Total number of unavailable pods targeted by this deployment. This is the total number of
+	// pods that are still required for the deployment to have 100% available capacity. They may
+	// either be pods that are running but not yet available or pods that still have not been created.
+	// +optional
+	UnavailableReplicas int32
+
+	// Represents the latest available observations of a deployment's current state.
+	Conditions []DeploymentCondition
+
+	// Count of hash collisions for the Deployment. The Deployment controller uses this
+	// field as a collision avoidance mechanism when it needs to create the name for the
+	// newest ReplicaSet.
+	// +optional
+	CollisionCount *int32
+}
+
+type DeploymentConditionType string
+
+// These are valid conditions of a deployment.
+const (
+	// Available means the deployment is available, ie. at least the minimum available
+	// replicas required are up and running for at least minReadySeconds.
+	DeploymentAvailable DeploymentConditionType = "Available"
+	// Progressing means the deployment is progressing. Progress for a deployment is
+	// considered when a new replica set is created or adopted, and when new pods scale
+	// up or old pods scale down. Progress is not estimated for paused deployments or
+	// when progressDeadlineSeconds is not specified.
+	DeploymentProgressing DeploymentConditionType = "Progressing"
+	// ReplicaFailure is added in a deployment when one of its pods fails to be created
+	// or deleted.
+	DeploymentReplicaFailure DeploymentConditionType = "ReplicaFailure"
+)
+
+// DeploymentCondition describes the state of a deployment at a certain point.
+type DeploymentCondition struct {
+	// Type of deployment condition.
+	Type DeploymentConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus
+	// The last time this condition was updated.
+	LastUpdateTime metav1.Time
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type DeploymentList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of deployments.
+	Items []Deployment
+}
+
+type DaemonSetUpdateStrategy struct {
+	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+	// Default is OnDelete.
+	// +optional
+	Type DaemonSetUpdateStrategyType
+
+	// Rolling update config params. Present only if type = "RollingUpdate".
+	//---
+	// TODO: Update this to follow our convention for oneOf, whatever we decide it
+	// to be. Same as Deployment `strategy.rollingUpdate`.
+	// See https://github.com/kubernetes/kubernetes/issues/35345
+	// +optional
+	RollingUpdate *RollingUpdateDaemonSet
+}
+
+type DaemonSetUpdateStrategyType string
+
+const (
+	// Replace the old daemons by new ones using rolling update i.e replace them on each node one after the other.
+	RollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "RollingUpdate"
+
+	// Replace the old daemons only when it's killed
+	OnDeleteDaemonSetStrategyType DaemonSetUpdateStrategyType = "OnDelete"
+)
+
+// Spec to control the desired behavior of daemon set rolling update.
+type RollingUpdateDaemonSet struct {
+	// The maximum number of DaemonSet pods that can be unavailable during the
+	// update. Value can be an absolute number (ex: 5) or a percentage of total
+	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
+	// number is calculated from percentage by rounding up.
+	// This cannot be 0.
+	// Default value is 1.
+	// Example: when this is set to 30%, at most 30% of the total number of nodes
+	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
+	// can have their pods stopped for an update at any given
+	// time. The update starts by stopping at most 30% of those DaemonSet pods
+	// and then brings up new DaemonSet pods in their place. Once the new pods
+	// are available, it then proceeds onto other DaemonSet pods, thus ensuring
+	// that at least 70% of original number of DaemonSet pods are available at
+	// all times during the update.
+	// +optional
+	MaxUnavailable intstr.IntOrString
+}
+
+// DaemonSetSpec is the specification of a daemon set.
+type DaemonSetSpec struct {
+	// A label query over pods that are managed by the daemon set.
+	// Must match in order to be controlled.
+	// If empty, defaulted to labels on Pod template.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	// +optional
+	Selector *metav1.LabelSelector
+
+	// An object that describes the pod that will be created.
+	// The DaemonSet will create exactly one copy of this pod on every node
+	// that matches the template's node selector (or on every node if no node
+	// selector is specified).
+	// More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+	Template api.PodTemplateSpec
+
+	// An update strategy to replace existing DaemonSet pods with new pods.
+	// +optional
+	UpdateStrategy DaemonSetUpdateStrategy
+
+	// The minimum number of seconds for which a newly created DaemonSet pod should
+	// be ready without any of its container crashing, for it to be considered
+	// available. Defaults to 0 (pod will be considered available as soon as it
+	// is ready).
+	// +optional
+	MinReadySeconds int32
+
+	// DEPRECATED.
+	// A sequence number representing a specific generation of the template.
+	// Populated by the system. It can be set only during the creation.
+	// +optional
+	TemplateGeneration int64
+
+	// The number of old history to retain to allow rollback.
+	// This is a pointer to distinguish between explicit zero and not specified.
+	// Defaults to 10.
+	// +optional
+	RevisionHistoryLimit *int32
+}
+
+// DaemonSetStatus represents the current status of a daemon set.
+type DaemonSetStatus struct {
+	// The number of nodes that are running at least 1
+	// daemon pod and are supposed to run the daemon pod.
+	CurrentNumberScheduled int32
+
+	// The number of nodes that are running the daemon pod, but are
+	// not supposed to run the daemon pod.
+	NumberMisscheduled int32
+
+	// The total number of nodes that should be running the daemon
+	// pod (including nodes correctly running the daemon pod).
+	DesiredNumberScheduled int32
+
+	// The number of nodes that should be running the daemon pod and have one
+	// or more of the daemon pod running and ready.
+	NumberReady int32
+
+	// The most recent generation observed by the daemon set controller.
+	// +optional
+	ObservedGeneration int64
+
+	// The total number of nodes that are running updated daemon pod
+	// +optional
+	UpdatedNumberScheduled int32
+
+	// The number of nodes that should be running the
+	// daemon pod and have one or more of the daemon pod running and
+	// available (ready for at least spec.minReadySeconds)
+	// +optional
+	NumberAvailable int32
+
+	// The number of nodes that should be running the
+	// daemon pod and have none of the daemon pod running and available
+	// (ready for at least spec.minReadySeconds)
+	// +optional
+	NumberUnavailable int32
+
+	// Count of hash collisions for the DaemonSet. The DaemonSet controller
+	// uses this field as a collision avoidance mechanism when it needs to
+	// create the name for the newest ControllerRevision.
+	// +optional
+	CollisionCount *int32
+
+	// Represents the latest available observations of a DaemonSet's current state.
+	Conditions []DaemonSetCondition
+}
+
+type DaemonSetConditionType string
+
+// TODO: Add valid condition types of a DaemonSet.
+
+// DaemonSetCondition describes the state of a DaemonSet at a certain point.
+type DaemonSetCondition struct {
+	// Type of DaemonSet condition.
+	Type DaemonSetConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// DaemonSet represents the configuration of a daemon set.
+type DaemonSet struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// The desired behavior of this daemon set.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// +optional
+	Spec DaemonSetSpec
+
+	// The current status of this daemon set. This data may be
+	// out of date by some window of time.
+	// Populated by the system.
+	// Read-only.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// +optional
+	Status DaemonSetStatus
+}
+
+const (
+	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
+	// DaemonSetTemplateGenerationKey is the key of the labels that is added
+	// to daemon set pods to distinguish between old and new pod templates
+	// during DaemonSet template update.
+	DaemonSetTemplateGenerationKey string = "pod-template-generation"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// DaemonSetList is a collection of daemon sets.
+type DaemonSetList struct {
+	metav1.TypeMeta
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+
+	// A list of daemon sets.
+	Items []DaemonSet
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+type ReplicaSet struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec defines the desired behavior of this ReplicaSet.
+	// +optional
+	Spec ReplicaSetSpec
+
+	// Status is the current status of this ReplicaSet. This data may be
+	// out of date by some window of time.
+	// +optional
+	Status ReplicaSetStatus
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ReplicaSetList is a collection of ReplicaSets.
+type ReplicaSetList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	Items []ReplicaSet
+}
+
+// ReplicaSetSpec is the specification of a ReplicaSet.
+// As the internal representation of a ReplicaSet, it must have
+// a Template set.
+type ReplicaSetSpec struct {
+	// Replicas is the number of desired replicas.
+	Replicas int32
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing, for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// +optional
+	MinReadySeconds int32
+
+	// Selector is a label query over pods that should match the replica count.
+	// Must match in order to be controlled.
+	// If empty, defaulted to labels on pod template.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	// +optional
+	Selector *metav1.LabelSelector
+
+	// Template is the object that describes the pod that will be created if
+	// insufficient replicas are detected.
+	// +optional
+	Template api.PodTemplateSpec
+}
+
+// ReplicaSetStatus represents the current status of a ReplicaSet.
+type ReplicaSetStatus struct {
+	// Replicas is the number of actual replicas.
+	Replicas int32
+
+	// The number of pods that have labels matching the labels of the pod template of the replicaset.
+	// +optional
+	FullyLabeledReplicas int32
+
+	// The number of ready replicas for this replica set.
+	// +optional
+	ReadyReplicas int32
+
+	// The number of available replicas (ready for at least minReadySeconds) for this replica set.
+	// +optional
+	AvailableReplicas int32
+
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +optional
+	ObservedGeneration int64
+
+	// Represents the latest available observations of a replica set's current state.
+	// +optional
+	Conditions []ReplicaSetCondition
+}
+
+type ReplicaSetConditionType string
+
+// These are valid conditions of a replica set.
+const (
+	// ReplicaSetReplicaFailure is added in a replica set when one of its pods fails to be created
+	// due to insufficient quota, limit ranges, pod security policy, node selectors, etc. or deleted
+	// due to kubelet being down or finalizers are failing.
+	ReplicaSetReplicaFailure ReplicaSetConditionType = "ReplicaFailure"
+)
+
+// ReplicaSetCondition describes the state of a replica set at a certain point.
+type ReplicaSetCondition struct {
+	// Type of replica set condition.
+	Type ReplicaSetConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus
+	// The last time the condition transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	// +optional
+	Reason string
+	// A human readable message indicating details about the transition.
+	// +optional
+	Message string
 }

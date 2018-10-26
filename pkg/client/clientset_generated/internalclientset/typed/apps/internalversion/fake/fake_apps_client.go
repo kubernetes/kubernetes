@@ -32,6 +32,18 @@ func (c *FakeApps) ControllerRevisions(namespace string) internalversion.Control
 	return &FakeControllerRevisions{c, namespace}
 }
 
+func (c *FakeApps) DaemonSets(namespace string) internalversion.DaemonSetInterface {
+	return &FakeDaemonSets{c, namespace}
+}
+
+func (c *FakeApps) Deployments(namespace string) internalversion.DeploymentInterface {
+	return &FakeDeployments{c, namespace}
+}
+
+func (c *FakeApps) ReplicaSets(namespace string) internalversion.ReplicaSetInterface {
+	return &FakeReplicaSets{c, namespace}
+}
+
 func (c *FakeApps) StatefulSets(namespace string) internalversion.StatefulSetInterface {
 	return &FakeStatefulSets{c, namespace}
 }

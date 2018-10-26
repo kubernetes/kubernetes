@@ -25,10 +25,7 @@ import (
 
 type ExtensionsInterface interface {
 	RESTClient() rest.Interface
-	DaemonSetsGetter
-	DeploymentsGetter
 	IngressesGetter
-	ReplicaSetsGetter
 }
 
 // ExtensionsClient is used to interact with features provided by the extensions group.
@@ -36,20 +33,8 @@ type ExtensionsClient struct {
 	restClient rest.Interface
 }
 
-func (c *ExtensionsClient) DaemonSets(namespace string) DaemonSetInterface {
-	return newDaemonSets(c, namespace)
-}
-
-func (c *ExtensionsClient) Deployments(namespace string) DeploymentInterface {
-	return newDeployments(c, namespace)
-}
-
 func (c *ExtensionsClient) Ingresses(namespace string) IngressInterface {
 	return newIngresses(c, namespace)
-}
-
-func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
-	return newReplicaSets(c, namespace)
 }
 
 // NewForConfig creates a new ExtensionsClient for the given config.
