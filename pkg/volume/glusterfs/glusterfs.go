@@ -824,7 +824,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 
 	// The 'endpointname' is created in form of 'glusterfs-dynamic-<PVC UID>'.
 	// createEndpointService() checks for this 'endpoint' existence in PVC's namespace and
-	// If not found, it create an endpoint and service using the IPs we dynamically picked at time
+	// if not found, it create an endpoint and service using the IPs we dynamically picked at time
 	// of volume creation.
 	epServiceName := dynamicEpSvcPrefix + string(p.options.PVC.UID)
 	epNamespace := p.options.PVC.Namespace
