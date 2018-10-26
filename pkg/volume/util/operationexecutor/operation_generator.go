@@ -27,9 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	csiapi "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
+	csiinformerlisters "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
 	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
@@ -65,6 +69,16 @@ type operationGenerator struct {
 
 	// blkUtil provides volume path related operations for block volume
 	blkUtil volumepathhandler.BlockVolumePathHandler
+
+	// csiNodeInfoLister is an informer for the CSINodeInfo CRs
+	// It currently can only be used on the attach/detach controller
+	// and only when the CSINodeInfo CRD is installed
+	csiNodeInfoLister csiinformerlisters.CSINodeInfoLister
+
+	// csiNodeInfoHasSynced returns true if the informer is running and is synced
+	// It currently can only be used on the attach/detach controller
+	// and only when the CSINodeInfo CRD is installed
+	csiNodeInfoHasSynced func() bool
 }
 
 // NewOperationGenerator is returns instance of operationGenerator
@@ -73,14 +87,29 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
 	blkUtil volumepathhandler.BlockVolumePathHandler) OperationGenerator {
-
-	return &operationGenerator{
-		kubeClient:                       kubeClient,
-		volumePluginMgr:                  volumePluginMgr,
-		recorder:                         recorder,
+	og := &operationGenerator{
+		kubeClient:      kubeClient,
+		volumePluginMgr: volumePluginMgr,
+		recorder:        recorder,
 		checkNodeCapabilitiesBeforeMount: checkNodeCapabilitiesBeforeMount,
-		blkUtil:                          blkUtil,
+
+		blkUtil: blkUtil,
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiKubeClient := volumePluginMgr.Host.GetCSIClient()
+		if csiKubeClient == nil {
+			glog.Warningf("The client for CSI Custom Resources is not available, skipping informer initialization")
+		} else {
+			factory := csiapiinformer.NewSharedInformerFactory(csiKubeClient, 1*time.Minute)
+			csiNodeInfos := factory.Csi().V1alpha1().CSINodeInfos()
+			og.csiNodeInfoHasSynced = csiNodeInfos.Informer().HasSynced
+			og.csiNodeInfoLister = csiNodeInfos.Lister()
+			go factory.Start(wait.NeverStop)
+		}
+	}
+
+	return og
 }
 
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
@@ -300,8 +329,13 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	}
 
 	originalSpec := volumeToAttach.VolumeSpec
-	// isMigrated will check both CSIMigration and the plugin specific feature gate
-	if isMigrated(og.volumePluginMgr, volumeToAttach.VolumeSpec) {
+
+	// isMigratable will check both CSIMigration and the plugin specific feature gate and Node Migration
+	im, err := isMigratable(og, volumeToAttach.VolumeSpec, volumeToAttach.VolumeName, volumeToAttach.NodeName)
+	if err != nil {
+		return volumetypes.GeneratedOperations{}, volumeToAttach.GenerateErrorDetailed("AttachVolume.IsMigratable failed", err)
+	}
+	if im {
 		// The volume represented by this spec is CSI and thus should be migrated
 		attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 		if err != nil || attachableVolumePlugin == nil {
@@ -392,17 +426,21 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	if volumeToDetach.VolumeSpec != nil {
 		// Get attacher plugin
-		// isMigrated will check both CSIMigration and the plugin specific feature gate
-		if isMigrated(og.volumePluginMgr, volumeToDetach.VolumeSpec) {
+		// isMigratable will check both CSIMigration and the plugin specific feature gate
+		im, err := isMigratable(og, volumeToDetach.VolumeSpec, volumeToDetach.VolumeName, volumeToDetach.NodeName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.IsMigratable failed", err)
+		}
+		if im {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
+				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			}
 
 			csiSpec, err := translateSpec(volumeToDetach.VolumeSpec)
 			if err != nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.TranslateSpec failed", err)
+				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.TranslateSpec failed", err)
 			}
 
 			volumeToDetach.VolumeSpec = csiSpec
@@ -430,8 +468,12 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 		// TODO(dyzz): This case can't distinguish between PV and In-line which is necessary because
 		// if it was PV it may have been migrated, but the same plugin with in-line may not have been.
-		// Suggestions welcome...
-		if csiMigration.IsMigratedByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		// fixing this depends on CSI in-line volumes implementation: PR #68232
+		inm, err := isNodeMigratable(og, pluginName, volumeToDetach.NodeName)
+		if err != nil {
+			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.IsNodeMigratable failed", err)
+		}
+		if csiMigration.IsMigratedByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && inm {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -1504,14 +1546,89 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 	return deviceOpened, nil
 }
 
-func isMigrated(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
-	if csiMigration.IsPVMigrated(spec.PersistentVolume) || csiMigration.IsInlineMigrated(spec.Volume) {
-		migratable, err := vpm.IsPluginMigratableBySpec(spec)
-		if err == nil && migratable {
-			return true
+func isNodeMigratable(og *operationGenerator, pluginName string, nodeName types.NodeName) (bool, error) {
+	// TODO(dyzz): Write a test that runs with feature flags on, tries to do an inline volume with a migratable volume but without
+	// driver installed. Should get the correct error message. Then clean up. Try to do a migratable volume but WITH driver installed,
+	// should succeed (even better if we can check that the driver did something).
+	var err error
+	var nodeInfo *csiapi.CSINodeInfo
+
+	pm, err := og.volumePluginMgr.IsPluginMigratableByName(pluginName)
+	if err != nil {
+		return false, err
+	}
+
+	if !pm {
+		// Feature flags aren't on so migration as a whole is just turned off
+		return false, nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		return false, fmt.Errorf("failed to check if node migrated, CSINodeInfo feature gate not enabled")
+	}
+
+	if og.csiNodeInfoHasSynced() {
+		nodeInfo, err = og.csiNodeInfoLister.Get(string(nodeName))
+		if err != nil {
+			return false, fmt.Errorf("failed to get CSI node info for node %v from informer: %v", string(nodeName), err)
+		}
+	} else {
+		glog.Warningf("CSINodeInfo informer not synced, please check that CSINodeInfo CRD is installed. If so, this warning should not appear again after ~1 minute")
+		// Fallback to a GET
+		nodeInfo, err = og.volumePluginMgr.Host.GetCSIClient().CsiV1alpha1().CSINodeInfos().Get(string(nodeName), metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to get CSI node info for node %v: %v", string(nodeName), err)
 		}
 	}
-	return false
+
+	driverName, err := csiMigration.GetCSINameFromIntreeName(pluginName)
+	if err != nil {
+		return false, err
+	}
+
+	for _, driver := range nodeInfo.CSIDrivers {
+		if driver.Driver == driverName {
+			return driver.IsDriverMigratableOnNode, nil
+		}
+	}
+	// The plugin is migrated but the driver is not installed
+	return false, fmt.Errorf("plugin %v is migratable but driver %v is not installed. Please install the driver and retry", pluginName, driverName)
+}
+
+func isMigratable(og *operationGenerator, spec *volume.Spec, uniqueVolumeName v1.UniqueVolumeName, nodeName types.NodeName) (bool, error) {
+	// IsPluginMigratableBySpec tests whether feature flags are on
+	pm, err := og.volumePluginMgr.IsPluginMigratableBySpec(spec)
+	if err != nil {
+		return false, err
+	}
+
+	if !pm {
+		// Feature flags aren't on so migration as a whole is just turned off
+		return false, nil
+	}
+
+	pluginName, _, err := util.SplitUniqueName(uniqueVolumeName)
+	if err != nil {
+		return false, fmt.Errorf("failed to split unique name %v: %v", uniqueVolumeName, err)
+	}
+	driverName, err := csiMigration.GetCSINameFromIntreeName(pluginName)
+	if err != nil {
+		return false, err
+	}
+
+	if csiMigration.IsPVMigrated(spec.PersistentVolume) || csiMigration.IsInlineMigrated(spec.Volume) {
+		inm, err := isNodeMigratable(og, pluginName, nodeName)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if driver migrated on node: %v", err)
+		}
+		if inm {
+			return true, nil
+		}
+	}
+	// If feature flags are on but we're not migratable for some other reason
+	// it is an error and a good error about installing the driver should be thrown
+	return false, fmt.Errorf("plugin %v is migratable but driver %v is not installed. Please install the driver and retry", pluginName, driverName)
+
 }
 
 func translateSpec(spec *volume.Spec) (*volume.Spec, error) {

@@ -548,7 +548,8 @@ func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 	}
 
 	if len(matches) == 0 {
-		return false, fmt.Errorf("no volume plugin matched")
+		// Not a known plugin (flex) in which case it is not migratable
+		return false, nil
 	}
 	if len(matches) > 1 {
 		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
@@ -571,7 +572,8 @@ func (pm *VolumePluginMgr) IsPluginMigratableByName(name string) (bool, error) {
 		}
 	}
 	if len(matches) == 0 {
-		return false, fmt.Errorf("no volume plugin matched")
+		// Not a known plugin (flex) in which case it is not migratable
+		return false, nil
 	}
 	if len(matches) > 1 {
 		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))

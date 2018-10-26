@@ -36,6 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+
+	csiPlugins "github.com/kubernetes-csi/kubernetes-csi-migration-library/plugins"
 )
 
 const (
@@ -44,6 +46,12 @@ const (
 )
 
 var nodeKind = v1.SchemeGroupVersion.WithKind("Node")
+
+var migratedDrivers = map[string](func() bool){
+	csiPlugins.GCEPDDriverName: func() bool {
+		return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+	},
+}
 
 // nodeInfoManager contains necessary common dependencies to update node info on both
 // the Node and CSINodeInfo objects.
@@ -370,6 +378,15 @@ func (nim *nodeInfoManager) createNodeInfoObject(
 		return err // do not wrap error
 	}
 
+	isMigratable := false
+	if driverIsMigratableFunc, ok := migratedDrivers[driverName]; ok {
+		isMigratable = driverIsMigratableFunc()
+		glog.V(4).Infof("CSI Driver %v found in migrated driver list, and migration status is %v", driverName, isMigratable)
+
+	} else {
+		glog.V(4).Infof("CSI Driver %v not found in migrated driver map", driverName)
+	}
+
 	nodeInfo := &csiv1alpha1.CSINodeInfo{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(nim.nodeName),
@@ -384,9 +401,10 @@ func (nim *nodeInfoManager) createNodeInfoObject(
 		},
 		CSIDrivers: []csiv1alpha1.CSIDriverInfo{
 			{
-				Driver:       driverName,
-				NodeID:       driverNodeID,
-				TopologyKeys: topologyKeys,
+				Driver:                   driverName,
+				NodeID:                   driverNodeID,
+				TopologyKeys:             topologyKeys,
+				IsDriverMigratableOnNode: isMigratable,
 			},
 		},
 	}
@@ -429,11 +447,17 @@ func (nim *nodeInfoManager) updateNodeInfoObject(
 		}
 	}
 
+	isMigratable := false
+	if driverIsMigratableFunc, ok := migratedDrivers[driverName]; ok {
+		isMigratable = driverIsMigratableFunc()
+	}
+
 	// Append new driver
 	driverInfo := csiv1alpha1.CSIDriverInfo{
-		Driver:       driverName,
-		NodeID:       driverNodeID,
-		TopologyKeys: topologyKeys.List(),
+		Driver:                   driverName,
+		NodeID:                   driverNodeID,
+		TopologyKeys:             topologyKeys.List(),
+		IsDriverMigratableOnNode: isMigratable,
 	}
 	newDriverInfos = append(newDriverInfos, driverInfo)
 	nodeInfo.CSIDrivers = newDriverInfos

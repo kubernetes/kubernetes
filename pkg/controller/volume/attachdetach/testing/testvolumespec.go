@@ -253,7 +253,7 @@ func (plugin *TestPlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
-func (plugin *TestPlugin) IsMigratedToCSI() bool {
+func (plugin *TestPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

@@ -124,6 +124,12 @@ type CSIDriverInfo struct {
 	// determine which labels it should retrieve from the node object and pass
 	// back to the driver.
 	TopologyKeys []string `json:"topologyKeys"`
+
+	// IsDriverMigratableOnNode is a boolean representing whether the node supports
+	// migration to CSI for this driver. It is used by storage controllers on
+	// the control plane to determine whether to use a migrated version of the
+	// plugin for this driver on this node.
+	IsDriverMigratableOnNode bool `json:"isDriverMigratableOnNode"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
