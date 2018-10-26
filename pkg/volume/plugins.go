@@ -118,9 +118,9 @@ type VolumePlugin interface {
 	// const.
 	CanSupport(spec *Spec) bool
 
-	// IsMigrated tests whether the plugin is migrated seamlessly to a CSI
+	// IsMigratable tests whether the plugin is migrated seamlessly to a CSI
 	// Driver
-	IsMigratedToCSI() bool
+	IsMigratableToCSI() bool
 
 	// RequiresRemount returns true if this plugin requires mount calls to be
 	// reexecuted. Atomically updating volumes, like Downward API, depend on
@@ -530,6 +530,9 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 }
 
 func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
 	if spec == nil {
 		return false, fmt.Errorf("could not find plugin migratable because volume spec is nil")
 	}
@@ -551,7 +554,29 @@ func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 
-	return matches[0].IsMigratedToCSI(), nil
+	return matches[0].IsMigratableToCSI(), nil
+}
+
+func (pm *VolumePluginMgr) IsPluginMigratableByName(name string) (bool, error) {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
+	// Once we can get rid of legacy names we can reduce this to a map lookup.
+	matchedPluginNames := []string{}
+	matches := []VolumePlugin{}
+	for k, v := range pm.plugins {
+		if v.GetPluginName() == name {
+			matchedPluginNames = append(matchedPluginNames, k)
+			matches = append(matches, v)
+		}
+	}
+	if len(matches) == 0 {
+		return false, fmt.Errorf("no volume plugin matched")
+	}
+	if len(matches) > 1 {
+		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+	}
+	return matches[0].IsMigratableToCSI(), nil
 }
 
 // FindPluginBySpec looks for a plugin that can support a given volume

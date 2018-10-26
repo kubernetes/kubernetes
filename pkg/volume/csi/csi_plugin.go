@@ -204,7 +204,7 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
 }
 
-func (p *csiPlugin) IsMigratedToCSI() bool {
+func (p *csiPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

@@ -78,7 +78,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) IsMigratedToCSI() bool {
+func (plugin *gitRepoPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

@@ -82,7 +82,7 @@ func (plugin *localVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Local != nil)
 }
 
-func (plugin *localVolumePlugin) IsMigratedToCSI() bool {
+func (plugin *localVolumePlugin) IsMigratableToCSI() bool {
 	return false
 }
 

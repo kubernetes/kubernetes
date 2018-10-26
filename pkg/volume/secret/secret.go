@@ -80,7 +80,7 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Secret != nil
 }
 
-func (plugin *secretPlugin) IsMigratedToCSI() bool {
+func (plugin *secretPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

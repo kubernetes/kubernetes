@@ -78,7 +78,7 @@ func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
-func (plugin *downwardAPIPlugin) IsMigratedToCSI() bool {
+func (plugin *downwardAPIPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

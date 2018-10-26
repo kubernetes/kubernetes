@@ -301,7 +301,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) IsMigratedToCSI() bool {
+func (plugin *FakeVolumePlugin) IsMigratableToCSI() bool {
 	return false
 }
 
@@ -511,7 +511,7 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeFileVolumePlugin) IsMigratedToCSI() bool {
+func (plugin *FakeFileVolumePlugin) IsMigratableToCSI() bool {
 	return false
 }
 

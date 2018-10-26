@@ -84,7 +84,7 @@ func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.NFS != nil)
 }
 
-func (plugin *nfsPlugin) IsMigratedToCSI() bool {
+func (plugin *nfsPlugin) IsMigratableToCSI() bool {
 	return false
 }
 

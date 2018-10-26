@@ -108,7 +108,7 @@ func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
 }
 
-func (p *flockerPlugin) IsMigratedToCSI() bool {
+func (p *flockerPlugin) IsMigratableToCSI() bool {
 	return false
 }
 
