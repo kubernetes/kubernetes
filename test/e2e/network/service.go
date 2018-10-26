@@ -1552,8 +1552,9 @@ var _ = SIGDescribe("Services", func() {
 	// to be something else, see if the interval will be reconciled.
 	It("should reconcile LB health check interval [Slow][Serial]", func() {
 		const gceHcCheckIntervalSeconds = int64(8)
-		// This test is for clusters on GCE/GKE.
-		framework.SkipUnlessProviderIs("gce", "gke")
+		// This test is for clusters on GCE.
+		// (It restarts kube-controller-manager, which we don't support on GKE)
+		framework.SkipUnlessProviderIs("gce")
 		clusterID, err := gce.GetClusterID(cs)
 		if err != nil {
 			framework.Failf("framework.GetClusterID(cs) = _, %v; want nil", err)
