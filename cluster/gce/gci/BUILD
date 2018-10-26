@@ -39,6 +39,7 @@ pkg_tar(
     files = {
         "//cluster/gce/gci/mounter": "gci-mounter",
         "configure-helper.sh": "gci-configure-helper.sh",
+        "configure-kube-apiserver.sh": "configure-kube-apiserver.sh",
         "health-monitor.sh": "health-monitor.sh",
     },
     mode = "0755",
@@ -67,5 +68,6 @@ filegroup(
     name = "scripts-test-data",
     srcs = [
         "configure-helper.sh",
+        "configure-kube-apiserver.sh",
     ],
 )

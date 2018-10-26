@@ -21,6 +21,260 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Sets-up etcd encryption.
+# Configuration of etcd level encryption consists of the following steps:
+# 1. Writing encryption provider config to disk
+# 2. Adding experimental-encryption-provider-config flag to kube-apiserver
+# 3. Add kms-socket-vol and kms-socket-vol-mnt to enable communication with kms-plugin (if requested)
+#
+# Expects parameters:
+# $1 - path to kube-apiserver template
+# $2 - kube-apiserver startup flags (must be passed by reference)
+#
+# Assumes vars (supplied via kube-env):
+# ENCRYPTION_PROVIDER_CONFIG
+# CLOUD_KMS_INTEGRATION
+# ENCRYPTION_PROVIDER_CONFIG_PATH (will default to /etc/srv/kubernetes/encryption-provider-config.yml)
+function setup-etcd-encryption {
+  local kube_apiserver_template_path
+  local -n kube_api_server_params
+  local default_encryption_provider_config_vol
+  local default_encryption_provider_config_vol_mnt
+  local encryption_provider_config_vol_mnt
+  local encryption_provider_config_vol
+  local default_kms_socket_dir
+  local default_kms_socket_vol_mnt
+  local default_kms_socket_vol
+  local kms_socket_vol_mnt
+  local kms_socket_vol
+  local encryption_provider_config_path
+
+  kube_apiserver_template_path="$1"
+  if [[ -z "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
+    sed -i -e " {
+      s@{{encryption_provider_mount}}@@
+      s@{{encryption_provider_volume}}@@
+      s@{{kms_socket_mount}}@@
+      s@{{kms_socket_volume}}@@
+    } " "${kube_apiserver_template_path}"
+    return
+  fi
+
+  kube_api_server_params="$2"
+  encryption_provider_config_path=${ENCRYPTION_PROVIDER_CONFIG_PATH:-/etc/srv/kubernetes/encryption-provider-config.yml}
+
+  echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
+  kube_api_server_params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
+
+  default_encryption_provider_config_vol=$(echo "{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${encryption_provider_config_path}\", \"type\": \"File\"}}" | base64 | tr -d '\r\n')
+  default_encryption_provider_config_vol_mnt=$(echo "{ \"name\": \"encryptionconfig\", \"mountPath\": \"${encryption_provider_config_path}\", \"readOnly\": true}" | base64 | tr -d '\r\n')
+
+  encryption_provider_config_vol_mnt=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL_MNT:-"${default_encryption_provider_config_vol_mnt}"}" | base64 --decode)
+  encryption_provider_config_vol=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL:-"${default_encryption_provider_config_vol}"}" | base64 --decode)
+  sed -i -e " {
+    s@{{encryption_provider_mount}}@${encryption_provider_config_vol_mnt},@
+    s@{{encryption_provider_volume}}@${encryption_provider_config_vol},@
+  } " "${kube_apiserver_template_path}"
+
+  if [[ -n "${CLOUD_KMS_INTEGRATION:-}" ]]; then
+    default_kms_socket_dir="/var/run/kmsplugin"
+    default_kms_socket_vol_mnt=$(echo "{ \"name\": \"kmssocket\", \"mountPath\": \"${default_kms_socket_dir}\", \"readOnly\": false}" | base64 | tr -d '\r\n')
+    default_kms_socket_vol=$(echo "{ \"name\": \"kmssocket\", \"hostPath\": {\"path\": \"${default_kms_socket_dir}\", \"type\": \"DirectoryOrCreate\"}}" | base64 | tr -d '\r\n')
+
+    kms_socket_vol_mnt=$(echo "${KMS_PLUGIN_SOCKET_VOL_MNT:-"${default_kms_socket_vol_mnt}"}" | base64 --decode)
+    kms_socket_vol=$(echo "${KMS_PLUGIN_SOCKET_VOL:-"${default_kms_socket_vol}"}" | base64 --decode)
+    sed -i -e " {
+      s@{{kms_socket_mount}}@${kms_socket_vol_mnt},@
+      s@{{kms_socket_volume}}@${kms_socket_vol},@
+    } " "${kube_apiserver_template_path}"
+  else
+    sed -i -e " {
+      s@{{kms_socket_mount}}@@
+      s@{{kms_socket_volume}}@@
+    } " "${kube_apiserver_template_path}"
+  fi
+}
+
+# Write the config for the audit policy.
+function create-master-audit-policy {
+  local -r path="${1}"
+  local -r policy="${2:-}"
+
+  if [[ -n "${policy}" ]]; then
+    echo "${policy}" > "${path}"
+    return
+  fi
+
+  # Known api groups
+  local -r known_apis='
+      - group: "" # core
+      - group: "admissionregistration.k8s.io"
+      - group: "apiextensions.k8s.io"
+      - group: "apiregistration.k8s.io"
+      - group: "apps"
+      - group: "authentication.k8s.io"
+      - group: "authorization.k8s.io"
+      - group: "autoscaling"
+      - group: "batch"
+      - group: "certificates.k8s.io"
+      - group: "extensions"
+      - group: "metrics.k8s.io"
+      - group: "networking.k8s.io"
+      - group: "policy"
+      - group: "rbac.authorization.k8s.io"
+      - group: "scheduling.k8s.io"
+      - group: "settings.k8s.io"
+      - group: "storage.k8s.io"'
+
+  cat <<EOF >"${path}"
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  # The following requests were manually identified as high-volume and low-risk,
+  # so drop them.
+  - level: None
+    users: ["system:kube-proxy"]
+    verbs: ["watch"]
+    resources:
+      - group: "" # core
+        resources: ["endpoints", "services", "services/status"]
+  - level: None
+    # Ingress controller reads 'configmaps/ingress-uid' through the unsecured port.
+    # TODO(#46983): Change this to the ingress controller service account.
+    users: ["system:unsecured"]
+    namespaces: ["kube-system"]
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps"]
+  - level: None
+    users: ["kubelet"] # legacy kubelet identity
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["nodes", "nodes/status"]
+  - level: None
+    userGroups: ["system:nodes"]
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["nodes", "nodes/status"]
+  - level: None
+    users:
+      - system:kube-controller-manager
+      - system:kube-scheduler
+      - system:serviceaccount:kube-system:endpoint-controller
+    verbs: ["get", "update"]
+    namespaces: ["kube-system"]
+    resources:
+      - group: "" # core
+        resources: ["endpoints"]
+  - level: None
+    users: ["system:apiserver"]
+    verbs: ["get"]
+    resources:
+      - group: "" # core
+        resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
+  # Don't log HPA fetching metrics.
+  - level: None
+    users:
+      - system:kube-controller-manager
+    verbs: ["get", "list"]
+    resources:
+      - group: "metrics.k8s.io"
+
+  # Don't log these read-only URLs.
+  - level: None
+    nonResourceURLs:
+      - /healthz*
+      - /version
+      - /swagger*
+
+  # Don't log events requests.
+  - level: None
+    resources:
+      - group: "" # core
+        resources: ["events"]
+
+  # node and pod status calls from nodes are high-volume and can be large, don't log responses for expected updates from nodes
+  - level: Request
+    users: ["kubelet", "system:node-problem-detector", "system:serviceaccount:kube-system:node-problem-detector"]
+    verbs: ["update","patch"]
+    resources:
+      - group: "" # core
+        resources: ["nodes/status", "pods/status"]
+    omitStages:
+      - "RequestReceived"
+  - level: Request
+    userGroups: ["system:nodes"]
+    verbs: ["update","patch"]
+    resources:
+      - group: "" # core
+        resources: ["nodes/status", "pods/status"]
+    omitStages:
+      - "RequestReceived"
+
+  # deletecollection calls can be large, don't log responses for expected namespace deletions
+  - level: Request
+    users: ["system:serviceaccount:kube-system:namespace-controller"]
+    verbs: ["deletecollection"]
+    omitStages:
+      - "RequestReceived"
+
+  # Secrets, ConfigMaps, and TokenReviews can contain sensitive & binary data,
+  # so only log at the Metadata level.
+  - level: Metadata
+    resources:
+      - group: "" # core
+        resources: ["secrets", "configmaps"]
+      - group: authentication.k8s.io
+        resources: ["tokenreviews"]
+    omitStages:
+      - "RequestReceived"
+  # Get repsonses can be large; skip them.
+  - level: Request
+    verbs: ["get", "list", "watch"]
+    resources: ${known_apis}
+    omitStages:
+      - "RequestReceived"
+  # Default level for known APIs
+  - level: RequestResponse
+    resources: ${known_apis}
+    omitStages:
+      - "RequestReceived"
+  # Default level for all other requests.
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"
+EOF
+}
+
+# Writes the configuration file used by the webhook advanced auditing backend.
+function create-master-audit-webhook-config {
+  local -r path="${1}"
+
+  if [[ -n "${GCP_AUDIT_URL:-}" ]]; then
+    # The webhook config file is a kubeconfig file describing the webhook endpoint.
+    cat <<EOF >"${path}"
+clusters:
+  - name: gcp-audit-server
+    cluster:
+      server: ${GCP_AUDIT_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-audit-server
+    user: kube-apiserver
+  name: webhook
+EOF
+  fi
+}
+
 # Starts kubernetes apiserver.
 # It prepares the log file, loads the docker image, calculates variables, sets them
 # in the manifest file, and then copies the manifest file to /etc/kubernetes/manifests.

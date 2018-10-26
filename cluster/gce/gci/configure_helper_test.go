@@ -117,6 +117,11 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
 	}
 	defer f.Close()
 
+	err = copyFile(configureKubeAPIServerScriptName, filepath.Join(c.kubeHome, configureKubeAPIServerScriptName))
+	if err != nil {
+		c.t.Fatalf("Failed to copy script %s to KUBE_HOME: %v", configureKubeAPIServerScriptName, err)
+	}
+
 	t := template.Must(template.New("env").Parse(envTemplate))
 
 	if err = t.Execute(f, env); err != nil {
@@ -126,7 +131,7 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
 
 func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
 	c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s --source-only ; source %s ; %s", c.envScriptPath, configureHelperScriptName, configureKubeAPIServerScriptName, c.manifestFuncName)
+	args := fmt.Sprintf("source %s ; source %s --source-only ; %s", c.envScriptPath, configureHelperScriptName, c.manifestFuncName)
 	cmd := exec.Command("bash", "-c", args)
 
 	bs, err := cmd.CombinedOutput()

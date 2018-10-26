@@ -211,7 +211,6 @@ func TestKMSIntegration(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			c := newKubeAPIServerManifestTestCase(t)
-			defer c.tearDown()
 
 			var e = kubeAPIServerEnv{
 				KubeHome:                     c.kubeHome,
