@@ -265,7 +265,6 @@ package proto
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -274,7 +273,66 @@ import (
 	"sync"
 )
 
-var errInvalidUTF8 = errors.New("proto: invalid UTF-8 string")
+// RequiredNotSetError is an error type returned by either Marshal or Unmarshal.
+// Marshal reports this when a required field is not initialized.
+// Unmarshal reports this when a required field is missing from the wire data.
+type RequiredNotSetError struct{ field string }
+
+func (e *RequiredNotSetError) Error() string {
+	if e.field == "" {
+		return fmt.Sprintf("proto: required field not set")
+	}
+	return fmt.Sprintf("proto: required field %q not set", e.field)
+}
+func (e *RequiredNotSetError) RequiredNotSet() bool {
+	return true
+}
+
+type invalidUTF8Error struct{ field string }
+
+func (e *invalidUTF8Error) Error() string {
+	if e.field == "" {
+		return "proto: invalid UTF-8 detected"
+	}
+	return fmt.Sprintf("proto: field %q contains invalid UTF-8", e.field)
+}
+func (e *invalidUTF8Error) InvalidUTF8() bool {
+	return true
+}
+
+// errInvalidUTF8 is a sentinel error to identify fields with invalid UTF-8.
+// This error should not be exposed to the external API as such errors should
+// be recreated with the field information.
+var errInvalidUTF8 = &invalidUTF8Error{}
+
+// isNonFatal reports whether the error is either a RequiredNotSet error
+// or a InvalidUTF8 error.
+func isNonFatal(err error) bool {
+	if re, ok := err.(interface{ RequiredNotSet() bool }); ok && re.RequiredNotSet() {
+		return true
+	}
+	if re, ok := err.(interface{ InvalidUTF8() bool }); ok && re.InvalidUTF8() {
+		return true
+	}
+	return false
+}
+
+type nonFatal struct{ E error }
+
+// Merge merges err into nf and reports whether it was successful.
+// Otherwise it returns false for any fatal non-nil errors.
+func (nf *nonFatal) Merge(err error) (ok bool) {
+	if err == nil {
+		return true // not an error
+	}
+	if !isNonFatal(err) {
+		return false // fatal error
+	}
+	if nf.E == nil {
+		nf.E = err // store first instance of non-fatal error
+	}
+	return true
+}
 
 // Message is implemented by generated protocol buffer messages.
 type Message interface {
@@ -282,26 +340,6 @@ type Message interface {
 	String() string
 	ProtoMessage()
 }
-
-// Stats records allocation details about the protocol buffer encoders
-// and decoders.  Useful for tuning the library itself.
-type Stats struct {
-	Emalloc uint64 // mallocs in encode
-	Dmalloc uint64 // mallocs in decode
-	Encode  uint64 // number of encodes
-	Decode  uint64 // number of decodes
-	Chit    uint64 // number of cache hits
-	Cmiss   uint64 // number of cache misses
-	Size    uint64 // number of sizes
-}
-
-// Set to true to enable stats collection.
-const collectStats = false
-
-var stats Stats
-
-// GetStats returns a copy of the global Stats structure.
-func GetStats() Stats { return stats }
 
 // A Buffer is a buffer manager for marshaling and unmarshaling
 // protocol buffers.  It may be reused between invocations to

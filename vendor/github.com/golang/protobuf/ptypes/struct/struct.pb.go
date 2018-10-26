@@ -3,9 +3,11 @@
 
 package structpb
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -32,6 +34,7 @@ const (
 var NullValue_name = map[int32]string{
 	0: "NULL_VALUE",
 }
+
 var NullValue_value = map[string]int32{
 	"NULL_VALUE": 0,
 }
@@ -39,9 +42,11 @@ var NullValue_value = map[string]int32{
 func (x NullValue) String() string {
 	return proto.EnumName(NullValue_name, int32(x))
 }
+
 func (NullValue) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_struct_3a5a94e0c7801b27, []int{0}
+	return fileDescriptor_df322afd6c9fb402, []int{0}
 }
+
 func (NullValue) XXX_WellKnownType() string { return "NullValue" }
 
 // `Struct` represents a structured data value, consisting of fields
@@ -54,7 +59,7 @@ func (NullValue) XXX_WellKnownType() string { return "NullValue" }
 // The JSON representation for `Struct` is JSON object.
 type Struct struct {
 	// Unordered map of dynamically typed values.
-	Fields               map[string]*Value `protobuf:"bytes,1,rep,name=fields" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Fields               map[string]*Value `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
 	XXX_unrecognized     []byte            `json:"-"`
 	XXX_sizecache        int32             `json:"-"`
@@ -64,17 +69,19 @@ func (m *Struct) Reset()         { *m = Struct{} }
 func (m *Struct) String() string { return proto.CompactTextString(m) }
 func (*Struct) ProtoMessage()    {}
 func (*Struct) Descriptor() ([]byte, []int) {
-	return fileDescriptor_struct_3a5a94e0c7801b27, []int{0}
+	return fileDescriptor_df322afd6c9fb402, []int{0}
 }
+
 func (*Struct) XXX_WellKnownType() string { return "Struct" }
+
 func (m *Struct) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Struct.Unmarshal(m, b)
 }
 func (m *Struct) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Struct.Marshal(b, m, deterministic)
 }
-func (dst *Struct) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Struct.Merge(dst, src)
+func (m *Struct) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Struct.Merge(m, src)
 }
 func (m *Struct) XXX_Size() int {
 	return xxx_messageInfo_Struct.Size(m)
@@ -118,17 +125,19 @@ func (m *Value) Reset()         { *m = Value{} }
 func (m *Value) String() string { return proto.CompactTextString(m) }
 func (*Value) ProtoMessage()    {}
 func (*Value) Descriptor() ([]byte, []int) {
-	return fileDescriptor_struct_3a5a94e0c7801b27, []int{1}
+	return fileDescriptor_df322afd6c9fb402, []int{1}
 }
+
 func (*Value) XXX_WellKnownType() string { return "Value" }
+
 func (m *Value) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Value.Unmarshal(m, b)
 }
 func (m *Value) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Value.Marshal(b, m, deterministic)
 }
-func (dst *Value) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Value.Merge(dst, src)
+func (m *Value) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Value.Merge(m, src)
 }
 func (m *Value) XXX_Size() int {
 	return xxx_messageInfo_Value.Size(m)
@@ -144,30 +153,40 @@ type isValue_Kind interface {
 }
 
 type Value_NullValue struct {
-	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,enum=google.protobuf.NullValue,oneof"`
-}
-type Value_NumberValue struct {
-	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,oneof"`
-}
-type Value_StringValue struct {
-	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,oneof"`
-}
-type Value_BoolValue struct {
-	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,oneof"`
-}
-type Value_StructValue struct {
-	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,oneof"`
-}
-type Value_ListValue struct {
-	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,oneof"`
+	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,proto3,enum=google.protobuf.NullValue,oneof"`
 }
 
-func (*Value_NullValue) isValue_Kind()   {}
+type Value_NumberValue struct {
+	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,proto3,oneof"`
+}
+
+type Value_StringValue struct {
+	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,proto3,oneof"`
+}
+
+type Value_BoolValue struct {
+	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,proto3,oneof"`
+}
+
+type Value_StructValue struct {
+	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,proto3,oneof"`
+}
+
+type Value_ListValue struct {
+	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,proto3,oneof"`
+}
+
+func (*Value_NullValue) isValue_Kind() {}
+
 func (*Value_NumberValue) isValue_Kind() {}
+
 func (*Value_StringValue) isValue_Kind() {}
-func (*Value_BoolValue) isValue_Kind()   {}
+
+func (*Value_BoolValue) isValue_Kind() {}
+
 func (*Value_StructValue) isValue_Kind() {}
-func (*Value_ListValue) isValue_Kind()   {}
+
+func (*Value_ListValue) isValue_Kind() {}
 
 func (m *Value) GetKind() isValue_Kind {
 	if m != nil {
@@ -358,7 +377,7 @@ func _Value_OneofSizer(msg proto.Message) (n int) {
 // The JSON representation for `ListValue` is JSON array.
 type ListValue struct {
 	// Repeated field of dynamically typed values.
-	Values               []*Value `protobuf:"bytes,1,rep,name=values" json:"values,omitempty"`
+	Values               []*Value `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -368,17 +387,19 @@ func (m *ListValue) Reset()         { *m = ListValue{} }
 func (m *ListValue) String() string { return proto.CompactTextString(m) }
 func (*ListValue) ProtoMessage()    {}
 func (*ListValue) Descriptor() ([]byte, []int) {
-	return fileDescriptor_struct_3a5a94e0c7801b27, []int{2}
+	return fileDescriptor_df322afd6c9fb402, []int{2}
 }
+
 func (*ListValue) XXX_WellKnownType() string { return "ListValue" }
+
 func (m *ListValue) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ListValue.Unmarshal(m, b)
 }
 func (m *ListValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ListValue.Marshal(b, m, deterministic)
 }
-func (dst *ListValue) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ListValue.Merge(dst, src)
+func (m *ListValue) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ListValue.Merge(m, src)
 }
 func (m *ListValue) XXX_Size() int {
 	return xxx_messageInfo_ListValue.Size(m)
@@ -397,18 +418,16 @@ func (m *ListValue) GetValues() []*Value {
 }
 
 func init() {
+	proto.RegisterEnum("google.protobuf.NullValue", NullValue_name, NullValue_value)
 	proto.RegisterType((*Struct)(nil), "google.protobuf.Struct")
 	proto.RegisterMapType((map[string]*Value)(nil), "google.protobuf.Struct.FieldsEntry")
 	proto.RegisterType((*Value)(nil), "google.protobuf.Value")
 	proto.RegisterType((*ListValue)(nil), "google.protobuf.ListValue")
-	proto.RegisterEnum("google.protobuf.NullValue", NullValue_name, NullValue_value)
 }
 
-func init() {
-	proto.RegisterFile("google/protobuf/struct.proto", fileDescriptor_struct_3a5a94e0c7801b27)
-}
+func init() { proto.RegisterFile("google/protobuf/struct.proto", fileDescriptor_df322afd6c9fb402) }
 
-var fileDescriptor_struct_3a5a94e0c7801b27 = []byte{
+var fileDescriptor_df322afd6c9fb402 = []byte{
 	// 417 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x74, 0x92, 0x41, 0x8b, 0xd3, 0x40,
 	0x14, 0xc7, 0x3b, 0xc9, 0x36, 0x98, 0x17, 0x59, 0x97, 0x11, 0xb4, 0xac, 0xa2, 0xa1, 0x7b, 0x09,

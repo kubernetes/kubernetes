@@ -1791,51 +1791,52 @@
 		},
 		{
 			"ImportPath": "github.com/golang/groupcache/lru",
-			"Rev": "02826c3e79038b59d737d3b1c0a1d937f71a4433"
+			"Rev": "c65c006176ff7ff98bb916961c7abbc6b0afc0aa"
 		},
 		{
 			"ImportPath": "github.com/golang/mock/gomock",
-			"Rev": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9"
+			"Comment": "v1.1.1-11-g8a44ef6",
+			"Rev": "8a44ef6e8be577e050008c7886f24fc705d709fb"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/jsonpb",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/any",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/struct",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/wrappers",
-			"Comment": "v1.1.0",
-			"Rev": "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+			"Comment": "v1.2.0-29-gd3de96c",
+			"Rev": "d3de96c4c28ef8af3aa1a892fc481e0f103c01ff"
 		},
 		{
 			"ImportPath": "github.com/google/btree",

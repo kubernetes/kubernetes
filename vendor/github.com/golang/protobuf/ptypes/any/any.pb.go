@@ -3,9 +3,11 @@
 
 package any
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
+import (
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -121,7 +123,7 @@ type Any struct {
 	// Schemes other than `http`, `https` (or the empty scheme) might be
 	// used with implementation specific semantics.
 	//
-	TypeUrl string `protobuf:"bytes,1,opt,name=type_url,json=typeUrl" json:"type_url,omitempty"`
+	TypeUrl string `protobuf:"bytes,1,opt,name=type_url,json=typeUrl,proto3" json:"type_url,omitempty"`
 	// Must be a valid serialized protocol buffer of the above specified type.
 	Value                []byte   `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -133,17 +135,19 @@ func (m *Any) Reset()         { *m = Any{} }
 func (m *Any) String() string { return proto.CompactTextString(m) }
 func (*Any) ProtoMessage()    {}
 func (*Any) Descriptor() ([]byte, []int) {
-	return fileDescriptor_any_744b9ca530f228db, []int{0}
+	return fileDescriptor_b53526c13ae22eb4, []int{0}
 }
+
 func (*Any) XXX_WellKnownType() string { return "Any" }
+
 func (m *Any) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Any.Unmarshal(m, b)
 }
 func (m *Any) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Any.Marshal(b, m, deterministic)
 }
-func (dst *Any) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Any.Merge(dst, src)
+func (m *Any) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Any.Merge(m, src)
 }
 func (m *Any) XXX_Size() int {
 	return xxx_messageInfo_Any.Size(m)
@@ -172,9 +176,9 @@ func init() {
 	proto.RegisterType((*Any)(nil), "google.protobuf.Any")
 }
 
-func init() { proto.RegisterFile("google/protobuf/any.proto", fileDescriptor_any_744b9ca530f228db) }
+func init() { proto.RegisterFile("google/protobuf/any.proto", fileDescriptor_b53526c13ae22eb4) }
 
-var fileDescriptor_any_744b9ca530f228db = []byte{
+var fileDescriptor_b53526c13ae22eb4 = []byte{
 	// 185 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x92, 0x4c, 0xcf, 0xcf, 0x4f,
 	0xcf, 0x49, 0xd5, 0x2f, 0x28, 0xca, 0x2f, 0xc9, 0x4f, 0x2a, 0x4d, 0xd3, 0x4f, 0xcc, 0xab, 0xd4,

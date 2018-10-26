@@ -11,6 +11,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/golang/mock/gomock",
     importpath = "github.com/golang/mock/gomock",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/golang.org/x/net/context:go_default_library"],
 )
 
 filegroup(
