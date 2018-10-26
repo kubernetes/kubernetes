@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"time"
 
+	pkgerrors "github.com/pkg/errors"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -62,7 +64,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	// Create the new, version-branched kubelet ComponentConfig ConfigMap
 	if err := kubeletphase.CreateConfigMap(cfg, client); err != nil {
-		errs = append(errs, fmt.Errorf("error creating kubelet configuration ConfigMap: %v", err))
+		errs = append(errs, pkgerrors.Wrap(err, "error creating kubelet configuration ConfigMap"))
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
@@ -74,7 +76,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// --cri-socket.
 	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		errs = append(errs, fmt.Errorf("error uploading crisocket: %v", err))
+		errs = append(errs, pkgerrors.Wrap(err, "error uploading crisocket"))
 	}
 
 	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
@@ -144,7 +146,7 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.InitConfiguration,
 				return err
 			}
 			if dnsDeployment.Status.ReadyReplicas == 0 {
-				return fmt.Errorf("the DNS deployment isn't ready yet")
+				return pkgerrors.New("the DNS deployment isn't ready yet")
 			}
 		}
 
@@ -166,7 +168,7 @@ func upgradeToSelfHosting(client clientset.Interface, cfg *kubeadmapi.InitConfig
 		// kubeadm will now convert the static Pod-hosted control plane into a self-hosted one
 		fmt.Println("[self-hosted] Creating self-hosted control plane.")
 		if err := selfhosting.CreateSelfHostedControlPlane(kubeadmconstants.GetStaticPodDirectory(), kubeadmconstants.KubernetesDir, cfg, client, waiter, dryRun); err != nil {
-			return fmt.Errorf("error creating self hosted control plane: %v", err)
+			return pkgerrors.Wrap(err, "error creating self hosted control plane")
 		}
 	}
 	return nil
@@ -178,7 +180,7 @@ func BackupAPIServerCertIfNeeded(cfg *kubeadmapi.InitConfiguration, dryRun bool)
 	shouldBackup, err := shouldBackupAPIServerCertAndKey(certAndKeyDir)
 	if err != nil {
 		// Don't fail the upgrade phase if failing to determine to backup kube-apiserver cert and key.
-		return fmt.Errorf("[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key: %v", err)
+		return pkgerrors.Wrap(err, "[postupgrade] WARNING: failed to determine to backup kube-apiserver cert and key")
 	}
 
 	if !shouldBackup {
@@ -216,7 +218,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		// *would* post the new kubelet-config-1.X configmap that doesn't exist now when we're trying to download it
 		// again.
 		if !(apierrors.IsNotFound(err) && dryRun) {
-			errs = append(errs, fmt.Errorf("error downloading kubelet configuration from the ConfigMap: %v", err))
+			errs = append(errs, pkgerrors.Wrap(err, "error downloading kubelet configuration from the ConfigMap"))
 		}
 	}
 
@@ -230,7 +232,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 		// as we handle that ourselves in the markmaster phase
 		// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the markmaster phase?
 		if err := kubeletphase.WriteKubeletDynamicEnvFile(&cfg.NodeRegistration, cfg.FeatureGates, false, kubeletDir); err != nil {
-			errs = append(errs, fmt.Errorf("error writing a dynamic environment file for the kubelet: %v", err))
+			errs = append(errs, pkgerrors.Wrap(err, "error writing a dynamic environment file for the kubelet"))
 		}
 
 		if dryRun { // Print what contents would be written
@@ -262,7 +264,7 @@ func getKubeletDir(dryRun bool) (string, error) {
 func backupAPIServerCertAndKey(certAndKeyDir string) error {
 	subDir := filepath.Join(certAndKeyDir, "expired")
 	if err := os.Mkdir(subDir, 0766); err != nil {
-		return fmt.Errorf("failed to created backup directory %s: %v", subDir, err)
+		return pkgerrors.Wrapf(err, "failed to created backup directory %s", subDir)
 	}
 
 	filesToMove := map[string]string{
@@ -292,7 +294,7 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 			errs = append(errs, err)
 		}
 	}
-	return fmt.Errorf("couldn't move these files: %v. Got errors: %v", files, errors.NewAggregate(errs))
+	return pkgerrors.Errorf("couldn't move these files: %v. Got errors: %v", files, errors.NewAggregate(errs))
 }
 
 // shouldBackupAPIServerCertAndKey checks if the cert of kube-apiserver will be expired in 180 days.
@@ -300,10 +302,10 @@ func shouldBackupAPIServerCertAndKey(certAndKeyDir string) (bool, error) {
 	apiServerCert := filepath.Join(certAndKeyDir, kubeadmconstants.APIServerCertName)
 	certs, err := certutil.CertsFromFile(apiServerCert)
 	if err != nil {
-		return false, fmt.Errorf("couldn't load the certificate file %s: %v", apiServerCert, err)
+		return false, pkgerrors.Wrapf(err, "couldn't load the certificate file %s", apiServerCert)
 	}
 	if len(certs) == 0 {
-		return false, fmt.Errorf("no certificate data found")
+		return false, pkgerrors.New("no certificate data found")
 	}
 
 	if time.Now().Sub(certs[0].NotBefore) > expiry {

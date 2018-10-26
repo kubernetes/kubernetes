@@ -18,7 +18,6 @@ package system
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
 
@@ -66,7 +65,7 @@ func (c *CgroupsValidator) validateCgroupSubsystems(cgroupSpec, subsystems []str
 		}
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("missing cgroups: %s", strings.Join(missing, " "))
+		return errors.Errorf("missing cgroups: %s", strings.Join(missing, " "))
 	}
 	return nil
 

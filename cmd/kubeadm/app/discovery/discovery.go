@@ -17,8 +17,9 @@ limitations under the License.
 package discovery
 
 import (
-	"fmt"
 	"net/url"
+
+	"github.com/pkg/errors"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -38,7 +39,7 @@ func For(cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
 	config, err := DiscoverValidatedKubeConfig(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't validate the identity of the API Server: %v", err)
+		return nil, errors.Wrap(err, "couldn't validate the identity of the API Server")
 	}
 
 	if len(cfg.Discovery.TLSBootstrapToken) == 0 {
@@ -66,7 +67,7 @@ func DiscoverValidatedKubeConfig(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	case cfg.Discovery.BootstrapToken != nil:
 		return token.RetrieveValidatedConfigInfo(cfg)
 	default:
-		return nil, fmt.Errorf("couldn't find a valid discovery configuration")
+		return nil, errors.New("couldn't find a valid discovery configuration")
 	}
 }
 

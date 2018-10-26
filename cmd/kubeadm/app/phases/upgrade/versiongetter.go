@@ -88,7 +88,7 @@ func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, erro
 func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
 	versionStr, err := kubeadmutil.KubernetesReleaseVersion(ciVersionLabel)
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't fetch latest %s from the internet: %v", description, err)
+		return "", nil, errors.Wrapf(err, "Couldn't fetch latest %s from the internet", description)
 	}
 
 	if description != "" {
@@ -97,7 +97,7 @@ func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description strin
 
 	ver, err := versionutil.ParseSemantic(versionStr)
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't parse latest %s: %v", description, err)
+		return "", nil, errors.Wrapf(err, "Couldn't parse latest %s", description)
 	}
 	return versionStr, ver, nil
 }
@@ -147,7 +147,7 @@ func (o *OfflineVersionGetter) VersionFromCILabel(ciVersionLabel, description st
 	}
 	ver, err := versionutil.ParseSemantic(o.version)
 	if err != nil {
-		return "", nil, fmt.Errorf("Couldn't parse version %s: %v", description, err)
+		return "", nil, errors.Wrapf(err, "Couldn't parse version %s", description)
 	}
 	return o.version, ver, nil
 }

@@ -17,9 +17,10 @@ limitations under the License.
 package apiclient
 
 import (
-	"fmt"
 	"net"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -88,12 +89,12 @@ func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (boo
 
 	_, svcSubnet, err := net.ParseCIDR(idr.serviceSubnet)
 	if err != nil {
-		return true, nil, fmt.Errorf("error parsing CIDR %q: %v", idr.serviceSubnet, err)
+		return true, nil, errors.Wrapf(err, "error parsing CIDR %q", idr.serviceSubnet)
 	}
 
 	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
-		return true, nil, fmt.Errorf("unable to get first IP address from the given CIDR (%s): %v", svcSubnet.String(), err)
+		return true, nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
 	}
 
 	// The only used field of this Service object is the ClusterIP, which kube-dns uses to calculate its own IP

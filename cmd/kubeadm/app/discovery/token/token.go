@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -85,19 +87,20 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		// Validate the MAC on the kubeconfig from the ConfigMap and load it
 		insecureKubeconfigString, ok := insecureClusterInfo.Data[bootstrapapi.KubeConfigKey]
 		if !ok || len(insecureKubeconfigString) == 0 {
-			return nil, fmt.Errorf("there is no %s key in the %s ConfigMap. This API Server isn't set up for token bootstrapping, can't connect", bootstrapapi.KubeConfigKey, bootstrapapi.ConfigMapClusterInfo)
+			return nil, errors.Errorf("there is no %s key in the %s ConfigMap. This API Server isn't set up for token bootstrapping, can't connect",
+				bootstrapapi.KubeConfigKey, bootstrapapi.ConfigMapClusterInfo)
 		}
 		detachedJWSToken, ok := insecureClusterInfo.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]
 		if !ok || len(detachedJWSToken) == 0 {
-			return nil, fmt.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the master node to creating a new valid token", token.ID)
+			return nil, errors.Errorf("token id %q is invalid for this cluster or it has expired. Use \"kubeadm token create\" on the master node to creating a new valid token", token.ID)
 		}
 		if !bootstrap.DetachedTokenIsValid(detachedJWSToken, insecureKubeconfigString, token.ID, token.Secret) {
-			return nil, fmt.Errorf("failed to verify JWS signature of received cluster info object, can't trust this API Server")
+			return nil, errors.New("failed to verify JWS signature of received cluster info object, can't trust this API Server")
 		}
 		insecureKubeconfigBytes := []byte(insecureKubeconfigString)
 		insecureConfig, err := clientcmd.Load(insecureKubeconfigBytes)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s configmap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+			return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 		}
 
 		// If no TLS root CA pinning was specified, we're done
@@ -108,7 +111,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 
 		// Load the cluster CA from the Config
 		if len(insecureConfig.Clusters) != 1 {
-			return nil, fmt.Errorf("expected the kubeconfig file in the %s configmap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
+			return nil, errors.Errorf("expected the kubeconfig file in the %s configmap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
 		}
 		var clusterCABytes []byte
 		for _, cluster := range insecureConfig.Clusters {
@@ -116,14 +119,14 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		}
 		clusterCA, err := parsePEMCert(clusterCABytes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse cluster CA from the %s configmap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+			return nil, errors.Wrapf(err, "failed to parse cluster CA from the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 
 		}
 
 		// Validate the cluster CA public key against the pinned set
 		err = pubKeyPins.Check(clusterCA)
 		if err != nil {
-			return nil, fmt.Errorf("cluster CA found in %s configmap is invalid: %v", bootstrapapi.ConfigMapClusterInfo, err)
+			return nil, errors.Wrapf(err, "cluster CA found in %s configmap is invalid", bootstrapapi.ConfigMapClusterInfo)
 		}
 
 		// Now that we know the proported cluster CA, connect back a second time validating with that CA
@@ -148,12 +151,12 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		// Pull the kubeconfig from the securely-obtained ConfigMap and validate that it's the same as what we found the first time
 		secureKubeconfigBytes := []byte(secureClusterInfo.Data[bootstrapapi.KubeConfigKey])
 		if !bytes.Equal(secureKubeconfigBytes, insecureKubeconfigBytes) {
-			return nil, fmt.Errorf("the second kubeconfig from the %s configmap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
+			return nil, errors.Errorf("the second kubeconfig from the %s configmap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
 		}
 
 		secureKubeconfig, err := clientcmd.Load(secureKubeconfigBytes)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s configmap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+			return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 		}
 
 		fmt.Printf("[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server %q\n", endpoint)
@@ -211,7 +214,7 @@ func runForEndpointsAndReturnFirst(endpoints []string, discoveryTimeout time.Dur
 	select {
 	case <-time.After(discoveryTimeout):
 		close(stopChan)
-		err := fmt.Errorf("abort connecting to API servers after timeout of %v", discoveryTimeout)
+		err := errors.Errorf("abort connecting to API servers after timeout of %v", discoveryTimeout)
 		fmt.Printf("[discovery] %v\n", err)
 		wg.Wait()
 		return nil, err
@@ -225,10 +228,10 @@ func runForEndpointsAndReturnFirst(endpoints []string, discoveryTimeout time.Dur
 func parsePEMCert(certData []byte) (*x509.Certificate, error) {
 	pemBlock, trailingData := pem.Decode(certData)
 	if pemBlock == nil {
-		return nil, fmt.Errorf("invalid PEM data")
+		return nil, errors.New("invalid PEM data")
 	}
 	if len(trailingData) != 0 {
-		return nil, fmt.Errorf("trailing data after first PEM block")
+		return nil, errors.New("trailing data after first PEM block")
 	}
 	return x509.ParseCertificate(pemBlock.Bytes)
 }

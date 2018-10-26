@@ -18,7 +18,6 @@ package system
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	"github.com/docker/docker/api/types"
@@ -78,7 +77,7 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 		r := regexp.MustCompile(ver)
 		if r.MatchString(info.ServerVersion) {
 			d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, good)
-			w := fmt.Errorf(
+			w := errors.Errorf(
 				"this Docker version is not on the list of validated versions: %s. Latest validated version: %s",
 				info.ServerVersion,
 				latestValidatedDockerVersion,
@@ -86,7 +85,7 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 			return w, nil
 		}
 		d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, bad)
-		return nil, fmt.Errorf("unsupported docker version: %s", info.ServerVersion)
+		return nil, errors.Errorf("unsupported docker version: %s", info.ServerVersion)
 	}
 	// Validate graph driver.
 	item := dockerConfigPrefix + "GRAPH_DRIVER"
@@ -97,5 +96,5 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 		}
 	}
 	d.Reporter.Report(item, info.Driver, bad)
-	return nil, fmt.Errorf("unsupported graph driver: %s", info.Driver)
+	return nil, errors.Errorf("unsupported graph driver: %s", info.Driver)
 }

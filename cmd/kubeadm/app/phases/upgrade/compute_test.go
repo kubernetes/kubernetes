@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +91,7 @@ func (f fakeEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse,
 func (f fakeEtcdClient) GetVersion() (string, error) {
 	versions, _ := f.GetClusterVersions()
 	if f.mismatchedVersions {
-		return "", fmt.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
+		return "", errors.Errorf("etcd cluster contains endpoints with mismatched versions: %v", versions)
 	}
 	return "3.1.12", nil
 }

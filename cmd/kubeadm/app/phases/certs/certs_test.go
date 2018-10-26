@@ -19,11 +19,12 @@ package certs
 import (
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
+
+	"github.com/pkg/errors"
 
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -704,14 +705,14 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 
 func deleteCAKey(cfg *kubeadmapi.InitConfiguration) error {
 	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
-		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
+		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.CAKeyName)
 	}
 	return nil
 }
 
 func deleteFrontProxyCAKey(cfg *kubeadmapi.InitConfiguration) error {
 	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
-		return fmt.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
+		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.FrontProxyCAKeyName)
 	}
 	return nil
 }

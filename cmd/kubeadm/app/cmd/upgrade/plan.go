@@ -25,6 +25,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
@@ -122,7 +123,7 @@ func RunPlan(flags *planFlags) error {
 	glog.V(1).Infof("[upgrade/plan] computing upgrade possibilities")
 	availUpgrades, err := upgrade.GetAvailableUpgrades(upgradeVars.versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, upgradeVars.cfg.FeatureGates, upgradeVars.client)
 	if err != nil {
-		return fmt.Errorf("[upgrade/versions] FATAL: %v", err)
+		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
 
 	// Tell the user which upgrades are available

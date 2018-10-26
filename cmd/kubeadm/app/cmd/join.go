@@ -514,7 +514,7 @@ func (j *Join) BootstrapKubelet(tlsBootstrapCfg *clientcmdapi.Config) error {
 
 	bootstrapClient, err := kubeconfigutil.ClientSetFromFile(bootstrapKubeConfigFile)
 	if err != nil {
-		return fmt.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
+		return errors.Errorf("couldn't create client from kubeconfig file %q", bootstrapKubeConfigFile)
 	}
 
 	// Configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
@@ -597,7 +597,7 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 
 	glog.V(1).Info("[join] uploading currently used configuration to the cluster")
 	if err := uploadconfigphase.UploadConfiguration(initConfiguration, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration: %v")
+		return errors.Wrap(err, "error uploading configuration")
 	}
 
 	glog.V(1).Info("[join] marking the master with right label")

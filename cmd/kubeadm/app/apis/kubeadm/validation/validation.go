@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -398,7 +399,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	})
 
 	if len(mixedInvalidFlags) != 0 {
-		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
+		return errors.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
 }

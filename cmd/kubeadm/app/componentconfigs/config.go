@@ -17,7 +17,7 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,7 +41,8 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 
 	kubeletConfigData, ok := kubeletCfg.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]
 	if !ok {
-		return nil, fmt.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing", configMapName, kubeadmconstants.KubeletBaseConfigurationConfigMapKey)
+		return nil, errors.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing",
+			configMapName, kubeadmconstants.KubeletBaseConfigurationConfigMapKey)
 	}
 
 	// Decodes the kubeletConfigData into the internal component config
@@ -66,7 +67,8 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 
 	kubeproxyConfigData, ok := kubeproxyCfg.Data[kubeadmconstants.KubeProxyConfigMapKey]
 	if !ok {
-		return nil, fmt.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing", kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey)
+		return nil, errors.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing",
+			kubeadmconstants.KubeProxyConfigMap, kubeadmconstants.KubeProxyConfigMapKey)
 	}
 
 	// Decodes the Config map dat into the internal component config
