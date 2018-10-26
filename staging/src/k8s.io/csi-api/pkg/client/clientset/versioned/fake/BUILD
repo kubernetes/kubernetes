@@ -21,9 +21,12 @@ go_library(
         "//staging/src/k8s.io/client-go/discovery/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/apis/csi/v1beta1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1alpha1:go_default_library",
         "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1alpha1/fake:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1beta1:go_default_library",
+        "//staging/src/k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1beta1/fake:go_default_library",
     ],
 )
 

@@ -27,6 +27,8 @@ import (
 	clientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	csiv1alpha1 "k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1alpha1"
 	fakecsiv1alpha1 "k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1alpha1/fake"
+	csiv1beta1 "k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1beta1"
+	fakecsiv1beta1 "k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1beta1/fake"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -76,7 +78,12 @@ func (c *Clientset) CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface {
 	return &fakecsiv1alpha1.FakeCsiV1alpha1{Fake: &c.Fake}
 }
 
-// Csi retrieves the CsiV1alpha1Client
-func (c *Clientset) Csi() csiv1alpha1.CsiV1alpha1Interface {
-	return &fakecsiv1alpha1.FakeCsiV1alpha1{Fake: &c.Fake}
+// CsiV1beta1 retrieves the CsiV1beta1Client
+func (c *Clientset) CsiV1beta1() csiv1beta1.CsiV1beta1Interface {
+	return &fakecsiv1beta1.FakeCsiV1beta1{Fake: &c.Fake}
+}
+
+// Csi retrieves the CsiV1beta1Client
+func (c *Clientset) Csi() csiv1beta1.CsiV1beta1Interface {
+	return &fakecsiv1beta1.FakeCsiV1beta1{Fake: &c.Fake}
 }

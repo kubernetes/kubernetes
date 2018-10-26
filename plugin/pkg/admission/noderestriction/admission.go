@@ -31,7 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/apis/csi/v1beta1"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
@@ -98,7 +98,7 @@ var (
 	pvcResource         = api.Resource("persistentvolumeclaims")
 	svcacctResource     = api.Resource("serviceaccounts")
 	leaseResource       = coordapi.Resource("leases")
-	csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos")
+	csiNodeInfoResource = csiv1beta1.Resource("csinodeinfos")
 )
 
 func (c *nodePlugin) Admit(a admission.Attributes) error {

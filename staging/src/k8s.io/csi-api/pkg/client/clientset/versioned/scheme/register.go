@@ -25,6 +25,7 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/apis/csi/v1beta1"
 )
 
 var Scheme = runtime.NewScheme()
@@ -32,6 +33,7 @@ var Codecs = serializer.NewCodecFactory(Scheme)
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	csiv1alpha1.AddToScheme,
+	csiv1beta1.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition

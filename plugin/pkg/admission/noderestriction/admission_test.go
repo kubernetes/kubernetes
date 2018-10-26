@@ -33,7 +33,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/apis/csi/v1beta1"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -306,14 +306,14 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 		}
 
-		csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos").WithVersion("v1alpha1")
-		csiNodeInfoKind     = schema.GroupVersionKind{Group: "csi.storage.k8s.io", Version: "v1alpha1", Kind: "CSINodeInfo"}
-		nodeInfo            = &csiv1alpha1.CSINodeInfo{
+		csiNodeInfoResource = csiv1beta1.Resource("csinodeinfos").WithVersion("v1beta1")
+		csiNodeInfoKind     = schema.GroupVersionKind{Group: "csi.storage.k8s.io", Version: "v1beta1", Kind: "CSINodeInfo"}
+		nodeInfo            = &csiv1beta1.CSINodeInfo{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "mynode",
 			},
-			Spec: csiv1alpha1.CSINodeInfoSpec{
-				Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			Spec: csiv1beta1.CSINodeInfoSpec{
+				Drivers: []csiv1beta1.CSIDriverInfoSpec{
 					{
 						Name:         "com.example.csi/mydriver",
 						NodeID:       "com.example.csi/mynode",
@@ -321,22 +321,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 					},
 				},
 			},
-			Status: csiv1alpha1.CSINodeInfoStatus{
-				Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+			Status: csiv1beta1.CSINodeInfoStatus{
+				Drivers: []csiv1beta1.CSIDriverInfoStatus{
 					{
 						Name:                  "com.example.csi/mydriver",
 						Available:             true,
-						VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+						VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 					},
 				},
 			},
 		}
-		nodeInfoWrongName = &csiv1alpha1.CSINodeInfo{
+		nodeInfoWrongName = &csiv1beta1.CSINodeInfo{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
-			Spec: csiv1alpha1.CSINodeInfoSpec{
-				Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+			Spec: csiv1beta1.CSINodeInfoSpec{
+				Drivers: []csiv1beta1.CSIDriverInfoSpec{
 					{
 						Name:         "com.example.csi/mydriver",
 						NodeID:       "com.example.csi/foo",
@@ -344,12 +344,12 @@ func Test_nodePlugin_Admit(t *testing.T) {
 					},
 				},
 			},
-			Status: csiv1alpha1.CSINodeInfoStatus{
-				Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+			Status: csiv1beta1.CSINodeInfoStatus{
+				Drivers: []csiv1beta1.CSIDriverInfoStatus{
 					{
 						Name:                  "com.example.csi/mydriver",
 						Available:             true,
-						VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+						VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 					},
 				},
 			},

@@ -25,7 +25,7 @@ import (
 
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/apis/csi/v1beta1"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
@@ -70,7 +70,7 @@ type nodeUpdateFunc func(*v1.Node) (newNode *v1.Node, updated bool, err error)
 
 // Interface implements an interface for managing labels of a node
 type Interface interface {
-	CreateCSINodeInfo() (*csiv1alpha1.CSINodeInfo, error)
+	CreateCSINodeInfo() (*csiv1beta1.CSINodeInfo, error)
 
 	// Record in the cluster the given node information from the CSI driver with the given name.
 	// Concurrent calls to InstallCSIDriver() is allowed, but they should not be intertwined with calls
@@ -374,7 +374,7 @@ func (nim *nodeInfoManager) tryUpdateCSINodeInfo(
 	driverNodeID string,
 	topology map[string]string) error {
 
-	nodeInfo, err := csiKubeClient.CsiV1alpha1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
+	nodeInfo, err := csiKubeClient.CsiV1beta1().CSINodeInfos().Get(string(nim.nodeName), metav1.GetOptions{})
 	if nodeInfo == nil || errors.IsNotFound(err) {
 		nodeInfo, err = nim.CreateCSINodeInfo()
 	}
@@ -385,7 +385,7 @@ func (nim *nodeInfoManager) tryUpdateCSINodeInfo(
 	return nim.installDriverToCSINodeInfo(nodeInfo, driverName, driverNodeID, topology)
 }
 
-func (nim *nodeInfoManager) CreateCSINodeInfo() (*csiv1alpha1.CSINodeInfo, error) {
+func (nim *nodeInfoManager) CreateCSINodeInfo() (*csiv1beta1.CSINodeInfo, error) {
 
 	kubeClient := nim.volumeHost.GetKubeClient()
 	if kubeClient == nil {
@@ -402,7 +402,7 @@ func (nim *nodeInfoManager) CreateCSINodeInfo() (*csiv1alpha1.CSINodeInfo, error
 		return nil, err
 	}
 
-	nodeInfo := &csiv1alpha1.CSINodeInfo{
+	nodeInfo := &csiv1beta1.CSINodeInfo{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(nim.nodeName),
 			OwnerReferences: []metav1.OwnerReference{
@@ -414,19 +414,19 @@ func (nim *nodeInfoManager) CreateCSINodeInfo() (*csiv1alpha1.CSINodeInfo, error
 				},
 			},
 		},
-		Spec: csiv1alpha1.CSINodeInfoSpec{
-			Drivers: []csiv1alpha1.CSIDriverInfoSpec{},
+		Spec: csiv1beta1.CSINodeInfoSpec{
+			Drivers: []csiv1beta1.CSIDriverInfoSpec{},
 		},
-		Status: csiv1alpha1.CSINodeInfoStatus{
-			Drivers: []csiv1alpha1.CSIDriverInfoStatus{},
+		Status: csiv1beta1.CSINodeInfoStatus{
+			Drivers: []csiv1beta1.CSIDriverInfoStatus{},
 		},
 	}
 
-	return csiKubeClient.CsiV1alpha1().CSINodeInfos().Create(nodeInfo)
+	return csiKubeClient.CsiV1beta1().CSINodeInfos().Create(nodeInfo)
 }
 
 func (nim *nodeInfoManager) installDriverToCSINodeInfo(
-	nodeInfo *csiv1alpha1.CSINodeInfo,
+	nodeInfo *csiv1beta1.CSINodeInfo,
 	driverName string,
 	driverNodeID string,
 	topology map[string]string) error {
@@ -444,7 +444,7 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 	specModified := true
 	statusModified := true
 	// Clone driver list, omitting the driver that matches the given driverName
-	newDriverSpecs := []csiv1alpha1.CSIDriverInfoSpec{}
+	newDriverSpecs := []csiv1beta1.CSIDriverInfoSpec{}
 	for _, driverInfoSpec := range nodeInfo.Spec.Drivers {
 		if driverInfoSpec.Name == driverName {
 			if driverInfoSpec.NodeID == driverNodeID &&
@@ -456,12 +456,12 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 			newDriverSpecs = append(newDriverSpecs, driverInfoSpec)
 		}
 	}
-	newDriverStatuses := []csiv1alpha1.CSIDriverInfoStatus{}
+	newDriverStatuses := []csiv1beta1.CSIDriverInfoStatus{}
 	for _, driverInfoStatus := range nodeInfo.Status.Drivers {
 		if driverInfoStatus.Name == driverName {
 			if driverInfoStatus.Available &&
 				/* TODO(https://github.com/kubernetes/enhancements/issues/625): Add actual migration status */
-				driverInfoStatus.VolumePluginMechanism == csiv1alpha1.VolumePluginMechanismInTree {
+				driverInfoStatus.VolumePluginMechanism == csiv1beta1.VolumePluginMechanismInTree {
 				statusModified = false
 			}
 		} else {
@@ -475,16 +475,16 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 	}
 
 	// Append new driver
-	driverSpec := csiv1alpha1.CSIDriverInfoSpec{
+	driverSpec := csiv1beta1.CSIDriverInfoSpec{
 		Name:         driverName,
 		NodeID:       driverNodeID,
 		TopologyKeys: topologyKeys.List(),
 	}
-	driverStatus := csiv1alpha1.CSIDriverInfoStatus{
+	driverStatus := csiv1beta1.CSIDriverInfoStatus{
 		Name:      driverName,
 		Available: true,
 		// TODO(https://github.com/kubernetes/enhancements/issues/625): Add actual migration status
-		VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+		VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 	}
 
 	newDriverSpecs = append(newDriverSpecs, driverSpec)
@@ -496,7 +496,7 @@ func (nim *nodeInfoManager) installDriverToCSINodeInfo(
 	if err != nil {
 		return err
 	}
-	_, err = csiKubeClient.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
+	_, err = csiKubeClient.CsiV1beta1().CSINodeInfos().Update(nodeInfo)
 	return err
 }
 
@@ -526,14 +526,14 @@ func (nim *nodeInfoManager) tryUninstallDriverFromCSINodeInfo(
 	csiKubeClient csiclientset.Interface,
 	csiDriverName string) error {
 
-	nodeInfoClient := csiKubeClient.CsiV1alpha1().CSINodeInfos()
+	nodeInfoClient := csiKubeClient.CsiV1beta1().CSINodeInfos()
 	nodeInfo, err := nodeInfoClient.Get(string(nim.nodeName), metav1.GetOptions{})
 	if err != nil {
 		return err // do not wrap error
 	}
 
 	hasModified := false
-	newDriverStatuses := []csiv1alpha1.CSIDriverInfoStatus{}
+	newDriverStatuses := []csiv1beta1.CSIDriverInfoStatus{}
 	for _, driverStatus := range nodeInfo.Status.Drivers {
 		if driverStatus.Name == csiDriverName {
 			// Uninstall the driver if we find it
@@ -615,7 +615,7 @@ func removeMaxAttachLimit(driverName string) nodeUpdateFunc {
 // validateCSINodeInfo ensures members of CSINodeInfo object satisfies map and set semantics.
 // Before calling CSINodeInfoInterface.Update(), validateCSINodeInfo() should be invoked to
 // make sure the CSINodeInfo is compliant
-func validateCSINodeInfo(nodeInfo *csiv1alpha1.CSINodeInfo) error {
+func validateCSINodeInfo(nodeInfo *csiv1beta1.CSINodeInfo) error {
 	if len(nodeInfo.Status.Drivers) < 1 {
 		return fmt.Errorf("at least one Driver entry is required in driver statuses")
 	}

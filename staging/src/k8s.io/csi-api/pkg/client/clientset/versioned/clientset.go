@@ -23,13 +23,15 @@ import (
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 	csiv1alpha1 "k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/client/clientset/versioned/typed/csi/v1beta1"
 )
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface
+	CsiV1beta1() csiv1beta1.CsiV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Csi() csiv1alpha1.CsiV1alpha1Interface
+	Csi() csiv1beta1.CsiV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -37,6 +39,7 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	csiV1alpha1 *csiv1alpha1.CsiV1alpha1Client
+	csiV1beta1  *csiv1beta1.CsiV1beta1Client
 }
 
 // CsiV1alpha1 retrieves the CsiV1alpha1Client
@@ -44,10 +47,15 @@ func (c *Clientset) CsiV1alpha1() csiv1alpha1.CsiV1alpha1Interface {
 	return c.csiV1alpha1
 }
 
+// CsiV1beta1 retrieves the CsiV1beta1Client
+func (c *Clientset) CsiV1beta1() csiv1beta1.CsiV1beta1Interface {
+	return c.csiV1beta1
+}
+
 // Deprecated: Csi retrieves the default version of CsiClient.
 // Please explicitly pick a version.
-func (c *Clientset) Csi() csiv1alpha1.CsiV1alpha1Interface {
-	return c.csiV1alpha1
+func (c *Clientset) Csi() csiv1beta1.CsiV1beta1Interface {
+	return c.csiV1beta1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -70,6 +78,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.csiV1beta1, err = csiv1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -83,6 +95,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.csiV1alpha1 = csiv1alpha1.NewForConfigOrDie(c)
+	cs.csiV1beta1 = csiv1beta1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -92,6 +105,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.csiV1alpha1 = csiv1alpha1.New(c)
+	cs.csiV1beta1 = csiv1beta1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

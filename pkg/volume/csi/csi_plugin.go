@@ -17,6 +17,7 @@ limitations under the License.
 package csi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -25,8 +26,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"context"
 
 	"k8s.io/klog"
 
@@ -39,8 +38,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	csiapiinformer "k8s.io/csi-api/pkg/client/informers/externalversions"
-	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1alpha1"
-	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1alpha1"
+	csiinformer "k8s.io/csi-api/pkg/client/informers/externalversions/csi/v1beta1"
+	csilister "k8s.io/csi-api/pkg/client/listers/csi/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
@@ -240,7 +239,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		} else {
 			// Start informer for CSIDrivers.
 			factory := csiapiinformer.NewSharedInformerFactory(csiClient, csiResyncPeriod)
-			p.csiDriverInformer = factory.Csi().V1alpha1().CSIDrivers()
+			p.csiDriverInformer = factory.Csi().V1beta1().CSIDrivers()
 			p.csiDriverLister = p.csiDriverInformer.Lister()
 			go factory.Start(wait.NeverStop)
 		}

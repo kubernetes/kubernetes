@@ -34,7 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	externalclientset "k8s.io/client-go/kubernetes"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/apis/csi/v1beta1"
 	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -410,18 +410,18 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	getNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
 		return func() error {
-			_, err := client.CsiV1alpha1().CSINodeInfos().Get("node1", metav1.GetOptions{})
+			_, err := client.CsiV1beta1().CSINodeInfos().Get("node1", metav1.GetOptions{})
 			return err
 		}
 	}
 	createNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
 		return func() error {
-			nodeInfo := &csiv1alpha1.CSINodeInfo{
+			nodeInfo := &csiv1beta1.CSINodeInfo{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
-				Spec: csiv1alpha1.CSINodeInfoSpec{
-					Drivers: []csiv1alpha1.CSIDriverInfoSpec{
+				Spec: csiv1beta1.CSINodeInfoSpec{
+					Drivers: []csiv1beta1.CSIDriverInfoSpec{
 						{
 							Name:         "com.example.csi/driver1",
 							NodeID:       "com.example.csi/node1",
@@ -429,41 +429,41 @@ func TestNodeAuthorizer(t *testing.T) {
 						},
 					},
 				},
-				Status: csiv1alpha1.CSINodeInfoStatus{
-					Drivers: []csiv1alpha1.CSIDriverInfoStatus{
+				Status: csiv1beta1.CSINodeInfoStatus{
+					Drivers: []csiv1beta1.CSIDriverInfoStatus{
 						{
 							Name:                  "com.example.csi/driver1",
 							Available:             true,
-							VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+							VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 						},
 					},
 				},
 			}
-			_, err := client.CsiV1alpha1().CSINodeInfos().Create(nodeInfo)
+			_, err := client.CsiV1beta1().CSINodeInfos().Create(nodeInfo)
 			return err
 		}
 	}
 	updateNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
 		return func() error {
-			nodeInfo, err := client.CsiV1alpha1().CSINodeInfos().Get("node1", metav1.GetOptions{})
+			nodeInfo, err := client.CsiV1beta1().CSINodeInfos().Get("node1", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			nodeInfo.Spec.Drivers = []csiv1alpha1.CSIDriverInfoSpec{
+			nodeInfo.Spec.Drivers = []csiv1beta1.CSIDriverInfoSpec{
 				{
 					Name:         "com.example.csi/driver1",
 					NodeID:       "com.example.csi/node1",
 					TopologyKeys: []string{"com.example.csi/rack"},
 				},
 			}
-			nodeInfo.Status.Drivers = []csiv1alpha1.CSIDriverInfoStatus{
+			nodeInfo.Status.Drivers = []csiv1beta1.CSIDriverInfoStatus{
 				{
 					Name:                  "com.example.csi/driver1",
 					Available:             true,
-					VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+					VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 				},
 			}
-			_, err = client.CsiV1alpha1().CSINodeInfos().Update(nodeInfo)
+			_, err = client.CsiV1beta1().CSINodeInfos().Update(nodeInfo)
 			return err
 		}
 	}
@@ -471,13 +471,13 @@ func TestNodeAuthorizer(t *testing.T) {
 		return func() error {
 			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage/driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
 			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
-			_, err := client.CsiV1alpha1().CSINodeInfos().Patch("node1", types.MergePatchType, bs)
+			_, err := client.CsiV1beta1().CSINodeInfos().Patch("node1", types.MergePatchType, bs)
 			return err
 		}
 	}
 	deleteNode1CSINodeInfo := func(client csiclientset.Interface) func() error {
 		return func() error {
-			return client.CsiV1alpha1().CSINodeInfos().Delete("node1", &metav1.DeleteOptions{})
+			return client.CsiV1beta1().CSINodeInfos().Delete("node1", &metav1.DeleteOptions{})
 		}
 	}
 

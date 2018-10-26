@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/apis/csi/v1beta1"
 	csifake "k8s.io/csi-api/pkg/client/clientset/versioned/fake"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -46,7 +46,7 @@ type testcase struct {
 	name                string
 	driverName          string
 	existingNode        *v1.Node
-	existingNodeInfo    *csiv1alpha1.CSINodeInfo
+	existingNodeInfo    *csiv1beta1.CSINodeInfo
 	inputNodeID         string
 	inputTopology       map[string]string
 	inputVolumeLimit    int64
@@ -1092,18 +1092,18 @@ func generateNode(nodeIDs, labels map[string]string, capacity map[v1.ResourceNam
 	return node
 }
 
-func generateNodeInfo(nodeIDs map[string]string, topologyKeys map[string][]string) *csiv1alpha1.CSINodeInfo {
-	driverInfoSpecs := []csiv1alpha1.CSIDriverInfoSpec{}
-	driverInfoStatuses := []csiv1alpha1.CSIDriverInfoStatus{}
+func generateNodeInfo(nodeIDs map[string]string, topologyKeys map[string][]string) *csiv1beta1.CSINodeInfo {
+	driverInfoSpecs := []csiv1beta1.CSIDriverInfoSpec{}
+	driverInfoStatuses := []csiv1beta1.CSIDriverInfoStatus{}
 	for k, nodeID := range nodeIDs {
-		dspec := csiv1alpha1.CSIDriverInfoSpec{
+		dspec := csiv1beta1.CSIDriverInfoSpec{
 			Name:   k,
 			NodeID: nodeID,
 		}
-		dstatus := csiv1alpha1.CSIDriverInfoStatus{
+		dstatus := csiv1beta1.CSIDriverInfoStatus{
 			Name:                  k,
 			Available:             true,
-			VolumePluginMechanism: csiv1alpha1.VolumePluginMechanismInTree,
+			VolumePluginMechanism: csiv1beta1.VolumePluginMechanismInTree,
 		}
 		if top, exists := topologyKeys[k]; exists {
 			dspec.TopologyKeys = top
@@ -1111,14 +1111,14 @@ func generateNodeInfo(nodeIDs map[string]string, topologyKeys map[string][]strin
 		driverInfoSpecs = append(driverInfoSpecs, dspec)
 		driverInfoStatuses = append(driverInfoStatuses, dstatus)
 	}
-	return &csiv1alpha1.CSINodeInfo{
+	return &csiv1beta1.CSINodeInfo{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
 		},
-		Spec: csiv1alpha1.CSINodeInfoSpec{
+		Spec: csiv1beta1.CSINodeInfoSpec{
 			Drivers: driverInfoSpecs,
 		},
-		Status: csiv1alpha1.CSINodeInfoStatus{
+		Status: csiv1beta1.CSINodeInfoStatus{
 			Drivers: driverInfoStatuses,
 		},
 	}

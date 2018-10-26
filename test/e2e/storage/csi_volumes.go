@@ -23,13 +23,13 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	csiv1beta1 "k8s.io/csi-api/pkg/apis/csi/v1beta1"
 	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
@@ -245,7 +245,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				if test.driverExists {
 					csiDriver := createCSIDriver(csics, testsuites.GetUniqueDriverName(driver), test.driverAttachable, nil)
 					if csiDriver != nil {
-						defer csics.CsiV1alpha1().CSIDrivers().Delete(csiDriver.Name, nil)
+						defer csics.CsiV1beta1().CSIDrivers().Delete(csiDriver.Name, nil)
 					}
 				}
 
@@ -366,7 +366,7 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 				if test.driverExists {
 					csiDriver := createCSIDriver(csics, testsuites.GetUniqueDriverName(driver), true, test.podInfoOnMountVersion)
 					if csiDriver != nil {
-						defer csics.CsiV1alpha1().CSIDrivers().Delete(csiDriver.Name, nil)
+						defer csics.CsiV1beta1().CSIDrivers().Delete(csiDriver.Name, nil)
 					}
 				}
 
@@ -464,18 +464,18 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	}
 }
 
-func createCSIDriver(csics csiclient.Interface, name string, attachable bool, podInfoOnMountVersion *string) *csiv1alpha1.CSIDriver {
+func createCSIDriver(csics csiclient.Interface, name string, attachable bool, podInfoOnMountVersion *string) *csiv1beta1.CSIDriver {
 	By("Creating CSIDriver instance")
-	driver := &csiv1alpha1.CSIDriver{
+	driver := &csiv1beta1.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: csiv1alpha1.CSIDriverSpec{
+		Spec: csiv1beta1.CSIDriverSpec{
 			AttachRequired:        &attachable,
 			PodInfoOnMountVersion: podInfoOnMountVersion,
 		},
 	}
-	driver, err := csics.CsiV1alpha1().CSIDrivers().Create(driver)
+	driver, err := csics.CsiV1beta1().CSIDrivers().Create(driver)
 	framework.ExpectNoError(err, "Failed to create CSIDriver: %v", err)
 	return driver
 }

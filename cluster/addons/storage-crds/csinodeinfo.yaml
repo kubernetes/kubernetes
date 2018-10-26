@@ -51,4 +51,11 @@ spec:
                       to use for any in-tree plugins replaced by this driver.
                     pattern: in-tree|csi
                     type: string
-  version: v1alpha1
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+  - name: v1alpha1
+    served: false
+    storage: false

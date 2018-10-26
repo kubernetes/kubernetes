@@ -25,4 +25,11 @@ spec:
               description: Indicates this CSI volume driver requires additional pod
                 information (like podName, podUID, etc.) during mount operations.
               type: string
-  version: v1alpha1
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+  - name: v1alpha1
+    served: false
+    storage: false
