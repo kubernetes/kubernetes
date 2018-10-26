@@ -1,3 +1,4 @@
+# To prevent accidental injection into istio-system.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -6,6 +7,81 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     istio-injection: disabled
+---
+
+# Prometheus recording rules to translate metrics to StackDriver format.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: prometheus
+    chart: prometheus-1.0.3
+    release: istio
+    heritage: Tiller
+data:
+  rules.yml: |-
+    groups:
+    - name: recording_rules
+      rules:
+        - record: pilot_config_push_latency
+          expr: pilot_proxy_convergence_time_bucket
+        - record: pilot_xds_push_timeouts
+          expr: pilot_xds_push_timeout_failures
+        - record: pilot_errors_xds
+          expr: >
+            pilot_duplicate_envoy_clusters + pilot_eds_no_instances + pilot_invalid_out_listeners
+            + pilot_total_xds_internal_errors + pilot_total_xds_rejects
+        - record: pilot_errors_internal
+          expr: pilot_total_internal_errors
+        - record: envoy_cx_errors
+          expr: >
+            envoy_cluster_upstream_cx_connect_attempts_exceeded + envoy_cluster_upstream_cx_protocol_error
+            + envoy_cluster_downstream_cx_connect_attempts_exceeded + envoy_cluster_downstream_cx_protocol_error
+        - record: envoy_cx_timeouts
+          expr: envoy_cluster_upstream_cx_connect_timeout + envoy_cluster_downstream_cx_connect_timeout
+        - record: envoy_rq_latency
+          expr: envoy_http_downstream_rq_time
+---
+# Prometheus recording rules to translate metrics to StackDriver format.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-sidecar
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: prometheus
+    chart: prometheus-1.0.3
+    release: istio
+    heritage: Tiller
+data:
+  sidecar.yml: |-
+    static_metadata:
+    - metric: pilot_xds_pushes
+      type: counter
+    - metric: pilot_config_push_latency
+      type: histogram
+    - metric: pilot_xds_push_timeouts
+      type: counter
+    - metric: pilot_errors_xds
+      type: counter
+    - metric: pilot_errors_internal
+      type: counter
+    - metric: envoy_cx_errors
+      type: counter
+    - metric: envoy_cx_timeouts
+      type: counter
+    - metric: envoy_rq_latency
+      type: histogram
+    - metric: envoy_cx_count
+      type: counter
+    - metric: envoy_rq_count
+      type: counter
 ---
 # Source: istio/charts/galley/templates/configmap.yaml
 apiVersion: v1
@@ -17,7 +93,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.2
+    chart: galley-1.0.3
     release: istio
     heritage: Tiller
     istio: mixer
@@ -30,7 +106,7 @@ data:
       namespace: istio-system
       labels:
         app: istio-galley
-        chart: galley-1.0.2
+        chart: galley-1.0.3
         release: istio
         heritage: Tiller
     webhooks:
@@ -83,8 +159,7 @@ data:
             - destinationrules
             - envoyfilters
             - gateways
-            # disabled per @costinm's request
-            # - serviceentries
+            - serviceentries
             - virtualservices
         failurePolicy: Fail
       - name: mixer.validation.istio.io
@@ -118,6 +193,8 @@ data:
             - servicecontrols
             - solarwindses
             - stackdrivers
+            - cloudwatches
+            - dogstatsds
             - statsds
             - stdios
             - apikeys
@@ -145,7 +222,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-statsd-prom-bridge
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     release: istio
     heritage: Tiller
     istio: mixer
@@ -163,31 +240,18 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: prometheus
-    chart: prometheus-1.0.2
+    chart: prometheus-1.0.3
     release: istio
     heritage: Tiller
 data:
   prometheus.yml: |-
     global:
       scrape_interval: 15s
+    rule_files:
+    - '/etc/prometheus-rules/rules.yml'
+
     scrape_configs:
-
-    - job_name: 'istio-mesh'
-      # Override the global default and scrape targets from this job every 5 seconds.
-      scrape_interval: 5s
-
-      kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names:
-          - istio-system
-
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-        action: keep
-        regex: istio-telemetry;prometheus
-
-    - job_name: 'envoy'
+    - job_name: 'pilot'
       # Override the global default and scrape targets from this job every 5 seconds.
       scrape_interval: 5s
       # metrics_path defaults to '/metrics'
@@ -202,7 +266,88 @@ data:
       relabel_configs:
       - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
         action: keep
-        regex: istio-statsd-prom-bridge;statsd-prom
+        regex: istio-pilot;http-monitoring
+
+    # Scrape config for envoy stats
+    - job_name: 'envoy-stats'
+      metrics_path: /stats/prometheus
+      kubernetes_sd_configs:
+      - role: pod
+
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: '.*-envoy-prom'
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:15090
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod_name
+
+      metric_relabel_configs:
+      # Exclude some of the envoy metrics that have massive cardinality
+      # This list may need to be pruned further moving forward, as informed
+      # by performance and scalability testing.
+      - source_labels: [ cluster_name ]
+        regex: '(outbound|inbound|prometheus_stats).*'
+        action: drop
+      - source_labels: [ tcp_prefix ]
+        regex: '(outbound|inbound|prometheus_stats).*'
+        action: drop
+      - source_labels: [ listener_address ]
+        regex: '(.+)'
+        action: drop
+      - source_labels: [ http_conn_manager_listener_prefix ]
+        regex: '(.+)'
+        action: drop
+      - source_labels: [ http_conn_manager_prefix ]
+        regex: '(.+)'
+        action: drop
+      - source_labels: [ __name__ ]
+        regex: 'envoy_tls.*'
+        action: drop
+      - source_labels: [ __name__ ]
+        regex: 'envoy_tcp_downstream.*'
+        action: drop
+      - source_labels: [ __name__ ]
+        regex: 'envoy_http_(stats|admin).*'
+        action: drop
+      - source_labels: [ __name__ ]
+        regex: 'envoy_cluster_(lb|retry|bind|internal|max|original).*'
+        action: drop
+      # Rename/relabel for internal metrics
+      - source_labels: [ __name__ ]
+        regex: 'envoy_cluster_(upstream|downstream)_rq_total'
+        replacement: '${1}'
+        target_label: direction
+      - source_labels: [ __name__ ]
+        regex: 'envoy_cluster_(upstream|downstream)_rq_total'
+        replacement: 'envoy_rq_count'
+        target_label: __name__
+      - source_labels: [ __name__ ]
+        regex: 'envoy_cluster_(upstream|downstream)_cx_total'
+        replacement: '${1}'
+        target_label: direction
+      - source_labels: [ __name__ ]
+        regex: 'envoy_cluster_(upstream|downstream)_cx_total'
+        replacement: 'envoy_cx_count'
+        target_label: __name__
+      - source_labels: [ __name__ ]
+        regex: 'envoy_cluster_(upstream|downstream)_rq_timeout'
+        replacement: '${1}'
+        target_label: direction
+      - source_labels: [ __name__ ]
+        regex: 'envoy_cluster_(upstream|downstream)_rq_timeout'
+        replacement: 'envoy_rq_timeouts'
+        target_label: __name__
 
     - job_name: 'istio-policy'
       # Override the global default and scrape targets from this job every 5 seconds.
@@ -239,162 +384,6 @@ data:
         action: keep
         regex: istio-telemetry;http-monitoring
 
-    - job_name: 'pilot'
-      # Override the global default and scrape targets from this job every 5 seconds.
-      scrape_interval: 5s
-      # metrics_path defaults to '/metrics'
-      # scheme defaults to 'http'.
-
-      kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names:
-          - istio-system
-
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-        action: keep
-        regex: istio-pilot;http-monitoring
-
-    - job_name: 'galley'
-      # Override the global default and scrape targets from this job every 5 seconds.
-      scrape_interval: 5s
-      # metrics_path defaults to '/metrics'
-      # scheme defaults to 'http'.
-
-      kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names:
-          - istio-system
-
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-        action: keep
-        regex: istio-galley;http-monitoring
-
-    # scrape config for API servers
-    - job_name: 'kubernetes-apiservers'
-      kubernetes_sd_configs:
-      - role: endpoints
-        namespaces:
-          names:
-          - default
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
-        action: keep
-        regex: kubernetes;https
-
-    # scrape config for nodes (kubelet)
-    - job_name: 'kubernetes-nodes'
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      kubernetes_sd_configs:
-      - role: node
-      relabel_configs:
-      - action: labelmap
-        regex: __meta_kubernetes_node_label_(.+)
-      - target_label: __address__
-        replacement: kubernetes.default.svc:443
-      - source_labels: [__meta_kubernetes_node_name]
-        regex: (.+)
-        target_label: __metrics_path__
-        replacement: /api/v1/nodes/${1}/proxy/metrics
-
-    # Scrape config for Kubelet cAdvisor.
-    #
-    # This is required for Kubernetes 1.7.3 and later, where cAdvisor metrics
-    # (those whose names begin with 'container_') have been removed from the
-    # Kubelet metrics endpoint.  This job scrapes the cAdvisor endpoint to
-    # retrieve those metrics.
-    #
-    # In Kubernetes 1.7.0-1.7.2, these metrics are only exposed on the cAdvisor
-    # HTTP endpoint; use "replacement: /api/v1/nodes/${1}:4194/proxy/metrics"
-    # in that case (and ensure cAdvisor's HTTP server hasn't been disabled with
-    # the --cadvisor-port=0 Kubelet flag).
-    #
-    # This job is not necessary and should be removed in Kubernetes 1.6 and
-    # earlier versions, or it will cause the metrics to be scraped twice.
-    - job_name: 'kubernetes-cadvisor'
-      scheme: https
-      tls_config:
-        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      kubernetes_sd_configs:
-      - role: node
-      relabel_configs:
-      - action: labelmap
-        regex: __meta_kubernetes_node_label_(.+)
-      - target_label: __address__
-        replacement: kubernetes.default.svc:443
-      - source_labels: [__meta_kubernetes_node_name]
-        regex: (.+)
-        target_label: __metrics_path__
-        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
-
-    # scrape config for service endpoints.
-    - job_name: 'kubernetes-service-endpoints'
-      kubernetes_sd_configs:
-      - role: endpoints
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
-        action: keep
-        regex: true
-      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
-        action: replace
-        target_label: __scheme__
-        regex: (https?)
-      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
-        action: replace
-        target_label: __metrics_path__
-        regex: (.+)
-      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
-        action: replace
-        target_label: __address__
-        regex: ([^:]+)(?::\d+)?;(\d+)
-        replacement: $1:$2
-      - action: labelmap
-        regex: __meta_kubernetes_service_label_(.+)
-      - source_labels: [__meta_kubernetes_namespace]
-        action: replace
-        target_label: kubernetes_namespace
-      - source_labels: [__meta_kubernetes_service_name]
-        action: replace
-        target_label: kubernetes_name
-
-    # Example scrape config for pods
-    - job_name: 'kubernetes-pods'
-      kubernetes_sd_configs:
-      - role: pod
-
-      relabel_configs:
-      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
-        action: keep
-        regex: true
-      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
-        action: replace
-        target_label: __metrics_path__
-        regex: (.+)
-      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
-        action: replace
-        regex: ([^:]+)(?::\d+)?;(\d+)
-        replacement: $1:$2
-        target_label: __address__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - source_labels: [__meta_kubernetes_namespace]
-        action: replace
-        target_label: namespace
-      - source_labels: [__meta_kubernetes_pod_name]
-        action: replace
-        target_label: pod_name
-
 ---
 # Source: istio/charts/security/templates/configmap.yaml
 apiVersion: v1
@@ -406,12 +395,26 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-security
-    chart: security-1.0.2
+    chart: security-1.0.3
     release: istio
     heritage: Tiller
     istio: security
 data:
-  custom-resources.yaml: |-
+  custom-resources.yaml: |-    
+    # Authentication policy to enable permissive mode for all services (that have sidecar) in the mesh.
+    apiVersion: "authentication.istio.io/v1alpha1"
+    kind: "MeshPolicy"
+    metadata:
+      name: "default"
+      labels:
+        app: istio-security
+        chart: security-1.0.3
+        release: istio
+        heritage: Tiller
+    spec:
+      peers:
+      - mtls:
+          mode: PERMISSIVE
   run.sh: |-    
     #!/bin/sh
     
@@ -457,7 +460,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio
-    chart: istio-1.0.2
+    chart: istio-1.0.3
     release: istio
     heritage: Tiller
 data:
@@ -475,6 +478,10 @@ data:
     # Deprecated: mixer is using EDS
     mixerCheckServer: istio-policy.istio-system.svc.cluster.local:9091
     mixerReportServer: istio-telemetry.istio-system.svc.cluster.local:9091
+
+    # policyCheckFailOpen allows traffic in cases when the mixer policy service cannot be reached.
+    # Default is false which means the traffic is denied when the client is unable to connect to Mixer.
+    policyCheckFailOpen: false
 
     # Unix Domain Socket through which envoy communicates with NodeAgent SDS to get
     # key/cert for mTLS. Use secret-mount files instead of SDS if set to empty. 
@@ -528,9 +535,6 @@ data:
       # Zipkin trace collector
       zipkinAddress: zipkin.istio-system:9411
       #
-      # Statsd metrics collector converts statsd metrics into Prometheus metrics.
-      statsdUdpAddress: istio-statsd-prom-bridge.istio-system:9125
-      #
       # Mutual TLS authentication between sidecars and istio control plane.
       controlPlaneAuthPolicy: NONE
       #
@@ -549,7 +553,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio
-    chart: istio-1.0.2
+    chart: istio-1.0.3
     release: istio
     heritage: Tiller
     istio: sidecar-injector
@@ -559,51 +563,38 @@ data:
     template: |-
       initContainers:
       - name: istio-init
-        image: "gcr.io/gke-release/istio/proxy_init:1.0.2-gke.0"
+        image: "gcr.io/gke-release/istio/proxy_init:1.0.3-gke.0"
         args:
         - "-p"
         - [[ .MeshConfig.ProxyListenPort ]]
         - "-u"
         - 1337
         - "-m"
-        - [[ or (index .ObjectMeta.Annotations "sidecar.istio.io/interceptionMode") .ProxyConfig.InterceptionMode.String ]]
+        - [[ annotation .ObjectMeta `sidecar.istio.io/interceptionMode` .ProxyConfig.InterceptionMode ]]
         - "-i"
-        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeOutboundIPRanges") -]]
-        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeOutboundIPRanges"  ]]"
-        [[ else -]]
-        - "*"
-        [[ end -]]
+        - "[[ annotation .ObjectMeta `traffic.sidecar.istio.io/includeOutboundIPRanges`  "*"  ]]"
         - "-x"
-        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeOutboundIPRanges") -]]
-        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeOutboundIPRanges"  ]]"
-        [[ else -]]
-        - ""
-        [[ end -]]
+        - "[[ annotation .ObjectMeta `traffic.sidecar.istio.io/excludeOutboundIPRanges`  ""  ]]"
         - "-b"
-        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeInboundPorts") -]]
-        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/includeInboundPorts"  ]]"
-        [[ else -]]
-        - [[ range .Spec.Containers -]][[ range .Ports -]][[ .ContainerPort -]], [[ end -]][[ end -]][[ end]]
+        - "[[ annotation .ObjectMeta `traffic.sidecar.istio.io/includeInboundPorts` (includeInboundPorts .Spec.Containers) ]]"
         - "-d"
-        [[ if (isset .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeInboundPorts") -]]
-        - "[[ index .ObjectMeta.Annotations "traffic.sidecar.istio.io/excludeInboundPorts" ]]"
-        [[ else -]]
-        - ""
-        [[ end -]]
+        - "[[ excludeInboundPort (annotation .ObjectMeta `status.sidecar.istio.io/port`  0 ) (annotation .ObjectMeta `traffic.sidecar.istio.io/excludeInboundPorts`  "" ) ]]"
         imagePullPolicy: IfNotPresent
         securityContext:
           capabilities:
             add:
             - NET_ADMIN
-          restartPolicy: Always
-      
+          privileged: true
+        restartPolicy: Always
       containers:
       - name: istio-proxy
-        image: [[ if (isset .ObjectMeta.Annotations "sidecar.istio.io/proxyImage") -]]
-        "[[ index .ObjectMeta.Annotations "sidecar.istio.io/proxyImage" ]]"
-        [[ else -]]
-         "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
-        [[ end -]]
+        image: [[ annotation .ObjectMeta `sidecar.istio.io/proxyImage`  "docker.io/istio/proxyv2:1.0.3"  ]]
+
+        ports:
+        - containerPort: 15090
+          protocol: TCP
+          name: http-envoy-prom
+
         args:
         - proxy
         - sidecar
@@ -629,8 +620,6 @@ data:
         - [[ .ProxyConfig.ZipkinAddress ]]
         - --connectTimeout
         - [[ formatDuration .ProxyConfig.ConnectTimeout ]]
-        - --statsdUdpAddress
-        - [[ .ProxyConfig.StatsdUdpAddress ]]
         - --proxyAdminPort
         - [[ .ProxyConfig.ProxyAdminPort ]]
         [[ if gt .ProxyConfig.Concurrency 0 -]]
@@ -638,7 +627,13 @@ data:
         - [[ .ProxyConfig.Concurrency ]]
         [[ end -]]
         - --controlPlaneAuthPolicy
-        - [[ or (index .ObjectMeta.Annotations "sidecar.istio.io/controlPlaneAuthPolicy") .ProxyConfig.ControlPlaneAuthPolicy ]]
+        - [[ annotation .ObjectMeta `sidecar.istio.io/controlPlaneAuthPolicy` .ProxyConfig.ControlPlaneAuthPolicy ]]
+      [[- if (ne (annotation .ObjectMeta `status.sidecar.istio.io/port`  0 ) "0") ]]
+        - --statusPort
+        - [[ annotation .ObjectMeta `status.sidecar.istio.io/port`  0  ]]
+        - --applicationPorts
+        - "[[ annotation .ObjectMeta `readiness.status.sidecar.istio.io/applicationPorts` (applicationPorts .Spec.Containers) ]]"
+      [[- end ]]
         env:
         - name: POD_NAME
           valueFrom:
@@ -658,10 +653,28 @@ data:
               fieldPath: metadata.name
         - name: ISTIO_META_INTERCEPTION_MODE
           value: [[ or (index .ObjectMeta.Annotations "sidecar.istio.io/interceptionMode") .ProxyConfig.InterceptionMode.String ]]
+        [[ if .ObjectMeta.Annotations ]]
+        - name: ISTIO_METAJSON_ANNOTATIONS
+          value: |
+                 [[ toJson .ObjectMeta.Annotations ]]
+        [[ end ]]
+        [[ range $k,$v := .ObjectMeta.Labels ]]
+        - name: ISTIO_META_[[ $k ]]
+          value: "[[ $v ]]"
+        [[ end ]]
         imagePullPolicy: IfNotPresent
-        securityContext:
+        [[ if (ne (annotation .ObjectMeta `status.sidecar.istio.io/port`  0 ) "0") ]]
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: [[ annotation .ObjectMeta `status.sidecar.istio.io/port`  0  ]]
+          initialDelaySeconds: [[ annotation .ObjectMeta `readiness.status.sidecar.istio.io/initialDelaySeconds`  1  ]]
+          periodSeconds: [[ annotation .ObjectMeta `readiness.status.sidecar.istio.io/periodSeconds`  2  ]]
+          failureThreshold: [[ annotation .ObjectMeta `readiness.status.sidecar.istio.io/failureThreshold`  30  ]]
+        [[ end -]]securityContext:
+          
           readOnlyRootFilesystem: true
-          [[ if eq (or (index .ObjectMeta.Annotations "sidecar.istio.io/interceptionMode") .ProxyConfig.InterceptionMode.String) "TPROXY" -]]
+          [[ if eq (annotation .ObjectMeta `sidecar.istio.io/interceptionMode` .ProxyConfig.InterceptionMode) "TPROXY" -]]
           capabilities:
             add:
             - NET_ADMIN
@@ -671,10 +684,10 @@ data:
           [[ end -]]
         restartPolicy: Always
         resources:
-          [[ if (isset .ObjectMeta.Annotations "sidecar.istio.io/proxyCPU") -]]
+          [[ if (isset .ObjectMeta.Annotations `sidecar.istio.io/proxyCPU`) -]]
           requests:
-            cpu: "[[ index .ObjectMeta.Annotations "sidecar.istio.io/proxyCPU" ]]"
-            memory: "[[ index .ObjectMeta.Annotations "sidecar.istio.io/proxyMemory" ]]"
+            cpu: "[[ index .ObjectMeta.Annotations `sidecar.istio.io/proxyCPU` ]]"
+            memory: "[[ index .ObjectMeta.Annotations `sidecar.istio.io/proxyMemory` ]]"
         [[ else -]]
           requests:
             cpu: 10m
@@ -710,7 +723,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.2
+    chart: galley-1.0.3
     heritage: Tiller
     release: istio
 
@@ -726,7 +739,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: egressgateway
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     heritage: Tiller
     release: istio
 ---
@@ -739,7 +752,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: ingressgateway
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     heritage: Tiller
     release: istio
 ---
@@ -755,7 +768,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     heritage: Tiller
     release: istio
 
@@ -770,7 +783,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.2
+    chart: pilot-1.0.3
     heritage: Tiller
     release: istio
 
@@ -784,6 +797,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
+
 ---
 # Source: istio/charts/security/templates/cleanup-secrets.yaml
 # The reason for creating a ServiceAccount and ClusterRole specifically for this
@@ -808,7 +822,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     heritage: Tiller
     release: istio
 ---
@@ -824,7 +838,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     heritage: Tiller
     release: istio
 rules:
@@ -844,7 +858,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     heritage: Tiller
     release: istio
 roleRef:
@@ -869,7 +883,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     release: istio
     heritage: Tiller
 spec:
@@ -896,6 +910,104 @@ spec:
       restartPolicy: OnFailure
 
 ---
+# Source: istio/charts/security/templates/create-custom-resources-job.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istio-security-post-install-account
+  namespace: istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-security
+    chart: security-1.0.3
+    heritage: Tiller
+    release: istio
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: istio-security-post-install-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-security
+    chart: security-1.0.3
+    heritage: Tiller
+    release: istio
+rules:
+- apiGroups: ["authentication.istio.io"] # needed to create default authn policy
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["networking.istio.io"] # needed to create security destination rules
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingwebhookconfigurations"]
+  verbs: ["get"]
+- apiGroups: ["extensions"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-security-post-install-role-binding-istio-system
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-security
+    chart: security-1.0.3
+    heritage: Tiller
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-security-post-install-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istio-security-post-install-account
+    namespace: istio-system
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: istio-security-post-install
+  namespace: istio-system
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-delete-policy": hook-succeeded
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: istio-security
+    chart: security-1.0.3
+    release: istio
+    heritage: Tiller
+spec:
+  template:
+    metadata:
+      name: istio-security-post-install
+      labels:
+        app: istio-security
+        release: istio
+    spec:
+      serviceAccountName: istio-security-post-install-account
+      containers:
+        - name: hyperkube
+          image: "gcr.io/gke-release/istio/coreos/hyperkube:v1.7.6_coreos.0"
+          command: [ "/bin/bash", "/tmp/security/run.sh", "/tmp/security/custom-resources.yaml" ]
+          volumeMounts:
+            - mountPath: "/tmp/security"
+              name: tmp-configmap-security
+      volumes:
+        - name: tmp-configmap-security
+          configMap:
+            name: istio-security-custom-resources
+      restartPolicy: OnFailure
+
+---
 # Source: istio/charts/security/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -906,7 +1018,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     heritage: Tiller
     release: istio
 
@@ -921,7 +1033,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.2
+    chart: sidecarInjectorWebhook-1.0.3
     heritage: Tiller
     release: istio
 
@@ -1586,6 +1698,56 @@ spec:
 kind: CustomResourceDefinition
 apiVersion: apiextensions.k8s.io/v1beta1
 metadata:
+  name: cloudwatches.config.istio.io
+  annotations:
+    "helm.sh/hook": crd-install
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: cloudwatch
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: cloudwatch
+    plural: cloudwatches
+    singular: cloudwatch
+    categories:
+    - istio-io
+    - policy-istio-io
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
+  name: dogstatsds.config.istio.io
+  annotations:
+    "helm.sh/hook": crd-install
+  labels:
+    k8s-app: istio
+    addonmanager.kubernetes.io/mode: Reconcile
+    app: mixer
+    package: dogstatsd
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: dogstatsd
+    plural: dogstatsds
+    singular: dogstatsd
+    categories:
+    - istio-io
+    - policy-istio-io
+  scope: Namespaced
+  version: v1alpha2
+---
+
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1beta1
+metadata:
   name: statsds.config.istio.io
   annotations:
     "helm.sh/hook": crd-install
@@ -2115,7 +2277,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.2
+    chart: galley-1.0.3
     heritage: Tiller
     release: istio
 rules:
@@ -2144,7 +2306,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: gateways
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     heritage: Tiller
     release: istio
   name: istio-egressgateway-istio-system
@@ -2160,7 +2322,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: gateways
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     heritage: Tiller
     release: istio
   name: istio-ingressgateway-istio-system
@@ -2180,7 +2342,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     heritage: Tiller
     release: istio
 rules:
@@ -2194,7 +2356,7 @@ rules:
   resources: ["customresourcedefinitions"]
   verbs: ["get", "list", "watch"]
 - apiGroups: [""]
-  resources: ["configmaps", "endpoints", "pods", "services", "namespaces", "secrets"]
+  resources: ["configmaps", "endpoints", "pods", "services", "namespaces", "secrets", "replicationcontrollers"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["extensions"]
   resources: ["replicasets"]
@@ -2213,7 +2375,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.2
+    chart: pilot-1.0.3
     heritage: Tiller
     release: istio
 rules:
@@ -2280,7 +2442,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     heritage: Tiller
     release: istio
 rules:
@@ -2304,7 +2466,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.2
+    chart: sidecarInjectorWebhook-1.0.3
     heritage: Tiller
     release: istio
 rules:
@@ -2325,7 +2487,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-galley
-    chart: galley-1.0.2
+    chart: galley-1.0.3
     heritage: Tiller
     release: istio
 roleRef:
@@ -2383,7 +2545,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: mixer
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     heritage: Tiller
     release: istio
 roleRef:
@@ -2405,7 +2567,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.2
+    chart: pilot-1.0.3
     heritage: Tiller
     release: istio
 roleRef:
@@ -2445,7 +2607,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     heritage: Tiller
     release: istio
 roleRef:
@@ -2467,7 +2629,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.2
+    chart: sidecarInjectorWebhook-1.0.3
     heritage: Tiller
     release: istio
 roleRef:
@@ -2513,7 +2675,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     release: istio
     heritage: Tiller
     app: istio-egressgateway
@@ -2541,7 +2703,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     release: istio
     heritage: Tiller
     app: istio-ingressgateway
@@ -2599,7 +2761,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     release: istio
     istio: mixer
 spec:
@@ -2623,7 +2785,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     release: istio
     istio: mixer
 spec:
@@ -2642,77 +2804,6 @@ spec:
 ---
 
 ---
-# Source: istio/charts/mixer/templates/statsdtoprom.yaml
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: istio-statsd-prom-bridge
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    kubernetes.io/cluster-service: "true"
-    chart: mixer-1.0.2
-    release: istio
-    istio: statsd-prom-bridge
-spec:
-  ports:
-  - name: statsd-prom
-    port: 9102
-  - name: statsd-udp
-    port: 9125
-    protocol: UDP
-  selector:
-    istio: statsd-prom-bridge
-
----
-
-apiVersion: extensions/v1beta1
-kind: Deployment
-metadata:
-  name: istio-statsd-prom-bridge
-  namespace: istio-system
-  labels:
-    k8s-app: istio
-    addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.2
-    release: istio
-    istio: mixer
-spec:
-  template:
-    metadata:
-      labels:
-        istio: statsd-prom-bridge
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
-        sidecar.istio.io/inject: "false"
-    spec:
-      serviceAccountName: istio-mixer-service-account
-      volumes:
-      - name: config-volume
-        configMap:
-          name: istio-statsd-prom-bridge
-      containers:
-      - name: statsd-prom-bridge
-        image: "gcr.io/gke-release/istio/prom/statsd-exporter:v0.6.0"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 9102
-        - containerPort: 9125
-          protocol: UDP
-        args:
-        - '-statsd.mapping-config=/etc/statsd/mapping.conf'
-        resources:
-          requests:
-            cpu: 10m
-          
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/statsd
-
----
 # Source: istio/charts/pilot/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -2724,7 +2815,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/cluster-service: "true"
     app: istio-pilot
-    chart: pilot-1.0.2
+    chart: pilot-1.0.3
     release: istio
     heritage: Tiller
 spec:
@@ -2816,7 +2907,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: galley
-    chart: galley-1.0.2
+    chart: galley-1.0.3
     release: istio
     heritage: Tiller
     istio: galley
@@ -2837,7 +2928,7 @@ spec:
       serviceAccountName: istio-galley-service-account
       containers:
         - name: validator
-          image: "gcr.io/gke-release/istio/galley:1.0.2-gke.0"
+          image: "gcr.io/gke-release/istio/galley:1.0.3-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 443
@@ -2934,7 +3025,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     release: istio
     heritage: Tiller
     app: istio-egressgateway
@@ -2953,11 +3044,16 @@ spec:
       serviceAccountName: istio-egressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
             - containerPort: 443
+
+            - containerPort: 15090
+              protocol: TCP
+              name: http-envoy-prom
+
           args:
           - proxy
           - router
@@ -2975,8 +3071,6 @@ spec:
           - istio-egressgateway
           - --zipkinAddress
           - zipkin:9411
-          - --statsdUdpAddress
-          - istio-statsd-prom-bridge:9125
           - --proxyAdminPort
           - "15000"
           - --controlPlaneAuthPolicy
@@ -3072,7 +3166,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: gateways-1.0.2
+    chart: gateways-1.0.3
     release: istio
     heritage: Tiller
     app: istio-ingressgateway
@@ -3091,7 +3185,7 @@ spec:
       serviceAccountName: istio-ingressgateway-service-account
       containers:
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -3102,6 +3196,11 @@ spec:
             - containerPort: 853
             - containerPort: 15030
             - containerPort: 15031
+
+            - containerPort: 15090
+              protocol: TCP
+              name: http-envoy-prom
+
           args:
           - proxy
           - router
@@ -3119,8 +3218,6 @@ spec:
           - istio-ingressgateway
           - --zipkinAddress
           - zipkin:9411
-          - --statsdUdpAddress
-          - istio-statsd-prom-bridge:9125
           - --proxyAdminPort
           - "15000"
           - --controlPlaneAuthPolicy
@@ -3220,7 +3317,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     release: istio
     istio: mixer
 spec:
@@ -3278,7 +3375,7 @@ spec:
                 - s390x
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.2-gke.0"
+        image: "gcr.io/gke-release/istio/mixer:1.0.3-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -3289,6 +3386,9 @@ spec:
           - --configStoreURL=k8s://
           - --configDefaultNamespace=istio-system
           - --trace_zipkin_url=http://zipkin:9411/api/v1/spans
+        env:
+        - name: GODEBUG
+          value: "gctrace=2"
         resources:
           requests:
             cpu: 10m
@@ -3303,11 +3403,17 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
         - containerPort: 15004
+
+        ports:
+        - containerPort: 15090
+          protocol: TCP
+          name: http-envoy-prom
+
         args:
         - proxy
         - --serviceCluster
@@ -3352,7 +3458,7 @@ metadata:
   labels:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
-    chart: mixer-1.0.2
+    chart: mixer-1.0.3
     release: istio
     istio: mixer
 spec:
@@ -3377,7 +3483,7 @@ spec:
         emptyDir: {}
       containers:
       - name: mixer
-        image: "gcr.io/gke-release/istio/mixer:1.0.2-gke.0"
+        image: "gcr.io/gke-release/istio/mixer:1.0.3-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9093
@@ -3388,6 +3494,9 @@ spec:
           - --configStoreURL=k8s://
           - --configDefaultNamespace=istio-system
           - --trace_zipkin_url=http://zipkin:9411/api/v1/spans
+        env:
+        - name: GODEBUG
+          value: "gctrace=2"
         resources:
           requests:
             cpu: 10m
@@ -3402,11 +3511,17 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 5
       - name: istio-proxy
-        image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
+        image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.0"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9091
         - containerPort: 15004
+
+        ports:
+        - containerPort: 15090
+          protocol: TCP
+          name: http-envoy-prom
+
         args:
         - proxy
         - --serviceCluster
@@ -3456,7 +3571,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-pilot
-    chart: pilot-1.0.2
+    chart: pilot-1.0.3
     release: istio
     heritage: Tiller
     istio: pilot
@@ -3476,7 +3591,7 @@ spec:
       serviceAccountName: istio-pilot-service-account
       containers:
         - name: discovery
-          image: "gcr.io/gke-release/istio/pilot:1.0.2-gke.0"
+          image: "gcr.io/gke-release/istio/pilot:1.0.3-gke.0"
           imagePullPolicy: IfNotPresent
           args:
           - "discovery"
@@ -3508,7 +3623,7 @@ spec:
           - name: PILOT_PUSH_THROTTLE_COUNT
             value: "100"
           - name: PILOT_TRACE_SAMPLING
-            value: "100"
+            value: "1"
           resources:
             requests:
               cpu: 500m
@@ -3521,7 +3636,7 @@ spec:
             mountPath: /etc/certs
             readOnly: true
         - name: istio-proxy
-          image: "gcr.io/gke-release/istio/proxyv2:1.0.2-gke.0"
+          image: "gcr.io/gke-release/istio/proxyv2:1.0.3-gke.0"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 15003
@@ -3614,7 +3729,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: prometheus
-    chart: prometheus-1.0.2
+    chart: prometheus-1.0.3
     release: istio
     heritage: Tiller
 spec:
@@ -3632,35 +3747,99 @@ spec:
     spec:
       serviceAccountName: prometheus
       containers:
-        - name: prometheus
-          image: "gcr.io/gke-release/istio/prom/prometheus:v2.3.1"
-          imagePullPolicy: IfNotPresent
-          args:
-            - '--storage.tsdb.retention=6h'
-            - '--config.file=/etc/prometheus/prometheus.yml'
-          ports:
-            - containerPort: 9090
-              name: http
-          livenessProbe:
-            httpGet:
-              path: /-/healthy
-              port: 9090
-          readinessProbe:
-            httpGet:
-              path: /-/ready
-              port: 9090
-          resources:
-            requests:
-              cpu: 10m
-            
-          volumeMounts:
-          - name: config-volume
-            mountPath: /etc/prometheus
+      - args:
+        - --prometheus.wal-directory=/data/wal
+        - --stackdriver.project-id=
+        - --stackdriver.kubernetes.location=
+        - --stackdriver.kubernetes.cluster-name=
+        - --stackdriver.use-gke-resource
+        - --stackdriver.metrics-prefix=container.googleapis.com/internal/addons/istio
+        - --config-file=/etc/prometheus-sidecar/sidecar.yml
+        - --filter=__name__=~"^(pilot_xds_pushes|pilot_xds_push_timeouts|pilot_errors_xds|pilot_errors_internal|envoy_cx_errors|envoy_cx_timeouts|envoy_cx_count|envoy_rq_count)$"
+        image: gcr.io/istio-release/stackdriver-prometheus-sidecar:0.1
+        env:
+        - name: DEBUG
+          value: "1"
+        imagePullPolicy: Always
+        name: sidecar
+        ports:
+        - containerPort: 9091
+          name: sidecar
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /data
+          name: data-volume
+        - mountPath: /etc/prometheus-sidecar
+          name: static-config-volume
+      - args:
+        - --storage.tsdb.retention=6h
+        - --storage.tsdb.path=/data
+        - --storage.tsdb.min-block-duration=15m
+        - --storage.tsdb.max-block-duration=4h
+        - --config.file=/etc/prometheus/prometheus.yml
+        image: quay.io/prometheus/prometheus:v2.4.3
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /-/healthy
+            port: 9090
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: prometheus
+        ports:
+        - containerPort: 9090
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /-/ready
+            port: 9090
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 10m
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/prometheus
+          name: config-volume
+        - mountPath: /etc/prometheus-rules
+          name: rules-config-volume
+        - mountPath: /etc/istio-certs
+          name: istio-certs
+        - mountPath: /data
+          name: data-volume
       volumes:
-      - name: config-volume
-        configMap:
+      - configMap:
+          defaultMode: 420
           name: prometheus
-      affinity:      
+        name: config-volume
+      - configMap:
+          defaultMode: 420
+          name: prometheus-rules
+        name: rules-config-volume
+      - emptyDir: {}
+        name: data-volume
+      - configMap:
+          defaultMode: 420
+          name: prometheus-sidecar
+        name: static-config-volume
+      - name: istio-certs
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: istio.default
+      affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -3706,7 +3885,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: security
-    chart: security-1.0.2
+    chart: security-1.0.3
     release: istio
     heritage: Tiller
     istio: citadel
@@ -3723,7 +3902,7 @@ spec:
       serviceAccountName: istio-citadel-service-account
       containers:
         - name: citadel
-          image: "gcr.io/gke-release/istio/citadel:1.0.2-gke.0"
+          image: "gcr.io/gke-release/istio/citadel:1.0.3-gke.0"
           imagePullPolicy: IfNotPresent
           args:
             - --append-dns-names=true
@@ -3781,7 +3960,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: sidecarInjectorWebhook
-    chart: sidecarInjectorWebhook-1.0.2
+    chart: sidecarInjectorWebhook-1.0.3
     release: istio
     heritage: Tiller
     istio: sidecar-injector
@@ -3798,7 +3977,7 @@ spec:
       serviceAccountName: istio-sidecar-injector-service-account
       containers:
         - name: sidecar-injector-webhook
-          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.2-gke.0"
+          image: "gcr.io/gke-release/istio/sidecar_injector:1.0.3-gke.0"
           imagePullPolicy: IfNotPresent
           args:
             - --caCertFile=/etc/istio/certs/root-cert.pem
@@ -3918,9 +4097,6 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-egressgateway
     namespace: istio-system
-    labels:
-      k8s-app: istio
-      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -3939,9 +4115,6 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-ingressgateway
     namespace: istio-system
-    labels:
-      k8s-app: istio
-      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -3964,9 +4137,6 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-policy
     namespace: istio-system
-    labels:
-      k8s-app: istio
-      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -3985,9 +4155,6 @@ kind: HorizontalPodAutoscaler
 metadata:
     name: istio-telemetry
     namespace: istio-system
-    labels:
-      k8s-app: istio
-      addonmanager.kubernetes.io/mode: Reconcile
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4009,9 +4176,7 @@ apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
     name: istio-pilot
-    labels:
-      k8s-app: istio
-      addonmanager.kubernetes.io/mode: Reconcile
+    namespace: istio-system
 spec:
     maxReplicas: 5
     minReplicas: 1
@@ -4037,7 +4202,7 @@ metadata:
     k8s-app: istio
     addonmanager.kubernetes.io/mode: Reconcile
     app: istio-sidecar-injector
-    chart: sidecarInjectorWebhook-1.0.2
+    chart: sidecarInjectorWebhook-1.0.3
     release: istio
     heritage: Tiller
 webhooks:
@@ -4068,11 +4233,11 @@ webhooks:
 
 
 ---
-# Source: istio/charts/security/templates/create-custom-resources-job.yaml
+# Source: istio/charts/security/templates/enable-mesh-mtls.yaml
 
 
 ---
-# Source: istio/charts/security/templates/enable-mesh-mtls.yaml
+# Source: istio/charts/security/templates/enable-mesh-permissive.yaml
 
 
 ---
@@ -4883,4 +5048,3 @@ spec:
         http2MaxRequests: 10000
         maxRequestsPerConnection: 10000
 ---
-
