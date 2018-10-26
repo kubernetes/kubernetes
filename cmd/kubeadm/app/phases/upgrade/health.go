@@ -21,6 +21,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/pkg/errors"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,11 +118,11 @@ func masterNodesReady(client clientset.Interface) error {
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return fmt.Errorf("couldn't list masters in cluster: %v", err)
+		return errors.Wrap(err, "couldn't list masters in cluster")
 	}
 
 	if len(masters.Items) == 0 {
-		return fmt.Errorf("failed to find any nodes with master role")
+		return errors.New("failed to find any nodes with master role")
 	}
 
 	notReadyMasters := getNotReadyNodes(masters.Items)
@@ -192,10 +194,10 @@ func daemonSetHealth(dsStatus *apps.DaemonSetStatus) error {
 		return fmt.Errorf("current number of scheduled Pods ('%d') doesn't match the amount of desired Pods ('%d')", dsStatus.CurrentNumberScheduled, dsStatus.DesiredNumberScheduled)
 	}
 	if dsStatus.NumberAvailable == 0 {
-		return fmt.Errorf("no available Pods for DaemonSet")
+		return errors.New("no available Pods for DaemonSet")
 	}
 	if dsStatus.NumberReady == 0 {
-		return fmt.Errorf("no ready Pods for DaemonSet")
+		return errors.New("no ready Pods for DaemonSet")
 	}
 	return nil
 }

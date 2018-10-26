@@ -23,6 +23,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 )
 
 var _ Validator = &DockerValidator{}
@@ -51,11 +52,11 @@ func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 
 	c, err := client.NewClient(dockerEndpoint, "", nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %v", err)
+		return nil, errors.Wrap(err, "failed to create docker client")
 	}
 	info, err := c.Info(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get docker info: %v", err)
+		return nil, errors.Wrap(err, "failed to get docker info")
 	}
 	return d.validateDockerInfo(spec.RuntimeSpec.DockerSpec, info)
 }
