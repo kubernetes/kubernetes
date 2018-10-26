@@ -1300,7 +1300,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -1833,7 +1832,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -2366,7 +2364,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -2899,7 +2896,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -3432,7 +3428,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -4139,7 +4134,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -6020,7 +6014,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -6553,7 +6546,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -7434,7 +7426,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -8141,7 +8132,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -8674,7 +8664,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -9121,7 +9110,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -10088,7 +10076,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -10848,7 +10835,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -12143,7 +12129,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -18333,7 +18318,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -19099,7 +19083,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -19616,7 +19599,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -20631,7 +20613,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -21596,7 +21577,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -22528,7 +22508,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -23813,7 +23792,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -24346,7 +24324,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -25053,7 +25030,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -25934,7 +25910,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -26815,7 +26790,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -29825,7 +29799,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -30358,7 +30331,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -31337,7 +31309,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -33675,7 +33646,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -34208,7 +34178,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -34915,7 +34884,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -35796,7 +35764,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -36677,7 +36644,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -39504,7 +39470,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -41449,7 +41414,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -42629,7 +42593,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -43809,7 +43772,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -45022,7 +44984,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -46202,7 +46163,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -47382,7 +47342,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -48483,7 +48442,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -49637,7 +49595,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -50676,7 +50633,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -51923,7 +51879,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -52630,7 +52585,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -53609,7 +53563,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -54316,7 +54269,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -54849,7 +54801,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -56000,7 +55951,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -58591,7 +58541,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -59630,7 +59579,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -60433,7 +60381,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -61552,7 +61499,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -62053,7 +61999,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -62562,7 +62507,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -63079,7 +63023,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -64933,7 +64876,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -65434,7 +65376,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -65943,7 +65884,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -66460,7 +66400,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -68314,7 +68253,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -68815,7 +68753,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -69324,7 +69261,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -69841,7 +69777,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -71744,7 +71679,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -72510,7 +72444,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -73317,7 +73250,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -74348,7 +74280,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -75114,7 +75045,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -75880,7 +75810,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
@@ -76397,7 +76326,6 @@
       {
        "name": "body",
        "in": "body",
-       "required": true,
        "schema": {
         "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
        }
