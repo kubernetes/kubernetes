@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/util/version"
@@ -155,7 +156,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 // RunUpgradeNodeConfig is executed when `kubeadm upgrade node config` runs.
 func RunUpgradeNodeConfig(flags *nodeUpgradeFlags) error {
 	if len(flags.kubeletVersionStr) == 0 {
-		return fmt.Errorf("The --kubelet-version argument is required")
+		return errors.Errorf("The --kubelet-version argument is required")
 	}
 
 	// Set up the kubelet directory to use. If dry-running, use a fake directory
@@ -166,7 +167,7 @@ func RunUpgradeNodeConfig(flags *nodeUpgradeFlags) error {
 
 	client, err := getClient(flags.kubeConfigPath, flags.dryRun)
 	if err != nil {
-		return fmt.Errorf("couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
+		return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
 	// Parse the desired kubelet version
@@ -181,7 +182,7 @@ func RunUpgradeNodeConfig(flags *nodeUpgradeFlags) error {
 
 	// If we're dry-running, print the generated manifests, otherwise do nothing
 	if err := printFilesIfDryRunning(flags.dryRun, kubeletDir); err != nil {
-		return fmt.Errorf("error printing files on dryrun: %v", err)
+		return errors.Wrapf(err, "error printing files on dryrun")
 	}
 
 	fmt.Println("[upgrade] The configuration for this node was successfully updated!")
@@ -194,7 +195,7 @@ func getKubeletDir(dryRun bool) (string, error) {
 	if dryRun {
 		dryRunDir, err := ioutil.TempDir("", "kubeadm-init-dryrun")
 		if err != nil {
-			return "", fmt.Errorf("couldn't create a temporary directory: %v", err)
+			return "", errors.Wrapf(err, "couldn't create a temporary directory")
 		}
 		return dryRunDir, nil
 	}
@@ -220,7 +221,7 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 
 	client, err := getClient(flags.kubeConfigPath, flags.dryRun)
 	if err != nil {
-		return fmt.Errorf("Couldn't create a Kubernetes client from file %q: %v", flags.kubeConfigPath, err)
+		return errors.Wrapf(err, "Couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
 	waiter := apiclient.NewKubeWaiter(client, upgrade.UpgradeManifestTimeout, os.Stdout)
@@ -228,12 +229,12 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 	// Fetches the cluster configuration
 	cfg, err := configutil.FetchConfigFromFileOrCluster(client, os.Stdout, "upgrade", "", false)
 	if err != nil {
-		return fmt.Errorf("Unable to fetch the kubeadm-config ConfigMap: %v", err)
+		return errors.Wrapf(err, "Unable to fetch the kubeadm-config ConfigMap")
 	}
 
 	// Rotate API server certificate if needed
 	if err := upgrade.BackupAPIServerCertIfNeeded(cfg, flags.dryRun); err != nil {
-		return fmt.Errorf("Unable to rotate API server certificate: %v", err)
+		return errors.Wrapf(err, "Unable to rotate API server certificate")
 	}
 
 	// Upgrade the control plane
@@ -243,7 +244,7 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 	}
 
 	if err := PerformStaticPodUpgrade(client, waiter, cfg, false); err != nil {
-		return fmt.Errorf("Couldn't complete the static pod upgrade: %v", err)
+		return errors.Wrapf(err, "Couldn't complete the static pod upgrade")
 	}
 
 	fmt.Println("[upgrade] The control plane instance for this node was successfully updated!")

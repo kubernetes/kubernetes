@@ -17,8 +17,9 @@ limitations under the License.
 package workflow
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 var myWorkflowRunner = NewRunner()

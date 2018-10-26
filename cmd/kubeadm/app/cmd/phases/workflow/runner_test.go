@@ -17,10 +17,11 @@ limitations under the License.
 package workflow
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func phaseBuilder(name string, phases ...Phase) Phase {

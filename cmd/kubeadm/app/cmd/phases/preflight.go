@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	perrors "github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -78,7 +79,7 @@ func NewPreflightMasterPhase() workflow.Phase {
 func runPreflightMaster(c workflow.RunData) error {
 	data, ok := c.(preflightMasterData)
 	if !ok {
-		return fmt.Errorf("preflight phase invoked with an invalid data struct")
+		return perrors.Errorf("preflight phase invoked with an invalid data struct")
 	}
 
 	fmt.Println("[preflight] running pre-flight checks")

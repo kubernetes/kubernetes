@@ -19,9 +19,10 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"github.com/ghodss/yaml"
 	"testing"
+
+	"github.com/ghodss/yaml"
+	"github.com/pkg/errors"
 )
 
 func TestNewCmdVersion(t *testing.T) {
@@ -80,7 +81,7 @@ func TestRunVersion(t *testing.T) {
 			goto error
 		}
 		if buf.String() == "" {
-			err = fmt.Errorf("empty output")
+			err = errors.Errorf("empty output")
 			goto error
 		}
 		if tc.shouldBeValidYAML {
