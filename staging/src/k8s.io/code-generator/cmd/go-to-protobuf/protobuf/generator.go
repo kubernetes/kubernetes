@@ -724,6 +724,10 @@ func genComment(out io.Writer, lines []string, indent string) {
 		lines = lines[:l-1]
 	}
 	for _, c := range lines {
+		if len(c) == 0 {
+			fmt.Fprintf(out, "%s//\n", indent) // avoid trailing whitespace
+			continue
+		}
 		fmt.Fprintf(out, "%s// %s\n", indent, c)
 	}
 }

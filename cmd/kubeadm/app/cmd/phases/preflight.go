@@ -83,7 +83,7 @@ func runPreflightMaster(c workflow.RunData) error {
 
 	fmt.Println("[preflight] running pre-flight checks")
 	if err := preflight.RunInitMasterChecks(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors()); err != nil {
-		return nil
+		return err
 	}
 
 	if !data.DryRun() {

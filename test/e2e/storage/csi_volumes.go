@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-
 	storagev1 "k8s.io/api/storage/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -56,6 +55,8 @@ type csiTestDriver interface {
 var csiTestDrivers = map[string]func(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver{
 	"hostPath": initCSIHostpath,
 	"gcePD":    initCSIgcePD,
+	// TODO(#70258): this is temporary until we can figure out how to make e2e tests a library
+	"[Feature: gcePD-external]": initCSIgcePDExternal,
 }
 
 var _ = utils.SIGDescribe("CSI Volumes", func() {
@@ -78,8 +79,9 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		node = nodes.Items[rand.Intn(len(nodes.Items))]
 		config = framework.VolumeTestConfig{
-			Namespace:         ns.Name,
-			Prefix:            "csi",
+			Namespace: ns.Name,
+			Prefix:    "csi",
+			// TODO(#70259): this needs to be parameterized so only hostpath sets node name
 			ClientNodeName:    node.Name,
 			ServerNodeName:    node.Name,
 			WaitForCompletion: true,
@@ -387,7 +389,6 @@ func (g *gcePDCSIDriver) createStorageClassTest(node v1.Node) testsuites.Storage
 		Parameters:   map[string]string{"type": "pd-standard"},
 		ClaimSize:    "5Gi",
 		ExpectedSize: "5Gi",
-		NodeName:     node.Name,
 	}
 }
 
@@ -421,4 +422,31 @@ func (g *gcePDCSIDriver) cleanupCSIDriver() {
 	csiControllerRoleBinding(cs, config, true, role, g.controllerServiceAccount)
 	csiServiceAccount(cs, config, "gce-controller", true /* teardown */)
 	csiServiceAccount(cs, config, "gce-node", true /* teardown */)
+}
+
+type gcePDCSIDriverExternal struct {
+}
+
+func initCSIgcePDExternal(f *framework.Framework, config framework.VolumeTestConfig) csiTestDriver {
+	cs := f.ClientSet
+	framework.SkipUnlessProviderIs("gce", "gke")
+	framework.SkipIfMultizone(cs)
+
+	return &gcePDCSIDriverExternal{}
+}
+
+func (g *gcePDCSIDriverExternal) createStorageClassTest(node v1.Node) testsuites.StorageClassTest {
+	return testsuites.StorageClassTest{
+		Name:         "com.google.csi.gcepd",
+		Provisioner:  "com.google.csi.gcepd",
+		Parameters:   map[string]string{"type": "pd-standard"},
+		ClaimSize:    "5Gi",
+		ExpectedSize: "5Gi",
+	}
+}
+
+func (g *gcePDCSIDriverExternal) createCSIDriver() {
+}
+
+func (g *gcePDCSIDriverExternal) cleanupCSIDriver() {
 }

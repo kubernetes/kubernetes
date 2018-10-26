@@ -137,14 +137,14 @@ func scaleUp(name string, kind schema.GroupVersionKind, checkStability bool, rc 
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    1,
-		totalInitialCPUUsage:        500,
-		perPodCPURequest:            1000,
+		totalInitialCPUUsage:        250,
+		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 20,
 		minPods:                     1,
 		maxPods:                     5,
 		firstScale:                  3,
 		firstScaleStasis:            stasis,
-		cpuBurst:                    1400,
+		cpuBurst:                    700,
 		secondScale:                 5,
 	}
 	scaleTest.run(name, kind, rc, f)
@@ -157,8 +157,8 @@ func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, r
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
-		totalInitialCPUUsage:        650,
-		perPodCPURequest:            1000,
+		totalInitialCPUUsage:        325,
+		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 30,
 		minPods:                     1,
 		maxPods:                     5,

@@ -339,7 +339,7 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	// the only supported on a route to simple kubectl run which should mimic
 	// docker run
 	if generatorName != generateversioned.RunPodV1GeneratorName {
-		fmt.Fprintf(o.ErrOut, "kubectl run --generator=%s is DEPRECATED and will be removed in a future version. Use kubectl create instead.\n", generatorName)
+		fmt.Fprintf(o.ErrOut, "kubectl run --generator=%s is DEPRECATED and will be removed in a future version. Use kubectl run --generator=%s or kubectl create instead.\n", generatorName, generateversioned.RunPodV1GeneratorName)
 	}
 
 	generators := generateversioned.GeneratorFn("run")

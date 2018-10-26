@@ -418,22 +418,22 @@ func (j *Join) FetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*ku
 func (j *Join) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.InitConfiguration) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
-		return fmt.Errorf("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
+		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
 	// blocks if the cluster was created without an external etcd cluster
 	if initConfiguration.Etcd.External == nil {
-		return fmt.Errorf("unable to add a new control plane instance on a cluster that doesn't use an external etcd")
+		return errors.New("unable to add a new control plane instance on a cluster that doesn't use an external etcd")
 	}
 
 	// blocks if control plane is self-hosted
 	if features.Enabled(initConfiguration.FeatureGates, features.SelfHosting) {
-		return fmt.Errorf("self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
+		return errors.New("self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
 	}
 
 	// blocks if the certificates for the control plane are stored in secrets (instead of the local pki folder)
 	if features.Enabled(initConfiguration.FeatureGates, features.StoreCertsInSecrets) {
-		return fmt.Errorf("certificates stored in secrets, as well as self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
+		return errors.New("certificates stored in secrets, as well as self-hosted clusters are deprecated and won't be supported by `kubeadm join --experimental-control-plane`")
 	}
 
 	// checks if the certificates that must be equal across contolplane instances are provided
@@ -561,7 +561,7 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 
 	glog.V(1).Info("[join] uploading currently used configuration to the cluster")
 	if err := uploadconfigphase.UploadConfiguration(initConfiguration, client); err != nil {
-		return fmt.Errorf("error uploading configuration: %v", err)
+		return errors.Wrap(err, "error uploading configuration: %v")
 	}
 
 	glog.V(1).Info("[join] marking the master with right label")

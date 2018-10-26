@@ -123,9 +123,10 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 		gv := scope.Kind.GroupVersion()
+
 		codec := runtime.NewCodec(
 			scope.Serializer.EncoderForVersion(s.Serializer, gv),
-			scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
+			scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion),
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
@@ -177,6 +178,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			resource:        scope.Resource,
 			subresource:     scope.Subresource,
 			dryRun:          dryrun.IsDryRun(options.DryRun),
+
+			hubGroupVersion: scope.HubGroupVersion,
 
 			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes), scope.Authorizer, createAuthorizerAttributes),
 			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes),
@@ -240,6 +243,8 @@ type patcher struct {
 	subresource     string
 	dryRun          bool
 
+	hubGroupVersion schema.GroupVersion
+
 	// Validation functions
 	createValidation rest.ValidateObjectFunc
 	updateValidation rest.ValidateObjectUpdateFunc
@@ -263,11 +268,6 @@ type patcher struct {
 	updatedObjectInfo rest.UpdatedObjectInfo
 	mechanism         patchMechanism
 	forceAllowCreate  bool
-}
-
-func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, error) {
-	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-	return p.unsafeConvertor.ConvertToVersion(versionedObj, gvk.GroupVersion())
 }
 
 type patchMechanism interface {
@@ -348,13 +348,8 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	if err := strategicPatchObject(p.defaulter, currentVersionedObject, p.patchBytes, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
 		return nil, err
 	}
-	// Convert the object back to unversioned (aka internal version).
-	unversionedObjToUpdate, err := p.toUnversioned(versionedObjToUpdate)
-	if err != nil {
-		return nil, err
-	}
-
-	return unversionedObjToUpdate, nil
+	// Convert the object back to the hub version
+	return p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, p.hubGroupVersion)
 }
 
 func (p *smpPatcher) createNewObject() (runtime.Object, error) {

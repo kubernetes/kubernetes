@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -296,7 +297,7 @@ func getDefaultComponentConfigBytes(registration componentconfigs.Registration) 
 
 	realobj, ok := registration.GetFromInternalConfig(&defaultedInitConfig.ClusterConfiguration)
 	if !ok {
-		return []byte{}, fmt.Errorf("GetFromInternalConfig failed")
+		return []byte{}, errors.New("GetFromInternalConfig failed")
 	}
 
 	return registration.Marshal(realobj)
@@ -325,7 +326,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 		`), kubeadmapiv1alpha3.SchemeGroupVersion.String(), kubeadmapiv1beta1.SchemeGroupVersion.String(), kubeadmapiv1beta1.SchemeGroupVersion.String()),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(oldCfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --old-config flag is mandatory"))
+				kubeadmutil.CheckErr(errors.New("The --old-config flag is mandatory"))
 			}
 
 			internalcfg, err := configutil.AnyConfigFileAndDefaultsToInternal(oldCfgPath)
@@ -398,7 +399,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 		`), metav1.NamespaceSystem, constants.KubeadmConfigConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config flag is mandatory"))
+				kubeadmutil.CheckErr(errors.New("The --config flag is mandatory"))
 			}
 
 			glog.V(1).Infoln("[config] retrieving ClientSet from file")
@@ -583,7 +584,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration) (*ImagesList, error) {
 	initcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %v", err)
+		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
 	}
 
 	return &ImagesList{

@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +43,7 @@ type applyPatcher struct {
 const workflowId = "default"
 
 func (p *applyPatcher) convertCurrentVersion(obj runtime.Object) (map[string]interface{}, error) {
-	vo, err := p.unsafeConvertor.ConvertToVersion(obj, p.kind.GroupVersion())
+	vo, err := p.unsafeConvertor.ConvertToVersion(obj, p.hubGroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +85,11 @@ func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.
 	}
 	p.defaulter.Default(voutput)
 
-	uoutput, err := p.toUnversioned(voutput)
+	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+	uoutput, err := p.unsafeConvertor.ConvertToVersion(voutput, gvk.GroupVersion())
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert to unversioned: %v", err)
 	}
-
 	return uoutput, nil
 }
 

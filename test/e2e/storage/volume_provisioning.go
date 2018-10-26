@@ -427,6 +427,40 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 		})
 
+		It("should provision storage with non-default reclaim policy Retain", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+
+			test := testsuites.StorageClassTest{
+				Name:           "HDD PD on GCE/GKE",
+				CloudProviders: []string{"gce", "gke"},
+				Provisioner:    "kubernetes.io/gce-pd",
+				Parameters: map[string]string{
+					"type": "pd-standard",
+				},
+				ClaimSize:    "1Gi",
+				ExpectedSize: "1Gi",
+				PvCheck: func(volume *v1.PersistentVolume) error {
+					return checkGCEPD(volume, "pd-standard")
+				},
+			}
+			class := newStorageClass(test, ns, "reclaimpolicy")
+			retain := v1.PersistentVolumeReclaimRetain
+			class.ReclaimPolicy = &retain
+			claim := newClaim(test, ns, "reclaimpolicy")
+			claim.Spec.StorageClassName = &class.Name
+			pv := testsuites.TestDynamicProvisioning(test, c, claim, class)
+
+			By(fmt.Sprintf("waiting for the provisioned PV %q to enter phase %s", pv.Name, v1.VolumeReleased))
+			framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 1*time.Second, 30*time.Second))
+
+			By(fmt.Sprintf("deleting the storage asset backing the PV %q", pv.Name))
+			framework.ExpectNoError(framework.DeletePDWithRetry(pv.Spec.GCEPersistentDisk.PDName))
+
+			By(fmt.Sprintf("deleting the PV %q", pv.Name))
+			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
+			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
+		})
+
 		It("should not provision a volume in an unmanaged GCE zone.", func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 			var suffix string = "unmananged"

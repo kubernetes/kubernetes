@@ -342,7 +342,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	case reflect.Struct:
 		// Specifically skip ObjectMeta because it has recursive types
 		if name == "ObjectMeta" {
-			break;
+			break
 		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)

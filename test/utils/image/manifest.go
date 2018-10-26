@@ -86,7 +86,7 @@ var (
 	APIServer                = ImageConfig{e2eRegistry, "sample-apiserver", "1.10"}
 	AppArmorLoader           = ImageConfig{e2eRegistry, "apparmor-loader", "1.0"}
 	BusyBox                  = ImageConfig{dockerLibraryRegistry, "busybox", "1.29"}
-	CheckMetadataConcealment = ImageConfig{e2eRegistry, "metadata-concealment", "1.0"}
+	CheckMetadataConcealment = ImageConfig{e2eRegistry, "metadata-concealment", "1.1"}
 	CudaVectorAdd            = ImageConfig{e2eRegistry, "cuda-vector-add", "1.0"}
 	Dnsutils                 = ImageConfig{e2eRegistry, "dnsutils", "1.1"}
 	EchoServer               = ImageConfig{e2eRegistry, "echoserver", "2.2"}
@@ -117,7 +117,7 @@ var (
 	Porter              = ImageConfig{e2eRegistry, "porter", "1.0"}
 	PortForwardTester   = ImageConfig{e2eRegistry, "port-forward-tester", "1.0"}
 	Redis               = ImageConfig{e2eRegistry, "redis", "1.0"}
-	ResourceConsumer    = ImageConfig{e2eRegistry, "resource-consumer", "1.3"}
+	ResourceConsumer    = ImageConfig{e2eRegistry, "resource-consumer", "1.4"}
 	ResourceController  = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0"}
 	ServeHostname       = ImageConfig{e2eRegistry, "serve-hostname", "1.1"}
 	TestWebserver       = ImageConfig{e2eRegistry, "test-webserver", "1.0"}

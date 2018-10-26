@@ -134,6 +134,7 @@ go_library(
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/onsi/gomega/types:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/prometheus/common/model:go_default_library",
         "//vendor/golang.org/x/crypto/ssh:go_default_library",

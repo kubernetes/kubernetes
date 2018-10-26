@@ -17,8 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -190,7 +188,7 @@ func NewCmdKubeletConfigUpload() *cobra.Command {
 		Example: kubeletConfigUploadExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config argument is required"))
+				kubeadmutil.CheckErr(errors.New("The --config argument is required"))
 			}
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
@@ -228,7 +226,7 @@ func NewCmdKubeletAnnotateCRI() *cobra.Command {
 		Example: kubeletConfigAnnotateCRIExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --config argument is required"))
+				kubeadmutil.CheckErr(errors.New("The --config argument is required"))
 			}
 
 			// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
@@ -301,10 +299,10 @@ func NewCmdKubeletConfigEnableDynamic() *cobra.Command {
 		Example: kubeletConfigEnableDynamicExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(nodeName) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --node-name argument is required"))
+				kubeadmutil.CheckErr(errors.New("The --node-name argument is required"))
 			}
 			if len(kubeletVersionStr) == 0 {
-				kubeadmutil.CheckErr(fmt.Errorf("The --kubelet-version argument is required"))
+				kubeadmutil.CheckErr(errors.New("The --kubelet-version argument is required"))
 			}
 
 			kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
