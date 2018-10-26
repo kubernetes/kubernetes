@@ -28,8 +28,8 @@ import (
 
 // Interface is an injectable interface for running ipconfig commands.  Implementations must be goroutine-safe.
 type Interface interface {
-	// GetDnsSuffixSearchList returns the list of DNS suffix to search
-	GetDnsSuffixSearchList() ([]string, error)
+	// GetDNSSuffixSearchList returns the list of DNS suffix to search
+	GetDNSSuffixSearchList() ([]string, error)
 }
 
 const (
@@ -54,8 +54,8 @@ func New(exec utilexec.Interface) Interface {
 	return runner
 }
 
-// GetDnsSuffixSearchList returns the list of DNS suffix to search
-func (runner *runner) GetDnsSuffixSearchList() ([]string, error) {
+// GetDNSSuffixSearchList returns the list of DNS suffix to search
+func (runner *runner) GetDNSSuffixSearchList() ([]string, error) {
 	// Parse the DNS suffix search list from ipconfig output
 	// ipconfig /all on Windows displays the entry of DNS suffix search list
 	// An example output contains:
