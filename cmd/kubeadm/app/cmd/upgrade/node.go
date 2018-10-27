@@ -24,7 +24,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -66,6 +65,7 @@ type controlplaneUpgradeFlags struct {
 	kubeConfigPath   string
 	advertiseAddress string
 	nodeName         string
+	etcdUpgrade      bool
 	dryRun           bool
 }
 
@@ -113,6 +113,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 	flags := &controlplaneUpgradeFlags{
 		kubeConfigPath:   constants.GetKubeletKubeConfigPath(),
 		advertiseAddress: "",
+		etcdUpgrade:      true,
 		dryRun:           false,
 	}
 
@@ -149,6 +150,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeConfigPath)
 	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output the actions that would be performed.")
+	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	return cmd
 }
 
@@ -236,13 +238,13 @@ func RunUpgradeControlPlane(flags *controlplaneUpgradeFlags) error {
 		return fmt.Errorf("Unable to rotate API server certificate: %v", err)
 	}
 
-	// Upgrade the control plane
+	// Upgrade the control plane and etcd if installed on this node
 	fmt.Printf("[upgrade] Upgrading your Static Pod-hosted control plane instance to version %q...\n", cfg.KubernetesVersion)
 	if flags.dryRun {
 		return DryRunStaticPodUpgrade(cfg)
 	}
 
-	if err := PerformStaticPodUpgrade(client, waiter, cfg, false); err != nil {
+	if err := PerformStaticPodUpgrade(client, waiter, cfg, flags.etcdUpgrade); err != nil {
 		return fmt.Errorf("Couldn't complete the static pod upgrade: %v", err)
 	}
 

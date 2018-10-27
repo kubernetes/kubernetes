@@ -26,7 +26,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
@@ -111,11 +110,8 @@ func RunPlan(flags *planFlags) error {
 		}
 		etcdClient = client
 	} else {
-		client, err := etcdutil.NewFromStaticPod(
-			[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
-			constants.GetStaticPodDirectory(),
-			upgradeVars.cfg.CertificatesDir,
-		)
+		// Connects to local/stacked etcd existing in the cluster
+		client, err := etcdutil.NewFromCluster(upgradeVars.client, upgradeVars.cfg.CertificatesDir)
 		if err != nil {
 			return err
 		}

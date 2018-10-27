@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -304,14 +305,19 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 }
 
 // GetEtcdAltNames builds an AltNames object for generating the etcd server certificate.
-// `localhost` is included in the SAN since this is the interface the etcd static pod listens on.
-// Hostname and `API.AdvertiseAddress` are excluded since etcd does not listen on this interface by default.
+// `advertise address` and localhost are included in the SAN since this is the interfaces the etcd static pod listens on.
 // The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.ServerCertSANs`.
 func GetEtcdAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
+	// advertise address
+	advertiseAddress := net.ParseIP(cfg.APIEndpoint.AdvertiseAddress)
+	if advertiseAddress == nil {
+		return nil, errors.Errorf("error parsing APIEndpoint AdvertiseAddress %q: is not a valid textual representation of an IP address", cfg.APIEndpoint.AdvertiseAddress)
+	}
+
 	// create AltNames with defaults DNSNames/IPs
 	altNames := &certutil.AltNames{
 		DNSNames: []string{cfg.NodeRegistration.Name, "localhost"},
-		IPs:      []net.IP{net.IPv4(127, 0, 0, 1), net.IPv6loopback},
+		IPs:      []net.IP{advertiseAddress, net.IPv4(127, 0, 0, 1), net.IPv6loopback},
 	}
 
 	if cfg.Etcd.Local != nil {
@@ -322,8 +328,7 @@ func GetEtcdAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, err
 }
 
 // GetEtcdPeerAltNames builds an AltNames object for generating the etcd peer certificate.
-// `localhost` is excluded from the SAN since etcd will not refer to itself as a peer.
-// Hostname and `API.AdvertiseAddress` are included if the user chooses to promote the single node etcd cluster into a multi-node one.
+// Hostname and `API.AdvertiseAddress` are included if the user chooses to promote the single node etcd cluster into a multi-node one (stacked etcd).
 // The user can override the listen address with `Etcd.ExtraArgs` and add SANs with `Etcd.PeerCertSANs`.
 func GetEtcdPeerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
 	// advertise address

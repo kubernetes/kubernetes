@@ -26,9 +26,12 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	"github.com/golang/glog"
 	"github.com/pkg/errors"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -40,6 +43,8 @@ type ClusterInterrogator interface {
 	GetVersion() (string, error)
 	HasTLS() bool
 	WaitForClusterAvailable(delay time.Duration, retries int, retryInterval time.Duration) (bool, error)
+	Sync() error
+	AddMember(name string, peerAddrs string) ([]Member, error)
 }
 
 // Client provides connection parameters for an etcd cluster
@@ -123,6 +128,108 @@ func NewFromStaticPod(endpoints []string, manifestDir string, certificatesDir st
 		)
 	}
 	return New(endpoints, "", "", "")
+}
+
+// NewFromCluster creates an etcd client for the the etcd endpoints defined in the ClusterStatus value stored in
+// the kubeadm-config ConfigMap in kube-system namespace.
+// Once created, the client synchronizes client's endpoints with the known endpoints from the etcd membership API (reality check).
+func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client, error) {
+	// Gets the cluster status
+	clusterStatus, err := config.GetClusterStatus(client)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the list of etcd endpoints from cluster status
+	endpoints := []string{}
+	for _, e := range clusterStatus.APIEndpoints {
+		endpoints = append(endpoints, fmt.Sprintf("https://%s:%d", e.AdvertiseAddress, constants.EtcdListenClientPort))
+	}
+	glog.V(1).Infof("etcd endpoints read from pods: %s", strings.Join(endpoints, ","))
+
+	// Creates an etcd client
+	etcdClient, err := New(
+		endpoints,
+		filepath.Join(certificatesDir, constants.EtcdCACertName),
+		filepath.Join(certificatesDir, constants.EtcdHealthcheckClientCertName),
+		filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// synchronizes client's endpoints with the known endpoints from the etcd membership.
+	err = etcdClient.Sync()
+	if err != nil {
+		return nil, err
+	}
+
+	return etcdClient, nil
+}
+
+// Sync synchronizes client's endpoints with the known endpoints from the etcd membership.
+func (c Client) Sync() error {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 20 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return err
+	}
+	defer cli.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	err = cli.Sync(ctx)
+	cancel()
+	if err != nil {
+		return err
+	}
+	glog.V(1).Infof("etcd endpoints read from etcd: %s", strings.Join(cli.Endpoints(), ","))
+
+	c.Endpoints = cli.Endpoints()
+	return nil
+}
+
+// Member struct defines an etcd member; it is used for avoiding to spread github.com/coreos/etcd dependency
+// across kubeadm codebase
+type Member struct {
+	Name    string
+	PeerURL string
+}
+
+// AddMember notifies an existing etcd cluster that a new member is joining
+func (c Client) AddMember(name string, peerAddrs string) ([]Member, error) {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   c.Endpoints,
+		DialTimeout: 20 * time.Second,
+		TLS:         c.TLS,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cli.Close()
+
+	// Adds a new member to the cluster
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	resp, err := cli.MemberAdd(ctx, []string{peerAddrs})
+	cancel()
+	if err != nil {
+		return nil, err
+	}
+
+	// Returns the updated list of etcd members
+	ret := []Member{}
+	for _, m := range resp.Members {
+		// fixes the entry for the joining member (that doesn't have a name set in the initialCluster returned by etcd)
+		if m.Name == "" {
+			ret = append(ret, Member{Name: name, PeerURL: m.PeerURLs[0]})
+		} else {
+			ret = append(ret, Member{Name: m.Name, PeerURL: m.PeerURLs[0]})
+		}
+	}
+
+	return ret, nil
 }
 
 // GetVersion returns the etcd version of the cluster.

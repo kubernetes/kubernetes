@@ -20,18 +20,15 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -157,63 +154,4 @@ func TestUploadConfiguration(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestGetClusterStatus(t *testing.T) {
-	var tests = []struct {
-		name                     string
-		clusterStatus            *kubeadmapi.ClusterStatus
-		expectedClusterEndpoints int
-	}{
-		{
-			name:                     "return empty ClusterStatus if cluster kubeadm-config doesn't exist (e.g init)",
-			expectedClusterEndpoints: 0,
-		},
-		{
-			name: "return ClusterStatus if cluster kubeadm-config exist (e.g upgrade)",
-			clusterStatus: &kubeadmapi.ClusterStatus{
-				APIEndpoints: map[string]kubeadmapi.APIEndpoint{
-					"dummy": {AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-				},
-			},
-			expectedClusterEndpoints: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-
-			if tt.clusterStatus != nil {
-				createConfigMapWithStatus(tt.clusterStatus, client)
-			}
-
-			actual, err := getClusterStatus(client)
-			if err != nil {
-				t.Error("GetClusterStatus returned unexpected error")
-				return
-			}
-			if tt.expectedClusterEndpoints != len(actual.APIEndpoints) {
-				t.Error("actual ClusterStatus doesn't return expected endpoints")
-			}
-		})
-	}
-}
-
-// createConfigMapWithStatus create a ConfigMap with ClusterStatus for TestGetClusterStatus
-func createConfigMapWithStatus(statusToCreate *kubeadmapi.ClusterStatus, client clientset.Interface) error {
-	statusYaml, err := configutil.MarshalKubeadmConfigObject(statusToCreate)
-	if err != nil {
-		return err
-	}
-
-	return apiclient.CreateOrUpdateConfigMap(client, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      kubeadmconstants.KubeadmConfigConfigMap,
-			Namespace: metav1.NamespaceSystem,
-		},
-		Data: map[string]string{
-			kubeadmconstants.ClusterStatusConfigMapKey: string(statusYaml),
-		},
-	})
 }
