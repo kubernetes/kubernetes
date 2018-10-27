@@ -1,0 +1,61 @@
+From ea85b4a9a9fa4a9b8b64e476ce7967ad8e1fd29f Mon Sep 17 00:00:00 2001
+From: "Linweibin (A)" <l00416327@china.huawei.com>
+Date: Sat, 27 Oct 2018 15:03:27 +0800
+Subject: [PATCH] add module 'nf_conntrack' in ipvs prerequisite
+
+---
+ pkg/proxy/ipvs/README.md  |  1 +
+ pkg/proxy/ipvs/proxier.go | 18 ++++++++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/pkg/proxy/ipvs/README.md b/pkg/proxy/ipvs/README.md
+index fcdca80744..0639a570e9 100644
+--- a/pkg/proxy/ipvs/README.md
++++ b/pkg/proxy/ipvs/README.md
+@@ -260,6 +260,7 @@ Currently, local-up scripts, GCE scripts and kubeadm support switching IPVS prox
+ 
+ ### Prerequisite
+ Ensure IPVS required kernel modules
++**Note**: use `nf_conntrack` instead of `nf_conntrack_ipv4` for Linux kernel 4.19 and later
+ ```shell
+ ip_vs
+ ip_vs_rr
+diff --git a/pkg/proxy/ipvs/proxier.go b/pkg/proxy/ipvs/proxier.go
+index 8815548014..8919e45004 100644
+--- a/pkg/proxy/ipvs/proxier.go
++++ b/pkg/proxy/ipvs/proxier.go
+@@ -163,6 +163,7 @@ var ipvsModules = []string{
+ 	"ip_vs_wrr",
+ 	"ip_vs_sh",
+ 	"nf_conntrack_ipv4",
++	"nf_conntrack",
+ }
+ 
+ // In IPVS proxy mode, the following flags need to be set
+@@ -489,8 +490,21 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner) (bool, err
+ 	wantModules.Insert(ipvsModules...)
+ 	loadModules.Insert(mods...)
+ 	modules := wantModules.Difference(loadModules).UnsortedList()
+-	if len(modules) != 0 {
+-		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", modules)
++	var missingMods []string
++	flagNFConntrack := 0
++	for _, mod := range modules {
++		if strings.Contains(mod, "nf_conntrack") {
++			flagNFConntrack += 1
++		} else {
++			missingMods = append(missingMods, mod)
++		}
++	}
++	if flagNFConntrack == 2 {
++		missingMods = append(missingMods, "nf_conntrack_ipv4(or nf_conntrack for Linux kernel 4.19 and later)")
++	}
++
++	if len(missingMods) != 0 {
++		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
+ 	}
+ 
+ 	// Check ipset version
+-- 
+2.19.1.windows.1
+
