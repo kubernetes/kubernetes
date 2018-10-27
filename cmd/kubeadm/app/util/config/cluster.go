@@ -18,13 +18,14 @@ package config
 
 import (
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -196,12 +197,8 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 // getAPIEndpoint returns the APIEndpoint for the current node
 func getAPIEndpoint(data map[string]string, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
 	// gets the ClusterStatus from kubeadm-config
-	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
-	if !ok {
-		return fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)
-	}
-	clusterStatus := &kubeadmapi.ClusterStatus{}
-	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterStatusData), clusterStatus); err != nil {
+	clusterStatus, err := unmarshalClusterStatus(data)
+	if err != nil {
 		return err
 	}
 
@@ -231,4 +228,35 @@ func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubea
 		}
 	}
 	return nil
+}
+
+// GetClusterStatus returns the kubeadm cluster status read from the kubeadm-config ConfigMap
+func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, error) {
+	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return &kubeadmapi.ClusterStatus{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	clusterStatus, err := unmarshalClusterStatus(configMap.Data)
+	if err != nil {
+		return nil, err
+	}
+
+	return clusterStatus, nil
+}
+
+func unmarshalClusterStatus(data map[string]string) (*kubeadmapi.ClusterStatus, error) {
+	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
+	if !ok {
+		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)
+	}
+	clusterStatus := &kubeadmapi.ClusterStatus{}
+	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterStatusData), clusterStatus); err != nil {
+		return nil, err
+	}
+
+	return clusterStatus, nil
 }

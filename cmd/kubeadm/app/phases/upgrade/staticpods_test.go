@@ -54,12 +54,13 @@ kind: InitConfiguration
 nodeRegistration:
   name: foo
   criSocket: ""
+apiEndpoint:
+  advertiseAddress: 1.2.3.4
+  bindPort: 6443
 ---
 apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterConfiguration
-api:
-  advertiseAddress: 1.2.3.4
-  bindPort: 6443
+
 apiServerCertSANs: null
 apiServerExtraArgs: null
 certificatesDir: %s
@@ -75,9 +76,6 @@ networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-nodeRegistration:
-  name: foo
-  criSocket: ""
 schedulerExtraArgs: null
 token: ce3aa5.5ec8455bb76b379f
 tokenTTL: 24h
@@ -236,19 +234,25 @@ func (c fakeTLSEtcdClient) WaitForClusterAvailable(delay time.Duration, retries 
 
 func (c fakeTLSEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
 	return map[string]*clientv3.StatusResponse{
-		"foo": {
+		"https://1.2.3.4:2379": {
 			Version: "3.1.12",
 		}}, nil
 }
 
 func (c fakeTLSEtcdClient) GetClusterVersions() (map[string]string, error) {
 	return map[string]string{
-		"foo": "3.1.12",
+		"https://1.2.3.4:2379": "3.1.12",
 	}, nil
 }
 
 func (c fakeTLSEtcdClient) GetVersion() (string, error) {
 	return "3.1.12", nil
+}
+
+func (c fakeTLSEtcdClient) Sync() error { return nil }
+
+func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
 }
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
@@ -277,18 +281,24 @@ func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.Stat
 	}
 
 	return map[string]*clientv3.StatusResponse{
-		"foo": {Version: "3.1.12"},
+		"https://1.2.3.4:2379": {Version: "3.1.12"},
 	}, nil
 }
 
 func (c fakePodManifestEtcdClient) GetClusterVersions() (map[string]string, error) {
 	return map[string]string{
-		"foo": "3.1.12",
+		"https://1.2.3.4:2379": "3.1.12",
 	}, nil
 }
 
 func (c fakePodManifestEtcdClient) GetVersion() (string, error) {
 	return "3.1.12", nil
+}
+
+func (c fakePodManifestEtcdClient) Sync() error { return nil }
+
+func (c fakePodManifestEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
 }
 
 func TestStaticPodControlPlane(t *testing.T) {
@@ -477,6 +487,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 		}
 
 		actualErr := StaticPodControlPlane(
+			nil,
 			waiter,
 			pathMgr,
 			newcfg,

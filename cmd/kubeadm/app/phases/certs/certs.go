@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 
 	"github.com/golang/glog"
-
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -285,7 +284,7 @@ type certKeyLocation struct {
 }
 
 // SharedCertificateExists verifies if the shared certificates - the certificates that must be
-// equal across masters: ca.key, ca.crt, sa.key, sa.pub
+// equal across masters: ca.key, ca.crt, sa.key, sa.pub + etcd/ca.key, etcd/ca.crt if local/stacked etcd
 func SharedCertificateExists(cfg *kubeadmapi.InitConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName, "", "CA"}); err != nil {
@@ -298,6 +297,13 @@ func SharedCertificateExists(cfg *kubeadmapi.InitConfiguration) (bool, error) {
 
 	if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, "", "front-proxy CA"}); err != nil {
 		return false, err
+	}
+
+	// in case of local/stacked etcd
+	if cfg.Etcd.External == nil {
+		if err := validateCACertAndKey(certKeyLocation{cfg.CertificatesDir, kubeadmconstants.EtcdCACertAndKeyBaseName, "", "etcd CA"}); err != nil {
+			return false, err
+		}
 	}
 
 	return true, nil
