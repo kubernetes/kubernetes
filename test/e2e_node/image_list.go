@@ -117,7 +117,7 @@ func getPuller() (puller, error) {
 	return nil, fmt.Errorf("can't prepull images, unknown container runtime %q", runtime)
 }
 
-// Pre-fetch all images tests depend on so that we don't fail in an actual test.
+// PrePullAllImages Pre-fetch all images tests depend on so that we don't fail in an actual test.
 func PrePullAllImages() error {
 	puller, err := getPuller()
 	if err != nil {

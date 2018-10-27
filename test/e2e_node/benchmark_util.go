@@ -26,17 +26,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
-
-	. "github.com/onsi/gomega"
 )
 
 const (
+	// TimeSeriesTag tag for TimeSeries Result
 	TimeSeriesTag = "[Result:TimeSeries]"
+	// TimeSeriesEnd tag for TimeSeries Finish
 	TimeSeriesEnd = "[Finish:TimeSeries]"
 )
 
@@ -155,7 +156,7 @@ func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatenc
 func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[string]string {
 	nodeName := framework.TestContext.NodeName
 	node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	cpu, ok := node.Status.Capacity[v1.ResourceCPU]
 	if !ok {

@@ -18,6 +18,7 @@ package e2e_node
 
 import "github.com/onsi/ginkgo"
 
+// SIGDescribe wraps ginkgo.Describe functonality for SIG-nodes
 func SIGDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[sig-node] "+text, body)
 }

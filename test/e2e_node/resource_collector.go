@@ -45,8 +45,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -62,6 +62,7 @@ var (
 	systemContainers map[string]string
 )
 
+// ResourceCollector describes a resource collector
 type ResourceCollector struct {
 	client  *cadvisorclient.Client
 	request *cadvisorapiv2.RequestOptions
@@ -106,7 +107,7 @@ func (r *ResourceCollector) Start() {
 		return false, err
 	})
 
-	Expect(r.client).NotTo(BeNil(), "cadvisor client not ready")
+	gomega.Expect(r.client).NotTo(gomega.BeNil(), "cadvisor client not ready")
 
 	r.request = &cadvisorapiv2.RequestOptions{IdType: "name", Count: 1, Recursive: false}
 	r.stopCh = make(chan struct{})
@@ -368,14 +369,14 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *v1.Pod) {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			defer wg.Done()
 
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
+			gomega.Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
 		}(pod)
 	}
 	wg.Wait()
@@ -437,7 +438,7 @@ func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod 
 	return pods
 }
 
-// GetResourceSeriesWithLabels gets the time series of resource usage of each container.
+// GetResourceTimeSeries gets the time series of resource usage of each container.
 func (r *ResourceCollector) GetResourceTimeSeries() map[string]*perftype.ResourceSeries {
 	resourceSeries := make(map[string]*perftype.ResourceSeries)
 	for key, name := range systemContainers {
@@ -458,13 +459,14 @@ func (r *ResourceCollector) GetResourceTimeSeries() map[string]*perftype.Resourc
 const kubeletProcessName = "kubelet"
 
 func getPidsForProcess(name, pidFile string) ([]int, error) {
+	var err error
+	var pid int
 	if len(pidFile) > 0 {
-		if pid, err := getPidFromPidFile(pidFile); err == nil {
+		if pid, err = getPidFromPidFile(pidFile); err == nil {
 			return []int{pid}, nil
-		} else {
-			// log the error and fall back to pidof
-			runtime.HandleError(err)
 		}
+		// log the error and fall back to pidof
+		runtime.HandleError(err)
 	}
 	return procfs.PidOf(name)
 }

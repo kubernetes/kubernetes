@@ -271,7 +271,7 @@ func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
 	if nodes == nil {
-		return nil, fmt.Errorf("the node list is nil.")
+		return nil, fmt.Errorf("the node list is nil")
 	}
 	Expect(len(nodes.Items) > 1).NotTo(BeTrue(), "should not be more than 1 nodes.")
 	if len(nodes.Items) == 0 {

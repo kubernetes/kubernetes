@@ -90,6 +90,7 @@ func (a *APIServer) Stop() error {
 
 const apiserverName = "apiserver"
 
+// Name returns the name of the apiserver
 func (a *APIServer) Name() string {
 	return apiserverName
 }

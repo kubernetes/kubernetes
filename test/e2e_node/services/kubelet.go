@@ -91,8 +91,9 @@ func RunKubelet() {
 
 const (
 	// Ports of different e2e services.
-	kubeletPort          = "10250"
-	kubeletReadOnlyPort  = "10255"
+	kubeletPort         = "10250"
+	kubeletReadOnlyPort = "10255"
+	// KubeletRootDirectory root directory for kubelet
 	KubeletRootDirectory = "/var/lib/kubelet"
 	// Health check url of kubelet
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
@@ -256,7 +257,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	cmdArgs = append(cmdArgs,
 		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
-		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
+		"--v", LogVerbosityLevel, "--logtostderr",
 		"--allow-privileged=true",
 	)
 
@@ -410,9 +411,8 @@ func createRootDirectory(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return os.MkdirAll(path, os.FileMode(0755))
-		} else {
-			return err
 		}
+		return err
 	}
 	return nil
 }

@@ -101,12 +101,14 @@ var (
 	suite          remote.TestSuite
 )
 
+// Archive contains information about an archive
 type Archive struct {
 	sync.Once
 	path string
 	err  error
 }
 
+// TestResult contains Test result information
 type TestResult struct {
 	output string
 	err    error
@@ -125,22 +127,25 @@ type TestResult struct {
 //         project: gce-image-project
 //         machine: for benchmark only, the machine type (GCE instance) to run test
 //         tests: for benchmark only, a list of ginkgo focus strings to match tests
-
+//
 // TODO(coufon): replace 'image' with 'node' in configurations
 // and we plan to support testing custom machines other than GCE by specifying host
 type ImageConfig struct {
 	Images map[string]GCEImage `json:"images"`
 }
 
+// Accelerator specifies the content of an Accelerator
 type Accelerator struct {
 	Type  string `json:"type,omitempty"`
 	Count int64  `json:"count,omitempty"`
 }
 
+// Resources specifies a list of Accelerators
 type Resources struct {
 	Accelerators []Accelerator `json:"accelerators,omitempty"`
 }
 
+// GCEImage specifies information about Google Compute Engine images
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
 	ImageDesc  string `json:"image_description,omitempty"`
@@ -420,23 +425,23 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 		}
 	}
 	if strings.ToUpper(instance.Status) != "RUNNING" {
-		err = fmt.Errorf("instance %s not in state RUNNING, was %s.", host, instance.Status)
+		err = fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
 		return &TestResult{
 			err:    err,
 			host:   host,
 			exitOk: false,
 		}
 	}
-	externalIp := getExternalIp(instance)
-	if len(externalIp) > 0 {
-		remote.AddHostnameIp(host, externalIp)
+	externalIP := getExternalIP(instance)
+	if len(externalIP) > 0 {
+		remote.AddHostnameIp(host, externalIP)
 	}
 
 	path, err := arc.getArchive()
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
 		return &TestResult{
-			err: fmt.Errorf("unable to create test archive: %v.", err),
+			err: fmt.Errorf("unable to create test archive: %v", err),
 		}
 	}
 
@@ -614,12 +619,12 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			continue
 		}
 		if strings.ToUpper(instance.Status) != "RUNNING" {
-			err = fmt.Errorf("instance %s not in state RUNNING, was %s.", name, instance.Status)
+			err = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
 			continue
 		}
-		externalIp := getExternalIp(instance)
-		if len(externalIp) > 0 {
-			remote.AddHostnameIp(name, externalIp)
+		externalIP := getExternalIP(instance)
+		if len(externalIP) > 0 {
+			remote.AddHostnameIp(name, externalIP)
 		}
 		// TODO(random-liu): Remove the docker version check. Use some other command to check
 		// instance readiness.
@@ -670,7 +675,7 @@ func isCloudInitUsed(metadata *compute.Metadata) bool {
 	return false
 }
 
-func getExternalIp(instance *compute.Instance) string {
+func getExternalIP(instance *compute.Instance) string {
 	for i := range instance.NetworkInterfaces {
 		ni := instance.NetworkInterfaces[i]
 		for j := range ni.AccessConfigs {

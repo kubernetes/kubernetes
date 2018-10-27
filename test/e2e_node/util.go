@@ -48,8 +48,8 @@ import (
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 // TODO(random-liu): Get this automatically from kubelet flag.
@@ -107,10 +107,10 @@ func getCurrentKubeletConfig() (*kubeletconfig.KubeletConfiguration, error) {
 // Returns true on success.
 func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(initialConfig *kubeletconfig.KubeletConfiguration)) {
 	var oldCfg *kubeletconfig.KubeletConfiguration
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
-		Expect(configEnabled).To(BeTrue(), "The Dynamic Kubelet Configuration feature is not enabled.\n"+
+		gomega.Expect(configEnabled).To(gomega.BeTrue(), "The Dynamic Kubelet Configuration feature is not enabled.\n"+
 			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n"+
 			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
 		oldCfg, err = getCurrentKubeletConfig()
@@ -123,7 +123,7 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 
 		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 	})
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		if oldCfg != nil {
 			err := setKubeletConfiguration(f, oldCfg)
 			framework.ExpectNoError(err)
@@ -179,15 +179,15 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 	}
 
 	// set the source, retry a few times in case we are competing with other writers
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		if err := setNodeConfigSource(f, src); err != nil {
 			return err
 		}
 		return nil
-	}, time.Minute, time.Second).Should(BeNil())
+	}, time.Minute, time.Second).Should(gomega.BeNil())
 
 	// poll for new config, for a maximum wait of restartGap
-	Eventually(func() error {
+	gomega.Eventually(func() error {
 		newKubeCfg, err := getCurrentKubeletConfig()
 		if err != nil {
 			return fmt.Errorf("failed trying to get current Kubelet config, will retry, error: %v", err)
@@ -197,7 +197,7 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		}
 		glog.Infof("new configuration has taken effect")
 		return nil
-	}, restartGap, pollInterval).Should(BeNil())
+	}, restartGap, pollInterval).Should(gomega.BeNil())
 
 	return nil
 }
@@ -235,7 +235,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 	req.Header.Add("Accept", "application/json")
 
 	var resp *http.Response
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		resp, err = client.Do(req)
 		if err != nil {
 			glog.Errorf("Failed to get /configz, retrying. Error: %v", err)
@@ -246,7 +246,7 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration) *http.Respon
 			return false
 		}
 		return true
-	}, timeout, pollInterval).Should(Equal(true))
+	}, timeout, pollInterval).Should(gomega.Equal(true))
 	return resp
 }
 
@@ -317,7 +317,7 @@ func logNodeEvents(f *framework.Framework) {
 
 func getLocalNode(f *framework.Framework) *apiv1.Node {
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	Expect(len(nodeList.Items)).To(Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
+	gomega.Expect(len(nodeList.Items)).To(gomega.Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
 }
 
@@ -393,7 +393,7 @@ func restartKubelet() {
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
-	Expect(len(matches)).NotTo(BeZero())
+	gomega.Expect(len(matches)).NotTo(gomega.BeZero())
 	kube := matches[0]
 	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
@@ -403,9 +403,8 @@ func restartKubelet() {
 func toCgroupFsName(cgroupName cm.CgroupName) string {
 	if framework.TestContext.KubeletConfig.CgroupDriver == "systemd" {
 		return cgroupName.ToSystemd()
-	} else {
-		return cgroupName.ToCgroupfs()
 	}
+	return cgroupName.ToCgroupfs()
 }
 
 // reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)

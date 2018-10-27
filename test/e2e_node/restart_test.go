@@ -34,9 +34,9 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-// waitForPods waits for timeout duration, for pod_count.
+// waitForPods waits for timeout duration, for podCount.
 // If the timeout is hit, it returns the list of currently running pods.
-func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (runningPods []*v1.Pod) {
+func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (runningPods []*v1.Pod) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		podList, err := f.PodClient().List(metav1.ListOptions{})
 		if err != nil {
@@ -52,7 +52,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 			runningPods = append(runningPods, &pod)
 		}
 		framework.Logf("Running pod count %d", len(runningPods))
-		if len(runningPods) >= pod_count {
+		if len(runningPods) >= podCount {
 			break
 		}
 	}
@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 					framework.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
 				}
 
-				for i := 0; i < restartCount; i += 1 {
+				for i := 0; i < restartCount; i++ {
 					By(fmt.Sprintf("Killing container runtime iteration %d", i))
 					// Wait for container runtime to be running
 					var pid int
