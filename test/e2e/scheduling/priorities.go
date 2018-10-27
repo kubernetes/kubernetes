@@ -29,8 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -281,14 +279,22 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(found).To(Equal(true))
 		nodeOriginalMemoryVal := nodeOriginalMemory.Value()
 		nodeOriginalCPUVal := nodeOriginalCPU.MilliValue()
-		err := updateNodeAllocatable(cs, nodeName, int64(10000), int64(12000))
+		err := updateNodeAllocatable(cs, nodeName, int64(10737418240), int64(12000))
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			// Resize the node back to its original allocatable values.
 			if err := updateNodeAllocatable(cs, nodeName, nodeOriginalMemoryVal, nodeOriginalCPUVal); err != nil {
 				framework.Logf("Failed to revert node memory with %v", err)
 			}
+			// Reset the node list with its old entry.
+			nodeList.Items[len(nodeList.Items)-1] = lastNode
 		}()
+		// update nodeList with newNode.
+		newNode, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil {
+			framework.Logf("Failed to get node", err)
+		}
+		nodeList.Items[len(nodeList.Items)-1] = *newNode
 		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
 		// After the above we should see 50% of node to be available which is 5000MiB memory, 6000m cpu for large node.
@@ -457,20 +463,11 @@ func addRandomTaitToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 func updateNodeAllocatable(c clientset.Interface, nodeName string, memory, cpu int64) error {
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	oldData, err := json.Marshal(node)
 	if err != nil {
 		return err
 	}
 	node.Status.Allocatable[v1.ResourceMemory] = *resource.NewQuantity(memory, resource.BinarySI)
 	node.Status.Allocatable[v1.ResourceCPU] = *resource.NewMilliQuantity(cpu, resource.DecimalSI)
-	newData, err := json.Marshal(node)
-	if err != nil {
-		return err
-	}
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
-	if err != nil {
-		return err
-	}
-	_, err = c.CoreV1().Nodes().Patch(string(node.Name), types.StrategicMergePatchType, patchBytes)
+	_, err = c.CoreV1().Nodes().UpdateStatus(node)
 	return err
 }
