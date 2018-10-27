@@ -20,9 +20,11 @@ import (
 	"bytes"
 	"encoding/json"
 	goflag "flag"
-	"fmt"
+
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/golang/glog"
@@ -202,21 +204,21 @@ func getVersion(lastSeenBinaryVersion *string) error {
 	// Create the get request for the etcd version endpoint.
 	req, err := http.NewRequest("GET", etcdVersionScrapeURI, nil)
 	if err != nil {
-		return fmt.Errorf("Failed to create GET request for etcd version: %v", err)
+		return errors.Wrap(err, "Failed to create GET request for etcd version")
 	}
 
 	// Send the get request and receive a response.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("Failed to receive GET response for etcd version: %v", err)
+		return errors.Wrap(err, "Failed to receive GET response for etcd version")
 	}
 	defer resp.Body.Close()
 
 	// Obtain EtcdVersion from the JSON response.
 	var version EtcdVersion
 	if err := json.NewDecoder(resp.Body).Decode(&version); err != nil {
-		return fmt.Errorf("Failed to decode etcd version JSON: %v", err)
+		return errors.Wrap(err, "Failed to decode etcd version JSON")
 	}
 
 	// Return without updating the version if it stayed the same since last time.
@@ -228,7 +230,7 @@ func getVersion(lastSeenBinaryVersion *string) error {
 	if *lastSeenBinaryVersion != "" {
 		deleted := etcdVersion.Delete(prometheus.Labels{"binary_version": *lastSeenBinaryVersion})
 		if !deleted {
-			return fmt.Errorf("Failed to delete previous version's metric")
+			return errors.New("Failed to delete previous version's metric")
 		}
 	}
 
@@ -259,14 +261,14 @@ func getVersionPeriodically(stopCh <-chan struct{}) {
 func scrapeMetrics() (map[string]*dto.MetricFamily, error) {
 	req, err := http.NewRequest("GET", etcdMetricsScrapeURI, nil)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create GET request for etcd metrics: %v", err)
+		return nil, errors.Wrap(err, "Failed to create GET request for etcd metrics")
 	}
 
 	// Send the get request and receive a response.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to receive GET response for etcd metrics: %v", err)
+		return nil, errors.Wrap(err, "Failed to receive GET response for etcd metrics")
 	}
 	defer resp.Body.Close()
 
