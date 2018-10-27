@@ -32,7 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -83,7 +85,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Pod should be schedule to node that don't match the PodAntiAffinity terms", func() {
+	It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		pod := runPausePod(f, pausePodConfig{
 			Name:   "pod-with-label-security-s1",
@@ -144,7 +146,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(labelPod.Spec.NodeName).NotTo(Equal(nodeName))
 	})
 
-	It("Pod should avoid to schedule to node that have avoidPod annotation", func() {
+	It("Pod should avoid nodes that have avoidPod annotation", func() {
 		nodeName := nodeList.Items[0].Name
 		// make the nodes have balanced cpu,mem usage
 		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
@@ -207,7 +209,8 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 	})
 
-	It("Pod should perfer to scheduled to nodes pod can tolerate", func() {
+	It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
+
 		// make the nodes have balanced cpu,mem usage ratio
 		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
@@ -257,6 +260,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(tolePod.Spec.NodeName).To(Equal(nodeName))
 	})
 	It("Pod should be preferably scheduled to nodes which satisfy its limits", func() {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ResourceLimitsPriorityFunction) {
+			framework.Skipf("ResourceLimits Priority function is not enabled, so skipping this test")
+		}
 		var podwithLargeRequestedResource *v1.ResourceRequirements = &v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("100Mi"),
@@ -264,26 +270,28 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			},
 			Limits: v1.ResourceList{
 				v1.ResourceMemory: resource.MustParse("3000Mi"),
-				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceCPU:    resource.MustParse("5000m"),
 			},
 		}
 		// Update one node to have large allocatable.
 		lastNode := nodeList.Items[len(nodeList.Items)-1]
 		nodeName := lastNode.Name
 		nodeOriginalMemory, found := lastNode.Status.Allocatable[v1.ResourceMemory]
+		nodeOriginalCPU, found := lastNode.Status.Allocatable[v1.ResourceCPU]
 		Expect(found).To(Equal(true))
 		nodeOriginalMemoryVal := nodeOriginalMemory.Value()
-		err := updateMemoryOfNode(cs, nodeName, int64(10000))
+		nodeOriginalCPUVal := nodeOriginalCPU.MilliValue()
+		err := updateNodeAllocatable(cs, nodeName, int64(10000), int64(12000))
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
-			// Resize the node back to its original memory.
-			if err := updateMemoryOfNode(cs, nodeName, nodeOriginalMemoryVal); err != nil {
+			// Resize the node back to its original allocatable values.
+			if err := updateNodeAllocatable(cs, nodeName, nodeOriginalMemoryVal, nodeOriginalCPUVal); err != nil {
 				framework.Logf("Failed to revert node memory with %v", err)
 			}
 		}()
 		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
-		// After the above we should see 50% of node to be available which is 5000MiB for large node.
+		// After the above we should see 50% of node to be available which is 5000MiB memory, 6000m cpu for large node.
 		By("Create a pod with unusual large limits")
 		podWithLargeLimits := "with-large-limits"
 
@@ -445,8 +453,8 @@ func addRandomTaitToNode(cs clientset.Interface, nodeName string) *v1.Taint {
 	return &testTaint
 }
 
-// updateMemoryOfNode updates the memory of given node with the given value
-func updateMemoryOfNode(c clientset.Interface, nodeName string, memory int64) error {
+// updateNodeAllocatable updates the allocatable values of given node with the given values.
+func updateNodeAllocatable(c clientset.Interface, nodeName string, memory, cpu int64) error {
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	oldData, err := json.Marshal(node)
@@ -454,6 +462,7 @@ func updateMemoryOfNode(c clientset.Interface, nodeName string, memory int64) er
 		return err
 	}
 	node.Status.Allocatable[v1.ResourceMemory] = *resource.NewQuantity(memory, resource.BinarySI)
+	node.Status.Allocatable[v1.ResourceCPU] = *resource.NewMilliQuantity(cpu, resource.DecimalSI)
 	newData, err := json.Marshal(node)
 	if err != nil {
 		return err
