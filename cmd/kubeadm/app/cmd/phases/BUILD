@@ -68,7 +68,6 @@ go_test(
     name = "go_default_test",
     srcs = [
         "addons_test.go",
-        "certs_test.go",
         "controlplane_test.go",
         "etcd_test.go",
         "kubeconfig_test.go",
@@ -84,7 +83,6 @@ go_test(
         "//cmd/kubeadm/test:go_default_library",
         "//cmd/kubeadm/test/cmd:go_default_library",
         "//cmd/kubeadm/test/kubeconfig:go_default_library",
-        "//pkg/util/node:go_default_library",
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
