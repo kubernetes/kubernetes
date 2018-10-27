@@ -18,6 +18,7 @@ package rest
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -166,70 +167,16 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 				return false, nil
 			}
 
+			wg := sync.WaitGroup{}
+
+			wg.Add(len(p.ClusterRoles))
 			// ensure bootstrap roles are created or reconciled
 			for _, clusterRole := range p.ClusterRoles {
-				opts := reconciliation.ReconcileRoleOptions{
-					Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
-					Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
-					Confirm: true,
-				}
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-					result, err := opts.Run()
-					if err != nil {
-						return err
-					}
-					switch {
-					case result.Protected && result.Operation != reconciliation.ReconcileNone:
-						glog.Warningf("skipped reconcile-protected clusterrole.%s/%s with missing permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
-					case result.Operation == reconciliation.ReconcileUpdate:
-						glog.Infof("updated clusterrole.%s/%s with additional permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
-					case result.Operation == reconciliation.ReconcileCreate:
-						glog.Infof("created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
-					}
-					return nil
-				})
-				if err != nil {
-					// don't fail on failures, try to create as many as you can
-					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
-				}
-			}
-
-			// ensure bootstrap rolebindings are created or reconciled
-			for _, clusterRoleBinding := range p.ClusterRoleBindings {
-				opts := reconciliation.ReconcileRoleBindingOptions{
-					RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
-					Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},
-					Confirm:     true,
-				}
-				err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-					result, err := opts.Run()
-					if err != nil {
-						return err
-					}
-					switch {
-					case result.Protected && result.Operation != reconciliation.ReconcileNone:
-						glog.Warningf("skipped reconcile-protected clusterrolebinding.%s/%s with missing subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
-					case result.Operation == reconciliation.ReconcileUpdate:
-						glog.Infof("updated clusterrolebinding.%s/%s with additional subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
-					case result.Operation == reconciliation.ReconcileCreate:
-						glog.Infof("created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
-					case result.Operation == reconciliation.ReconcileRecreate:
-						glog.Infof("recreated clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
-					}
-					return nil
-				})
-				if err != nil {
-					// don't fail on failures, try to create as many as you can
-					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
-				}
-			}
-
-			// ensure bootstrap namespaced roles are created or reconciled
-			for namespace, roles := range p.Roles {
-				for _, role := range roles {
+				go func(clusterRole rbacapiv1.ClusterRole) {
+					defer wg.Done()
 					opts := reconciliation.ReconcileRoleOptions{
-						Role:    reconciliation.RoleRuleOwner{Role: &role},
-						Client:  reconciliation.RoleModifier{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
+						Role:    reconciliation.ClusterRoleRuleOwner{ClusterRole: &clusterRole},
+						Client:  reconciliation.ClusterRoleModifier{Client: clientset.ClusterRoles()},
 						Confirm: true,
 					}
 					err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -239,27 +186,29 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						}
 						switch {
 						case result.Protected && result.Operation != reconciliation.ReconcileNone:
-							glog.Warningf("skipped reconcile-protected role.%s/%s in %v with missing permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+							glog.Warningf("skipped reconcile-protected clusterrole.%s/%s with missing permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
 						case result.Operation == reconciliation.ReconcileUpdate:
-							glog.Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+							glog.Infof("updated clusterrole.%s/%s with additional permissions: %v", rbac.GroupName, clusterRole.Name, result.MissingRules)
 						case result.Operation == reconciliation.ReconcileCreate:
-							glog.Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
+							glog.Infof("created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
 						}
 						return nil
 					})
 					if err != nil {
 						// don't fail on failures, try to create as many as you can
-						utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+						utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
 					}
-				}
+				}(clusterRole)
 			}
 
-			// ensure bootstrap namespaced rolebindings are created or reconciled
-			for namespace, roleBindings := range p.RoleBindings {
-				for _, roleBinding := range roleBindings {
+			wg.Add(len(p.ClusterRoleBindings))
+			// ensure bootstrap rolebindings are created or reconciled
+			for _, clusterRoleBinding := range p.ClusterRoleBindings {
+				go func(clusterRoleBinding rbacapiv1.ClusterRoleBinding) {
+					defer wg.Done()
 					opts := reconciliation.ReconcileRoleBindingOptions{
-						RoleBinding: reconciliation.RoleBindingAdapter{RoleBinding: &roleBinding},
-						Client:      reconciliation.RoleBindingClientAdapter{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
+						RoleBinding: reconciliation.ClusterRoleBindingAdapter{ClusterRoleBinding: &clusterRoleBinding},
+						Client:      reconciliation.ClusterRoleBindingClientAdapter{Client: clientset.ClusterRoleBindings()},
 						Confirm:     true,
 					}
 					err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -269,23 +218,95 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 						}
 						switch {
 						case result.Protected && result.Operation != reconciliation.ReconcileNone:
-							glog.Warningf("skipped reconcile-protected rolebinding.%s/%s in %v with missing subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+							glog.Warningf("skipped reconcile-protected clusterrolebinding.%s/%s with missing subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
 						case result.Operation == reconciliation.ReconcileUpdate:
-							glog.Infof("updated rolebinding.%s/%s in %v with additional subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+							glog.Infof("updated clusterrolebinding.%s/%s with additional subjects: %v", rbac.GroupName, clusterRoleBinding.Name, result.MissingSubjects)
 						case result.Operation == reconciliation.ReconcileCreate:
-							glog.Infof("created rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+							glog.Infof("created clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
 						case result.Operation == reconciliation.ReconcileRecreate:
-							glog.Infof("recreated rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+							glog.Infof("recreated clusterrolebinding.%s/%s", rbac.GroupName, clusterRoleBinding.Name)
 						}
 						return nil
 					})
 					if err != nil {
 						// don't fail on failures, try to create as many as you can
-						utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
+						utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
 					}
-				}
+				}(clusterRoleBinding)
 			}
 
+			wg.Add(len(p.Roles))
+			// ensure bootstrap namespaced roles are created or reconciled
+			for namespace, roles := range p.Roles {
+				go func(namespace string, roles []rbacapiv1.Role) {
+					defer wg.Done()
+
+					for _, role := range roles {
+						opts := reconciliation.ReconcileRoleOptions{
+							Role:    reconciliation.RoleRuleOwner{Role: &role},
+							Client:  reconciliation.RoleModifier{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
+							Confirm: true,
+						}
+						err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+							result, err := opts.Run()
+							if err != nil {
+								return err
+							}
+							switch {
+							case result.Protected && result.Operation != reconciliation.ReconcileNone:
+								glog.Warningf("skipped reconcile-protected role.%s/%s in %v with missing permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+							case result.Operation == reconciliation.ReconcileUpdate:
+								glog.Infof("updated role.%s/%s in %v with additional permissions: %v", rbac.GroupName, role.Name, namespace, result.MissingRules)
+							case result.Operation == reconciliation.ReconcileCreate:
+								glog.Infof("created role.%s/%s in %v", rbac.GroupName, role.Name, namespace)
+							}
+							return nil
+						})
+						if err != nil {
+							// don't fail on failures, try to create as many as you can
+							utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+						}
+					}
+				}(namespace, roles)
+			}
+
+			wg.Add(len(p.RoleBindings))
+			// ensure bootstrap namespaced rolebindings are created or reconciled
+			for namespace, roleBindings := range p.RoleBindings {
+				go func(namespace string, roleBindings []rbacapiv1.RoleBinding) {
+					defer wg.Done()
+					for _, roleBinding := range roleBindings {
+						opts := reconciliation.ReconcileRoleBindingOptions{
+							RoleBinding: reconciliation.RoleBindingAdapter{RoleBinding: &roleBinding},
+							Client:      reconciliation.RoleBindingClientAdapter{Client: clientset, NamespaceClient: coreclientset.Namespaces()},
+							Confirm:     true,
+						}
+						err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+							result, err := opts.Run()
+							if err != nil {
+								return err
+							}
+							switch {
+							case result.Protected && result.Operation != reconciliation.ReconcileNone:
+								glog.Warningf("skipped reconcile-protected rolebinding.%s/%s in %v with missing subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+							case result.Operation == reconciliation.ReconcileUpdate:
+								glog.Infof("updated rolebinding.%s/%s in %v with additional subjects: %v", rbac.GroupName, roleBinding.Name, namespace, result.MissingSubjects)
+							case result.Operation == reconciliation.ReconcileCreate:
+								glog.Infof("created rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+							case result.Operation == reconciliation.ReconcileRecreate:
+								glog.Infof("recreated rolebinding.%s/%s in %v", rbac.GroupName, roleBinding.Name, namespace)
+							}
+							return nil
+						})
+						if err != nil {
+							// don't fail on failures, try to create as many as you can
+							utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
+						}
+					}
+				}(namespace, roleBindings)
+			}
+
+			wg.Wait()
 			return true, nil
 		})
 		// if we're never able to make it through initialization, kill the API server
