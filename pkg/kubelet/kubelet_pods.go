@@ -216,7 +216,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 
 		// Docker Volume Mounts fail on Windows if it is not of the form C:/
 		if volumeutil.IsWindowsLocalPath(runtime.GOOS, hostPath) {
-			hostPath = "c:" + hostPath
+			hostPath = volumeutil.MakeAbsolutePath(runtime.GOOS, hostPath)
 		}
 
 		containerPath := mount.MountPath
