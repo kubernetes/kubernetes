@@ -200,7 +200,7 @@ DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            /* default/nginx-s
 Currently, local-up scripts, GCE scripts and kubeadm support switching IPVS proxy mode via exporting environment variables or specifying flags.  
 
 ### Prerequisite
-Ensure IPVS required kernel modules
+Ensure IPVS required kernel modules (**Notes**: use `nf_conntrack` instead of `nf_conntrack_ipv4` for Linux kernel 4.19 and later)
 ```shell
 ip_vs
 ip_vs_rr
