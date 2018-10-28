@@ -19,7 +19,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["pki_helpers.go"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
