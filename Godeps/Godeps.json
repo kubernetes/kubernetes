@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/kubernetes",
-	"GoVersion": "go1.10",
+	"GoVersion": "go1.11",
 	"GodepVersion": "v80",
 	"Packages": [
 		"github.com/onsi/ginkgo/ginkgo",
@@ -808,8 +808,8 @@
 		},
 		{
 			"ImportPath": "github.com/container-storage-interface/spec/lib/go/csi/v0",
-			"Comment": "v0.3.0",
-			"Rev": "2178fdeea87f1150a17a63252eee28d4d8141f72"
+			"Comment": "v0.3.0-16-g0361f62",
+			"Rev": "0361f621e6bbfc62f3b60708544e5489ce22fc28"
 		},
 		{
 			"ImportPath": "github.com/containerd/console",
@@ -1561,6 +1561,7 @@
 		},
 		{
 			"ImportPath": "github.com/ghodss/yaml",
+			"Comment": "v1.0.0-4-gc7ce166",
 			"Rev": "c7ce16629ff4cd059ed96ed06419dd3856fd3577"
 		},
 		{
@@ -3816,6 +3817,7 @@
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
+			"Comment": "v2.2.1",
 			"Rev": "5420a8b6744d3b0345ab293f6fcba19c978f1183"
 		},
 		{
