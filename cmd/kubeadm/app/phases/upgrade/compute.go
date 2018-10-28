@@ -302,7 +302,7 @@ func minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion *versionut
 func getSuggestedEtcdVersion(kubernetesVersion string) string {
 	etcdVersion, err := kubeadmconstants.EtcdSupportedVersion(kubernetesVersion)
 	if err != nil {
-		fmt.Printf("[upgrade/versions] WARNING: No recommended etcd for requested kubernetes version (%s)\n", kubernetesVersion)
+		fmt.Printf("[upgrade/versions] WARNING: No recommended etcd for requested Kubernetes version (%s)\n", kubernetesVersion)
 		return "N/A"
 	}
 	return etcdVersion.String()

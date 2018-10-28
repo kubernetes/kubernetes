@@ -732,7 +732,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	}
 
 	// Instantiating a fake etcd cluster for being able to get etcd version for a corresponding
-	// kubernetes release.
+	// Kubernetes release.
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 

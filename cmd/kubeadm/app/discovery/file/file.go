@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 
 	"github.com/pkg/errors"
-
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +52,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		return nil, err
 	}
 
-	// This is the cluster object we've got from the cluster-info KubeConfig file
+	// This is the cluster object we've got from the cluster-info kubeconfig file
 	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
 
 	// Create a new kubeconfig object from the given, just copy over the server and the CA cert
@@ -153,14 +152,14 @@ func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, e
 	return parsedKubeConfig, nil
 }
 
-// validateKubeConfig makes sure the user-provided KubeConfig file is valid
+// validateKubeConfig makes sure the user-provided kubeconfig file is valid
 func validateKubeConfig(config *clientcmdapi.Config) error {
 	if len(config.Clusters) < 1 {
-		return errors.New("the provided cluster-info KubeConfig file must have at least one Cluster defined")
+		return errors.New("the provided cluster-info kubeconfig file must have at least one Cluster defined")
 	}
 	defaultCluster := kubeconfigutil.GetClusterFromKubeConfig(config)
 	if defaultCluster == nil {
-		return errors.New("the provided cluster-info KubeConfig file must have an unnamed Cluster or a CurrentContext that specifies a non-nil Cluster")
+		return errors.New("the provided cluster-info kubeconfig file must have an unnamed Cluster or a CurrentContext that specifies a non-nil Cluster")
 	}
 	return clientcmd.Validate(*config)
 }

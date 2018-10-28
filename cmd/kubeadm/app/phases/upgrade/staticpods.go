@@ -274,7 +274,7 @@ func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Wa
 	// Need to check currently used version and version from constants, if differs then upgrade
 	desiredEtcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
 	if err != nil {
-		return true, errors.Wrap(err, "failed to retrieve an etcd version for the target kubernetes version")
+		return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
 	}
 
 	// gets the etcd version of the local/stacked etcd member running on the current machine
