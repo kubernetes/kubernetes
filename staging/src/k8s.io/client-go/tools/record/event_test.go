@@ -31,7 +31,9 @@ import (
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	clientcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
 )
@@ -921,4 +923,40 @@ func TestMultiSinkCache(t *testing.T) {
 
 	sinkWatcher.Stop()
 	sinkWatcher2.Stop()
+}
+
+func TestEventCreationWithFakeClientSet(t *testing.T) {
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			SelfLink:  "/api/version/pods/foo",
+			Name:      "foo",
+			Namespace: "baz",
+		},
+	}
+
+	fakeCLI := fake.NewSimpleClientset(testPod)
+	fakeEvents := fakeCLI.CoreV1().Events(v1.NamespaceAll)
+	fakeSink := &clientcorev1.EventSinkImpl{
+		Interface: fakeEvents,
+	}
+
+	ch := make(chan struct{})
+	testSink := testEventSink{
+		OnCreate: func(event *v1.Event) (*v1.Event, error) {
+			defer close(ch)
+			event, err := fakeSink.Create(event)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return event, err
+		},
+	}
+
+	eventBroadcaster := NewBroadcasterForTests(0)
+	eventBroadcaster.StartRecordingToSink(&testSink)
+
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "baz"})
+	recorder.Event(testPod, v1.EventTypeNormal, "SomeReason", "Dummy event")
+
+	<-ch
 }
