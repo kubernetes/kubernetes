@@ -774,10 +774,16 @@ func checkPodEvents(config *localTestConfig, podName string, ep *eventPatterns) 
 	}.AsSelector().String()
 	options := metav1.ListOptions{FieldSelector: selector}
 	events, err := config.client.CoreV1().Events(config.ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(events.Items)).NotTo(Equal(0))
+	if err != nil {
+		framework.Failf("error fetching events for pod %s/%s: %v", config.ns, podName, err)
+	}
+	if len(events.Items) == 0 {
+		framework.Failf("did not find any events for pod %s/%s with reason %s", config.ns, podName, ep.reason)
+	}
 	for _, p := range ep.pattern {
-		Expect(events.Items[0].Message).To(ContainSubstring(p))
+		if !strings.Contains(events.Items[0].Message, p) {
+			framework.Failf("pod event %s did not contain pattern %s", events.Items[0].Message, p)
+		}
 	}
 }
 
