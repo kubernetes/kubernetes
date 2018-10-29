@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 )
 
@@ -43,7 +42,6 @@ type AdmissionConfig struct {
 	CloudConfigFile      string
 	LoopbackClientConfig *rest.Config
 	ExternalInformers    externalinformers.SharedInformerFactory
-	InternalInformers    internalinformers.SharedInformerFactory
 }
 
 func (c *AdmissionConfig) buildAuthnInfoResolver(proxyTransport *http.Transport) webhook.AuthenticationInfoResolverWrapper {

@@ -63,8 +63,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -281,9 +279,8 @@ func CreateKubeAPIServerConfig(
 ) {
 	var genericConfig *genericapiserver.Config
 	var storageFactory *serverstorage.DefaultStorageFactory
-	var sharedInformers informers.SharedInformerFactory
 	var versionedInformers clientgoinformers.SharedInformerFactory
-	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)
+	genericConfig, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if lastErr != nil {
 		return
 	}
@@ -399,7 +396,6 @@ func CreateKubeAPIServerConfig(
 			APIAudiences:                apiAudiences,
 			ServiceAccountMaxExpiration: maxExpiration,
 
-			InternalInformers:  sharedInformers,
 			VersionedInformers: versionedInformers,
 		},
 	}
@@ -418,7 +414,6 @@ func buildGenericConfig(
 	proxyTransport *http.Transport,
 ) (
 	genericConfig *genericapiserver.Config,
-	sharedInformers informers.SharedInformerFactory,
 	versionedInformers clientgoinformers.SharedInformerFactory,
 	insecureServingInfo *genericapiserver.DeprecatedInsecureServingInfo,
 	serviceResolver aggregatorapiserver.ServiceResolver,
@@ -486,14 +481,7 @@ func buildGenericConfig(
 	// set it in kube-apiserver.
 	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
-	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		lastErr = fmt.Errorf("failed to create clientset: %v", err)
-		return
-	}
-
 	kubeClientConfig := genericConfig.LoopbackClientConfig
-	sharedInformers = informers.NewSharedInformerFactory(client, 10*time.Minute)
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
