@@ -129,15 +129,46 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
 	}
 }
 
+type sourceScript struct {
+	path       string
+	sourceOnly bool
+}
+
+// Creates source script string for sourcing bash scripts, in order passed.
+func makeSource(scripts []sourceScript) string {
+	out := ""
+	for _, s := range scripts {
+		out += fmt.Sprintf("source %s", s.path)
+		if s.sourceOnly {
+			out += " --source-only"
+		}
+		out += " ; "
+	}
+	return out
+}
+
 func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
 	c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s --source-only ; %s", c.envScriptPath, configureHelperScriptName, c.manifestFuncName)
+	args := makeSource([]sourceScript{
+		{
+			path: c.envScriptPath,
+		},
+		{
+			path:       configureHelperScriptName,
+			sourceOnly: true,
+		},
+		{
+			path:       configureKubeAPIServerScriptName,
+			sourceOnly: true,
+		},
+	})
+	args += fmt.Sprintf(" %s", c.manifestFuncName)
 	cmd := exec.Command("bash", "-c", args)
 
 	bs, err := cmd.CombinedOutput()
 	if err != nil {
 		c.t.Logf("%s", bs)
-		c.t.Fatalf("Failed to run configure-helper.sh: %v", err)
+		c.t.Fatalf("Failed to run function %v: %v", c.manifestFuncName, err)
 	}
 	c.t.Logf("%s", string(bs))
 }

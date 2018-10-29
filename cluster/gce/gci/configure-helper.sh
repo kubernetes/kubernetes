@@ -30,8 +30,6 @@ readonly UUID_BLOCK_PREFIX="/dev/disk/by-uuid/google-local-ssds"
 readonly COREDNS_AUTOSCALER="Deployment/coredns"
 readonly KUBEDNS_AUTOSCALER="Deployment/kube-dns"
 
-source "${KUBE_HOME}/configure-kube-apiserver.sh"
-
 # Resource requests of master components.
 KUBE_CONTROLLER_MANAGER_CPU_REQUEST="${KUBE_CONTROLLER_MANAGER_CPU_REQUEST:-200m}"
 KUBE_SCHEDULER_CPU_REQUEST="${KUBE_SCHEDULER_CPU_REQUEST:-75m}"
@@ -2173,6 +2171,8 @@ function main() {
   echo "Start to configure instance for kubernetes"
 
   KUBE_HOME="/home/kubernetes"
+  source "${KUBE_HOME}/bin/configure-kube-apiserver.sh"
+
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
 
