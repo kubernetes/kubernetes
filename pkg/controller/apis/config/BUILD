@@ -30,6 +30,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/apis/config/fuzzer:all-srcs",
         "//pkg/controller/apis/config/scheme:all-srcs",
         "//pkg/controller/apis/config/v1alpha1:all-srcs",
     ],
