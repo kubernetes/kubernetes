@@ -95,7 +95,7 @@ spec:
           operator: "Exists"
       containers:
       - name: coredns
-        image: coredns/coredns:1.0.1
+        image: k8s.gcr.io/coredns:1.0.1
         imagePullPolicy: IfNotPresent
         resources:
           limits:
