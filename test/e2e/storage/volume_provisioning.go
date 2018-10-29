@@ -54,57 +54,87 @@ import (
 const (
 	// Plugin name of the external provisioner
 	externalPluginName = "example.com/nfs"
+	// Number of PVCs for multi PVC tests
+	multiPVCcount = 3
 )
 
 func testBindingWaitForFirstConsumer(client clientset.Interface, claim *v1.PersistentVolumeClaim, class *storage.StorageClass) (*v1.PersistentVolume, *v1.Node) {
+	pvs, node := testBindingWaitForFirstConsumerMultiPVC(client, []*v1.PersistentVolumeClaim{claim}, class)
+	return pvs[0], node
+}
+
+func testBindingWaitForFirstConsumerMultiPVC(client clientset.Interface, claims []*v1.PersistentVolumeClaim, class *storage.StorageClass) ([]*v1.PersistentVolume, *v1.Node) {
 	var err error
+	Expect(len(claims)).ToNot(Equal(0))
+	namespace := claims[0].Namespace
 
 	By("creating a storage class " + class.Name)
 	class, err = client.StorageV1().StorageClasses().Create(class)
 	Expect(err).NotTo(HaveOccurred())
 	defer deleteStorageClass(client, class.Name)
 
-	By("creating a claim")
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
-	Expect(err).NotTo(HaveOccurred())
+	By("creating claims")
+	var claimNames []string
+	var createdClaims []*v1.PersistentVolumeClaim
+	for _, claim := range claims {
+		c, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
+		claimNames = append(claimNames, c.Name)
+		createdClaims = append(createdClaims, c)
+		Expect(err).NotTo(HaveOccurred())
+	}
 	defer func() {
-		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(client, claim.Name, claim.Namespace), "Failed to delete PVC ", claim.Name)
+		var errors map[string]error
+		for _, claim := range createdClaims {
+			err := framework.DeletePersistentVolumeClaim(client, claim.Name, claim.Namespace)
+			if err != nil {
+				errors[claim.Name] = err
+			}
+		}
+		if len(errors) > 0 {
+			for claimName, err := range errors {
+				framework.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
+			}
+		}
 	}()
 
-	// Wait for ClaimProvisionTimeout and make sure the phase did not become Bound i.e. the Wait errors out
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
+	By("checking the claims are in pending state")
+	err = framework.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, client, namespace, claimNames, 2*time.Second, framework.ClaimProvisionShortTimeout, true)
 	Expect(err).To(HaveOccurred())
+	for _, claim := range createdClaims {
+		// Get new copy of the claim
+		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
+	}
 
-	By("checking the claim is in pending state")
-	// Get new copy of the claim
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(claim.Status.Phase).To(Equal(v1.ClaimPending))
-
-	By("creating a pod referring to the claim")
+	By("creating a pod referring to the claims")
 	// Create a pod referring to the claim and wait for it to get to running
-	pod, err := framework.CreateClientPod(client, claim.Namespace, claim)
+	pod, err := framework.CreatePod(client, namespace, nil /* nodeSelector */, createdClaims, true /* isPrivileged */, "" /* command */)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		framework.DeletePodOrFail(client, pod.Namespace, pod.Name)
 	}()
-
-	By("re-checking the claim to see it binded")
-	// Get new copy of the claim
-	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	// make sure claim did bind
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
-
-	// collect node and pv details
+	// collect node details
 	node, err := client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
-	pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	By("re-checking the claims to see they binded")
+	var pvs []*v1.PersistentVolume
+	for _, claim := range createdClaims {
+		// Get new copy of the claim
+		claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		// make sure claim did bind
+		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		Expect(err).NotTo(HaveOccurred())
 
-	return pv, node
+		pv, err := client.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		pvs = append(pvs, pv)
+	}
+	Expect(len(pvs)).ToNot(Equal(0))
+	return pvs, node
 }
 
 func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZone bool) {
@@ -229,6 +259,67 @@ func checkGCEPD(volume *v1.PersistentVolume, volumeType string) error {
 		return fmt.Errorf("unexpected disk type %q, expected suffix %q", disk.Type, volumeType)
 	}
 	return nil
+}
+
+func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTopology bool, pvcCount int) {
+	storageClassTestNameFmt := "Delayed binding %s storage class test %s"
+	storageClassTestNameSuffix := ""
+	if specifyAllowedTopology {
+		storageClassTestNameSuffix += " with AllowedTopologies"
+	}
+	tests := []testsuites.StorageClassTest{
+		{
+			Name:           fmt.Sprintf(storageClassTestNameFmt, "EBS", storageClassTestNameSuffix),
+			CloudProviders: []string{"aws"},
+			Provisioner:    "kubernetes.io/aws-ebs",
+			ClaimSize:      "2Gi",
+			DelayBinding:   true,
+		},
+		{
+			Name:           fmt.Sprintf(storageClassTestNameFmt, "GCE PD", storageClassTestNameSuffix),
+			CloudProviders: []string{"gce", "gke"},
+			Provisioner:    "kubernetes.io/gce-pd",
+			ClaimSize:      "2Gi",
+			DelayBinding:   true,
+		},
+	}
+	for _, test := range tests {
+		if !framework.ProviderIs(test.CloudProviders...) {
+			framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+			continue
+		}
+		action := "creating claims with class with waitForFirstConsumer"
+		suffix := "delayed"
+		var topoZone string
+		class := newStorageClass(test, ns, suffix)
+		if specifyAllowedTopology {
+			action += " and allowedTopologies"
+			suffix += "-topo"
+			topoZone = getRandomCloudZone(c)
+			addSingleZoneAllowedTopologyToStorageClass(c, class, topoZone)
+		}
+		By(action)
+		var claims []*v1.PersistentVolumeClaim
+		for i := 0; i < pvcCount; i++ {
+			claim := newClaim(test, ns, suffix)
+			claim.Spec.StorageClassName = &class.Name
+			claims = append(claims, claim)
+		}
+		pvs, node := testBindingWaitForFirstConsumerMultiPVC(c, claims, class)
+		if node == nil {
+			framework.Failf("unexpected nil node found")
+		}
+		zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
+		if !ok {
+			framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
+		}
+		if specifyAllowedTopology && topoZone != zone {
+			framework.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, zone)
+		}
+		for _, pv := range pvs {
+			checkZoneFromLabelAndAffinity(pv, zone, true)
+		}
+	}
 }
 
 var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
@@ -846,43 +937,9 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 	})
 	Describe("DynamicProvisioner delayed binding [Slow]", func() {
-		It("should create a persistent volume in the same zone as node after a pod mounting the claim is started", func() {
-			tests := []testsuites.StorageClassTest{
-				{
-					Name:           "Delayed binding EBS storage class test",
-					CloudProviders: []string{"aws"},
-					Provisioner:    "kubernetes.io/aws-ebs",
-					ClaimSize:      "2Gi",
-					DelayBinding:   true,
-				},
-				{
-					Name:           "Delayed binding GCE PD storage class test",
-					CloudProviders: []string{"gce", "gke"},
-					Provisioner:    "kubernetes.io/gce-pd",
-					ClaimSize:      "2Gi",
-					DelayBinding:   true,
-				},
-			}
-			for _, test := range tests {
-				if !framework.ProviderIs(test.CloudProviders...) {
-					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
-					continue
-				}
-				By("creating a claim with class with waitForFirstConsumer")
-				suffix := "delayed"
-				class := newStorageClass(test, ns, suffix)
-				claim := newClaim(test, ns, suffix)
-				claim.Spec.StorageClassName = &class.Name
-				pv, node := testBindingWaitForFirstConsumer(c, claim, class)
-				if node == nil {
-					framework.Failf("unexpected nil node found")
-				}
-				zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
-				if !ok {
-					framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
-				}
-				checkZoneFromLabelAndAffinity(pv, zone, true)
-			}
+		It("should create persistent volumes in the same zone as node after a pod mounting the claims is started", func() {
+			testZonalDelayedBinding(c, ns, false /*specifyAllowedTopology*/, 1 /*pvcCount*/)
+			testZonalDelayedBinding(c, ns, false /*specifyAllowedTopology*/, 3 /*pvcCount*/)
 		})
 	})
 	Describe("DynamicProvisioner allowedTopologies", func() {
@@ -921,51 +978,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 	})
 	Describe("DynamicProvisioner delayed binding with allowedTopologies [Slow]", func() {
-		It("should create persistent volume in the same zone as specified in allowedTopologies after a pod mounting the claim is started", func() {
-			tests := []testsuites.StorageClassTest{
-				{
-					Name:           "AllowedTopologies and delayed binding EBS storage class test",
-					CloudProviders: []string{"aws"},
-					Provisioner:    "kubernetes.io/aws-ebs",
-					ClaimSize:      "2Gi",
-					DelayBinding:   true,
-				},
-				{
-					Name:           "AllowedTopologies and delayed binding GCE PD storage class test",
-					CloudProviders: []string{"gce", "gke"},
-					Provisioner:    "kubernetes.io/gce-pd",
-					ClaimSize:      "2Gi",
-					DelayBinding:   true,
-				},
-			}
-			for _, test := range tests {
-				if !framework.ProviderIs(test.CloudProviders...) {
-					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
-					continue
-				}
-				By("creating a claim with class with WaitForFirstConsumer and allowedTopologies")
-				suffix := "delayed-topo"
-				class := newStorageClass(test, ns, suffix)
-				topoZone := getRandomCloudZone(c)
-				addSingleZoneAllowedTopologyToStorageClass(c, class, topoZone)
-				claim := newClaim(test, ns, suffix)
-				claim.Spec.StorageClassName = &class.Name
-				pv, node := testBindingWaitForFirstConsumer(c, claim, class)
-				if node == nil {
-					framework.Failf("unexpected nil node found")
-				}
-				nodeZone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]
-				if !ok {
-					framework.Failf("label %s not found on Node", kubeletapis.LabelZoneFailureDomain)
-				}
-				if topoZone != nodeZone {
-					framework.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, nodeZone)
-				}
-				checkZoneFromLabelAndAffinity(pv, topoZone, true)
-			}
+		It("should create persistent volumes in the same zone as specified in allowedTopologies after a pod mounting the claims is started", func() {
+			testZonalDelayedBinding(c, ns, true /*specifyAllowedTopology*/, 1 /*pvcCount*/)
+			testZonalDelayedBinding(c, ns, true /*specifyAllowedTopology*/, 3 /*pvcCount*/)
 		})
 	})
-
 })
 
 func getDefaultStorageClassName(c clientset.Interface) string {
