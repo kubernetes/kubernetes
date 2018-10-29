@@ -20,6 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -44,6 +45,9 @@ type StatefulSetInterface interface {
 	List(opts metav1.ListOptions) (*v1.StatefulSetList, error)
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StatefulSet, err error)
+	GetScale(statefulSetName string, options metav1.GetOptions) (*autoscalingv1.Scale, error)
+	UpdateScale(statefulSetName string, scale *autoscalingv1.Scale) (*autoscalingv1.Scale, error)
+
 	StatefulSetExpansion
 }
 
@@ -168,6 +172,34 @@ func (c *statefulSets) Patch(name string, pt types.PatchType, data []byte, subre
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the statefulSet, and returns the corresponding autoscalingv1.Scale object, and an error if there is any.
+func (c *statefulSets) GetScale(statefulSetName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
+	result = &autoscalingv1.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("statefulsets").
+		Name(statefulSetName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *statefulSets) UpdateScale(statefulSetName string, scale *autoscalingv1.Scale) (result *autoscalingv1.Scale, err error) {
+	result = &autoscalingv1.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("statefulsets").
+		Name(statefulSetName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return
