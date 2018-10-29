@@ -68,11 +68,11 @@ func (r regHandler) DeRegisterPlugin(pluginName string) {
 }
 
 var pluginInitOnce sync.Once
-var instance *plugin
+var instance *Plugin
 
-func getPluginSingleton() *plugin {
+func getPluginSingleton() *Plugin {
 	pluginInitOnce.Do(func() {
-		instance = &plugin{
+		instance = &Plugin{
 			host:         nil,
 			blockEnabled: utilfeature.DefaultFeatureGate.Enabled(features.CSIBlockVolume),
 		}

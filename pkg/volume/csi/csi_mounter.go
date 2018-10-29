@@ -23,13 +23,12 @@ import (
 	"os"
 	"path"
 
-	"k8s.io/klog"
-
 	api "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -57,7 +56,7 @@ var (
 type csiMountMgr struct {
 	csiClient    csiClient
 	k8s          kubernetes.Interface
-	plugin       *plugin
+	plugin       *Plugin
 	driverName   string
 	volumeID     string
 	specVolumeID string
@@ -362,7 +361,7 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check
-func isDirMounted(plug *plugin, dir string) (bool, error) {
+func isDirMounted(plug *Plugin, dir string) (bool, error) {
 	mounter := plug.host.GetMounter(plug.GetPluginName())
 	notMnt, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
@@ -373,7 +372,7 @@ func isDirMounted(plug *plugin, dir string) (bool, error) {
 }
 
 // removeMountDir cleans the mount dir when dir is not mounted and removed the volume data file in dir
-func removeMountDir(plug *plugin, mountPath string) error {
+func removeMountDir(plug *Plugin, mountPath string) error {
 	klog.V(4).Info(log("removing mount path [%s]", mountPath))
 	if pathExists, pathErr := util.PathExists(mountPath); pathErr != nil {
 		klog.Error(log("failed while checking mount path stat [%s]", pathErr))
