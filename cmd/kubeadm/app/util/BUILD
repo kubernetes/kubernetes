@@ -89,6 +89,7 @@ filegroup(
         "//cmd/kubeadm/app/util/runtime:all-srcs",
         "//cmd/kubeadm/app/util/staticpod:all-srcs",
         "//cmd/kubeadm/app/util/system:all-srcs",
+        "//cmd/kubeadm/app/util/upgrade:all-srcs",
     ],
     tags = ["automanaged"],
 )

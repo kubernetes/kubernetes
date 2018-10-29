@@ -47,7 +47,6 @@ filegroup(
         "//cmd/kubeadm/app/phases/markcontrolplane:all-srcs",
         "//cmd/kubeadm/app/phases/patchnode:all-srcs",
         "//cmd/kubeadm/app/phases/selfhosting:all-srcs",
-        "//cmd/kubeadm/app/phases/upgrade:all-srcs",
         "//cmd/kubeadm/app/phases/uploadconfig:all-srcs",
         "//cmd/kubeadm/app/preflight:all-srcs",
         "//cmd/kubeadm/app/util:all-srcs",

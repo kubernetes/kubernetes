@@ -22,7 +22,6 @@ go_library(
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
-        "//cmd/kubeadm/app/phases/upgrade:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
@@ -30,6 +29,7 @@ go_library(
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
         "//cmd/kubeadm/app/util/etcd:go_default_library",
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
+        "//cmd/kubeadm/app/util/upgrade:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/normalizer:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -60,7 +60,7 @@ go_test(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//cmd/kubeadm/app/phases/upgrade:go_default_library",
+        "//cmd/kubeadm/app/util/upgrade:go_default_library",
     ],
 )
 
