@@ -30,6 +30,7 @@ import (
 	"github.com/golang/glog"
 
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/blkio"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -253,6 +254,10 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 
 	if err != nil {
 		err = transformStartContainerError(err)
+		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
+	}
+	err = blkio.UpdateBlkio(r.ContainerId, ds.client)
+	if err != nil {
 		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
 	}
 
