@@ -60,7 +60,7 @@ const (
 	csiResyncPeriod = time.Minute
 )
 
-type Plugin struct {
+type plugin struct {
 	drivers           *driverEndpoints
 	nim               nodeinfomanager.Interface
 	host              volume.VolumeHost
@@ -99,7 +99,7 @@ func (e *driverEndpoints) Get(pluginName string) (string, bool) {
 
 // ProbeVolumePlugins returns implemented plugins
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	p := &Plugin{
+	p := &plugin{
 		host:         nil,
 		blockEnabled: utilfeature.DefaultFeatureGate.Enabled(features.CSIBlockVolume),
 	}
@@ -107,12 +107,12 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 }
 
 // volume.VolumePlugin methods
-var _ volume.VolumePlugin = &Plugin{}
+var _ volume.VolumePlugin = &plugin{}
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by CSI Driver registrar side car.
 // ValidatePlugin is for implementing the PluginHandler
-func (p *Plugin) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
+func (p *plugin) ValidatePlugin(pluginName string, endpoint string, versions []string) error {
 	klog.Infof(log("Trying to register a new plugin with name: %s endpoint: %s versions: %s",
 		pluginName, endpoint, strings.Join(versions, ",")))
 
@@ -121,7 +121,7 @@ func (p *Plugin) ValidatePlugin(pluginName string, endpoint string, versions []s
 
 // RegisterPlugin is called when a plugin can be registered
 // RegisterPlugin is for implementing the PluginHandler
-func (p *Plugin) RegisterPlugin(pluginName string, endpoint string) error {
+func (p *plugin) RegisterPlugin(pluginName string, endpoint string) error {
 	klog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
 	p.drivers.Set(pluginName, endpoint)
@@ -158,14 +158,14 @@ func (p *Plugin) RegisterPlugin(pluginName string, endpoint string) error {
 // DeRegisterPlugin is called when a plugin removed its socket, signaling
 // it is no longer available
 // DeregisterPlugin is for implementing the PluginHandler
-func (p *Plugin) DeRegisterPlugin(pluginName string) {
+func (p *plugin) DeRegisterPlugin(pluginName string) {
 	klog.V(4).Info(log("registrationHandler.DeRegisterPlugin request for plugin %s", pluginName))
 	if err := p.unregisterDriver(pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
 	}
 }
 
-func (p *Plugin) unregisterDriver(driverName string) error {
+func (p *plugin) unregisterDriver(driverName string) error {
 	p.drivers.Delete(driverName)
 
 	if err := p.nim.UninstallCSIDriver(driverName); err != nil {
@@ -176,10 +176,10 @@ func (p *Plugin) unregisterDriver(driverName string) error {
 	return nil
 }
 
-var _ pluginwatcher.PluginHandler = &Plugin{}
+var _ pluginwatcher.PluginHandler = &plugin{}
 
 // Init is for implementing the VolumePlugin
-func (p *Plugin) Init(host volume.VolumeHost) error {
+func (p *plugin) Init(host volume.VolumeHost) error {
 	p.host = host
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
@@ -205,14 +205,14 @@ func (p *Plugin) Init(host volume.VolumeHost) error {
 }
 
 // GetPluginName is for implementing the VolumePlugin
-func (p *Plugin) GetPluginName() string {
+func (p *plugin) GetPluginName() string {
 	return PluginName
 }
 
 // GetVolumeName returns a concatenated string of CSIVolumeSource.Driver<volNameSe>CSIVolumeSource.VolumeHandle
 // That string value is used in Detach() to extract driver name and volumeName.
 // GetVolumeName is for implementing the VolumePlugin
-func (p *Plugin) GetVolumeName(spec *volume.Spec) (string, error) {
+func (p *plugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	csi, err := getCSISourceFromSpec(spec)
 	if err != nil {
 		klog.Error(log("plugin.GetVolumeName failed to extract volume source from spec: %v", err))
@@ -224,19 +224,19 @@ func (p *Plugin) GetVolumeName(spec *volume.Spec) (string, error) {
 }
 
 // CanSupport is for implementing the VolumePlugin
-func (p *Plugin) CanSupport(spec *volume.Spec) bool {
+func (p *plugin) CanSupport(spec *volume.Spec) bool {
 	// TODO (vladimirvivien) CanSupport should also take into account
 	// the availability/registration of specified Driver in the volume source
 	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
 }
 
 // RequiresRemount is for implementing the VolumePlugin
-func (p *Plugin) RequiresRemount() bool {
+func (p *plugin) RequiresRemount() bool {
 	return false
 }
 
 // NewMounter is for implementing the VolumePlugin
-func (p *Plugin) NewMounter(
+func (p *plugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
 	_ volume.VolumeOptions) (volume.Mounter, error) {
@@ -306,7 +306,7 @@ func (p *Plugin) NewMounter(
 }
 
 // NewUnmounter is for implementing the VolumePlugin
-func (p *Plugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
+func (p *plugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
 	klog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
 
 	unmounter := &csiMountMgr{
@@ -331,7 +331,7 @@ func (p *Plugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmount
 }
 
 // ConstructVolumeSpec is for implementing the VolumePlugin
-func (p *Plugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+func (p *plugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec [pv.Name=%v, path=%v]", volumeName, mountPath))
 
 	volData, err := loadVolumeData(mountPath, volDataFileName)
@@ -362,7 +362,7 @@ func (p *Plugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec
 }
 
 // SupportsMountOption is for implementing the VolumePlugin
-func (p *Plugin) SupportsMountOption() bool {
+func (p *plugin) SupportsMountOption() bool {
 	// TODO (vladimirvivien) use CSI VolumeCapability.MountVolume.mount_flags
 	// to probe for the result for this method
 	// (bswartz) Until the CSI spec supports probing, our only option is to
@@ -372,17 +372,17 @@ func (p *Plugin) SupportsMountOption() bool {
 }
 
 // SupportsBulkVolumeVerification is for implementing the VolumePlugin
-func (p *Plugin) SupportsBulkVolumeVerification() bool {
+func (p *plugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
 // volume.AttachableVolumePlugin methods
-var _ volume.AttachableVolumePlugin = &Plugin{}
+var _ volume.AttachableVolumePlugin = &plugin{}
 
-var _ volume.DeviceMountableVolumePlugin = &Plugin{}
+var _ volume.DeviceMountableVolumePlugin = &plugin{}
 
 // NewAttacher is for implementing the AttachableVolumePlugin
-func (p *Plugin) NewAttacher() (volume.Attacher, error) {
+func (p *plugin) NewAttacher() (volume.Attacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
 		klog.Error(log("unable to get kubernetes client from host"))
@@ -397,12 +397,12 @@ func (p *Plugin) NewAttacher() (volume.Attacher, error) {
 }
 
 // NewDeviceMounter is for implementing the DeviceMountableVolumePlugin
-func (p *Plugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+func (p *plugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 	return p.NewAttacher()
 }
 
 // NewDetacher is for implementing the AttachableVolumePlugin
-func (p *Plugin) NewDetacher() (volume.Detacher, error) {
+func (p *plugin) NewDetacher() (volume.Detacher, error) {
 	k8s := p.host.GetKubeClient()
 	if k8s == nil {
 		klog.Error(log("unable to get kubernetes client from host"))
@@ -417,21 +417,21 @@ func (p *Plugin) NewDetacher() (volume.Detacher, error) {
 }
 
 // NewDeviceUnmounter is for implementing the DeviceMountableVolumePlugin
-func (p *Plugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+func (p *plugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return p.NewDetacher()
 }
 
 // GetDeviceMountRefs is for implementing the DeviceMountableVolumePlugin
-func (p *Plugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+func (p *plugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
 	m := p.host.GetMounter(p.GetPluginName())
 	return m.GetMountRefs(deviceMountPath)
 }
 
 // BlockVolumePlugin methods
-var _ volume.BlockVolumePlugin = &Plugin{}
+var _ volume.BlockVolumePlugin = &plugin{}
 
 // NewBlockVolumeMapper is for implementing the BlockVolumePlugin
-func (p *Plugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+func (p *plugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
 	if !p.blockEnabled {
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
@@ -499,7 +499,7 @@ func (p *Plugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts v
 }
 
 // NewBlockVolumeUnmapper is for implementing the BlockVolumePlugin
-func (p *Plugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
+func (p *plugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
 	if !p.blockEnabled {
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
@@ -526,7 +526,7 @@ func (p *Plugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volum
 }
 
 // ContstructBlockVolumeSpec is for implementing the BlockVolumePlugin
-func (p *Plugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapPath string) (*volume.Spec, error) {
+func (p *plugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapPath string) (*volume.Spec, error) {
 	if !p.blockEnabled {
 		return nil, errors.New("CSIBlockVolume feature not enabled")
 	}
@@ -561,7 +561,7 @@ func (p *Plugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapPath
 	return volume.NewSpecFromPersistentVolume(pv, false), nil
 }
 
-func (p *Plugin) skipAttach(driver string) (bool, error) {
+func (p *plugin) skipAttach(driver string) (bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return false, nil
 	}
@@ -582,7 +582,7 @@ func (p *Plugin) skipAttach(driver string) (bool, error) {
 	return false, nil
 }
 
-func (p *Plugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
+func (p *plugin) getPublishVolumeInfo(client clientset.Interface, handle, driver, nodeName string) (map[string]string, error) {
 	skip, err := p.skipAttach(driver)
 	if err != nil {
 		return nil, err

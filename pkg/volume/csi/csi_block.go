@@ -39,7 +39,7 @@ import (
 type csiBlockMapper struct {
 	k8s        kubernetes.Interface
 	csiClient  csiClient
-	plugin     *Plugin
+	plugin     *plugin
 	driverName string
 	specName   string
 	volumeID   string

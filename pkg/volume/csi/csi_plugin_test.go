@@ -48,7 +48,7 @@ import (
 )
 
 // create a plugin mgr to load plugins and setup a fake client
-func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*Plugin, string) {
+func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecsi.Clientset) (*plugin, string) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -75,7 +75,7 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecs
 		t.Fatalf("can't find plugin %v", PluginName)
 	}
 
-	csiPlug, ok := plug.(*Plugin)
+	csiPlug, ok := plug.(*plugin)
 	if !ok {
 		t.Fatalf("cannot assert plugin to be type Plugin")
 	}
@@ -579,7 +579,7 @@ func TestRegisterPlugin(t *testing.T) {
 			nodeInfoManager := &fake.FakeNodeInfoManager{}
 			nodeInfoManager.InstallCSIDriverReturns(tc.installCSIDriverErr)
 
-			registrationHandler := &Plugin{
+			registrationHandler := &plugin{
 				drivers: newDriverEndpoints(),
 				nim:     nodeInfoManager,
 			}
@@ -621,7 +621,7 @@ func TestPluginInit(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			plugin := Plugin{}
+			plugin := plugin{}
 
 			csiClient := fakecsi.NewSimpleClientset(
 				getCSIDriver("fake csi driver name", nil, nil),
