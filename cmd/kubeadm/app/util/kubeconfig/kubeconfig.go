@@ -72,7 +72,7 @@ func CreateWithToken(serverURL, clusterName, userName string, caCert []byte, tok
 func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 	config, err := clientcmd.LoadFromFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load admin kubeconfig")
+		return nil, errors.Wrap(err, "failed to load admin KubeConfig")
 	}
 	return ToClientSet(config)
 }
@@ -81,7 +81,7 @@ func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 func ToClientSet(config *clientcmdapi.Config) (*clientset.Clientset, error) {
 	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
+		return nil, errors.Wrap(err, "failed to create API client configuration from KubeConfig")
 	}
 
 	client, err := clientset.NewForConfig(clientConfig)

@@ -84,7 +84,7 @@ func ValidateConfigInfo(config *clientcmdapi.Config, clustername string) (*clien
 		}
 
 		if len(authInfo.ClientCertificateData) == 0 || len(authInfo.ClientKeyData) == 0 {
-			return nil, fmt.Errorf("couldn't read authentication info from the given kubeconfig file")
+			return nil, fmt.Errorf("couldn't read authentication info from the given KubeConfig file")
 		}
 		kubeconfig = kubeconfigutil.CreateWithCerts(
 			defaultCluster.Server,
@@ -145,7 +145,7 @@ func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, e
 	}
 	parsedKubeConfig, err := clientcmd.Load([]byte(kubeConfigString))
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s ConfigMap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+		return nil, fmt.Errorf("couldn't parse the KubeConfig file in the %s ConfigMap: %v", bootstrapapi.ConfigMapClusterInfo, err)
 	}
 	return parsedKubeConfig, nil
 }

@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	// selfHostedKubeConfigDir sets the directory where kubeconfig files for the scheduler and controller-manager should be mounted
+	// selfHostedKubeConfigDir sets the directory where KubeConfig files for the scheduler and controller-manager should be mounted
 	// Due to how the projected volume mount works (can only be a full directory, not mount individual files), we must change this from
 	// the default as mounts cannot be nested (/etc/kubernetes would override /etc/kubernetes/pki)
 	selfHostedKubeConfigDir = "/etc/kubernetes/kubeconfig"
@@ -149,7 +149,7 @@ func setSelfHostedVolumesForControllerManager(podSpec *v1.PodSpec) {
 		}
 	}
 
-	// Change directory for the kubeconfig directory to selfHostedKubeConfigDir
+	// Change directory for the KubeConfig directory to selfHostedKubeConfigDir
 	for i, vm := range podSpec.Containers[0].VolumeMounts {
 		if vm.Name == kubeadmconstants.KubeConfigVolumeName {
 			podSpec.Containers[0].VolumeMounts[i].MountPath = selfHostedKubeConfigDir
@@ -174,7 +174,7 @@ func setSelfHostedVolumesForScheduler(podSpec *v1.PodSpec) {
 		}
 	}
 
-	// Change directory for the kubeconfig directory to selfHostedKubeConfigDir
+	// Change directory for the KubeConfig directory to selfHostedKubeConfigDir
 	for i, vm := range podSpec.Containers[0].VolumeMounts {
 		if vm.Name == kubeadmconstants.KubeConfigVolumeName {
 			podSpec.Containers[0].VolumeMounts[i].MountPath = selfHostedKubeConfigDir

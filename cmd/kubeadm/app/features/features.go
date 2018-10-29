@@ -87,7 +87,7 @@ func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool,
 		if minVersion := allFeatures[k].MinimumVersion; minVersion != nil {
 			if !parsedExpVersion.AtLeast(minVersion) {
 				return fmt.Errorf(
-					"the requested kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
+					"the requested Kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
 					requestedVersion, k, minVersion)
 			}
 		}

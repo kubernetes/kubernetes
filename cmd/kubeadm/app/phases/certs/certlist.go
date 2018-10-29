@@ -236,16 +236,16 @@ var (
 	// KubeadmCertRootCA is the definition of the Kubernetes Root CA for the API Server and kubelet.
 	KubeadmCertRootCA = KubeadmCert{
 		Name:     "ca",
-		LongName: "self-signed kubernetes CA to provision identities for other kuberenets components",
+		LongName: "self-signed Kubernetes CA to provision identities for other Kubernets components",
 		BaseName: kubeadmconstants.CACertAndKeyBaseName,
 		config: certutil.Config{
 			CommonName: "kubernetes",
 		},
 	}
-	// KubeadmCertAPIServer is the definition of the cert used to serve the kubernetes API.
+	// KubeadmCertAPIServer is the definition of the cert used to serve the Kubernetes API.
 	KubeadmCertAPIServer = KubeadmCert{
 		Name:     "apiserver",
-		LongName: "certificate for serving the kubernetes API",
+		LongName: "certificate for serving the Kubernetes API",
 		BaseName: kubeadmconstants.APIServerCertAndKeyBaseName,
 		CAName:   "ca",
 		config: certutil.Config{

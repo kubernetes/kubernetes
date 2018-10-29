@@ -42,15 +42,15 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 
 	fmt.Printf("[bootstraptoken] creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
 
-	glog.V(1).Infoln("[bootstraptoken] loading admin kubeconfig")
+	glog.V(1).Infoln("[bootstraptoken] loading admin KubeConfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)
 	if err != nil {
-		return fmt.Errorf("failed to load admin kubeconfig [%v]", err)
+		return fmt.Errorf("failed to load admin KubeConfig [%v]", err)
 	}
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
 	// Copy the cluster from admin.conf to the bootstrap kubeconfig, contains the CA cert and the server URL
-	glog.V(1).Infoln("[bootstraptoken] copying the cluster from admin.conf to the bootstrap kubeconfig")
+	glog.V(1).Infoln("[bootstraptoken] copying the cluster from admin.conf to the bootstrap KubeConfig")
 	bootstrapConfig := &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"": adminConfig.Clusters[adminCluster],

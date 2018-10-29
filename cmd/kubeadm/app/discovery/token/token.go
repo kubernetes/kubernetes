@@ -97,7 +97,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		insecureKubeconfigBytes := []byte(insecureKubeconfigString)
 		insecureConfig, err := clientcmd.Load(insecureKubeconfigBytes)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s configmap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+			return nil, fmt.Errorf("couldn't parse the KubeConfig file in the %s configmap: %v", bootstrapapi.ConfigMapClusterInfo, err)
 		}
 
 		// If no TLS root CA pinning was specified, we're done
@@ -108,7 +108,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 
 		// Load the cluster CA from the Config
 		if len(insecureConfig.Clusters) != 1 {
-			return nil, fmt.Errorf("expected the kubeconfig file in the %s configmap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
+			return nil, fmt.Errorf("expected the KubeConfig file in the %s configmap to have a single cluster, but it had %d", bootstrapapi.ConfigMapClusterInfo, len(insecureConfig.Clusters))
 		}
 		var clusterCABytes []byte
 		for _, cluster := range insecureConfig.Clusters {
@@ -148,12 +148,12 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		// Pull the kubeconfig from the securely-obtained ConfigMap and validate that it's the same as what we found the first time
 		secureKubeconfigBytes := []byte(secureClusterInfo.Data[bootstrapapi.KubeConfigKey])
 		if !bytes.Equal(secureKubeconfigBytes, insecureKubeconfigBytes) {
-			return nil, fmt.Errorf("the second kubeconfig from the %s configmap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
+			return nil, fmt.Errorf("the second KubeConfig from the %s configmap (using validated TLS) was different from the first", bootstrapapi.ConfigMapClusterInfo)
 		}
 
 		secureKubeconfig, err := clientcmd.Load(secureKubeconfigBytes)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s configmap: %v", bootstrapapi.ConfigMapClusterInfo, err)
+			return nil, fmt.Errorf("couldn't parse the KubeConfig file in the %s configmap: %v", bootstrapapi.ConfigMapClusterInfo, err)
 		}
 
 		fmt.Printf("[discovery] Cluster info signature and contents are valid and TLS certificate validates against pinned roots, will use API Server %q\n", endpoint)

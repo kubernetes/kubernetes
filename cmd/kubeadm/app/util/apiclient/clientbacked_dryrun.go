@@ -63,11 +63,11 @@ func NewClientBackedDryRunGetter(config *rest.Config) (*ClientBackedDryRunGetter
 func NewClientBackedDryRunGetterFromKubeconfig(file string) (*ClientBackedDryRunGetter, error) {
 	config, err := clientcmd.LoadFromFile(file)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load kubeconfig")
+		return nil, errors.Wrap(err, "failed to load KubeConfig")
 	}
 	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
+		return nil, errors.Wrap(err, "failed to create API client configuration from KubeConfig")
 	}
 	return NewClientBackedDryRunGetter(clientConfig)
 }
