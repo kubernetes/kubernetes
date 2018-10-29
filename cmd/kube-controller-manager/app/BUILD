@@ -46,6 +46,7 @@ go_library(
         "//pkg/controller/certificates/cleaner:go_default_library",
         "//pkg/controller/certificates/rootcacertpublisher:go_default_library",
         "//pkg/controller/certificates/signer:go_default_library",
+        "//pkg/controller/cloud:go_default_library",
         "//pkg/controller/clusterroleaggregation:go_default_library",
         "//pkg/controller/cronjob:go_default_library",
         "//pkg/controller/daemon:go_default_library",
