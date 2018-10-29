@@ -46,6 +46,7 @@ var wellKnownRegions = [...]string{
 
 	// these are not registered in many / most accounts
 	"cn-north-1",
+	"cn-northwest-1",
 	"us-gov-west-1",
 }
 
