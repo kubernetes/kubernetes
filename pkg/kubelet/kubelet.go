@@ -1206,7 +1206,7 @@ type Kubelet struct {
 	// pluginwatcher is a utility for Kubelet to register different types of node-level plugins
 	// such as device plugins or CSI plugins. It discovers plugins by monitoring inotify events under the
 	// directory returned by kubelet.getPluginsDir()
-	pluginWatcher *pluginwatcher.Watcher
+	pluginWatcher pluginWatcher
 
 	// This flag sets a maximum number of images to report in the node status.
 	nodeStatusMaxImages int32
@@ -1216,6 +1216,11 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+}
+
+type pluginWatcher interface {
+	AddHandler(pluginType string, handler pluginwatcher.PluginHandler)
+	Start() error
 }
 
 func allGlobalUnicastIPs() ([]net.IP, error) {
@@ -1388,7 +1393,20 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	kl.containerLogManager.Start()
 	if kl.enablePluginsWatcher {
 		// Adding Registration Callback function for CSI Driver
-		kl.pluginWatcher.AddHandler("CSIPlugin", pluginwatcher.PluginHandler(csi.PluginHandler))
+		plugin, err := kl.volumePluginMgr.FindPluginByName(csi.PluginName)
+		if err != nil {
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
+			klog.Fatalf("failed to get the CSI plugin from the volume plugin manager. err: %v", err)
+		}
+		csiPlugin, ok := plugin.(*csi.Plugin)
+		if !ok {
+			errMsg := "Could not use the CSI Plugin as a plugin registration handler"
+			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, errMsg)
+			klog.Fatalf("failed to get the CSI plugin from the volume plugin manager. err: %v", errMsg)
+		}
+		handler := pluginwatcher.PluginHandler(csiPlugin)
+		kl.pluginWatcher.AddHandler(pluginwatcherapi.CSIPlugin, handler)
+
 		// Adding Registration Callback function for Device Manager
 		kl.pluginWatcher.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 		// Start the plugin watcher
