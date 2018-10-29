@@ -24,7 +24,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -70,7 +69,6 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset, csiClient *fakecs
 	)
 	plugMgr := &volume.VolumePluginMgr{}
 
-	pluginInitOnce = sync.Once{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plug, err := plugMgr.FindPluginByName(PluginName)
@@ -676,29 +674,6 @@ func TestPluginInit(t *testing.T) {
 	}
 }
 
-func TestCSIPluginSingleton(t *testing.T) {
-	pluginInitOnce = sync.Once{}
-
-	pluginViaHandler := PluginHandler
-	pluginViaProbing := ProbeVolumePlugins()[0]
-	var err error
-
-	err = pluginViaHandler.RegisterPlugin("some plugin", "some endpoint")
-	if err != errNotInitialized {
-		t.Errorf("Expected init error (%v), got: %#v", errNotInitialized, err)
-	}
-
-	err = pluginViaProbing.Init(getFakeVolumeHost())
-	if err != nil {
-		t.Errorf("Expected no error on plugin init, got: %#v", err)
-	}
-
-	err = pluginViaHandler.RegisterPlugin("some plugin", "some endpoint")
-	if err == errNotInitialized {
-		t.Errorf("Expected plugin to be initialized now, but still got the init error: %#v", err)
-	}
-}
-
 func TestInitRegisterOrder(t *testing.T) {
 	testcases := map[string]struct {
 		callInit               bool
@@ -718,7 +693,6 @@ func TestInitRegisterOrder(t *testing.T) {
 
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			pluginInitOnce = sync.Once{}
 			plugins := ProbeVolumePlugins()
 			plugin := plugins[0].(*Plugin)
 

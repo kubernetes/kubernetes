@@ -101,11 +101,10 @@ func (e *driverEndpoints) Get(pluginName string) (string, bool) {
 
 // ProbeVolumePlugins returns implemented plugins
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	p := getPluginSingleton()
-	// p := &Plugin{
-	// 	host:         nil,
-	// 	blockEnabled: utilfeature.DefaultFeatureGate.Enabled(features.CSIBlockVolume),
-	// }
+	p := &Plugin{
+		host:         nil,
+		blockEnabled: utilfeature.DefaultFeatureGate.Enabled(features.CSIBlockVolume),
+	}
 	return []volume.VolumePlugin{p}
 }
 
