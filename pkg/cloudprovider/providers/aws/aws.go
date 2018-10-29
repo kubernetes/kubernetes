@@ -1547,11 +1547,6 @@ func (c *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) 
 
 }
 
-// Abstraction around AWS Instance Types
-// There isn't an API to get information for a particular instance type (that I know of)
-type awsInstanceType struct {
-}
-
 // Used to represent a mount device for attaching an EBS volume
 // This should be stored as a single letter (i.e. c, not sdc or /dev/sdc)
 type mountDevice string
@@ -1597,13 +1592,6 @@ func newAWSInstance(ec2Service EC2, instance *ec2.Instance) *awsInstance {
 	return self
 }
 
-// Gets the awsInstanceType that models the instance type of this instance
-func (i *awsInstance) getInstanceType() *awsInstanceType {
-	// TODO: Make this real
-	awsInstanceType := &awsInstanceType{}
-	return awsInstanceType
-}
-
 // Gets the full information about this instance from the EC2 API
 func (i *awsInstance) describeInstance() (*ec2.Instance, error) {
 	return describeInstance(i.ec2, awsInstanceID(i.awsID))
@@ -1617,10 +1605,6 @@ func (c *Cloud) getMountDevice(
 	info *ec2.Instance,
 	volumeID EBSVolumeID,
 	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
-	instanceType := i.getInstanceType()
-	if instanceType == nil {
-		return "", false, fmt.Errorf("could not get instance type for instance: %s", i.awsID)
-	}
 
 	deviceMappings := map[mountDevice]EBSVolumeID{}
 	for _, blockDevice := range info.BlockDeviceMappings {
