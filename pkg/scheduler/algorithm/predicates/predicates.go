@@ -793,7 +793,7 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 }
 
 // nodeMatchesNodeSelectorTerms checks if a node's labels satisfy a list of node selector terms,
-// terms are ORed, and an empty list of terms will match nothing.
+// terms are ANDed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
 	nodeFields := map[string]string{}
 	for k, f := range algorithm.NodeFieldSelectorKeys {

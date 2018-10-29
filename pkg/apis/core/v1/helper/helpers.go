@@ -297,22 +297,30 @@ func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorR
 	return false
 }
 
-// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ORed;
+// MatchNodeSelectorTerms checks whether the node labels and fields match node selector terms in ANDed;
 // nil or empty term matches no objects.
 func MatchNodeSelectorTerms(
 	nodeSelectorTerms []v1.NodeSelectorTerm,
 	nodeLabels labels.Set,
 	nodeFields fields.Set,
 ) bool {
+	result := true
+
+	if len(nodeSelectorTerms) == 0 {
+		return false
+	}
+
 	for _, req := range nodeSelectorTerms {
 		// nil or empty term selects no objects
 		if len(req.MatchExpressions) == 0 && len(req.MatchFields) == 0 {
+			result = false
 			continue
 		}
 
 		if len(req.MatchExpressions) != 0 {
 			labelSelector, err := NodeSelectorRequirementsAsSelector(req.MatchExpressions)
 			if err != nil || !labelSelector.Matches(nodeLabels) {
+				result = false
 				continue
 			}
 		}
@@ -320,14 +328,13 @@ func MatchNodeSelectorTerms(
 		if len(req.MatchFields) != 0 {
 			fieldSelector, err := NodeSelectorRequirementsAsFieldSelector(req.MatchFields)
 			if err != nil || !fieldSelector.Matches(nodeFields) {
+				result = false
 				continue
 			}
 		}
-
-		return true
 	}
 
-	return false
+	return result
 }
 
 // TopologySelectorRequirementsAsSelector converts the []TopologySelectorLabelRequirement api type into a struct

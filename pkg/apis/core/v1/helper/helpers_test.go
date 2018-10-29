@@ -773,6 +773,34 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "multi-selector was set, both node fields and labels (mismatched)",
+			args: args{
+				nodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						MatchExpressions: []v1.NodeSelectorRequirement{{
+							Key:      "label_1",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"label_1_val"},
+						}},
+					},
+					{
+						MatchFields: []v1.NodeSelectorRequirement{{
+							Key:      "metadata.name",
+							Operator: v1.NodeSelectorOpIn,
+							Values:   []string{"host_1"},
+						}},
+					},
+				},
+				nodeLabels: map[string]string{
+					"label_1": "label_1_val",
+				},
+				nodeFields: map[string]string{
+					"metadata.name": "host_1",
+				},
+			},
+			want: true,
+		},
+		{
 			name: "multi-selector was set, both node fields and labels (one mismatched)",
 			args: args{
 				nodeSelectorTerms: []v1.NodeSelectorTerm{
@@ -798,14 +826,14 @@ func TestMatchNodeSelectorTerms(t *testing.T) {
 					"metadata.name": "host_1",
 				},
 			},
-			want: true,
+			want: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MatchNodeSelectorTerms(tt.args.nodeSelectorTerms, tt.args.nodeLabels, tt.args.nodeFields); got != tt.want {
-				t.Errorf("MatchNodeSelectorTermsORed() = %v, want %v", got, tt.want)
+				t.Errorf("MatchNodeSelectorTermsANDed() = %v, want %v", got, tt.want)
 			}
 		})
 	}
