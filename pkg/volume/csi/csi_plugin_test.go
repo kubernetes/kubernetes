@@ -623,23 +623,13 @@ func TestPluginInit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			plugin := plugin{}
 
-			csiClient := fakecsi.NewSimpleClientset(
-				getCSIDriver("fake csi driver name", nil, nil),
-			)
-			volumeHost := volumetest.NewFakeVolumeHostWithCSINodeName(
-				"fakeTmpDir", // root dirctory
-				nil,          // kube clientset
-				csiClient,    // csi clientset
-				nil,          // plugins
-				"fake node",  // node name
-			)
-
 			if tc.registryEnabled {
 				defer utilfeaturetesting.SetFeatureGateDuringTest(
 					t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true,
 				)()
 			}
 
+			volumeHost := getFakeVolumeHost()
 			err := plugin.Init(volumeHost)
 			checkErrWithMessage(t, err, tc.expectedErrMsg)
 
@@ -681,6 +671,65 @@ func TestPluginInit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestInitRegisterOrder(t *testing.T) {
+	testcases := map[string]struct {
+		callInit               bool
+		expectedRegisterErrMsg string
+	}{
+		"RegisterPlugin() called without Init()": {
+			callInit:               false,
+			expectedRegisterErrMsg: errNotInitialized.Error(),
+		},
+		"RegisterPlugin() called after Init()": {
+			callInit: true,
+			// we get some other error, because we don't setup all the fakes for, we
+			// just make sure we do not get the "not initialized" error
+			expectedRegisterErrMsg: "connection error",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			plugins := ProbeVolumePlugins()
+			plugin := plugins[0].(*plugin)
+
+			if tc.callInit {
+				plugin.Init(getFakeVolumeHost())
+			}
+
+			// fake out the NIM
+			plugin.nim = &fake.FakeNodeInfoManager{}
+
+			registerErr := plugin.RegisterPlugin("some name", "/tmp/some.sock")
+
+			checkErrWithMessage(t, registerErr, tc.expectedRegisterErrMsg)
+		})
+	}
+}
+
+func TestPluginInitialized(t *testing.T) {
+	plugin := &plugin{}
+
+	if plugin.isInitialized() {
+		t.Fatalf("plugin should not show as initialized")
+	}
+
+	plugin.drivers = newDriverEndpoints()
+
+	if plugin.isInitialized() {
+		t.Fatalf("plugin should not show as initialized")
+	}
+
+	plugin.nim = &fake.FakeNodeInfoManager{}
+
+	if !plugin.isInitialized() {
+		t.Fatalf("plugin should show as initialized")
+	}
+
+	// must not panic
+	plugin.RegisterPlugin("some plugin name", "/tmp/some.plugin.endpoint.sock")
 }
 
 func waitForInformerSync(t *testing.T, informer cache.SharedInformer) {
@@ -735,4 +784,20 @@ func newCsiDriverServer(t *testing.T, sockPath string, nodeServer csipb.NodeServ
 	}
 
 	return starter, stopper
+}
+
+func getFakeVolumeHost() volume.VolumeHost {
+	csiClient := fakecsi.NewSimpleClientset(
+		getCSIDriver("fake csi driver name", nil, nil),
+	)
+	kubeClient := fakeclient.NewSimpleClientset()
+	volumeHost := volumetest.NewFakeVolumeHostWithCSINodeName(
+		"fakeTmpDir", // root dirctory
+		kubeClient,   // kube clientset
+		csiClient,    // csi clientset
+		nil,          // plugins
+		"fake node",  // node name
+	)
+
+	return volumeHost
 }

@@ -60,6 +60,8 @@ const (
 	csiResyncPeriod = time.Minute
 )
 
+var errNotInitialized = errors.New("CSI plugin not initialized")
+
 type plugin struct {
 	drivers           *driverEndpoints
 	nim               nodeinfomanager.Interface
@@ -124,6 +126,10 @@ func (p *plugin) ValidatePlugin(pluginName string, endpoint string, versions []s
 func (p *plugin) RegisterPlugin(pluginName string, endpoint string) error {
 	klog.Infof(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
+	if !p.isInitialized() {
+		return errNotInitialized
+	}
+
 	p.drivers.Set(pluginName, endpoint)
 
 	// Get node info from the driver.
@@ -177,6 +183,10 @@ func (p *plugin) unregisterDriver(driverName string) error {
 }
 
 var _ pluginwatcher.PluginHandler = &plugin{}
+
+func (p *plugin) isInitialized() bool {
+	return (p.drivers != nil && p.nim != nil)
+}
 
 // Init is for implementing the VolumePlugin
 func (p *plugin) Init(host volume.VolumeHost) error {
