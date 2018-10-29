@@ -749,7 +749,7 @@ func PrioritizeNodes(
 
 	if glog.V(10) {
 		for i := range result {
-			glog.V(10).Infof("Host %s => Score %d", result[i].Host, result[i].Score)
+			glog.Infof("Host %s => Score %d", result[i].Host, result[i].Score)
 		}
 	}
 	return result, nil
