@@ -25,6 +25,8 @@ import (
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 
+const phaseTestK8sVersion = "v1.11.0"
+
 func TestControlPlaneSubCommandsHasFlags(t *testing.T) {
 
 	subCmds := getControlPlaneSubCommands("", phaseTestK8sVersion)

@@ -20,18 +20,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	certscmdphase "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
@@ -66,6 +66,24 @@ var (
 		` + cmdutil.AlphaDisclaimer)
 )
 
+// certsData defines the behavior that a runtime data struct passed to the certs phase should
+// have. Please note that we are using an interface in order to make this phase reusable in different workflows
+// (and thus with different runtime data struct, all of them requested to be compliant to this interface)
+type certsData interface {
+	Cfg() *kubeadmapi.InitConfiguration
+	CertificateDir() string
+	CertificateWriteDir() string
+}
+
+// NewCertsPhase returns the phase for the certs
+func NewCertsPhase() workflow.Phase {
+	return workflow.Phase{
+		Name:   "certs",
+		Short:  "Certificate generation",
+		Phases: getCertsSubPhases(),
+	}
+}
+
 // NewCmdCerts returns main command for certs phase
 func NewCmdCerts() *cobra.Command {
 	cmd := &cobra.Command{
@@ -75,72 +93,62 @@ func NewCmdCerts() *cobra.Command {
 		Long:    cmdutil.MacroCommandLongDescription,
 	}
 
-	cmd.AddCommand(getCertsSubCommands("")...)
+	cmd.AddCommand(getCertsSubCommands()...)
 	return cmd
 }
 
 // getCertsSubCommands returns sub commands for certs phase
-func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
-
-	cfg := &kubeadmapiv1beta1.InitConfiguration{}
-
-	// Default values for the cobra help text
-	kubeadmscheme.Scheme.Default(cfg)
-
-	var cfgPath string
-
-	// Special case commands
-	// All runs CreatePKIAssets, which isn't a particular certificate
-	allCmd := &cobra.Command{
-		Use:     "all",
-		Short:   "Generates all PKI assets necessary to establish the control plane",
-		Long:    allCertsLongDesc,
-		Example: allCertsExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-
-			err = certsphase.CreatePKIAssets(internalcfg)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-	addFlags(allCmd, &cfgPath, cfg, true)
-
-	// SA creates the private/public key pair, which doesn't use x509 at all
-	saCmd := &cobra.Command{
-		Use:   "sa",
-		Short: "Generates a private key for signing service account tokens along with its public key",
-		Long:  saKeyLongDesc,
-		Run: func(cmd *cobra.Command, args []string) {
-			internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
-			kubeadmutil.CheckErr(err)
-
-			err = certsphase.CreateServiceAccountKeyAndPublicKeyFiles(internalcfg)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-	addFlags(saCmd, &cfgPath, cfg, false)
-
-	// "renew" command
-	renewCmd := certscmdphase.NewCmdCertsRenewal()
-
-	subCmds := []*cobra.Command{allCmd, saCmd, renewCmd}
-
-	certTree, err := certsphase.GetDefaultCertList().AsMap().CertTree()
-	kubeadmutil.CheckErr(err)
-
-	for ca, certList := range certTree {
-		// Don't use pointers from for loops, they will be rewrittenb
-		caCmds := makeCommandsForCA(ca, certList, &cfgPath, cfg)
-		subCmds = append(subCmds, caCmds...)
-	}
-
-	return subCmds
+func getCertsSubCommands() []*cobra.Command {
+	return []*cobra.Command{certscmdphase.NewCmdCertsRenewal()}
 }
 
-func makeCmd(certSpec *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   certSpec.Name,
+// getCertsSubPhases returns sub phases for certs phase
+func getCertsSubPhases() []workflow.Phase {
+	subPhases := []workflow.Phase{}
+
+	certTree, _ := certsphase.GetDefaultCertList().AsMap().CertTree()
+
+	for ca, certList := range certTree {
+		caPhase := newCertSubPhase(ca, runCAPhase(ca))
+		subPhases = append(subPhases, caPhase)
+
+		for _, cert := range certList {
+			certPhase := newCertSubPhase(cert, runCertPhase(cert, ca))
+			subPhases = append(subPhases, certPhase)
+		}
+
+		subPhases = append(subPhases, caPhase)
+	}
+
+	// SA creates the private/public key pair, which doesn't use x509 at all
+	saPhase := workflow.Phase{
+		Name:  "sa",
+		Short: "Generates a private key for signing service account tokens along with its public key",
+		Long:  saKeyLongDesc,
+		Run:   runCertsSa,
+	}
+
+	subPhases = append(subPhases, saPhase)
+
+	return subPhases
+}
+
+func runCertsSa(c workflow.RunData) error {
+	data, ok := c.(certsData)
+	if !ok {
+		return errors.New("certs phase invoked with an invalid data struct")
+	}
+
+	cfg := data.Cfg()
+	cfg.CertificatesDir = data.CertificateWriteDir()
+	defer func() { cfg.CertificatesDir = data.CertificateDir() }()
+
+	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg)
+}
+
+func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunData) error) workflow.Phase {
+	phase := workflow.Phase{
+		Name:  certSpec.Name,
 		Short: fmt.Sprintf("Generates the %s", certSpec.LongName),
 		Long: fmt.Sprintf(
 			genericLongDesc,
@@ -148,10 +156,9 @@ func makeCmd(certSpec *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv
 			certSpec.BaseName,
 			getSANDescription(certSpec),
 		),
+		Run: run,
 	}
-	addFlags(cmd, cfgPath, cfg, certSpec.Name == "apiserver")
-	// Add flags to the command
-	return cmd
+	return phase
 }
 
 func getSANDescription(certSpec *certsphase.KubeadmCert) string {
@@ -188,51 +195,32 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	return fmt.Sprintf("\n\nDefault SANs are %s", strings.Join(sans, ", "))
 }
 
-func addFlags(cmd *cobra.Command, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration, addAPIFlags bool) {
-	options.AddCertificateDirFlag(cmd.Flags(), &cfg.CertificatesDir)
-	options.AddConfigFlag(cmd.Flags(), cfgPath)
-	if addAPIFlags {
-		cmd.Flags().StringVar(&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain, "Alternative domain for services, to use for the API server serving cert")
-		cmd.Flags().StringVar(&cfg.Networking.ServiceSubnet, "service-cidr", cfg.Networking.ServiceSubnet, "Alternative range of IP address for service VIPs, from which derives the internal API server VIP that will be added to the API Server serving cert")
-		cmd.Flags().StringSliceVar(&cfg.APIServerCertSANs, "apiserver-cert-extra-sans", []string{}, "Optional extra altnames to use for the API server serving cert. Can be both IP addresses and DNS names")
-		cmd.Flags().StringVar(&cfg.APIEndpoint.AdvertiseAddress, "apiserver-advertise-address", cfg.APIEndpoint.AdvertiseAddress, "The IP address the API server is accessible on, to use for the API server serving cert")
+func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
+	return func(c workflow.RunData) error {
+		data, ok := c.(certsData)
+		if !ok {
+			return errors.New("certs phase invoked with an invalid data struct")
+		}
+
+		cfg := data.Cfg()
+		cfg.CertificatesDir = data.CertificateWriteDir()
+		defer func() { cfg.CertificatesDir = data.CertificateDir() }()
+
+		return certsphase.CreateCACertAndKeyFiles(ca, cfg)
 	}
 }
 
-func makeCommandsForCA(ca *certsphase.KubeadmCert, certList []*certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration) []*cobra.Command {
-	subCmds := []*cobra.Command{}
+func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(c workflow.RunData) error {
+	return func(c workflow.RunData) error {
+		data, ok := c.(certsData)
+		if !ok {
+			return errors.New("certs phase invoked with an invalid data struct")
+		}
 
-	caCmd := makeCmd(ca, cfgPath, cfg)
-	caCmd.Run = func(cmd *cobra.Command, args []string) {
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
-		kubeadmutil.CheckErr(err)
+		cfg := data.Cfg()
+		cfg.CertificatesDir = data.CertificateWriteDir()
+		defer func() { cfg.CertificatesDir = data.CertificateDir() }()
 
-		err = certsphase.CreateCACertAndKeyFiles(ca, internalcfg)
-		kubeadmutil.CheckErr(err)
+		return certsphase.CreateCertAndKeyFilesWithCA(cert, caCert, cfg)
 	}
-
-	subCmds = append(subCmds, caCmd)
-
-	for _, cert := range certList {
-		certCmd := makeCommandForCert(cert, ca, cfgPath, cfg)
-		subCmds = append(subCmds, certCmd)
-	}
-
-	return subCmds
-}
-
-func makeCommandForCert(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfgPath *string, cfg *kubeadmapiv1beta1.InitConfiguration) *cobra.Command {
-	certCmd := makeCmd(cert, cfgPath, cfg)
-
-	certCmd.Run = func(cmd *cobra.Command, args []string) {
-		internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
-		kubeadmutil.CheckErr(err)
-		err = configutil.VerifyAPIServerBindAddress(internalcfg.APIEndpoint.AdvertiseAddress)
-		kubeadmutil.CheckErr(err)
-
-		err = certsphase.CreateCertAndKeyFilesWithCA(cert, caCert, internalcfg)
-		kubeadmutil.CheckErr(err)
-	}
-
-	return certCmd
 }
