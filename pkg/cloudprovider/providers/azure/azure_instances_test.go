@@ -66,7 +66,6 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string) {
 
 func TestInstanceID(t *testing.T) {
 	cloud := getTestCloud()
-	cloud.metadata = &InstanceMetadata{}
 
 	testcases := []struct {
 		name         string
@@ -105,15 +104,18 @@ func TestInstanceID(t *testing.T) {
 		}
 
 		mux := http.NewServeMux()
-		mux.Handle("/instance/compute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf("{\"name\":\"%s\"}", test.metadataName))
+		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"name":"%s"}}`, test.metadataName))
 		}))
 		go func() {
 			http.Serve(listener, mux)
 		}()
 		defer listener.Close()
 
-		cloud.metadata.baseURL = "http://" + listener.Addr().String() + "/"
+		cloud.metadata, err = NewInstanceMetadataService("http://" + listener.Addr().String() + "/")
+		if err != nil {
+			t.Errorf("Test [%s] unexpected error: %v", test.name, err)
+		}
 		vmListWithPowerState := make(map[string]string)
 		for _, vm := range test.vmList {
 			vmListWithPowerState[vm] = ""
