@@ -120,6 +120,9 @@ type APIServer struct {
 
 	// CertSANs sets extra Subject Alternative Names for the API Server signing cert.
 	CertSANs []string `json:"certSANs,omitempty"`
+
+	// TimeoutForControlPlane controls the timeout that we use for API server to appear
+	TimeoutForControlPlane *metav1.Duration `json:"timeoutForControlPlane,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

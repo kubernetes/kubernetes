@@ -18,7 +18,8 @@ nodeRegistration:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
 ---
-apiServer: {}
+apiServer:
+  timeoutForControlPlane: 4m0s
 apiVersion: kubeadm.k8s.io/v1beta1
 auditPolicy:
   logDir: /var/log/kubernetes/audit

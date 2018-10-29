@@ -469,8 +469,10 @@ func runInit(i *initData, out io.Writer) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create client")
 	}
+
 	// TODO: NewControlPlaneWaiter should be converted to private after the self-hosting phase is removed.
-	waiter, err := phases.NewControlPlaneWaiter(i.dryRun, client, i.outputWriter)
+	timeout := i.cfg.ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
+	waiter, err := phases.NewControlPlaneWaiter(i.dryRun, timeout, client, i.outputWriter)
 	if err != nil {
 		return errors.Wrap(err, "failed to create waiter")
 	}

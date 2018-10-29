@@ -29,6 +29,7 @@ apiServer:
   - hostPath: /host/writable
     mountPath: /mount/writable
     name: WritableVolume
+  timeoutForControlPlane: 4m0s
 apiVersion: kubeadm.k8s.io/v1beta1
 auditPolicy:
   logDir: /var/log/kubernetes/audit

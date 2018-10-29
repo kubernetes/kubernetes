@@ -93,12 +93,13 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return errors.Wrap(err, "cannot obtain client")
 	}
 
-	waiter, err := NewControlPlaneWaiter(data.DryRun(), client, data.OutputWriter())
+	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
+	waiter, err := NewControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}
 
-	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q\n", data.ManifestDir())
+	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)
 
 	if err := waiter.WaitForKubeletAndFunc(waiter.WaitForAPI); err != nil {
 		ctx := map[string]string{
@@ -143,14 +144,10 @@ func printFilesIfDryRunning(data waitControlPlaneData) error {
 
 // NewControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.
 // TODO: make private (lowercase) after self-hosting phase is removed.
-func NewControlPlaneWaiter(dryRun bool, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
+func NewControlPlaneWaiter(dryRun bool, timeout time.Duration, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
 	if dryRun {
 		return dryrunutil.NewWaiter(), nil
 	}
 
-	// We know that the images should be cached locally already as we have pulled them using
-	// crictl in the preflight checks. Hence we can have a pretty short timeout for the kubelet
-	// to start creating Static Pods.
-	timeout := 4 * time.Minute
 	return apiclient.NewKubeWaiter(client, timeout, out), nil
 }

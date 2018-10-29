@@ -212,6 +212,7 @@ limitations under the License.
 //	  certSANs:
 //	  - "10.100.1.1"
 //	  - "ec2-10-100-0-1.compute-1.amazonaws.com"
+//	  timeoutForControlPlane: 4m0s
 //	controllerManager:
 //	  extraArgs:
 //	    node-cidr-mask-size: 20

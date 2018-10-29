@@ -16,6 +16,7 @@ APIServer:
     Name: WritableVolume
     PathType: ""
     ReadOnly: false
+  TimeoutForControlPlane: 4m0s
 AuditPolicyConfiguration:
   LogDir: /var/log/kubernetes/audit
   LogMaxAge: 2

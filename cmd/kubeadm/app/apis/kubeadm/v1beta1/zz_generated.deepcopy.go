@@ -51,6 +51,11 @@ func (in *APIServer) DeepCopyInto(out *APIServer) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.TimeoutForControlPlane != nil {
+		in, out := &in.TimeoutForControlPlane, &out.TimeoutForControlPlane
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	return
 }
 

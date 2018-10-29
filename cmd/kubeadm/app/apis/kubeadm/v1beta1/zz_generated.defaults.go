@@ -37,6 +37,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
 	SetDefaults_ClusterConfiguration(in)
+	SetDefaults_APIServer(&in.APIServer)
 }
 
 func SetObjectDefaults_ClusterStatus(in *ClusterStatus) {
