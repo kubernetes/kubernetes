@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -54,11 +53,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/webhook"
-	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
@@ -67,8 +63,6 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
@@ -81,7 +75,6 @@ import (
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/tunneler"
-	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -286,9 +279,8 @@ func CreateKubeAPIServerConfig(
 ) {
 	var genericConfig *genericapiserver.Config
 	var storageFactory *serverstorage.DefaultStorageFactory
-	var sharedInformers informers.SharedInformerFactory
 	var versionedInformers clientgoinformers.SharedInformerFactory
-	genericConfig, sharedInformers, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)
+	genericConfig, versionedInformers, insecureServingInfo, serviceResolver, pluginInitializers, admissionPostStartHook, storageFactory, lastErr = buildGenericConfig(s.ServerRunOptions, proxyTransport)
 	if lastErr != nil {
 		return
 	}
@@ -404,7 +396,6 @@ func CreateKubeAPIServerConfig(
 			APIAudiences:                apiAudiences,
 			ServiceAccountMaxExpiration: maxExpiration,
 
-			InternalInformers:  sharedInformers,
 			VersionedInformers: versionedInformers,
 		},
 	}
@@ -423,7 +414,6 @@ func buildGenericConfig(
 	proxyTransport *http.Transport,
 ) (
 	genericConfig *genericapiserver.Config,
-	sharedInformers informers.SharedInformerFactory,
 	versionedInformers clientgoinformers.SharedInformerFactory,
 	insecureServingInfo *genericapiserver.DeprecatedInsecureServingInfo,
 	serviceResolver aggregatorapiserver.ServiceResolver,
@@ -491,38 +481,13 @@ func buildGenericConfig(
 	// set it in kube-apiserver.
 	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
-	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		lastErr = fmt.Errorf("failed to create clientset: %v", err)
-		return
-	}
-
 	kubeClientConfig := genericConfig.LoopbackClientConfig
-	sharedInformers = informers.NewSharedInformerFactory(client, 10*time.Minute)
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create real external clientset: %v", err)
 		return
 	}
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
-
-	if s.EnableAggregatorRouting {
-		serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(
-			versionedInformers.Core().V1().Services().Lister(),
-			versionedInformers.Core().V1().Endpoints().Lister(),
-		)
-	} else {
-		serviceResolver = aggregatorapiserver.NewClusterIPServiceResolver(
-			versionedInformers.Core().V1().Services().Lister(),
-		)
-	}
-	// resolve kubernetes.default.svc locally
-	localHost, err := url.Parse(genericConfig.LoopbackClientConfig.Host)
-	if err != nil {
-		lastErr = err
-		return
-	}
-	serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
 
 	genericConfig.Authentication.Authenticator, genericConfig.OpenAPIConfig.SecurityDefinitions, err = BuildAuthenticator(s, clientgoExternalClient, versionedInformers)
 	if err != nil {
@@ -539,35 +504,14 @@ func buildGenericConfig(
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
-	webhookAuthResolverWrapper := func(delegate webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
-		return &webhook.AuthenticationInfoResolverDelegator{
-			ClientConfigForFunc: func(server string) (*rest.Config, error) {
-				if server == "kubernetes.default.svc" {
-					return genericConfig.LoopbackClientConfig, nil
-				}
-				return delegate.ClientConfigFor(server)
-			},
-			ClientConfigForServiceFunc: func(serviceName, serviceNamespace string) (*rest.Config, error) {
-				if serviceName == "kubernetes" && serviceNamespace == "default" {
-					return genericConfig.LoopbackClientConfig, nil
-				}
-				ret, err := delegate.ClientConfigForService(serviceName, serviceNamespace)
-				if err != nil {
-					return nil, err
-				}
-				if proxyTransport != nil && proxyTransport.DialContext != nil {
-					ret.Dial = proxyTransport.DialContext
-				}
-				return ret, err
-			},
-		}
+	admissionConfig := &kubeapiserveradmission.AdmissionConfig{
+		ExternalInformers:    versionedInformers,
+		LoopbackClientConfig: genericConfig.LoopbackClientConfig,
+		CloudConfigFile:      s.CloudProvider.CloudConfigFile,
 	}
-	pluginInitializers, admissionPostStartHook, err = BuildAdmissionPluginInitializers(
-		s,
-		client,
-		serviceResolver,
-		webhookAuthResolverWrapper,
-	)
+	serviceResolver = buildServiceResolver(s.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+
+	pluginInitializers, admissionPostStartHook, err = admissionConfig.New(proxyTransport, serviceResolver)
 	if err != nil {
 		lastErr = fmt.Errorf("failed to create admission plugin initializer: %v", err)
 		return
@@ -584,42 +528,6 @@ func buildGenericConfig(
 	}
 
 	return
-}
-
-// BuildAdmissionPluginInitializers constructs the admission plugin initializer
-func BuildAdmissionPluginInitializers(
-	s *options.ServerRunOptions,
-	client internalclientset.Interface,
-	serviceResolver aggregatorapiserver.ServiceResolver,
-	webhookAuthWrapper webhook.AuthenticationInfoResolverWrapper,
-) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
-	var cloudConfig []byte
-
-	if s.CloudProvider.CloudConfigFile != "" {
-		var err error
-		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
-		if err != nil {
-			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
-		}
-	}
-
-	// We have a functional client so we can use that to build our discovery backed REST mapper
-	// Use a discovery client capable of being refreshed.
-	discoveryClient := cacheddiscovery.NewMemCacheClient(client.Discovery())
-	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-
-	admissionPostStartHook := func(context genericapiserver.PostStartHookContext) error {
-		discoveryRESTMapper.Reset()
-		go utilwait.Until(discoveryRESTMapper.Reset, 30*time.Second, context.StopCh)
-		return nil
-	}
-
-	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
-
-	kubePluginInitializer := kubeapiserveradmission.NewPluginInitializer(cloudConfig, discoveryRESTMapper, quotaConfiguration)
-	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthWrapper, serviceResolver)
-
-	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, admissionPostStartHook, nil
 }
 
 // BuildAuthenticator constructs the authenticator
@@ -726,6 +634,25 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	}
 	options.ServerRunOptions = s
 	return options, nil
+}
+
+func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) webhook.ServiceResolver {
+	var serviceResolver webhook.ServiceResolver
+	if enabledAggregatorRouting {
+		serviceResolver = aggregatorapiserver.NewEndpointServiceResolver(
+			informer.Core().V1().Services().Lister(),
+			informer.Core().V1().Endpoints().Lister(),
+		)
+	} else {
+		serviceResolver = aggregatorapiserver.NewClusterIPServiceResolver(
+			informer.Core().V1().Services().Lister(),
+		)
+	}
+	// resolve kubernetes.default.svc locally
+	if localHost, err := url.Parse(hostname); err == nil {
+		serviceResolver = aggregatorapiserver.NewLoopbackServiceResolver(serviceResolver, localHost)
+	}
+	return serviceResolver
 }
 
 func readCAorNil(file string) ([]byte, error) {

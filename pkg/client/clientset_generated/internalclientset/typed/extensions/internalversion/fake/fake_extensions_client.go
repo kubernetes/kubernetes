@@ -28,20 +28,8 @@ type FakeExtensions struct {
 	*testing.Fake
 }
 
-func (c *FakeExtensions) DaemonSets(namespace string) internalversion.DaemonSetInterface {
-	return &FakeDaemonSets{c, namespace}
-}
-
-func (c *FakeExtensions) Deployments(namespace string) internalversion.DeploymentInterface {
-	return &FakeDeployments{c, namespace}
-}
-
 func (c *FakeExtensions) Ingresses(namespace string) internalversion.IngressInterface {
 	return &FakeIngresses{c, namespace}
-}
-
-func (c *FakeExtensions) ReplicaSets(namespace string) internalversion.ReplicaSetInterface {
-	return &FakeReplicaSets{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

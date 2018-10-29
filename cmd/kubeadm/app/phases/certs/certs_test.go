@@ -308,6 +308,8 @@ func TestSharedCertificateExists(t *testing.T) {
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
 				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 		},
 		{
@@ -318,6 +320,8 @@ func TestSharedCertificateExists(t *testing.T) {
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
 				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 			expectedError: true,
 		},
@@ -329,17 +333,34 @@ func TestSharedCertificateExists(t *testing.T) {
 				"front-proxy-ca.crt": caCert,
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 			expectedError: true,
 		},
 		{
-			name: "expected front-proxy.crt missing",
+			name: "missing front-proxy.crt",
 			files: pkiFiles{
 				"ca.crt":             caCert,
 				"ca.key":             caKey,
 				"front-proxy-ca.key": caKey,
 				"sa.pub":             publicKey,
 				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
+			},
+			expectedError: true,
+		},
+		{
+			name: "missing etcd/ca.crt",
+			files: pkiFiles{
+				"ca.crt":             caCert,
+				"ca.key":             caKey,
+				"front-proxy-ca.key": caKey,
+				"sa.pub":             publicKey,
+				"sa.key":             key,
+				"etcd/ca.crt":        caCert,
+				"etcd/ca.key":        caKey,
 			},
 			expectedError: true,
 		},
@@ -348,6 +369,7 @@ func TestSharedCertificateExists(t *testing.T) {
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
 			tmpdir := testutil.SetupTempDir(t)
+			os.MkdirAll(tmpdir+"/etcd", os.ModePerm)
 			defer os.RemoveAll(tmpdir)
 
 			cfg := &kubeadmapi.InitConfiguration{

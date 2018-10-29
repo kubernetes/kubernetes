@@ -23,12 +23,44 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/renstrom/dedent"
+
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+)
+
+const (
+	etcdPod = `apiVersion: v1
+kind: Pod
+metadata:
+spec:
+  volumes:
+  - hostPath:
+      path: /path/to/etcd
+      type: DirectoryOrCreate
+    name: etcd-data
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: etcd-certs`
+
+	etcdPodWithoutDataVolume = `apiVersion: v1
+kind: Pod
+metadata:
+spec:
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: etcd-certs`
+
+	etcdPodInvalid = `invalid pod`
 )
 
 func assertExists(t *testing.T, path string) {
@@ -233,4 +265,67 @@ func TestRemoveContainers(t *testing.T) {
 	}
 
 	removeContainers(&fexec, "unix:///var/run/crio/crio.sock")
+}
+
+func TestGetEtcdDataDir(t *testing.T) {
+	tests := map[string]struct {
+		dataDir       string
+		podYaml       string
+		expectErr     bool
+		writeManifest bool
+	}{
+		"non-existent file returns error": {
+			dataDir:       "",
+			podYaml:       "",
+			expectErr:     true,
+			writeManifest: false,
+		},
+		"return etcd data dir": {
+			dataDir:       "/path/to/etcd",
+			podYaml:       etcdPod,
+			expectErr:     false,
+			writeManifest: true,
+		},
+		"invalid etcd pod": {
+			dataDir:       "",
+			podYaml:       etcdPodInvalid,
+			expectErr:     true,
+			writeManifest: true,
+		},
+		"etcd pod spec without data volume": {
+			dataDir:       "",
+			podYaml:       etcdPodWithoutDataVolume,
+			expectErr:     true,
+			writeManifest: true,
+		},
+	}
+
+	for name, test := range tests {
+		tmpdir := testutil.SetupTempDir(t)
+		defer os.RemoveAll(tmpdir)
+
+		manifestPath := filepath.Join(tmpdir, "etcd.yaml")
+		if test.writeManifest {
+			err := ioutil.WriteFile(manifestPath, []byte(test.podYaml), 0644)
+			if err != nil {
+				t.Fatalf(dedent.Dedent("failed to write pod manifest\n%s\n\tfatal error: %v"), name, err)
+			}
+		}
+
+		client := clientsetfake.NewSimpleClientset()
+		dataDir, err := getEtcdDataDir(manifestPath, client)
+		if (err != nil) != test.expectErr {
+			t.Fatalf(dedent.Dedent(
+				"getEtcdDataDir failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
+				name,
+				test.expectErr,
+				(err != nil),
+				err,
+			)
+		}
+
+		if dataDir != test.dataDir {
+			t.Fatalf(dedent.Dedent("getEtcdDataDir failed\n%s\n\texpected: %s\ngot: %s"), name, test.dataDir, dataDir)
+		}
+	}
 }

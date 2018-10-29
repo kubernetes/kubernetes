@@ -34,6 +34,7 @@ import (
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -346,14 +347,14 @@ func AddHandlers(h printers.PrintHandler) {
 
 	podSecurityPolicyColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Priv", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
-		{Name: "Caps", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
-		{Name: "SELinux", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
-		{Name: "RunAsUser", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
-		{Name: "FsGroup", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["fsGroup"]},
-		{Name: "SupGroup", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["supplementalGroups"]},
-		{Name: "ReadOnlyRootFs", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["readOnlyRootFilesystem"]},
-		{Name: "Volumes", Type: "string", Description: extensionsv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["volumes"]},
+		{Name: "Priv", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["privileged"]},
+		{Name: "Caps", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["allowedCapabilities"]},
+		{Name: "SELinux", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["seLinux"]},
+		{Name: "RunAsUser", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["runAsUser"]},
+		{Name: "FsGroup", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["fsGroup"]},
+		{Name: "SupGroup", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["supplementalGroups"]},
+		{Name: "ReadOnlyRootFs", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["readOnlyRootFilesystem"]},
+		{Name: "Volumes", Type: "string", Description: policyv1beta1.PodSecurityPolicySpec{}.SwaggerDoc()["volumes"]},
 	}
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
@@ -769,7 +770,7 @@ func printReplicationControllerList(list *api.ReplicationControllerList, options
 	return rows, nil
 }
 
-func printReplicaSet(obj *extensions.ReplicaSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printReplicaSet(obj *apps.ReplicaSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -786,7 +787,7 @@ func printReplicaSet(obj *extensions.ReplicaSet, options printers.PrintOptions) 
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printReplicaSetList(list *extensions.ReplicaSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printReplicaSetList(list *apps.ReplicaSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printReplicaSet(&list.Items[i], options)
@@ -1063,7 +1064,7 @@ func printStatefulSetList(list *apps.StatefulSetList, options printers.PrintOpti
 	return rows, nil
 }
 
-func printDaemonSet(obj *extensions.DaemonSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDaemonSet(obj *apps.DaemonSet, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1082,7 +1083,7 @@ func printDaemonSet(obj *extensions.DaemonSet, options printers.PrintOptions) ([
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printDaemonSetList(list *extensions.DaemonSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDaemonSetList(list *apps.DaemonSetList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printDaemonSet(&list.Items[i], options)
@@ -1555,7 +1556,7 @@ func truncate(str string, maxLen int) string {
 	return str
 }
 
-func printDeployment(obj *extensions.Deployment, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDeployment(obj *apps.Deployment, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -1578,7 +1579,7 @@ func printDeployment(obj *extensions.Deployment, options printers.PrintOptions) 
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printDeploymentList(list *extensions.DeploymentList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printDeploymentList(list *apps.DeploymentList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printDeployment(&list.Items[i], options)

@@ -49,6 +49,7 @@ const (
 	// owner: @vishh
 	// alpha: v1.5
 	//
+	// DEPRECATED - This feature is deprecated by Pod Priority and Preemption as of Kubernetes 1.13.
 	// Ensures guaranteed scheduling of pods marked with a special pod annotation `scheduler.alpha.kubernetes.io/critical-pod`
 	// and also prevents them from being evicted from a node.
 	// Note: This feature is not supported for `BestEffort` pods.

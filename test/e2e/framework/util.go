@@ -3895,7 +3895,7 @@ func ParseKVLines(output, key string) string {
 func RestartKubeProxy(host string) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartKubeProxy: %s", TestContext.Provider)
 	}
 	// kubelet will restart the kube-proxy since it's running in a static pod
 	Logf("Killing kube-proxy on node %v", host)
@@ -3932,7 +3932,7 @@ func RestartKubelet(host string) error {
 	// TODO: Make it work for all providers and distros.
 	supportedProviders := []string{"gce", "aws", "vsphere"}
 	if !ProviderIs(supportedProviders...) {
-		return fmt.Errorf("unsupported provider: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
+		return fmt.Errorf("unsupported provider for RestartKubelet: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
 	}
 	if ProviderIs("gce") && !NodeOSDistroIs("debian", "gci") {
 		return fmt.Errorf("unsupported node OS distro: %s", TestContext.NodeOSDistro)
@@ -3988,7 +3988,7 @@ func WaitForKubeletUp(host string) error {
 func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
 	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartApiserver: %s", TestContext.Provider)
 	}
 	if ProviderIs("gce", "aws") {
 		initialRestartCount, err := getApiserverRestartCount(cs)
@@ -4011,7 +4011,7 @@ func RestartApiserver(cs clientset.Interface) error {
 
 func sshRestartMaster() error {
 	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for sshRestartMaster: %s", TestContext.Provider)
 	}
 	var command string
 	if ProviderIs("gce") {
@@ -4077,7 +4077,7 @@ func getApiserverRestartCount(c clientset.Interface) (int32, error) {
 func RestartControllerManager() error {
 	// TODO: Make it work for all providers and distros.
 	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+		return fmt.Errorf("unsupported provider for RestartControllerManager: %s", TestContext.Provider)
 	}
 	if ProviderIs("gce") && !MasterOSDistroIs("gci") {
 		return fmt.Errorf("unsupported master OS distro: %s", TestContext.MasterOSDistro)

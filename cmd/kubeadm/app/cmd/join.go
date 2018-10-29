@@ -30,7 +30,6 @@ import (
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
@@ -74,7 +74,6 @@ var (
 
 		Please ensure that:
 		* The cluster has a stable controlPlaneEndpoint address.
-		* The cluster uses an external etcd.
 		* The certificates that must be shared among control plane instances are provided.
 
 		`)))
@@ -86,6 +85,7 @@ var (
 		* The Kubelet was informed of the new secure connection details.
 		* Master label and taint were applied to the new node.
 		* The kubernetes control plane instances scaled up.
+		{{.etcdMessage}}
 
 		To start administering your cluster from this node, you need to run the following as a regular user:
 
@@ -383,8 +383,15 @@ func (j *Join) Run(out io.Writer) error {
 		}
 
 		// outputs the join control plane done template and exits
+		etcdMessage := ""
+		// in case of local etcd
+		if initConfiguration.Etcd.External == nil {
+			etcdMessage = "* A new etcd member was added to the local/stacked etcd cluster."
+		}
+
 		ctx := map[string]string{
 			"KubeConfigPath": kubeadmconstants.GetAdminKubeConfigPath(),
+			"etcdMessage":    etcdMessage,
 		}
 		joinControPlaneDoneTemp.Execute(out, ctx)
 		return nil
@@ -419,11 +426,6 @@ func (j *Join) CheckIfReadyForAdditionalControlPlane(initConfiguration *kubeadma
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
 		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
-	}
-
-	// blocks if the cluster was created without an external etcd cluster
-	if initConfiguration.Etcd.External == nil {
-		return errors.New("unable to add a new control plane instance on a cluster that doesn't use an external etcd")
 	}
 
 	// blocks if control plane is self-hosted
@@ -463,6 +465,23 @@ func (j *Join) PrepareForHostingControlPlane(initConfiguration *kubeadmapi.InitC
 	// Static pods will be created and managed by the kubelet as soon as it starts
 	if err := controlplanephase.CreateInitStaticPodManifestFiles(kubeadmconstants.GetStaticPodDirectory(), initConfiguration); err != nil {
 		return errors.Wrap(err, "error creating static pod manifest files for the control plane components")
+	}
+
+	// in case of local etcd
+	if initConfiguration.Etcd.External == nil {
+		// Checks that the etcd cluster is healthy
+		// NB. this check cannot be implemented before because it requires the admin.conf and all the certificates
+		//     for connecting to etcd already in place
+		kubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.AdminKubeConfigFileName)
+
+		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+		if err != nil {
+			return errors.Wrap(err, "couldn't create kubernetes client")
+		}
+
+		if err := etcdphase.CheckLocalEtcdClusterStatus(client, initConfiguration); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -557,6 +576,23 @@ func (j *Join) PostInstallControlPlane(initConfiguration *kubeadmapi.InitConfigu
 	client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 	if err != nil {
 		return errors.Wrap(err, "couldn't create kubernetes client")
+	}
+
+	// in case of local etcd
+	if initConfiguration.Etcd.External == nil {
+		// Adds a new etcd instance; in order to do this the new etcd instance should be "announced" to
+		// the existing etcd members before being created.
+		// This operation must be executed after kubelet is already started in order to minimize the time
+		// between the new etcd member is announced and the start of the static pod running the new etcd member, because during
+		// this time frame etcd gets temporary not available (only when moving from 1 to 2 members in the etcd cluster).
+		// From https://coreos.com/etcd/docs/latest/v2/runtime-configuration.html
+		// "If you add a new member to a 1-node cluster, the cluster cannot make progress before the new member starts
+		// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
+		// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the existing one."
+		glog.V(1).Info("[join] adding etcd")
+		if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, kubeadmconstants.GetStaticPodDirectory(), initConfiguration); err != nil {
+			return errors.Wrap(err, "error creating local etcd static pod manifest file")
+		}
 	}
 
 	glog.V(1).Info("[join] uploading currently used configuration to the cluster")

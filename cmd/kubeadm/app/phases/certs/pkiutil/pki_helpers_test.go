@@ -513,6 +513,12 @@ func TestGetEtcdAltNames(t *testing.T) {
 	proxy := "user-etcd-proxy"
 	proxyIP := "10.10.10.100"
 	cfg := &kubeadmapi.InitConfiguration{
+		APIEndpoint: kubeadmapi.APIEndpoint{
+			AdvertiseAddress: "1.2.3.4",
+		},
+		NodeRegistration: kubeadmapi.NodeRegistrationOptions{
+			Name: "myNode",
+		},
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			Etcd: kubeadmapi.Etcd{
 				Local: &kubeadmapi.LocalEtcd{
@@ -532,7 +538,7 @@ func TestGetEtcdAltNames(t *testing.T) {
 		t.Fatalf("failed calling GetEtcdAltNames: %v", err)
 	}
 
-	expectedDNSNames := []string{"localhost", proxy}
+	expectedDNSNames := []string{"myNode", "localhost", proxy}
 	for _, DNSName := range expectedDNSNames {
 		found := false
 		for _, val := range altNames.DNSNames {
@@ -547,7 +553,7 @@ func TestGetEtcdAltNames(t *testing.T) {
 		}
 	}
 
-	expectedIPAddresses := []string{"127.0.0.1", net.IPv6loopback.String(), proxyIP}
+	expectedIPAddresses := []string{"1.2.3.4", "127.0.0.1", net.IPv6loopback.String(), proxyIP}
 	for _, IPAddress := range expectedIPAddresses {
 		found := false
 		for _, val := range altNames.IPs {

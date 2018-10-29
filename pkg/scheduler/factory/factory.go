@@ -1096,7 +1096,6 @@ func (c *configFactory) CreateFromProvider(providerName string) (*Config, error)
 	if err != nil {
 		return nil, err
 	}
-
 	return c.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys, []algorithm.SchedulerExtender{})
 }
 

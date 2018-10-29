@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -184,7 +183,7 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	}
 
 	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
-		return nil, false, errors.NewInvalid(extensions.Kind("Scale"), scale.Name, errs)
+		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
 	}
 
 	ss.Spec.Replicas = scale.Spec.Replicas

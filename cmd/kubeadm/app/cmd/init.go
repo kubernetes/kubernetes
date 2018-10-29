@@ -166,6 +166,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 
 	// initialize the workflow runner with the list of phases
 	initRunner.AppendPhase(phases.NewPreflightMasterPhase())
+	initRunner.AppendPhase(phases.NewCertsPhase())
 	initRunner.AppendPhase(phases.NewKubeletStartPhase())
 	// TODO: add other phases to the runner.
 
@@ -426,12 +427,6 @@ func runInit(i *initData, out io.Writer) error {
 	adminKubeConfigPath := filepath.Join(kubeConfigDir, kubeadmconstants.AdminKubeConfigFileName)
 
 	if res, _ := certsphase.UsingExternalCA(i.cfg); !res {
-
-		// PHASE 1: Generate certificates
-		glog.V(1).Infof("[init] creating PKI Assets")
-		if err := certsphase.CreatePKIAssets(i.cfg); err != nil {
-			return err
-		}
 
 		// PHASE 2: Generate kubeconfig files for the admin and the kubelet
 		glog.V(2).Infof("[init] generating kubeconfig files")

@@ -822,11 +822,11 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, "", fmt.Errorf("failed to get cluster nodes for volume %s: %v", volume, err)
 	}
 
-	// The 'endpointname' is created in form of 'glusterfs-dynamic-<claimname>'.
+	// The 'endpointname' is created in form of 'glusterfs-dynamic-<PVC UID>'.
 	// createEndpointService() checks for this 'endpoint' existence in PVC's namespace and
-	// If not found, it create an endpoint and service using the IPs we dynamically picked at time
+	// if not found, it create an endpoint and service using the IPs we dynamically picked at time
 	// of volume creation.
-	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
+	epServiceName := dynamicEpSvcPrefix + string(p.options.PVC.UID)
 	epNamespace := p.options.PVC.Namespace
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {

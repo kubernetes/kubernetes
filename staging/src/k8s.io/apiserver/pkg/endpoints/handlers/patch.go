@@ -201,6 +201,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		}
 		trace.Step("Self-link added")
 
+		scope.Trace = trace
 		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
 	}
 }

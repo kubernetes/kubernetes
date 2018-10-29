@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -2188,7 +2187,7 @@ func TestDescribeEvents(t *testing.T) {
 
 	m := map[string]printers.Describer{
 		"DaemonSetDescriber": &DaemonSetDescriber{
-			fake.NewSimpleClientset(&extensions.DaemonSet{
+			fake.NewSimpleClientset(&apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
@@ -2245,7 +2244,7 @@ func TestDescribeEvents(t *testing.T) {
 			}, events),
 		},
 		"ReplicaSetDescriber": &ReplicaSetDescriber{
-			fake.NewSimpleClientset(&extensions.ReplicaSet{
+			fake.NewSimpleClientset(&apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",

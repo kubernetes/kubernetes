@@ -22,7 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/version"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -250,34 +252,42 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 }
 
 // performEtcdStaticPodUpgrade performs upgrade of etcd, it returns bool which indicates fatal error or not and the actual error.
-func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, isTLSUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
+func performEtcdStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, isTLSUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
 	// Add etcd static pod spec only if external etcd is not configured
 	if cfg.Etcd.External != nil {
-		return false, fmt.Errorf("external etcd detected, won't try to change any etcd state")
+		return false, errors.New("external etcd detected, won't try to change any etcd state")
 	}
 
 	// Checking health state of etcd before proceeding with the upgrade
 	_, err := oldEtcdClient.GetClusterStatus()
 	if err != nil {
-		return true, fmt.Errorf("etcd cluster is not healthy: %v", err)
+		return true, errors.Wrap(err, "etcd cluster is not healthy")
 	}
 
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
-		return true, fmt.Errorf("failed to back up etcd data: %v", err)
+		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
 	// Need to check currently used version and version from constants, if differs then upgrade
 	desiredEtcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
 	if err != nil {
-		return true, fmt.Errorf("failed to retrieve an etcd version for the target kubernetes version: %v", err)
+		return true, errors.Wrap(err, "failed to retrieve an etcd version for the target kubernetes version")
 	}
-	currentEtcdVersionStr, err := oldEtcdClient.GetVersion()
+
+	// gets the etcd version of the local/stacked etcd member running on the current machine
+	currentEtcdVersions, err := oldEtcdClient.GetClusterVersions()
 	if err != nil {
-		return true, fmt.Errorf("failed to retrieve the current etcd version: %v", err)
+		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
 	}
+	currentEtcdVersionStr, ok := currentEtcdVersions[fmt.Sprintf("https://%s:%d", cfg.APIEndpoint.AdvertiseAddress, constants.EtcdListenClientPort)]
+	if !ok {
+		fmt.Println(currentEtcdVersions)
+		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
+	}
+
 	currentEtcdVersion, err := version.ParseSemantic(currentEtcdVersionStr)
 	if err != nil {
 		return true, fmt.Errorf("failed to parse the current etcd version(%s): %v", currentEtcdVersionStr, err)
@@ -294,13 +304,13 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 
 	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeRegistration.Name, constants.Etcd)
 	if err != nil {
-		return true, fmt.Errorf("failed to get etcd pod's hash: %v", err)
+		return true, errors.Wrap(err, "failed to get etcd pod's hash")
 	}
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
 	// has occurred in any aspects.
 	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg); err != nil {
-		return true, fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
+		return true, errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
 	// Waiter configurations for checking etcd status
@@ -346,20 +356,16 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
 
 		// Since etcd cluster came back up with the old manifest
-		return true, fmt.Errorf("fatal error when trying to upgrade the etcd cluster: %v, rolled the state back to pre-upgrade state", err)
+		return true, errors.Wrap(err, "fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state")
 	}
 
 	// Initialize the new etcd client if it wasn't pre-initialized
 	if newEtcdClient == nil {
-		client, err := etcdutil.NewFromStaticPod(
-			[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
-			constants.GetStaticPodDirectory(),
-			cfg.CertificatesDir,
-		)
+		etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
 		if err != nil {
-			return true, fmt.Errorf("fatal error creating etcd client: %v", err)
+			return true, errors.Wrap(err, "fatal error creating etcd client")
 		}
-		newEtcdClient = client
+		newEtcdClient = etcdClient
 	}
 
 	// Checking health state of etcd after the upgrade
@@ -390,14 +396,14 @@ func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathM
 		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
 
 		// We've successfully rolled back etcd, and now return an error describing that the upgrade failed
-		return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, rolled the state back to pre-upgrade state", err)
+		return true, errors.Wrap(err, "fatal error upgrading local etcd cluster, rolled the state back to pre-upgrade state")
 	}
 
 	return false, nil
 }
 
 // StaticPodControlPlane upgrades a static pod-hosted control plane
-func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, etcdUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) error {
+func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, etcdUpgrade bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) error {
 	recoverManifests := map[string]string{}
 	var isTLSUpgrade bool
 	var isExternalEtcd bool
@@ -411,31 +417,27 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 		if cfg.Etcd.External != nil {
 			// External etcd
 			isExternalEtcd = true
-			client, err := etcdutil.New(
+			etcdClient, err := etcdutil.New(
 				cfg.Etcd.External.Endpoints,
 				cfg.Etcd.External.CAFile,
 				cfg.Etcd.External.CertFile,
 				cfg.Etcd.External.KeyFile,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to create etcd client for external etcd: %v", err)
+				return errors.Wrap(err, "failed to create etcd client for external etcd")
 			}
-			oldEtcdClient = client
+			oldEtcdClient = etcdClient
 			// Since etcd is managed externally, the new etcd client will be the same as the old client
 			if newEtcdClient == nil {
-				newEtcdClient = client
+				newEtcdClient = etcdClient
 			}
 		} else {
 			// etcd Static Pod
-			client, err := etcdutil.NewFromStaticPod(
-				[]string{fmt.Sprintf("localhost:%d", constants.EtcdListenClientPort)},
-				constants.GetStaticPodDirectory(),
-				cfg.CertificatesDir,
-			)
+			etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
 			if err != nil {
-				return fmt.Errorf("failed to create etcd client: %v", err)
+				return errors.Wrap(err, "failed to create etcd client")
 			}
-			oldEtcdClient = client
+			oldEtcdClient = etcdClient
 		}
 	}
 
@@ -450,7 +452,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 		}
 
 		// Perform etcd upgrade using common to all control plane components function
-		fatal, err := performEtcdStaticPodUpgrade(waiter, pathMgr, cfg, recoverManifests, isTLSUpgrade, oldEtcdClient, newEtcdClient)
+		fatal, err := performEtcdStaticPodUpgrade(client, waiter, pathMgr, cfg, recoverManifests, isTLSUpgrade, oldEtcdClient, newEtcdClient)
 		if err != nil {
 			if fatal {
 				return err
@@ -463,7 +465,7 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
 	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
 	if err != nil {
-		return fmt.Errorf("error creating init static pod manifest files: %v", err)
+		return errors.Wrap(err, "error creating init static pod manifest files")
 	}
 
 	for _, component := range constants.MasterComponents {
@@ -497,7 +499,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 		}
 	}
 	// Let the user know there were problems, but we tried to recover
-	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)
+	return errors.New("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced")
 }
 
 // rollbackEtcdData rolls back the content of etcd folder if something went wrong.

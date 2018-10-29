@@ -107,6 +107,12 @@ func (f fakeEtcdClient) GetClusterVersions() (map[string]string, error) {
 	}, nil
 }
 
+func (f fakeEtcdClient) Sync() error { return nil }
+
+func (f fakeEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
+
 func TestGetAvailableUpgrades(t *testing.T) {
 	etcdClient := fakeEtcdClient{}
 	tests := []struct {
