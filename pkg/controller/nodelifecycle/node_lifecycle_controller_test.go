@@ -17,7 +17,6 @@ limitations under the License.
 package nodelifecycle
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -28,9 +27,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
@@ -40,8 +37,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
-	cloudprovider "k8s.io/cloud-provider"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/testutil"
@@ -128,7 +123,6 @@ func (nc *nodeLifecycleController) syncNodeStore(fakeNodeHandler *testutil.FakeN
 }
 
 func newNodeLifecycleControllerFromClient(
-	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
 	evictionLimiterQPS float32,
@@ -152,7 +146,6 @@ func newNodeLifecycleControllerFromClient(
 		factory.Core().V1().Pods(),
 		nodeInformer,
 		daemonSetInformer,
-		cloud,
 		kubeClient,
 		nodeMonitorPeriod,
 		nodeStartupGracePeriod,
@@ -641,7 +634,6 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 
 	for _, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			evictionTimeout,
 			testRateLimiterQPS,
@@ -802,7 +794,6 @@ func TestPodStatusChange(t *testing.T) {
 
 	for _, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			evictionTimeout,
 			testRateLimiterQPS,
@@ -1327,7 +1318,6 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 			Clientset: fake.NewSimpleClientset(&v1.PodList{Items: item.podList}),
 		}
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			fakeNodeHandler,
 			evictionTimeout,
 			testRateLimiterQPS,
@@ -1389,185 +1379,6 @@ func TestMonitorNodeHealthEvictPodsWithDisruption(t *testing.T) {
 		if item.expectedEvictPods != podEvicted {
 			t.Errorf("%v: expected pod eviction: %+v, got %+v", item.description, item.expectedEvictPods, podEvicted)
 		}
-	}
-}
-
-func TestCloudProviderNodeShutdown(t *testing.T) {
-
-	testCases := []struct {
-		testName string
-		node     *v1.Node
-		shutdown bool
-	}{
-		{
-			testName: "node shutdowned add taint",
-			shutdown: true,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionUnknown,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-		{
-			testName: "node started after shutdown remove taint",
-			shutdown: false,
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Spec: v1.NodeSpec{
-					ProviderID: "node0",
-					Taints: []v1.Taint{
-						{
-							Key:    schedulerapi.TaintNodeShutdown,
-							Effect: v1.TaintEffectNoSchedule,
-						},
-					},
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionTrue,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.testName, func(t *testing.T) {
-			fnh := &testutil.FakeNodeHandler{
-				Existing:  []*v1.Node{tc.node},
-				Clientset: fake.NewSimpleClientset(),
-			}
-			nodeController, _ := newNodeLifecycleControllerFromClient(
-				nil,
-				fnh,
-				10*time.Minute,
-				testRateLimiterQPS,
-				testRateLimiterQPS,
-				testLargeClusterThreshold,
-				testUnhealthyThreshold,
-				testNodeMonitorGracePeriod,
-				testNodeStartupGracePeriod,
-				testNodeMonitorPeriod,
-				false)
-			nodeController.cloud = &fakecloud.FakeCloud{}
-			nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
-			nodeController.recorder = testutil.NewFakeRecorder()
-			nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
-				return tc.shutdown, nil
-			}
-
-			if err := nodeController.syncNodeStore(fnh); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if err := nodeController.monitorNodeHealth(); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			if len(fnh.UpdatedNodes) != 1 {
-				t.Errorf("Node was not updated")
-			}
-			if tc.shutdown {
-				if len(fnh.UpdatedNodes[0].Spec.Taints) != 1 {
-					t.Errorf("Node Taint was not added")
-				}
-				if fnh.UpdatedNodes[0].Spec.Taints[0].Key != "node.cloudprovider.kubernetes.io/shutdown" {
-					t.Errorf("Node Taint key is not correct")
-				}
-			} else {
-				if len(fnh.UpdatedNodes[0].Spec.Taints) != 0 {
-					t.Errorf("Node Taint was not removed after node is back in ready state")
-				}
-			}
-		})
-	}
-
-}
-
-// TestCloudProviderNoRateLimit tests that monitorNodes() immediately deletes
-// pods and the node when kubelet has not reported, and the cloudprovider says
-// the node is gone.
-func TestCloudProviderNoRateLimit(t *testing.T) {
-	fnh := &testutil.FakeNodeHandler{
-		Existing: []*v1.Node{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "node0",
-					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-				},
-				Status: v1.NodeStatus{
-					Conditions: []v1.NodeCondition{
-						{
-							Type:               v1.NodeReady,
-							Status:             v1.ConditionUnknown,
-							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
-						},
-					},
-				},
-			},
-		},
-		Clientset:      fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0"), *testutil.NewPod("pod1", "node0")}}),
-		DeleteWaitChan: make(chan struct{}),
-	}
-	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
-		fnh,
-		10*time.Minute,
-		testRateLimiterQPS,
-		testRateLimiterQPS,
-		testLargeClusterThreshold,
-		testUnhealthyThreshold,
-		testNodeMonitorGracePeriod,
-		testNodeStartupGracePeriod,
-		testNodeMonitorPeriod,
-		false)
-	nodeController.cloud = &fakecloud.FakeCloud{}
-	nodeController.now = func() metav1.Time { return metav1.Date(2016, 1, 1, 12, 0, 0, 0, time.UTC) }
-	nodeController.recorder = testutil.NewFakeRecorder()
-	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
-		return false, nil
-	}
-	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
-		return false, nil
-	}
-	// monitorNodeHealth should allow this node to be immediately deleted
-	if err := nodeController.syncNodeStore(fnh); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if err := nodeController.monitorNodeHealth(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	select {
-	case <-fnh.DeleteWaitChan:
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Timed out waiting %v for node to be deleted", wait.ForeverTestTimeout)
-	}
-	if len(fnh.DeletedNodes) != 1 || fnh.DeletedNodes[0].Name != "node0" {
-		t.Errorf("Node was not deleted")
-	}
-	if nodeOnQueue := nodeController.zonePodEvictor[""].Remove("node0"); nodeOnQueue {
-		t.Errorf("Node was queued for eviction. Should have been immediately deleted.")
 	}
 }
 
@@ -1822,7 +1633,6 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 	}
 	for i, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			5*time.Minute,
 			testRateLimiterQPS,
@@ -2403,7 +2213,6 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 	for _, item := range testcases {
 		t.Run(item.description, func(t *testing.T) {
 			nodeController, _ := newNodeLifecycleControllerFromClient(
-				nil,
 				item.fakeNodeHandler,
 				5*time.Minute,
 				testRateLimiterQPS,
@@ -2567,7 +2376,6 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 
 	for i, item := range table {
 		nodeController, _ := newNodeLifecycleControllerFromClient(
-			nil,
 			item.fakeNodeHandler,
 			5*time.Minute,
 			testRateLimiterQPS,
@@ -2697,7 +2505,6 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 	}
 	originalTaint := UnreachableTaintTemplate
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,
@@ -2838,7 +2645,6 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 	updatedTaint := NotReadyTaintTemplate
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,
@@ -2940,7 +2746,6 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	}
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,
@@ -3180,7 +2985,6 @@ func TestNodeEventGeneration(t *testing.T) {
 	}
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		5*time.Minute,
 		testRateLimiterQPS,
@@ -3191,26 +2995,20 @@ func TestNodeEventGeneration(t *testing.T) {
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
 		false)
-	nodeController.cloud = &fakecloud.FakeCloud{}
-	nodeController.nodeExistsInCloudProvider = func(nodeName types.NodeName) (bool, error) {
-		return false, nil
-	}
-	nodeController.nodeShutdownInCloudProvider = func(ctx context.Context, node *v1.Node) (bool, error) {
-		return false, nil
-	}
 	nodeController.now = func() metav1.Time { return fakeNow }
 	fakeRecorder := testutil.NewFakeRecorder()
 	nodeController.recorder = fakeRecorder
+
 	if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if err := nodeController.monitorNodeHealth(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(fakeRecorder.Events) != 2 {
-		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 2, fakeRecorder.Events)
+	if len(fakeRecorder.Events) != 1 {
+		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(fakeRecorder.Events), 1, fakeRecorder.Events)
 	}
-	if fakeRecorder.Events[0].Reason != "RegisteredNode" || fakeRecorder.Events[1].Reason != "DeletingNode" {
+	if fakeRecorder.Events[0].Reason != "RegisteredNode" {
 		var reasons []string
 		for _, event := range fakeRecorder.Events {
 			reasons = append(reasons, event.Reason)
@@ -3249,7 +3047,6 @@ func TestFixDeprecatedTaintKey(t *testing.T) {
 	}
 
 	nodeController, _ := newNodeLifecycleControllerFromClient(
-		nil,
 		fakeNodeHandler,
 		evictionTimeout,
 		testRateLimiterQPS,
