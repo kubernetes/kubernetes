@@ -171,7 +171,7 @@ func TestMapLoadBalancerNameToVMSet(t *testing.T) {
 	}
 }
 
-func TestGetLoadBalancerName(t *testing.T) {
+func TestGetAzureLoadBalancerName(t *testing.T) {
 	az := getTestCloud()
 	az.PrimaryAvailabilitySetName = "primary"
 
@@ -247,7 +247,7 @@ func TestGetLoadBalancerName(t *testing.T) {
 		} else {
 			az.Config.LoadBalancerSku = loadBalancerSkuBasic
 		}
-		loadbalancerName := az.getLoadBalancerName(c.clusterName, c.vmSet, c.isInternal)
+		loadbalancerName := az.getAzureLoadBalancerName(c.clusterName, c.vmSet, c.isInternal)
 		assert.Equal(t, c.expected, loadbalancerName, c.description)
 	}
 }

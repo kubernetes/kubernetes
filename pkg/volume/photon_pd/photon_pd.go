@@ -114,7 +114,9 @@ func (plugin *photonPersistentDiskPlugin) newMounterInternal(spec *volume.Spec, 
 			plugin:  plugin,
 		},
 		fsType:      fsType,
-		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mountOption: util.MountOptionFromSpec(spec),
+	}, nil
 }
 
 func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -177,6 +179,7 @@ type photonPersistentDiskMounter struct {
 	*photonPersistentDisk
 	fsType      string
 	diskMounter *mount.SafeFormatAndMount
+	mountOption []string
 }
 
 func (b *photonPersistentDiskMounter) GetAttributes() volume.Attributes {
@@ -222,7 +225,8 @@ func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error 
 	globalPDPath := makeGlobalPDPath(b.plugin.host, b.pdID)
 	glog.V(4).Infof("attempting to mount %s", dir)
 
-	err = b.mounter.Mount(globalPDPath, dir, "", options)
+	mountOptions := util.JoinMountOptions(options, b.mountOption)
+	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
 	if err != nil {
 		notmnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {

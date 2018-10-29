@@ -25,7 +25,7 @@ import (
 	"time"
 )
 
-func TestParseInstance(t *testing.T) {
+func TestMapToAWSInstanceIDs(t *testing.T) {
 	tests := []struct {
 		Kubernetes  kubernetesInstanceID
 		Aws         awsInstanceID

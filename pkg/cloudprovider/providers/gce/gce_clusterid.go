@@ -59,7 +59,7 @@ type ClusterID struct {
 }
 
 // Continually watches for changes to the cluster id config map
-func (gce *GCECloud) watchClusterID() {
+func (gce *GCECloud) watchClusterID(stop <-chan struct{}) {
 	gce.ClusterID = ClusterID{
 		cfgMapKey: fmt.Sprintf("%v/%v", UIDNamespace, UIDConfigMapName),
 		client:    gce.client,
@@ -105,7 +105,7 @@ func (gce *GCECloud) watchClusterID() {
 	var controller cache.Controller
 	gce.ClusterID.store, controller = cache.NewInformer(newSingleObjectListerWatcher(listerWatcher, UIDConfigMapName), &v1.ConfigMap{}, updateFuncFrequency, mapEventHandler)
 
-	controller.Run(nil)
+	controller.Run(stop)
 }
 
 // GetID returns the id which is unique to this cluster

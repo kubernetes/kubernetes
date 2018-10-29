@@ -21,7 +21,6 @@ import (
 	"reflect"
 
 	"github.com/golang/glog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -132,13 +131,13 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				CreationTimestamp:          m.GetCreationTimestamp(),
 				DeletionTimestamp:          m.GetDeletionTimestamp(),
 				DeletionGracePeriodSeconds: m.GetDeletionGracePeriodSeconds(),
-				Labels:          m.GetLabels(),
-				Annotations:     m.GetAnnotations(),
-				OwnerReferences: m.GetOwnerReferences(),
-				Finalizers:      m.GetFinalizers(),
-				ClusterName:     m.GetClusterName(),
-				Initializers:    m.GetInitializers(),
-				LastApplied:     m.GetLastApplied(),
+				Labels:                     m.GetLabels(),
+				Annotations:                m.GetAnnotations(),
+				OwnerReferences:            m.GetOwnerReferences(),
+				Finalizers:                 m.GetFinalizers(),
+				ClusterName:                m.GetClusterName(),
+				Initializers:               m.GetInitializers(),
+				ManagedFields:              m.GetManagedFields(),
 			},
 		}
 	}

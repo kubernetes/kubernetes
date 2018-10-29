@@ -179,7 +179,7 @@ func (c *ExpirationCache) Delete(obj interface{}) error {
 func (c *ExpirationCache) Replace(list []interface{}, resourceVersion string) error {
 	c.expirationLock.Lock()
 	defer c.expirationLock.Unlock()
-	items := map[string]interface{}{}
+	items := make(map[string]interface{}, len(list))
 	ts := c.clock.Now()
 	for _, item := range list {
 		key, err := c.keyFunc(item)

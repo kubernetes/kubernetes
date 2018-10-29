@@ -28,6 +28,7 @@ import (
 )
 
 var (
+	Write      = []string{"create", "update", "patch", "delete", "deletecollection"}
 	ReadWrite  = []string{"get", "list", "watch", "create", "update", "patch", "delete", "deletecollection"}
 	Read       = []string{"get", "list", "watch"}
 	ReadUpdate = []string{"get", "list", "watch", "update", "patch"}
@@ -158,6 +159,25 @@ func NodeRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
 		volAttachRule := rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, volAttachRule)
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csidrivers").RuleOrDie()
+			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
+	}
+
+	// Node leases
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("coordination.k8s.io").Resources("leases").RuleOrDie())
+	}
+
+	// RuntimeClass
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
 	}
 	return nodePolicyRules
 }
@@ -203,59 +223,36 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
 			AggregationRule: &rbacv1.AggregationRule{
-				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}}},
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}},
+				},
 			},
 		},
 		{
 			// a role for a namespace level editor.  It grants access to all user level actions in a namespace.
 			// It does not grant powers for "privileged" resources which are domain of the system: `/status`
 			// subresources or `quota`/`limits` which are used to control namespaces
-			ObjectMeta: metav1.ObjectMeta{Name: "edit"},
+			ObjectMeta: metav1.ObjectMeta{Name: "edit", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}},
 			AggregationRule: &rbacv1.AggregationRule{
-				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}}},
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}},
+				},
 			},
 		},
 		{
 			// a role for namespace level viewing.  It grants Read-only access to non-escalating resources in
 			// a namespace.
-			ObjectMeta: metav1.ObjectMeta{Name: "view"},
+			ObjectMeta: metav1.ObjectMeta{Name: "view", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}},
 			AggregationRule: &rbacv1.AggregationRule{
-				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}}},
+				ClusterRoleSelectors: []metav1.LabelSelector{
+					{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}},
+				},
 			},
 		},
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-admin", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
-					"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
-				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
-				// indicator of which namespaces you have access to.
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
-				rbacv1helpers.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(appsGroup).Resources(
-					"statefulsets", "statefulsets/scale",
-					"daemonsets",
-					"deployments", "deployments/scale", "deployments/rollback",
-					"replicasets", "replicasets/scale").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
-					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
-					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
-					"networkpolicies").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
-
-				rbacv1helpers.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
-
 				// additional admin powers
 				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
 				rbacv1helpers.NewRule(ReadWrite...).Groups(rbacGroup).Resources("roles", "rolebindings").RuleOrDie(),
@@ -267,34 +264,32 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			// subresources or `quota`/`limits` which are used to control namespaces
 			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-edit", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}},
 			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
-				rbacv1helpers.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
-					"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
-				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
-				// indicator of which namespaces you have access to.
-				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+				// Allow read on escalating resources
+				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods/attach", "pods/proxy", "pods/exec", "pods/portforward", "secrets", "services/proxy").RuleOrDie(),
 				rbacv1helpers.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(appsGroup).Resources(
+				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
+					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
+
+				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
 					"daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback",
 					"replicasets", "replicasets/scale").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
+				rbacv1helpers.NewRule(Write...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
 					"replicasets", "replicasets/scale", "replicationcontrollers/scale",
 					"networkpolicies").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-				rbacv1helpers.NewRule(ReadWrite...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
+				rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies").RuleOrDie(),
 			},
 		},
 		{
@@ -407,7 +402,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				eventsRule(),
 				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				rbacv1helpers.NewRule("delete").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
-				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "secrets", "serviceaccounts").RuleOrDie(),
+				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("endpoints", "namespaces", "secrets", "serviceaccounts", "configmaps").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("endpoints", "secrets", "serviceaccounts").RuleOrDie(),
 				// Needed to check API access.  These creates are non-mutating
 				rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("tokenreviews").RuleOrDie(),
@@ -463,16 +458,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role for the csi external provisioner
-			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
-				rbacv1helpers.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-			},
-		},
-		{
 			// a role for the csi external attacher
 			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-attacher"},
 			Rules: []rbacv1.PolicyRule{
@@ -506,18 +491,31 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
-		rules := []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicProvisioningScheduling) {
-			rules = append(rules, rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie())
-		}
 		roles = append(roles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "system:volume-scheduler"},
-			Rules:      rules,
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+				rbacv1helpers.NewRule(ReadUpdate...).Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			},
 		})
 	}
+
+	externalProvisionerRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+		rbacv1helpers.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("csi.storage.k8s.io").Resources("csinodeinfos").RuleOrDie())
+	}
+	roles = append(roles, rbacv1.ClusterRole{
+		// a role for the csi external provisioner
+		ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
+		Rules:      externalProvisionerRules,
+	})
 
 	addClusterRoleLabel(roles)
 	return roles

@@ -112,7 +112,7 @@ func (c *FakeComponentStatuses) DeleteCollection(options *v1.DeleteOptions, list
 // Patch applies the patch and returns the patched componentStatus.
 func (c *FakeComponentStatuses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *corev1.ComponentStatus, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, data, subresources...), &corev1.ComponentStatus{})
+		Invokes(testing.NewRootPatchSubresourceAction(componentstatusesResource, name, pt, data, subresources...), &corev1.ComponentStatus{})
 	if obj == nil {
 		return nil, err
 	}

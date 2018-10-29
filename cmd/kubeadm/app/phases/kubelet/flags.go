@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -43,17 +43,21 @@ type kubeletFlagsOpts struct {
 	defaultHostname          string
 }
 
-// WriteKubeletDynamicEnvFile writes a environment file with dynamic flags to the kubelet.
+// WriteKubeletDynamicEnvFile writes an environment file with dynamic flags to the kubelet.
 // Used at "kubeadm init" and "kubeadm join" time.
 func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions, featureGates map[string]bool, registerTaintsUsingFlags bool, kubeletDir string) error {
+	hostName, err := nodeutil.GetHostname("")
+	if err != nil {
+		return err
+	}
 
 	flagOpts := kubeletFlagsOpts{
 		nodeRegOpts:              nodeRegOpts,
 		featureGates:             featureGates,
 		registerTaintsUsingFlags: registerTaintsUsingFlags,
-		execer:          utilsexec.New(),
-		pidOfFunc:       procfs.PidOf,
-		defaultHostname: nodeutil.GetHostname(""),
+		execer:                   utilsexec.New(),
+		pidOfFunc:                procfs.PidOf,
+		defaultHostname:          hostName,
 	}
 	stringMap := buildKubeletArgMap(flagOpts)
 	argList := kubeadmutil.BuildArgumentListFromMap(stringMap, nodeRegOpts.KubeletExtraArgs)
@@ -67,7 +71,7 @@ func WriteKubeletDynamicEnvFile(nodeRegOpts *kubeadmapi.NodeRegistrationOptions,
 func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}
 
-	if opts.nodeRegOpts.CRISocket == kubeadmapiv1alpha3.DefaultCRISocket {
+	if opts.nodeRegOpts.CRISocket == kubeadmapiv1beta1.DefaultCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
 		driver, err := kubeadmutil.GetCgroupDriverDocker(opts.execer)
@@ -115,7 +119,7 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 // writeKubeletFlagBytesToDisk writes a byte slice down to disk at the specific location of the kubelet flag overrides file
 func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 	kubeletEnvFilePath := filepath.Join(kubeletDir, constants.KubeletEnvFileName)
-	fmt.Printf("[kubelet] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
+	fmt.Printf("[kubelet-start] Writing kubelet environment file with flags to file %q\n", kubeletEnvFilePath)
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {

@@ -14,6 +14,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/policy/podsecuritypolicy",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/podsecuritypolicy:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/policy/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

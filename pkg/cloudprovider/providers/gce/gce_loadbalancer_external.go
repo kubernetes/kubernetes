@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -27,7 +28,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
-	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
 
@@ -44,7 +44,7 @@ import (
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
-func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (gce *GCECloud) ensureExternalLoadBalancer(clusterName string, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
 	}
@@ -56,7 +56,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		return nil, err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(apiService)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, apiService)
 	requestedIP := apiService.Spec.LoadBalancerIP
 	ports := apiService.Spec.Ports
 	portStr := []string{}
@@ -281,13 +281,13 @@ func (gce *GCECloud) updateExternalLoadBalancer(clusterName string, service *v1.
 		return err
 	}
 
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, service)
 	return gce.updateTargetPool(loadBalancerName, hosts)
 }
 
 // ensureExternalLoadBalancerDeleted is the external implementation of LoadBalancer.EnsureLoadBalancerDeleted
 func (gce *GCECloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID string, service *v1.Service) error {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	loadBalancerName := gce.GetLoadBalancerName(context.TODO(), clusterName, service)
 	serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
 
@@ -505,6 +505,14 @@ func (gce *GCECloud) ensureTargetPoolAndHealthCheck(tpExists, tpNeedsRecreation 
 			return fmt.Errorf("failed to update target pool for load balancer (%s): %v", lbRefStr, err)
 		}
 		glog.Infof("ensureTargetPoolAndHealthCheck(%s): Updated target pool (with %d hosts).", lbRefStr, len(hosts))
+		if hcToCreate != nil {
+			if hc, err := gce.ensureHttpHealthCheck(hcToCreate.Name, hcToCreate.RequestPath, int32(hcToCreate.Port)); err != nil || hc == nil {
+				return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", loadBalancerName, hcToCreate.Port, hcToCreate.RequestPath, err)
+			}
+		}
+	} else {
+		// Panic worthy.
+		glog.Errorf("ensureTargetPoolAndHealthCheck(%s): target pool not exists and doesn't need to be created.", lbRefStr)
 	}
 	return nil
 }
@@ -621,6 +629,37 @@ func makeHttpHealthCheck(name, path string, port int32) *compute.HttpHealthCheck
 	}
 }
 
+// mergeHttpHealthChecks reconciles HttpHealthCheck configures to be no smaller
+// than the default values.
+// E.g. old health check interval is 2s, new default is 8.
+// The HC interval will be reconciled to 8 seconds.
+// If the existing health check is larger than the default interval,
+// the configuration will be kept.
+func mergeHttpHealthChecks(hc, newHC *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
+		newHC.CheckIntervalSec = hc.CheckIntervalSec
+	}
+	if hc.TimeoutSec > newHC.TimeoutSec {
+		newHC.TimeoutSec = hc.TimeoutSec
+	}
+	if hc.UnhealthyThreshold > newHC.UnhealthyThreshold {
+		newHC.UnhealthyThreshold = hc.UnhealthyThreshold
+	}
+	if hc.HealthyThreshold > newHC.HealthyThreshold {
+		newHC.HealthyThreshold = hc.HealthyThreshold
+	}
+	return newHC
+}
+
+// needToUpdateHttpHealthChecks checks whether the http healthcheck needs to be
+// updated.
+func needToUpdateHttpHealthChecks(hc, newHC *compute.HttpHealthCheck) bool {
+	changed := hc.Port != newHC.Port || hc.RequestPath != newHC.RequestPath || hc.Description != newHC.Description
+	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
+	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
+	return changed
+}
+
 func (gce *GCECloud) ensureHttpHealthCheck(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {
 	newHC := makeHttpHealthCheck(name, path, port)
 	hc, err = gce.GetHttpHealthCheck(name)
@@ -639,16 +678,18 @@ func (gce *GCECloud) ensureHttpHealthCheck(name, path string, port int32) (hc *c
 	}
 	// Validate health check fields
 	glog.V(4).Infof("Checking http health check params %s", name)
-	drift := hc.Port != int64(port) || hc.RequestPath != path || hc.Description != makeHealthCheckDescription(name)
-	drift = drift || hc.CheckIntervalSec != gceHcCheckIntervalSeconds || hc.TimeoutSec != gceHcTimeoutSeconds
-	drift = drift || hc.UnhealthyThreshold != gceHcUnhealthyThreshold || hc.HealthyThreshold != gceHcHealthyThreshold
-	if drift {
+	if needToUpdateHttpHealthChecks(hc, newHC) {
 		glog.Warningf("Health check %v exists but parameters have drifted - updating...", name)
+		newHC = mergeHttpHealthChecks(hc, newHC)
 		if err := gce.UpdateHttpHealthCheck(newHC); err != nil {
 			glog.Warningf("Failed to reconcile http health check %v parameters", name)
 			return nil, err
 		}
 		glog.V(4).Infof("Corrected health check %v parameters successful", name)
+		hc, err = gce.GetHttpHealthCheck(name)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return hc, nil
 }

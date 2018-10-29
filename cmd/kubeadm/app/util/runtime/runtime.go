@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/errors"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -53,7 +53,7 @@ func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (Containe
 	var toolName string
 	var runtime ContainerRuntime
 
-	if criSocket != kubeadmapiv1alpha3.DefaultCRISocket {
+	if criSocket != kubeadmapiv1beta1.DefaultCRISocket {
 		toolName = "crictl"
 		// !!! temporary work around crictl warning:
 		// Using "/var/run/crio/crio.sock" as endpoint is deprecated,
@@ -108,9 +108,7 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 	}
 	pods := []string{}
 	for _, pod := range strings.Fields(string(out)) {
-		if strings.HasPrefix(pod, "k8s_") {
-			pods = append(pods, pod)
-		}
+		pods = append(pods, pod)
 	}
 	return pods, nil
 }
@@ -172,18 +170,12 @@ func (runtime *DockerRuntime) PullImage(image string) error {
 
 // ImageExists checks to see if the image exists on the system
 func (runtime *CRIRuntime) ImageExists(image string) (bool, error) {
-	out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "inspecti", image).CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("output: %s, error: %v", string(out), err)
-	}
-	return true, nil
+	err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "inspecti", image).Run()
+	return err == nil, nil
 }
 
 // ImageExists checks to see if the image exists on the system
 func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
-	out, err := runtime.exec.Command("docker", "inspect", image).CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("output: %s, error: %v", string(out), err)
-	}
-	return true, nil
+	err := runtime.exec.Command("docker", "inspect", image).Run()
+	return err == nil, nil
 }

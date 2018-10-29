@@ -189,7 +189,7 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 // launch will attempt to start the etcd server
 func (m *EtcdTestServer) launch(t *testing.T) error {
 	var err error
-	if m.s, err = etcdserver.NewServer(&m.ServerConfig); err != nil {
+	if m.s, err = etcdserver.NewServer(m.ServerConfig); err != nil {
 		return fmt.Errorf("failed to initialize the etcd server: %v", err)
 	}
 	m.s.SyncTicker = time.NewTicker(500 * time.Millisecond)
@@ -293,11 +293,10 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storageb
 	}
 	server.V3Client = server.v3Cluster.RandClient()
 	config := &storagebackend.Config{
-		Type:                     "etcd3",
-		Prefix:                   etcdtest.PathPrefix(),
-		ServerList:               server.V3Client.Endpoints(),
-		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
-		Paging: true,
+		Type:       "etcd3",
+		Prefix:     etcdtest.PathPrefix(),
+		ServerList: server.V3Client.Endpoints(),
+		Paging:     true,
 	}
 	return server, config
 }

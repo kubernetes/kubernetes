@@ -25,6 +25,7 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 	admissionregistration "k8s.io/kubernetes/pkg/apis/admissionregistration"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
+	auditregistration "k8s.io/kubernetes/pkg/apis/auditregistration"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
@@ -78,6 +79,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().ControllerRevisions().Informer()}, nil
 	case apps.SchemeGroupVersion.WithResource("statefulsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().InternalVersion().StatefulSets().Informer()}, nil
+
+		// Group=auditregistration.k8s.io, Version=internalVersion
+	case auditregistration.SchemeGroupVersion.WithResource("auditsinks"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Auditregistration().InternalVersion().AuditSinks().Informer()}, nil
 
 		// Group=autoscaling, Version=internalVersion
 	case autoscaling.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):

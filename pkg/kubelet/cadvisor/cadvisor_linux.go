@@ -104,18 +104,23 @@ func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
-	ignoreMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.NetworkTcpUsageMetrics:  struct{}{},
-		cadvisormetrics.NetworkUdpUsageMetrics:  struct{}{},
-		cadvisormetrics.PerCpuUsageMetrics:      struct{}{},
-		cadvisormetrics.ProcessSchedulerMetrics: struct{}{},
+	includedMetrics := cadvisormetrics.MetricSet{
+		cadvisormetrics.CpuUsageMetrics:         struct{}{},
+		cadvisormetrics.MemoryUsageMetrics:      struct{}{},
+		cadvisormetrics.CpuLoadMetrics:          struct{}{},
+		cadvisormetrics.DiskIOMetrics:           struct{}{},
+		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
+		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
+		cadvisormetrics.AppMetrics:              struct{}{},
 	}
-	if !usingLegacyStats {
-		ignoreMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
+	if usingLegacyStats {
+		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}
 
+	// collect metrics for all cgroups
+	rawContainerCgroupPathPrefixWhiteList := []string{"/"}
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, ignoreMetrics, http.DefaultClient)
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, includedMetrics, http.DefaultClient, rawContainerCgroupPathPrefixWhiteList)
 	if err != nil {
 		return nil, err
 	}

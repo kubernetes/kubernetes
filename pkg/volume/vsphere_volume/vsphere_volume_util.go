@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/volume"
@@ -188,8 +188,8 @@ func getCloudProvider(cloud cloudprovider.Interface) (*vsphere.VSphere, error) {
 		return nil, errors.New("Cloud provider not initialized properly")
 	}
 
-	vs := cloud.(*vsphere.VSphere)
-	if vs == nil {
+	vs, ok := cloud.(*vsphere.VSphere)
+	if !ok || vs == nil {
 		return nil, errors.New("Invalid cloud provider: expected vSphere")
 	}
 	return vs, nil

@@ -29,8 +29,7 @@ import (
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"gopkg.in/gcfg.v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -122,7 +121,8 @@ func newCSCloud(cfg *CSConfig) (*CSCloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (cs *CSCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (cs *CSCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 // LoadBalancer returns an implementation of LoadBalancer for CloudStack.
 func (cs *CSCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

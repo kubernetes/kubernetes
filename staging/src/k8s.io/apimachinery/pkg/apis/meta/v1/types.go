@@ -76,9 +76,10 @@ type ListMeta struct {
 	// continue may be set if the user set a limit on the number of items returned, and indicates that
 	// the server has more data available. The value is opaque and may be used to issue another request
 	// to the endpoint that served this list to retrieve the next set of available objects. Continuing a
-	// list may not be possible if the server configuration has changed or more than a few minutes have
-	// passed. The resourceVersion field returned when using this continue value will be identical to
-	// the value in the first response.
+	// consistent list may not be possible if the server configuration has changed or more than a few
+	// minutes have passed. The resourceVersion field returned when using this continue value will be
+	// identical to the value in the first response, unless you have received this token from an error
+	// message.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,3,opt,name=continue"`
 }
 
@@ -250,14 +251,15 @@ type ObjectMeta struct {
 	// +optional
 	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 
-	// LastApplied is a map of workflow-id to last applied
-	// configuration. A workflow can be the user's name, a
+	// ManagedFields is a map of workflow-id to the set of fields
+	// that are managed by that workflow. This is mostly for internal
+	// housekeeping, and users typically shouldn't need to set or
+	// understand this field. A workflow can be the user's name, a
 	// controller's name, or the name of a specific apply path like
-	// "ci-cd". It keeps track of the ownership of fields. The last
-	// applied configuration is always in the same version as the
-	// parent object. It's used to keep track of the intent of the
-	// workflow-id that submitted that configuration.
-	LastApplied map[string]string `json:"lastApplied,omitempty" protobuf:"bytes,17,rep,name=lastApplied"`
+	// "ci-cd". The set of fields is always in the version that the
+	// workflow used when modifying the object.
+	// +optional
+	ManagedFields map[string]VersionedFieldSet `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
 
 // Initializers tracks the progress of initialization.
@@ -372,14 +374,20 @@ type ListOptions struct {
 	// updated during a chunked list the version of the object that was present at the time the first list
 	// result was calculated is returned.
 	Limit int64 `json:"limit,omitempty" protobuf:"varint,7,opt,name=limit"`
-	// The continue option should be set when retrieving more results from the server. Since this value
-	// is server defined, clients may only use the continue value from a previous query result with
-	// identical query parameters (except for the value of continue) and the server may reject a continue
-	// value it does not recognize. If the specified continue value is no longer valid whether due to
-	// expiration (generally five to fifteen minutes) or a configuration change on the server the server
-	// will respond with a 410 ResourceExpired error indicating the client must restart their list without
-	// the continue field. This field is not supported when watch is true. Clients may start a watch from
-	// the last resourceVersion value returned by the server and not miss any modifications.
+	// The continue option should be set when retrieving more results from the server. Since this value is
+	// server defined, clients may only use the continue value from a previous query result with identical
+	// query parameters (except for the value of continue) and the server may reject a continue value it
+	// does not recognize. If the specified continue value is no longer valid whether due to expiration
+	// (generally five to fifteen minutes) or a configuration change on the server, the server will
+	// respond with a 410 ResourceExpired error together with a continue token. If the client needs a
+	// consistent list, it must restart their list without the continue field. Otherwise, the client may
+	// send another list request with the token received with the 410 error, the server will respond with
+	// a list starting from the next key, but from the latest snapshot, which is inconsistent from the
+	// previous list results - objects that are created, modified, or deleted after the first list request
+	// will be included in the response, as long as their keys are after the "next key".
+	//
+	// This field is not supported when watch is true. Clients may start a watch from the last
+	// resourceVersion value returned by the server and not miss any modifications.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
 }
 
@@ -1005,3 +1013,87 @@ const (
 	LabelSelectorOpExists       LabelSelectorOperator = "Exists"
 	LabelSelectorOpDoesNotExist LabelSelectorOperator = "DoesNotExist"
 )
+
+// VersionedFieldSet is a pair of a FieldSet and the group version of the resource
+// that the fieldset applies to.
+type VersionedFieldSet struct {
+	// APIVersion defines the version of this resource that this field set
+	// applies to. The format is "group/version" just like the top-level
+	// APIVersion field. It is necessary to track the version of a field
+	// set because it cannot be automatically converted.
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,1,opt,name=apiVersion"`
+	// Fields identifies a set of fields.
+	Fields FieldSet `json:"fields,omitempty" protobuf:"bytes,2,opt,name=fields,casttype=FieldSet"`
+}
+
+// FieldSet stores a set of fields in a data structure like a Trie.
+// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+type FieldSet struct {
+	// Members lists fields that are part of the set.
+	Members []FieldPathElement `json:"members" protobuf:"bytes,1,rep,name=members"`
+	// Children lists child fields which themselves have children that are
+	// members of the set. Appearance in this list does not imply membership,
+	// although it does imply some descendant field is a member.
+	// Note: this is a tree, not an arbitrary graph.
+	Children []FieldSetNode `json:"children" protobuf:"bytes,2,rep,name=children"`
+}
+
+// FieldPathElement describes how to select a child field given a containing object.
+type FieldPathElement struct {
+	// Exactly one of the following fields should be non-nil.
+	// FieldName selects a single field from a map (reminder: this is also
+	// how structs are represented). The containing object must be a map.
+	// +optional
+	FieldName *string `json:"fieldName,omitempty" protobuf:"bytes,1,opt,name=fieldName"`
+	// Key selects the list element which has fields matching those given.
+	// The containing object must be an associative list with map typed
+	// elements.
+	// +optional
+	Key []FieldNameValuePair `json:"key,omitempty" protobuf:"bytes,2,rep,name=key"`
+	// Value selects the list element with the given value. The containing
+	// object must be an associative list with a primitive typed element
+	// (i.e., a set).
+	// +optional
+	Value *FieldValue `json:"value,omitempty" protobuf:"bytes,3,opt,name=value,casttype=FieldValue"`
+	// Index selects a list element by its index number. The containing
+	// object must be an atomic list.
+	// +optional
+	Index *int32 `json:"index,omitempty" protobuf:"varint,4,opt,name=index"`
+}
+
+// FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing
+// nested set membership.
+type FieldSetNode struct {
+	// PathElement identifies which field this node expresses child membership for.
+	PathElement FieldPathElement `json:"pathElement" protobuf:"bytes,1,opt,name=pathElement,casttype=FieldPathElement"`
+	// Set identifies which child fields of this node are part of the FieldSet.
+	Set *FieldSet `json:"set" protobuf:"bytes,2,opt,name=set,casttype=FieldSet"`
+}
+
+// FieldNameValuePair is an individual key-value pair.
+type FieldNameValuePair struct {
+	// Name is the field's name.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// Value is the field's value.
+	Value FieldValue `json:"value" protobuf:"bytes,2,opt,name=value,casttype=FieldValue"`
+}
+
+// FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.
+type FieldValue struct {
+	// Exactly one of the following fields should be set.
+	// FloatValue is a primitive float value.
+	// it is serialized as a string
+	// +optional
+	FloatValue *string `json:"floatValue,omitempty" protobuf:"bytes,1,opt,name=floatValue"`
+	// IntValue is a primitive int value.
+	// +optional
+	IntValue *int32 `json:"intValue,omitempty" protobuf:"varint,2,opt,name=intValue"`
+	// StringValue is a primitive string value.
+	// +optional
+	StringValue *string `json:"stringValue,omitempty" protobuf:"bytes,3,opt,name=stringValue"`
+	// BooleanValue is a primitive boolean value.
+	// +optional
+	BooleanValue *bool `json:"booleanValue,omitempty" protobuf:"varint,4,opt,name=booleanValue"`
+	// Null represents an explicit `"foo" = null`
+	Null bool `json:"null" protobuf:"varint,5,opt,name=null"`
+}

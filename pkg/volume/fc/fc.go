@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&fcPlugin{nil}}
 }
@@ -106,7 +106,7 @@ func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 
 func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod.UID, &fcUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Mounter, error) {
@@ -139,20 +139,22 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		}
 		glog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
 		return &fcDiskMounter{
-			fcDisk:     fcDisk,
-			fsType:     fc.FSType,
-			volumeMode: volumeMode,
-			readOnly:   readOnly,
-			mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-			deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+			fcDisk:       fcDisk,
+			fsType:       fc.FSType,
+			volumeMode:   volumeMode,
+			readOnly:     readOnly,
+			mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+			deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
+			mountOptions: []string{},
 		}, nil
 	}
 	return &fcDiskMounter{
-		fcDisk:     fcDisk,
-		fsType:     fc.FSType,
-		readOnly:   readOnly,
-		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-		deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+		fcDisk:       fcDisk,
+		fsType:       fc.FSType,
+		readOnly:     readOnly,
+		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+		deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
+		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
 
 }
@@ -164,7 +166,7 @@ func (plugin *fcPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ v
 	if pod != nil {
 		uid = pod.UID
 	}
-	return plugin.newBlockVolumeMapperInternal(spec, uid, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newBlockVolumeMapperInternal(spec, uid, &fcUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.BlockVolumeMapper, error) {
@@ -196,7 +198,7 @@ func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID t
 
 func (plugin *fcPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, &fcUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -214,7 +216,7 @@ func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, m
 }
 
 func (plugin *fcPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
-	return plugin.newUnmapperInternal(volName, podUID, &FCUtil{})
+	return plugin.newUnmapperInternal(volName, podUID, &fcUtil{})
 }
 
 func (plugin *fcPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager) (volume.BlockVolumeUnmapper, error) {
@@ -374,11 +376,12 @@ func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
 
 type fcDiskMounter struct {
 	*fcDisk
-	readOnly   bool
-	fsType     string
-	volumeMode v1.PersistentVolumeMode
-	mounter    *mount.SafeFormatAndMount
-	deviceUtil util.DeviceUtil
+	readOnly     bool
+	fsType       string
+	volumeMode   v1.PersistentVolumeMode
+	mounter      *mount.SafeFormatAndMount
+	deviceUtil   util.DeviceUtil
+	mountOptions []string
 }
 
 var _ volume.Mounter = &fcDiskMounter{}

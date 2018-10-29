@@ -22,16 +22,16 @@ import (
 
 	"github.com/golang/glog"
 
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	admission "k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	storagev1listers "k8s.io/client-go/listers/storage/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 const (
@@ -51,12 +51,12 @@ func Register(plugins *admission.Plugins) {
 type claimDefaulterPlugin struct {
 	*admission.Handler
 
-	lister storagelisters.StorageClassLister
+	lister storagev1listers.StorageClassLister
 }
 
 var _ admission.Interface = &claimDefaulterPlugin{}
 var _ admission.MutationInterface = &claimDefaulterPlugin{}
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&claimDefaulterPlugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&claimDefaulterPlugin{})
 
 // newPlugin creates a new admission plugin.
 func newPlugin() *claimDefaulterPlugin {
@@ -65,8 +65,8 @@ func newPlugin() *claimDefaulterPlugin {
 	}
 }
 
-func (a *claimDefaulterPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	informer := f.Storage().InternalVersion().StorageClasses()
+func (a *claimDefaulterPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	informer := f.Storage().V1().StorageClasses()
 	a.lister = informer.Lister()
 	a.SetReadyFunc(informer.Informer().HasSynced)
 }
@@ -122,13 +122,13 @@ func (a *claimDefaulterPlugin) Admit(attr admission.Attributes) error {
 }
 
 // getDefaultClass returns the default StorageClass from the store, or nil.
-func getDefaultClass(lister storagelisters.StorageClassLister) (*storage.StorageClass, error) {
+func getDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.StorageClass, error) {
 	list, err := lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	defaultClasses := []*storage.StorageClass{}
+	defaultClasses := []*storagev1.StorageClass{}
 	for _, class := range list {
 		if storageutil.IsDefaultAnnotation(class.ObjectMeta) {
 			defaultClasses = append(defaultClasses, class)

@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"github.com/ghodss/yaml"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apply"
 	"k8s.io/apimachinery/pkg/apply/parse"
@@ -43,7 +43,7 @@ type applyPatcher struct {
 const workflowId = "default"
 
 func (p *applyPatcher) convertCurrentVersion(obj runtime.Object) (map[string]interface{}, error) {
-	vo, err := p.unsafeConvertor.ConvertToVersion(obj, p.kind.GroupVersion())
+	vo, err := p.unsafeConvertor.ConvertToVersion(obj, p.hubGroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +56,10 @@ func (p *applyPatcher) extractLastIntent(obj runtime.Object, workflow string) (m
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
 	last := make(map[string]interface{})
-	if accessor.GetLastApplied()[workflow] != "" {
-		if err := json.Unmarshal([]byte(accessor.GetLastApplied()[workflow]), &last); err != nil {
-			return nil, fmt.Errorf("couldn't unmarshal last applied field: %v", err)
+	// TODO: use the managedFields correctly
+	if _, ok := accessor.GetManagedFields()[workflow]; ok {
+		if err := json.Unmarshal([]byte(accessor.GetManagedFields()[workflow].APIVersion), &last); err != nil {
+			return nil, fmt.Errorf("couldn't unmarshal managedFields field: %v", err)
 		}
 	}
 	return last, nil
@@ -84,11 +85,11 @@ func (p *applyPatcher) convertResultToUnversioned(result apply.Result) (runtime.
 	}
 	p.defaulter.Default(voutput)
 
-	uoutput, err := p.toUnversioned(voutput)
+	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
+	uoutput, err := p.unsafeConvertor.ConvertToVersion(voutput, gvk.GroupVersion())
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert to unversioned: %v", err)
 	}
-
 	return uoutput, nil
 }
 
@@ -105,12 +106,15 @@ func (p *applyPatcher) saveNewIntent(patch map[string]interface{}, workflow stri
 	if err != nil {
 		return fmt.Errorf("couldn't get accessor: %v", err)
 	}
-	m := accessor.GetLastApplied()
+	m := accessor.GetManagedFields()
 	if m == nil {
-		m = make(map[string]string)
+		m = make(map[string]metav1.VersionedFieldSet)
 	}
-	m[workflow] = string(j)
-	accessor.SetLastApplied(m)
+	// TODO: save the managedFields correctly
+	m[workflow] = metav1.VersionedFieldSet{
+		APIVersion: string(j),
+	}
+	accessor.SetManagedFields(m)
 	return nil
 }
 
@@ -147,7 +151,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (
 		return nil, fmt.Errorf("failed to save last intent: %v", err)
 	}
 
-	// TODO(apelisse): Check for conflicts with other lastApplied
+	// TODO(apelisse): Check for conflicts with other managedFields
 	// and report actionable errors to users.
 
 	return output, nil

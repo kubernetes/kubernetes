@@ -30,12 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
@@ -209,7 +209,7 @@ func TestNodeShutdown(t *testing.T) {
 					ProviderID: "node0",
 					Taints: []v1.Taint{
 						{
-							Key:    algorithm.TaintNodeShutdown,
+							Key:    schedulerapi.TaintNodeShutdown,
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
@@ -385,7 +385,7 @@ func TestNodeInitialized(t *testing.T) {
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
 						{
-							Key:    algorithm.TaintExternalCloudProvider,
+							Key:    schedulerapi.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -524,7 +524,7 @@ func TestGCECondition(t *testing.T) {
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
 						{
-							Key:    algorithm.TaintExternalCloudProvider,
+							Key:    schedulerapi.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -610,7 +610,7 @@ func TestZoneInitialized(t *testing.T) {
 				Spec: v1.NodeSpec{
 					Taints: []v1.Taint{
 						{
-							Key:    algorithm.TaintExternalCloudProvider,
+							Key:    schedulerapi.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -701,7 +701,7 @@ func TestNodeAddresses(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 						{
-							Key:    algorithm.TaintExternalCloudProvider,
+							Key:    schedulerapi.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -816,7 +816,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 						{
-							Key:    algorithm.TaintExternalCloudProvider,
+							Key:    schedulerapi.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -1110,7 +1110,7 @@ func TestNodeProviderID(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 						{
-							Key:    algorithm.TaintExternalCloudProvider,
+							Key:    schedulerapi.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},
@@ -1194,7 +1194,7 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 							Effect: v1.TaintEffectNoSchedule,
 						},
 						{
-							Key:    algorithm.TaintExternalCloudProvider,
+							Key:    schedulerapi.TaintExternalCloudProvider,
 							Value:  "true",
 							Effect: v1.TaintEffectNoSchedule,
 						},

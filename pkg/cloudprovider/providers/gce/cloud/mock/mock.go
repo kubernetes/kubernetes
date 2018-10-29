@@ -44,6 +44,8 @@ var (
 	InUseError = &googleapi.Error{Code: http.StatusBadRequest, Message: "It's being used by god."}
 	// InternalServerError is shared variable with error code StatusInternalServerError for error verification.
 	InternalServerError = &googleapi.Error{Code: http.StatusInternalServerError}
+	// UnauthorizedErr wraps a Google API error with code StatusForbidden.
+	UnauthorizedErr = &googleapi.Error{Code: http.StatusForbidden}
 )
 
 // gceObject is an abstraction of all GCE API object in go client
@@ -436,6 +438,82 @@ func UpdateRegionBackendServiceHook(ctx context.Context, key *meta.Key, obj *ga.
 	return nil
 }
 
+// UpdateBackendServiceHook defines the hook for updating a BackendService.
+// It replaces the object with the same key in the mock with the updated object.
+func UpdateBackendServiceHook(ctx context.Context, key *meta.Key, obj *ga.BackendService, m *cloud.MockBackendServices) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in BackendServices", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "backendServices")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "backendServices", key)
+
+	m.Objects[*key] = &cloud.MockBackendServicesObj{Obj: obj}
+	return nil
+}
+
+// UpdateAlphaBackendServiceHook defines the hook for updating an alpha BackendService.
+// It replaces the object with the same key in the mock with the updated object.
+func UpdateAlphaBackendServiceHook(ctx context.Context, key *meta.Key, obj *alpha.BackendService, m *cloud.MockAlphaBackendServices) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in BackendServices", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "alpha", "backendServices")
+	obj.SelfLink = cloud.SelfLink(meta.VersionAlpha, projectID, "backendServices", key)
+
+	m.Objects[*key] = &cloud.MockBackendServicesObj{Obj: obj}
+	return nil
+}
+
+// UpdateBetaBackendServiceHook defines the hook for updating an beta BackendService.
+// It replaces the object with the same key in the mock with the updated object.
+func UpdateBetaBackendServiceHook(ctx context.Context, key *meta.Key, obj *beta.BackendService, m *cloud.MockBetaBackendServices) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in BackendServices", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "beta", "backendServices")
+	obj.SelfLink = cloud.SelfLink(meta.VersionBeta, projectID, "backendServices", key)
+
+	m.Objects[*key] = &cloud.MockBackendServicesObj{Obj: obj}
+	return nil
+}
+
+// UpdateURLMapHook defines the hook for updating a UrlMap.
+// It replaces the object with the same key in the mock with the updated object.
+func UpdateURLMapHook(ctx context.Context, key *meta.Key, obj *ga.UrlMap, m *cloud.MockUrlMaps) error {
+	_, err := m.Get(ctx, key)
+	if err != nil {
+		return &googleapi.Error{
+			Code:    http.StatusNotFound,
+			Message: fmt.Sprintf("Key: %s was not found in UrlMaps", key.String()),
+		}
+	}
+
+	obj.Name = key.Name
+	projectID := m.ProjectRouter.ProjectID(ctx, "ga", "urlMaps")
+	obj.SelfLink = cloud.SelfLink(meta.VersionGA, projectID, "urlMaps", key)
+
+	m.Objects[*key] = &cloud.MockUrlMapsObj{Obj: obj}
+	return nil
+}
+
 // InsertFirewallsUnauthorizedErrHook mocks firewall insertion. A forbidden error will be thrown as return.
 func InsertFirewallsUnauthorizedErrHook(ctx context.Context, key *meta.Key, obj *ga.Firewall, m *cloud.MockFirewalls) (bool, error) {
 	return true, &googleapi.Error{Code: http.StatusForbidden}
@@ -494,6 +572,16 @@ func DeleteAddressesNotFoundErrHook(ctx context.Context, key *meta.Key, m *cloud
 // DeleteAddressesInternalErrHook mocks deleting address and returns an internal server error.
 func DeleteAddressesInternalErrHook(ctx context.Context, key *meta.Key, m *cloud.MockAddresses) (bool, error) {
 	return true, InternalServerError
+}
+
+// InsertAlphaBackendServiceUnauthorizedErrHook mocks inserting an alpha BackendService and returns a forbidden error.
+func InsertAlphaBackendServiceUnauthorizedErrHook(ctx context.Context, key *meta.Key, obj *alpha.BackendService, m *cloud.MockAlphaBackendServices) (bool, error) {
+	return true, UnauthorizedErr
+}
+
+// UpdateAlphaBackendServiceUnauthorizedErrHook mocks updating an alpha BackendService and returns a forbidden error.
+func UpdateAlphaBackendServiceUnauthorizedErrHook(ctx context.Context, key *meta.Key, obj *alpha.BackendService, m *cloud.MockAlphaBackendServices) error {
+	return UnauthorizedErr
 }
 
 // GetRegionBackendServicesErrHook mocks getting region backend service and returns an internal server error.

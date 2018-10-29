@@ -19,6 +19,7 @@ package daemon
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/golang/glog"
@@ -330,26 +331,30 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 	}
 
 	history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Create(history)
-	if errors.IsAlreadyExists(err) {
+	if outerErr := err; errors.IsAlreadyExists(outerErr) {
 		// TODO: Is it okay to get from historyLister?
 		existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
 		}
 		// Check if we already created it
-		done, err := Match(ds, existedHistory)
-		if err != nil {
-			return nil, err
+		done, matchErr := Match(ds, existedHistory)
+		if matchErr != nil {
+			return nil, matchErr
 		}
 		if done {
 			return existedHistory, nil
 		}
 
 		// Handle name collisions between different history
-		// TODO: Is it okay to get from dsLister?
+		// Get the latest DaemonSet from the API server to make sure collision count is only increased when necessary
 		currDS, getErr := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
+		}
+		// If the collision count used to compute hash was in fact stale, there's no need to bump collision count; retry again
+		if !reflect.DeepEqual(currDS.Status.CollisionCount, ds.Status.CollisionCount) {
+			return nil, fmt.Errorf("found a stale collision count (%d, expected %d) of DaemonSet %q while processing; will retry until it is updated", ds.Status.CollisionCount, currDS.Status.CollisionCount, ds.Name)
 		}
 		if currDS.Status.CollisionCount == nil {
 			currDS.Status.CollisionCount = new(int32)
@@ -360,7 +365,7 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 			return nil, updateErr
 		}
 		glog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
-		return nil, err
+		return nil, outerErr
 	}
 	return history, err
 }

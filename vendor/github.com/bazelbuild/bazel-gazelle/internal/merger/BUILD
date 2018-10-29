@@ -9,11 +9,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/bazel-gazelle/internal/merger",
     importpath = "github.com/bazelbuild/bazel-gazelle/internal/merger",
     visibility = ["//vendor/github.com/bazelbuild/bazel-gazelle:__subpackages__"],
-    deps = [
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/config:go_default_library",
-        "//vendor/github.com/bazelbuild/bazel-gazelle/internal/label:go_default_library",
-        "//vendor/github.com/bazelbuild/buildtools/build:go_default_library",
-    ],
+    deps = ["//vendor/github.com/bazelbuild/bazel-gazelle/internal/rule:go_default_library"],
 )
 
 filegroup(

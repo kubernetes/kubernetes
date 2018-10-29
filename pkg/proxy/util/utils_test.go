@@ -20,25 +20,25 @@ import (
 	"net"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
 )
 
 func TestShouldSkipService(t *testing.T) {
 	testCases := []struct {
-		service    *api.Service
+		service    *v1.Service
 		svcName    types.NamespacedName
 		shouldSkip bool
 	}{
 		{
 			// Cluster IP is None
-			service: &api.Service{
+			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
-				Spec: api.ServiceSpec{
-					ClusterIP: api.ClusterIPNone,
+				Spec: v1.ServiceSpec{
+					ClusterIP: v1.ClusterIPNone,
 				},
 			},
 			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
@@ -46,9 +46,9 @@ func TestShouldSkipService(t *testing.T) {
 		},
 		{
 			// Cluster IP is empty
-			service: &api.Service{
+			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
-				Spec: api.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					ClusterIP: "",
 				},
 			},
@@ -57,11 +57,11 @@ func TestShouldSkipService(t *testing.T) {
 		},
 		{
 			// ExternalName type service
-			service: &api.Service{
+			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
-				Spec: api.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      api.ServiceTypeExternalName,
+					Type:      v1.ServiceTypeExternalName,
 				},
 			},
 			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
@@ -69,11 +69,11 @@ func TestShouldSkipService(t *testing.T) {
 		},
 		{
 			// ClusterIP type service with ClusterIP set
-			service: &api.Service{
+			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
-				Spec: api.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      api.ServiceTypeClusterIP,
+					Type:      v1.ServiceTypeClusterIP,
 				},
 			},
 			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
@@ -81,11 +81,11 @@ func TestShouldSkipService(t *testing.T) {
 		},
 		{
 			// NodePort type service with ClusterIP set
-			service: &api.Service{
+			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
-				Spec: api.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      api.ServiceTypeNodePort,
+					Type:      v1.ServiceTypeNodePort,
 				},
 			},
 			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},
@@ -93,11 +93,11 @@ func TestShouldSkipService(t *testing.T) {
 		},
 		{
 			// LoadBalancer type service with ClusterIP set
-			service: &api.Service{
+			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "bar"},
-				Spec: api.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					ClusterIP: "1.2.3.4",
-					Type:      api.ServiceTypeLoadBalancer,
+					Type:      v1.ServiceTypeLoadBalancer,
 				},
 			},
 			svcName:    types.NamespacedName{Namespace: "foo", Name: "bar"},

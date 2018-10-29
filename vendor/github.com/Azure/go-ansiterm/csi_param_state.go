@@ -5,7 +5,7 @@ type csiParamState struct {
 }
 
 func (csiState csiParamState) Handle(b byte) (s state, e error) {
-	logger.Infof("CsiParam::Handle %#x", b)
+	csiState.parser.logf("CsiParam::Handle %#x", b)
 
 	nextState, err := csiState.baseState.Handle(b)
 	if nextState != nil || err != nil {
@@ -26,7 +26,7 @@ func (csiState csiParamState) Handle(b byte) (s state, e error) {
 }
 
 func (csiState csiParamState) Transition(s state) error {
-	logger.Infof("CsiParam::Transition %s --> %s", csiState.Name(), s.Name())
+	csiState.parser.logf("CsiParam::Transition %s --> %s", csiState.Name(), s.Name())
 	csiState.baseState.Transition(s)
 
 	switch s {

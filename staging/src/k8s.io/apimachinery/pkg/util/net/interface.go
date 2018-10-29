@@ -53,6 +53,28 @@ type RouteFile struct {
 	parse func(input io.Reader) ([]Route, error)
 }
 
+// noRoutesError can be returned by ChooseBindAddress() in case of no routes
+type noRoutesError struct {
+	message string
+}
+
+func (e noRoutesError) Error() string {
+	return e.message
+}
+
+// IsNoRoutesError checks if an error is of type noRoutesError
+func IsNoRoutesError(err error) bool {
+	if err == nil {
+		return false
+	}
+	switch err.(type) {
+	case noRoutesError:
+		return true
+	default:
+		return false
+	}
+}
+
 var (
 	v4File = RouteFile{name: ipv4RouteFile, parse: getIPv4DefaultRoutes}
 	v6File = RouteFile{name: ipv6RouteFile, parse: getIPv6DefaultRoutes}
@@ -347,7 +369,9 @@ func getAllDefaultRoutes() ([]Route, error) {
 	v6Routes, _ := v6File.extract()
 	routes = append(routes, v6Routes...)
 	if len(routes) == 0 {
-		return nil, fmt.Errorf("No default routes.")
+		return nil, noRoutesError{
+			message: fmt.Sprintf("no default routes found in %q or %q", v4File.name, v6File.name),
+		}
 	}
 	return routes, nil
 }

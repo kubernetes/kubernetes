@@ -41,6 +41,7 @@ import (
 type DelegatingAuthenticatorConfig struct {
 	Anonymous bool
 
+	// TokenAccessReviewClient is a client to do token review. It can be nil. Then every token is ignored.
 	TokenAccessReviewClient authenticationclient.TokenReviewInterface
 
 	// CacheTTL is the length of time that a token authentication answer will be cached.

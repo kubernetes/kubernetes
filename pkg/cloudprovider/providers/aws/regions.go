@@ -23,12 +23,13 @@ import (
 	"sync"
 )
 
-// WellKnownRegions is the complete list of regions known to the AWS cloudprovider
+// wellKnownRegions is the complete list of regions known to the AWS cloudprovider
 // and credentialprovider.
-var WellKnownRegions = [...]string{
+var wellKnownRegions = [...]string{
 	// from `aws ec2 describe-regions --region us-east-1 --query Regions[].RegionName | sort`
 	"ap-northeast-1",
 	"ap-northeast-2",
+	"ap-northeast-3",
 	"ap-south-1",
 	"ap-southeast-1",
 	"ap-southeast-2",
@@ -36,6 +37,7 @@ var WellKnownRegions = [...]string{
 	"eu-central-1",
 	"eu-west-1",
 	"eu-west-2",
+	"eu-west-3",
 	"sa-east-1",
 	"us-east-1",
 	"us-east-2",
@@ -53,12 +55,12 @@ var awsRegionsMutex sync.Mutex
 // awsRegions is a set of recognized regions
 var awsRegions sets.String
 
-// RecognizeRegion is called for each AWS region we know about.
+// recognizeRegion is called for each AWS region we know about.
 // It currently registers a credential provider for that region.
 // There are two paths to discovering a region:
 //  * we hard-code some well-known regions
 //  * if a region is discovered from instance metadata, we add that
-func RecognizeRegion(region string) {
+func recognizeRegion(region string) {
 	awsRegionsMutex.Lock()
 	defer awsRegionsMutex.Unlock()
 
@@ -78,10 +80,10 @@ func RecognizeRegion(region string) {
 	awsRegions.Insert(region)
 }
 
-// RecognizeWellKnownRegions calls RecognizeRegion on each WellKnownRegion
-func RecognizeWellKnownRegions() {
-	for _, region := range WellKnownRegions {
-		RecognizeRegion(region)
+// recognizeWellKnownRegions calls RecognizeRegion on each WellKnownRegion
+func recognizeWellKnownRegions() {
+	for _, region := range wellKnownRegions {
+		recognizeRegion(region)
 	}
 }
 

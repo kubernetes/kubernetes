@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
 type ioHandler interface {
@@ -62,13 +61,13 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 
 // given a wwn and lun, find the device and associated devicemapper parent
 func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
-	fc_path := "-fc-0x" + wwn + "-lun-" + lun
-	dev_path := byPath
-	if dirs, err := io.ReadDir(dev_path); err == nil {
+	fcPath := "-fc-0x" + wwn + "-lun-" + lun
+	devPath := byPath
+	if dirs, err := io.ReadDir(devPath); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
-			if strings.Contains(name, fc_path) {
-				if disk, err1 := io.EvalSymlinks(dev_path + name); err1 == nil {
+			if strings.Contains(name, fcPath) {
+				if disk, err1 := io.EvalSymlinks(devPath + name); err1 == nil {
 					dm := deviceUtil.FindMultipathDeviceForDevice(disk)
 					glog.Infof("fc: find disk: %v, dm: %v", disk, dm)
 					return disk, dm
@@ -90,15 +89,15 @@ func findDiskWWIDs(wwid string, io ioHandler, deviceUtil volumeutil.DeviceUtil) 
 	// The wwid could contain white space and it will be replaced
 	// underscore when wwid is exposed under /dev/by-id.
 
-	fc_path := "scsi-" + wwid
-	dev_id := byID
-	if dirs, err := io.ReadDir(dev_id); err == nil {
+	fcPath := "scsi-" + wwid
+	devID := byID
+	if dirs, err := io.ReadDir(devID); err == nil {
 		for _, f := range dirs {
 			name := f.Name()
-			if name == fc_path {
-				disk, err := io.EvalSymlinks(dev_id + name)
+			if name == fcPath {
+				disk, err := io.EvalSymlinks(devID + name)
 				if err != nil {
-					glog.V(2).Infof("fc: failed to find a corresponding disk from symlink[%s], error %v", dev_id+name, err)
+					glog.V(2).Infof("fc: failed to find a corresponding disk from symlink[%s], error %v", devID+name, err)
 					return "", ""
 				}
 				dm := deviceUtil.FindMultipathDeviceForDevice(disk)
@@ -107,7 +106,7 @@ func findDiskWWIDs(wwid string, io ioHandler, deviceUtil volumeutil.DeviceUtil) 
 			}
 		}
 	}
-	glog.V(2).Infof("fc: failed to find a disk [%s]", dev_id+fc_path)
+	glog.V(2).Infof("fc: failed to find a disk [%s]", devID+fcPath)
 	return "", ""
 }
 
@@ -121,10 +120,10 @@ func removeFromScsiSubsystem(deviceName string, io ioHandler) {
 
 // rescan scsi bus
 func scsiHostRescan(io ioHandler) {
-	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := io.ReadDir(scsi_path); err == nil {
+	scsiPath := "/sys/class/scsi_host/"
+	if dirs, err := io.ReadDir(scsiPath); err == nil {
 		for _, f := range dirs {
-			name := scsi_path + f.Name() + "/scan"
+			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")
 			io.WriteFile(name, data, 0666)
 		}
@@ -135,33 +134,31 @@ func scsiHostRescan(io ioHandler) {
 func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
 		return path.Join(host.GetPluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
-	} else {
-		return path.Join(host.GetPluginDir(fcPluginName), wwids[0])
 	}
+	return path.Join(host.GetPluginDir(fcPluginName), wwids[0])
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/fc/volumeDevices/target-lun-0
 func makeVDPDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
 	if len(wwns) != 0 {
 		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
-	} else {
-		return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), wwids[0])
 	}
+	return path.Join(host.GetVolumeDevicePluginDir(fcPluginName), wwids[0])
 }
 
-type FCUtil struct{}
+type fcUtil struct{}
 
-func (util *FCUtil) MakeGlobalPDName(fc fcDisk) string {
+func (util *fcUtil) MakeGlobalPDName(fc fcDisk) string {
 	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun, fc.wwids)
 }
 
 // Global volume device plugin dir
-func (util *FCUtil) MakeGlobalVDPDName(fc fcDisk) string {
+func (util *fcUtil) MakeGlobalVDPDName(fc fcDisk) string {
 	return makeVDPDNameInternal(fc.plugin.host, fc.wwns, fc.lun, fc.wwids)
 }
 
 func searchDisk(b fcDiskMounter) (string, error) {
-	var diskIds []string
+	var diskIDs []string
 	var disk string
 	var dm string
 	io := b.io
@@ -170,9 +167,9 @@ func searchDisk(b fcDiskMounter) (string, error) {
 	lun := b.lun
 
 	if len(wwns) != 0 {
-		diskIds = wwns
+		diskIDs = wwns
 	} else {
-		diskIds = wwids
+		diskIDs = wwids
 	}
 
 	rescaned := false
@@ -180,11 +177,11 @@ func searchDisk(b fcDiskMounter) (string, error) {
 	// first phase, search existing device path, if a multipath dm is found, exit loop
 	// otherwise, in second phase, rescan scsi bus and search again, return with any findings
 	for true {
-		for _, diskId := range diskIds {
+		for _, diskID := range diskIDs {
 			if len(wwns) != 0 {
-				disk, dm = findDisk(diskId, lun, io, b.deviceUtil)
+				disk, dm = findDisk(diskID, lun, io, b.deviceUtil)
 			} else {
-				disk, dm = findDiskWWIDs(diskId, io, b.deviceUtil)
+				disk, dm = findDiskWWIDs(diskID, io, b.deviceUtil)
 			}
 			// if multipath device is found, break
 			if dm != "" {
@@ -212,7 +209,7 @@ func searchDisk(b fcDiskMounter) (string, error) {
 	return disk, nil
 }
 
-func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
+func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	devicePath, err := searchDisk(b)
 	if err != nil {
 		return "", err
@@ -251,7 +248,7 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 }
 
 // DetachDisk removes scsi device file such as /dev/sdX from the node.
-func (util *FCUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
+func (util *fcUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 	var devices []string
 	// devicePath might be like /dev/mapper/mpathX. Find destination.
 	dstPath, err := c.io.EvalSymlinks(devicePath)
@@ -282,7 +279,7 @@ func (util *FCUtil) DetachDisk(c fcDiskUnmounter, devicePath string) error {
 }
 
 // detachFCDisk removes scsi device file such as /dev/sdX from the node.
-func (util *FCUtil) detachFCDisk(io ioHandler, devicePath string) error {
+func (util *fcUtil) detachFCDisk(io ioHandler, devicePath string) error {
 	// Remove scsi device from the node.
 	if !strings.HasPrefix(devicePath, "/dev/") {
 		return fmt.Errorf("fc detach disk: invalid device name: %s", devicePath)
@@ -295,7 +292,7 @@ func (util *FCUtil) detachFCDisk(io ioHandler, devicePath string) error {
 
 // DetachBlockFCDisk detaches a volume from kubelet node, removes scsi device file
 // such as /dev/sdX from the node, and then removes loopback for the scsi device.
-func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string) error {
+func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath string) error {
 	// Check if devicePath is valid
 	if len(devicePath) != 0 {
 		if pathExists, pathErr := checkPathExists(devicePath); !pathExists || pathErr != nil {
@@ -348,24 +345,10 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	}
 	glog.V(4).Infof("fc: find destination device path from symlink: %v", dstPath)
 
-	// Get loopback device which takes fd lock for device beofore detaching a volume from node.
-	// TODO: This is a workaround for issue #54108
-	// Currently local attach plugins such as FC, iSCSI, RBD can't obtain devicePath during
-	// GenerateUnmapDeviceFunc() in operation_generator. As a result, these plugins fail to get
-	// and remove loopback device then it will be remained on kubelet node. To avoid the problem,
-	// local attach plugins needs to remove loopback device during TearDownDevice().
 	var devices []string
-	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
 	dm := c.deviceUtil.FindMultipathDeviceForDevice(dstPath)
 	if len(dm) != 0 {
 		dstPath = dm
-	}
-	loop, err := volumepathhandler.BlockVolumePathHandler.GetLoopDevice(blkUtil, dstPath)
-	if err != nil {
-		if err.Error() != volumepathhandler.ErrDeviceNotFound {
-			return fmt.Errorf("fc: failed to get loopback for destination path: %v, err: %v", dstPath, err)
-		}
-		glog.Warningf("fc: loopback for destination path: %s not found", dstPath)
 	}
 
 	// Detach volume from kubelet node
@@ -387,13 +370,6 @@ func (util *FCUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if lastErr != nil {
 		glog.Errorf("fc: last error occurred during detach disk:\n%v", lastErr)
 		return lastErr
-	}
-	if len(loop) != 0 {
-		// The volume was successfully detached from node. We can safely remove the loopback.
-		err = volumepathhandler.BlockVolumePathHandler.RemoveLoopDevice(blkUtil, loop)
-		if err != nil {
-			return fmt.Errorf("fc: failed to remove loopback :%v, err: %v", loop, err)
-		}
 	}
 	return nil
 }

@@ -44,6 +44,7 @@ type memCacheClient struct {
 	cacheValid             bool
 }
 
+// Error Constants
 var (
 	ErrCacheEmpty    = errors.New("the cache has not been filled yet")
 	ErrCacheNotFound = errors.New("not found")

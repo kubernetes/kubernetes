@@ -18,6 +18,7 @@ package logs
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"time"
 
@@ -46,7 +47,7 @@ type GlogWriter struct{}
 
 // Write implements the io.Writer interface.
 func (writer GlogWriter) Write(data []byte) (n int, err error) {
-	glog.Info(string(data))
+	glog.InfoDepth(1, string(data))
 	return len(data), nil
 }
 
@@ -66,4 +67,13 @@ func FlushLogs() {
 // NewLogger creates a new log.Logger which sends logs to glog.Info.
 func NewLogger(prefix string) *log.Logger {
 	return log.New(GlogWriter{}, prefix, 0)
+}
+
+// GlogSetter is a setter to set glog level.
+func GlogSetter(val string) (string, error) {
+	var level glog.Level
+	if err := level.Set(val); err != nil {
+		return "", fmt.Errorf("failed set glog.logging.verbosity %s: %v", val, err)
+	}
+	return fmt.Sprintf("successfully set glog.logging.verbosity to %s", val), nil
 }

@@ -11,7 +11,7 @@ go_test(
     srcs = ["scheme_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/fuzzer:go_default_library",
     ],
 )

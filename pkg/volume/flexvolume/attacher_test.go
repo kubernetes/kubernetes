@@ -30,7 +30,7 @@ func TestAttach(t *testing.T) {
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), attachCmd,
-			specJson(plugin, spec, nil), "localhost"),
+			specJSON(plugin, spec, nil), "localhost"),
 	)
 
 	a, _ := plugin.NewAttacher()
@@ -43,7 +43,7 @@ func TestWaitForAttach(t *testing.T) {
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), waitForAttachCmd, "/dev/sdx",
-			specJson(plugin, spec, nil)),
+			specJSON(plugin, spec, nil)),
 	)
 
 	a, _ := plugin.NewAttacher()
@@ -56,7 +56,7 @@ func TestMountDevice(t *testing.T) {
 	plugin, rootDir := testPlugin()
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), mountDeviceCmd, rootDir+"/mount-dir", "/dev/sdx",
-			specJson(plugin, spec, nil)),
+			specJSON(plugin, spec, nil)),
 	)
 
 	a, _ := plugin.NewAttacher()
@@ -68,7 +68,7 @@ func TestIsVolumeAttached(t *testing.T) {
 
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
-		assertDriverCall(t, notSupportedOutput(), isAttached, specJson(plugin, spec, nil), "localhost"),
+		assertDriverCall(t, notSupportedOutput(), isAttached, specJSON(plugin, spec, nil), "localhost"),
 	)
 	a, _ := plugin.NewAttacher()
 	specs := []*volume.Spec{spec}

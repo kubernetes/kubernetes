@@ -46,6 +46,21 @@ import (
 // PluginName indicates name of admission plugin.
 const PluginName = "ImagePolicyWebhook"
 
+// AuditKeyPrefix is used as the prefix for all audit keys handled by this
+// pluggin. Some well known suffixes are listed below.
+var AuditKeyPrefix = strings.ToLower(PluginName) + ".image-policy.k8s.io/"
+
+const (
+	// ImagePolicyFailedOpenKeySuffix in an annotation indicates the image
+	// review failed open when the image policy webhook backend connection
+	// failed.
+	ImagePolicyFailedOpenKeySuffix string = "failed-open"
+
+	// ImagePolicyAuditRequiredKeySuffix in an annotation indicates the pod
+	// should be audited.
+	ImagePolicyAuditRequiredKeySuffix string = "audit-required"
+)
+
 var (
 	groupVersions = []schema.GroupVersion{v1alpha1.SchemeGroupVersion}
 )
@@ -97,12 +112,15 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 	if err != nil {
 		glog.V(2).Infof("error contacting webhook backend: %s", err)
 		if a.defaultAllow {
+			attributes.AddAnnotation(AuditKeyPrefix+ImagePolicyFailedOpenKeySuffix, "true")
+			// TODO(wteiken): Remove the annotation code for the 1.13 release
 			annotations := pod.GetAnnotations()
 			if annotations == nil {
 				annotations = make(map[string]string)
 			}
 			annotations[api.ImagePolicyFailedOpenKey] = "true"
 			pod.ObjectMeta.SetAnnotations(annotations)
+
 			glog.V(2).Infof("resource allowed in spite of webhook backend failure")
 			return nil
 		}
@@ -174,13 +192,17 @@ func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review 
 		a.responseCache.Add(string(cacheKey), review.Status, a.statusTTL(review.Status))
 	}
 
+	for k, v := range review.Status.AuditAnnotations {
+		if err := attributes.AddAnnotation(AuditKeyPrefix+k, v); err != nil {
+			glog.Warningf("failed to set admission audit annotation %s to %s: %v", AuditKeyPrefix+k, v, err)
+		}
+	}
 	if !review.Status.Allowed {
 		if len(review.Status.Reason) > 0 {
 			return fmt.Errorf("image policy webhook backend denied one or more images: %s", review.Status.Reason)
 		}
 		return errors.New("one or more images rejected by webhook backend")
 	}
-
 	return nil
 }
 

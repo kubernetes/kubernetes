@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
@@ -106,14 +106,14 @@ func NewManager(
 	clock clock.Clock,
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
-		clock:           clock,
-		killPodFunc:     killPodFunc,
-		imageGC:         imageGC,
-		containerGC:     containerGC,
-		config:          config,
-		recorder:        recorder,
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        clock,
+		killPodFunc:                  killPodFunc,
+		imageGC:                      imageGC,
+		containerGC:                  containerGC,
+		config:                       config,
+		recorder:                     recorder,
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 		dedicatedImageFs:             nil,
@@ -131,7 +131,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 	// Admit Critical pods even under resource pressure since they are required for system stability.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) && kubelettypes.IsCriticalPod(attrs.Pod) {
+	if kubelettypes.IsCriticalPod(attrs.Pod) {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 	// the node has memory pressure, admit if not best-effort
@@ -145,7 +145,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. OutOfDisk.
 		if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) &&
 			v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
-				Key:    algorithm.TaintNodeMemoryPressure,
+				Key:    schedulerapi.TaintNodeMemoryPressure,
 				Effect: v1.TaintEffectNoSchedule,
 			}) {
 			return lifecycle.PodAdmitResult{Admit: true}
@@ -240,7 +240,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	updateStats := true
 	summary, err := m.summaryProvider.Get(updateStats)
 	if err != nil {
-		glog.Errorf("eviction manager: failed to get get summary stats: %v", err)
+		glog.Errorf("eviction manager: failed to get summary stats: %v", err)
 		return nil
 	}
 
@@ -418,7 +418,7 @@ func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Sign
 	if len(nodeReclaimFuncs) > 0 {
 		summary, err := m.summaryProvider.Get(true)
 		if err != nil {
-			glog.Errorf("eviction manager: failed to get get summary stats after resource reclaim: %v", err)
+			glog.Errorf("eviction manager: failed to get summary stats after resource reclaim: %v", err)
 			return false
 		}
 
@@ -544,8 +544,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
+	if kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
 		glog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
 		return false
 	}

@@ -130,13 +130,13 @@ func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, 
 	glog.Infof("Desired state populator starts to run")
 	wait.PollUntil(dswp.loopSleepDuration, func() (bool, error) {
 		done := sourcesReady.AllReady()
-		dswp.populatorLoopFunc()()
+		dswp.populatorLoop()
 		return done, nil
 	}, stopCh)
 	dswp.hasAddedPodsLock.Lock()
 	dswp.hasAddedPods = true
 	dswp.hasAddedPodsLock.Unlock()
-	wait.Until(dswp.populatorLoopFunc(), dswp.loopSleepDuration, stopCh)
+	wait.Until(dswp.populatorLoop, dswp.loopSleepDuration, stopCh)
 }
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
@@ -150,26 +150,24 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 	return dswp.hasAddedPods
 }
 
-func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
-	return func() {
-		dswp.findAndAddNewPods()
+func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
+	dswp.findAndAddNewPods()
 
-		// findAndRemoveDeletedPods() calls out to the container runtime to
-		// determine if the containers for a given pod are terminated. This is
-		// an expensive operation, therefore we limit the rate that
-		// findAndRemoveDeletedPods() is called independently of the main
-		// populator loop.
-		if time.Since(dswp.timeOfLastGetPodStatus) < dswp.getPodStatusRetryDuration {
-			glog.V(5).Infof(
-				"Skipping findAndRemoveDeletedPods(). Not permitted until %v (getPodStatusRetryDuration %v).",
-				dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration),
-				dswp.getPodStatusRetryDuration)
+	// findAndRemoveDeletedPods() calls out to the container runtime to
+	// determine if the containers for a given pod are terminated. This is
+	// an expensive operation, therefore we limit the rate that
+	// findAndRemoveDeletedPods() is called independently of the main
+	// populator loop.
+	if time.Since(dswp.timeOfLastGetPodStatus) < dswp.getPodStatusRetryDuration {
+		glog.V(5).Infof(
+			"Skipping findAndRemoveDeletedPods(). Not permitted until %v (getPodStatusRetryDuration %v).",
+			dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration),
+			dswp.getPodStatusRetryDuration)
 
-			return
-		}
-
-		dswp.findAndRemoveDeletedPods()
+		return
 	}
+
+	dswp.findAndRemoveDeletedPods()
 }
 
 func (dswp *desiredStateOfWorldPopulator) isPodTerminated(pod *v1.Pod) bool {

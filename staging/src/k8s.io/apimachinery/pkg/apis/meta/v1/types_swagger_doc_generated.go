@@ -118,6 +118,61 @@ func (ExportOptions) SwaggerDoc() map[string]string {
 	return map_ExportOptions
 }
 
+var map_FieldNameValuePair = map[string]string{
+	"":      "FieldNameValuePair is an individual key-value pair.",
+	"name":  "Name is the field's name.",
+	"value": "Value is the field's value.",
+}
+
+func (FieldNameValuePair) SwaggerDoc() map[string]string {
+	return map_FieldNameValuePair
+}
+
+var map_FieldPathElement = map[string]string{
+	"":          "FieldPathElement describes how to select a child field given a containing object.",
+	"fieldName": "Exactly one of the following fields should be non-nil. FieldName selects a single field from a map (reminder: this is also how structs are represented). The containing object must be a map.",
+	"key":       "Key selects the list element which has fields matching those given. The containing object must be an associative list with map typed elements.",
+	"value":     "Value selects the list element with the given value. The containing object must be an associative list with a primitive typed element (i.e., a set).",
+	"index":     "Index selects a list element by its index number. The containing object must be an atomic list.",
+}
+
+func (FieldPathElement) SwaggerDoc() map[string]string {
+	return map_FieldPathElement
+}
+
+var map_FieldSet = map[string]string{
+	"":         "FieldSet stores a set of fields in a data structure like a Trie. To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff",
+	"members":  "Members lists fields that are part of the set.",
+	"children": "Children lists child fields which themselves have children that are members of the set. Appearance in this list does not imply membership, although it does imply some descendant field is a member. Note: this is a tree, not an arbitrary graph.",
+}
+
+func (FieldSet) SwaggerDoc() map[string]string {
+	return map_FieldSet
+}
+
+var map_FieldSetNode = map[string]string{
+	"":            "FieldSetNode is a pair of FieldPathElement / FieldSet, for the purpose of expressing nested set membership.",
+	"pathElement": "PathElement identifies which field this node expresses child membership for.",
+	"set":         "Set identifies which child fields of this node are part of the FieldSet.",
+}
+
+func (FieldSetNode) SwaggerDoc() map[string]string {
+	return map_FieldSetNode
+}
+
+var map_FieldValue = map[string]string{
+	"":             "FieldValue represents a concrete value, either for a key-value pair or identifying an item in a set.",
+	"floatValue":   "Exactly one of the following fields should be set. FloatValue is a primitive float value. it is serialized as a string",
+	"intValue":     "IntValue is a primitive int value.",
+	"stringValue":  "StringValue is a primitive string value.",
+	"booleanValue": "BooleanValue is a primitive boolean value.",
+	"null":         "Null represents an explicit `\"foo\" = null`",
+}
+
+func (FieldValue) SwaggerDoc() map[string]string {
+	return map_FieldValue
+}
+
 var map_GetOptions = map[string]string{
 	"":                     "GetOptions is the standard query options to the standard REST get call.",
 	"resourceVersion":      "When specified: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
@@ -192,7 +247,7 @@ var map_ListMeta = map[string]string{
 	"":                "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
 	"selfLink":        "selfLink is a URL representing this object. Populated by the system. Read-only.",
 	"resourceVersion": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency",
-	"continue":        "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response.",
+	"continue":        "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message.",
 }
 
 func (ListMeta) SwaggerDoc() map[string]string {
@@ -208,7 +263,7 @@ var map_ListOptions = map[string]string{
 	"resourceVersion":      "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
 	"timeoutSeconds":       "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
 	"limit":                "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-	"continue":             "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+	"continue":             "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {
@@ -233,7 +288,7 @@ var map_ObjectMeta = map[string]string{
 	"initializers":               "An initializer is a controller which enforces some system invariant at object creation time. This field is a list of initializers that have not yet acted on this object. If nil or empty, this object has been completely initialized. Otherwise, the object is considered uninitialized and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to observe uninitialized objects.\n\nWhen an object is created, the system will populate this list with the current set of initializers. Only privileged users may set or modify this list. Once it is empty, it may not be modified further by any user.",
 	"finalizers":                 "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed.",
 	"clusterName":                "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.",
-	"lastApplied":                "LastApplied is a map of workflow-id to last applied configuration. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". It keeps track of the ownership of fields. The last applied configuration is always in the same version as the parent object. It's used to keep track of the intent of the workflow-id that submitted that configuration.",
+	"managedFields":              "ManagedFields is a map of workflow-id to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
 }
 
 func (ObjectMeta) SwaggerDoc() map[string]string {
@@ -346,6 +401,16 @@ var map_UpdateOptions = map[string]string{
 
 func (UpdateOptions) SwaggerDoc() map[string]string {
 	return map_UpdateOptions
+}
+
+var map_VersionedFieldSet = map[string]string{
+	"":           "VersionedFieldSet is a pair of a FieldSet and the group version of the resource that the fieldset applies to.",
+	"apiVersion": "APIVersion defines the version of this resource that this field set applies to. The format is \"group/version\" just like the top-level APIVersion field. It is necessary to track the version of a field set because it cannot be automatically converted.",
+	"fields":     "Fields identifies a set of fields.",
+}
+
+func (VersionedFieldSet) SwaggerDoc() map[string]string {
+	return map_VersionedFieldSet
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE

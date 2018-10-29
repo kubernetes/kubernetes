@@ -472,7 +472,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				firstUnhealthyPod.Name)
 			return &status, nil
 		}
-		glog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for scale dowm",
+		glog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for scale down",
 			set.Namespace,
 			set.Name,
 			condemned[target].Name)

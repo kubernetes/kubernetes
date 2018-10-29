@@ -24,7 +24,7 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/generated"
+	"k8s.io/kubernetes/pkg/kubectl/generated"
 
 	"github.com/chai2010/gettext-go/gettext"
 	"github.com/golang/glog"
@@ -50,9 +50,18 @@ var knownTranslations = map[string][]string{
 }
 
 func loadSystemLanguage() string {
-	langStr := os.Getenv("LANG")
+	// Implements the following locale priority order: LC_ALL, LC_MESSAGES, LANG
+	// Similarly to: https://www.gnu.org/software/gettext/manual/html_node/Locale-Environment-Variables.html
+	langStr := os.Getenv("LC_ALL")
 	if langStr == "" {
-		glog.V(3).Infof("Couldn't find the LANG environment variable, defaulting to en_US")
+		langStr = os.Getenv("LC_MESSAGES")
+	}
+	if langStr == "" {
+		langStr = os.Getenv("LANG")
+	}
+
+	if langStr == "" {
+		glog.V(3).Infof("Couldn't find the LC_ALL, LC_MESSAGES or LANG environment variables, defaulting to en_US")
 		return "default"
 	}
 	pieces := strings.Split(langStr, ".")

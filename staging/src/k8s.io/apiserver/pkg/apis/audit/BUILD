@@ -37,6 +37,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/fuzzer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/install:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/validation:all-srcs",

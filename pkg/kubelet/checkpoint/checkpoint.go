@@ -82,7 +82,7 @@ func checkAnnotations(pod *v1.Pod) bool {
 
 //getPodKey returns the full qualified path for the pod checkpoint
 func getPodKey(pod *v1.Pod) string {
-	return fmt.Sprintf("Pod%v%v.yaml", delimiter, pod.GetUID())
+	return fmt.Sprintf("%s%s%v.yaml", podPrefix, delimiter, pod.GetUID())
 }
 
 // LoadPods Loads All Checkpoints from disk

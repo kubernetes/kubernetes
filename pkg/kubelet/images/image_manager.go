@@ -40,6 +40,7 @@ type imageManager struct {
 
 var _ ImageManager = &imageManager{}
 
+// NewImageManager instantiates a new ImageManager object.
 func NewImageManager(recorder record.EventRecorder, imageService kubecontainer.ImageService, imageBackOff *flowcontrol.Backoff, serialized bool, qps float32, burst int) ImageManager {
 	imageService = throttleImagePulling(imageService, qps, burst)
 
@@ -112,11 +113,10 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 			msg := fmt.Sprintf("Container image %q already present on machine", container.Image)
 			m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, glog.Info)
 			return imageRef, "", nil
-		} else {
-			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
-			m.logIt(ref, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
-			return "", msg, ErrImageNeverPull
 		}
+		msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
+		m.logIt(ref, v1.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
+		return "", msg, ErrImageNeverPull
 	}
 
 	backOffKey := fmt.Sprintf("%s_%s", pod.UID, container.Image)
@@ -132,7 +132,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	if imagePullResult.err != nil {
 		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), glog.Warning)
 		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
-		if imagePullResult.err == RegistryUnavailable {
+		if imagePullResult.err == ErrRegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
 			return "", msg, imagePullResult.err
 		}

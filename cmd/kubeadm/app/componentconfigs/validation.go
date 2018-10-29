@@ -19,12 +19,12 @@ package componentconfigs
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
-	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
+	kubeletvalidation "k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
+	proxyvalidation "k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 )
 
 // ValidateKubeProxyConfiguration validates proxy configuration and collects all encountered errors
-func ValidateKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration, _ *field.Path) field.ErrorList {
+func ValidateKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration, _ *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if internalcfg.ComponentConfigs.KubeProxy == nil {
 		return allErrs
@@ -33,7 +33,7 @@ func ValidateKubeProxyConfiguration(internalcfg *kubeadmapi.InitConfiguration, _
 }
 
 // ValidateKubeletConfiguration validates kubelet configuration and collects all encountered errors
-func ValidateKubeletConfiguration(internalcfg *kubeadmapi.InitConfiguration, fldPath *field.Path) field.ErrorList {
+func ValidateKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if internalcfg.ComponentConfigs.Kubelet == nil {
 		return allErrs

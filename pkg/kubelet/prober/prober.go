@@ -46,13 +46,13 @@ const maxProbeRetries = 3
 
 // Prober helps to check the liveness/readiness of a container.
 type prober struct {
-	exec execprobe.ExecProber
+	exec execprobe.Prober
 	// probe types needs different httprobe instances so they don't
 	// share a connection pool which can cause collsions to the
 	// same host:port and transient failures. See #49740.
-	readinessHttp httprobe.HTTPProber
-	livenessHttp  httprobe.HTTPProber
-	tcp           tcprobe.TCPProber
+	readinessHttp httprobe.Prober
+	livenessHttp  httprobe.Prober
+	tcp           tcprobe.Prober
 	runner        kubecontainer.ContainerCommandRunner
 
 	refManager *kubecontainer.RefManager

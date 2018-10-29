@@ -26,10 +26,7 @@ go_test(
     srcs = ["kubelet_client_test.go"],
     data = ["//pkg/client/testdata"],
     embed = [":go_default_library"],
-    deps = [
-        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-    ],
+    deps = ["//staging/src/k8s.io/client-go/rest:go_default_library"],
 )
 
 filegroup(

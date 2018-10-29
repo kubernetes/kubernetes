@@ -108,7 +108,7 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 		attrs.Subresource = "spec"
 	}
 
-	glog.V(5).Infof("Node request attributes: attrs=%#v", attrs)
+	glog.V(5).Infof("Node request attributes: user=%#v attrs=%#v", attrs.GetUser(), attrs)
 
 	return attrs
 }

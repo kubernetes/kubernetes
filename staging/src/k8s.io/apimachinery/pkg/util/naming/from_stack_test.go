@@ -31,12 +31,12 @@ func TestGetNameFromCallsite(t *testing.T) {
 		{
 			name:            "ignore-package",
 			ignoredPackages: []string{"k8s.io/apimachinery/pkg/util/naming"},
-			expected:        "testing/testing.go:777",
+			expected:        "testing/testing.go:827",
 		},
 		{
 			name:            "ignore-file",
 			ignoredPackages: []string{"k8s.io/apimachinery/pkg/util/naming/from_stack_test.go"},
-			expected:        "testing/testing.go:777",
+			expected:        "testing/testing.go:827",
 		},
 		{
 			name:            "ignore-multiple",

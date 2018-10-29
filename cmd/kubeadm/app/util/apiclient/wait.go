@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/pkg/errors"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -143,7 +144,7 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("[kubelet-check] It seems like the kubelet isn't running or healthy.")
 			fmt.Printf("[kubelet-check] The HTTP call equal to 'curl -sSL %s' returned HTTP code %d\n", healthzEndpoint, resp.StatusCode)
-			return fmt.Errorf("the kubelet healthz endpoint is unhealthy")
+			return errors.New("the kubelet healthz endpoint is unhealthy")
 		}
 		return nil
 	}, 5) // a failureThreshold of five means waiting for a total of 155 seconds
@@ -209,20 +210,6 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 
 		return true, nil
 	})
-}
-
-// getStaticPodControlPlaneHashes computes hashes for all the control plane's Static Pod resources
-func getStaticPodControlPlaneHashes(client clientset.Interface, nodeName string) (map[string]string, error) {
-
-	mirrorPodHashes := map[string]string{}
-	for _, component := range constants.MasterComponents {
-		hash, err := getStaticPodSingleHash(client, nodeName, component)
-		if err != nil {
-			return nil, err
-		}
-		mirrorPodHashes[component] = hash
-	}
-	return mirrorPodHashes, nil
 }
 
 // getStaticSinglePodHash computes hashes for a single Static Pod resource

@@ -79,6 +79,8 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 		return runtimeapi.Protocol_TCP
 	case v1.ProtocolUDP:
 		return runtimeapi.Protocol_UDP
+	case v1.ProtocolSCTP:
+		return runtimeapi.Protocol_SCTP
 	}
 
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)

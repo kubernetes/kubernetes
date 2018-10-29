@@ -18,6 +18,7 @@ package intstr
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"runtime/debug"
@@ -142,7 +143,17 @@ func (intstr *IntOrString) Fuzz(c fuzz.Continue) {
 	}
 }
 
+func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrString {
+	if intOrPercent == nil {
+		return &defaultValue
+	}
+	return intOrPercent
+}
+
 func GetValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool) (int, error) {
+	if intOrPercent == nil {
+		return 0, errors.New("nil value for IntOrString")
+	}
 	value, isPercent, err := getIntOrPercentValue(intOrPercent)
 	if err != nil {
 		return 0, fmt.Errorf("invalid value for IntOrString: %v", err)

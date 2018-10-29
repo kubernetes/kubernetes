@@ -79,7 +79,7 @@ func newHeadlessService(namespace string) *v1.Service {
 	}
 }
 
-// newSTS returns a StatefulSet with with a fake container image
+// newSTS returns a StatefulSet with a fake container image
 func newSTS(name, namespace string, replicas int) *v1beta1.StatefulSet {
 	replicasCopy := int32(replicas)
 	return &v1beta1.StatefulSet{

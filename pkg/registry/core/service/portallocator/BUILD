@@ -23,7 +23,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["allocator_test.go"],
+    srcs = [
+        "allocator_test.go",
+        "operation_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",

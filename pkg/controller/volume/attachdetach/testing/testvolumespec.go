@@ -294,12 +294,20 @@ func (plugin *TestPlugin) NewAttacher() (volume.Attacher, error) {
 	return &attacher, nil
 }
 
+func (plugin *TestPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
+}
+
 func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	detacher := testPluginDetacher{
 		detachedVolumeMap: plugin.detachedVolumeMap,
 		pluginLock:        plugin.pluginLock,
 	}
 	return &detacher, nil
+}
+
+func (plugin *TestPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 func (plugin *TestPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {

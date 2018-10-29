@@ -240,7 +240,7 @@ func DeleteTaintsByKey(taints []v1.Taint, taintKey string) ([]v1.Taint, bool) {
 	return newTaints, deleted
 }
 
-// DeleteTaint removes all the the taints that have the same key and effect to given taintToDelete.
+// DeleteTaint removes all the taints that have the same key and effect to given taintToDelete.
 func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) {
 	newTaints := []v1.Taint{}
 	deleted := false

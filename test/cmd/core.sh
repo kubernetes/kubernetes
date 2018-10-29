@@ -435,9 +435,13 @@ run_pod_tests() {
   ## Patch can modify a local object
   kubectl patch --local -f pkg/kubectl/validation/testdata/v1/validPod.yaml --patch='{"spec": {"restartPolicy":"Never"}}' -o yaml | grep -q "Never"
 
-  ## Patch fails with error message "not patched" and exit code 1
-  output_message=$(! kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"replicas":7}}' 2>&1)
-  kube::test::if_has_string "${output_message}" 'not patched'
+  ## Patch fails with type restore error and exit code 1
+  output_message=$(! kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":"invalid"}}' 2>&1)
+  kube::test::if_has_string "${output_message}" 'cannot restore map from string'
+
+  ## Patch exits with error message "patched (no change)" and exit code 0 when no-op occurs
+  output_message=$(kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"metadata":{"labels":{"name":"valid-pod"}}}' 2>&1)
+  kube::test::if_has_string "${output_message}" 'patched (no change)'
 
   ## Patch pod can change image
   # Command
@@ -745,6 +749,13 @@ run_secrets_test() {
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
   # Clean-up
+  kubectl delete secret test-secret --namespace=test-secrets
+
+  # Command with process substitution
+  kubectl create secret tls test-secret --namespace=test-secrets --key <(cat hack/testdata/tls.key) --cert <(cat hack/testdata/tls.crt)
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
+    # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
   # Create a secret using stringData

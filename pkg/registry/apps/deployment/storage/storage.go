@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 
-	externalappsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
+	"k8s.io/apiserver/pkg/util/dryrun"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -148,7 +148,7 @@ func (r *RollbackREST) ProducesMIMETypes(verb string) []string {
 // ProducesObject returns an object the specified HTTP verb respond with. It will overwrite storage object if
 // it is not nil. Only the type of the return object matters, the value will be ignored.
 func (r *RollbackREST) ProducesObject(verb string) interface{} {
-	return externalappsv1beta1.DeploymentStatus{}
+	return metav1.Status{}
 }
 
 var _ = rest.StorageMetadata(&RollbackREST{})
@@ -171,7 +171,7 @@ func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createVal
 	}
 
 	// Update the Deployment with information in DeploymentRollback to trigger rollback
-	err := r.rollbackDeployment(ctx, rollback.Name, &rollback.RollbackTo, rollback.UpdatedAnnotations)
+	err := r.rollbackDeployment(ctx, rollback.Name, &rollback.RollbackTo, rollback.UpdatedAnnotations, dryrun.IsDryRun(options.DryRun))
 	if err != nil {
 		return nil, err
 	}
@@ -182,8 +182,8 @@ func (r *RollbackREST) Create(ctx context.Context, obj runtime.Object, createVal
 	}, nil
 }
 
-func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) error {
-	if _, err := r.setDeploymentRollback(ctx, deploymentID, config, annotations); err != nil {
+func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string, dryRun bool) error {
+	if _, err := r.setDeploymentRollback(ctx, deploymentID, config, annotations, dryRun); err != nil {
 		err = storeerr.InterpretGetError(err, extensions.Resource("deployments"), deploymentID)
 		err = storeerr.InterpretUpdateError(err, extensions.Resource("deployments"), deploymentID)
 		if _, ok := err.(*errors.StatusError); !ok {
@@ -194,7 +194,7 @@ func (r *RollbackREST) rollbackDeployment(ctx context.Context, deploymentID stri
 	return nil
 }
 
-func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string) (*extensions.Deployment, error) {
+func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID string, config *extensions.RollbackConfig, annotations map[string]string, dryRun bool) (*extensions.Deployment, error) {
 	dKey, err := r.store.KeyFunc(ctx, deploymentID)
 	if err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func (r *RollbackREST) setDeploymentRollback(ctx context.Context, deploymentID s
 		d.Spec.RollbackTo = config
 		finalDeployment = d
 		return d, nil
-	}))
+	}), dryRun)
 	return finalDeployment, err
 }
 

@@ -210,3 +210,10 @@ func (m *VirtualDiskManager) QueryVirtualDiskUuid(req *types.QueryVirtualDiskUui
 
 	return body
 }
+
+func (m *VirtualDiskManager) SetVirtualDiskUuid(req *types.SetVirtualDiskUuid) soap.HasFault {
+	body := new(methods.SetVirtualDiskUuidBody)
+	// TODO: validate uuid format and persist
+	body.Res = new(types.SetVirtualDiskUuidResponse)
+	return body
+}

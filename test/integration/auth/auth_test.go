@@ -397,7 +397,7 @@ func getTestRequests(namespace string) []struct {
 	return requests
 }
 
-// The TestAuthMode* tests tests a large number of URLs and checks that they
+// The TestAuthMode* tests a large number of URLs and checks that they
 // are FORBIDDEN or not, depending on the mode.  They do not attempt to do
 // detailed verification of behaviour beyond authorization.  They are not
 // fuzz tests.

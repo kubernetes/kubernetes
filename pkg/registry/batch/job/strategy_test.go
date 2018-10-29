@@ -24,19 +24,24 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newBool(a bool) *bool {
-	r := new(bool)
-	*r = a
-	return r
+	return &a
+}
+
+func newInt32(i int32) *int32 {
+	return &i
 }
 
 func TestJobStrategy(t *testing.T) {
+	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
@@ -64,9 +69,10 @@ func TestJobStrategy(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
-			Selector:       validSelector,
-			Template:       validPodTemplateSpec,
-			ManualSelector: newBool(true),
+			Selector:                validSelector,
+			Template:                validPodTemplateSpec,
+			TTLSecondsAfterFinished: newInt32(0), // Set TTL
+			ManualSelector:          newBool(true),
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -81,11 +87,21 @@ func TestJobStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
+	if ttlEnabled && job.Spec.TTLSecondsAfterFinished == nil {
+		// When the TTL feature is enabled, the TTL field can be set
+		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+	}
+	if !ttlEnabled && job.Spec.TTLSecondsAfterFinished != nil {
+		// When the TTL feature is disabled, the TTL field cannot be set
+		t.Errorf("Job should not allow setting .spec.ttlSecondsAfterFinished when %v feature is disabled", features.TTLAfterFinished)
+	}
+
 	parallelism := int32(10)
 	updatedJob := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.JobSpec{
-			Parallelism: &parallelism,
+			Parallelism:             &parallelism,
+			TTLSecondsAfterFinished: newInt32(1), // Update TTL
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -100,6 +116,9 @@ func TestJobStrategy(t *testing.T) {
 	errs = Strategy.ValidateUpdate(ctx, updatedJob, job)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
+	}
+	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil || updatedJob.Spec.TTLSecondsAfterFinished != nil) {
+		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
 	}
 
 	// Make sure we correctly implement the interface.

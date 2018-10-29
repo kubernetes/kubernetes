@@ -22,6 +22,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/pkg/errors"
 )
 
 // CreateBasic creates a basic, general KubeConfig object that then can be extended
@@ -32,7 +34,7 @@ func CreateBasic(serverURL, clusterName, userName string, caCert []byte) *client
 	return &clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
 			clusterName: {
-				Server: serverURL,
+				Server:                   serverURL,
 				CertificateAuthorityData: caCert,
 			},
 		},
@@ -70,7 +72,7 @@ func CreateWithToken(serverURL, clusterName, userName string, caCert []byte, tok
 func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 	config, err := clientcmd.LoadFromFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load admin kubeconfig [%v]", err)
+		return nil, errors.Wrap(err, "failed to load admin kubeconfig")
 	}
 	return ToClientSet(config)
 }
@@ -79,12 +81,12 @@ func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 func ToClientSet(config *clientcmdapi.Config) (*clientset.Clientset, error) {
 	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create API client configuration from kubeconfig: %v", err)
+		return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
 	}
 
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create API client: %v", err)
+		return nil, errors.Wrap(err, "failed to create API client")
 	}
 	return client, nil
 }

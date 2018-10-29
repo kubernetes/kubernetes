@@ -18,6 +18,7 @@ go_library(
         "//pkg/cloudprovider/providers/gce/cloud:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",

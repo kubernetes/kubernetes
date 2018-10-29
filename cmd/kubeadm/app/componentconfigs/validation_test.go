@@ -23,19 +23,20 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestValidateKubeProxyConfiguration(t *testing.T) {
 	var tests = []struct {
-		masterConfig *kubeadm.InitConfiguration
-		msg          string
-		expectErr    bool
+		clusterConfig *kubeadm.ClusterConfiguration
+		msg           string
+		expectErr     bool
 	}{
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "192.168.59.103",
@@ -54,9 +55,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
 						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
+							Max:                   utilpointer.Int32Ptr(2),
+							MaxPerCore:            utilpointer.Int32Ptr(1),
+							Min:                   utilpointer.Int32Ptr(1),
 							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 						},
@@ -66,7 +67,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: false,
 		},
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						// only BindAddress is invalid
@@ -86,9 +87,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
 						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
+							Max:                   utilpointer.Int32Ptr(2),
+							MaxPerCore:            utilpointer.Int32Ptr(1),
+							Min:                   utilpointer.Int32Ptr(1),
 							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 						},
@@ -99,7 +100,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress: "10.10.12.11",
@@ -119,9 +120,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
 						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
+							Max:                   utilpointer.Int32Ptr(2),
+							MaxPerCore:            utilpointer.Int32Ptr(1),
+							Min:                   utilpointer.Int32Ptr(1),
 							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 						},
@@ -132,7 +133,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -152,9 +153,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
 						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
+							Max:                   utilpointer.Int32Ptr(2),
+							MaxPerCore:            utilpointer.Int32Ptr(1),
+							Min:                   utilpointer.Int32Ptr(1),
 							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 						},
@@ -165,7 +166,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -185,9 +186,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
 						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
+							Max:                   utilpointer.Int32Ptr(2),
+							MaxPerCore:            utilpointer.Int32Ptr(1),
+							Min:                   utilpointer.Int32Ptr(1),
 							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 						},
@@ -198,7 +199,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -218,9 +219,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
 						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
+							Max:                   utilpointer.Int32Ptr(2),
+							MaxPerCore:            utilpointer.Int32Ptr(1),
+							Min:                   utilpointer.Int32Ptr(1),
 							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 						},
@@ -231,7 +232,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					KubeProxy: &kubeproxyconfig.KubeProxyConfiguration{
 						BindAddress:        "10.10.12.11",
@@ -251,9 +252,9 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 							MinSyncPeriod: metav1.Duration{Duration: 5 * time.Second},
 						},
 						Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-							Max:        utilpointer.Int32Ptr(2),
-							MaxPerCore: utilpointer.Int32Ptr(1),
-							Min:        utilpointer.Int32Ptr(1),
+							Max:                   utilpointer.Int32Ptr(2),
+							MaxPerCore:            utilpointer.Int32Ptr(1),
+							Min:                   utilpointer.Int32Ptr(1),
 							TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
 							TCPCloseWaitTimeout:   &metav1.Duration{Duration: 5 * time.Second},
 						},
@@ -265,7 +266,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 		},
 	}
 	for i, rt := range tests {
-		err := ValidateKubeProxyConfiguration(rt.masterConfig, nil).ToAggregate()
+		err := ValidateKubeProxyConfiguration(rt.clusterConfig, nil).ToAggregate()
 		if (err != nil) != rt.expectErr {
 			t.Errorf("%d failed ValidateKubeProxyConfiguration: expected error %t, got error %t", i, rt.expectErr, err != nil)
 		}
@@ -277,11 +278,11 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 
 func TestValidateKubeletConfiguration(t *testing.T) {
 	var tests = []struct {
-		masterConfig *kubeadm.InitConfiguration
-		expectErr    bool
+		clusterConfig *kubeadm.ClusterConfiguration
+		expectErr     bool
 	}{
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					Kubelet: &kubeletconfig.KubeletConfiguration{
 						CgroupsPerQOS:               true,
@@ -290,7 +291,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 						CgroupRoot:                  "",
 						EventBurst:                  10,
 						EventRecordQPS:              5,
-						HealthzPort:                 10248,
+						HealthzPort:                 kubeadmconstants.KubeletHealthzPort,
 						ImageGCHighThresholdPercent: 85,
 						ImageGCLowThresholdPercent:  80,
 						IPTablesDropBit:             15,
@@ -306,13 +307,14 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 						RegistryBurst:               10,
 						RegistryPullQPS:             5,
 						HairpinMode:                 "promiscuous-bridge",
+						NodeLeaseDurationSeconds:    40,
 					},
 				},
 			},
 			expectErr: false,
 		},
 		{
-			masterConfig: &kubeadm.InitConfiguration{
+			clusterConfig: &kubeadm.ClusterConfiguration{
 				ComponentConfigs: kubeadm.ComponentConfigs{
 					Kubelet: &kubeletconfig.KubeletConfiguration{
 						CgroupsPerQOS:               false,
@@ -343,7 +345,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 	}
 	for i, rt := range tests {
-		err := ValidateKubeletConfiguration(rt.masterConfig, nil).ToAggregate()
+		err := ValidateKubeletConfiguration(rt.clusterConfig, nil).ToAggregate()
 		if (err != nil) != rt.expectErr {
 			t.Errorf("%d failed ValidateKubeletConfiguration: expected error %t, got error %t", i, rt.expectErr, err != nil)
 		}

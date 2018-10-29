@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&flockerPlugin{nil}}
 }
@@ -116,11 +116,11 @@ func (p *flockerPlugin) SupportsMountOption() bool {
 	return false
 }
 
-func (plugin *flockerPlugin) SupportsBulkVolumeVerification() bool {
+func (p *flockerPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
-func (plugin *flockerPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
+func (p *flockerPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,
 	}
@@ -136,12 +136,12 @@ func (p *flockerPlugin) getFlockerVolumeSource(spec *volume.Spec) (*v1.FlockerVo
 	return spec.PersistentVolume.Spec.Flocker, readOnly
 }
 
-func (plugin *flockerPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
+func (p *flockerPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &FlockerUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return p.newMounterInternal(spec, pod.UID, &flockerUtil{}, p.host.GetMounter(p.GetPluginName()))
 }
 
-func (plugin *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager volumeManager, mounter mount.Interface) (volume.Mounter, error) {
+func (p *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager volumeManager, mounter mount.Interface) (volume.Mounter, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
@@ -158,15 +158,15 @@ func (plugin *flockerPlugin) newMounterInternal(spec *volume.Spec, podUID types.
 			datasetUUID:     datasetUUID,
 			mounter:         mounter,
 			manager:         manager,
-			plugin:          plugin,
-			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
+			plugin:          p,
+			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), p.host)),
 		},
 		readOnly: readOnly}, nil
 }
 
 func (p *flockerPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return p.newUnmounterInternal(volName, podUID, &FlockerUtil{}, p.host.GetMounter(p.GetPluginName()))
+	return p.newUnmounterInternal(volName, podUID, &flockerUtil{}, p.host.GetMounter(p.GetPluginName()))
 }
 
 func (p *flockerPlugin) newUnmounterInternal(volName string, podUID types.UID, manager volumeManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -304,7 +304,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		}
 		_, err := b.flockerClient.GetDatasetState(datasetUUID)
 		if err != nil {
-			return fmt.Errorf("The volume with datasetUUID='%s' migrated unsuccessfully.", datasetUUID)
+			return fmt.Errorf("The volume with datasetUUID='%s' migrated unsuccessfully", datasetUUID)
 		}
 	}
 
@@ -433,11 +433,11 @@ func (c *flockerVolumeUnmounter) TearDownAt(dir string) error {
 	return util.UnmountPath(dir, c.mounter)
 }
 
-func (plugin *flockerPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
-	return plugin.newDeleterInternal(spec, &FlockerUtil{})
+func (p *flockerPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return p.newDeleterInternal(spec, &flockerUtil{})
 }
 
-func (plugin *flockerPlugin) newDeleterInternal(spec *volume.Spec, manager volumeManager) (volume.Deleter, error) {
+func (p *flockerPlugin) newDeleterInternal(spec *volume.Spec, manager volumeManager) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Flocker == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Flocker is nil")
 	}
@@ -450,15 +450,15 @@ func (plugin *flockerPlugin) newDeleterInternal(spec *volume.Spec, manager volum
 		}}, nil
 }
 
-func (plugin *flockerPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	return plugin.newProvisionerInternal(options, &FlockerUtil{})
+func (p *flockerPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	return p.newProvisionerInternal(options, &flockerUtil{})
 }
 
-func (plugin *flockerPlugin) newProvisionerInternal(options volume.VolumeOptions, manager volumeManager) (volume.Provisioner, error) {
+func (p *flockerPlugin) newProvisionerInternal(options volume.VolumeOptions, manager volumeManager) (volume.Provisioner, error) {
 	return &flockerVolumeProvisioner{
 		flockerVolume: &flockerVolume{
 			manager: manager,
-			plugin:  plugin,
+			plugin:  p,
 		},
 		options: options,
 	}, nil

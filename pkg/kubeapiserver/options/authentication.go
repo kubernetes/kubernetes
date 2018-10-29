@@ -29,11 +29,12 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
+	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 )
 
 type BuiltInAuthenticationOptions struct {
+	APIAudiences    []string
 	Anonymous       *AnonymousAuthenticationOptions
 	BootstrapToken  *BootstrapTokenAuthenticationOptions
 	ClientCert      *genericoptions.ClientCertAuthenticationOptions
@@ -76,7 +77,6 @@ type ServiceAccountAuthenticationOptions struct {
 	KeyFiles      []string
 	Lookup        bool
 	Issuer        string
-	APIAudiences  []string
 	MaxExpiration time.Duration
 }
 
@@ -174,6 +174,10 @@ func (s *BuiltInAuthenticationOptions) Validate() []error {
 }
 
 func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.StringSliceVar(&s.APIAudiences, "api-audiences", s.APIAudiences, ""+
+		"Identifiers of the API. The service account token authenticator will validate that "+
+		"tokens used against the API are bound to at least one of these audiences.")
+
 	if s.Anonymous != nil {
 		fs.BoolVar(&s.Anonymous.Allow, "anonymous-auth", s.Anonymous.Allow, ""+
 			"Enables anonymous requests to the secure port of the API server. "+
@@ -258,9 +262,11 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"Identifier of the service account token issuer. The issuer will assert this identifier "+
 			"in \"iss\" claim of issued tokens. This value is a string or URI.")
 
-		fs.StringSliceVar(&s.ServiceAccounts.APIAudiences, "service-account-api-audiences", s.ServiceAccounts.APIAudiences, ""+
+		// Deprecated in 1.13
+		fs.StringSliceVar(&s.APIAudiences, "service-account-api-audiences", s.APIAudiences, ""+
 			"Identifiers of the API. The service account token authenticator will validate that "+
 			"tokens used against the API are bound to at least one of these audiences.")
+		fs.MarkDeprecated("service-account-api-audiences", "Use --api-audiences")
 
 		fs.DurationVar(&s.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", s.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
@@ -283,8 +289,8 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.AuthenticatorConfig {
-	ret := authenticator.AuthenticatorConfig{
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticator.AuthenticatorConfig {
+	ret := kubeauthenticator.AuthenticatorConfig{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
 	}
@@ -325,7 +331,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() authenticator.Au
 		ret.ServiceAccountKeyFiles = s.ServiceAccounts.KeyFiles
 		ret.ServiceAccountLookup = s.ServiceAccounts.Lookup
 		ret.ServiceAccountIssuer = s.ServiceAccounts.Issuer
-		ret.ServiceAccountAPIAudiences = s.ServiceAccounts.APIAudiences
+		ret.APIAudiences = s.APIAudiences
 	}
 
 	if s.TokenFile != nil {
@@ -367,6 +373,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 	}
 
 	c.Authentication.SupportsBasicAuth = o.PasswordFile != nil && len(o.PasswordFile.BasicAuthFile) > 0
+	c.Authentication.APIAudiences = o.APIAudiences
 
 	return nil
 }

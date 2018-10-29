@@ -18,8 +18,8 @@ package ipvs
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"fmt"
 	"github.com/golang/glog"
@@ -64,6 +64,12 @@ const (
 
 	kubeNodePortLocalSetUDPComment = "Kubernetes nodeport UDP port with externalTrafficPolicy=local"
 	kubeNodePortLocalSetUDP        = "KUBE-NODE-PORT-LOCAL-UDP"
+
+	kubeNodePortSetSCTPComment = "Kubernetes nodeport SCTP port for masquerade purpose"
+	kubeNodePortSetSCTP        = "KUBE-NODE-PORT-SCTP"
+
+	kubeNodePortLocalSetSCTPComment = "Kubernetes nodeport SCTP port with externalTrafficPolicy=local"
+	kubeNodePortLocalSetSCTP        = "KUBE-NODE-PORT-LOCAL-SCTP"
 )
 
 // IPSetVersioner can query the current ipset version.

@@ -39,9 +39,8 @@ import (
 	"gopkg.in/gcfg.v1"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 const (
@@ -228,19 +227,19 @@ func getPhotonClient(pc *PCCloud) (*photon.Client, error) {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
 		if !scanner.Scan() {
-			glog.Errorf("Photon Cloud Provider: Empty username inside /etc/kubernetes/pc_login_info.")
+			glog.Error("Photon Cloud Provider: Empty username inside /etc/kubernetes/pc_login_info.")
 			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid username")
 		}
 		username := scanner.Text()
 		if !scanner.Scan() {
-			glog.Errorf("Photon Cloud Provider: Empty password set inside /etc/kubernetes/pc_login_info.")
+			glog.Error("Photon Cloud Provider: Empty password set inside /etc/kubernetes/pc_login_info.")
 			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid password")
 		}
 		password := scanner.Text()
 
 		token_options, err := pc.photonClient.Auth.GetTokensByPassword(username, password)
 		if err != nil {
-			glog.Errorf("Photon Cloud Provider: failed to get tokens by password")
+			glog.Error("Photon Cloud Provider: failed to get tokens by password")
 			return nil, err
 		}
 
@@ -287,7 +286,8 @@ func newPCCloud(cfg PCConfig) (*PCCloud, error) {
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (pc *PCCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+func (pc *PCCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+}
 
 // Instances returns an implementation of Instances for Photon Controller.
 func (pc *PCCloud) Instances() (cloudprovider.Instances, bool) {

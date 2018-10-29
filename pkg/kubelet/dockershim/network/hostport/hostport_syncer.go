@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -74,6 +75,12 @@ func (h *hostportSyncer) openHostports(podHostportMapping *PodPortMapping) error
 			// Assume hostport is not specified in this portmapping. So skip
 			continue
 		}
+
+		// We do not open host ports for SCTP ports, as we agreed in the Support of SCTP KEP
+		if port.Protocol == v1.ProtocolSCTP {
+			continue
+		}
+
 		hp := hostport{
 			port:     port.HostPort,
 			protocol: strings.ToLower(string(port.Protocol)),

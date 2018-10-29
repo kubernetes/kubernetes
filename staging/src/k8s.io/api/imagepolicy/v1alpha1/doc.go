@@ -18,4 +18,5 @@ limitations under the License.
 // +k8s:openapi-gen=true
 
 // +groupName=imagepolicy.k8s.io
+
 package v1alpha1 // import "k8s.io/api/imagepolicy/v1alpha1"

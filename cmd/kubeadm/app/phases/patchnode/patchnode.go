@@ -36,5 +36,8 @@ func AnnotateCRISocket(client clientset.Interface, nodeName string, criSocket st
 }
 
 func annotateNodeWithCRISocket(n *v1.Node, criSocket string) {
+	if n.ObjectMeta.Annotations == nil {
+		n.ObjectMeta.Annotations = make(map[string]string)
+	}
 	n.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket] = criSocket
 }

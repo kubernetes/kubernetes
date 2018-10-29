@@ -35,8 +35,12 @@ import (
 )
 
 const (
+	// ProxyProtocolPolicyName is the tag named used for the proxy protocol
+	// policy
 	ProxyProtocolPolicyName = "k8s-proxyprotocol-enabled"
 
+	// SSLNegotiationPolicyNameFormat is a format string used for the SSL
+	// negotiation policy tag name
 	SSLNegotiationPolicyNameFormat = "k8s-SSLNegotiationPolicy-%s"
 )
 
@@ -912,9 +916,17 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 		// We are supposed to specify one subnet per AZ.
 		// TODO: What happens if we have more than one subnet per AZ?
-		createRequest.Subnets = stringPointerArray(subnetIDs)
+		if subnetIDs == nil {
+			createRequest.Subnets = nil
+		} else {
+			createRequest.Subnets = aws.StringSlice(subnetIDs)
+		}
 
-		createRequest.SecurityGroups = stringPointerArray(securityGroupIDs)
+		if securityGroupIDs == nil {
+			createRequest.SecurityGroups = nil
+		} else {
+			createRequest.SecurityGroups = aws.StringSlice(securityGroupIDs)
+		}
 
 		// Get additional tags set by the user
 		tags := getLoadBalancerAdditionalTags(annotations)
@@ -996,7 +1008,11 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 				// This call just replaces the security groups, unlike e.g. subnets (!)
 				request := &elb.ApplySecurityGroupsToLoadBalancerInput{}
 				request.LoadBalancerName = aws.String(loadBalancerName)
-				request.SecurityGroups = stringPointerArray(securityGroupIDs)
+				if securityGroupIDs == nil {
+					request.SecurityGroups = nil
+				} else {
+					request.SecurityGroups = aws.StringSlice(securityGroupIDs)
+				}
 				glog.V(2).Info("Applying updated security groups to load balancer")
 				_, err := c.elb.ApplySecurityGroupsToLoadBalancer(request)
 				if err != nil {
@@ -1314,16 +1330,16 @@ func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances
 	removals := actual.Difference(expected)
 
 	addInstances := []*elb.Instance{}
-	for _, instanceId := range additions.List() {
+	for _, instanceID := range additions.List() {
 		addInstance := &elb.Instance{}
-		addInstance.InstanceId = aws.String(instanceId)
+		addInstance.InstanceId = aws.String(instanceID)
 		addInstances = append(addInstances, addInstance)
 	}
 
 	removeInstances := []*elb.Instance{}
-	for _, instanceId := range removals.List() {
+	for _, instanceID := range removals.List() {
 		removeInstance := &elb.Instance{}
-		removeInstance.InstanceId = aws.String(instanceId)
+		removeInstance.InstanceId = aws.String(instanceID)
 		removeInstances = append(removeInstances, removeInstance)
 	}
 

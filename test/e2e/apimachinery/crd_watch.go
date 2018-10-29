@@ -125,7 +125,7 @@ func watchCRWithName(crdResourceClient dynamic.ResourceInterface, name string) (
 }
 
 func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, client dynamic.ResourceInterface, definition *apiextensionsv1beta1.CustomResourceDefinition) (*unstructured.Unstructured, error) {
-	createdInstance, err := client.Create(instanceToCreate)
+	createdInstance, err := client.Create(instanceToCreate, metav1.CreateOptions{})
 	if err != nil {
 		return nil, err
 	}

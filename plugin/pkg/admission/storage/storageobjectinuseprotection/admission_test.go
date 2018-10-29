@@ -29,8 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -118,8 +116,6 @@ func TestAdmit(t *testing.T) {
 	}
 
 	ctrl := newPlugin()
-	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
-	ctrl.SetInternalKubeInformerFactory(informerFactory)
 
 	for _, test := range tests {
 		feature.DefaultFeatureGate.Set(fmt.Sprintf("StorageObjectInUseProtection=%v", test.featureEnabled))
@@ -133,7 +129,8 @@ func TestAdmit(t *testing.T) {
 			test.resource,
 			"", // subresource
 			admission.Create,
-			nil, // userInfo
+			false, // dryRun
+			nil,   // userInfo
 		)
 
 		err := ctrl.Admit(attrs)

@@ -38,10 +38,15 @@ type vsphereVMDKAttacher struct {
 }
 
 var _ volume.Attacher = &vsphereVMDKAttacher{}
+
+var _ volume.DeviceMounter = &vsphereVMDKAttacher{}
+
 var _ volume.AttachableVolumePlugin = &vsphereVolumePlugin{}
 
+var _ volume.DeviceMountableVolumePlugin = &vsphereVolumePlugin{}
+
 // Singleton key mutex for keeping attach operations for the same host atomic
-var attachdetachMutex = keymutex.NewKeyMutex()
+var attachdetachMutex = keymutex.NewHashed(0)
 
 func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
 	vsphereCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
@@ -53,6 +58,10 @@ func (plugin *vsphereVolumePlugin) NewAttacher() (volume.Attacher, error) {
 		host:           plugin.host,
 		vsphereVolumes: vsphereCloud,
 	}, nil
+}
+
+func (plugin *vsphereVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
+	return plugin.NewAttacher()
 }
 
 // Attaches the volume specified by the given spec to the given host.
@@ -237,6 +246,8 @@ type vsphereVMDKDetacher struct {
 
 var _ volume.Detacher = &vsphereVMDKDetacher{}
 
+var _ volume.DeviceUnmounter = &vsphereVMDKDetacher{}
+
 func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 	vsphereCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
@@ -247,6 +258,10 @@ func (plugin *vsphereVolumePlugin) NewDetacher() (volume.Detacher, error) {
 		mounter:        plugin.host.GetMounter(plugin.GetPluginName()),
 		vsphereVolumes: vsphereCloud,
 	}, nil
+}
+
+func (plugin *vsphereVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.NewDetacher()
 }
 
 // Detach the given device from the given node.

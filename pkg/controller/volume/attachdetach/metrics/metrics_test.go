@@ -22,13 +22,17 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
-func TestMetricCollection(t *testing.T) {
+func TestVolumesInUseMetricCollection(t *testing.T) {
 	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	fakeClient := &fake.Clientset{}
 
@@ -103,7 +107,13 @@ func TestMetricCollection(t *testing.T) {
 	pvcLister := pvcInformer.Lister()
 	pvLister := pvInformer.Lister()
 
-	metricCollector := newVolumeInUseCollector(pvcLister, fakePodInformer.Lister(), pvLister, fakeVolumePluginMgr)
+	metricCollector := newAttachDetachStateCollector(
+		pvcLister,
+		fakePodInformer.Lister(),
+		pvLister,
+		nil,
+		nil,
+		fakeVolumePluginMgr)
 	nodeUseMap := metricCollector.getVolumeInUseCount()
 	if len(nodeUseMap) < 1 {
 		t.Errorf("Expected one volume in use got %d", len(nodeUseMap))
@@ -117,5 +127,54 @@ func TestMetricCollection(t *testing.T) {
 	if pluginUseCount < 1 {
 		t.Errorf("Expected at least in-use volume metric got %d", pluginUseCount)
 	}
+}
 
+func TestTotalVolumesMetricCollection(t *testing.T) {
+	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+	asw := cache.NewActualStateOfWorld(fakeVolumePluginMgr)
+	podName := "pod-uid"
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	nodeName := k8stypes.NodeName("node-name")
+
+	dsw.AddNode(nodeName, false)
+	_, err := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	asw.AddVolumeNode(volumeName, volumeSpec, nodeName, "")
+
+	metricCollector := newAttachDetachStateCollector(
+		nil,
+		nil,
+		nil,
+		asw,
+		dsw,
+		fakeVolumePluginMgr)
+
+	totalVolumesMap := metricCollector.getTotalVolumesCount()
+	if len(totalVolumesMap) != 2 {
+		t.Errorf("Expected 2 states, got %d", len(totalVolumesMap))
+	}
+
+	dswCount, ok := totalVolumesMap["desired_state_of_world"]
+	if !ok {
+		t.Errorf("Expected desired_state_of_world, got nothing")
+	}
+
+	fakePluginCount := dswCount["fake-plugin"]
+	if fakePluginCount != 1 {
+		t.Errorf("Expected 1 fake-plugin volume in DesiredStateOfWorld, got %d", fakePluginCount)
+	}
+
+	aswCount, ok := totalVolumesMap["actual_state_of_world"]
+	if !ok {
+		t.Errorf("Expected actual_state_of_world, got nothing")
+	}
+
+	fakePluginCount = aswCount["fake-plugin"]
+	if fakePluginCount != 1 {
+		t.Errorf("Expected 1 fake-plugin volume in ActualStateOfWorld, got %d", fakePluginCount)
+	}
 }

@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
 )
 

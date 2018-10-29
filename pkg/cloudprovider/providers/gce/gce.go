@@ -49,7 +49,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
 	"k8s.io/kubernetes/pkg/controller"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -80,13 +80,13 @@ const (
 	maxTargetPoolCreateInstances = 200
 
 	// HTTP Load Balancer parameters
-	// Configure 2 second period for external health checks.
-	gceHcCheckIntervalSeconds = int64(2)
+	// Configure 8 second period for external health checks.
+	gceHcCheckIntervalSeconds = int64(8)
 	gceHcTimeoutSeconds       = int64(1)
 	// Start sending requests as soon as a pod is found on the node.
 	gceHcHealthyThreshold = int64(1)
-	// Defaults to 5 * 2 = 10 seconds before the LB will steer traffic away
-	gceHcUnhealthyThreshold = int64(5)
+	// Defaults to 3 * 8 = 24 seconds before the LB will steer traffic away.
+	gceHcUnhealthyThreshold = int64(3)
 
 	gceComputeAPIEndpoint     = "https://www.googleapis.com/compute/v1/"
 	gceComputeAPIEndpointBeta = "https://www.googleapis.com/compute/beta/"
@@ -114,6 +114,7 @@ type GCECloud struct {
 	eventRecorder    record.EventRecorder
 	projectID        string
 	region           string
+	regional         bool
 	localZone        string // The zone in which we are running
 	// managedZones will be set to the 1 zone if running a single zone cluster
 	// it will be set to ALL zones in region for any multi-zone cluster
@@ -174,10 +175,14 @@ type ConfigGlobal struct {
 	SecondaryRangeName string   `gcfg:"secondary-range-name"`
 	NodeTags           []string `gcfg:"node-tags"`
 	NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
+	Regional           bool     `gcfg:"regional"`
 	Multizone          bool     `gcfg:"multizone"`
 	// ApiEndpoint is the GCE compute API endpoint to use. If this is blank,
 	// then the default endpoint is used.
 	ApiEndpoint string `gcfg:"api-endpoint"`
+	// ContainerApiEndpoint is the GCE container API endpoint to use. If this is blank,
+	// then the default endpoint is used.
+	ContainerApiEndpoint string `gcfg:"container-api-endpoint"`
 	// LocalZone specifies the GCE zone that gce cloud client instance is
 	// located in (i.e. where the controller will be running). If this is
 	// blank, then the local zone will be discovered via the metadata server.
@@ -194,22 +199,24 @@ type ConfigFile struct {
 
 // CloudConfig includes all the necessary configuration for creating GCECloud
 type CloudConfig struct {
-	ApiEndpoint        string
-	ProjectID          string
-	NetworkProjectID   string
-	Region             string
-	Zone               string
-	ManagedZones       []string
-	NetworkName        string
-	NetworkURL         string
-	SubnetworkName     string
-	SubnetworkURL      string
-	SecondaryRangeName string
-	NodeTags           []string
-	NodeInstancePrefix string
-	TokenSource        oauth2.TokenSource
-	UseMetadataServer  bool
-	AlphaFeatureGate   *AlphaFeatureGate
+	ApiEndpoint          string
+	ContainerApiEndpoint string
+	ProjectID            string
+	NetworkProjectID     string
+	Region               string
+	Regional             bool
+	Zone                 string
+	ManagedZones         []string
+	NetworkName          string
+	NetworkURL           string
+	SubnetworkName       string
+	SubnetworkURL        string
+	SecondaryRangeName   string
+	NodeTags             []string
+	NodeInstancePrefix   string
+	TokenSource          oauth2.TokenSource
+	UseMetadataServer    bool
+	AlphaFeatureGate     *AlphaFeatureGate
 }
 
 func init() {
@@ -236,6 +243,11 @@ func (g *GCECloud) ComputeServices() *Services {
 // Compute returns the generated stubs for the compute API.
 func (g *GCECloud) Compute() cloud.Cloud {
 	return g.c
+}
+
+// ContainerService returns the container service.
+func (g *GCECloud) ContainerService() *container.Service {
+	return g.containerService
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -276,6 +288,10 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 	if configFile != nil {
 		if configFile.Global.ApiEndpoint != "" {
 			cloudConfig.ApiEndpoint = configFile.Global.ApiEndpoint
+		}
+
+		if configFile.Global.ContainerApiEndpoint != "" {
+			cloudConfig.ContainerApiEndpoint = configFile.Global.ContainerApiEndpoint
 		}
 
 		if configFile.Global.TokenURL != "" {
@@ -319,9 +335,14 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 		return nil, err
 	}
 
+	// Determine if its a regional cluster
+	if configFile != nil && configFile.Global.Regional {
+		cloudConfig.Regional = true
+	}
+
 	// generate managedZones
 	cloudConfig.ManagedZones = []string{cloudConfig.Zone}
-	if configFile != nil && configFile.Global.Multizone {
+	if configFile != nil && (configFile.Global.Multizone || configFile.Global.Regional) {
 		cloudConfig.ManagedZones = nil // Use all zones in region
 	}
 
@@ -419,6 +440,9 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		return nil, err
 	}
 	containerService.UserAgent = userAgent
+	if config.ContainerApiEndpoint != "" {
+		containerService.BasePath = config.ContainerApiEndpoint
+	}
 
 	tpuService, err := newTPUService(client)
 	if err != nil {
@@ -496,6 +520,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		networkProjectID:         netProjID,
 		onXPN:                    onXPN,
 		region:                   config.Region,
+		regional:                 config.Regional,
 		localZone:                config.Zone,
 		managedZones:             config.ManagedZones,
 		networkURL:               networkURL,
@@ -585,7 +610,7 @@ func tryConvertToProjectNames(configProject, configNetworkProject string, servic
 
 // Initialize takes in a clientBuilder and spawns a goroutine for watching the clusterid configmap.
 // This must be called before utilizing the funcs of gce.ClusterID
-func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder) {
+func (gce *GCECloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 	gce.clientBuilder = clientBuilder
 	gce.client = clientBuilder.ClientOrDie("cloud-provider")
 
@@ -595,7 +620,7 @@ func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder
 		gce.eventRecorder = gce.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "gce-cloudprovider"})
 	}
 
-	go gce.watchClusterID()
+	go gce.watchClusterID(stop)
 }
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.

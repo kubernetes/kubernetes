@@ -25,11 +25,11 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	apiservice "k8s.io/kubernetes/pkg/api/service"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
@@ -41,10 +41,10 @@ import (
 type BaseServiceInfo struct {
 	ClusterIP                net.IP
 	Port                     int
-	Protocol                 api.Protocol
+	Protocol                 v1.Protocol
 	NodePort                 int
-	LoadBalancerStatus       api.LoadBalancerStatus
-	SessionAffinityType      api.ServiceAffinity
+	LoadBalancerStatus       v1.LoadBalancerStatus
+	SessionAffinityType      v1.ServiceAffinity
 	StickyMaxAgeSeconds      int
 	ExternalIPs              []string
 	LoadBalancerSourceRanges []string
@@ -65,7 +65,7 @@ func (info *BaseServiceInfo) ClusterIPString() string {
 }
 
 // GetProtocol is part of ServicePort interface.
-func (info *BaseServiceInfo) GetProtocol() api.Protocol {
+func (info *BaseServiceInfo) GetProtocol() v1.Protocol {
 	return info.Protocol
 }
 
@@ -74,13 +74,13 @@ func (info *BaseServiceInfo) GetHealthCheckNodePort() int {
 	return info.HealthCheckNodePort
 }
 
-func (sct *ServiceChangeTracker) newBaseServiceInfo(port *api.ServicePort, service *api.Service) *BaseServiceInfo {
+func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	onlyNodeLocalEndpoints := false
 	if apiservice.RequestsOnlyLocalTraffic(service) {
 		onlyNodeLocalEndpoints = true
 	}
 	var stickyMaxAgeSeconds int
-	if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
@@ -128,7 +128,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *api.ServicePort, servi
 	return info
 }
 
-type makeServicePortFunc func(*api.ServicePort, *api.Service, *BaseServiceInfo) ServicePort
+type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServiceInfo) ServicePort
 
 // serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
 // changes are accumulated, i.e. previous is state from before applying the changes,
@@ -170,7 +170,7 @@ func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, isIPv6Mode *bo
 //   - pass <oldService, service> as the <previous, current> pair.
 // Delete item
 //   - pass <service, nil> as the <previous, current> pair.
-func (sct *ServiceChangeTracker) Update(previous, current *api.Service) bool {
+func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	svc := current
 	if svc == nil {
 		svc = previous
@@ -231,7 +231,7 @@ type ServiceMap map[ServicePortName]ServicePort
 // serviceToServiceMap translates a single Service object to a ServiceMap.
 //
 // NOTE: service object should NOT be modified.
-func (sct *ServiceChangeTracker) serviceToServiceMap(service *api.Service) ServiceMap {
+func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) ServiceMap {
 	if service == nil {
 		return nil
 	}
@@ -332,7 +332,7 @@ func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
 		info, exists := (*sm)[svcPortName]
 		if exists {
 			glog.V(1).Infof("Removing service port %q", svcPortName)
-			if info.GetProtocol() == api.ProtocolUDP {
+			if info.GetProtocol() == v1.ProtocolUDP {
 				UDPStaleClusterIP.Insert(info.ClusterIPString())
 			}
 			delete(*sm, svcPortName)

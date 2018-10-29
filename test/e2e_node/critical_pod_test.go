@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -45,6 +45,9 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 
 	Context("when we need to admit a critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = make(map[string]bool)
+			}
 			initialConfig.FeatureGates[string(features.ExperimentalCriticalPodAnnotation)] = true
 		})
 
@@ -142,9 +145,9 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 		pod.ObjectMeta.Annotations = map[string]string{
 			kubelettypes.CriticalPodAnnotationKey: "",
 		}
-		Expect(kubelettypes.IsCriticalPod(pod)).To(BeTrue(), "pod should be a critical pod")
+		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeTrue(), "pod should be a critical pod")
 	} else {
-		Expect(kubelettypes.IsCriticalPod(pod)).To(BeFalse(), "pod should not be a critical pod")
+		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeFalse(), "pod should not be a critical pod")
 	}
 	return pod
 }

@@ -68,13 +68,15 @@ type testCase struct {
 
 	replicas              int
 	targetTimestamp       int
+	window                time.Duration
 	reportedMetricsPoints [][]metricPoint
 	reportedPodMetrics    [][]int64
 
-	namespace    string
-	selector     labels.Selector
-	resourceName v1.ResourceName
-	metricName   string
+	namespace      string
+	selector       labels.Selector
+	metricSelector labels.Selector
+	resourceName   v1.ResourceName
+	metricName     string
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
@@ -108,7 +110,8 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
 					},
-					Timestamp:  metav1.Time{Time: fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)},
+					Timestamp:  metav1.Time{Time: offsetTimestampBy(tc.targetTimestamp)},
+					Window:     metav1.Duration{Duration: tc.window},
 					Containers: []metricsapi.ContainerMetrics{},
 				}
 				for j, cpu := range containers {
@@ -137,7 +140,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 			for _, reportedMetricPoints := range tc.reportedMetricsPoints {
 				var heapsterMetricPoints []heapster.MetricPoint
 				for _, reportedMetricPoint := range reportedMetricPoints {
-					timestamp := fixedTimestamp.Add(time.Duration(reportedMetricPoint.timestamp) * time.Minute)
+					timestamp := offsetTimestampBy(reportedMetricPoint.timestamp)
 					if latestTimestamp.Before(timestamp) {
 						latestTimestamp = timestamp
 					}
@@ -196,10 +199,20 @@ func (tc *testCase) verifyResults(t *testing.T, metrics PodMetricsInfo, timestam
 	}
 	assert.NoError(t, err, "there should be no error retrieving the metrics")
 	assert.NotNil(t, metrics, "there should be metrics returned")
+	if len(metrics) != len(tc.desiredMetricValues) {
+		t.Errorf("Not equal:\nexpected: %v\nactual: %v", tc.desiredMetricValues, metrics)
+	} else {
+		for k, m := range metrics {
+			if !m.Timestamp.Equal(tc.desiredMetricValues[k].Timestamp) ||
+				m.Window != tc.desiredMetricValues[k].Window ||
+				m.Value != tc.desiredMetricValues[k].Value {
+				t.Errorf("Not equal:\nexpected: %v\nactual: %v", tc.desiredMetricValues, metrics)
+				break
+			}
+		}
+	}
 
-	assert.Equal(t, tc.desiredMetricValues, metrics, "the metrics values should be as expected")
-
-	targetTimestamp := fixedTimestamp.Add(time.Duration(tc.targetTimestamp) * time.Minute)
+	targetTimestamp := offsetTimestampBy(tc.targetTimestamp)
 	assert.True(t, targetTimestamp.Equal(timestamp), fmt.Sprintf("the timestamp should be as expected (%s) but was %s", targetTimestamp, timestamp))
 }
 
@@ -211,71 +224,92 @@ func (tc *testCase) runTest(t *testing.T) {
 		info, timestamp, err := metricsClient.GetResourceMetric(tc.resourceName, tc.namespace, tc.selector)
 		tc.verifyResults(t, info, timestamp, err)
 	} else {
-		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector)
+		info, timestamp, err := metricsClient.GetRawMetric(tc.metricName, tc.namespace, tc.selector, tc.metricSelector)
 		tc.verifyResults(t, info, timestamp, err)
 	}
 }
 
 func TestCPU(t *testing.T) {
+	targetTimestamp := 1
+	window := 30 * time.Second
 	tc := testCase{
 		replicas: 3,
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 5000, "test-pod-1": 5000, "test-pod-2": 5000,
+			"test-pod-0": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+			"test-pod-1": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+			"test-pod-2": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
 		},
 		resourceName:       v1.ResourceCPU,
-		targetTimestamp:    1,
+		targetTimestamp:    targetTimestamp,
+		window:             window,
 		reportedPodMetrics: [][]int64{{5000}, {5000}, {5000}},
 	}
 	tc.runTest(t)
 }
 
 func TestQPS(t *testing.T) {
+	targetTimestamp := 1
 	tc := testCase{
 		replicas: 3,
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 10000, "test-pod-1": 20000, "test-pod-2": 10000,
+			"test-pod-0": PodMetric{Value: 10000, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
+			"test-pod-1": PodMetric{Value: 20000, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
+			"test-pod-2": PodMetric{Value: 10000, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
 		},
 		metricName:            "qps",
-		targetTimestamp:       1,
+		targetTimestamp:       targetTimestamp,
 		reportedMetricsPoints: [][]metricPoint{{{10, 1}}, {{20, 1}}, {{10, 1}}},
 	}
 	tc.runTest(t)
 }
 
 func TestQpsSumEqualZero(t *testing.T) {
+	targetTimestamp := 0
 	tc := testCase{
 		replicas: 3,
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 0, "test-pod-1": 0, "test-pod-2": 0,
+			"test-pod-0": PodMetric{Value: 0, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
+			"test-pod-1": PodMetric{Value: 0, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
+			"test-pod-2": PodMetric{Value: 0, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
 		},
 		metricName:            "qps",
-		targetTimestamp:       0,
+		targetTimestamp:       targetTimestamp,
 		reportedMetricsPoints: [][]metricPoint{{{0, 0}}, {{0, 0}}, {{0, 0}}},
 	}
 	tc.runTest(t)
 }
 
 func TestCPUMoreMetrics(t *testing.T) {
+	targetTimestamp := 10
+	window := 30 * time.Second
 	tc := testCase{
 		replicas: 5,
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 5000, "test-pod-1": 5000, "test-pod-2": 5000,
-			"test-pod-3": 5000, "test-pod-4": 5000,
+			"test-pod-0": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+			"test-pod-1": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+			"test-pod-2": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+			"test-pod-3": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+			"test-pod-4": PodMetric{Value: 5000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
 		},
 		resourceName:       v1.ResourceCPU,
-		targetTimestamp:    10,
+		targetTimestamp:    targetTimestamp,
+		window:             window,
 		reportedPodMetrics: [][]int64{{1000, 2000, 2000}, {5000}, {1000, 1000, 1000, 2000}, {4000, 1000}, {5000}},
 	}
 	tc.runTest(t)
 }
 
 func TestCPUMissingMetrics(t *testing.T) {
+	targetTimestamp := 0
+	window := 30 * time.Second
 	tc := testCase{
 		replicas: 3,
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 4000,
+			"test-pod-0": PodMetric{Value: 4000, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
 		},
 		resourceName:       v1.ResourceCPU,
+		targetTimestamp:    targetTimestamp,
+		window:             window,
 		reportedPodMetrics: [][]int64{{4000}},
 	}
 	tc.runTest(t)
@@ -314,13 +348,15 @@ func TestCPUEmptyMetrics(t *testing.T) {
 }
 
 func TestQpsEmptyEntries(t *testing.T) {
+	targetTimestamp := 4
 	tc := testCase{
 		replicas:   3,
 		metricName: "qps",
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 4000000, "test-pod-2": 2000000,
+			"test-pod-0": PodMetric{Value: 4000000, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
+			"test-pod-2": PodMetric{Value: 2000000, Timestamp: offsetTimestampBy(targetTimestamp), Window: heapsterDefaultMetricWindow},
 		},
-		targetTimestamp:       4,
+		targetTimestamp:       targetTimestamp,
 		reportedMetricsPoints: [][]metricPoint{{{4000, 4}}, {}, {{2000, 4}}},
 	}
 	tc.runTest(t)
@@ -337,12 +373,17 @@ func TestCPUZeroReplicas(t *testing.T) {
 }
 
 func TestCPUEmptyMetricsForOnePod(t *testing.T) {
+	targetTimestamp := 0
+	window := 30 * time.Second
 	tc := testCase{
 		replicas:     3,
 		resourceName: v1.ResourceCPU,
 		desiredMetricValues: PodMetricsInfo{
-			"test-pod-0": 100, "test-pod-1": 700,
+			"test-pod-0": PodMetric{Value: 100, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
+			"test-pod-1": PodMetric{Value: 700, Timestamp: offsetTimestampBy(targetTimestamp), Window: window},
 		},
+		targetTimestamp:    targetTimestamp,
+		window:             window,
 		reportedPodMetrics: [][]int64{{100}, {300, 400}, {}},
 	}
 	tc.runTest(t)
@@ -362,4 +403,8 @@ func testCollapseTimeSamples(t *testing.T) {
 	assert.True(t, hadMetrics, "should report that it received a populated list of metrics")
 	assert.InEpsilon(t, float64(75), val, 0.1, "collapsed sample value should be as expected")
 	assert.True(t, timestamp.Equal(now), "timestamp should be the current time (the newest)")
+}
+
+func offsetTimestampBy(t int) time.Time {
+	return fixedTimestamp.Add(time.Duration(t) * time.Minute)
 }

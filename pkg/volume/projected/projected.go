@@ -198,6 +198,8 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
 	}
+
+	setupSuccess := false
 	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
 		return err
 	}
@@ -205,6 +207,21 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err := volumeutil.MakeNestedMountpoints(s.volName, dir, *s.pod); err != nil {
 		return err
 	}
+
+	defer func() {
+		// Clean up directories if setup fails
+		if !setupSuccess {
+			unmounter, unmountCreateErr := s.plugin.NewUnmounter(s.volName, s.podUID)
+			if unmountCreateErr != nil {
+				glog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", s.volName, unmountCreateErr)
+				return
+			}
+			tearDownErr := unmounter.TearDown()
+			if tearDownErr != nil {
+				glog.Errorf("error tearing down volume %s with : %v", s.volName, tearDownErr)
+			}
+		}
+	}()
 
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", s.pod.Namespace, s.pod.Name, s.volName)
 	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
@@ -224,6 +241,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
 		return err
 	}
+	setupSuccess = true
 	return nil
 }
 

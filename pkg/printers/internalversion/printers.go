@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/printers"
@@ -428,6 +431,24 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevision)
 	h.TableHandler(controllerRevisionColumnDefinition, printControllerRevisionList)
 
+	resorceQuotaColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Request", Type: "string", Description: "Request represents a minimum amount of cpu/memory that a container may consume."},
+		{Name: "Limit", Type: "string", Description: "Limits control the maximum amount of cpu/memory that a container may use independent of contention on the node."},
+	}
+	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuota)
+	h.TableHandler(resorceQuotaColumnDefinitions, printResourceQuotaList)
+
+	priorityClassColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Value", Type: "integer", Description: schedulingv1beta1.PriorityClass{}.SwaggerDoc()["value"]},
+		{Name: "Global-Default", Type: "boolean", Description: schedulingv1beta1.PriorityClass{}.SwaggerDoc()["globalDefault"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(priorityClassColumnDefinitions, printPriorityClass)
+	h.TableHandler(priorityClassColumnDefinitions, printPriorityClassList)
+
 	AddDefaultHandlers(h)
 }
 
@@ -482,19 +503,33 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	count := 0
 	for i := range endpoints.Subsets {
 		ss := &endpoints.Subsets[i]
-		for i := range ss.Ports {
-			port := &ss.Ports[i]
-			if ports == nil || ports.Has(port.Name) {
-				for i := range ss.Addresses {
-					if len(list) == max {
-						more = true
+		if len(ss.Ports) == 0 {
+			// It's possible to have headless services with no ports.
+			for i := range ss.Addresses {
+				if len(list) == max {
+					more = true
+				}
+				if !more {
+					list = append(list, ss.Addresses[i].IP)
+				}
+				count++
+			}
+		} else {
+			// "Normal" services with ports defined.
+			for i := range ss.Ports {
+				port := &ss.Ports[i]
+				if ports == nil || ports.Has(port.Name) {
+					for i := range ss.Addresses {
+						if len(list) == max {
+							more = true
+						}
+						addr := &ss.Addresses[i]
+						if !more {
+							hostPort := net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port)))
+							list = append(list, hostPort)
+						}
+						count++
 					}
-					addr := &ss.Addresses[i]
-					if !more {
-						hostPort := net.JoinHostPort(addr.IP, strconv.Itoa(int(port.Port)))
-						list = append(list, hostPort)
-					}
-					count++
 				}
 			}
 		}
@@ -1566,47 +1601,47 @@ func formatHPAMetrics(specs []autoscaling.MetricSpec, statuses []autoscaling.Met
 	for i, spec := range specs {
 		switch spec.Type {
 		case autoscaling.ExternalMetricSourceType:
-			if spec.External.TargetAverageValue != nil {
+			if spec.External.Target.AverageValue != nil {
 				current := "<unknown>"
-				if len(statuses) > i && statuses[i].External != nil && statuses[i].External.CurrentAverageValue != nil {
-					current = statuses[i].External.CurrentAverageValue.String()
+				if len(statuses) > i && statuses[i].External != nil && &statuses[i].External.Current.AverageValue != nil {
+					current = statuses[i].External.Current.AverageValue.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s (avg)", current, spec.External.TargetAverageValue.String()))
+				list = append(list, fmt.Sprintf("%s/%s (avg)", current, spec.External.Target.AverageValue.String()))
 			} else {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].External != nil {
-					current = statuses[i].External.CurrentValue.String()
+					current = statuses[i].External.Current.Value.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.TargetValue.String()))
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.External.Target.Value.String()))
 			}
 		case autoscaling.PodsMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Pods != nil {
-				current = statuses[i].Pods.CurrentAverageValue.String()
+				current = statuses[i].Pods.Current.AverageValue.String()
 			}
-			list = append(list, fmt.Sprintf("%s/%s", current, spec.Pods.TargetAverageValue.String()))
+			list = append(list, fmt.Sprintf("%s/%s", current, spec.Pods.Target.AverageValue.String()))
 		case autoscaling.ObjectMetricSourceType:
 			current := "<unknown>"
 			if len(statuses) > i && statuses[i].Object != nil {
-				current = statuses[i].Object.CurrentValue.String()
+				current = statuses[i].Object.Current.Value.String()
 			}
-			list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.TargetValue.String()))
+			list = append(list, fmt.Sprintf("%s/%s", current, spec.Object.Target.Value.String()))
 		case autoscaling.ResourceMetricSourceType:
-			if spec.Resource.TargetAverageValue != nil {
+			if spec.Resource.Target.AverageValue != nil {
 				current := "<unknown>"
 				if len(statuses) > i && statuses[i].Resource != nil {
-					current = statuses[i].Resource.CurrentAverageValue.String()
+					current = statuses[i].Resource.Current.AverageValue.String()
 				}
-				list = append(list, fmt.Sprintf("%s/%s", current, spec.Resource.TargetAverageValue.String()))
+				list = append(list, fmt.Sprintf("%s/%s", current, spec.Resource.Target.AverageValue.String()))
 			} else {
 				current := "<unknown>"
-				if len(statuses) > i && statuses[i].Resource != nil && statuses[i].Resource.CurrentAverageUtilization != nil {
-					current = fmt.Sprintf("%d%%", *statuses[i].Resource.CurrentAverageUtilization)
+				if len(statuses) > i && statuses[i].Resource != nil && statuses[i].Resource.Current.AverageUtilization != nil {
+					current = fmt.Sprintf("%d%%", *statuses[i].Resource.Current.AverageUtilization)
 				}
 
 				target := "<auto>"
-				if spec.Resource.TargetAverageUtilization != nil {
-					target = fmt.Sprintf("%d%%", *spec.Resource.TargetAverageUtilization)
+				if spec.Resource.Target.AverageUtilization != nil {
+					target = fmt.Sprintf("%d%%", *spec.Resource.Target.AverageUtilization)
 				}
 				list = append(list, fmt.Sprintf("%s/%s", current, target))
 			}
@@ -1863,6 +1898,75 @@ func printControllerRevisionList(list *apps.ControllerRevisionList, options prin
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printControllerRevision(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printResourceQuota(resourceQuota *api.ResourceQuota, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: resourceQuota},
+	}
+
+	resources := make([]api.ResourceName, 0, len(resourceQuota.Status.Hard))
+	for resource := range resourceQuota.Status.Hard {
+		resources = append(resources, resource)
+	}
+	sort.Sort(SortableResourceNames(resources))
+
+	requestColumn := bytes.NewBuffer([]byte{})
+	limitColumn := bytes.NewBuffer([]byte{})
+	for i := range resources {
+		w := requestColumn
+		resource := resources[i]
+		usedQuantity := resourceQuota.Status.Used[resource]
+		hardQuantity := resourceQuota.Status.Hard[resource]
+
+		// use limitColumn writer if a resource name prefixed with "limits" is found
+		if pieces := strings.Split(resource.String(), "."); len(pieces) > 1 && pieces[0] == "limits" {
+			w = limitColumn
+		}
+
+		fmt.Fprintf(w, "%s: %s/%s, ", resource, usedQuantity.String(), hardQuantity.String())
+	}
+
+	age := translateTimestampSince(resourceQuota.CreationTimestamp)
+	row.Cells = append(row.Cells, resourceQuota.Name, age, strings.TrimSuffix(requestColumn.String(), ", "), strings.TrimSuffix(limitColumn.String(), ", "))
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printResourceQuotaList(list *api.ResourceQuotaList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printResourceQuota(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printPriorityClass(obj *scheduling.PriorityClass, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	name := obj.Name
+	value := obj.Value
+	globalDefault := obj.GlobalDefault
+	row.Cells = append(row.Cells, name, int64(value), globalDefault, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printPriorityClassList(list *scheduling.PriorityClassList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printPriorityClass(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

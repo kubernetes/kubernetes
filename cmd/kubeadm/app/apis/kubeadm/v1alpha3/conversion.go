@@ -19,94 +19,58 @@ package v1alpha3
 import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletconfigscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	kubeproxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
-func Convert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
-	if err := autoConvert_v1alpha3_InitConfiguration_To_kubeadm_InitConfiguration(in, out, s); err != nil {
+func Convert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1alpha3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s); err != nil {
 		return err
 	}
 
-	// TODO: This conversion code is here ONLY for fuzzing tests. When we remove the v1alpha2 API, we can remove this (unnecessary)
-	// code. Right now this defaulting code has to be kept in sync with the defaulting code in cmd/kubeadm/app/apis/kubeadm/v1alpha2 and cmd/kubeadm/app/componentconfig
-	if out.ComponentConfigs.Kubelet == nil {
-		// Set the Kubelet ComponentConfig to an empty, defaulted struct
-		out.ComponentConfigs.Kubelet = &kubeletconfig.KubeletConfiguration{}
-		extkubeletconfig := &kubeletconfigv1beta1.KubeletConfiguration{}
+	out.Discovery.Timeout = in.DiscoveryTimeout
 
-		scheme, _, err := kubeletconfigscheme.NewSchemeAndCodecs()
-		if err != nil {
-			return err
+	if len(in.TLSBootstrapToken) != 0 {
+		out.Discovery.TLSBootstrapToken = in.TLSBootstrapToken
+	} else {
+		out.Discovery.TLSBootstrapToken = in.Token
+	}
+
+	if len(in.DiscoveryFile) != 0 {
+		out.Discovery.File = &kubeadm.FileDiscovery{
+			KubeConfigPath: in.DiscoveryFile,
 		}
+	} else {
+		out.Discovery.BootstrapToken = &kubeadm.BootstrapTokenDiscovery{
+			APIServerEndpoints:       in.DiscoveryTokenAPIServers,
+			CACertHashes:             in.DiscoveryTokenCACertHashes,
+			UnsafeSkipCAVerification: in.DiscoveryTokenUnsafeSkipCAVerification,
+		}
+		if len(in.DiscoveryToken) != 0 {
+			out.Discovery.BootstrapToken.Token = in.DiscoveryToken
+		} else {
+			out.Discovery.BootstrapToken.Token = in.Token
+		}
+	}
 
-		scheme.Default(extkubeletconfig)
-		scheme.Convert(extkubeletconfig, out.ComponentConfigs.Kubelet, nil)
-		defaultKubeletConfiguration(in, out.ComponentConfigs.Kubelet)
-	}
-	if out.ComponentConfigs.KubeProxy == nil {
-		// Set the KubeProxy ComponentConfig to an empty, defaulted struct
-		out.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{}
-		extkubeproxyconfig := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
-		kubeproxyconfigscheme.Scheme.Default(extkubeproxyconfig)
-		kubeproxyconfigscheme.Scheme.Convert(extkubeproxyconfig, out.ComponentConfigs.KubeProxy, nil)
-		defaultKubeProxyConfiguration(in, out.ComponentConfigs.KubeProxy)
-	}
 	return nil
 }
 
-func defaultKubeProxyConfiguration(internalcfg *InitConfiguration, obj *kubeproxyconfig.KubeProxyConfiguration) {
-	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
-	if obj.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
-		obj.ClusterCIDR = internalcfg.Networking.PodSubnet
+func Convert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_JoinConfiguration_To_v1alpha3_JoinConfiguration(in, out, s); err != nil {
+		return err
 	}
 
-	if obj.ClientConnection.KubeConfigFile == "" {
-		obj.ClientConnection.KubeConfigFile = "/var/lib/kube-proxy/kubeconfig.conf"
+	out.DiscoveryTimeout = in.Discovery.Timeout
+	out.TLSBootstrapToken = in.Discovery.TLSBootstrapToken
+
+	if in.Discovery.BootstrapToken != nil {
+		out.DiscoveryToken = in.Discovery.BootstrapToken.Token
+		out.DiscoveryTokenAPIServers = in.Discovery.BootstrapToken.APIServerEndpoints
+		out.DiscoveryTokenCACertHashes = in.Discovery.BootstrapToken.CACertHashes
+		out.DiscoveryTokenUnsafeSkipCAVerification = in.Discovery.BootstrapToken.UnsafeSkipCAVerification
+
+	} else if in.Discovery.File != nil {
+		out.DiscoveryFile = in.Discovery.File.KubeConfigPath
 	}
-}
 
-func defaultKubeletConfiguration(internalcfg *InitConfiguration, obj *kubeletconfig.KubeletConfiguration) {
-	// NOTE: This code should be mirrored from cmd/kubeadm/app/apis/kubeadm/v1alpha2/defaults.go and cmd/kubeadm/app/componentconfig/defaults.go
-	if obj.StaticPodPath == "" {
-		obj.StaticPodPath = DefaultManifestsDir
-	}
-	if obj.ClusterDNS == nil {
-		dnsIP, err := constants.GetDNSIP(internalcfg.Networking.ServiceSubnet)
-		if err != nil {
-			obj.ClusterDNS = []string{DefaultClusterDNSIP}
-		} else {
-			obj.ClusterDNS = []string{dnsIP.String()}
-		}
-	}
-	if obj.ClusterDomain == "" {
-		obj.ClusterDomain = internalcfg.Networking.DNSDomain
-	}
-	// Enforce security-related kubelet options
-
-	// Require all clients to the kubelet API to have client certs signed by the cluster CA
-	obj.Authentication.X509.ClientCAFile = DefaultCACertPath
-	obj.Authentication.Anonymous.Enabled = false
-
-	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server
-	// and ask it whether the client is authorized to access the kubelet API
-	obj.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeWebhook
-
-	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
-	obj.Authentication.Webhook.Enabled = true
-
-	// Disable the readonly port of the kubelet, in order to not expose unnecessary information
-	obj.ReadOnlyPort = 0
-
-	// Enables client certificate rotation for the kubelet
-	obj.RotateCertificates = true
-
-	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
-	obj.HealthzBindAddress = "127.0.0.1"
-	obj.HealthzPort = 10248
+	return nil
 }

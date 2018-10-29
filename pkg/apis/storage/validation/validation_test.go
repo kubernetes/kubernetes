@@ -644,29 +644,250 @@ func TestValidateAllowedTopologies(t *testing.T) {
 		},
 	}
 
+	topologyDupValues := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node1"},
+				},
+			},
+		},
+	}
+
+	topologyMultiValues := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node2"},
+				},
+			},
+		},
+	}
+
+	topologyEmptyMatchLabelExpressions := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: nil,
+		},
+	}
+
+	topologyDupKeys := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyMultiTerm := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyDupTermsIdentical := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+	}
+
+	topologyExprsOneSameOneDiff := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node2"},
+				},
+			},
+		},
+	}
+
+	topologyValuesOneSameOneDiff := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node2"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1", "node3"},
+				},
+			},
+		},
+	}
+
+	topologyDupTermsDiffExprOrder := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1"},
+				},
+				{
+					Key:    "kubernetes.io/hostname",
+					Values: []string{"node1"},
+				},
+			},
+		},
+	}
+
+	topologyDupTermsDiffValueOrder := []api.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone1", "zone2"},
+				},
+			},
+		},
+		{
+			MatchLabelExpressions: []api.TopologySelectorLabelRequirement{
+				{
+					Key:    "failure-domain.beta.kubernetes.io/zone",
+					Values: []string{"zone2", "zone1"},
+				},
+			},
+		},
+	}
+
 	cases := map[string]bindingTest{
 		"no topology": {
-			class:         makeClass(nil, nil),
+			class:         makeClass(&waitingMode, nil),
 			shouldSucceed: true,
 		},
 		"valid topology": {
-			class:         makeClass(nil, validTopology),
+			class:         makeClass(&waitingMode, validTopology),
 			shouldSucceed: true,
 		},
 		"topology invalid key": {
-			class:         makeClass(nil, topologyInvalidKey),
+			class:         makeClass(&waitingMode, topologyInvalidKey),
 			shouldSucceed: false,
 		},
 		"topology lack of values": {
-			class:         makeClass(nil, topologyLackOfValues),
+			class:         makeClass(&waitingMode, topologyLackOfValues),
+			shouldSucceed: false,
+		},
+		"duplicate TopologySelectorRequirement values": {
+			class:         makeClass(&waitingMode, topologyDupValues),
+			shouldSucceed: false,
+		},
+		"multiple TopologySelectorRequirement values": {
+			class:         makeClass(&waitingMode, topologyMultiValues),
+			shouldSucceed: true,
+		},
+		"empty MatchLabelExpressions": {
+			class:         makeClass(&waitingMode, topologyEmptyMatchLabelExpressions),
+			shouldSucceed: false,
+		},
+		"duplicate MatchLabelExpression keys": {
+			class:         makeClass(&waitingMode, topologyDupKeys),
+			shouldSucceed: false,
+		},
+		"duplicate MatchLabelExpression keys but across separate terms": {
+			class:         makeClass(&waitingMode, topologyMultiTerm),
+			shouldSucceed: true,
+		},
+		"duplicate AllowedTopologies terms - identical": {
+			class:         makeClass(&waitingMode, topologyDupTermsIdentical),
+			shouldSucceed: false,
+		},
+		"two AllowedTopologies terms, with a pair of the same MatchLabelExpressions and a pair of different ones": {
+			class:         makeClass(&waitingMode, topologyExprsOneSameOneDiff),
+			shouldSucceed: true,
+		},
+		"two AllowedTopologies terms, with a pair of the same Values and a pair of different ones": {
+			class:         makeClass(&waitingMode, topologyValuesOneSameOneDiff),
+			shouldSucceed: true,
+		},
+		"duplicate AllowedTopologies terms - different MatchLabelExpressions order": {
+			class:         makeClass(&waitingMode, topologyDupTermsDiffExprOrder),
+			shouldSucceed: false,
+		},
+		"duplicate AllowedTopologies terms - different TopologySelectorRequirement values order": {
+			class:         makeClass(&waitingMode, topologyDupTermsDiffValueOrder),
 			shouldSucceed: false,
 		},
 	}
 
 	// TODO: remove when feature gate not required
-	err := utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=true")
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
 	if err != nil {
-		t.Fatalf("Failed to enable feature gate for DynamicProvisioningScheduling: %v", err)
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
 	}
 
 	for testName, testCase := range cases {
@@ -679,9 +900,9 @@ func TestValidateAllowedTopologies(t *testing.T) {
 		}
 	}
 
-	err = utilfeature.DefaultFeatureGate.Set("DynamicProvisioningScheduling=false")
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
 	if err != nil {
-		t.Fatalf("Failed to disable feature gate for DynamicProvisioningScheduling: %v", err)
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
 	}
 
 	for testName, testCase := range cases {

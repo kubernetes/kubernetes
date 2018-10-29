@@ -8,7 +8,7 @@ spec:
   containers:
   - args:
     - /server
-    image: k8s.gcr.io/liveness
+    image: gcr.io/kubernetes-e2e-test-images/liveness:1.0
     livenessProbe:
       httpGet:
         path: /healthz

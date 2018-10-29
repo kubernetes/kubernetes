@@ -26,6 +26,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	"github.com/pkg/errors"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
@@ -58,7 +59,7 @@ func PodManifestsHaveTLS(ManifestDir string) (bool, error) {
 	etcdPodPath := constants.GetStaticPodFilepath(constants.Etcd, ManifestDir)
 	etcdPod, err := staticpod.ReadStaticPodFromDisk(etcdPodPath)
 	if err != nil {
-		return false, fmt.Errorf("failed to check if etcd pod implements TLS: %v", err)
+		return false, errors.Wrap(err, "failed to check if etcd pod implements TLS")
 	}
 
 	tlsFlags := []string{
@@ -140,7 +141,7 @@ func (c Client) GetVersion() (string, error) {
 		clusterVersion = v
 	}
 	if clusterVersion == "" {
-		return "", fmt.Errorf("could not determine cluster etcd version")
+		return "", errors.New("could not determine cluster etcd version")
 	}
 	return clusterVersion, nil
 }
@@ -215,7 +216,7 @@ func (c Client) WaitForClusterAvailable(delay time.Duration, retries int, retryI
 		}
 		return resp, nil
 	}
-	return false, fmt.Errorf("timeout waiting for etcd cluster to be available")
+	return false, errors.New("timeout waiting for etcd cluster to be available")
 }
 
 // CheckConfigurationIsHA returns true if the given InitConfiguration etcd block appears to be an HA configuration.

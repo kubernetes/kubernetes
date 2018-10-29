@@ -199,7 +199,7 @@ func TestCRD(t *testing.T) {
 	}
 	createErr := make(chan error, 1)
 	go func() {
-		_, err := dynamicClient.Resource(fooResource).Namespace("default").Create(unstructuredFoo)
+		_, err := dynamicClient.Resource(fooResource).Namespace("default").Create(unstructuredFoo, metav1.CreateOptions{})
 		t.Logf("Foo instance create returned: %v", err)
 		if err != nil {
 			createErr <- err
@@ -272,7 +272,7 @@ func TestCRD(t *testing.T) {
 		}
 		fooUnstructured.UnmarshalJSON(bs)
 
-		_, err = dynamicClient.Resource(fooResource).Namespace("default").Update(fooUnstructured)
+		_, err = dynamicClient.Resource(fooResource).Namespace("default").Update(fooUnstructured, metav1.UpdateOptions{})
 		if err != nil && !errors.IsConflict(err) {
 			t.Fatalf("Failed to update Foo instance: %v", err)
 		} else if err == nil {

@@ -14,8 +14,6 @@ go_library(
         "docker_legacy_service.go",
         "docker_logs.go",
         "docker_sandbox.go",
-        "docker_sandbox_others.go",
-        "docker_sandbox_windows.go",
         "docker_service.go",
         "docker_stats_linux.go",
         "docker_stats_unsupported.go",
@@ -34,8 +32,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
+        "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/cri/runtime/v1alpha2:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/checkpointmanager:go_default_library",
         "//pkg/kubelet/checkpointmanager/checksum:go_default_library",
         "//pkg/kubelet/checkpointmanager/errors:go_default_library",

@@ -269,10 +269,9 @@ var _ volume.Mounter = &portworxVolumeMounter{}
 
 func (b *portworxVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly: b.readOnly,
-		Managed:  !b.readOnly,
-		// true ?
-		SupportsSELinux: true,
+		ReadOnly:        b.readOnly,
+		Managed:         !b.readOnly,
+		SupportsSELinux: false,
 	}
 }
 

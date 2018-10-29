@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -80,8 +81,9 @@ type LegacyRESTStorageProvider struct {
 	ServiceNodePortRange utilnet.PortRange
 
 	ServiceAccountIssuer        serviceaccount.TokenGenerator
-	ServiceAccountAPIAudiences  []string
 	ServiceAccountMaxExpiration time.Duration
+
+	APIAudiences authenticator.Audiences
 
 	LoopbackClientConfig *restclient.Config
 }
@@ -98,9 +100,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		PrioritizedVersions:          legacyscheme.Scheme.PrioritizedVersionsForGroup(""),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:               legacyscheme.Scheme,
-		ParameterCodec:       legacyscheme.ParameterCodec,
-		NegotiatedSerializer: legacyscheme.Codecs,
+		Scheme:                       legacyscheme.Scheme,
+		ParameterCodec:               legacyscheme.ParameterCodec,
+		NegotiatedSerializer:         legacyscheme.Codecs,
 	}
 
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
@@ -142,7 +144,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	var serviceAccountStorage *serviceaccountstore.REST
 	if c.ServiceAccountIssuer != nil && utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.ServiceAccountAPIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store)
+		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, c.ServiceAccountIssuer, c.APIAudiences, c.ServiceAccountMaxExpiration, podStorage.Pod.Store, secretStorage.Store)
 	} else {
 		serviceAccountStorage = serviceaccountstore.NewREST(restOptionsGetter, nil, nil, 0, nil, nil)
 	}

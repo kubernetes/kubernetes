@@ -31,7 +31,7 @@ type SecureServingOptionsWithLoopback struct {
 	*SecureServingOptions
 }
 
-func WithLoopback(o *SecureServingOptions) *SecureServingOptionsWithLoopback {
+func (o *SecureServingOptions) WithLoopback() *SecureServingOptionsWithLoopback {
 	return &SecureServingOptionsWithLoopback{o}
 }
 

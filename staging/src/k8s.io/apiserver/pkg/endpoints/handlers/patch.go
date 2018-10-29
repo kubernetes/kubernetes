@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/evanphx/json-patch"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -42,7 +41,10 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
@@ -53,8 +55,8 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		trace := utiltrace.New("Patch " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
 
-		if isDryRun(req.URL) {
-			scope.err(errors.NewBadRequest("dryRun is not supported yet"), w, req)
+		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
+			scope.err(errors.NewBadRequest("the dryRun alpha feature is disabled"), w, req)
 			return
 		}
 
@@ -121,9 +123,10 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 		gv := scope.Kind.GroupVersion()
+
 		codec := runtime.NewCodec(
 			scope.Serializer.EncoderForVersion(s.Serializer, gv),
-			scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
+			scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion),
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
@@ -136,6 +139,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.Resource,
 			scope.Subresource,
 			admission.Create,
+			dryrun.IsDryRun(options.DryRun),
 			userInfo)
 		staticUpdateAttributes := admission.NewAttributesRecord(
 			nil,
@@ -146,7 +150,10 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.Resource,
 			scope.Subresource,
 			admission.Update,
-			userInfo)
+			dryrun.IsDryRun(options.DryRun),
+			userInfo,
+		)
+
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
@@ -170,6 +177,9 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			kind:            scope.Kind,
 			resource:        scope.Resource,
 			subresource:     scope.Subresource,
+			dryRun:          dryrun.IsDryRun(options.DryRun),
+
+			hubGroupVersion: scope.HubGroupVersion,
 
 			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes), scope.Authorizer, createAuthorizerAttributes),
 			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes),
@@ -231,6 +241,9 @@ type patcher struct {
 	resource        schema.GroupVersionResource
 	kind            schema.GroupVersionKind
 	subresource     string
+	dryRun          bool
+
+	hubGroupVersion schema.GroupVersion
 
 	// Validation functions
 	createValidation rest.ValidateObjectFunc
@@ -257,11 +270,6 @@ type patcher struct {
 	forceAllowCreate  bool
 }
 
-func (p *patcher) toUnversioned(versionedObj runtime.Object) (runtime.Object, error) {
-	gvk := p.kind.GroupKind().WithVersion(runtime.APIVersionInternal)
-	return p.unsafeConvertor.ConvertToVersion(versionedObj, gvk.GroupVersion())
-}
-
 type patchMechanism interface {
 	applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error)
 	createNewObject() (runtime.Object, error)
@@ -281,7 +289,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	// Apply the patch.
 	patchedObjJS, err := p.applyJSPatch(currentObjJS)
 	if err != nil {
-		return nil, interpretPatchError(err)
+		return nil, err
 	}
 
 	// Construct the resulting typed, unversioned object.
@@ -304,9 +312,13 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(p.patchBytes)
 		if err != nil {
-			return nil, err
+			return nil, errors.NewBadRequest(err.Error())
 		}
-		return patchObj.Apply(versionedJS)
+		patchedJS, err := patchObj.Apply(versionedJS)
+		if err != nil {
+			return nil, errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)
+		}
+		return patchedJS, nil
 	case types.MergePatchType:
 		return jsonpatch.MergePatch(versionedJS, p.patchBytes)
 	default:
@@ -336,13 +348,8 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	if err := strategicPatchObject(p.defaulter, currentVersionedObject, p.patchBytes, versionedObjToUpdate, p.schemaReferenceObj); err != nil {
 		return nil, err
 	}
-	// Convert the object back to unversioned (aka internal version).
-	unversionedObjToUpdate, err := p.toUnversioned(versionedObjToUpdate)
-	if err != nil {
-		return nil, err
-	}
-
-	return unversionedObjToUpdate, nil
+	// Convert the object back to the hub version
+	return p.unsafeConvertor.ConvertToVersion(versionedObjToUpdate, p.hubGroupVersion)
 }
 
 func (p *smpPatcher) createNewObject() (runtime.Object, error) {
@@ -414,7 +421,7 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 
 func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation) admission.Attributes {
 	userInfo, _ := request.UserFrom(ctx)
-	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, userInfo)
+	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, p.dryRun, userInfo)
 }
 
 // applyAdmission is called every time GuaranteedUpdate asks for the updated object,
@@ -481,7 +488,7 @@ func applyPatchToObject(
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, schemaReferenceObj)
 	if err != nil {
-		return interpretPatchError(err)
+		return interpretStrategicMergePatchError(err)
 	}
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
@@ -494,8 +501,8 @@ func applyPatchToObject(
 	return nil
 }
 
-// interpretPatchError interprets the error type and returns an error with appropriate HTTP code.
-func interpretPatchError(err error) error {
+// interpretStrategicMergePatchError interprets the error type and returns an error with appropriate HTTP code.
+func interpretStrategicMergePatchError(err error) error {
 	switch err {
 	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
 		return errors.NewBadRequest(err.Error())

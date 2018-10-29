@@ -242,6 +242,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 				RunAsUser: policy.RunAsUserStrategyOptions{
 					Rule: policy.RunAsUserStrategyRunAsAny,
 				},
+				RunAsGroup: &policy.RunAsGroupStrategyOptions{
+					Rule: policy.RunAsGroupStrategyRunAsAny,
+				},
 				FSGroup: policy.FSGroupStrategyOptions{
 					Rule: policy.FSGroupStrategyRunAsAny,
 				},
@@ -259,11 +262,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	noUserOptions := validPSP()
 	noUserOptions.Spec.RunAsUser.Rule = ""
 
+	noGroupOptions := validPSP()
+	noGroupOptions.Spec.RunAsGroup.Rule = ""
+
 	noSELinuxOptions := validPSP()
 	noSELinuxOptions.Spec.SELinux.Rule = ""
 
 	invalidUserStratType := validPSP()
 	invalidUserStratType.Spec.RunAsUser.Rule = "invalid"
+
+	invalidGroupStratType := validPSP()
+	invalidGroupStratType.Spec.RunAsGroup.Rule = "invalid"
 
 	invalidSELinuxStratType := validPSP()
 	invalidSELinuxStratType.Spec.SELinux.Rule = "invalid"
@@ -271,6 +280,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidUIDPSP := validPSP()
 	invalidUIDPSP.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
 	invalidUIDPSP.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: -1, Max: 1}}
+
+	invalidGIDPSP := validPSP()
+	invalidGIDPSP.Spec.RunAsGroup.Rule = policy.RunAsGroupStrategyMustRunAs
+	invalidGIDPSP.Spec.RunAsGroup.Ranges = []policy.IDRange{{Min: -1, Max: 1}}
 
 	missingObjectMetaName := validPSP()
 	missingObjectMetaName.ObjectMeta.Name = ""
@@ -382,6 +395,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: `supported values: "MustRunAs", "MustRunAsNonRoot", "RunAsAny"`,
 		},
+		"no group options": {
+			psp:         noGroupOptions,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: `supported values: "MustRunAs", "RunAsAny", "MayRunAs"`,
+		},
 		"no selinux options": {
 			psp:         noSELinuxOptions,
 			errorType:   field.ErrorTypeNotSupported,
@@ -390,17 +408,22 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"no fsgroup options": {
 			psp:         noFSGroupOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"no sup group options": {
 			psp:         noSupplementalGroupsOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid user strategy type": {
 			psp:         invalidUserStratType,
 			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: `supported values: "MustRunAs", "MustRunAsNonRoot", "RunAsAny"`,
+		},
+		"invalid group strategy type": {
+			psp:         invalidGroupStratType,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: `supported values: "MustRunAs", "RunAsAny", "MayRunAs"`,
 		},
 		"invalid selinux strategy type": {
 			psp:         invalidSELinuxStratType,
@@ -410,15 +433,20 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"invalid sup group strategy type": {
 			psp:         invalidSupGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid fs group strategy type": {
 			psp:         invalidFSGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid uid": {
 			psp:         invalidUIDPSP,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "min cannot be negative",
+		},
+		"invalid gid": {
+			psp:         invalidGIDPSP,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "min cannot be negative",
 		},
@@ -679,6 +707,9 @@ func TestValidatePSPVolumes(t *testing.T) {
 				},
 				RunAsUser: policy.RunAsUserStrategyOptions{
 					Rule: policy.RunAsUserStrategyRunAsAny,
+				},
+				RunAsGroup: &policy.RunAsGroupStrategyOptions{
+					Rule: policy.RunAsGroupStrategyRunAsAny,
 				},
 				FSGroup: policy.FSGroupStrategyOptions{
 					Rule: policy.FSGroupStrategyRunAsAny,

@@ -55,7 +55,7 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 	return nil
 }
 
-var notFlexVolume = fmt.Errorf("not a flex volume")
+var errNotFlexVolume = fmt.Errorf("not a flex volume")
 
 func getDriver(spec *volume.Spec) (string, error) {
 	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
@@ -64,7 +64,7 @@ func getDriver(spec *volume.Spec) (string, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
 		return spec.PersistentVolume.Spec.FlexVolume.Driver, nil
 	}
-	return "", notFlexVolume
+	return "", errNotFlexVolume
 }
 
 func getFSType(spec *volume.Spec) (string, error) {
@@ -74,7 +74,7 @@ func getFSType(spec *volume.Spec) (string, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
 		return spec.PersistentVolume.Spec.FlexVolume.FSType, nil
 	}
-	return "", notFlexVolume
+	return "", errNotFlexVolume
 }
 
 func getSecretNameAndNamespace(spec *volume.Spec, podNamespace string) (string, string, error) {
@@ -95,7 +95,7 @@ func getSecretNameAndNamespace(spec *volume.Spec, podNamespace string) (string, 
 		}
 		return secretName, secretNamespace, nil
 	}
-	return "", "", notFlexVolume
+	return "", "", errNotFlexVolume
 }
 
 func getReadOnly(spec *volume.Spec) (bool, error) {
@@ -106,7 +106,7 @@ func getReadOnly(spec *volume.Spec) (bool, error) {
 		// ReadOnly is specified at the PV level
 		return spec.ReadOnly, nil
 	}
-	return false, notFlexVolume
+	return false, errNotFlexVolume
 }
 
 func getOptions(spec *volume.Spec) (map[string]string, error) {
@@ -116,7 +116,7 @@ func getOptions(spec *volume.Spec) (map[string]string, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
 		return spec.PersistentVolume.Spec.FlexVolume.Options, nil
 	}
-	return nil, notFlexVolume
+	return nil, errNotFlexVolume
 }
 
 func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, error) {

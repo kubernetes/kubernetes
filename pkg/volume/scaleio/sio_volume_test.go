@@ -263,8 +263,8 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Name = "testpvc"
@@ -408,9 +408,9 @@ func TestVolumeProvisionerWithIncompleteConfig(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVName:      "pvc-sio-dynamic-vol",
-		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVName:                        "pvc-sio-dynamic-vol",
+		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Namespace = testns
@@ -440,9 +440,9 @@ func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVName:      "pvc-sio-dynamic-vol",
-		PVC:         volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVName:                        "pvc-sio-dynamic-vol",
+		PVC:                           volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 	options.PVC.Namespace = testns
@@ -488,9 +488,9 @@ func TestVolumeProvisionerWithSecretNamespace(t *testing.T) {
 	}
 
 	options := volume.VolumeOptions{
-		ClusterName: "testcluster",
-		PVName:      "pvc-sio-dynamic-vol",
-		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		ClusterName:                   "testcluster",
+		PVName:                        "pvc-sio-dynamic-vol",
+		PVC:                           volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
 

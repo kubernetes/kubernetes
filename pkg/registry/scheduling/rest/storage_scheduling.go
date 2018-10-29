@@ -85,7 +85,7 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						_, err := schedClientSet.PriorityClasses().Create(pc)
-						if err != nil {
+						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
 						} else {
 							glog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)

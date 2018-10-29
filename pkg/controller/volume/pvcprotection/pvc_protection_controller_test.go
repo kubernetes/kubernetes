@@ -264,14 +264,12 @@ func TestPVCProtectionController(t *testing.T) {
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name: "deleted PVC with finalizer + pods with the PVC and is finished -> finalizer is removed",
+			name: "deleted PVC with finalizer + pods with the PVC finished but is not deleted -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				withStatus(v1.PodFailed, withPVC(defaultPVCName, pod())),
 			},
-			updatedPVC: deleted(withProtectionFinalizer(pvc())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
-			},
+			updatedPVC:                          deleted(withProtectionFinalizer(pvc())),
+			expectedActions:                     []clienttesting.Action{},
 			storageObjectInUseProtectionEnabled: true,
 		},
 		//
@@ -287,14 +285,12 @@ func TestPVCProtectionController(t *testing.T) {
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
-			name: "updated finished Pod -> finalizer is removed",
+			name: "updated finished Pod -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				deleted(withProtectionFinalizer(pvc())),
 			},
-			updatedPod: withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewUpdateAction(pvcVer, defaultNS, deleted(pvc())),
-			},
+			updatedPod:                          withStatus(v1.PodSucceeded, withPVC(defaultPVCName, pod())),
+			expectedActions:                     []clienttesting.Action{},
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{

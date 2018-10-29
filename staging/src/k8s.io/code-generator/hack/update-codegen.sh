@@ -30,3 +30,7 @@ $(dirname ${BASH_SOURCE})/../generate-groups.sh all \
   k8s.io/code-generator/_examples/crd k8s.io/code-generator/_examples/crd/apis \
   "example:v1 example2:v1" \
   --output-base "$(dirname ${BASH_SOURCE})/../../.."
+  $(dirname ${BASH_SOURCE})/../generate-groups.sh all \
+  k8s.io/code-generator/_examples/MixedCase k8s.io/code-generator/_examples/MixedCase/apis \
+  "example:v1" \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.."

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -34,18 +35,18 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	/*
-		    Testname: secret-volume-mount-without-mapping
-		    Description: Ensure that secret can be mounted without mapping to a
-			pod volume.
+		Release : v1.9
+		Testname: Secrets Volume, default
+		Description: Create a secret. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -rw-r--r-- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume [NodeConformance]", func() {
 		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
 	/*
-		    Testname: secret-volume-mount-without-mapping-default-mode
-		    Description: Ensure that secret can be mounted without mapping to a
-			pod volume in default mode.
+		Release : v1.9
+		Testname: Secrets Volume, volume mode 0400
+		Description: Create a secret. Create a Pod with secret volume source configured into the container with file mode set to 0x400. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -r——--—-—- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
 		defaultMode := int32(0400)
@@ -53,9 +54,9 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	})
 
 	/*
-		    Testname: secret-volume-mount-without-mapping-non-root-default-mode-fsgroup
-		    Description: Ensure that secret can be mounted without mapping to a pod
-			volume as non-root in default mode with fsGroup set.
+		Release : v1.9
+		Testname: Secrets Volume, volume mode 0440, fsGroup 1001 and uid 1000
+		Description: Create a secret. Create a Pod with secret volume source configured into the container with file mode set to 0x440 as a non-root user with uid 1000 and fsGroup id 1001. Pod MUST be able to read the secret from the mounted volume from the container runtime and the file mode of the secret MUST be -r——r-—-—- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [NodeConformance]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
@@ -65,25 +66,30 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	})
 
 	/*
-		    Testname: secret-volume-mount-with-mapping
-		    Description: Ensure that secret can be mounted with mapping to a pod
-			volume.
+		Release : v1.9
+		Testname: Secrets Volume, mapping
+		Description: Create a secret. Create a Pod with secret volume source configured into the container with a custom path. Pod MUST be able to read the secret from the mounted volume from the specified custom path. The file mode of the secret MUST be -rw—r-—r—- by default.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings [NodeConformance]", func() {
 		doSecretE2EWithMapping(f, nil)
 	})
 
 	/*
-		    Testname: secret-volume-mount-with-mapping-item-mode
-		    Description: Ensure that secret can be mounted with mapping to a pod
-			volume in item mode.
+		Release : v1.9
+		Testname: Secrets Volume, mapping, volume mode 0400
+		Description: Create a secret. Create a Pod with secret volume source configured into the container with a custom path and file mode set to 0x400. Pod MUST be able to read the secret from the mounted volume from the specified custom path. The file mode of the secret MUST be -r-—r-—r—-.
 	*/
 	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set [NodeConformance]", func() {
 		mode := int32(0400)
 		doSecretE2EWithMapping(f, &mode)
 	})
 
-	It("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
+	/*
+		Release : v1.12
+		Testname: Secrets Volume, volume mode default, secret with same name in different namespace
+		Description: Create a secret with same name in two namespaces. Create a Pod with secret volume source configured into the container. Pod MUST be able to read the secrets from the mounted volume from the container runtime and only secrets which are associated with namespace where pod is created. The file mode of the secret MUST be -rw-r--r-- by default.
+	*/
+	framework.ConformanceIt("should be able to mount in a volume regardless of a different secret existing with same name in different namespace [NodeConformance]", func() {
 		var (
 			namespace2  *v1.Namespace
 			err         error
@@ -105,8 +111,9 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	})
 
 	/*
-	   Testname: secret-multiple-volume-mounts
-	   Description: Ensure that secret can be mounted to multiple pod volumes.
+		Release : v1.9
+		Testname: Secrets Volume, mapping multiple volume paths
+		Description: Create a secret. Create a Pod with two secret volume sources configured into the container in to two different custom paths. Pod MUST be able to read the secret from the both the mounted volumes from the two specified custom paths.
 	*/
 	framework.ConformanceIt("should be consumable in multiple volumes in a pod [NodeConformance]", func() {
 		// This test ensures that the same secret can be mounted in multiple
@@ -153,7 +160,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: mountImage,
+						Image: imageutils.GetE2EImage(imageutils.Mounttest),
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
@@ -182,9 +189,9 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	})
 
 	/*
-		    Testname: secret-mounted-volume-optional-update-change
-		    Description: Ensure that optional update change to secret can be
-			reflected on a mounted volume.
+		Release : v1.9
+		Testname: Secrets Volume, create, update and delete
+		Description: Create a Pod with three containers with secrets volume sources namely a create, update and delete container. Create Container when started MUST not have secret, update and delete containers MUST be created with a secret value. Create a secret in the create container, the Pod MUST be able to read the secret from the create container. Update the secret in the update container, Pod MUST be able to read the updated secret value. Delete the secret in the delete container. Pod MUST fail to read the secret from the delete container.
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
@@ -279,7 +286,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -291,7 +298,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -303,7 +310,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   mountImage,
+						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
 						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -406,7 +413,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
@@ -483,7 +490,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Mounttest),
 					Args: []string{
 						"--file_content=/etc/secret-volume/new-path-data-1",
 						"--file_mode=/etc/secret-volume/new-path-data-1"},

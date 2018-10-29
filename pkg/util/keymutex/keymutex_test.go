@@ -25,46 +25,58 @@ const (
 	callbackTimeout = 1 * time.Second
 )
 
+func newKeyMutexes() []KeyMutex {
+	return []KeyMutex{
+		NewHashed(0),
+		NewHashed(1),
+		NewHashed(2),
+		NewHashed(4),
+	}
+}
+
 func Test_SingleLock_NoUnlock(t *testing.T) {
-	// Arrange
-	km := NewKeyMutex()
-	key := "fakeid"
-	callbackCh := make(chan interface{})
+	for _, km := range newKeyMutexes() {
+		// Arrange
+		key := "fakeid"
+		callbackCh := make(chan interface{})
 
-	// Act
-	go lockAndCallback(km, key, callbackCh)
+		// Act
+		go lockAndCallback(km, key, callbackCh)
 
-	// Assert
-	verifyCallbackHappens(t, callbackCh)
+		// Assert
+		verifyCallbackHappens(t, callbackCh)
+	}
 }
 
 func Test_SingleLock_SingleUnlock(t *testing.T) {
-	// Arrange
-	km := NewKeyMutex()
-	key := "fakeid"
-	callbackCh := make(chan interface{})
+	for _, km := range newKeyMutexes() {
+		// Arrange
+		key := "fakeid"
+		callbackCh := make(chan interface{})
 
-	// Act & Assert
-	go lockAndCallback(km, key, callbackCh)
-	verifyCallbackHappens(t, callbackCh)
-	km.UnlockKey(key)
+		// Act & Assert
+		go lockAndCallback(km, key, callbackCh)
+		verifyCallbackHappens(t, callbackCh)
+		km.UnlockKey(key)
+	}
 }
 
 func Test_DoubleLock_DoubleUnlock(t *testing.T) {
-	// Arrange
-	km := NewKeyMutex()
-	key := "fakeid"
-	callbackCh1stLock := make(chan interface{})
-	callbackCh2ndLock := make(chan interface{})
+	for _, km := range newKeyMutexes() {
+		// Arrange
+		key := "fakeid"
+		callbackCh1stLock := make(chan interface{})
+		callbackCh2ndLock := make(chan interface{})
 
-	// Act & Assert
-	go lockAndCallback(km, key, callbackCh1stLock)
-	verifyCallbackHappens(t, callbackCh1stLock)
-	go lockAndCallback(km, key, callbackCh2ndLock)
-	verifyCallbackDoesntHappens(t, callbackCh2ndLock)
-	km.UnlockKey(key)
-	verifyCallbackHappens(t, callbackCh2ndLock)
-	km.UnlockKey(key)
+		// Act & Assert
+		go lockAndCallback(km, key, callbackCh1stLock)
+		verifyCallbackHappens(t, callbackCh1stLock)
+		go lockAndCallback(km, key, callbackCh2ndLock)
+		verifyCallbackDoesntHappens(t, callbackCh2ndLock)
+		km.UnlockKey(key)
+		verifyCallbackHappens(t, callbackCh2ndLock)
+		km.UnlockKey(key)
+	}
 }
 
 func lockAndCallback(km KeyMutex, id string, callbackCh chan<- interface{}) {

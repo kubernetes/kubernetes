@@ -20,8 +20,8 @@ import (
 	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/pem"
-	"flag"
 	"fmt"
 	"log"
 
@@ -29,8 +29,10 @@ import (
 	"github.com/google/certificate-transparency-go/x509"
 )
 
-var allowVerificationWithNonCompliantKeys = flag.Bool("allow_verification_with_non_compliant_keys", false,
-	"Allow a SignatureVerifier to use keys which are technically non-compliant with RFC6962.")
+// AllowVerificationWithNonCompliantKeys may be set to true in order to allow
+// SignatureVerifier to use keys which are technically non-compliant with
+// RFC6962.
+var AllowVerificationWithNonCompliantKeys = false
 
 // PublicKeyFromPEM parses a PEM formatted block and returns the public key contained within and any remaining unread bytes, or an error.
 func PublicKeyFromPEM(b []byte) (crypto.PublicKey, SHA256Hash, []byte, error) {
@@ -40,6 +42,15 @@ func PublicKeyFromPEM(b []byte) (crypto.PublicKey, SHA256Hash, []byte, error) {
 	}
 	k, err := x509.ParsePKIXPublicKey(p.Bytes)
 	return k, sha256.Sum256(p.Bytes), rest, err
+}
+
+// PublicKeyFromB64 parses a base64-encoded public key.
+func PublicKeyFromB64(b64PubKey string) (crypto.PublicKey, error) {
+	der, err := base64.StdEncoding.DecodeString(b64PubKey)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding public key: %s", err)
+	}
+	return x509.ParsePKIXPublicKey(der)
 }
 
 // SignatureVerifier can verify signatures on SCTs and STHs
@@ -53,7 +64,7 @@ func NewSignatureVerifier(pk crypto.PublicKey) (*SignatureVerifier, error) {
 	case *rsa.PublicKey:
 		if pkType.N.BitLen() < 2048 {
 			e := fmt.Errorf("public key is RSA with < 2048 bits (size:%d)", pkType.N.BitLen())
-			if !(*allowVerificationWithNonCompliantKeys) {
+			if !AllowVerificationWithNonCompliantKeys {
 				return nil, e
 			}
 			log.Printf("WARNING: %v", e)
@@ -62,7 +73,7 @@ func NewSignatureVerifier(pk crypto.PublicKey) (*SignatureVerifier, error) {
 		params := *(pkType.Params())
 		if params != *elliptic.P256().Params() {
 			e := fmt.Errorf("public is ECDSA, but not on the P256 curve")
-			if !(*allowVerificationWithNonCompliantKeys) {
+			if !AllowVerificationWithNonCompliantKeys {
 				return nil, e
 			}
 			log.Printf("WARNING: %v", e)

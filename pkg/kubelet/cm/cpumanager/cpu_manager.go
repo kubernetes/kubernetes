@@ -181,12 +181,16 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 		err = m.updateContainerCPUSet(containerID, cpus)
 		if err != nil {
 			glog.Errorf("[cpumanager] AddContainer error: %v", err)
-			return err
+			m.Lock()
+			err := m.policy.RemoveContainer(m.state, containerID)
+			if err != nil {
+				glog.Errorf("[cpumanager] AddContainer rollback state error: %v", err)
+			}
+			m.Unlock()
 		}
-	} else {
-		glog.V(5).Infof("[cpumanager] update container resources is skipped due to cpu set is empty")
+		return err
 	}
-
+	glog.V(5).Infof("[cpumanager] update container resources is skipped due to cpu set is empty")
 	return nil
 }
 
@@ -245,6 +249,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 					if err != nil {
 						glog.Errorf("[cpumanager] reconcileState: failed to add container (pod: %s, container: %s, container id: %s, error: %v)", pod.Name, container.Name, containerID, err)
 						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+						continue
 					}
 				} else {
 					// if DeletionTimestamp is set, pod has already been removed from state

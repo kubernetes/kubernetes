@@ -28,9 +28,9 @@ import (
 )
 
 const (
-	// NodeStatusUpdateRetry controls the number of retries of writing
-	// NodeStatus update.
-	NodeStatusUpdateRetry = 5
+	// NodeHealthUpdateRetry controls the number of retries of writing
+	// node health update.
+	NodeHealthUpdateRetry = 5
 	// NodeEvictionPeriod controls how often NodeController will try to
 	// evict Pods from non-responsive Nodes.
 	NodeEvictionPeriod = 100 * time.Millisecond

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/pkg/errors"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
@@ -32,15 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/duration"
 	clientset "k8s.io/client-go/kubernetes"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	bootstraputil "k8s.io/client-go/tools/bootstrap/token/util"
-	"k8s.io/client-go/tools/clientcmd"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1alpha3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha3"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -48,11 +50,9 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-const defaultKubeConfig = "/etc/kubernetes/admin.conf"
-
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
-	var kubeConfigFile string
+	kubeConfigFile := kubeadmconstants.GetAdminKubeConfigPath()
 	var dryRun bool
 	tokenCmd := &cobra.Command{
 		Use:   "token",
@@ -84,16 +84,11 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		RunE: cmdutil.SubCmdRunE("token"),
 	}
 
-	tokenCmd.PersistentFlags().StringVar(&kubeConfigFile,
-		"kubeconfig", defaultKubeConfig, "The KubeConfig file to use when talking to the cluster. If the flag is not set a set of standard locations are searched for an existing KubeConfig file")
+	options.AddKubeConfigFlag(tokenCmd.PersistentFlags(), &kubeConfigFile)
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		"dry-run", dryRun, "Whether to enable dry-run mode or not")
 
-	cfg := &kubeadmapiv1alpha3.InitConfiguration{
-		// KubernetesVersion is not used by bootstrap-token, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-		KubernetesVersion: "v1.10.0",
-	}
+	cfg := &kubeadmapiv1beta1.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -103,9 +98,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	bto := options.NewBootstrapTokenOptions()
 
 	createCmd := &cobra.Command{
-		Use: "create [token]",
+		Use:                   "create [token]",
 		DisableFlagsInUseLine: true,
-		Short: "Create bootstrap tokens on the server.",
+		Short:                 "Create bootstrap tokens on the server.",
 		Long: dedent.Dedent(`
 			This command will create a bootstrap token for you.
 			You can specify the usages for this token, the "time to live" and an optional human friendly description.
@@ -126,7 +121,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 
 			glog.V(1).Infoln("[token] getting Clientsets from KubeConfig file")
-			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -153,7 +148,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This command will list all bootstrap tokens for you.
 		`),
 		Run: func(tokenCmd *cobra.Command, args []string) {
-			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -164,9 +159,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.AddCommand(listCmd)
 
 	deleteCmd := &cobra.Command{
-		Use: "delete [token-value]",
+		Use:                   "delete [token-value]",
 		DisableFlagsInUseLine: true,
-		Short: "Delete bootstrap tokens on the server.",
+		Short:                 "Delete bootstrap tokens on the server.",
 		Long: dedent.Dedent(`
 			This command will delete a given bootstrap token for you.
 
@@ -177,7 +172,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				kubeadmutil.CheckErr(fmt.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
 			}
-			kubeConfigFile = findExistingKubeConfig(kubeConfigFile)
+			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
@@ -214,7 +209,11 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1alpha3.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
+func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1beta1.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
+	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
+	// of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+	phaseutil.SetKubernetesVersion(cfg)
+
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	glog.V(1).Infoln("[token] loading configurations")
 	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
@@ -232,7 +231,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 	if printJoinCommand {
 		joinCommand, err := cmdutil.GetJoinCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), false)
 		if err != nil {
-			return fmt.Errorf("failed to get join command: %v", err)
+			return errors.Wrap(err, "failed to get join command")
 		}
 		fmt.Fprintln(out, joinCommand)
 	} else {
@@ -273,7 +272,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 	glog.V(1).Infoln("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(listOptions)
 	if err != nil {
-		return fmt.Errorf("failed to list bootstrap tokens [%v]", err)
+		return errors.Wrap(err, "failed to list bootstrap tokens")
 	}
 
 	w := tabwriter.NewWriter(out, 10, 4, 3, ' ', 0)
@@ -302,7 +301,7 @@ func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken st
 	glog.V(1).Infoln("[token] parsing token ID")
 	if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 		// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
-		bts, err := kubeadmapiv1alpha3.NewBootstrapTokenString(tokenIDOrToken)
+		bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tokenIDOrToken)
 		if err != nil {
 			return fmt.Errorf("given token or token id %q didn't match pattern %q or %q", tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
 		}
@@ -312,7 +311,7 @@ func RunDeleteToken(out io.Writer, client clientset.Interface, tokenIDOrToken st
 	tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 	glog.V(1).Infoln("[token] deleting token")
 	if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(tokenSecretName, nil); err != nil {
-		return fmt.Errorf("failed to delete bootstrap token [%v]", err)
+		return errors.Wrap(err, "failed to delete bootstrap token")
 	}
 	fmt.Fprintf(out, "bootstrap token with id %q deleted\n", tokenID)
 	return nil
@@ -341,7 +340,7 @@ func humanReadableBootstrapToken(token *kubeadmapi.BootstrapToken) string {
 		groupsString = "<none>"
 	}
 
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\n", token.Token.String(), ttl, expires, usagesString, description, groupsString)
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", token.Token.String(), ttl, expires, usagesString, description, groupsString)
 }
 
 func getClientset(file string, dryRun bool) (clientset.Interface, error) {
@@ -353,17 +352,4 @@ func getClientset(file string, dryRun bool) (clientset.Interface, error) {
 		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
 	}
 	return kubeconfigutil.ClientSetFromFile(file)
-}
-
-func findExistingKubeConfig(file string) string {
-	// The user did provide a --kubeconfig flag. Respect that and threat it as an
-	// explicit path without building a DefaultClientConfigLoadingRules object.
-	if file != defaultKubeConfig {
-		return file
-	}
-	// The user did not provide a --kubeconfig flag. Find a config in the standard
-	// locations using DefaultClientConfigLoadingRules, but also consider `defaultKubeConfig`.
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	rules.Precedence = append(rules.Precedence, defaultKubeConfig)
-	return rules.GetDefaultFilename()
 }

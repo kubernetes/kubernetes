@@ -21,15 +21,19 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	// Register the kubeadm configuration types because CLI flag generation
 	// depends on the generated defaults.
 )
 
-// NewKubeadmCommand return cobra.Command to run kubeadm command
+// NewKubeadmCommand returns cobra.Command to run kubeadm command
 func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
+	var rootfsPath string
+
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
@@ -65,6 +69,15 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			    You can then repeat the second step on as many other machines as you like.
 
 		`),
+
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if rootfsPath != "" {
+				if err := kubeadmutil.Chroot(rootfsPath); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
 	}
 
 	cmds.ResetFlags()
@@ -86,5 +99,15 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	experimentalCmd.AddCommand(phases.NewCmdPhase(out))
 	cmds.AddCommand(experimentalCmd)
 
+	AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
+
 	return cmds
+}
+
+// AddKubeadmOtherFlags adds flags that are not bound to a configuration file to the given flagset
+func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
+	flagSet.StringVar(
+		rootfsPath, "rootfs", *rootfsPath,
+		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
+	)
 }

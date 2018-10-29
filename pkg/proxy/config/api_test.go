@@ -22,25 +22,25 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	informers "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 )
 
 func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
-	service1v1 := &api.Service{
+	service1v1 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}}}
-	service1v2 := &api.Service{
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}}}
+	service1v2 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s1"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}}}
-	service2 := &api.Service{
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 20}}}}
+	service2 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "s2"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 30}}}}
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 30}}}}
 
 	// Setup fake api client.
 	client := fake.NewSimpleClientset()
@@ -54,59 +54,59 @@ func TestNewServicesSourceApi_UpdatesAndMultipleServices(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	serviceConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), time.Minute)
+	serviceConfig := NewServiceConfig(sharedInformers.Core().V1().Services(), time.Minute)
 	serviceConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go serviceConfig.Run(stopCh)
 
 	// Add the first service
 	fakeWatch.Add(service1v1)
-	handler.ValidateServices(t, []*api.Service{service1v1})
+	handler.ValidateServices(t, []*v1.Service{service1v1})
 
 	// Add another service
 	fakeWatch.Add(service2)
-	handler.ValidateServices(t, []*api.Service{service1v1, service2})
+	handler.ValidateServices(t, []*v1.Service{service1v1, service2})
 
 	// Modify service1
 	fakeWatch.Modify(service1v2)
-	handler.ValidateServices(t, []*api.Service{service1v2, service2})
+	handler.ValidateServices(t, []*v1.Service{service1v2, service2})
 
 	// Delete service1
 	fakeWatch.Delete(service1v2)
-	handler.ValidateServices(t, []*api.Service{service2})
+	handler.ValidateServices(t, []*v1.Service{service2})
 
 	// Delete service2
 	fakeWatch.Delete(service2)
-	handler.ValidateServices(t, []*api.Service{})
+	handler.ValidateServices(t, []*v1.Service{})
 }
 
 func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
-	endpoints1v1 := &api.Endpoints{
+	endpoints1v1 := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{
 				{IP: "1.2.3.4"},
 			},
-			Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+			Ports: []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	}
-	endpoints1v2 := &api.Endpoints{
+	endpoints1v2 := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e1"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{
 				{IP: "1.2.3.4"},
 				{IP: "4.3.2.1"},
 			},
-			Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+			Ports: []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	}
-	endpoints2 := &api.Endpoints{
+	endpoints2 := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "e2"},
-		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{
 				{IP: "5.6.7.8"},
 			},
-			Ports: []api.EndpointPort{{Port: 80, Protocol: "TCP"}},
+			Ports: []v1.EndpointPort{{Port: 80, Protocol: "TCP"}},
 		}},
 	}
 
@@ -122,37 +122,37 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	endpointsConfig := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), time.Minute)
+	endpointsConfig := NewEndpointsConfig(sharedInformers.Core().V1().Endpoints(), time.Minute)
 	endpointsConfig.RegisterEventHandler(handler)
 	go sharedInformers.Start(stopCh)
 	go endpointsConfig.Run(stopCh)
 
 	// Add the first endpoints
 	fakeWatch.Add(endpoints1v1)
-	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints1v1})
+	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints1v1})
 
 	// Add another endpoints
 	fakeWatch.Add(endpoints2)
-	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints1v1, endpoints2})
+	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints1v1, endpoints2})
 
 	// Modify endpoints1
 	fakeWatch.Modify(endpoints1v2)
-	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints1v2, endpoints2})
+	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints1v2, endpoints2})
 
 	// Delete endpoints1
 	fakeWatch.Delete(endpoints1v2)
-	handler.ValidateEndpoints(t, []*api.Endpoints{endpoints2})
+	handler.ValidateEndpoints(t, []*v1.Endpoints{endpoints2})
 
 	// Delete endpoints2
 	fakeWatch.Delete(endpoints2)
-	handler.ValidateEndpoints(t, []*api.Endpoints{})
+	handler.ValidateEndpoints(t, []*v1.Endpoints{})
 }
 
-func newSvcHandler(t *testing.T, svcs []*api.Service, done func()) ServiceHandler {
+func newSvcHandler(t *testing.T, svcs []*v1.Service, done func()) ServiceHandler {
 	shm := &ServiceHandlerMock{
-		state: make(map[types.NamespacedName]*api.Service),
+		state: make(map[types.NamespacedName]*v1.Service),
 	}
-	shm.process = func(services []*api.Service) {
+	shm.process = func(services []*v1.Service) {
 		defer done()
 		if !reflect.DeepEqual(services, svcs) {
 			t.Errorf("Unexpected services: %#v, expected: %#v", services, svcs)
@@ -161,11 +161,11 @@ func newSvcHandler(t *testing.T, svcs []*api.Service, done func()) ServiceHandle
 	return shm
 }
 
-func newEpsHandler(t *testing.T, eps []*api.Endpoints, done func()) EndpointsHandler {
+func newEpsHandler(t *testing.T, eps []*v1.Endpoints, done func()) EndpointsHandler {
 	ehm := &EndpointsHandlerMock{
-		state: make(map[types.NamespacedName]*api.Endpoints),
+		state: make(map[types.NamespacedName]*v1.Endpoints),
 	}
-	ehm.process = func(endpoints []*api.Endpoints) {
+	ehm.process = func(endpoints []*v1.Endpoints) {
 		defer done()
 		if !reflect.DeepEqual(eps, endpoints) {
 			t.Errorf("Unexpected endpoints: %#v, expected: %#v", endpoints, eps)
@@ -175,18 +175,18 @@ func newEpsHandler(t *testing.T, eps []*api.Endpoints, done func()) EndpointsHan
 }
 
 func TestInitialSync(t *testing.T) {
-	svc1 := &api.Service{
+	svc1 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}},
 	}
-	svc2 := &api.Service{
+	svc2 := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+		Spec:       v1.ServiceSpec{Ports: []v1.ServicePort{{Protocol: "TCP", Port: 10}}},
 	}
-	eps1 := &api.Endpoints{
+	eps1 := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
 	}
-	eps2 := &api.Endpoints{
+	eps2 := &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
 	}
 
@@ -198,11 +198,11 @@ func TestInitialSync(t *testing.T) {
 	client := fake.NewSimpleClientset(svc1, svc2, eps2, eps1)
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
-	svcConfig := NewServiceConfig(sharedInformers.Core().InternalVersion().Services(), 0)
-	epsConfig := NewEndpointsConfig(sharedInformers.Core().InternalVersion().Endpoints(), 0)
-	svcHandler := newSvcHandler(t, []*api.Service{svc2, svc1}, wg.Done)
+	svcConfig := NewServiceConfig(sharedInformers.Core().V1().Services(), 0)
+	epsConfig := NewEndpointsConfig(sharedInformers.Core().V1().Endpoints(), 0)
+	svcHandler := newSvcHandler(t, []*v1.Service{svc2, svc1}, wg.Done)
 	svcConfig.RegisterEventHandler(svcHandler)
-	epsHandler := newEpsHandler(t, []*api.Endpoints{eps2, eps1}, wg.Done)
+	epsHandler := newEpsHandler(t, []*v1.Endpoints{eps2, eps1}, wg.Done)
 	epsConfig.RegisterEventHandler(epsHandler)
 
 	stopCh := make(chan struct{})

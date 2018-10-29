@@ -23,6 +23,7 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 )
 
 var _ Validator = &DockerValidator{}
@@ -37,8 +38,8 @@ func (d *DockerValidator) Name() string {
 }
 
 const (
-	dockerConfigPrefix        = "DOCKER_"
-	maxDockerValidatedVersion = "17.03"
+	dockerConfigPrefix           = "DOCKER_"
+	latestValidatedDockerVersion = "18.06"
 )
 
 // TODO(random-liu): Add more validating items.
@@ -51,11 +52,11 @@ func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 
 	c, err := client.NewClient(dockerEndpoint, "", nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create docker client: %v", err)
+		return nil, errors.Wrap(err, "failed to create docker client")
 	}
 	info, err := c.Info(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to get docker info: %v", err)
+		return nil, errors.Wrap(err, "failed to get docker info")
 	}
 	return d.validateDockerInfo(spec.RuntimeSpec.DockerSpec, info)
 }
@@ -78,9 +79,9 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 		if r.MatchString(info.ServerVersion) {
 			d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, good)
 			w := fmt.Errorf(
-				"docker version is greater than the most recently validated version. Docker version: %s. Max validated version: %s",
+				"this Docker version is not on the list of validated versions: %s. Latest validated version: %s",
 				info.ServerVersion,
-				maxDockerValidatedVersion,
+				latestValidatedDockerVersion,
 			)
 			return w, nil
 		}

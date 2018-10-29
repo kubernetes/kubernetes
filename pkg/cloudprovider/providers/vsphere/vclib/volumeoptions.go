@@ -38,7 +38,7 @@ type VolumeOptions struct {
 var (
 	// DiskFormatValidType specifies the valid disk formats
 	DiskFormatValidType = map[string]string{
-		ThinDiskType:                              ThinDiskType,
+		ThinDiskType: ThinDiskType,
 		strings.ToLower(EagerZeroedThickDiskType): EagerZeroedThickDiskType,
 		strings.ToLower(ZeroedThickDiskType):      PreallocatedDiskType,
 	}

@@ -19,6 +19,7 @@ package phases
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -31,7 +32,7 @@ import (
 )
 
 // phaseTestK8sVersion is a fake kubernetes version to use when testing
-const phaseTestK8sVersion = "v1.10.0"
+const phaseTestK8sVersion = "v1.11.0"
 
 func TestCertsSubCommandsHasFlags(t *testing.T) {
 
@@ -146,18 +147,21 @@ func TestSubCmdCertsCreateFilesWithFlags(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+		t.Run(strings.Join(test.subCmds, ","), func(t *testing.T) {
+			// Create temp folder for the test case
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
 
-		// executes given sub commands
-		for _, subCmdName := range test.subCmds {
-			certDirFlag := fmt.Sprintf("--cert-dir=%s", tmpdir)
-			cmdtestutil.RunSubCommand(t, subCmds, subCmdName, certDirFlag)
-		}
+			// executes given sub commands
+			for _, subCmdName := range test.subCmds {
+				fmt.Printf("running command %q\n", subCmdName)
+				certDirFlag := fmt.Sprintf("--cert-dir=%s", tmpdir)
+				cmdtestutil.RunSubCommand(t, subCmds, subCmdName, certDirFlag)
+			}
 
-		// verify expected files are there
-		testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
+			// verify expected files are there
+			testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
+		})
 	}
 }
 
@@ -189,7 +193,10 @@ func TestSubCmdCertsApiServerForwardsFlags(t *testing.T) {
 		t.Fatalf("Error loading API server certificate: %v", err)
 	}
 
-	hostname := node.GetHostname("")
+	hostname, err := node.GetHostname("")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i, name := range []string{hostname, "kubernetes", "kubernetes.default", "kubernetes.default.svc", "kubernetes.default.svc.mycluster.local"} {
 		if APIserverCert.DNSNames[i] != name {
@@ -223,8 +230,12 @@ func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 			},
 		},
 		{
-			subCmds:       []string{"ca", "apiserver", "apiserver-kubelet-client"},
-			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
+			subCmds: []string{"ca", "apiserver", "apiserver-kubelet-client"},
+			expectedFiles: []string{
+				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
+				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
+				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
+			},
 		},
 		{
 			subCmds: []string{"etcd-ca", "etcd-server", "etcd-peer", "etcd-healthcheck-client", "apiserver-etcd-client"},
@@ -247,26 +258,30 @@ func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+		t.Run(strings.Join(test.subCmds, ","), func(t *testing.T) {
 
-		certdir := tmpdir
+			// Create temp folder for the test case
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
 
-		cfg := &kubeadmapi.InitConfiguration{
-			API:              kubeadmapi.API{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-			CertificatesDir:  certdir,
-			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
-		}
-		configPath := testutil.SetupInitConfigurationFile(t, tmpdir, cfg)
+			cfg := &kubeadmapi.InitConfiguration{
+				APIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					CertificatesDir: tmpdir,
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
+			}
+			configPath := testutil.SetupInitConfigurationFile(t, tmpdir, cfg)
 
-		// executes given sub commands
-		for _, subCmdName := range test.subCmds {
-			configFlag := fmt.Sprintf("--config=%s", configPath)
-			cmdtestutil.RunSubCommand(t, subCmds, subCmdName, configFlag)
-		}
+			// executes given sub commands
+			for _, subCmdName := range test.subCmds {
+				t.Logf("running subcommand %q", subCmdName)
+				configFlag := fmt.Sprintf("--config=%s", configPath)
+				cmdtestutil.RunSubCommand(t, subCmds, subCmdName, configFlag)
+			}
 
-		// verify expected files are there
-		testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
+			// verify expected files are there
+			testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
+		})
 	}
 }

@@ -31,6 +31,7 @@ find_files() {
   find . -not \( \
       \( \
         -wholename './output' \
+        -o -wholename './.git' \
         -o -wholename './_output' \
         -o -wholename './_gopath' \
         -o -wholename './release' \

@@ -25,7 +25,7 @@ ADD on-start.sh /
 COPY peer-finder /
 
 # See README.md
-RUN wget -q -O /zookeeper-3.5.0-alpha.tar.gz http://apache.mirrors.pair.com/zookeeper/zookeeper-3.5.0-alpha/zookeeper-3.5.0-alpha.tar.gz && \
+RUN wget -q -O /zookeeper-3.5.0-alpha.tar.gz http://archive.apache.org/dist/zookeeper/zookeeper-3.5.0-alpha/zookeeper-3.5.0-alpha.tar.gz && \
     tar -xzf /zookeeper-3.5.0-alpha.tar.gz -C /tmp/ && mv /tmp/zookeeper-3.5.0-alpha /zookeeper && rm /zookeeper-3.5.0-alpha.tar.gz
 
 ADD install.sh /

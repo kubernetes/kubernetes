@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,7 +37,7 @@ func ValidateStatefulSetName(name string, prefix bool) []string {
 	// TODO: Validate that there's name for the suffix inserted by the pods.
 	// Currently this is just "-index". In the future we may allow a user
 	// specified list of suffixes and we need  to validate the longest one.
-	return apivalidation.NameIsDNSSubdomain(name, prefix)
+	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
 // Validates the given template and ensures that it is in accordance with the desired selector.
@@ -208,7 +209,7 @@ func ValidateStatefulSetStatusUpdate(statefulSet, oldStatefulSet *apps.StatefulS
 // ValidateControllerRevisionName can be used to check whether the given ControllerRevision name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateControllerRevisionName = apivalidation.NameIsDNSSubdomain
+var ValidateControllerRevisionName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateControllerRevision collects errors for the fields of state and returns those errors as an ErrorList. If the
 // returned list is empty, state is valid. Validation is performed to ensure that state is a valid ObjectMeta, its name

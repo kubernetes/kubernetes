@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/auditregistration:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/certificates:go_default_library",
@@ -30,6 +31,7 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/admissionregistration:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/apps:go_default_library",
+        "//pkg/client/informers/informers_generated/internalversion/auditregistration:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/autoscaling:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/batch:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/certificates:go_default_library",
@@ -63,6 +65,7 @@ filegroup(
         ":package-srcs",
         "//pkg/client/informers/informers_generated/internalversion/admissionregistration:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion/apps:all-srcs",
+        "//pkg/client/informers/informers_generated/internalversion/auditregistration:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion/autoscaling:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion/batch:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion/certificates:all-srcs",

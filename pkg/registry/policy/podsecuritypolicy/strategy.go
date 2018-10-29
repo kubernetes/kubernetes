@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	psputil "k8s.io/kubernetes/pkg/api/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/policy/validation"
 )
@@ -55,9 +56,17 @@ func (strategy) AllowUnconditionalUpdate() bool {
 }
 
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	psp := obj.(*policy.PodSecurityPolicy)
+
+	psputil.DropDisabledAlphaFields(&psp.Spec)
 }
 
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPsp := obj.(*policy.PodSecurityPolicy)
+	oldPsp := old.(*policy.PodSecurityPolicy)
+
+	psputil.DropDisabledAlphaFields(&newPsp.Spec)
+	psputil.DropDisabledAlphaFields(&oldPsp.Spec)
 }
 
 func (strategy) Canonicalize(obj runtime.Object) {

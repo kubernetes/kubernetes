@@ -6,7 +6,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/raft/raftpb",
     importpath = "github.com/coreos/etcd/raft/raftpb",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
+    deps = [
+        "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
+    ],
 )
 
 filegroup(
