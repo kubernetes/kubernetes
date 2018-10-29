@@ -139,9 +139,10 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 func coreDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, k8sVersion *version.Version) error {
 	// Get the YAML manifest conditionally based on the k8s version
 	dnsDeploymentBytes := GetCoreDNSManifest(k8sVersion)
-	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(dnsDeploymentBytes, struct{ MasterTaintKey, Version string }{
-		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
-		Version:        GetDNSVersion(k8sVersion, kubeadmconstants.CoreDNS),
+	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(dnsDeploymentBytes, struct{ ImageRepository, MasterTaintKey, Version string }{
+		ImageRepository: cfg.ImageRepository,
+		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+		Version:         GetDNSVersion(k8sVersion, kubeadmconstants.CoreDNS),
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing CoreDNS deployment template: %v", err)
