@@ -76,7 +76,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs/pkiutil:go_default_library",
