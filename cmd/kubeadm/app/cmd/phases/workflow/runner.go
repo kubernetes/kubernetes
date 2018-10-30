@@ -312,6 +312,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			Short:   p.Short,
 			Long:    p.Long,
 			Example: p.Example,
+			Aliases: p.Aliases,
 			Run: func(cmd *cobra.Command, args []string) {
 				e.Options.FilterPhases = []string{p.generatedName}
 				if err := e.Run(); err != nil {

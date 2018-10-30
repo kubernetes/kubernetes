@@ -50,9 +50,7 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	selfhostingphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting"
-	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -183,6 +181,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	initRunner.AppendPhase(phases.NewControlPlanePhase())
 	initRunner.AppendPhase(phases.NewEtcdPhase())
 	initRunner.AppendPhase(phases.NewWaitControlPlanePhase())
+	initRunner.AppendPhase(phases.NewUploadConfigPhase())
 	// TODO: add other phases to the runner.
 
 	// sets the data builder function, that will be used by the runner
@@ -487,28 +486,10 @@ func runInit(i *initData, out io.Writer) error {
 		return errors.Wrap(err, "failed to create waiter")
 	}
 
-	// Upload currently used configuration to the cluster
-	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
-	// depend on centralized information from this source in the future
-	glog.V(1).Infof("[init] uploading currently used configuration to the cluster")
-	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration")
-	}
-
-	glog.V(1).Infof("[init] creating kubelet configuration configmap")
-	if err := kubeletphase.CreateConfigMap(i.cfg, client); err != nil {
-		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
-	}
-
 	// PHASE 4: Mark the master with the right label/taint
 	glog.V(1).Infof("[init] marking the master with right label")
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.Taints); err != nil {
 		return errors.Wrap(err, "error marking master")
-	}
-
-	glog.V(1).Infof("[init] preserving the crisocket information for the master")
-	if err := patchnodephase.AnnotateCRISocket(client, i.cfg.NodeRegistration.Name, i.cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "error uploading crisocket")
 	}
 
 	// This feature is disabled by default
