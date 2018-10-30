@@ -32,5 +32,5 @@ func NewContainerManager(_ string, _ libdocker.Interface) ContainerManager {
 }
 
 func (m *unsupportedContainerManager) Start() error {
-	return fmt.Errorf("Container Manager is unsupported in this build")
+	return fmt.Errorf("container Manager is unsupported in this build")
 }

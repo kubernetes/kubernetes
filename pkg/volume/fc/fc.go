@@ -312,7 +312,7 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 	//   wwid: plugins/kubernetes.io/fc/volumeDevices/3600508b400105e210000900000490000/{pod uuid}
 	arr := strings.Split(globalMapPathUUID, "/")
 	if len(arr) < 2 {
-		return nil, fmt.Errorf("Fail to retrieve volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
+		return nil, fmt.Errorf("fail to retrieve volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 	l := len(arr) - 2
 	volumeInfo := arr[l]
@@ -494,7 +494,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.FCVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.FC, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a FibreChannel volume type")
+	return nil, false, fmt.Errorf("spec does not reference a FibreChannel volume type")
 }
 
 func createPersistentVolumeFromFCVolumeSource(volumeName string, fc v1.FCVolumeSource) *v1.PersistentVolume {

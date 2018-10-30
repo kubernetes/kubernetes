@@ -81,7 +81,7 @@ func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions
 	servers := rs.GetServersToValidate()
 
 	if server, ok := servers[name]; !ok {
-		return nil, fmt.Errorf("Component not found: %s", name)
+		return nil, fmt.Errorf("component not found: %s", name)
 	} else {
 		return rs.getComponentStatus(name, server), nil
 	}

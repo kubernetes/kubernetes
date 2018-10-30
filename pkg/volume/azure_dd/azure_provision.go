@@ -100,16 +100,16 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 
 	// perform static validation first
 	if p.options.PVC.Spec.Selector != nil {
-		return nil, fmt.Errorf("azureDisk - claim.Spec.Selector is not supported for dynamic provisioning on Azure disk")
+		return nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on Azure disk")
 	}
 
 	if len(p.options.PVC.Spec.AccessModes) > 1 {
-		return nil, fmt.Errorf("AzureDisk - multiple access modes are not supported on AzureDisk plugin")
+		return nil, fmt.Errorf("multiple access modes are not supported on AzureDisk plugin")
 	}
 
 	if len(p.options.PVC.Spec.AccessModes) == 1 {
 		if p.options.PVC.Spec.AccessModes[0] != supportedModes[0] {
-			return nil, fmt.Errorf("AzureDisk - mode %s is not supported by AzureDisk plugin (supported mode is %s)", p.options.PVC.Spec.AccessModes[0], supportedModes)
+			return nil, fmt.Errorf("mode %s is not supported by AzureDisk plugin (supported mode is %s)", p.options.PVC.Spec.AccessModes[0], supportedModes)
 		}
 	}
 
@@ -174,7 +174,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		case "diskmbpsreadwrite":
 			diskMbpsReadWrite = v
 		default:
-			return nil, fmt.Errorf("AzureDisk - invalid option %s in storage class", k)
+			return nil, fmt.Errorf("invalid option %s in storage class", k)
 		}
 	}
 
@@ -196,11 +196,11 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 
 	if kind != v1.AzureManagedDisk {
 		if resourceGroup != "" {
-			return nil, errors.New("StorageClass option 'resourceGroup' can be used only for managed disks")
+			return nil, errors.New("storage class option 'resourceGroup' can be used only for managed disks")
 		}
 
 		if zoned {
-			return nil, errors.New("StorageClass option 'zoned' parameter is only supported for managed disks")
+			return nil, errors.New("storage class option 'zoned' parameter is only supported for managed disks")
 		}
 	}
 

@@ -115,7 +115,7 @@ func (fake *fakePortworxManager) CreateVolume(c *portworxVolumeProvisioner) (vol
 
 func (fake *fakePortworxManager) DeleteVolume(cd *portworxVolumeDeleter) error {
 	if cd.volumeID != PortworxTestVolume {
-		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.volumeID)
+		return fmt.Errorf("deleter got unexpected volume name: %s", cd.volumeID)
 	}
 	return nil
 }

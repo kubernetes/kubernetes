@@ -196,7 +196,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 
 func (o *DeleteOptions) Validate() error {
 	if o.Output != "" && o.Output != "name" {
-		return fmt.Errorf("unexpected -o output mode: %v. We only support '-o name'.", o.Output)
+		return fmt.Errorf("unexpected -o output mode: %v. We only support '-o name'", o.Output)
 	}
 
 	if o.DeleteAll && len(o.LabelSelector) > 0 {

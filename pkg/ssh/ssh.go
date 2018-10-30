@@ -124,7 +124,7 @@ func (s *SSHTunnel) Open() error {
 
 func (s *SSHTunnel) Dial(ctx context.Context, network, address string) (net.Conn, error) {
 	if s.client == nil {
-		return nil, errors.New("tunnel is not opened.")
+		return nil, errors.New("tunnel is not opened")
 	}
 	// This Dial method does not allow to pass a context unfortunately
 	return s.client.Dial(network, address)
@@ -132,7 +132,7 @@ func (s *SSHTunnel) Dial(ctx context.Context, network, address string) (net.Conn
 
 func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
 	if s.client == nil {
-		return errors.New("tunnel is not opened.")
+		return errors.New("tunnel is not opened")
 	}
 	tunnel, err := s.client.Dial("tcp", net.JoinHostPort(remoteHost, remotePort))
 	if err != nil {
@@ -145,7 +145,7 @@ func (s *SSHTunnel) tunnel(conn net.Conn, remoteHost, remotePort string) error {
 
 func (s *SSHTunnel) Close() error {
 	if s.client == nil {
-		return errors.New("Cannot close tunnel. Tunnel was not opened.")
+		return errors.New("cannot close tunnel. Tunnel was not opened")
 	}
 	if err := s.client.Close(); err != nil {
 		return err
@@ -414,7 +414,7 @@ func (l *SSHTunnelList) pickTunnel(addr string) (tunnel, error) {
 	l.tunnelsLock.Lock()
 	defer l.tunnelsLock.Unlock()
 	if len(l.entries) == 0 {
-		return nil, fmt.Errorf("No SSH tunnels currently open. Were the targets able to accept an ssh-key for user %q?", l.user)
+		return nil, fmt.Errorf("no SSH tunnels currently open. Were the targets able to accept an ssh-key for user %q?", l.user)
 	}
 	// Prefer same tunnel as kubelet
 	// TODO: Change l.entries to a map of address->tunnel

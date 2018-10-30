@@ -214,7 +214,7 @@ func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 	funcType := printFunc.Type()
 	if funcType.NumIn() != 2 || funcType.NumOut() != 2 {
 		return fmt.Errorf("invalid print handler." +
-			"Must accept 2 parameters and return 2 value.")
+			"Must accept 2 parameters and return 2 value")
 	}
 	if funcType.In(1) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
 		funcType.Out(0) != reflect.TypeOf((*[]metav1beta1.TableRow)(nil)).Elem() ||
@@ -238,7 +238,7 @@ func ValidatePrintHandlerFunc(printFunc reflect.Value) error {
 	funcType := printFunc.Type()
 	if funcType.NumIn() != 3 || funcType.NumOut() != 1 {
 		return fmt.Errorf("invalid print handler." +
-			"Must accept 3 parameters and return 1 value.")
+			"Must accept 3 parameters and return 1 value")
 	}
 	if funcType.In(1) != reflect.TypeOf((*io.Writer)(nil)).Elem() ||
 		funcType.In(2) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||

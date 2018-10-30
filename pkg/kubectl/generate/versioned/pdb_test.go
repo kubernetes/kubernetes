@@ -65,7 +65,7 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"min-available": minAvailable,
 				"selector":      selector,
 			},
-			expectErrMsg: "Parameter: name is required",
+			expectErrMsg: "parameter: name is required",
 		},
 		{
 			name: "test-blank-name-param",
@@ -74,7 +74,7 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"min-available": minAvailable,
 				"selector":      selector,
 			},
-			expectErrMsg: "Parameter: name is required",
+			expectErrMsg: "parameter: name is required",
 		},
 		{
 			name: "test-invalid-name-param",
@@ -125,7 +125,7 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"name":          name,
 				"min-available": minAvailable,
 			},
-			expectErrMsg: "Parameter: selector is required",
+			expectErrMsg: "parameter: selector is required",
 		},
 		{
 			name: "test-blank-selector-param",
@@ -134,7 +134,7 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"min-available": minAvailable,
 				"selector":      "",
 			},
-			expectErrMsg: "Parameter: selector is required",
+			expectErrMsg: "parameter: selector is required",
 		},
 		{
 			name: "test-invalid-selector-param",
@@ -232,7 +232,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"max-unavailable": "",
 				"selector":        selector,
 			},
-			expectErrMsg: "Parameter: name is required",
+			expectErrMsg: "parameter: name is required",
 		},
 		{
 			name: "test-blank-name-param",
@@ -242,7 +242,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"max-unavailable": "",
 				"selector":        selector,
 			},
-			expectErrMsg: "Parameter: name is required",
+			expectErrMsg: "parameter: name is required",
 		},
 		{
 			name: "test-invalid-name-param",
@@ -319,7 +319,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"min-available":   "",
 				"max-unavailable": "",
 			},
-			expectErrMsg: "Parameter: selector is required",
+			expectErrMsg: "parameter: selector is required",
 		},
 		{
 			name: "test-blank-selector-param",
@@ -329,7 +329,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"max-unavailable": "",
 				"selector":        "",
 			},
-			expectErrMsg: "Parameter: selector is required",
+			expectErrMsg: "parameter: selector is required",
 		},
 		{
 			name: "test-invalid-selector-param",

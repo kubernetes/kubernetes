@@ -791,11 +791,11 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 			return &VolumesV1{sClient, os.bsOpts}, nil
 		}
 
-		errTxt := "BlockStorage API version autodetection failed. " +
+		errTxt := "API version autodetection failed. " +
 			"Please set it explicitly in cloud.conf in section [BlockStorage] with key `bs-version`"
 		return nil, errors.New(errTxt)
 	default:
-		errTxt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
+		errTxt := fmt.Sprintf("unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
 		return nil, errors.New(errTxt)
 	}
 }

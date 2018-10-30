@@ -71,7 +71,7 @@ func NewInitializedVolumePluginMgr(
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
 		return nil, fmt.Errorf(
-			"Could not initialize volume plugins for KubeletVolumePluginMgr: %v",
+			"could not initialize volume plugins for KubeletVolumePluginMgr: %v",
 			err)
 	}
 

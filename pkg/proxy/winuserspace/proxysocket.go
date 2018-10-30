@@ -150,7 +150,7 @@ func tryConnect(service ServicePortPortalName, srcAddr net.Addr, protocol string
 		}
 		return outConn, nil
 	}
-	return nil, fmt.Errorf("failed to connect to an endpoint.")
+	return nil, fmt.Errorf("failed to connect to an endpoint")
 }
 
 func (tcp *tcpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serviceInfo, proxier *Proxier) {
@@ -288,7 +288,7 @@ func appendDNSSuffix(msg *dns.Msg, buffer []byte, length int, dnsSuffix string) 
 	}
 
 	if &buffer[0] != &mbuf[0] {
-		return length, fmt.Errorf("Buffer is too small in packing DNS packet")
+		return length, fmt.Errorf("buffer is too small in packing DNS packet")
 	}
 
 	return len(mbuf), nil
@@ -315,7 +315,7 @@ func recoverDNSQuestion(origName string, msg *dns.Msg, buffer []byte, length int
 	}
 
 	if &buffer[0] != &mbuf[0] {
-		return length, fmt.Errorf("Buffer is too small in packing DNS packet")
+		return length, fmt.Errorf("buffer is too small in packing DNS packet")
 	}
 
 	return len(mbuf), nil

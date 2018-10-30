@@ -40,7 +40,7 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 	format, err := resizefs.mounter.GetDiskFormat(devicePath)
 
 	if err != nil {
-		formatErr := fmt.Errorf("ResizeFS.Resize - error checking format for device %s: %v", devicePath, err)
+		formatErr := fmt.Errorf("error checking format for device %s: %v", devicePath, err)
 		return false, formatErr
 	}
 
@@ -57,7 +57,7 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 	case "xfs":
 		return resizefs.xfsResize(deviceMountPath)
 	}
-	return false, fmt.Errorf("ResizeFS.Resize - resize of format %s is not supported for device %s mounted at %s", format, devicePath, deviceMountPath)
+	return false, fmt.Errorf("resize of format %s is not supported for device %s mounted at %s", format, devicePath, deviceMountPath)
 }
 
 func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {

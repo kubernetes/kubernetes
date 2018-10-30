@@ -298,7 +298,7 @@ func resultsManager(m *manager, probeType probeType) results.Manager {
 	case liveness:
 		return m.livenessManager
 	}
-	panic(fmt.Errorf("Unhandled case: %v", probeType))
+	panic(fmt.Errorf("unhandled case: %v", probeType))
 }
 
 type crashingExecProber struct{}

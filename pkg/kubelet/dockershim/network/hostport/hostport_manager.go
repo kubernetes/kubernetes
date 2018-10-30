@@ -249,7 +249,7 @@ func (hm *hostportManager) syncIPTables(lines []byte) error {
 	klog.V(3).Infof("Restoring iptables rules: %s", lines)
 	err := hm.iptables.RestoreAll(lines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
+		return fmt.Errorf("failed to execute iptables-restore: %v", err)
 	}
 	return nil
 }

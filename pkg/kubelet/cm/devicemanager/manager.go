@@ -267,12 +267,12 @@ func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string) error {
 
 	e, err := newEndpointImpl(endpoint, pluginName, m.callback)
 	if err != nil {
-		return fmt.Errorf("Failed to dial device plugin with socketPath %s: %v", endpoint, err)
+		return fmt.Errorf("failed to dial device plugin with socketPath %s: %v", endpoint, err)
 	}
 
 	options, err := e.client.GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
 	if err != nil {
-		return fmt.Errorf("Failed to get device plugin options: %v", err)
+		return fmt.Errorf("failed to get device plugin options: %v", err)
 	}
 
 	m.registerEndpoint(pluginName, options, e)
@@ -678,7 +678,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
 			m.mutex.Unlock()
-			return fmt.Errorf("Unknown Device Plugin %s", resource)
+			return fmt.Errorf("unknown Device Plugin %s", resource)
 		}
 
 		devs := allocDevices.UnsortedList()
@@ -697,7 +697,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		}
 
 		if len(resp.ContainerResponses) == 0 {
-			return fmt.Errorf("No containers return in allocation response %v", resp)
+			return fmt.Errorf("no containers return in allocation response %v", resp)
 		}
 
 		// Update internal cached podDevices state.

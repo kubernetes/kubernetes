@@ -57,7 +57,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 		return nil
 	}
 	if pathErr != nil && !util.IsCorruptedMnt(pathErr) {
-		return fmt.Errorf("Error checking path: %v", pathErr)
+		return fmt.Errorf("error checking path: %v", pathErr)
 	}
 
 	notmnt, err := isNotMounted(d.plugin.host.GetMounter(d.plugin.GetPluginName()), deviceMountPath)
@@ -86,7 +86,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
 	if pathExists, pathErr := util.PathExists(deviceMountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		return nil
 	}

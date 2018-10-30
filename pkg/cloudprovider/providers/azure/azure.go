@@ -460,14 +460,14 @@ func initDiskControllers(az *Cloud) error {
 	// create/attach/detach/delete blob based (unmanaged disks)
 	blobController, err := newBlobDiskController(common)
 	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Blob Disk Controller with error (%s)", err.Error())
+		return fmt.Errorf("failed to init Blob Disk Controller with error (%s)", err.Error())
 	}
 
 	// ManagedDiskController: contains the functions needed to
 	// create/attach/detach/delete managed disks
 	managedController, err := newManagedDiskController(common)
 	if err != nil {
-		return fmt.Errorf("AzureDisk -  failed to init Managed  Disk Controller with error (%s)", err.Error())
+		return fmt.Errorf("failed to init Managed  Disk Controller with error (%s)", err.Error())
 	}
 
 	az.BlobDiskController = blobController
@@ -572,7 +572,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 // GetActiveZones returns all the zones in which k8s nodes are currently running.
 func (az *Cloud) GetActiveZones() (sets.String, error) {
 	if az.nodeInformerSynced == nil {
-		return nil, fmt.Errorf("Azure cloud provider doesn't have informers set")
+		return nil, fmt.Errorf("no informers set")
 	}
 
 	az.nodeCachesLock.Lock()

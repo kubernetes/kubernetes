@@ -447,7 +447,7 @@ func (rsc *ReplicaSetController) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Sync %q failed with %v", key, err))
+	utilruntime.HandleError(fmt.Errorf("sync %q failed with %v", key, err))
 	rsc.queue.AddRateLimited(key)
 
 	return true
@@ -460,7 +460,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for %v %#v: %v", rsc.Kind, rs, err))
 		return nil
 	}
 	if diff < 0 {
@@ -592,7 +592,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	rsNeedsSync := rsc.expectations.SatisfiedExpectations(key)
 	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error converting pod selector to selector: %v", err))
+		utilruntime.HandleError(fmt.Errorf("error converting pod selector to selector: %v", err))
 		return nil
 	}
 

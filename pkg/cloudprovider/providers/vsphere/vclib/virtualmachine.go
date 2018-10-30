@@ -63,7 +63,7 @@ func (vm *VirtualMachine) DeleteVM(ctx context.Context) error {
 func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, volumeOptions *VolumeOptions) (string, error) {
 	// Check if the diskControllerType is valid
 	if !CheckControllerSupported(volumeOptions.SCSIControllerType) {
-		return "", fmt.Errorf("Not a valid SCSI Controller Type. Valid options are %q", SCSIControllerTypeValidOptions())
+		return "", fmt.Errorf("not a valid SCSI Controller Type. Valid options are %q", SCSIControllerTypeValidOptions())
 	}
 	vmDiskPathCopy := vmDiskPath
 	vmDiskPath = RemoveStorageClusterORFolderNameFromVDiskPath(vmDiskPath)
@@ -164,7 +164,7 @@ func (vm *VirtualMachine) DetachDisk(ctx context.Context, vmDiskPath string) err
 	}
 	if device == nil {
 		klog.Errorf("No virtual device found with diskPath: %q on VM: %q", vmDiskPath, vm.InventoryPath)
-		return fmt.Errorf("No virtual device found with diskPath: %q on VM: %q", vmDiskPath, vm.InventoryPath)
+		return fmt.Errorf("no virtual device found with diskPath: %q on VM: %q", vmDiskPath, vm.InventoryPath)
 	}
 	// Detach disk from VM
 	requestTime := time.Now()
@@ -272,7 +272,7 @@ func (vm *VirtualMachine) CreateDiskSpec(ctx context.Context, diskPath string, d
 			klog.Errorf("Cannot find SCSI controller of type: %q in VM", volumeOptions.SCSIControllerType)
 			// attempt clean up of scsi controller
 			vm.deleteController(ctx, newSCSIController, vmDevices)
-			return nil, nil, fmt.Errorf("Cannot find SCSI controller of type: %q in VM", volumeOptions.SCSIControllerType)
+			return nil, nil, fmt.Errorf("cannot find SCSI controller of type: %q in VM", volumeOptions.SCSIControllerType)
 		}
 	}
 	disk := vmDevices.CreateDisk(scsiController, dsObj.Reference(), diskPath)

@@ -60,7 +60,7 @@ func (r *ProxyREST) NewConnectOptions() (runtime.Object, bool, string) {
 func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	proxyOpts, ok := opts.(*api.ServiceProxyOptions)
 	if !ok {
-		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
 	location, transport, err := r.Redirector.ResourceLocation(ctx, id)
 	if err != nil {

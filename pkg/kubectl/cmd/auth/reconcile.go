@@ -151,22 +151,22 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 
 func (o *ReconcileOptions) Validate() error {
 	if o.Visitor == nil {
-		return errors.New("ReconcileOptions.Visitor must be set")
+		return errors.New("visitor must be set")
 	}
 	if o.RBACClient == nil {
-		return errors.New("ReconcileOptions.RBACClient must be set")
+		return errors.New("RBAC client must be set")
 	}
 	if o.NamespaceClient == nil {
-		return errors.New("ReconcileOptions.NamespaceClient must be set")
+		return errors.New("namespace client must be set")
 	}
 	if o.PrintObject == nil {
-		return errors.New("ReconcileOptions.Print must be set")
+		return errors.New("print must be set")
 	}
 	if o.Out == nil {
-		return errors.New("ReconcileOptions.Out must be set")
+		return errors.New("out must be set")
 	}
 	if o.ErrOut == nil {
-		return errors.New("ReconcileOptions.Err must be set")
+		return errors.New("err must be set")
 	}
 	return nil
 }

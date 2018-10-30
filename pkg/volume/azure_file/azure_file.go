@@ -335,7 +335,7 @@ func getVolumeSource(spec *volume.Spec) (string, bool, error) {
 		readOnly := spec.ReadOnly
 		return share, readOnly, nil
 	}
-	return "", false, fmt.Errorf("Spec does not reference an AzureFile volume type")
+	return "", false, fmt.Errorf("spec does not reference an AzureFile volume type")
 }
 
 func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
@@ -353,7 +353,7 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 		}
 		secretName = spec.PersistentVolume.Spec.AzureFile.SecretName
 	} else {
-		return "", "", fmt.Errorf("Spec does not reference an AzureFile volume type")
+		return "", "", fmt.Errorf("spec does not reference an AzureFile volume type")
 	}
 
 	if len(secretNamespace) == 0 {
@@ -366,7 +366,7 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 func getAzureCloud(cloudProvider cloudprovider.Interface) (*azure.Cloud, error) {
 	azure, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azure == nil {
-		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
 	return azure, nil

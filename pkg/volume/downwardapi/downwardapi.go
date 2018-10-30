@@ -66,7 +66,7 @@ func (plugin *downwardAPIPlugin) GetPluginName() string {
 func (plugin *downwardAPIPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _ := getVolumeSource(spec)
 	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a DownwardAPI volume type")
+		return "", fmt.Errorf("spec does not reference a DownwardAPI volume type")
 	}
 
 	// Return user defined volume name, since this is an ephemeral volume type
@@ -239,7 +239,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 // Note: this function is exported so that it can be called from the projection volume driver
 func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.VolumeHost, defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
 
 	errlist := []error{}

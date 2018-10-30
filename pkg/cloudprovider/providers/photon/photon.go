@@ -162,7 +162,7 @@ func getVMIDbyNodename(pc *PCCloud, nodeName string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("No matching started VM is found with name %s", nodeName)
+	return "", fmt.Errorf("no matching started VM is found with name %s", nodeName)
 }
 
 // Retrieve the Photon VM ID from the Photon Controller endpoint based on the IP address
@@ -203,13 +203,13 @@ func getVMIDbyIP(pc *PCCloud, IPAddress string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("No matching VM is found with IP %s", IPAddress)
+	return "", fmt.Errorf("no matching VM is found with IP %s", IPAddress)
 }
 
 func getPhotonClient(pc *PCCloud) (*photon.Client, error) {
 	var err error
 	if len(pc.cfg.Global.CloudTarget) == 0 {
-		return nil, fmt.Errorf("Photon Controller endpoint was not specified.")
+		return nil, fmt.Errorf("endpoint was not specified")
 	}
 
 	options := &photon.ClientOptions{
@@ -228,12 +228,12 @@ func getPhotonClient(pc *PCCloud) (*photon.Client, error) {
 		scanner := bufio.NewScanner(file)
 		if !scanner.Scan() {
 			klog.Error("Photon Cloud Provider: Empty username inside /etc/kubernetes/pc_login_info.")
-			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid username")
+			return nil, fmt.Errorf("failed to create authentication enabled client with invalid username")
 		}
 		username := scanner.Text()
 		if !scanner.Scan() {
 			klog.Error("Photon Cloud Provider: Empty password set inside /etc/kubernetes/pc_login_info.")
-			return nil, fmt.Errorf("Failed to create authentication enabled client with invalid password")
+			return nil, fmt.Errorf("failed to create authentication enabled client with invalid password")
 		}
 		password := scanner.Text()
 
@@ -415,7 +415,7 @@ func (pc *PCCloud) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 	}
 
 	klog.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
-	return nodeAddrs, fmt.Errorf("Failed to find the node %s from Photon Controller endpoint", name)
+	return nodeAddrs, fmt.Errorf("failed to find the node %s from Photon Controller endpoint", name)
 }
 
 // NodeAddressesByProviderID returns the node addresses of an instances with the specified unique providerID
@@ -520,14 +520,14 @@ func (pc *PCCloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (pc *PCCloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+	return cloudprovider.Zone{}, errors.New("not implemented")
 }
 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
 func (pc *PCCloud) GetZoneByNodeName(ctx context.Context, nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+	return cloudprovider.Zone{}, errors.New("not imeplemented")
 }
 
 // Routes returns a false since the interface is not supported for photon controller.

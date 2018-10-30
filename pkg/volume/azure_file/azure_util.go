@@ -48,12 +48,12 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 	var accountKey, accountName string
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		return "", "", fmt.Errorf("Cannot get kube client")
+		return "", "", fmt.Errorf("cannot get kube client")
 	}
 
 	keys, err := kubeClient.CoreV1().Secrets(nameSpace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
-		return "", "", fmt.Errorf("Couldn't get secret %v/%v", nameSpace, secretName)
+		return "", "", fmt.Errorf("couldn't get secret %v/%v", nameSpace, secretName)
 	}
 	for name, data := range keys.Data {
 		if name == "azurestorageaccountname" {
@@ -64,7 +64,7 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 		}
 	}
 	if accountName == "" || accountKey == "" {
-		return "", "", fmt.Errorf("Invalid %v/%v, couldn't extract azurestorageaccountname or azurestorageaccountkey", nameSpace, secretName)
+		return "", "", fmt.Errorf("invalid %v/%v, couldn't extract azurestorageaccountname or azurestorageaccountkey", nameSpace, secretName)
 	}
 	return accountName, accountKey, nil
 }
@@ -72,7 +72,7 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accountName, accountKey string) (string, error) {
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		return "", fmt.Errorf("Cannot get kube client")
+		return "", fmt.Errorf("cannot get kube client")
 	}
 	secretName := "azure-storage-account-" + accountName + "-secret"
 	secret := &v1.Secret{
@@ -91,7 +91,7 @@ func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accoun
 		err = nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("Couldn't create secret %v", err)
+		return "", fmt.Errorf("couldn't create secret %v", err)
 	}
 	return secretName, err
 }

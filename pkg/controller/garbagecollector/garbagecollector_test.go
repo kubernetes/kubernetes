@@ -869,7 +869,7 @@ func TestGarbageCollectorSync(t *testing.T) {
 
 	// Simulate the discovery client returning an error
 	fakeDiscoveryClient.setPreferredResources(nil)
-	fakeDiscoveryClient.setError(fmt.Errorf("Error calling discoveryClient.ServerPreferredResources()"))
+	fakeDiscoveryClient.setError(fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"))
 
 	// Wait until sync discovers the change
 	time.Sleep(1 * time.Second)

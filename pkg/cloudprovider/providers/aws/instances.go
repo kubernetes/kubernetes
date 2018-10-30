@@ -24,6 +24,10 @@ import (
 	"sync"
 	"time"
 
+	"regexp"
+	"sync"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"k8s.io/klog"
@@ -63,10 +67,10 @@ func (name kubernetesInstanceID) mapToAWSInstanceID() (awsInstanceID, error) {
 	}
 	url, err := url.Parse(s)
 	if err != nil {
-		return "", fmt.Errorf("Invalid instance name (%s): %v", name, err)
+		return "", fmt.Errorf("invalid instance name (%s): %v", name, err)
 	}
 	if url.Scheme != "aws" {
-		return "", fmt.Errorf("Invalid scheme for AWS instance (%s)", name)
+		return "", fmt.Errorf("invalid scheme for AWS instance (%s)", name)
 	}
 
 	awsID := ""
@@ -82,7 +86,7 @@ func (name kubernetesInstanceID) mapToAWSInstanceID() (awsInstanceID, error) {
 	// We sanity check the resulting volume; the two known formats are
 	// i-12345678 and i-12345678abcdef01
 	if awsID == "" || !awsInstanceRegMatch.MatchString(awsID) {
-		return "", fmt.Errorf("Invalid format for AWS instance (%s)", name)
+		return "", fmt.Errorf("invalid format for AWS instance (%s)", name)
 	}
 
 	return awsInstanceID(awsID), nil

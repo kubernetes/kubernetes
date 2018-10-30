@@ -106,7 +106,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.LocalVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.Local, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a Local volume type")
+	return nil, false, fmt.Errorf("spec does not reference a Local volume type")
 }
 
 func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {

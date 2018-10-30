@@ -373,7 +373,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 		vsphereInstanceMap[cfg.Global.VCenterIP] = &vsphereIns
 	} else {
 		if cfg.Workspace.VCenterIP == "" || cfg.Workspace.Folder == "" || cfg.Workspace.Datacenter == "" {
-			msg := fmt.Sprintf("All fields in workspace are mandatory."+
+			msg := fmt.Sprintf("all fields in workspace are mandatory."+
 				" vsphere.conf does not have the workspace specified correctly. cfg.Workspace: %+v", cfg.Workspace)
 			klog.Error(msg)
 			return nil, errors.New(msg)
@@ -744,7 +744,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 
 		// Below logic can be performed only on master node where VC details are preset.
 		if vs.cfg == nil {
-			return "", fmt.Errorf("The current node can't detremine InstanceID for %q", convertToString(nodeName))
+			return "", fmt.Errorf("the current node can't detremine InstanceID for %q", convertToString(nodeName))
 		}
 
 		// Create context
@@ -1193,7 +1193,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 				}
 			}
 			if !found {
-				msg := fmt.Sprintf("The specified datastore %s is not a shared datastore across node VMs", datastore)
+				msg := fmt.Sprintf("the specified datastore %s is not a shared datastore across node VMs", datastore)
 				return "", errors.New(msg)
 			}
 		}

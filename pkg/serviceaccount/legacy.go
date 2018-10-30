@@ -66,7 +66,7 @@ func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private
 	private, ok := privateObj.(*legacyPrivateClaims)
 	if !ok {
 		klog.Errorf("jwt validator expected private claim of type *legacyPrivateClaims but got: %T", privateObj)
-		return nil, errors.New("Token could not be validated.")
+		return nil, errors.New("token could not be validated.")
 	}
 
 	// Make sure the claims we need exist
@@ -100,15 +100,15 @@ func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private
 		secret, err := v.getter.GetSecret(namespace, secretName)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("token has been invalidated")
 		}
 		if secret.DeletionTimestamp != nil {
 			klog.V(4).Infof("Token is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("token has been invalidated")
 		}
 		if bytes.Compare(secret.Data[v1.ServiceAccountTokenKey], []byte(tokenData)) != 0 {
 			klog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
-			return nil, errors.New("Token does not match server's copy")
+			return nil, errors.New("token does not match server's copy")
 		}
 
 		// Make sure service account still exists (name and UID)

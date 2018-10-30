@@ -232,7 +232,7 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 
 	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil {
-		return devicePath, fmt.Errorf("Heuristic determination of mount point failed:%v", err)
+		return devicePath, fmt.Errorf("heuristic determination of mount point failed:%v", err)
 	}
 	if !noMnt {
 		klog.Infof("fc: %s already mounted", globalPDPath)
@@ -315,7 +315,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	// Retrieve volume plugin dependent path like '50060e801049cfd1-lun-0' from global map path
 	arr := strings.Split(mapPath, "/")
 	if len(arr) < 1 {
-		return fmt.Errorf("Fail to retrieve volume plugin information from global map path: %v", mapPath)
+		return fmt.Errorf("fail to retrieve volume plugin information from global map path: %v", mapPath)
 	}
 	volumeInfo := arr[len(arr)-1]
 
@@ -376,7 +376,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 
 func checkPathExists(path string) (bool, error) {
 	if pathExists, pathErr := volumeutil.PathExists(path); pathErr != nil {
-		return pathExists, fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return pathExists, fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", path)
 		return pathExists, nil

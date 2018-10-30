@@ -66,7 +66,7 @@ func GetVSphere() (*VSphere, error) {
 func getVSphereConfig() (*VSphereConfig, error) {
 	confFileLocation := os.Getenv(vSphereConfFileEnvVar)
 	if confFileLocation == "" {
-		return nil, fmt.Errorf("Env variable 'VSPHERE_CONF_FILE' is not set.")
+		return nil, fmt.Errorf("env variable 'VSPHERE_CONF_FILE' is not set")
 	}
 	confFile, err := os.Open(confFileLocation)
 	if err != nil {
@@ -123,7 +123,7 @@ func getSharedDatastoresInK8SCluster(ctx context.Context, dc *vclib.Datacenter, 
 	}
 
 	if len(nodeVmDetails) == 0 {
-		msg := fmt.Sprintf("Kubernetes node nodeVmDetail details is empty. nodeVmDetails : %+v", nodeVmDetails)
+		msg := fmt.Sprintf("kubernetes node nodeVmDetail details is empty. nodeVmDetails : %+v", nodeVmDetails)
 		klog.Error(msg)
 		return nil, fmt.Errorf(msg)
 	}
@@ -333,7 +333,7 @@ func getcanonicalVolumePath(ctx context.Context, dc *vclib.Datacenter, volumePat
 		}
 		diskPath := vclib.GetPathFromVMDiskPath(canonicalVolumePath)
 		if diskPath == "" {
-			return "", fmt.Errorf("Failed to parse canonicalVolumePath: %s in getcanonicalVolumePath method", canonicalVolumePath)
+			return "", fmt.Errorf("failed to parse canonicalVolumePath: %s in getcanonicalVolumePath method", canonicalVolumePath)
 		}
 		folderID = strings.Split(strings.TrimSpace(diskPath), "/")[0]
 		setdatastoreFolderIDMap(datastoreFolderIDMap, datastore, dsFolder, folderID)
@@ -528,7 +528,7 @@ func (vs *VSphere) GetNodeNameFromProviderID(providerID string) (string, error) 
 		}
 	}
 	if nodeName == "" {
-		msg := fmt.Sprintf("error while obtaining Kubernetes nodename for providerID %s.", providerID)
+		msg := fmt.Sprintf("error while obtaining Kubernetes nodename for providerID %s", providerID)
 		return "", errors.New(msg)
 	}
 	return nodeName, nil

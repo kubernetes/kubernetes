@@ -163,7 +163,7 @@ func ReplicaSetToSelectableFields(rs *apps.ReplicaSet) fields.Set {
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	rs, ok := obj.(*apps.ReplicaSet)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a ReplicaSet.")
+		return nil, nil, false, fmt.Errorf("given object is not a ReplicaSet")
 	}
 	return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), rs.Initializers != nil, nil
 }

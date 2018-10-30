@@ -123,7 +123,7 @@ func gatherAllHostports(activePodPortMappings []*PodPortMapping) (map[*PortMappi
 	podHostportMap := make(map[*PortMapping]targetPod)
 	for _, pm := range activePodPortMappings {
 		if pm.IP.To4() == nil {
-			return nil, fmt.Errorf("Invalid or missing pod %s IP", getPodFullName(pm))
+			return nil, fmt.Errorf("invalid or missing pod %s IP", getPodFullName(pm))
 		}
 		// should not handle hostports for hostnetwork pods
 		if pm.HostNetwork {
@@ -286,7 +286,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	klog.V(3).Infof("Restoring iptables rules: %s", natLines)
 	err = h.iptables.RestoreAll(natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
+		return fmt.Errorf("failed to execute iptables-restore: %v", err)
 	}
 
 	h.cleanupHostportMap(hostportPodMap)

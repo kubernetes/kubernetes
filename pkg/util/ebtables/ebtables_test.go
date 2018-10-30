@@ -70,7 +70,7 @@ func TestEnsureChain(t *testing.T) {
 	if exists {
 		t.Errorf("expected exists = false")
 	}
-	errStr := "Failed to ensure TEST-CHAIN chain: exit 2, output:"
+	errStr := "failed to ensure TEST-CHAIN chain: exit 2, output:"
 	if err == nil || !strings.Contains(err.Error(), errStr) {
 		t.Errorf("expected error: %q", errStr)
 	}
@@ -119,7 +119,7 @@ Bridge chain: TEST, entries: 0, policy: ACCEPT`), nil
 	if exists {
 		t.Errorf("expected exists = false")
 	}
-	errStr := "Failed to ensure rule: exit 2, output: "
+	errStr := "failed to ensure rule: exit 2, output: "
 	if err == nil || err.Error() != errStr {
 		t.Errorf("expected error: %q", errStr)
 	}

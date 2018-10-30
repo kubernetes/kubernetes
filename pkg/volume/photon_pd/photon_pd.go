@@ -401,5 +401,5 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.PhotonPersistentDisk, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a Photon Controller persistent disk type")
+	return nil, false, fmt.Errorf("spec does not reference a Photon Controller persistent disk type")
 }

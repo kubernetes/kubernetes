@@ -101,11 +101,11 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 		// if secret is provideded, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
+			return nil, fmt.Errorf("cannot get kube client")
 		}
 		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
 		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+			err = fmt.Errorf("couldn't get secret %v/%v err: %v", secretNs, secretName, err)
 			return nil, err
 		}
 		for name, data := range secrets.Data {
@@ -325,7 +325,7 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 
 	opt = util.JoinMountOptions(cephfsVolume.mountOptions, opt)
 	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
-		return fmt.Errorf("CephFS: mount failed: %v", err)
+		return fmt.Errorf("mount failed: %v", err)
 	}
 
 	return nil
@@ -447,7 +447,7 @@ func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool,
 		return mon, path, user, secretFile, readOnly, nil
 	}
 
-	return nil, "", "", "", false, fmt.Errorf("Spec does not reference a CephFS volume type")
+	return nil, "", "", "", false, fmt.Errorf("spec does not reference a CephFS volume type")
 }
 
 func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
@@ -470,5 +470,5 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 		}
 		return "", "", nil
 	}
-	return "", "", fmt.Errorf("Spec does not reference an CephFS volume type")
+	return "", "", fmt.Errorf("spec does not reference an CephFS volume type")
 }

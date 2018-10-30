@@ -106,7 +106,7 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInfo
 	case CloudAllocatorType:
 		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:
-		return nil, fmt.Errorf("Invalid CIDR allocator type: %v", allocatorType)
+		return nil, fmt.Errorf("invalid CIDR allocator type: %v", allocatorType)
 	}
 }
 
@@ -126,7 +126,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 		}
 		return true, nil
 	}); pollErr != nil {
-		return nil, fmt.Errorf("Failed to list all nodes in %v, cannot proceed without updating CIDR map",
+		return nil, fmt.Errorf("failed to list all nodes in %v, cannot proceed without updating CIDR map",
 			apiserverStartupGracePeriod)
 	}
 	return nodeList, nil

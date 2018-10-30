@@ -344,7 +344,7 @@ outer:
 		return nil // Yay!
 	}
 
-	return fmt.Errorf("Unexpected probes: %v; Missing probes: %v;", unexpected, missing)
+	return fmt.Errorf("unexpected probes: %v; missing probes: %v;", unexpected, missing)
 }
 
 const interval = 1 * time.Second

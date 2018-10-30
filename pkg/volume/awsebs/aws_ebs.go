@@ -109,11 +109,11 @@ func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, e
 	// default values from here will mean, no one can
 	// override them.
 	if cloud == nil {
-		return nil, fmt.Errorf("No cloudprovider present")
+		return nil, fmt.Errorf("no cloudprovider present")
 	}
 
 	if cloud.ProviderName() != aws.ProviderName {
-		return nil, fmt.Errorf("Expected aws cloud, found %s", cloud.ProviderName())
+		return nil, fmt.Errorf("expected aws cloud, found %s", cloud.ProviderName())
 	}
 
 	instances, ok := cloud.Instances()
@@ -240,7 +240,7 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.AWSElasticBlockStore, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference an AWS EBS volume type")
+	return nil, false, fmt.Errorf("spec does not reference an AWS EBS volume type")
 }
 
 func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
@@ -261,11 +261,11 @@ func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath
 		names := strings.Split(volumeID, "/")
 		length := len(names)
 		if length < 2 || length > 3 {
-			return nil, fmt.Errorf("Failed to get AWS volume id from mount path %q: invalid volume name format %q", mountPath, volumeID)
+			return nil, fmt.Errorf("failed to get AWS volume id from mount path %q: invalid volume name format %q", mountPath, volumeID)
 		}
 		volName := names[length-1]
 		if !strings.HasPrefix(volName, "vol-") {
-			return nil, fmt.Errorf("Invalid volume name format for AWS volume (%q) retrieved from mount path %q", volName, mountPath)
+			return nil, fmt.Errorf("invalid volume name format for AWS volume (%q) retrieved from mount path %q", volName, mountPath)
 		}
 		if length == 2 {
 			sourceName = awsURLNamePrefix + "" + "/" + volName // empty zone label
@@ -307,7 +307,7 @@ func (plugin *awsElasticBlockStorePlugin) ExpandVolumeDevice(
 	volumeID := aws.KubernetesVolumeID(rawVolumeName)
 
 	if volumeID == "" {
-		return oldSize, fmt.Errorf("EBS.ExpandVolumeDevice Invalid volume id for %s", spec.Name())
+		return oldSize, fmt.Errorf("invalid volume id for %s", spec.Name())
 	}
 	return awsVolume.ResizeDisk(volumeID, oldSize, newSize)
 }

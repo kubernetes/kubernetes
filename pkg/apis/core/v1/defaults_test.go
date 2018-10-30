@@ -291,10 +291,10 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 
 		for k, v := range got.Resources.Limits {
 			if ev, found := expected.Resources.Limits[v1.ResourceName(k)]; !found {
-				return fmt.Errorf("failed to find resource <%v> in expected resources.Limits.", k)
+				return fmt.Errorf("failed to find resource <%v> in expected resources.Limits", k)
 			} else {
 				if ev.Value() != v.Value() {
-					return fmt.Errorf("different resource.Limits: got <%v>, expected <%v>.", v.Value(), ev.Value())
+					return fmt.Errorf("different resource.Limits: got <%v>, expected <%v>", v.Value(), ev.Value())
 				}
 			}
 		}
@@ -305,10 +305,10 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 
 		for k, v := range got.Resources.Requests {
 			if ev, found := expected.Resources.Requests[v1.ResourceName(k)]; !found {
-				return fmt.Errorf("failed to find resource <%v> in expected resources.Requests.", k)
+				return fmt.Errorf("failed to find resource <%v> in expected resources.Requests", k)
 			} else {
 				if ev.Value() != v.Value() {
-					return fmt.Errorf("different resource.Requests: got <%v>, expected <%v>.", v.Value(), ev.Value())
+					return fmt.Errorf("different resource.Requests: got <%v>, expected <%v>", v.Value(), ev.Value())
 				}
 			}
 		}

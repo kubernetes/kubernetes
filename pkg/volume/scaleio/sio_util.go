@@ -78,11 +78,11 @@ var (
 
 	secretNotFoundErr              = errors.New("secret not found")
 	configMapNotFoundErr           = errors.New("configMap not found")
-	gatewayNotProvidedErr          = errors.New("ScaleIO gateway not provided")
+	gatewayNotProvidedErr          = errors.New("gateway not provided")
 	secretRefNotProvidedErr        = errors.New("secret ref not provided")
-	systemNotProvidedErr           = errors.New("ScaleIO system not provided")
-	storagePoolNotProvidedErr      = errors.New("ScaleIO storage pool not provided")
-	protectionDomainNotProvidedErr = errors.New("ScaleIO protection domain not provided")
+	systemNotProvidedErr           = errors.New("system not provided")
+	storagePoolNotProvidedErr      = errors.New("storage pool not provided")
+	protectionDomainNotProvidedErr = errors.New("protection domain not provided")
 )
 
 // mapVolumeSpec maps attributes from either ScaleIOVolumeSource  or ScaleIOPersistentVolumeSource to config

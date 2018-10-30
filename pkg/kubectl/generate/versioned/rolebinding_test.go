@@ -38,7 +38,7 @@ func TestRoleBindingGenerate(t *testing.T) {
 				"groups":         []string{"fake-group"},
 				"serviceaccount": []string{"fake-namespace:fake-account"},
 			},
-			expectErrMsg: "Parameter: name is required",
+			expectErrMsg: "parameter: name is required",
 		},
 		{
 			name: "test-missing-role-and-clusterrole",

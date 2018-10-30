@@ -546,7 +546,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		if og.checkNodeCapabilitiesBeforeMount {
 			if canMountErr := volumeMounter.CanMount(); canMountErr != nil {
 				err = fmt.Errorf(
-					"Verify that your node machine has the required components before attempting to mount this volume type. %s",
+					"verify that your node machine has the required components before attempting to mount this volume type. %s",
 					canMountErr)
 				return volumeToMount.GenerateError("MountVolume.CanMount failed", err)
 			}
@@ -740,7 +740,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 
 		if err != nil || mount.HasMountRefs(deviceMountPath, refs) {
 			if err == nil {
-				err = fmt.Errorf("The device mount path %q is still mounted by other references %v", deviceMountPath, refs)
+				err = fmt.Errorf("the device mount path %q is still mounted by other references %v", deviceMountPath, refs)
 			}
 			return deviceToDetach.GenerateError("GetDeviceMountRefs check failed", err)
 		}
@@ -869,7 +869,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			devicePath = pluginDevicePath
 		}
 		if len(devicePath) == 0 {
-			return volumeToMount.GenerateError("MapVolume failed", fmt.Errorf("Device path of the volume is empty"))
+			return volumeToMount.GenerateError("MapVolume failed", fmt.Errorf("device path of the volume is empty"))
 		}
 
 		// When kubelet is containerized, devicePath may be a symlink at a place unavailable to
@@ -1060,7 +1060,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 			return deviceToDetach.GenerateError("UnmapDevice.GetDeviceSymlinkRefs check failed", err)
 		}
 		if len(refs) > 0 {
-			err = fmt.Errorf("The device %q is still referenced from other Pods %v", globalMapPath, refs)
+			err = fmt.Errorf("the device %q is still referenced from other Pods %v", globalMapPath, refs)
 			return deviceToDetach.GenerateError("UnmapDevice failed", err)
 		}
 
@@ -1182,7 +1182,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError(
 				"VerifyControllerAttachedVolume failed",
-				fmt.Errorf("Node object retrieved from API server is nil"))
+				fmt.Errorf("node object retrieved from API server is nil"))
 		}
 
 		for _, attachedVolume := range node.Status.VolumesAttached {
@@ -1253,11 +1253,11 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	volumePlugin, err := og.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
+		return volumetypes.GeneratedOperations{}, fmt.Errorf("error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
 	}
 
 	if volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
+		return volumetypes.GeneratedOperations{}, fmt.Errorf("can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
 	}
 
 	expandVolumeFunc := func() (error, error) {
@@ -1282,7 +1282,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 			updateErr := resizeMap.UpdatePVSize(pvcWithResizeRequest, newSize)
 
 			if updateErr != nil {
-				detailedErr := fmt.Errorf("Error updating PV spec capacity for volume %q with : %v", pvcWithResizeRequest.QualifiedName(), updateErr)
+				detailedErr := fmt.Errorf("error updating PV spec capacity for volume %q with : %v", pvcWithResizeRequest.QualifiedName(), updateErr)
 				return detailedErr, detailedErr
 			}
 			klog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
@@ -1296,7 +1296,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
 
 			if err != nil {
-				detailedErr := fmt.Errorf("Error marking pvc %s as resized : %v", pvcWithResizeRequest.QualifiedName(), err)
+				detailedErr := fmt.Errorf("error marking pvc %s as resized : %v", pvcWithResizeRequest.QualifiedName(), err)
 				return detailedErr, detailedErr
 			}
 			successMsg := fmt.Sprintf("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
@@ -1304,7 +1304,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		} else {
 			err := resizeMap.MarkForFSResize(pvcWithResizeRequest)
 			if err != nil {
-				detailedErr := fmt.Errorf("Error updating pvc %s condition for fs resize : %v", pvcWithResizeRequest.QualifiedName(), err)
+				detailedErr := fmt.Errorf("error updating pvc %s condition for fs resize : %v", pvcWithResizeRequest.QualifiedName(), err)
 				klog.Warning(detailedErr)
 				return nil, nil
 			}
@@ -1338,7 +1338,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 		og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil || attachableVolumePlugin == nil {
 		if attachableVolumePlugin == nil {
-			err = fmt.Errorf("AttachableVolumePlugin is nil")
+			err = fmt.Errorf("invalid nil for AttachableVolumePlugin")
 		}
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.FindAttachablePluginBySpec failed", err)
 	}
@@ -1346,7 +1346,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 	volumeAttacher, err := attachableVolumePlugin.NewAttacher()
 	if err != nil || volumeAttacher == nil {
 		if volumeAttacher == nil {
-			err = fmt.Errorf("VolumeAttacher is nil")
+			err = fmt.Errorf("invalid nil for VolumeAttacher")
 		}
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.NewAttacher failed", err)
 	}
@@ -1386,7 +1386,7 @@ func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount
 	mountOptions := util.MountOptionFromSpec(volumeToMount.VolumeSpec)
 
 	if len(mountOptions) > 0 && !plugin.SupportsMountOption() {
-		return fmt.Errorf("Mount options are not supported for this volume type")
+		return fmt.Errorf("mount options are not supported for this volume type")
 	}
 	return nil
 }

@@ -408,7 +408,7 @@ var _ volume.BlockVolumePlugin = &csiPlugin{}
 
 func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opts volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
 	if !p.blockEnabled {
-		return nil, errors.New("CSIBlockVolume feature not enabled")
+		return nil, errors.New("CSI BlockVolume feature not enabled")
 	}
 
 	pvSource, err := getCSISourceFromSpec(spec)
@@ -475,7 +475,7 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 
 func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
 	if !p.blockEnabled {
-		return nil, errors.New("CSIBlockVolume feature not enabled")
+		return nil, errors.New("CSI BlockVolume feature not enabled")
 	}
 
 	klog.V(4).Infof(log("setting up block unmapper for [Spec=%v, podUID=%v]", volName, podUID))
@@ -501,7 +501,7 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 
 func (p *csiPlugin) ConstructBlockVolumeSpec(podUID types.UID, specVolName, mapPath string) (*volume.Spec, error) {
 	if !p.blockEnabled {
-		return nil, errors.New("CSIBlockVolume feature not enabled")
+		return nil, errors.New("CSI BlockVolume feature not enabled")
 	}
 
 	klog.V(4).Infof("plugin.ConstructBlockVolumeSpec [podUID=%s, specVolName=%s, path=%s]", string(podUID), specVolName, mapPath)
@@ -539,7 +539,7 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 		return false, nil
 	}
 	if p.csiDriverLister == nil {
-		return false, errors.New("CSIDriver lister does not exist")
+		return false, errors.New("CSI Driver lister does not exist")
 	}
 	csiDriver, err := p.csiDriverLister.Get(driver)
 	if err != nil {

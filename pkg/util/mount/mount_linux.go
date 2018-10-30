@@ -212,7 +212,7 @@ func (mounter *Mounter) Unmount(target string) error {
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
 	}
 	return nil
 }
@@ -448,7 +448,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			case isExitError && ee.ExitStatus() == fsckErrorsCorrected:
 				klog.Infof("Device %s has errors which were corrected by fsck.", source)
 			case isExitError && ee.ExitStatus() == fsckErrorsUncorrected:
-				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s.", source, string(out))
+				return fmt.Errorf("'fsck' found errors on device %s but could not correct them: %s", source, string(out))
 			case isExitError && ee.ExitStatus() > fsckErrorsUncorrected:
 				klog.Infof("`fsck` error %s", string(out))
 			}
@@ -1259,11 +1259,11 @@ func doSafeOpen(pathname string, base string) (int, error) {
 		var deviceStat unix.Stat_t
 		err := unix.Fstat(childFD, &deviceStat)
 		if err != nil {
-			return -1, fmt.Errorf("Error running fstat on %s with %v", currentPath, err)
+			return -1, fmt.Errorf("error running fstat on %s with %v", currentPath, err)
 		}
 		fileFmt := deviceStat.Mode & syscall.S_IFMT
 		if fileFmt == syscall.S_IFLNK {
-			return -1, fmt.Errorf("Unexpected symlink found %s", currentPath)
+			return -1, fmt.Errorf("unexpected symlink found %s", currentPath)
 		}
 
 		// Close parentFD

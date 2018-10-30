@@ -38,7 +38,7 @@ const (
 	diskPhotonPrefix   = "wwn-0x"
 )
 
-var ErrProbeVolume = errors.New("Error scanning attached volumes")
+var ErrProbeVolume = errors.New("error scanning attached volumes")
 
 // volNameToDeviceName is a mapping between spec.Name from detacher
 // and the device name inside scsi path. Once pvscsi controller is
@@ -70,7 +70,7 @@ func scsiHostScan() {
 
 func verifyDevicePath(path string) (string, error) {
 	if pathExists, err := volumeutil.PathExists(path); err != nil {
-		return "", fmt.Errorf("Error checking if path exists: %v", err)
+		return "", fmt.Errorf("error checking if path exists: %v", err)
 	} else if pathExists {
 		return path, nil
 	}
@@ -109,7 +109,7 @@ func (util *PhotonDiskUtil) CreateVolume(p *photonPersistentDiskProvisioner) (pd
 			klog.V(4).Infof("Photon Controller Util: Setting fstype to %s", fstype)
 		default:
 			klog.Errorf("Photon Controller Util: invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
-			return "", 0, "", fmt.Errorf("Photon Controller Util: invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
+			return "", 0, "", fmt.Errorf("invalid option %s for volume plugin %s.", parameter, p.plugin.GetPluginName())
 		}
 	}
 
@@ -143,13 +143,13 @@ func (util *PhotonDiskUtil) DeleteVolume(pd *photonPersistentDiskDeleter) error 
 func getCloudProvider(cloud cloudprovider.Interface) (*photon.PCCloud, error) {
 	if cloud == nil {
 		klog.Errorf("Photon Controller Util: Cloud provider not initialized properly")
-		return nil, fmt.Errorf("Photon Controller Util: Cloud provider not initialized properly")
+		return nil, fmt.Errorf("cloud provider not initialized properly")
 	}
 
 	pcc := cloud.(*photon.PCCloud)
 	if pcc == nil {
 		klog.Errorf("Invalid cloud provider: expected Photon Controller")
-		return nil, fmt.Errorf("Invalid cloud provider: expected Photon Controller")
+		return nil, fmt.Errorf("invalid cloud provider: expected Photon Controller")
 	}
 	return pcc, nil
 }

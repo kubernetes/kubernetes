@@ -188,7 +188,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 func verifyDevicePath(devicePaths []string) (string, error) {
 	for _, path := range devicePaths {
 		if pathExists, err := volumeutil.PathExists(path); err != nil {
-			return "", fmt.Errorf("Error checking if path exists: %v", err)
+			return "", fmt.Errorf("error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
 		}
@@ -203,7 +203,7 @@ func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 	for _, path := range devicePaths {
 		exists, err := volumeutil.PathExists(path)
 		if err != nil {
-			return false, fmt.Errorf("Error checking if path exists: %v", err)
+			return false, fmt.Errorf("error checking if path exists: %v", err)
 		}
 		allPathsRemoved = allPathsRemoved && !exists
 	}
@@ -250,7 +250,7 @@ func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, deviceP
 func getCloudProvider(cloudProvider cloudprovider.Interface) (*aws.Cloud, error) {
 	awsCloudProvider, ok := cloudProvider.(*aws.Cloud)
 	if !ok || awsCloudProvider == nil {
-		return nil, fmt.Errorf("Failed to get AWS Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get AWS Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 
 	return awsCloudProvider, nil

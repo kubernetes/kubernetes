@@ -672,7 +672,7 @@ func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol v1.Protocol,
 		// We are idempotent
 		return nil
 	}
-	return fmt.Errorf("Port conflict detected on port %s.  %v vs %v", key.String(), owner, existing)
+	return fmt.Errorf("port conflict detected on port %s.  %v vs %v", key.String(), owner, existing)
 }
 
 // Release a claim on a port.  Returns an error if the owner does not match the claim.
@@ -689,7 +689,7 @@ func (proxier *Proxier) releaseNodePort(ip net.IP, port int, protocol v1.Protoco
 		return nil
 	}
 	if existing.owner != owner {
-		return fmt.Errorf("Port conflict detected on port %v (unowned unlock).  %v vs %v", key, owner, existing)
+		return fmt.Errorf("port conflict detected on port %v (unowned unlock).  %v vs %v", key, owner, existing)
 	}
 	delete(proxier.portMap, key)
 	existing.socket.Close()

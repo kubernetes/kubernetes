@@ -88,7 +88,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 						}
 						klog.Warningf("LUN(%d) found, but could not get disk number(%q), location: %q", lun, d, location)
 					}
-					return "", fmt.Errorf("LUN(%d) found, but could not get disk number, location: %q", lun, location)
+					return "", fmt.Errorf("LUN (%d) found, but could not get disk number, location: %q", lun, location)
 				}
 			}
 		}

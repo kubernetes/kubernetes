@@ -321,7 +321,7 @@ var _ PluginFactory = fakePluginFactory{}
 
 func (m fakePluginFactory) NewFlexVolumePlugin(_, driverName string, _ exec.Interface) (volume.VolumePlugin, error) {
 	if m.error {
-		return nil, fmt.Errorf("Flexvolume plugin error")
+		return nil, fmt.Errorf("flexvolume plugin error")
 	}
 	// Dummy Flexvolume plugin. Prober never interacts with the plugin.
 	return &flexVolumePlugin{driverName: driverName}, nil

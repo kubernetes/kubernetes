@@ -32,7 +32,7 @@ type fakeSocket struct {
 
 func (f *fakeSocket) Close() error {
 	if f.closed {
-		return fmt.Errorf("Socket %q.%s already closed!", f.port, f.protocol)
+		return fmt.Errorf("socket %q.%s already closed!", f.port, f.protocol)
 	}
 	f.closed = true
 	return nil

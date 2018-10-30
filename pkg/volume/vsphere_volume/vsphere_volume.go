@@ -419,5 +419,5 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.VsphereVolume, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a VSphere volume type")
+	return nil, false, fmt.Errorf("spec does not reference a VSphere volume type")
 }

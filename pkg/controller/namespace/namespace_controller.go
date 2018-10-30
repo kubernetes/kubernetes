@@ -104,7 +104,7 @@ func NewNamespaceController(
 func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
@@ -172,7 +172,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 		return nil
 	}
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to retrieve namespace %v from store: %v", key, err))
+		utilruntime.HandleError(fmt.Errorf("unable to retrieve namespace %v from store: %v", key, err))
 		return err
 	}
 	return nm.namespacedResourcesDeleter.Delete(namespace.Name)

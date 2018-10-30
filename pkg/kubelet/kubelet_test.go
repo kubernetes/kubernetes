@@ -442,7 +442,7 @@ func (ls testNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 			return node, nil
 		}
 	}
-	return nil, fmt.Errorf("Node with name: %s does not exist", id)
+	return nil, fmt.Errorf("node with name: %s does not exist", id)
 }
 
 func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
@@ -679,7 +679,7 @@ func TestHandlePluginResources(t *testing.T) {
 					continue
 				}
 				if newQuantity.Value() < 0 {
-					return fmt.Errorf("Allocation failed")
+					return fmt.Errorf("allocation failed")
 				}
 				newAllocatableResource.ScalarResources[resource] = newQuantity.Value()
 			}
@@ -2192,7 +2192,7 @@ func waitForVolumeUnmount(
 
 	if err != nil {
 		return fmt.Errorf(
-			"Expected volumes to be unmounted. But some volumes are still mounted: %#v", podVolumes)
+			"expected volumes to be unmounted. But some volumes are still mounted: %#v", podVolumes)
 	}
 
 	return nil
@@ -2213,7 +2213,7 @@ func waitForVolumeDetach(
 
 	if err != nil {
 		return fmt.Errorf(
-			"Expected volumes to be detached. But some volumes are still attached: %#v", attachedVolumes)
+			"expected volumes to be detached. But some volumes are still attached: %#v", attachedVolumes)
 	}
 
 	return nil

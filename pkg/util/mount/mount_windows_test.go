@@ -733,7 +733,7 @@ func TestFormatAndMount(t *testing.T) {
 				return nil, nil
 			}
 		}
-		return nil, fmt.Errorf("Unexpected cmd %s, args %v", cmd, args)
+		return nil, fmt.Errorf("unexpected cmd %s, args %v", cmd, args)
 	}
 	fakeExec := NewFakeExec(execCallback)
 

@@ -691,7 +691,7 @@ func findLBRuleForPort(lbRules []network.LoadBalancingRule, port int32) (network
 			return lbRule, nil
 		}
 	}
-	return network.LoadBalancingRule{}, fmt.Errorf("Expected LB rule with port %d but none found", port)
+	return network.LoadBalancingRule{}, fmt.Errorf("expected LB rule with port %d but none found", port)
 }
 
 func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
@@ -1386,15 +1386,15 @@ func securityRuleMatches(serviceSourceRange string, servicePort v1.ServicePort, 
 	}
 
 	if !contains(*ruleSource, serviceSourceRange) {
-		return fmt.Errorf("Rule does not contain source %s", serviceSourceRange)
+		return fmt.Errorf("rule does not contain source %s", serviceSourceRange)
 	}
 
 	if !contains(*rulePorts, fmt.Sprintf("%d", servicePort.Port)) {
-		return fmt.Errorf("Rule does not contain port %d", servicePort.Port)
+		return fmt.Errorf("rule does not contain port %d", servicePort.Port)
 	}
 
 	if serviceIP != "" && !contains(*ruleDestination, serviceIP) {
-		return fmt.Errorf("Rule does not contain destination %s", serviceIP)
+		return fmt.Errorf("rule does not contain destination %s", serviceIP)
 	}
 
 	return nil

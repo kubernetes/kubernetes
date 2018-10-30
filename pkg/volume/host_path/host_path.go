@@ -153,7 +153,7 @@ func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, err
 
 func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	if !plugin.config.ProvisioningEnabled {
-		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
+		return nil, fmt.Errorf("provisioning in volume plugin %q is disabled", plugin.GetPluginName())
 	}
 	return newProvisioner(options, plugin.host, plugin)
 }
@@ -232,7 +232,7 @@ func (b *hostPathMounter) SetUp(fsGroup *int64) error {
 
 // SetUpAt does not make sense for host paths - probably programmer error.
 func (b *hostPathMounter) SetUpAt(dir string, fsGroup *int64) error {
-	return fmt.Errorf("SetUpAt() does not make sense for host paths")
+	return fmt.Errorf("not available for host paths")
 }
 
 func (b *hostPathMounter) GetPath() string {
@@ -252,7 +252,7 @@ func (c *hostPathUnmounter) TearDown() error {
 
 // TearDownAt does not make sense for host paths - probably programmer error.
 func (c *hostPathUnmounter) TearDownAt(dir string) error {
-	return fmt.Errorf("TearDownAt() does not make sense for host paths")
+	return fmt.Errorf("not available for host paths")
 }
 
 // hostPathProvisioner implements a Provisioner for the HostPath plugin
@@ -332,7 +332,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) 
 		return spec.PersistentVolume.Spec.HostPath, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference an HostPath volume type")
+	return nil, false, fmt.Errorf("spec does not reference an HostPath volume type")
 }
 
 type hostPathTypeChecker interface {

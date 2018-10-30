@@ -98,22 +98,22 @@ func (v *validator) ValidateHost() error {
 func validateHost(runtime string) error {
 	// Check feature-gates
 	if !utilfeature.DefaultFeatureGate.Enabled(features.AppArmor) {
-		return errors.New("AppArmor disabled by feature-gate")
+		return errors.New("app armor disabled by feature-gate")
 	}
 
 	// Check build support.
 	if isDisabledBuild {
-		return errors.New("Binary not compiled for linux")
+		return errors.New("binary not compiled for linux")
 	}
 
 	// Check kernel support.
 	if !IsAppArmorEnabled() {
-		return errors.New("AppArmor is not enabled on the host")
+		return errors.New("app armor is not enabled on the host")
 	}
 
 	// Check runtime support. Currently only Docker is supported.
 	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q.", runtime)
+		return fmt.Errorf("app armor is only enabled for 'docker' and 'remote' runtimes. Found: %q", runtime)
 	}
 
 	return nil

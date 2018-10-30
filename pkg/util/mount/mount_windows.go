@@ -272,10 +272,10 @@ func lockAndCheckSubPathWithoutSymlink(volumePath, subPath string) ([]uintptr, e
 	// get relative path to volumePath
 	relSubPath, err := filepath.Rel(volumePath, subPath)
 	if err != nil {
-		return []uintptr{}, fmt.Errorf("Rel(%s, %s) error: %v", volumePath, subPath, err)
+		return []uintptr{}, fmt.Errorf("rel(%s, %s) error: %v", volumePath, subPath, err)
 	}
 	if startsWithBackstep(relSubPath) {
-		return []uintptr{}, fmt.Errorf("SubPath %q not within volume path %q", subPath, volumePath)
+		return []uintptr{}, fmt.Errorf("subPath %q not within volume path %q", subPath, volumePath)
 	}
 
 	if relSubPath == "." {
@@ -301,7 +301,7 @@ func lockAndCheckSubPathWithoutSymlink(volumePath, subPath string) ([]uintptr, e
 		// make sure intermediate subPath directory does not contain symlink any more
 		stat, err := os.Lstat(currentFullPath)
 		if err != nil {
-			errorResult = fmt.Errorf("Lstat(%q) error: %v", currentFullPath, err)
+			errorResult = fmt.Errorf("lstat(%q) error: %v", currentFullPath, err)
 			break
 		}
 		if stat.Mode()&os.ModeSymlink != 0 {
@@ -310,7 +310,7 @@ func lockAndCheckSubPathWithoutSymlink(volumePath, subPath string) ([]uintptr, e
 		}
 
 		if !PathWithinBase(currentFullPath, volumePath) {
-			errorResult = fmt.Errorf("SubPath %q not within volume path %q", currentFullPath, volumePath)
+			errorResult = fmt.Errorf("subPath %q not within volume path %q", currentFullPath, volumePath)
 			break
 		}
 	}
@@ -443,7 +443,7 @@ func getAllParentLinks(path string) ([]string, error) {
 
 		fi, err := os.Lstat(path)
 		if err != nil {
-			return links, fmt.Errorf("Lstat: %v", err)
+			return links, fmt.Errorf("lstat: %v", err)
 		}
 		if fi.Mode()&os.ModeSymlink == 0 {
 			break
@@ -451,7 +451,7 @@ func getAllParentLinks(path string) ([]string, error) {
 
 		path, err = os.Readlink(path)
 		if err != nil {
-			return links, fmt.Errorf("Readlink error: %v", err)
+			return links, fmt.Errorf("readlink error: %v", err)
 		}
 	}
 
@@ -565,7 +565,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		// make sure newly created directory does not contain symlink after lock
 		stat, err := os.Lstat(currentPath)
 		if err != nil {
-			return fmt.Errorf("Lstat(%q) error: %v", currentPath, err)
+			return fmt.Errorf("lstat(%q) error: %v", currentPath, err)
 		}
 		if stat.Mode()&os.ModeSymlink != 0 {
 			return fmt.Errorf("subpath %q is an unexpected symlink after Mkdir", currentPath)

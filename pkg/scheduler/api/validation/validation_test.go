@@ -31,11 +31,11 @@ func TestValidatePolicy(t *testing.T) {
 	}{
 		{
 			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority"}}},
-			expected: errors.New("Priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}},
-			expected: errors.New("Priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: 2}}},
@@ -43,11 +43,11 @@ func TestValidatePolicy(t *testing.T) {
 		},
 		{
 			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}},
-			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority WeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			policy:   api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: api.MaxWeight}}},
-			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
+			expected: errors.New("priority WeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
 			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: 2}}},
@@ -55,7 +55,7 @@ func TestValidatePolicy(t *testing.T) {
 		},
 		{
 			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: -2}}},
-			expected: errors.New("Priority for extender http://127.0.0.1:8081/extender should have a positive weight applied to it"),
+			expected: errors.New("priority for extender http://127.0.0.1:8081/extender should have a positive weight applied to it"),
 		},
 		{
 			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", FilterVerb: "filter"}}},
@@ -71,7 +71,7 @@ func TestValidatePolicy(t *testing.T) {
 					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
 				}},
-			expected: errors.New("Only one extender can implement bind, found 2"),
+			expected: errors.New("only one extender can implement bind, found 2"),
 		},
 		{
 			policy: api.Policy{
@@ -79,7 +79,7 @@ func TestValidatePolicy(t *testing.T) {
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []api.ExtenderManagedResource{{Name: "foo.com/bar"}}},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", ManagedResources: []api.ExtenderManagedResource{{Name: "foo.com/bar"}}},
 				}},
-			expected: errors.New("Duplicate extender managed resource name foo.com/bar"),
+			expected: errors.New("duplicate extender managed resource name foo.com/bar"),
 		},
 		{
 			policy: api.Policy{

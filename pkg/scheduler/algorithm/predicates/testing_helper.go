@@ -33,7 +33,7 @@ func (pvcs FakePersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 			return &pvc, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find persistent volume claim: %s/%s", namespace, pvcID)
+	return nil, fmt.Errorf("unable to find persistent volume claim: %s/%s", namespace, pvcID)
 }
 
 // FakeNodeInfo declares a v1.Node type for testing.
@@ -55,7 +55,7 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 			return &node, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
+	return nil, fmt.Errorf("unable to find node: %s", nodeName)
 }
 
 // FakePersistentVolumeInfo declares a []v1.PersistentVolume type for testing.
@@ -68,7 +68,7 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 			return &pv, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
+	return nil, fmt.Errorf("unable to find persistent volume: %s", pvID)
 }
 
 // FakeStorageClassInfo declares a []storagev1.StorageClass type for testing.
@@ -81,5 +81,5 @@ func (classes FakeStorageClassInfo) GetStorageClassInfo(name string) (*storagev1
 			return &sc, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find storage class: %s", name)
+	return nil, fmt.Errorf("unable to find storage class: %s", name)
 }

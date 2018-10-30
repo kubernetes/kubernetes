@@ -282,7 +282,7 @@ func (t *tcShaper) Reset(cidr string) error {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("Failed to find cidr: %s on interface: %s", cidr, t.iface)
+		return fmt.Errorf("failed to find cidr: %s on interface: %s", cidr, t.iface)
 	}
 	for i := 0; i < len(classAndHandle); i++ {
 		if err := t.execAndLog("tc", "filter", "del",

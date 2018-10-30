@@ -233,7 +233,7 @@ func (util *PortworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 
 	updatedVol := vols[0]
 	if updatedVol.Spec.Size < vol.Spec.Size {
-		return fmt.Errorf("Portworx volume: %s doesn't match expected size after resize. expected:%v actual:%v",
+		return fmt.Errorf("%s doesn't match expected size after resize. expected:%v actual:%v",
 			spec.Name(), vol.Spec.Size, updatedVol.Spec.Size)
 	}
 

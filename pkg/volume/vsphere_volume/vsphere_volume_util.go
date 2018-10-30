@@ -60,7 +60,7 @@ const (
 	IopsLimitCapabilityMin              = 0
 )
 
-var ErrProbeVolume = errors.New("Error scanning attached volumes")
+var ErrProbeVolume = errors.New("error scanning attached volumes")
 
 type VsphereDiskUtil struct{}
 
@@ -74,7 +74,7 @@ type VolumeSpec struct {
 
 func verifyDevicePath(path string) (string, error) {
 	if pathExists, err := volumeutil.PathExists(path); err != nil {
-		return "", fmt.Errorf("Error checking if path exists: %v", err)
+		return "", fmt.Errorf("error checking if path exists: %v", err)
 	} else if pathExists {
 		return path, nil
 	}
@@ -133,7 +133,7 @@ func (util *VsphereDiskUtil) CreateVolume(v *vsphereVolumeProvisioner) (volSpec 
 
 	if volumeOptions.VSANStorageProfileData != "" {
 		if volumeOptions.StoragePolicyName != "" {
-			return nil, fmt.Errorf("Cannot specify storage policy capabilities along with storage policy name. Please specify only one")
+			return nil, fmt.Errorf("cannot specify storage policy capabilities along with storage policy name. Please specify only one")
 		}
 		volumeOptions.VSANStorageProfileData = "(" + volumeOptions.VSANStorageProfileData + ")"
 	}
@@ -185,12 +185,12 @@ func getVolPathfromVolumeName(deviceMountPath string) string {
 func getCloudProvider(cloud cloudprovider.Interface) (*vsphere.VSphere, error) {
 	if cloud == nil {
 		klog.Errorf("Cloud provider not initialized properly")
-		return nil, errors.New("Cloud provider not initialized properly")
+		return nil, errors.New("cloud provider not initialized properly")
 	}
 
 	vs, ok := cloud.(*vsphere.VSphere)
 	if !ok || vs == nil {
-		return nil, errors.New("Invalid cloud provider: expected vSphere")
+		return nil, errors.New("invalid cloud provider: expected vSphere")
 	}
 	return vs, nil
 }
@@ -200,23 +200,23 @@ func validateVSANCapability(capabilityName string, capabilityValue string) (stri
 	var capabilityData string
 	capabilityIntVal, ok := verifyCapabilityValueIsInteger(capabilityValue)
 	if !ok {
-		return "", fmt.Errorf("Invalid value for %s. The capabilityValue: %s must be a valid integer value", capabilityName, capabilityValue)
+		return "", fmt.Errorf("invalid value for %s. The capabilityValue: %s must be a valid integer value", capabilityName, capabilityValue)
 	}
 	switch strings.ToLower(capabilityName) {
 	case HostFailuresToTolerateCapability:
 		if capabilityIntVal >= HostFailuresToTolerateCapabilityMin && capabilityIntVal <= HostFailuresToTolerateCapabilityMax {
 			capabilityData = " (\"hostFailuresToTolerate\" i" + capabilityValue + ")"
 		} else {
-			return "", fmt.Errorf(`Invalid value for hostFailuresToTolerate.
-				The default value is %d, minimum value is %d and maximum value is %d.`,
+			return "", fmt.Errorf("invalid value for hostFailuresToTolerate."+
+				"The default value is %d, minimum value is %d and maximum value is %d",
 				1, HostFailuresToTolerateCapabilityMin, HostFailuresToTolerateCapabilityMax)
 		}
 	case ForceProvisioningCapability:
 		if capabilityIntVal >= ForceProvisioningCapabilityMin && capabilityIntVal <= ForceProvisioningCapabilityMax {
 			capabilityData = " (\"forceProvisioning\" i" + capabilityValue + ")"
 		} else {
-			return "", fmt.Errorf(`Invalid value for forceProvisioning.
-				The value can be either %d or %d.`,
+			return "", fmt.Errorf("invalid value for forceProvisioning."+
+				"The value can be either %d or %d",
 				ForceProvisioningCapabilityMin, ForceProvisioningCapabilityMax)
 		}
 	case CacheReservationCapability:

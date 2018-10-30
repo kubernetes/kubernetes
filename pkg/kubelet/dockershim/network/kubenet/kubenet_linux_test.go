@@ -87,7 +87,7 @@ func TestGetPodNetworkStatus(t *testing.T) {
 				func() ([]byte, error) {
 					ip, ok := podIPMap[kubecontainer.ContainerID{ID: t.id}]
 					if !ok {
-						return nil, fmt.Errorf("Pod IP %q not found", t.id)
+						return nil, fmt.Errorf("pod IP %q not found", t.id)
 					}
 					return []byte(ip), nil
 				},

@@ -75,7 +75,7 @@ func (plugin *emptyDirPlugin) GetPluginName() string {
 func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _ := getVolumeSource(spec)
 	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference an EmptyDir volume type")
+		return "", fmt.Errorf("spec does not reference an EmptyDir volume type")
 	}
 
 	// Return user defined volume name, since this is an ephemeral volume type
@@ -368,7 +368,7 @@ func (ed *emptyDir) TearDown() error {
 // TearDownAt simply discards everything in the directory.
 func (ed *emptyDir) TearDownAt(dir string) error {
 	if pathExists, pathErr := volumeutil.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil

@@ -37,7 +37,7 @@ type unsupportedContainerManager struct {
 var _ ContainerManager = &unsupportedContainerManager{}
 
 func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
-	return fmt.Errorf("Container Manager is unsupported in this build")
+	return fmt.Errorf("container manager is unsupported in this build")
 }
 
 func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {

@@ -69,7 +69,7 @@ func ValidateParams(paramSpec []GeneratorParam, params map[string]interface{}) e
 		if paramSpec[ix].Required {
 			value, found := params[paramSpec[ix].Name]
 			if !found || IsZero(value) {
-				allErrs = append(allErrs, fmt.Errorf("Parameter: %s is required", paramSpec[ix].Name))
+				allErrs = append(allErrs, fmt.Errorf("parameter: %s is required", paramSpec[ix].Name))
 			}
 		}
 	}

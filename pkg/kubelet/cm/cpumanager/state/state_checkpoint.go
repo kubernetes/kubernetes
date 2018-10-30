@@ -52,7 +52,7 @@ func NewCheckpointState(stateDir, checkpointName, policyName string) (State, err
 
 	if err := stateCheckpoint.restoreState(); err != nil {
 		return nil, fmt.Errorf("could not restore state from checkpoint: %v\n"+
-			"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet.",
+			"Please drain this node and delete the CPU manager checkpoint file %q before restarting Kubelet",
 			err, path.Join(stateDir, checkpointName))
 	}
 

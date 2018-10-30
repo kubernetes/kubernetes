@@ -416,7 +416,7 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	for _, name := range names.List() {
 		factory, ok := fitPredicateMap[name]
 		if !ok {
-			return nil, fmt.Errorf("Invalid predicate name %q specified - no corresponding function found", name)
+			return nil, fmt.Errorf("invalid predicate name %q specified - no corresponding function found", name)
 		}
 		predicates[name] = factory(args)
 	}
@@ -459,7 +459,7 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]al
 	for _, name := range names.List() {
 		factory, ok := priorityFunctionMap[name]
 		if !ok {
-			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
+			return nil, fmt.Errorf("invalid priority name %s specified - no corresponding function found", name)
 		}
 		if factory.Function != nil {
 			configs = append(configs, algorithm.PriorityConfig{
@@ -489,7 +489,7 @@ func validateSelectedConfigs(configs []algorithm.PriorityConfig) error {
 	for _, config := range configs {
 		// Checks totalPriority against MaxTotalPriority to avoid overflow
 		if config.Weight*schedulerapi.MaxPriority > schedulerapi.MaxTotalPriority-totalPriority {
-			return fmt.Errorf("Total priority of priority functions has overflown")
+			return fmt.Errorf("total priority of priority functions has overflown")
 		}
 		totalPriority += config.Weight * schedulerapi.MaxPriority
 	}

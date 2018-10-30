@@ -145,7 +145,7 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 	}
 	corruptedMnt := IsCorruptedMnt(pathErr)
 	if pathErr != nil && !corruptedMnt {
-		return fmt.Errorf("Error checking path: %v", pathErr)
+		return fmt.Errorf("error checking path: %v", pathErr)
 	}
 	return doUnmountMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
 }
@@ -189,7 +189,7 @@ func doUnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMou
 		klog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
 		return os.Remove(mountPath)
 	}
-	return fmt.Errorf("Failed to unmount path %v", mountPath)
+	return fmt.Errorf("failed to unmount path %v", mountPath)
 }
 
 // PathExists returns true if the specified path exists.
@@ -230,7 +230,7 @@ func IsCorruptedMnt(err error) bool {
 func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
-		return secret, fmt.Errorf("Cannot get kube client")
+		return secret, fmt.Errorf("cannot get kube client")
 	}
 	secrets, err := kubeClient.CoreV1().Secrets(pod.Namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
@@ -246,14 +246,14 @@ func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interf
 func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeClient clientset.Interface) (map[string]string, error) {
 	secret := make(map[string]string)
 	if kubeClient == nil {
-		return secret, fmt.Errorf("Cannot get kube client")
+		return secret, fmt.Errorf("cannot get kube client")
 	}
 	secrets, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return secret, err
 	}
 	if secrets.Type != v1.SecretType(volumePluginName) {
-		return secret, fmt.Errorf("Cannot get secret of type %s", volumePluginName)
+		return secret, fmt.Errorf("cannot get secret of type %s", volumePluginName)
 	}
 	for name, data := range secrets.Data {
 		secret[name] = string(data)
@@ -264,11 +264,11 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 // GetClassForVolume locates storage class by persistent volume
 func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
 	if kubeClient == nil {
-		return nil, fmt.Errorf("Cannot get kube client")
+		return nil, fmt.Errorf("cannot get kube client")
 	}
 	className := v1helper.GetPersistentVolumeClass(pv)
 	if className == "" {
-		return nil, fmt.Errorf("Volume has no storage class")
+		return nil, fmt.Errorf("volume has no storage class")
 	}
 
 	class, err := kubeClient.StorageV1().StorageClasses().Get(className, metav1.GetOptions{})
@@ -293,7 +293,7 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]stri
 		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
 		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
 		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
-			return fmt.Errorf("No matching NodeSelectorTerms")
+			return fmt.Errorf("no matching NodeSelectorTerms")
 		}
 	}
 
@@ -576,7 +576,7 @@ func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
 func GetPath(mounter volume.Mounter) (string, error) {
 	path := mounter.GetPath()
 	if path == "" {
-		return "", fmt.Errorf("Path is empty %s", reflect.TypeOf(mounter).String())
+		return "", fmt.Errorf("path is empty %s", reflect.TypeOf(mounter).String())
 	}
 	return path, nil
 }

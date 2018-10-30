@@ -404,13 +404,13 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 		return err
 	}
 	if mounter == nil {
-		return fmt.Errorf("Got a nil Mounter")
+		return fmt.Errorf("got a nil Mounter")
 	}
 
 	volPath := path.Join(tmpDir, testMountPath)
 	path := mounter.GetPath()
 	if path != volPath {
-		return fmt.Errorf("Got unexpected path: %s", path)
+		return fmt.Errorf("got unexpected path: %s", path)
 	}
 
 	if err := mounter.SetUp(&fsGroup); err != nil {

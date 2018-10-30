@@ -119,7 +119,7 @@ func createUserStrategy(opts *policy.RunAsUserStrategyOptions) (user.RunAsUserSt
 	case policy.RunAsUserStrategyRunAsAny:
 		return user.NewRunAsAny(opts)
 	default:
-		return nil, fmt.Errorf("Unrecognized RunAsUser strategy type %s", opts.Rule)
+		return nil, fmt.Errorf("unrecognized RunAsUser strategy type %s", opts.Rule)
 	}
 }
 
@@ -136,7 +136,7 @@ func createRunAsGroupStrategy(opts *policy.RunAsGroupStrategyOptions) (group.Gro
 	case policy.RunAsGroupStrategyMayRunAs:
 		return group.NewMayRunAs(opts.Ranges)
 	default:
-		return nil, fmt.Errorf("Unrecognized RunAsGroup strategy type %s", opts.Rule)
+		return nil, fmt.Errorf("unrecognized RunAsGroup strategy type %s", opts.Rule)
 	}
 }
 
@@ -148,7 +148,7 @@ func createSELinuxStrategy(opts *policy.SELinuxStrategyOptions) (selinux.SELinux
 	case policy.SELinuxStrategyRunAsAny:
 		return selinux.NewRunAsAny(opts)
 	default:
-		return nil, fmt.Errorf("Unrecognized SELinuxContext strategy type %s", opts.Rule)
+		return nil, fmt.Errorf("unrecognized SELinuxContext strategy type %s", opts.Rule)
 	}
 }
 
@@ -172,7 +172,7 @@ func createFSGroupStrategy(opts *policy.FSGroupStrategyOptions) (group.GroupStra
 	case policy.FSGroupStrategyMustRunAs:
 		return group.NewMustRunAs(opts.Ranges)
 	default:
-		return nil, fmt.Errorf("Unrecognized FSGroup strategy type %s", opts.Rule)
+		return nil, fmt.Errorf("unrecognized FSGroup strategy type %s", opts.Rule)
 	}
 }
 
@@ -186,7 +186,7 @@ func createSupplementalGroupStrategy(opts *policy.SupplementalGroupsStrategyOpti
 	case policy.SupplementalGroupsStrategyMustRunAs:
 		return group.NewMustRunAs(opts.Ranges)
 	default:
-		return nil, fmt.Errorf("Unrecognized SupplementalGroups strategy type %s", opts.Rule)
+		return nil, fmt.Errorf("unrecognized SupplementalGroups strategy type %s", opts.Rule)
 	}
 }
 

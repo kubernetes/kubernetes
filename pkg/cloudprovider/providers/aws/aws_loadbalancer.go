@@ -137,7 +137,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 		klog.Infof("Creating load balancer for %v with name: %s", namespacedName, loadBalancerName)
 		createResponse, err := c.elbv2.CreateLoadBalancer(createRequest)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating load balancer: %q", err)
+			return nil, fmt.Errorf("error creating load balancer: %q", err)
 		}
 
 		loadBalancer = createResponse.LoadBalancers[0]
@@ -153,7 +153,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			// duplicate target groups where the backend port is the same
 			_, targetGroupArn, err := c.createListenerV2(createResponse.LoadBalancers[0].LoadBalancerArn, mappings[i], namespacedName, instanceIDs, *createResponse.LoadBalancers[0].VpcId)
 			if err != nil {
-				return nil, fmt.Errorf("Error creating listener: %q", err)
+				return nil, fmt.Errorf("error creating listener: %q", err)
 			}
 			addTagsInput.ResourceArns = append(addTagsInput.ResourceArns, targetGroupArn)
 
@@ -168,7 +168,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 		if len(addTagsInput.ResourceArns) > 0 && len(addTagsInput.Tags) > 0 {
 			_, err = c.elbv2.AddTags(addTagsInput)
 			if err != nil {
-				return nil, fmt.Errorf("Error adding tags after creating Load Balancer: %q", err)
+				return nil, fmt.Errorf("error adding tags after creating Load Balancer: %q", err)
 			}
 		}
 	} else {
@@ -182,7 +182,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 				},
 			)
 			if err != nil {
-				return nil, fmt.Errorf("Error describing listeners: %q", err)
+				return nil, fmt.Errorf("error describing listeners: %q", err)
 			}
 
 			// actual maps FrontendPort to an elbv2.Listener
@@ -197,7 +197,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 				},
 			)
 			if err != nil {
-				return nil, fmt.Errorf("Error listing target groups: %q", err)
+				return nil, fmt.Errorf("error listing target groups: %q", err)
 			}
 
 			nodePortTargetGroup := map[int64]*elbv2.TargetGroup{}
@@ -245,7 +245,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 							}},
 						})
 						if err != nil {
-							return nil, fmt.Errorf("Error updating load balancer listener: %q", err)
+							return nil, fmt.Errorf("error updating load balancer listener: %q", err)
 						}
 
 						// Delete old target group
@@ -253,7 +253,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 							TargetGroupArn: listener.DefaultActions[0].TargetGroupArn,
 						})
 						if err != nil {
-							return nil, fmt.Errorf("Error deleting old target group: %q", err)
+							return nil, fmt.Errorf("error deleting old target group: %q", err)
 						}
 
 					} else {
@@ -308,7 +308,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			if len(addTagsInput.ResourceArns) > 0 && len(addTagsInput.Tags) > 0 {
 				_, err = c.elbv2.AddTags(addTagsInput)
 				if err != nil {
-					return nil, fmt.Errorf("Error adding tags after modifying load balancer targets: %q", err)
+					return nil, fmt.Errorf("error adding tags after modifying load balancer targets: %q", err)
 				}
 			}
 		}
@@ -323,7 +323,7 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 				},
 			)
 			if err != nil {
-				return nil, fmt.Errorf("Error retrieving load balancer after update: %q", err)
+				return nil, fmt.Errorf("error retrieving load balancer after update: %q", err)
 			}
 			loadBalancer = loadBalancers.LoadBalancers[0]
 		}
@@ -364,7 +364,7 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 	klog.Infof("Creating load balancer listener for %v", namespacedName)
 	createListenerOutput, err := c.elbv2.CreateListener(createListernerInput)
 	if err != nil {
-		return nil, aws.String(""), fmt.Errorf("Error creating load balancer listener: %q", err)
+		return nil, aws.String(""), fmt.Errorf("error creating load balancer listener: %q", err)
 	}
 	return createListenerOutput.Listeners[0], target.TargetGroupArn, nil
 }
@@ -373,11 +373,11 @@ func (c *Cloud) createListenerV2(loadBalancerArn *string, mapping nlbPortMapping
 func (c *Cloud) deleteListenerV2(listener *elbv2.Listener) error {
 	_, err := c.elbv2.DeleteListener(&elbv2.DeleteListenerInput{ListenerArn: listener.ListenerArn})
 	if err != nil {
-		return fmt.Errorf("Error deleting load balancer listener: %q", err)
+		return fmt.Errorf("error deleting load balancer listener: %q", err)
 	}
 	_, err = c.elbv2.DeleteTargetGroup(&elbv2.DeleteTargetGroupInput{TargetGroupArn: listener.DefaultActions[0].TargetGroupArn})
 	if err != nil {
-		return fmt.Errorf("Error deleting load balancer target group: %q", err)
+		return fmt.Errorf("error deleting load balancer target group: %q", err)
 	}
 	return nil
 }
@@ -412,10 +412,10 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, mapping nlbPor
 
 		result, err := c.elbv2.CreateTargetGroup(input)
 		if err != nil {
-			return nil, fmt.Errorf("Error creating load balancer target group: %q", err)
+			return nil, fmt.Errorf("error creating load balancer target group: %q", err)
 		}
 		if len(result.TargetGroups) != 1 {
-			return nil, fmt.Errorf("Expected only one target group on CreateTargetGroup, got %d groups", len(result.TargetGroups))
+			return nil, fmt.Errorf("expected only one target group on CreateTargetGroup, got %d groups", len(result.TargetGroups))
 		}
 
 		registerInput := &elbv2.RegisterTargetsInput{
@@ -431,7 +431,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, mapping nlbPor
 
 		_, err = c.elbv2.RegisterTargets(registerInput)
 		if err != nil {
-			return nil, fmt.Errorf("Error registering targets for load balancer: %q", err)
+			return nil, fmt.Errorf("error registering targets for load balancer: %q", err)
 		}
 
 		return result.TargetGroups[0], nil
@@ -441,7 +441,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, mapping nlbPor
 	{
 		healthResponse, err := c.elbv2.DescribeTargetHealth(&elbv2.DescribeTargetHealthInput{TargetGroupArn: targetGroup.TargetGroupArn})
 		if err != nil {
-			return nil, fmt.Errorf("Error describing target group health: %q", err)
+			return nil, fmt.Errorf("error describing target group health: %q", err)
 		}
 		actualIDs := []string{}
 		for _, healthDescription := range healthResponse.TargetHealthDescriptions {
@@ -475,7 +475,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, mapping nlbPor
 			}
 			_, err := c.elbv2.RegisterTargets(registerInput)
 			if err != nil {
-				return nil, fmt.Errorf("Error registering new targets in target group: %q", err)
+				return nil, fmt.Errorf("error registering new targets in target group: %q", err)
 			}
 			dirty = true
 		}
@@ -493,7 +493,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, mapping nlbPor
 			}
 			_, err := c.elbv2.DeregisterTargets(deregisterInput)
 			if err != nil {
-				return nil, fmt.Errorf("Error trying to deregister targets in target group: %q", err)
+				return nil, fmt.Errorf("error trying to deregister targets in target group: %q", err)
 			}
 			dirty = true
 		}
@@ -523,7 +523,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, mapping nlbPor
 		if dirtyHealthCheck {
 			_, err := c.elbv2.ModifyTargetGroup(input)
 			if err != nil {
-				return nil, fmt.Errorf("Error modifying target group health check: %q", err)
+				return nil, fmt.Errorf("error modifying target group health check: %q", err)
 			}
 
 			dirty = true
@@ -535,7 +535,7 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, mapping nlbPor
 			Names: []*string{aws.String(name)},
 		})
 		if err != nil {
-			return nil, fmt.Errorf("Error retrieving target group after creation/update: %q", err)
+			return nil, fmt.Errorf("error retrieving target group after creation/update: %q", err)
 		}
 		targetGroup = result.TargetGroups[0]
 	}
@@ -587,10 +587,10 @@ func (c *Cloud) getVpcCidrBlock() (*string, error) {
 		VpcIds: []*string{aws.String(c.vpcID)},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error querying VPC for ELB: %q", err)
+		return nil, fmt.Errorf("error querying VPC for ELB: %q", err)
 	}
 	if len(vpcs.Vpcs) != 1 {
-		return nil, fmt.Errorf("Error querying VPC for ELB, got %d vpcs for %s", len(vpcs.Vpcs), c.vpcID)
+		return nil, fmt.Errorf("error querying VPC for ELB, got %d vpcs for %s", len(vpcs.Vpcs), c.vpcID)
 	}
 	return vpcs.Vpcs[0].CidrBlock, nil
 }
@@ -825,7 +825,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 		describeRequest.Filters = c.tagging.addFilters(filters)
 		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
 		if err != nil {
-			return fmt.Errorf("Error querying security groups for NLB: %q", err)
+			return fmt.Errorf("error querying security groups for NLB: %q", err)
 		}
 		for _, sg := range response {
 			if !c.tagging.hasClusterTag(sg.Tags) {
@@ -841,7 +841,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 
 	taggedSecurityGroups, err := c.getTaggedSecurityGroups()
 	if err != nil {
-		return fmt.Errorf("Error querying for tagged security groups: %q", err)
+		return fmt.Errorf("error querying for tagged security groups: %q", err)
 	}
 
 	externalTrafficPolicyIsLocal := false
@@ -1198,7 +1198,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 			modifyAttributesRequest.LoadBalancerAttributes = loadBalancerAttributes
 			_, err = c.elb.ModifyLoadBalancerAttributes(modifyAttributesRequest)
 			if err != nil {
-				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %q", err)
+				return nil, fmt.Errorf("unable to update load balancer attributes during attribute sync: %q", err)
 			}
 			dirty = true
 		}

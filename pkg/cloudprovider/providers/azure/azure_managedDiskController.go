@@ -236,7 +236,7 @@ func (c *ManagedDiskController) ResizeDisk(diskURI string, oldSize resource.Quan
 	}
 
 	if result.DiskProperties == nil || result.DiskProperties.DiskSizeGB == nil {
-		return oldSize, fmt.Errorf("DiskProperties of disk(%s) is nil", diskName)
+		return oldSize, fmt.Errorf("invliad nil for DiskProperties of disk(%s)", diskName)
 	}
 
 	requestBytes := newSize.Value()

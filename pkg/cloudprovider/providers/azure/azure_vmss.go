@@ -466,7 +466,7 @@ func (ss *scaleSet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) (vmSetN
 	}
 	if len(*scaleSetNames) == 0 {
 		klog.Errorf("ss.GetVMSetNames - No scale sets found for nodes in the cluster, node count(%d)", len(nodes))
-		return nil, fmt.Errorf("No scale sets found for nodes, node count(%d)", len(nodes))
+		return nil, fmt.Errorf("no scale sets found for nodes, node count(%d)", len(nodes))
 	}
 
 	// sort the list to have deterministic selection
@@ -693,7 +693,7 @@ func (ss *scaleSet) ensureHostsInVMSetPool(service *v1.Service, backendPoolID st
 		return err
 	}
 	if !exists {
-		errorMessage := fmt.Errorf("Scale set %q not found", vmSetName)
+		errorMessage := fmt.Errorf("scale set %q not found", vmSetName)
 		klog.Errorf("%v", errorMessage)
 		return errorMessage
 	}

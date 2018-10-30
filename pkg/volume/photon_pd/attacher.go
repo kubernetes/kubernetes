@@ -170,7 +170,7 @@ func (attacher *photonPersistentDiskAttacher) WaitForAttach(spec *volume.Spec, d
 				return devicePath, nil
 			}
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached PD %s. Timeout waiting for mount paths to be created.", volumeSource.PdID)
+			return "", fmt.Errorf("could not find attached PD %s. Timeout waiting for mount paths to be created", volumeSource.PdID)
 		}
 	}
 }
@@ -294,12 +294,12 @@ func (detacher *photonPersistentDiskDetacher) WaitForDetach(devicePath string, t
 		case <-ticker.C:
 			klog.V(4).Infof("Checking device %q is detached.", devicePath)
 			if pathExists, err := volumeutil.PathExists(devicePath); err != nil {
-				return fmt.Errorf("Error checking if device path exists: %v", err)
+				return fmt.Errorf("error checking if device path exists: %v", err)
 			} else if !pathExists {
 				return nil
 			}
 		case <-timer.C:
-			return fmt.Errorf("Timeout reached; Device %v is still attached", devicePath)
+			return fmt.Errorf("timeout reached; Device %v is still attached", devicePath)
 		}
 	}
 }

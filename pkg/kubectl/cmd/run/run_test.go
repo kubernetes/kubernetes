@@ -437,7 +437,7 @@ func TestRunValidations(t *testing.T) {
 			flags: map[string]string{
 				"image": "#",
 			},
-			expectedErr: "Invalid image name",
+			expectedErr: "invalid image name",
 		},
 		{
 			name: "test stdin replicas value",

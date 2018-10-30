@@ -486,7 +486,7 @@ func generateCallbackFunc(done chan<- interface{}) func() error {
 func generateErrorFunc(done <-chan interface{}) func() error {
 	return func() error {
 		<-done
-		return fmt.Errorf("Generic error")
+		return fmt.Errorf("generic error")
 	}
 }
 

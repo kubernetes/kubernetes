@@ -199,7 +199,7 @@ func extractContainerResourceValue(fs *corev1.ResourceFieldSelector, container *
 		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
 	}
 
-	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
+	return "", fmt.Errorf("unsupported container resource : %v", fs.Resource)
 }
 
 // convertResourceCPUToString converts cpu value to the format of divisor and returns

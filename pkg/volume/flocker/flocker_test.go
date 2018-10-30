@@ -92,7 +92,7 @@ func (c *fakeFlockerClient) GetDatasetID(metaName string) (datasetID string, err
 	if val, ok := c.Metadata["Name"]; !ok {
 		return val, nil
 	}
-	return "", fmt.Errorf("No dataset with metadata X found")
+	return "", fmt.Errorf("no dataset with metadata X found")
 }
 
 func (c *fakeFlockerClient) GetPrimaryUUID() (primaryUUID string, err error) {
@@ -118,7 +118,7 @@ func (fake *fakeFlockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetU
 
 func (fake *fakeFlockerUtil) DeleteVolume(cd *flockerVolumeDeleter) error {
 	if cd.datasetUUID != "test-flocker-volume-uuid" {
-		return fmt.Errorf("Deleter got unexpected datasetUUID: %s", cd.datasetUUID)
+		return fmt.Errorf("deleter got unexpected datasetUUID: %s", cd.datasetUUID)
 	}
 	return nil
 }

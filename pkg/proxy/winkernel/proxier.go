@@ -67,7 +67,7 @@ type WindowsKernelCompatTester struct{}
 func (lkct WindowsKernelCompatTester) IsCompatible() error {
 	_, err := hcsshim.HNSListPolicyListRequest()
 	if err != nil {
-		return fmt.Errorf("Windows kernel is not compatible for Kernel mode")
+		return fmt.Errorf("windows kernel is not compatible for Kernel mode")
 	}
 	return nil
 }
@@ -483,7 +483,7 @@ func NewProxier(
 	// TODO : Make this a param
 	hnsNetworkName := os.Getenv("KUBE_NETWORK")
 	if len(hnsNetworkName) == 0 {
-		return nil, fmt.Errorf("Environment variable KUBE_NETWORK not initialized")
+		return nil, fmt.Errorf("environment variable KUBE_NETWORK not initialized")
 	}
 	hnsNetwork, err := getHnsNetworkInfo(hnsNetworkName)
 	if err != nil {
@@ -683,7 +683,7 @@ func getHnsEndpointByIpAddress(ip net.IP, networkName string) (*hcsshim.HNSEndpo
 		}
 	}
 
-	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
+	return nil, fmt.Errorf("endpoint %v not found on network %s", ip, networkName)
 }
 
 // Sync is called to synchronize the proxier state to hns as soon as possible.

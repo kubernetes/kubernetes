@@ -60,11 +60,11 @@ func (c *flockerVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 	}
 
 	if len(c.options.Parameters) > 0 {
-		return nil, fmt.Errorf("Provisioning failed: Specified at least one unsupported parameter")
+		return nil, fmt.Errorf("specified at least one unsupported parameter")
 	}
 
 	if c.options.PVC.Spec.Selector != nil {
-		return nil, fmt.Errorf("Provisioning failed: Specified unsupported selector")
+		return nil, fmt.Errorf("specified unsupported selector")
 	}
 
 	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {

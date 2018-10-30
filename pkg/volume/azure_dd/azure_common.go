@@ -184,7 +184,7 @@ func getDiskController(host volume.VolumeHost) (DiskController, error) {
 	az, ok := cloudProvider.(*azure.Cloud)
 
 	if !ok || az == nil {
-		return nil, fmt.Errorf("AzureDisk -  failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 	return az, nil
 }
@@ -194,7 +194,7 @@ func getCloud(host volume.VolumeHost) (*azure.Cloud, error) {
 	az, ok := cloudProvider.(*azure.Cloud)
 
 	if !ok || az == nil {
-		return nil, fmt.Errorf("AzureDisk -  failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
+		return nil, fmt.Errorf("failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)
 	}
 	return az, nil
 }

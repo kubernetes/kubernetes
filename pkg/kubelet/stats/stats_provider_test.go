@@ -170,7 +170,7 @@ func TestRootFsStats(t *testing.T) {
 
 func TestGetContainerInfo(t *testing.T) {
 	cadvisorAPIFailure := fmt.Errorf("cAdvisor failure")
-	runtimeError := fmt.Errorf("List containers error")
+	runtimeError := fmt.Errorf("list containers error")
 	tests := []struct {
 		name                      string
 		containerID               string

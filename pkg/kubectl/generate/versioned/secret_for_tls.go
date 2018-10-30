@@ -116,7 +116,7 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 func readFile(file string) ([]byte, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
-		return []byte{}, fmt.Errorf("Cannot read file %v, %v", file, err)
+		return []byte{}, fmt.Errorf("cannot read file %v, %v", file, err)
 	}
 	return b, nil
 }

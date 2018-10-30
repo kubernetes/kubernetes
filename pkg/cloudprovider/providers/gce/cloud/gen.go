@@ -2812,7 +2812,7 @@ func (m *MockBackendServices) GetHealth(ctx context.Context, key *meta.Key, arg0
 	if m.GetHealthHook != nil {
 		return m.GetHealthHook(ctx, key, arg0, m)
 	}
-	return nil, fmt.Errorf("GetHealthHook must be set")
+	return nil, fmt.Errorf("invalid nil for GetHealthHook")
 }
 
 // Patch is a mock for the corresponding method.
@@ -4105,7 +4105,7 @@ func (m *MockRegionBackendServices) GetHealth(ctx context.Context, key *meta.Key
 	if m.GetHealthHook != nil {
 		return m.GetHealthHook(ctx, key, arg0, m)
 	}
-	return nil, fmt.Errorf("GetHealthHook must be set")
+	return nil, fmt.Errorf("invalid nil for GetHealthHook")
 }
 
 // Update is a mock for the corresponding method.
@@ -4520,7 +4520,7 @@ func (m *MockAlphaRegionBackendServices) GetHealth(ctx context.Context, key *met
 	if m.GetHealthHook != nil {
 		return m.GetHealthHook(ctx, key, arg0, m)
 	}
-	return nil, fmt.Errorf("GetHealthHook must be set")
+	return nil, fmt.Errorf("invalid nil for GetHealthHook")
 }
 
 // Update is a mock for the corresponding method.
@@ -12543,7 +12543,7 @@ func (m *MockBetaSecurityPolicies) GetRule(ctx context.Context, key *meta.Key) (
 	if m.GetRuleHook != nil {
 		return m.GetRuleHook(ctx, key, m)
 	}
-	return nil, fmt.Errorf("GetRuleHook must be set")
+	return nil, fmt.Errorf("invalid nil for GetRuleHook")
 }
 
 // Patch is a mock for the corresponding method.

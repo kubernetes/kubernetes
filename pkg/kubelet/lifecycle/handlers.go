@@ -70,8 +70,8 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		}
 		return msg, err
 	default:
-		err := fmt.Errorf("Invalid handler: %v", handler)
-		msg := fmt.Sprintf("Cannot run handler: %v", err)
+		err := fmt.Errorf("invalid handler: %v", handler)
+		msg := fmt.Sprintf("cannot run handler: %v", err)
 		klog.Errorf(msg)
 		return msg, err
 	}

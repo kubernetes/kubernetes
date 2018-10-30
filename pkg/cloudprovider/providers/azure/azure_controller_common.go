@@ -132,7 +132,7 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 			return *disk.Lun, nil
 		}
 	}
-	return -1, fmt.Errorf("Cannot find Lun for disk %s", diskName)
+	return -1, fmt.Errorf("cannot find Lun for disk %s", diskName)
 }
 
 // GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.

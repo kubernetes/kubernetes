@@ -78,13 +78,13 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	//   podDeviceMapPath/linkName: pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
 	//   linkName: {volumeName}
 	if len(devicePath) == 0 {
-		return fmt.Errorf("Failed to map device to map path. devicePath is empty")
+		return fmt.Errorf("failed to map device to map path. devicePath is empty")
 	}
 	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to map device to map path. mapPath is empty")
+		return fmt.Errorf("failed to map device to map path. mapPath is empty")
 	}
 	if !filepath.IsAbs(mapPath) {
-		return fmt.Errorf("The map path should be absolute: map path: %s", mapPath)
+		return fmt.Errorf("the map path should be absolute: map path: %s", mapPath)
 	}
 	klog.V(5).Infof("MapDevice: devicePath %s", devicePath)
 	klog.V(5).Infof("MapDevice: mapPath %s", mapPath)
@@ -97,7 +97,7 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 		return err
 	}
 	if err = os.MkdirAll(mapPath, 0750); err != nil {
-		return fmt.Errorf("Failed to mkdir %s, error %v", mapPath, err)
+		return fmt.Errorf("failed to mkdir %s, error %v", mapPath, err)
 	}
 	// Remove old symbolic link(or file) then create new one.
 	// This should be done because current symbolic link is
@@ -113,7 +113,7 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 // UnmapDevice removes a symbolic link associated to block device under specified map path
 func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string) error {
 	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to unmap device from map path. mapPath is empty")
+		return fmt.Errorf("failed to unmap device from map path. mapPath is empty")
 	}
 	klog.V(5).Infof("UnmapDevice: mapPath %s", mapPath)
 	klog.V(5).Infof("UnmapDevice: linkName %s", linkName)
@@ -133,7 +133,7 @@ func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string) error {
 // RemoveMapPath removes a file or directory on specified map path
 func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to remove map path. mapPath is empty")
+		return fmt.Errorf("failed to remove map path. mapPath is empty")
 	}
 	klog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
 	err := os.RemoveAll(mapPath)
@@ -169,7 +169,7 @@ func (v VolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) 
 	var refs []string
 	files, err := ioutil.ReadDir(mapPath)
 	if err != nil {
-		return nil, fmt.Errorf("Directory cannot read %v", err)
+		return nil, fmt.Errorf("directory cannot read %v", err)
 	}
 	for _, file := range files {
 		if file.Mode()&os.ModeSymlink != os.ModeSymlink {
@@ -178,7 +178,7 @@ func (v VolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) 
 		filename := file.Name()
 		filepath, err := os.Readlink(path.Join(mapPath, filename))
 		if err != nil {
-			return nil, fmt.Errorf("Symbolic link cannot be retrieved %v", err)
+			return nil, fmt.Errorf("symbolic link cannot be retrieved %v", err)
 		}
 		klog.V(5).Infof("GetDeviceSymlinkRefs: filepath: %v, devPath: %v", filepath, devPath)
 		if filepath == devPath {

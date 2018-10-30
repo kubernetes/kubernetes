@@ -33,43 +33,43 @@ type runner struct {
 }
 
 func (runner *runner) Flush() error {
-	return fmt.Errorf("IPVS not supported for this platform")
+	return fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) AddVirtualServer(*VirtualServer) error {
-	return fmt.Errorf("IPVS not supported for this platform")
+	return fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) UpdateVirtualServer(*VirtualServer) error {
-	return fmt.Errorf("IPVS not supported for this platform")
+	return fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) DeleteVirtualServer(*VirtualServer) error {
-	return fmt.Errorf("IPVS not supported for this platform")
+	return fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) GetVirtualServer(*VirtualServer) (*VirtualServer, error) {
-	return nil, fmt.Errorf("IPVS not supported for this platform")
+	return nil, fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
-	return nil, fmt.Errorf("IPVS not supported for this platform")
+	return nil, fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) AddRealServer(*VirtualServer, *RealServer) error {
-	return fmt.Errorf("IPVS not supported for this platform")
+	return fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) GetRealServers(*VirtualServer) ([]*RealServer, error) {
-	return nil, fmt.Errorf("IPVS not supported for this platform")
+	return nil, fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) DeleteRealServer(*VirtualServer, *RealServer) error {
-	return fmt.Errorf("IPVS not supported for this platform")
+	return fmt.Errorf("not supported for this platform")
 }
 
 func (runner *runner) UpdateRealServer(*VirtualServer, *RealServer) error {
-	return fmt.Errorf("IPVS not supported for this platform")
+	return fmt.Errorf("not supported for this platform")
 }
 
 var _ = Interface(&runner{})

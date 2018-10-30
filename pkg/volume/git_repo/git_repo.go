@@ -64,7 +64,7 @@ func (plugin *gitRepoPlugin) GetPluginName() string {
 func (plugin *gitRepoPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	volumeSource, _ := getVolumeSource(spec)
 	if volumeSource == nil {
-		return "", fmt.Errorf("Spec does not reference a Git repo volume type")
+		return "", fmt.Errorf("spec does not reference a Git repo volume type")
 	}
 
 	return fmt.Sprintf(

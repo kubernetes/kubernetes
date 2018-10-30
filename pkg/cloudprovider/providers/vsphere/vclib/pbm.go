@@ -115,7 +115,7 @@ func (pbmClient *PbmClient) GetCompatibleDatastores(ctx context.Context, dc *Dat
 	// Return an error if there are no compatible datastores.
 	if len(compatibleHubs) < 1 {
 		klog.Errorf("No compatible datastores found that satisfy the storage policy requirements: %s", storagePolicyID)
-		return nil, localizedMessagesForNotCompatibleDatastores, fmt.Errorf("No compatible datastores found that satisfy the storage policy requirements")
+		return nil, localizedMessagesForNotCompatibleDatastores, fmt.Errorf("no compatible datastores found that satisfy the storage policy requirements")
 	}
 	return compatibleDatastoreList, localizedMessagesForNotCompatibleDatastores, nil
 }

@@ -260,7 +260,7 @@ func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, 
 	}
 	pod := obj.(*api.Pod)
 	if pod == nil {
-		return nil, fmt.Errorf("Unexpected object type: %#v", pod)
+		return nil, fmt.Errorf("unexpected object type: %#v", pod)
 	}
 	return pod, nil
 }
@@ -441,7 +441,7 @@ func streamParams(params url.Values, opts runtime.Object) error {
 			params.Add(api.PortHeader, strings.Join(ports, ","))
 		}
 	default:
-		return fmt.Errorf("Unknown object for streaming: %v", opts)
+		return fmt.Errorf("unknown object for streaming: %v", opts)
 	}
 	return nil
 }

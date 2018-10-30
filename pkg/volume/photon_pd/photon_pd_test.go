@@ -85,7 +85,7 @@ func (fake *fakePDManager) CreateVolume(c *photonPersistentDiskProvisioner) (pdI
 
 func (fake *fakePDManager) DeleteVolume(cd *photonPersistentDiskDeleter) error {
 	if cd.pdID != "test-photon-pd-id" {
-		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.pdID)
+		return fmt.Errorf("deleter got unexpected volume name: %s", cd.pdID)
 	}
 	return nil
 }

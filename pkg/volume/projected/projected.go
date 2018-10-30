@@ -249,12 +249,12 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
 
 	kubeClient := s.plugin.host.GetKubeClient()
 	if kubeClient == nil {
-		return nil, fmt.Errorf("Cannot setup projected volume %v because kube client is not configured", s.volName)
+		return nil, fmt.Errorf("cannot setup projected volume %v because kube client is not configured", s.volName)
 	}
 
 	errlist := []error{}
@@ -383,5 +383,5 @@ func getVolumeSource(spec *volume.Spec) (*v1.ProjectedVolumeSource, bool, error)
 		return spec.Volume.Projected, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a projected volume type")
+	return nil, false, fmt.Errorf("spec does not reference a projected volume type")
 }

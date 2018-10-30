@@ -125,7 +125,7 @@ func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Nod
 
 func (fake *fakePDManager) DeleteVolume(cd *cinderVolumeDeleter) error {
 	if cd.pdName != "test-volume-name" {
-		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.pdName)
+		return fmt.Errorf("deleter got unexpected volume name: %s", cd.pdName)
 	}
 	return nil
 }

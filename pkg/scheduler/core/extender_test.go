@@ -42,7 +42,7 @@ type priorityConfig struct {
 }
 
 func errorPredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
-	return false, fmt.Errorf("Some error")
+	return false, fmt.Errorf("some error")
 }
 
 func falsePredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
@@ -68,7 +68,7 @@ func machine2PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
 }
 
 func errorPrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, error) {
-	return &schedulerapi.HostPriorityList{}, fmt.Errorf("Some error")
+	return &schedulerapi.HostPriorityList{}, fmt.Errorf("some error")
 }
 
 func machine1PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, error) {
@@ -317,7 +317,7 @@ func (f *FakeExtender) Bind(binding *v1.Binding) error {
 				return nil
 			}
 		}
-		err := fmt.Errorf("Node %v not in filtered nodes %v", binding.Target.Name, f.filteredNodes)
+		err := fmt.Errorf("node %v not in filtered nodes %v", binding.Target.Name, f.filteredNodes)
 		f.filteredNodes = nil
 		return err
 	}

@@ -20,12 +20,12 @@ import "errors"
 
 // Error Messages
 const (
-	FileAlreadyExistErrMsg     = "File requested already exist"
-	NoDiskUUIDFoundErrMsg      = "No disk UUID found"
-	NoDevicesFoundErrMsg       = "No devices found"
-	DiskNotFoundErrMsg         = "No vSphere disk ID found"
-	InvalidVolumeOptionsErrMsg = "VolumeOptions verification failed"
-	NoVMFoundErrMsg            = "No VM found"
+	FileAlreadyExistErrMsg     = "file requested already exist"
+	NoDiskUUIDFoundErrMsg      = "no disk UUID found"
+	NoDevicesFoundErrMsg       = "no devices found"
+	DiskNotFoundErrMsg         = "no vSphere disk ID found"
+	InvalidVolumeOptionsErrMsg = "nolumeOptions verification failed"
+	NoVMFoundErrMsg            = "no VM found"
 )
 
 // Error constants

@@ -74,7 +74,7 @@ func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error)
 	name := *runtimeClassName
 	item, exists, err := m.informer.GetStore().GetByKey(name)
 	if err != nil {
-		return "", fmt.Errorf("Failed to lookup RuntimeClass %s: %v", name, err)
+		return "", fmt.Errorf("failed to lookup RuntimeClass %s: %v", name, err)
 	}
 	if !exists {
 		return "", errors.NewNotFound(schema.GroupResource{
@@ -90,7 +90,7 @@ func (m *Manager) LookupRuntimeHandler(runtimeClassName *string) (string, error)
 
 	handler, _, err := unstructured.NestedString(rc.Object, "spec", "runtimeHandler")
 	if err != nil {
-		return "", fmt.Errorf("Invalid RuntimeClass object: %v", err)
+		return "", fmt.Errorf("invalid RuntimeClass object: %v", err)
 	}
 
 	return handler, nil

@@ -210,7 +210,7 @@ func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 	defer fp.Close()
 	encoder := json.NewEncoder(fp)
 	if err = encoder.Encode(conf); err != nil {
-		return fmt.Errorf("iscsi: encode err: %v.", err)
+		return fmt.Errorf("iscsi: encode err: %v", err)
 	}
 	return nil
 }
@@ -224,7 +224,7 @@ func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
 	defer fp.Close()
 	decoder := json.NewDecoder(fp)
 	if err = decoder.Decode(conf); err != nil {
-		return fmt.Errorf("iscsi: decode err: %v.", err)
+		return fmt.Errorf("iscsi: decode err: %v", err)
 	}
 	return nil
 }
@@ -250,7 +250,7 @@ func scanOneLun(hostNumber int, lunNumber int) error {
 	if written, err := fd.WriteString(scanCmd); err != nil {
 		return err
 	} else if 0 == written {
-		return fmt.Errorf("No data written to file: %s", filename)
+		return fmt.Errorf("no data written to file: %s", filename)
 	}
 
 	klog.V(3).Infof("Scanned SCSI host %d LUN %d", hostNumber, lunNumber)
@@ -394,7 +394,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			klog.V(5).Infof("AttachDisk: scanning SCSI host %d LUN %s", hostNumber, b.Lun)
 			lunNumber, err := strconv.Atoi(b.Lun)
 			if err != nil {
-				return "", fmt.Errorf("AttachDisk: lun is not a number: %s\nError: %v", b.Lun, err)
+				return "", fmt.Errorf("lun is not a number: %s\nError: %v", b.Lun, err)
 			}
 
 			// Scan the iSCSI bus for the LUN
@@ -405,7 +405,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 			if iscsiTransport == "" {
 				klog.Errorf("iscsi: could not find transport name in iface %s", b.Iface)
-				return "", fmt.Errorf("Could not parse iface file for %s", b.Iface)
+				return "", fmt.Errorf("could not parse iface file for %s", b.Iface)
 			}
 			if iscsiTransport == "tcp" {
 				devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
@@ -416,7 +416,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			if exist := waitForPathToExist(&devicePath, multipathDeviceTimeout, iscsiTransport); !exist {
 				klog.Errorf("Could not attach disk: Timeout after 10s")
 				// update last error
-				lastErr = fmt.Errorf("Could not attach disk: Timeout after 10s")
+				lastErr = fmt.Errorf("could not attach disk: Timeout after 10s")
 				continue
 			} else {
 				devicePaths[tp] = devicePath
@@ -502,7 +502,7 @@ func globalPDPathOperation(b iscsiDiskMounter) func(iscsiDiskMounter, string, *I
 		globalPDPath := b.manager.MakeGlobalPDName(*b.iscsiDisk)
 		notMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 		if err != nil && !os.IsNotExist(err) {
-			return "", fmt.Errorf("Heuristic determination of mount point failed:%v", err)
+			return "", fmt.Errorf("heuristic determination of mount point failed:%v", err)
 		}
 		// Return confirmed devicePath to caller
 		if !notMnt {
@@ -539,7 +539,7 @@ func deleteDevice(deviceName string) error {
 	if written, err := fd.WriteString("1"); err != nil {
 		return err
 	} else if 0 == written {
-		return fmt.Errorf("No data written to file: %s", filename)
+		return fmt.Errorf("no data written to file: %s", filename)
 	}
 	klog.V(4).Infof("Deleted block device: %s", deviceName)
 	return nil
@@ -591,7 +591,7 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 // DetachDisk unmounts and detaches a volume from node
 func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	if pathExists, pathErr := volumeutil.PathExists(mntPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
 		return nil
@@ -668,7 +668,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 // DetachBlockISCSIDisk removes loopback device for a volume and detaches a volume from node
 func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
 	if pathExists, pathErr := volumeutil.PathExists(mapPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
 		return nil
@@ -842,7 +842,7 @@ func parseIscsiadmShow(output string) (map[string]string, error) {
 		}
 		iface := strings.Fields(line)
 		if len(iface) != 3 || iface[1] != "=" {
-			return nil, fmt.Errorf("Error: invalid iface setting: %v", iface)
+			return nil, fmt.Errorf("error: invalid iface setting: %v", iface)
 		}
 		// iscsi_ifacename is immutable once the iface is created
 		if iface[0] == "iface.iscsi_ifacename" {

@@ -138,7 +138,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.QuobyteVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.Quobyte, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a Quobyte volume type")
+	return nil, false, fmt.Errorf("spec does not reference a Quobyte volume type")
 }
 
 func (plugin *quobytePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -398,7 +398,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 	}
 
 	if !validateRegistry(provisioner.registry) {
-		return nil, fmt.Errorf("Quobyte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
+		return nil, fmt.Errorf("quobyte registry missing or malformed: must be a host:port pair or multiple pairs separated by commas")
 	}
 
 	// create random image name
@@ -483,11 +483,11 @@ func parseAPIConfig(plugin *quobytePlugin, params map[string]string) (*quobyteAP
 
 	var ok bool
 	if cfg.quobyteUser, ok = secretMap["user"]; !ok {
-		return nil, fmt.Errorf("Missing \"user\" in secret %s/%s", secretNamespace, secretName)
+		return nil, fmt.Errorf("missing \"user\" in secret %s/%s", secretNamespace, secretName)
 	}
 
 	if cfg.quobytePassword, ok = secretMap["password"]; !ok {
-		return nil, fmt.Errorf("Missing \"password\" in secret %s/%s", secretNamespace, secretName)
+		return nil, fmt.Errorf("missing \"password\" in secret %s/%s", secretNamespace, secretName)
 	}
 
 	return cfg, nil

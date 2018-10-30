@@ -1969,13 +1969,13 @@ func wrapAttachError(err error, disk *awsDisk, instance string) error {
 					if disk.awsID != EBSVolumeID(aws.StringValue(a.VolumeId)) {
 						klog.Warningf("Expected to get attachment info of volume %q but instead got info of %q", disk.awsID, aws.StringValue(a.VolumeId))
 					} else if aws.StringValue(a.State) == "attached" {
-						return fmt.Errorf("Error attaching EBS volume %q to instance %q: %q. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
+						return fmt.Errorf("error attaching EBS volume %q to instance %q: %q. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
 					}
 				}
 			}
 		}
 	}
-	return fmt.Errorf("Error attaching EBS volume %q to instance %q: %q", disk.awsID, instance, err)
+	return fmt.Errorf("error attaching EBS volume %q to instance %q: %q", disk.awsID, instance, err)
 }
 
 // AttachDisk implements Volumes.AttachDisk
@@ -2209,7 +2209,7 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (KubernetesVolumeID, er
 
 	awsID := EBSVolumeID(aws.StringValue(response.VolumeId))
 	if awsID == "" {
-		return "", fmt.Errorf("VolumeID was not returned by CreateVolume")
+		return "", fmt.Errorf("volumeID was not returned by CreateVolume")
 	}
 	volumeName := KubernetesVolumeID("aws://" + aws.StringValue(response.AvailabilityZone) + "/" + string(awsID))
 
@@ -2375,7 +2375,7 @@ func (c *Cloud) GetDiskPath(volumeName KubernetesVolumeID) (string, error) {
 		return "", err
 	}
 	if len(info.Attachments) == 0 {
-		return "", fmt.Errorf("No attachment to volume %s", volumeName)
+		return "", fmt.Errorf("no attachment to volume %s", volumeName)
 	}
 	return aws.StringValue(info.Attachments[0].Device), nil
 }
@@ -2481,7 +2481,7 @@ func (c *Cloud) ResizeDisk(
 
 	volumeInfo, err := awsDisk.describeVolume()
 	if err != nil {
-		descErr := fmt.Errorf("AWS.ResizeDisk Error describing volume %s with %v", diskName, err)
+		descErr := fmt.Errorf("error describing volume %s with %v", diskName, err)
 		return oldSize, descErr
 	}
 	// AWS resizes in chunks of GiB (not GB)
@@ -2559,7 +2559,7 @@ func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error)
 				return nil, nil
 			}
 		}
-		return nil, fmt.Errorf("Error describing load balancer: %q", err)
+		return nil, fmt.Errorf("error describing load balancer: %q", err)
 	}
 
 	// AWS will not return 2 load balancers with the same name _and_ type.
@@ -2576,7 +2576,7 @@ func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error)
 func (c *Cloud) findVPCID() (string, error) {
 	macs, err := c.metadata.GetMetadata("network/interfaces/macs/")
 	if err != nil {
-		return "", fmt.Errorf("Could not list interfaces of the instance: %q", err)
+		return "", fmt.Errorf("could not list interfaces of the instance: %q", err)
 	}
 
 	// loop over interfaces, first vpc id returned wins
@@ -2591,7 +2591,7 @@ func (c *Cloud) findVPCID() (string, error) {
 		}
 		return vpcID, nil
 	}
-	return "", fmt.Errorf("Could not find VPC ID in instance metadata")
+	return "", fmt.Errorf("could not find VPC ID in instance metadata")
 }
 
 // Retrieves the specified security group from the AWS API, or returns nil if not found
@@ -3132,7 +3132,7 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
 	}
 
 	if subnetTable == nil {
-		return false, fmt.Errorf("Could not locate routing table for subnet %s", subnetID)
+		return false, fmt.Errorf("could not locate routing table for subnet %s", subnetID)
 	}
 
 	for _, route := range subnetTable.Routes {
@@ -3245,7 +3245,7 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 		} else {
 			protocol = backendProtocolMapping[instanceProtocol]
 			if protocol == "" {
-				return nil, fmt.Errorf("Invalid backend protocol %s for %s in %s", instanceProtocol, certID, ServiceAnnotationLoadBalancerBEProtocol)
+				return nil, fmt.Errorf("invalid backend protocol %s for %s in %s", instanceProtocol, certID, ServiceAnnotationLoadBalancerBEProtocol)
 			}
 		}
 		listener.SSLCertificateId = &certID
@@ -3282,7 +3282,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 	portList := getPortSets(annotations[ServiceAnnotationLoadBalancerSSLPorts])
 	for _, port := range apiService.Spec.Ports {
 		if port.Protocol != v1.ProtocolTCP {
-			return nil, fmt.Errorf("Only TCP LoadBalancer is supported for AWS ELB")
+			return nil, fmt.Errorf("only TCP LoadBalancer is supported for AWS ELB")
 		}
 		if port.NodePort == 0 {
 			klog.Errorf("Ignoring port without NodePort defined: %v", port)
@@ -3593,7 +3593,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		klog.V(4).Infof("service %v (%v) needs health checks on :%d%s)", apiService.Name, loadBalancerName, healthCheckNodePort, path)
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, "HTTP", healthCheckNodePort, path, annotations)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to ensure health check for localized service %v on node port %v: %q", loadBalancerName, healthCheckNodePort, err)
+			return nil, fmt.Errorf("failed to ensure health check for localized service %v on node port %v: %q", loadBalancerName, healthCheckNodePort, err)
 		}
 	} else {
 		klog.V(4).Infof("service %v does not need custom health checks", apiService.Name)
@@ -3728,7 +3728,7 @@ func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups m
 			for _, v := range tagged {
 				taggedGroups += fmt.Sprintf("%s(%s) ", *v.GroupId, *v.GroupName)
 			}
-			return nil, fmt.Errorf("Multiple tagged security groups found for instance %s; ensure only the k8s security group is tagged; the tagged groups were %v", instanceID, taggedGroups)
+			return nil, fmt.Errorf("multiple tagged security groups found for instance %s; ensure only the k8s security group is tagged; the tagged groups were %v", instanceID, taggedGroups)
 		}
 		return tagged[0], nil
 	}
@@ -3736,7 +3736,7 @@ func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups m
 	if len(untagged) > 0 {
 		// For back-compat, we will allow a single untagged SG
 		if len(untagged) != 1 {
-			return nil, fmt.Errorf("Multiple untagged security groups found for instance %s; ensure the k8s security group is tagged", instanceID)
+			return nil, fmt.Errorf("multiple untagged security groups found for instance %s; ensure the k8s security group is tagged", instanceID)
 		}
 		return untagged[0], nil
 	}
@@ -3790,7 +3790,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 		loadBalancerSecurityGroupID = *securityGroup
 	}
 	if loadBalancerSecurityGroupID == "" {
-		return fmt.Errorf("Could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
+		return fmt.Errorf("could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
 
 	// Get the actual list of groups that allow ingress from the load-balancer
@@ -3933,14 +3933,14 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 				&elbv2.DescribeTargetGroupsInput{LoadBalancerArn: lb.LoadBalancerArn},
 			)
 			if err != nil {
-				return fmt.Errorf("Error listing target groups before deleting load balancer: %q", err)
+				return fmt.Errorf("error listing target groups before deleting load balancer: %q", err)
 			}
 
 			_, err = c.elbv2.DeleteLoadBalancer(
 				&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: lb.LoadBalancerArn},
 			)
 			if err != nil {
-				return fmt.Errorf("Error deleting load balancer %q: %v", loadBalancerName, err)
+				return fmt.Errorf("error deleting load balancer %q: %v", loadBalancerName, err)
 			}
 
 			for _, group := range targetGroups.TargetGroups {
@@ -3948,7 +3948,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 					&elbv2.DeleteTargetGroupInput{TargetGroupArn: group.TargetGroupArn},
 				)
 				if err != nil {
-					return fmt.Errorf("Error deleting target groups after deleting load balancer: %q", err)
+					return fmt.Errorf("error deleting target groups after deleting load balancer: %q", err)
 				}
 			}
 		}
@@ -3964,7 +3964,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 				describeRequest.Filters = c.tagging.addFilters(filters)
 				response, err := c.ec2.DescribeSecurityGroups(describeRequest)
 				if err != nil {
-					return fmt.Errorf("Error querying security groups for NLB: %q", err)
+					return fmt.Errorf("error querying security groups for NLB: %q", err)
 				}
 				for _, sg := range response {
 					if !c.tagging.hasClusterTag(sg.Tags) {
@@ -4160,7 +4160,7 @@ func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, serv
 			return err
 		}
 		if lb == nil {
-			return fmt.Errorf("Load balancer not found")
+			return fmt.Errorf("load balancer not found")
 		}
 		_, err = c.EnsureLoadBalancer(ctx, clusterName, service, nodes)
 		return err
@@ -4171,7 +4171,7 @@ func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, serv
 	}
 
 	if lb == nil {
-		return fmt.Errorf("Load balancer not found")
+		return fmt.Errorf("load balancer not found")
 	}
 
 	if sslPolicyName, ok := service.Annotations[ServiceAnnotationLoadBalancerSSLNegotiationPolicy]; ok {

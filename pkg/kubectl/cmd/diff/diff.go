@@ -167,7 +167,7 @@ func (v *DiffVersion) getObject(obj Object) (runtime.Object, error) {
 	case "MERGED":
 		return obj.Merged()
 	}
-	return nil, fmt.Errorf("Unknown version: %v", v.Name)
+	return nil, fmt.Errorf("unknown version: %v", v.Name)
 }
 
 // Print prints the object using the printer into a new file in the directory.

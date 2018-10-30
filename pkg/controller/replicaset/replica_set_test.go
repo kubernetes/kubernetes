@@ -326,7 +326,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1
 	fakePodControl.Clear()
-	fakePodControl.Err = fmt.Errorf("Fake Error")
+	fakePodControl.Err = fmt.Errorf("fake Error")
 
 	manager.syncReplicaSet(GetKey(rsSpec, t))
 	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
@@ -670,7 +670,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("get", "replicasets", func(action core.Action) (bool, runtime.Object, error) { return true, rs, nil })
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
-		return true, &apps.ReplicaSet{}, fmt.Errorf("Fake error")
+		return true, &apps.ReplicaSet{}, fmt.Errorf("fake error")
 	})
 	fakeRSClient := fakeClient.Apps().ReplicaSets("default")
 	numReplicas := int32(10)
@@ -1136,10 +1136,10 @@ func TestPatchPodFails(t *testing.T) {
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(newPod("pod2", rs, v1.PodRunning, nil, false))
 	// let both patches fail. The rs controller will assume it fails to take
 	// control of the pods and requeue to try again.
-	fakePodControl.Err = fmt.Errorf("Fake Error")
+	fakePodControl.Err = fmt.Errorf("fake error")
 	rsKey := GetKey(rs, t)
 	err := processSync(manager, rsKey)
-	if err == nil || !strings.Contains(err.Error(), "Fake Error") {
+	if err == nil || !strings.Contains(err.Error(), "fake error") {
 		t.Errorf("expected Fake Error, got %+v", err)
 	}
 	// 2 patches to take control of pod1 and pod2 (both fail).

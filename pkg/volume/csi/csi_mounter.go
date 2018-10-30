@@ -236,7 +236,7 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 		return nil, nil
 	}
 	if c.plugin.csiDriverLister == nil {
-		return nil, errors.New("CSIDriver lister does not exist")
+		return nil, errors.New("CSI Driver lister does not exist")
 	}
 
 	csiDriver, err := c.plugin.csiDriverLister.Get(c.driverName)

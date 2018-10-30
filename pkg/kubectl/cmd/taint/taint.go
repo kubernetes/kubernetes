@@ -180,7 +180,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 func (o TaintOptions) validateFlags() error {
 	// Cannot have a non-empty selector and all flag set. They are mutually exclusive.
 	if o.all && o.selector != "" {
-		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited.")
+		return fmt.Errorf("setting 'all' parameter with a non empty selector is prohibited")
 	}
 	// If both selector and all are not set.
 	if !o.all && o.selector == "" {

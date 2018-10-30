@@ -93,7 +93,7 @@ func (fake *fakePDManager) CreateVolume(c *awsElasticBlockStoreProvisioner, node
 
 func (fake *fakePDManager) DeleteVolume(cd *awsElasticBlockStoreDeleter) error {
 	if cd.volumeID != "test-aws-volume-name" {
-		return fmt.Errorf("Deleter got unexpected volume name: %s", cd.volumeID)
+		return fmt.Errorf("deleter got unexpected volume name: %s", cd.volumeID)
 	}
 	return nil
 }

@@ -196,15 +196,15 @@ func (nfsMounter *nfsMounter) CanMount() error {
 	switch runtime.GOOS {
 	case "linux":
 		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs"); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
+			return fmt.Errorf("required binary /sbin/mount.nfs is missing")
 		}
 		if _, err := exec.Run("test", "-x", "/sbin/mount.nfs4"); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
+			return fmt.Errorf("required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
 		if _, err := exec.Run("test", "-x", "/sbin/mount_nfs"); err != nil {
-			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
+			return fmt.Errorf("required binary /sbin/mount_nfs is missing")
 		}
 	}
 	return nil
@@ -305,5 +305,5 @@ func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {
 		return spec.PersistentVolume.Spec.NFS, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a NFS volume type")
+	return nil, false, fmt.Errorf("spec does not reference a NFS volume type")
 }

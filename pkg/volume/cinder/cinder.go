@@ -587,5 +587,5 @@ func getVolumeInfo(spec *volume.Spec) (string, string, bool, error) {
 		return spec.PersistentVolume.Spec.Cinder.VolumeID, spec.PersistentVolume.Spec.Cinder.FSType, spec.ReadOnly, nil
 	}
 
-	return "", "", false, fmt.Errorf("Spec does not reference a Cinder volume type")
+	return "", "", false, fmt.Errorf("spec does not reference a Cinder volume type")
 }

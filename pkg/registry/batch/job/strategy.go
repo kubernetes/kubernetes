@@ -194,7 +194,7 @@ func JobToSelectableFields(job *batch.Job) fields.Set {
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	job, ok := obj.(*batch.Job)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a job.")
+		return nil, nil, false, fmt.Errorf("given object is not a job")
 	}
 	return labels.Set(job.ObjectMeta.Labels), JobToSelectableFields(job), job.Initializers != nil, nil
 }

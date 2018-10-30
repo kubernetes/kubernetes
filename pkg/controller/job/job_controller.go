@@ -354,7 +354,7 @@ func (jm *JobController) updateJob(old, cur interface{}) {
 func (jm *JobController) enqueueController(obj interface{}, immediate bool) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
@@ -394,7 +394,7 @@ func (jm *JobController) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing job: %v", err))
+	utilruntime.HandleError(fmt.Errorf("error syncing job: %v", err))
 	jm.queue.AddRateLimited(key)
 
 	return true
@@ -688,7 +688,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for job %#v: %v", job, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for job %#v: %v", job, err))
 		return 0, nil
 	}
 
@@ -744,7 +744,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 		}
 		diff := wantActive - active
 		if diff < 0 {
-			utilruntime.HandleError(fmt.Errorf("More active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
+			utilruntime.HandleError(fmt.Errorf("more active than wanted: job %q, want %d, have %d", jobKey, wantActive, active))
 			diff = 0
 		}
 		jm.expectations.ExpectCreations(jobKey, int(diff))

@@ -65,7 +65,7 @@ type awsTagging struct {
 func (t *awsTagging) init(legacyClusterID string, clusterID string) error {
 	if legacyClusterID != "" {
 		if clusterID != "" && legacyClusterID != clusterID {
-			return fmt.Errorf("ClusterID tags did not match: %q vs %q", clusterID, legacyClusterID)
+			return fmt.Errorf("clusterID tags did not match: %q vs %q", clusterID, legacyClusterID)
 		}
 		t.usesLegacyTags = true
 		clusterID = legacyClusterID
@@ -109,7 +109,7 @@ func findClusterIDs(tags []*ec2.Tag) (string, string, error) {
 		if strings.HasPrefix(tagKey, TagNameKubernetesClusterPrefix) {
 			id := strings.TrimPrefix(tagKey, TagNameKubernetesClusterPrefix)
 			if newClusterID != "" {
-				return "", "", fmt.Errorf("Found multiple cluster tags with prefix %s (%q and %q)", TagNameKubernetesClusterPrefix, newClusterID, id)
+				return "", "", fmt.Errorf("found multiple cluster tags with prefix %s (%q and %q)", TagNameKubernetesClusterPrefix, newClusterID, id)
 			}
 			newClusterID = id
 		}
@@ -117,7 +117,7 @@ func findClusterIDs(tags []*ec2.Tag) (string, string, error) {
 		if tagKey == TagNameKubernetesClusterLegacy {
 			id := aws.StringValue(tag.Value)
 			if legacyClusterID != "" {
-				return "", "", fmt.Errorf("Found multiple %s tags (%q and %q)", TagNameKubernetesClusterLegacy, legacyClusterID, id)
+				return "", "", fmt.Errorf("found multiple %s tags (%q and %q)", TagNameKubernetesClusterLegacy, legacyClusterID, id)
 			}
 			legacyClusterID = id
 		}

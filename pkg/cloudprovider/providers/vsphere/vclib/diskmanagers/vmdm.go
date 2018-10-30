@@ -63,7 +63,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 
 		if !compatible {
 			klog.Errorf("Datastore: %s is not compatible with Policy: %s", datastore.Name(), vmdisk.volumeOptions.StoragePolicyName)
-			return "", fmt.Errorf("User specified datastore is not compatible with the storagePolicy: %q. Failed with faults: %+q", vmdisk.volumeOptions.StoragePolicyName, faultMessage)
+			return "", fmt.Errorf("user specified datastore is not compatible with the storagePolicy: %q. Failed with faults: %+q", vmdisk.volumeOptions.StoragePolicyName, faultMessage)
 		}
 	}
 
@@ -80,9 +80,9 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 		}
 		if dsType != vclib.VSANDatastoreType {
 			klog.Errorf("The specified datastore: %q is not a VSAN datastore", datastore.Name())
-			return "", fmt.Errorf("The specified datastore: %q is not a VSAN datastore."+
+			return "", fmt.Errorf("the specified datastore: %q is not a VSAN datastore."+
 				" The policy parameters will work only with VSAN Datastore."+
-				" So, please specify a valid VSAN datastore in Storage class definition.", datastore.Name())
+				" So, please specify a valid VSAN datastore in Storage class definition", datastore.Name())
 		}
 		storageProfileSpec.ProfileId = ""
 		storageProfileSpec.ProfileData = &types.VirtualMachineProfileRawData{
@@ -91,7 +91,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 		}
 	} else {
 		klog.Errorf("Both volumeOptions.StoragePolicyID and volumeOptions.VSANStorageProfileData are not set. One of them should be set")
-		return "", fmt.Errorf("Both volumeOptions.StoragePolicyID and volumeOptions.VSANStorageProfileData are not set. One of them should be set")
+		return "", fmt.Errorf("both volumeOptions.StoragePolicyID and volumeOptions.VSANStorageProfileData are not set. One of them should be set")
 	}
 	var dummyVM *vclib.VirtualMachine
 	// Check if VM already exist in the folder.
@@ -219,7 +219,7 @@ func CleanUpDummyVMs(ctx context.Context, folder *vclib.Folder, dc *vclib.Datace
 	}
 	if vmList == nil || len(vmList) == 0 {
 		klog.Errorf("No virtual machines found in the kubernetes cluster: %s", folder.InventoryPath)
-		return fmt.Errorf("No virtual machines found in the kubernetes cluster: %s", folder.InventoryPath)
+		return fmt.Errorf("no virtual machines found in the kubernetes cluster: %s", folder.InventoryPath)
 	}
 	var dummyVMList []*vclib.VirtualMachine
 	// Loop through VM's in the Kubernetes cluster to find dummy VM's

@@ -19,6 +19,7 @@ package gcepd
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"strings"
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
@@ -110,9 +110,9 @@ func TestAttachDetach(t *testing.T) {
 	readOnly := false
 	regional := false
 	spec := createVolSpec(diskName, readOnly)
-	attachError := errors.New("Fake attach error")
-	detachError := errors.New("Fake detach error")
-	diskCheckError := errors.New("Fake DiskIsAttached error")
+	attachError := errors.New("fake attach error")
+	detachError := errors.New("fake detach error")
+	diskCheckError := errors.New("fake DiskIsAttached error")
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -328,22 +328,22 @@ func (testcase *testcase) AttachDisk(diskName string, nodeName types.NodeName, r
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return errors.New("Unexpected AttachDisk call: wrong diskName")
+		return errors.New("unexpected AttachDisk call: wrong diskName")
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return errors.New("Unexpected AttachDisk call: wrong nodeName")
+		return errors.New("unexpected AttachDisk call: wrong nodeName")
 	}
 
 	if expected.readOnly != readOnly {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected readOnly %v, got %v", expected.readOnly, readOnly)
-		return errors.New("Unexpected AttachDisk call: wrong readOnly")
+		return errors.New("unexpected AttachDisk call: wrong readOnly")
 	}
 
 	if expected.regional != regional {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected regional %v, got %v", expected.regional, regional)
-		return errors.New("Unexpected AttachDisk call: wrong regional")
+		return errors.New("unexpected AttachDisk call: wrong regional")
 	}
 
 	klog.V(4).Infof("AttachDisk call: %s, %s, %v, returning %v", diskName, nodeName, readOnly, expected.ret)
@@ -363,12 +363,12 @@ func (testcase *testcase) DetachDisk(devicePath string, nodeName types.NodeName)
 
 	if expected.devicePath != devicePath {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected devicePath %s, got %s", expected.devicePath, devicePath)
-		return errors.New("Unexpected DetachDisk call: wrong diskName")
+		return errors.New("unexpected DetachDisk call: wrong diskName")
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return errors.New("Unexpected DetachDisk call: wrong nodeName")
+		return errors.New("unexpected DetachDisk call: wrong nodeName")
 	}
 
 	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", devicePath, nodeName, expected.ret)
@@ -388,12 +388,12 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected DiskIsAttached call: expected diskName %s, got %s", expected.diskName, diskName)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong diskName")
+		return false, errors.New("unexpected DiskIsAttached call: wrong diskName")
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DiskIsAttached call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong nodeName")
+		return false, errors.New("unexpected DiskIsAttached call: wrong nodeName")
 	}
 
 	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
@@ -402,28 +402,28 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 }
 
 func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
-	return errors.New("Not implemented")
+	return errors.New("not implemented")
 }
 
 func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error {
-	return errors.New("Not implemented")
+	return errors.New("not implemented")
 }
 
 func (testcase *testcase) DeleteDisk(diskToDelete string) error {
-	return errors.New("Not implemented")
+	return errors.New("not implemented")
 }
 
 func (testcase *testcase) GetAutoLabelsForPD(name string, zone string) (map[string]string, error) {
-	return map[string]string{}, errors.New("Not implemented")
+	return map[string]string{}, errors.New("not implemented")
 }
 
 func (testcase *testcase) ResizeDisk(
 	diskName string,
 	oldSize resource.Quantity,
 	newSize resource.Quantity) (resource.Quantity, error) {
-	return oldSize, errors.New("Not implemented")
+	return oldSize, errors.New("not implemented")
 }

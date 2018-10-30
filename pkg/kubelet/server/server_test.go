@@ -841,7 +841,7 @@ func TestAuthenticationError(t *testing.T) {
 	}
 	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 		calledAuthorize = true
-		return authorizer.DecisionNoOpinion, "", errors.New("Failed")
+		return authorizer.DecisionNoOpinion, "", errors.New("failed")
 	}
 
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)

@@ -207,11 +207,11 @@ func TestRunPredicate(t *testing.T) {
 		},
 		{
 			name:             "predicate error",
-			pred:             mockPredicate{err: errors.New("This is expected")},
+			pred:             mockPredicate{err: errors.New("this is expected")},
 			expectFit:        false,
 			expectCacheHit:   false,
 			expectCacheWrite: false,
-			expectedError:    "This is expected",
+			expectedError:    "this is expected",
 		},
 	}
 

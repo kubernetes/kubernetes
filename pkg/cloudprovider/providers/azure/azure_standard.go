@@ -521,7 +521,7 @@ func (as *availabilitySet) GetVMSetNames(service *v1.Service, nodes []*v1.Node) 
 	}
 	if len(*availabilitySetNames) == 0 {
 		klog.Errorf("as.GetVMSetNames - No availability sets found for nodes in the cluster, node count(%d)", len(nodes))
-		return nil, fmt.Errorf("No availability sets found for nodes, node count(%d)", len(nodes))
+		return nil, fmt.Errorf("no availability sets found for nodes, node count(%d)", len(nodes))
 	}
 	// sort the list to have deterministic selection
 	sort.Strings(*availabilitySetNames)

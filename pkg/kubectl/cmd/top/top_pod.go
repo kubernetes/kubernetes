@@ -255,7 +255,7 @@ func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
 func checkPodAge(pod *v1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
-		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
+		message := fmt.Sprintf("metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
 		klog.Warningf(message)
 		return errors.New(message)
 	} else {

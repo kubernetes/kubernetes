@@ -189,7 +189,7 @@ func (rq *ResourceQuotaController) enqueueAll() {
 	for i := range rqs {
 		key, err := controller.KeyFunc(rqs[i])
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", rqs[i], err))
+			utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", rqs[i], err))
 			continue
 		}
 		rq.queue.Add(key)
@@ -476,7 +476,7 @@ func GetQuotableResources(discoveryFunc NamespacedResourcesFunc) (map[schema.Gro
 	quotableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"create", "list", "watch", "delete"}}, possibleResources)
 	quotableGroupVersionResources, err := discovery.GroupVersionResources(quotableResources)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse resources: %v", err)
+		return nil, fmt.Errorf("failed to parse resources: %v", err)
 	}
 	// return the original discovery error (if any) in addition to the list
 	return quotableGroupVersionResources, discoveryErr

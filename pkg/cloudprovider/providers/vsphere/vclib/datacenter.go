@@ -151,7 +151,7 @@ func (dc *Datacenter) GetDatastoreByPath(ctx context.Context, vmDiskPath string)
 	isSuccess := datastorePathObj.FromString(vmDiskPath)
 	if !isSuccess {
 		klog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
-		return nil, errors.New("Failed to parse vmDiskPath")
+		return nil, errors.New("failed to parse vmDiskPath")
 	}
 
 	return dc.GetDatastoreByName(ctx, datastorePathObj.Datastore)

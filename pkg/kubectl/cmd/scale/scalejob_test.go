@@ -42,7 +42,7 @@ func (c *errorJobs) Update(job *batch.Job) (*batch.Job, error) {
 	case c.conflict:
 		return nil, kerrors.NewConflict(api.Resource(job.Kind), job.Name, nil)
 	}
-	return nil, errors.New("Job update failure")
+	return nil, errors.New("job update failure")
 }
 
 func (c *errorJobs) Get(name string, options metav1.GetOptions) (*batch.Job, error) {

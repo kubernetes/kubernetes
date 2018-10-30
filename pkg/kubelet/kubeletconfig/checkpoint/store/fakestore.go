@@ -38,23 +38,23 @@ func NewFakeStore() Store {
 }
 
 func (s *fakeStore) Initialize() error {
-	return fmt.Errorf("Initialize method not supported")
+	return fmt.Errorf("not supported")
 }
 
 func (s *fakeStore) Exists(source checkpoint.RemoteConfigSource) (bool, error) {
-	return false, fmt.Errorf("Exists method not supported")
+	return false, fmt.Errorf("not supported")
 }
 
 func (s *fakeStore) Save(c checkpoint.Payload) error {
-	return fmt.Errorf("Save method not supported")
+	return fmt.Errorf("not supported")
 }
 
 func (s *fakeStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.KubeletConfiguration, error) {
-	return nil, fmt.Errorf("Load method not supported")
+	return nil, fmt.Errorf("not supported")
 }
 
 func (s *fakeStore) AssignedModified() (time.Time, error) {
-	return time.Time{}, fmt.Errorf("AssignedModified method not supported")
+	return time.Time{}, fmt.Errorf("not supported")
 }
 
 func (s *fakeStore) Assigned() (checkpoint.RemoteConfigSource, error) {
@@ -76,5 +76,5 @@ func (s *fakeStore) SetLastKnownGood(source checkpoint.RemoteConfigSource) error
 }
 
 func (s *fakeStore) Reset() (bool, error) {
-	return false, fmt.Errorf("Reset method not supported")
+	return false, fmt.Errorf("not supported")
 }

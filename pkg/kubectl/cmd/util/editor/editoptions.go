@@ -399,7 +399,7 @@ func (o *EditOptions) Run() error {
 			return err
 		}
 		if len(infos) == 0 {
-			return errors.New("edit cancelled, no objects found.")
+			return errors.New("edit cancelled, no objects found")
 		}
 		return editFn(infos)
 	case ApplyEditMode:

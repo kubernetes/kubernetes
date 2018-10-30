@@ -36,7 +36,7 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 			return node, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
+	return nil, fmt.Errorf("unable to find node: %s", nodeName)
 }
 
 func TestInterPodAffinityPriority(t *testing.T) {

@@ -83,7 +83,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 4}},
 			},
-			expectedError: fmt.Errorf("'fsck' found errors on device /dev/foo but could not correct them: ."),
+			expectedError: fmt.Errorf("'fsck' found errors on device /dev/foo but could not correct them: "),
 		},
 		{
 			description: "Test 'fsck' fails with exit status 1 (errors found and corrected)",
@@ -123,13 +123,13 @@ func TestSafeFormatAndMount(t *testing.T) {
 		{
 			description: "Test that 'blkid' is called and confirms unformatted disk, format passes, second mount fails",
 			fstype:      "ext4",
-			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), fmt.Errorf("Still cannot mount")},
+			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), fmt.Errorf("still cannot mount")},
 			execScripts: []ExecArgs{
 				{"fsck", []string{"-a", "/dev/foo"}, "", nil},
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 2}},
 				{"mkfs.ext4", []string{"-F", "-m0", "/dev/foo"}, "", nil},
 			},
-			expectedError: fmt.Errorf("Still cannot mount"),
+			expectedError: fmt.Errorf("still cannot mount"),
 		},
 		{
 			description: "Test that 'blkid' is called and confirms unformatted disk, format passes, second mount passes",

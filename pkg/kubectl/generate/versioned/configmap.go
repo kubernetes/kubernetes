@@ -204,7 +204,7 @@ func handleConfigMapFromFileSources(configMap *v1.ConfigMap, fileSources []strin
 		}
 		if info.IsDir() {
 			if strings.Contains(fileSource, "=") {
-				return fmt.Errorf("cannot give a key name for a directory path.")
+				return fmt.Errorf("cannot give a key name for a directory path")
 			}
 			fileList, err := ioutil.ReadDir(filePath)
 			if err != nil {

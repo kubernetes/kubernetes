@@ -136,7 +136,7 @@ func TestGet_BadName(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected error, but did not get one")
 	}
-	if !strings.Contains(err.Error(), "Component not found: invalidname") {
+	if !strings.Contains(err.Error(), "component not found: invalidname") {
 		t.Fatalf("Got unexpected error: %v", err)
 	}
 }

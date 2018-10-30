@@ -82,7 +82,7 @@ func (f *FakeIPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
 	if f.Sets[set.Name] != nil {
 		if !ignoreExistErr {
 			// already exists
-			return fmt.Errorf("Set cannot be created: set with the same name already exists")
+			return fmt.Errorf("set cannot be created: set with the same name already exists")
 		}
 		return nil
 	}
@@ -97,7 +97,7 @@ func (f *FakeIPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool
 	if f.Entries[set.Name].Has(entry) {
 		if !ignoreExistErr {
 			// already exists
-			return fmt.Errorf("Element cannot be added to the set: it's already added")
+			return fmt.Errorf("element cannot be added to the set: it's already added")
 		}
 		return nil
 	}

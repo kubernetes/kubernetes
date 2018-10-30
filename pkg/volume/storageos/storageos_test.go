@@ -126,7 +126,7 @@ func (fake *fakePDManager) UnmountVolume(b *storageosUnmounter) error {
 func (fake *fakePDManager) DeleteVolume(d *storageosDeleter) error {
 	fake.deleteCalled = true
 	if d.volName != "test-storageos-name" {
-		return fmt.Errorf("Deleter got unexpected volume name: %s", d.volName)
+		return fmt.Errorf("deleter got unexpected volume name: %s", d.volName)
 	}
 	return nil
 }

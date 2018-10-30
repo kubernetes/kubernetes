@@ -50,7 +50,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	if pathErr != nil && !util.IsCorruptedMnt(pathErr) {
-		return fmt.Errorf("Error checking path: %v", pathErr)
+		return fmt.Errorf("error checking path: %v", pathErr)
 	}
 
 	call := f.plugin.NewDriverCall(unmountCmd)
@@ -65,7 +65,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		return nil
 	}

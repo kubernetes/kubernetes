@@ -79,7 +79,7 @@ func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (volSpec *V
 
 func (fake *fakePDManager) DeleteVolume(vd *vsphereVolumeDeleter) error {
 	if vd.volPath != "[local] test-volume-name.vmdk" {
-		return fmt.Errorf("Deleter got unexpected volume path: %s", vd.volPath)
+		return fmt.Errorf("deleter got unexpected volume path: %s", vd.volPath)
 	}
 	return nil
 }

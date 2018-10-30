@@ -201,7 +201,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	// Extract the desired replica count from the controller.
 	desiredAnnotation, err := strconv.Atoi(newRc.Annotations[desiredReplicasAnnotation])
 	if err != nil {
-		return fmt.Errorf("Unable to parse annotation for %s: %s=%s",
+		return fmt.Errorf("unable to parse annotation for %s: %s=%s",
 			newRc.Name, desiredReplicasAnnotation, newRc.Annotations[desiredReplicasAnnotation])
 	}
 	desired := int32(desiredAnnotation)
@@ -474,7 +474,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev
 			return nil, false, err
 		}
 		if valOrZero(controller.Spec.Replicas) <= 0 {
-			return nil, false, fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %d", controller.Name, valOrZero(controller.Spec.Replicas))
+			return nil, false, fmt.Errorf("invalid controller spec for %s; required: > 0 replicas, actual: %d", controller.Name, valOrZero(controller.Spec.Replicas))
 		}
 		// The controller wasn't found, so create it.
 		if controller.Annotations == nil {
@@ -491,7 +491,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev
 	source := annotations[sourceIDAnnotation]
 	_, ok := annotations[desiredReplicasAnnotation]
 	if source != sourceID || !ok {
-		return nil, false, fmt.Errorf("Missing/unexpected annotations for controller %s, expected %s : %s", controller.Name, sourceID, annotations)
+		return nil, false, fmt.Errorf("missing/unexpected annotations for controller %s, expected %s : %s", controller.Name, sourceID, annotations)
 	}
 	return existingRc, true, nil
 }

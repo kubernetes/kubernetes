@@ -256,11 +256,11 @@ func (plugin *rbdPlugin) createMounterFromVolumeSpecAndPod(spec *volume.Spec, po
 		// if secret is provideded, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
+			return nil, fmt.Errorf("cannot get kube client")
 		}
 		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
 		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+			err = fmt.Errorf("couldn't get secret %v/%v err: %v", secretNs, secretName, err)
 			return nil, err
 		}
 		for _, data := range secrets.Data {
@@ -289,11 +289,11 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.Vol
 		// if secret is provideded, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
+			return nil, fmt.Errorf("cannot get kube client")
 		}
 		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
 		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+			err = fmt.Errorf("couldn't get secret %v/%v err: %v", secretNs, secretName, err)
 			return nil, err
 		}
 		for _, data := range secrets.Data {
@@ -466,11 +466,11 @@ func (plugin *rbdPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ 
 			// if secret is provideded, retrieve it
 			kubeClient := plugin.host.GetKubeClient()
 			if kubeClient == nil {
-				return nil, fmt.Errorf("Cannot get kube client")
+				return nil, fmt.Errorf("cannot get kube client")
 			}
 			secrets, err := kubeClient.Core().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
 			if err != nil {
-				err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+				err = fmt.Errorf("couldn't get secret %v/%v err: %v", secretNs, secretName, err)
 				return nil, err
 			}
 			for _, data := range secrets.Data {
@@ -849,7 +849,7 @@ func (c *rbdUnmounter) TearDown() error {
 func (c *rbdUnmounter) TearDownAt(dir string) error {
 	klog.V(4).Infof("rbd: attempting to teardown at %s", dir)
 	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil
@@ -990,7 +990,7 @@ func getVolumeSourceMonitors(spec *volume.Spec) ([]string, error) {
 		return spec.PersistentVolume.Spec.RBD.CephMonitors, nil
 	}
 
-	return nil, fmt.Errorf("Spec does not reference a RBD volume type")
+	return nil, fmt.Errorf("spec does not reference a RBD volume type")
 }
 
 func getVolumeSourceImage(spec *volume.Spec) (string, error) {
@@ -1001,7 +1001,7 @@ func getVolumeSourceImage(spec *volume.Spec) (string, error) {
 		return spec.PersistentVolume.Spec.RBD.RBDImage, nil
 	}
 
-	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+	return "", fmt.Errorf("spec does not reference a RBD volume type")
 }
 
 func getVolumeSourceFSType(spec *volume.Spec) (string, error) {
@@ -1012,7 +1012,7 @@ func getVolumeSourceFSType(spec *volume.Spec) (string, error) {
 		return spec.PersistentVolume.Spec.RBD.FSType, nil
 	}
 
-	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+	return "", fmt.Errorf("spec does not reference a RBD volume type")
 }
 
 func getVolumeSourcePool(spec *volume.Spec) (string, error) {
@@ -1023,7 +1023,7 @@ func getVolumeSourcePool(spec *volume.Spec) (string, error) {
 		return spec.PersistentVolume.Spec.RBD.RBDPool, nil
 	}
 
-	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+	return "", fmt.Errorf("spec does not reference a RBD volume type")
 }
 
 func getVolumeSourceUser(spec *volume.Spec) (string, error) {
@@ -1034,7 +1034,7 @@ func getVolumeSourceUser(spec *volume.Spec) (string, error) {
 		return spec.PersistentVolume.Spec.RBD.RadosUser, nil
 	}
 
-	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+	return "", fmt.Errorf("spec does not reference a RBD volume type")
 }
 
 func getVolumeSourceKeyRing(spec *volume.Spec) (string, error) {
@@ -1045,7 +1045,7 @@ func getVolumeSourceKeyRing(spec *volume.Spec) (string, error) {
 		return spec.PersistentVolume.Spec.RBD.Keyring, nil
 	}
 
-	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+	return "", fmt.Errorf("spec does not reference a RBD volume type")
 }
 
 func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
@@ -1058,7 +1058,7 @@ func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
 		return spec.ReadOnly, nil
 	}
 
-	return false, fmt.Errorf("Spec does not reference a RBD volume type")
+	return false, fmt.Errorf("spec does not reference a RBD volume type")
 }
 
 func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, error) {
@@ -1067,7 +1067,7 @@ func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, e
 		if spec.PersistentVolume.Spec.RBD != nil {
 			return spec.PersistentVolume.Spec.AccessModes, nil
 		} else {
-			return nil, fmt.Errorf("Spec does not reference a RBD volume type")
+			return nil, fmt.Errorf("spec does not reference a RBD volume type")
 		}
 	}
 
@@ -1128,5 +1128,5 @@ func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (stri
 		}
 		return "", "", nil
 	}
-	return "", "", fmt.Errorf("Spec does not reference an RBD volume type")
+	return "", "", fmt.Errorf("spec does not reference an RBD volume type")
 }

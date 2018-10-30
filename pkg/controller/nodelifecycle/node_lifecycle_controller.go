@@ -790,7 +790,7 @@ func (nc *Controller) monitorNodeHealth() error {
 			if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
 				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
 				if err = nodeutil.MarkAllPodsNotReady(nc.kubeClient, node); err != nil {
-					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
+					utilruntime.HandleError(fmt.Errorf("unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
 

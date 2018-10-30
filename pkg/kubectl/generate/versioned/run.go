@@ -619,7 +619,7 @@ func populateResourceListV1(spec string) (v1.ResourceList, error) {
 	for _, resourceStatement := range resourceStatements {
 		parts := strings.Split(resourceStatement, "=")
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("Invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
+			return nil, fmt.Errorf("invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
 		}
 		resourceName := v1.ResourceName(parts[0])
 		resourceQuantity, err := resource.ParseQuantity(parts[1])

@@ -364,7 +364,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 
 	globalPDPath := util.MakeGlobalPDName(*b.rbd)
 	if pathExists, pathErr := volutil.PathExists(globalPDPath); pathErr != nil {
-		return "", fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return "", fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
 			return "", err
@@ -450,7 +450,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			devicePath, mapped = waitForPath(b.Pool, b.Image, 10 /*maxRetries*/, false /*useNbdDriver*/)
 		}
 		if !mapped {
-			return "", fmt.Errorf("Could not map image %s/%s, Timeout after 10s", b.Pool, b.Image)
+			return "", fmt.Errorf("could not map image %s/%s, Timeout after 10s", b.Pool, b.Image)
 		}
 	}
 	return devicePath, nil
@@ -506,7 +506,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 func (util *RBDUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error {
 
 	if pathExists, pathErr := volutil.PathExists(mapPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
 		return nil
@@ -560,7 +560,7 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 
 	decoder := json.NewDecoder(fp)
 	if err = decoder.Decode(mounter); err != nil {
-		return fmt.Errorf("rbd: decode err: %v.", err)
+		return fmt.Errorf("rbd: decode err: %v", err)
 	}
 
 	if err != nil {

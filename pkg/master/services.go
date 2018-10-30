@@ -34,7 +34,7 @@ func DefaultServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, ne
 		serviceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
 	}
 	if size := ipallocator.RangeSize(&serviceClusterIPRange); size < 8 {
-		return net.IPNet{}, net.IP{}, fmt.Errorf("The service cluster IP range must be at least %d IP addresses", 8)
+		return net.IPNet{}, net.IP{}, fmt.Errorf("the service cluster IP range must be at least %d IP addresses", 8)
 	}
 
 	// Select the first valid IP from ServiceClusterIPRange to use as the GenericAPIServer service IP.

@@ -143,7 +143,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		err = apierrors.NewConflict(
 			api.Resource("namespaces"),
 			name,
-			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, namespace.UID),
+			fmt.Errorf("precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, namespace.UID),
 		)
 		return nil, false, err
 	}
@@ -208,7 +208,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
-		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
+		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("the system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system"))
 		return nil, false, err
 	}
 	return r.store.Delete(ctx, name, options)

@@ -202,7 +202,7 @@ func (grm *nestedPendingOperations) getOperation(
 	}
 
 	logOperationName := getOperationName(volumeName, podName)
-	return 0, fmt.Errorf("Operation %q not found", logOperationName)
+	return 0, fmt.Errorf("operation %q not found", logOperationName)
 }
 
 func (grm *nestedPendingOperations) deleteOperation(

@@ -133,7 +133,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
-		return fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestApiResources(o.CmdParent))
+		return fmt.Errorf("you must specify the type of resource to describe %s\n", cmdutil.SuggestApiResources(o.CmdParent))
 	}
 
 	o.BuilderArgs = args

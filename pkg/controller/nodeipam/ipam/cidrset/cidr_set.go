@@ -56,7 +56,7 @@ var (
 	// ErrCIDRSetSubNetTooBig occurs when the subnet mask size is too
 	// big compared to the CIDR mask size.
 	ErrCIDRSetSubNetTooBig = errors.New(
-		"New CIDR set failed; the node CIDR size is too big")
+		"new CIDR set failed; the node CIDR size is too big")
 )
 
 // NewCIDRSet creates a new CidrSet.
@@ -162,7 +162,7 @@ func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 	var ipSize int
 
 	if cidr == nil {
-		return -1, -1, fmt.Errorf("Error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
+		return -1, -1, fmt.Errorf("error getting indices for cluster cidr %v, cidr is nil", s.clusterCIDR)
 	}
 
 	if !s.clusterCIDR.Contains(cidr.IP.Mask(s.clusterCIDR.Mask)) && !cidr.Contains(s.clusterCIDR.IP.Mask(cidr.Mask)) {
@@ -245,7 +245,7 @@ func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
 	if ip.To4() != nil {
 		cidrIndex := (binary.BigEndian.Uint32(s.clusterIP) ^ binary.BigEndian.Uint32(ip.To4())) >> uint32(32-s.subNetMaskSize)
 		if cidrIndex >= uint32(s.maxCIDRs) {
-			return 0, fmt.Errorf("CIDR: %v/%v is out of the range of CIDR allocator", ip, s.subNetMaskSize)
+			return 0, fmt.Errorf("CIDR %v/%v is out of the range of CIDR allocator", ip, s.subNetMaskSize)
 		}
 		return int(cidrIndex), nil
 	}
@@ -255,7 +255,7 @@ func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
 		cidrIndexBig := bigIP.Rsh(bigIP, uint(net.IPv6len*8-s.subNetMaskSize))
 		cidrIndex := cidrIndexBig.Uint64()
 		if cidrIndex >= uint64(s.maxCIDRs) {
-			return 0, fmt.Errorf("CIDR: %v/%v is out of the range of CIDR allocator", ip, s.subNetMaskSize)
+			return 0, fmt.Errorf("CIDR %v/%v is out of the range of CIDR allocator", ip, s.subNetMaskSize)
 		}
 		return int(cidrIndex), nil
 	}

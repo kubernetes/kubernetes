@@ -58,7 +58,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 		klog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
 		msiEndpoint, err := adal.GetMSIVMEndpoint()
 		if err != nil {
-			return nil, fmt.Errorf("Getting the managed service identity endpoint: %v", err)
+			return nil, fmt.Errorf("getting the managed service identity endpoint: %v", err)
 		}
 		if len(config.UserAssignedIdentityID) > 0 {
 			klog.V(4).Info("azure: using User Assigned MSI ID to retrieve access token")
@@ -104,7 +104,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 			env.ServiceManagementEndpoint)
 	}
 
-	return nil, fmt.Errorf("No credentials provided for AAD application %s", config.AADClientID)
+	return nil, fmt.Errorf("no credentials provided for AAD application %s", config.AADClientID)
 }
 
 // ParseAzureEnvironment returns azure environment by name

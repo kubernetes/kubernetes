@@ -69,7 +69,7 @@ func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Dat
 		return "", vclib.ErrInvalidVolumeOptions
 	}
 	if virtualDisk.VolumeOptions.StoragePolicyID != "" && virtualDisk.VolumeOptions.StoragePolicyName != "" {
-		return "", fmt.Errorf("Storage Policy ID and Storage Policy Name both set, Please set only one parameter")
+		return "", fmt.Errorf("storage policy ID and Storage Policy Name both set, Please set only one parameter")
 	}
 	return getDiskManager(virtualDisk, VirtualDiskCreateOperation).Create(ctx, datastore)
 }

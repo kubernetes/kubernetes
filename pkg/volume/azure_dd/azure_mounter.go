@@ -139,20 +139,20 @@ func (m *azureDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 		if !mountPoint {
 			if err = mounter.Unmount(dir); err != nil {
-				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup failed to unmount disk:%s on dir:%s with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
+				return fmt.Errorf("setupAt:Mount:Failure:cleanup failed to unmount disk:%s on dir:%s with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
 			}
 			mountPoint, err := mounter.IsLikelyNotMountPoint(dir)
 			if err != nil {
-				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup IsLikelyNotMountPoint for disk:%s on dir:%s check failed with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
+				return fmt.Errorf("setupAt:Mount:Failure:cleanup IsLikelyNotMountPoint for disk:%s on dir:%s check failed with error:%v original-mountErr:%v", diskName, dir, err, mountErr)
 			}
 			if !mountPoint {
 				// not cool. leave for next sync loop.
-				return fmt.Errorf("azureDisk - SetupAt:Mount:Failure:cleanup disk %s is still mounted on %s during cleanup original-mountErr:%v, despite call to unmount(). Will try again next sync loop.", diskName, dir, mountErr)
+				return fmt.Errorf("setupAt:Mount:Failure:cleanup disk %s is still mounted on %s during cleanup original-mountErr:%v, despite call to unmount(). Will try again next sync loop", diskName, dir, mountErr)
 			}
 		}
 
 		if err = os.Remove(dir); err != nil {
-			return fmt.Errorf("azureDisk - SetupAt:Mount:Failure error cleaning up (removing dir:%s) with error:%v original-mountErr:%v", dir, err, mountErr)
+			return fmt.Errorf("SetupAt:Mount:Failure error cleaning up (removing dir:%s) with error:%v original-mountErr:%v", dir, err, mountErr)
 		}
 
 		klog.V(2).Infof("azureDisk - Mount of disk:%s on dir:%s failed with mount error:%v post failure clean up was completed", diskName, dir, mountErr)
@@ -173,7 +173,7 @@ func (u *azureDiskUnmounter) TearDown() error {
 
 func (u *azureDiskUnmounter) TearDownAt(dir string) error {
 	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
 		return nil

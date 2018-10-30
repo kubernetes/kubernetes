@@ -262,7 +262,7 @@ func (kubemarkController *KubemarkController) RemoveNodeFromNodeGroup(nodeGroup 
 			return nil
 		}
 	}
-	return fmt.Errorf("Failed to delete node %s: %v", node, err)
+	return fmt.Errorf("failed to delete node %s: %v", node, err)
 }
 
 func (kubemarkController *KubemarkController) getReplicationControllerByName(name string) *apiv1.ReplicationController {

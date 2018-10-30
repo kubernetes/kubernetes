@@ -23,5 +23,5 @@ import (
 )
 
 func RlimitNumFiles(maxOpenFiles uint64) error {
-	return errors.New("SetRLimit unsupported in this platform")
+	return errors.New("unsupported in this platform")
 }

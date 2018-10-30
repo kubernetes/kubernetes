@@ -499,7 +499,7 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 
 		_, err := c.common.cloud.StorageAccountClient.Create(ctx, c.common.resourceGroup, storageAccountName, cp)
 		if err != nil {
-			return fmt.Errorf(fmt.Sprintf("Create Storage Account: %s, error: %s", storageAccountName, err))
+			return fmt.Errorf("create Storage Account: %s, error: %s", storageAccountName, err)
 		}
 
 		newAccountState := &storageAccountState{

@@ -19,20 +19,21 @@ package vsphere
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
+	"sync"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog"
-	"net/http"
-	"strings"
-	"sync"
 )
 
 // Error Messages
 const (
-	CredentialsNotFoundErrMsg = "Credentials not found"
-	CredentialMissingErrMsg   = "Username/Password is missing"
-	UnknownSecretKeyErrMsg    = "Unknown secret key"
+	CredentialsNotFoundErrMsg = "credentials not found"
+	CredentialMissingErrMsg   = "username/password is missing"
+	UnknownSecretKeyErrMsg    = "unknown secret key"
 )
 
 // Error constants

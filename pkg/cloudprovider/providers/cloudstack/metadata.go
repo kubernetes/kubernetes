@@ -77,7 +77,7 @@ func (m *metadata) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1
 
 // NodeAddressesByProviderID returns the addresses of the specified instance.
 func (m *metadata) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
-	return nil, errors.New("NodeAddressesByProviderID not implemented")
+	return nil, errors.New("not implemented")
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.
@@ -107,7 +107,7 @@ func (m *metadata) InstanceType(ctx context.Context, name types.NodeName) (strin
 
 // InstanceTypeByProviderID returns the type of the specified instance.
 func (m *metadata) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
-	return "", errors.New("InstanceTypeByProviderID not implemented")
+	return "", errors.New("not implemented")
 }
 
 // AddSSHKeyToAllInstances is currently not implemented.
@@ -122,7 +122,7 @@ func (m *metadata) CurrentNodeName(ctx context.Context, hostname string) (types.
 
 // InstanceExistsByProviderID returns if the instance still exists.
 func (m *metadata) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	return false, errors.New("InstanceExistsByProviderID not implemented")
+	return false, errors.New("not implemented")
 }
 
 // InstanceShutdownByProviderID returns if the instance is shutdown.
@@ -152,12 +152,12 @@ func (m *metadata) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 
 // GetZoneByProviderID returns the Zone, found by using the provider ID.
 func (m *metadata) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+	return cloudprovider.Zone{}, errors.New("not implemented")
 }
 
 // GetZoneByNodeName returns the Zone, found by using the node name.
 func (m *metadata) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not implemented")
+	return cloudprovider.Zone{}, errors.New("not implemented")
 }
 
 func (m *metadata) get(mdType metadataType) (string, error) {

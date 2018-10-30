@@ -67,7 +67,7 @@ func (m *csiBlockMapper) GetPodDeviceMapPath() (string, string) {
 // SetUpDevice ensures the device is attached returns path where the device is located.
 func (m *csiBlockMapper) SetUpDevice() (string, error) {
 	if !m.plugin.blockEnabled {
-		return "", errors.New("CSIBlockVolume feature not enabled")
+		return "", errors.New("CSI BlockVolume feature not enabled")
 	}
 
 	klog.V(4).Infof(log("blockMapper.SetupDevice called"))
@@ -180,7 +180,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 
 func (m *csiBlockMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
 	if !m.plugin.blockEnabled {
-		return errors.New("CSIBlockVolume feature not enabled")
+		return errors.New("CSI BlockVolume feature not enabled")
 	}
 
 	klog.V(4).Infof(log("blockMapper.MapDevice mapping block device %s", devicePath))
@@ -295,7 +295,7 @@ var _ volume.BlockVolumeUnmapper = &csiBlockMapper{}
 // TearDownDevice removes traces of the SetUpDevice.
 func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error {
 	if !m.plugin.blockEnabled {
-		return errors.New("CSIBlockVolume feature not enabled")
+		return errors.New("CSI BlockVolume feature not enabled")
 	}
 
 	klog.V(4).Infof(log("unmapper.TearDownDevice(globalMapPath=%s; devicePath=%s)", globalMapPath, devicePath))

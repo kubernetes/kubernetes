@@ -40,7 +40,7 @@ func collectNodeAddresses(manager *cloudResourceSyncManager) ([]v1.NodeAddress, 
 	case <-collected:
 		return nodeAddresses, err
 	case <-time.Tick(2 * nodeAddressesRetryPeriod):
-		return nil, fmt.Errorf("Timeout after %v waiting for address to appear", 2*nodeAddressesRetryPeriod)
+		return nil, fmt.Errorf("timeout after %v waiting for address to appear", 2*nodeAddressesRetryPeriod)
 	}
 }
 

@@ -35,7 +35,7 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 
 	for _, priority := range policy.Priorities {
 		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
+			validationErrors = append(validationErrors, fmt.Errorf("priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
 	}
 
@@ -43,7 +43,7 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 	extenderManagedResources := sets.NewString()
 	for _, extender := range policy.ExtenderConfigs {
 		if len(extender.PrioritizeVerb) > 0 && extender.Weight <= 0 {
-			validationErrors = append(validationErrors, fmt.Errorf("Priority for extender %s should have a positive weight applied to it", extender.URLPrefix))
+			validationErrors = append(validationErrors, fmt.Errorf("priority for extender %s should have a positive weight applied to it", extender.URLPrefix))
 		}
 		if extender.BindVerb != "" {
 			binders++
@@ -54,13 +54,13 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 				validationErrors = append(validationErrors, errs...)
 			}
 			if extenderManagedResources.Has(string(resource.Name)) {
-				validationErrors = append(validationErrors, fmt.Errorf("Duplicate extender managed resource name %s", string(resource.Name)))
+				validationErrors = append(validationErrors, fmt.Errorf("duplicate extender managed resource name %s", string(resource.Name)))
 			}
 			extenderManagedResources.Insert(string(resource.Name))
 		}
 	}
 	if binders > 1 {
-		validationErrors = append(validationErrors, fmt.Errorf("Only one extender can implement bind, found %v", binders))
+		validationErrors = append(validationErrors, fmt.Errorf("only one extender can implement bind, found %v", binders))
 	}
 	return utilerrors.NewAggregate(validationErrors)
 }

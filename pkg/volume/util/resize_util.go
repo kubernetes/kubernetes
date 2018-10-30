@@ -67,22 +67,22 @@ func PatchPVCStatus(
 
 	oldData, err := json.Marshal(oldPVC)
 	if err != nil {
-		return nil, fmt.Errorf("PatchPVCStatus.Failed to marshal oldData for pvc %q with %v", pvcName, err)
+		return nil, fmt.Errorf("failed to marshal oldData for pvc %q with %v", pvcName, err)
 	}
 
 	newData, err := json.Marshal(newPVC)
 	if err != nil {
-		return nil, fmt.Errorf("PatchPVCStatus.Failed to marshal newData for pvc %q with %v", pvcName, err)
+		return nil, fmt.Errorf("failed to marshal newData for pvc %q with %v", pvcName, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, oldPVC)
 	if err != nil {
-		return nil, fmt.Errorf("PatchPVCStatus.Failed to CreateTwoWayMergePatch for pvc %q with %v ", pvcName, err)
+		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for pvc %q with %v ", pvcName, err)
 	}
 	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(oldPVC.Namespace).
 		Patch(pvcName, types.StrategicMergePatchType, patchBytes, "status")
 	if updateErr != nil {
-		return nil, fmt.Errorf("PatchPVCStatus.Failed to patch PVC %q with %v", pvcName, updateErr)
+		return nil, fmt.Errorf("failed to patch PVC %q with %v", pvcName, updateErr)
 	}
 	return updatedClaim, nil
 }

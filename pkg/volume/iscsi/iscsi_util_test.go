@@ -266,7 +266,7 @@ func TestClonedIface(t *testing.T) {
 		case 4:
 			return []byte(""), nil
 		}
-		return nil, fmt.Errorf("Unexpected exec call nr %d: %s", cmdCount, cmd)
+		return nil, fmt.Errorf("unexpected exec call nr %d: %s", cmdCount, cmd)
 	})
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{
@@ -340,7 +340,7 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 			// iscsiadm -m iface -I <newIface> -o delete
 			return []byte(""), nil
 		}
-		return nil, fmt.Errorf("Unexpected exec call nr %d: %s", cmdCount, cmd)
+		return nil, fmt.Errorf("unexpected exec call nr %d: %s", cmdCount, cmd)
 	})
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{

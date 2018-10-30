@@ -231,12 +231,12 @@ func (c conversionClient) List(opts metav1.ListOptions) (*apps.ReplicaSetList, e
 
 func (c conversionClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	// This is not used by RSC because we wrap the shared informer instead.
-	return nil, errors.New("Watch() is not implemented for conversionClient")
+	return nil, errors.New("not implemented for conversionClient")
 }
 
 func (c conversionClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apps.ReplicaSet, err error) {
 	// This is not used by RSC.
-	return nil, errors.New("Patch() is not implemented for conversionClient")
+	return nil, errors.New("not implemented for conversionClient")
 }
 
 func convertSlice(rcList []*v1.ReplicationController) ([]*apps.ReplicaSet, error) {
@@ -307,12 +307,12 @@ type podControlAdapter struct {
 
 func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
 	// This is not used by RSC.
-	return errors.New("CreatePods() is not implemented for podControlAdapter")
+	return errors.New("not implemented for podControlAdapter")
 }
 
 func (pc podControlAdapter) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	// This is not used by RSC.
-	return errors.New("CreatePodsOnNode() is not implemented for podControlAdapter")
+	return errors.New("not implemented for podControlAdapter")
 }
 
 func (pc podControlAdapter) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {

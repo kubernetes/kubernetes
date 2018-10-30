@@ -219,7 +219,7 @@ func getVolumeSource(
 		return spec.PersistentVolume.Spec.PortworxVolume, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a Portworx Volume type")
+	return nil, false, fmt.Errorf("spec does not reference a Portworx Volume type")
 }
 
 // Abstract interface to PD operations.

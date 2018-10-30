@@ -128,7 +128,7 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 					if pod.Status.Message != "" {
 						return fmt.Errorf(pod.Status.Message)
 					} else {
-						return fmt.Errorf("pod failed, pod.Status.Message unknown.")
+						return fmt.Errorf("pod failed, pod.Status.Message unknown")
 					}
 				}
 

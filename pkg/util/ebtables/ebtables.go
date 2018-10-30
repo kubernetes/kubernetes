@@ -135,7 +135,7 @@ func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain
 		fullArgs = makeFullArgs(table, operation(position), chain, args...)
 		out, err := runner.exec.Command(cmdebtables, fullArgs...).CombinedOutput()
 		if err != nil {
-			return exist, fmt.Errorf("Failed to ensure rule: %v, output: %v", err, string(out))
+			return exist, fmt.Errorf("failed to ensure rule: %v, output: %v", err, string(out))
 		}
 	}
 	return exist, nil
@@ -153,7 +153,7 @@ func (runner *runner) EnsureChain(table Table, chain Chain) (bool, error) {
 		args = makeFullArgs(table, opCreateChain, chain)
 		out, err := runner.exec.Command(cmdebtables, args...).CombinedOutput()
 		if err != nil {
-			return exist, fmt.Errorf("Failed to ensure %v chain: %v, output: %v", chain, err, string(out))
+			return exist, fmt.Errorf("failed to ensure %v chain: %v, output: %v", chain, err, string(out))
 		}
 	}
 	return exist, nil
@@ -175,7 +175,7 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	fullArgs := makeFullArgs(table, opDeleteChain, chain)
 	out, err := runner.exec.Command(cmdebtables, fullArgs...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Failed to delete %v chain %v: %v, output: %v", string(table), string(chain), err, string(out))
+		return fmt.Errorf("failed to delete %v chain %v: %v, output: %v", string(table), string(chain), err, string(out))
 	}
 	return nil
 }
@@ -184,7 +184,7 @@ func (runner *runner) FlushChain(table Table, chain Chain) error {
 	fullArgs := makeFullArgs(table, opFlushChain, chain)
 	out, err := runner.exec.Command(cmdebtables, fullArgs...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Failed to flush %v chain %v: %v, output: %v", string(table), string(chain), err, string(out))
+		return fmt.Errorf("failed to flush %v chain %v: %v, output: %v", string(table), string(chain), err, string(out))
 	}
 	return nil
 }

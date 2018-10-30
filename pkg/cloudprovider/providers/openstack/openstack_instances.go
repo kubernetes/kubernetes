@@ -227,7 +227,7 @@ func instanceIDFromProviderID(providerID string) (instanceID string, err error) 
 
 	matches := providerIDRegexp.FindStringSubmatch(providerID)
 	if len(matches) != 2 {
-		return "", fmt.Errorf("ProviderID \"%s\" didn't match expected format \"openstack:///InstanceID\"", providerID)
+		return "", fmt.Errorf("providerID \"%s\" didn't match expected format \"openstack:///InstanceID\"", providerID)
 	}
 	return matches[1], nil
 }

@@ -161,7 +161,7 @@ func ControllerToSelectableFields(controller *api.ReplicationController) fields.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	rc, ok := obj.(*api.ReplicationController)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a replication controller.")
+		return nil, nil, false, fmt.Errorf("given object is not a replication controller")
 	}
 	return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), rc.Initializers != nil, nil
 }

@@ -257,7 +257,7 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 		err := rs.serviceNodePorts.Release(nodePort)
 		if err != nil {
 			// these should be caught by an eventual reconciliation / restart
-			utilruntime.HandleError(fmt.Errorf("Error releasing service %s node port %d: %v", svc.Name, nodePort, err))
+			utilruntime.HandleError(fmt.Errorf("error releasing service %s node port %d: %v", svc.Name, nodePort, err))
 		}
 	}
 
@@ -267,7 +267,7 @@ func (rs *REST) releaseAllocatedResources(svc *api.Service) {
 			err := rs.serviceNodePorts.Release(int(nodePort))
 			if err != nil {
 				// these should be caught by an eventual reconciliation / restart
-				utilruntime.HandleError(fmt.Errorf("Error releasing service %s health check node port %d: %v", svc.Name, nodePort, err))
+				utilruntime.HandleError(fmt.Errorf("error releasing service %s health check node port %d: %v", svc.Name, nodePort, err))
 			}
 		}
 	}
@@ -482,7 +482,7 @@ func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http
 				for try := 0; try < len(ss.Addresses); try++ {
 					addr := ss.Addresses[(addrSeed+try)%len(ss.Addresses)]
 					if err := isValidAddress(ctx, &addr, rs.pods); err != nil {
-						utilruntime.HandleError(fmt.Errorf("Address %v isn't valid (%v)", addr, err))
+						utilruntime.HandleError(fmt.Errorf("address %v isn't valid (%v)", addr, err))
 						continue
 					}
 					ip := addr.IP
@@ -492,7 +492,7 @@ func (rs *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http
 						Host:   net.JoinHostPort(ip, strconv.Itoa(port)),
 					}, rs.proxyTransport, nil
 				}
-				utilruntime.HandleError(fmt.Errorf("Failed to find a valid address, skipping subset: %v", ss))
+				utilruntime.HandleError(fmt.Errorf("failed to find a valid address, skipping subset: %v", ss))
 			}
 		}
 	}
@@ -505,10 +505,10 @@ func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableO
 
 func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Getter) error {
 	if addr.TargetRef == nil {
-		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
+		return fmt.Errorf("address has no target ref, skipping: %v", addr)
 	}
 	if genericapirequest.NamespaceValue(ctx) != addr.TargetRef.Namespace {
-		return fmt.Errorf("Address namespace doesn't match context namespace")
+		return fmt.Errorf("address namespace doesn't match context namespace")
 	}
 	obj, err := pods.Get(ctx, addr.TargetRef.Name, &metav1.GetOptions{})
 	if err != nil {
